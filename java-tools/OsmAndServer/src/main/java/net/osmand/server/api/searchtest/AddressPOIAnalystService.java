@@ -110,6 +110,136 @@ public interface AddressPOIAnalystService extends TokenAnalystService {
         }
     }
 
+    default DbReport getTagsDbReport(String datasource, String objectType) throws IOException, SQLException {
+        Path dbFile = resolveTagsDatasource(datasource);
+        String typeWhere = reportTypePredicate(objectType);
+        String join = typeWhere.isEmpty() ? "" : " JOIN \"object\" o ON o.id = p.object_id";
+        String cond = typeWhere.isEmpty() ? "" : " WHERE " + typeWhere;
+        try (Connection conn = openAddressPoiTagsDbConnection(dbFile)) {
+            long totalTokens = queryAddressPoiLong(conn,
+                    "SELECT COUNT(DISTINCT t.id) FROM token t JOIN posting p ON p.token_id = t.id" + join + cond);
+            long totalPostings = queryAddressPoiLong(conn,
+                    "SELECT COUNT(*) FROM posting p" + join + cond);
+            return new DbReport(totalTokens, totalPostings,
+                    loadReportDistribution(conn, typeWhere),
+                    loadReportPruning(conn, totalPostings, typeWhere),
+                    loadReportCandidates(conn, typeWhere),
+                    loadReportAttribution(conn, typeWhere));
+        }
+    }
+
+    private String reportTypePredicate(String objectType) {
+        String normalized = objectType == null ? "all" : objectType.trim().toLowerCase(Locale.ROOT);
+        return switch (normalized) {
+            case "poi" -> "o.type = 'POI'";
+            case "address", "addr" -> "o.type <> 'POI'";
+            default -> "";
+        };
+    }
+
+    private List<DbReportDistribution> loadReportDistribution(Connection conn, String typeWhere) throws SQLException {
+        String join = typeWhere.isEmpty() ? "" : " JOIN \"object\" o ON o.id = p.object_id";
+        String cond = typeWhere.isEmpty() ? "" : " WHERE " + typeWhere;
+        String sql = "WITH tm AS ("
+                + " SELECT t.id, COUNT(p.object_id) m"
+                + " FROM token t JOIN posting p ON p.token_id = t.id" + join + cond
+                + " GROUP BY t.id)"
+                + " SELECT bucket, ord, COUNT(*) tokens, SUM(m) postings FROM ("
+                + "   SELECT m,"
+                + "     CASE WHEN m = 1 THEN '1' WHEN m <= 5 THEN '2-5' WHEN m <= 20 THEN '6-20'"
+                + "          WHEN m <= 100 THEN '21-100' WHEN m <= 500 THEN '101-500' ELSE '500+' END bucket,"
+                + "     CASE WHEN m = 1 THEN 1 WHEN m <= 5 THEN 2 WHEN m <= 20 THEN 3"
+                + "          WHEN m <= 100 THEN 4 WHEN m <= 500 THEN 5 ELSE 6 END ord"
+                + "   FROM tm"
+                + " ) GROUP BY bucket, ord ORDER BY ord";
+        List<DbReportDistribution> result = new ArrayList<>();
+        try (PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                result.add(new DbReportDistribution(rs.getString("bucket"), rs.getLong("tokens"), rs.getLong("postings")));
+            }
+        }
+        return result;
+    }
+
+    private List<DbReportPruneToken> loadReportPruning(Connection conn, long totalPostings, String typeWhere) throws SQLException {
+        String join = typeWhere.isEmpty() ? "" : " JOIN \"object\" o ON o.id = p.object_id";
+        String cond = typeWhere.isEmpty() ? "" : " WHERE " + typeWhere;
+        String sql = "SELECT t.name, t.isCommon, t.isFrequent, COUNT(p.object_id) matched, SUM(p.isAlone) alone"
+                + " FROM token t JOIN posting p ON p.token_id = t.id" + join + cond
+                + " GROUP BY t.id"
+                + " HAVING alone = 0 OR length(t.name) < 2"
+                + " ORDER BY matched DESC LIMIT 100";
+        List<DbReportPruneToken> result = new ArrayList<>();
+        long cumulative = 0;
+        try (PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                long matched = rs.getLong("matched");
+                long alone = rs.getLong("alone");
+                String name = rs.getString("name");
+                long removable = name != null && name.length() < 2 ? matched : matched - alone;
+                cumulative += removable;
+                double cumulativePct = totalPostings > 0 ? 100.0 * cumulative / totalPostings : 0;
+                result.add(new DbReportPruneToken(name, rs.getInt("isCommon") != 0,
+                        rs.getInt("isFrequent") != 0, matched, alone, removable, cumulativePct));
+            }
+        }
+        return result;
+    }
+
+    private List<DbReportCandidateTag> loadReportCandidates(Connection conn, String typeWhere) throws SQLException {
+        String join = typeWhere.isEmpty() ? "" : " JOIN \"object\" o ON o.id = otv.object_id";
+        String cond = typeWhere.isEmpty() ? "" : " WHERE " + typeWhere;
+        String sql = "SELECT t.name, COUNT(DISTINCT otv.object_id) objs, COUNT(DISTINCT otv.value_id) vals"
+                + " FROM tag t JOIN object_tag_value otv ON otv.tag_id = t.id" + join + cond
+                + " GROUP BY t.id"
+                + " HAVING objs >= 20"
+                + " ORDER BY (1.0 * vals / objs) DESC, objs DESC LIMIT 50";
+        List<DbReportCandidateTag> result = new ArrayList<>();
+        try (PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                long objects = rs.getLong("objs");
+                long distinctValues = rs.getLong("vals");
+                double selectivity = objects > 0 ? 1.0 * distinctValues / objects : 0;
+                result.add(new DbReportCandidateTag(rs.getString("name"), objects, distinctValues, selectivity));
+            }
+        }
+        return result;
+    }
+
+    private List<DbReportAttribution> loadReportAttribution(Connection conn, String typeWhere) throws SQLException {
+        String topJoin = typeWhere.isEmpty() ? "" : " JOIN \"object\" o ON o.id = p.object_id";
+        String topCond = typeWhere.isEmpty() ? "" : " WHERE " + typeWhere;
+        String attrCond = typeWhere.isEmpty() ? "" : " AND " + typeWhere;
+        String sql = "WITH top_tokens AS ("
+                + " SELECT t.id, t.name, COUNT(p.object_id) matched"
+                + " FROM token t JOIN posting p ON p.token_id = t.id" + topJoin + topCond
+                + " GROUP BY t.id ORDER BY matched DESC LIMIT 15),"
+                + " attr AS ("
+                + " SELECT tt.id token_id, tt.name token, tt.matched, tg.name tag, COUNT(DISTINCT otv.object_id) hits"
+                + " FROM top_tokens tt"
+                + " JOIN posting p ON p.token_id = tt.id"
+                + " JOIN \"object\" o ON o.id = p.object_id"
+                + " JOIN object_tag_value otv ON otv.object_id = p.object_id"
+                + " JOIN tag tg ON tg.id = otv.tag_id"
+                + " WHERE instr(lower(otv.value), lower(tt.name)) > 0" + attrCond
+                + " GROUP BY tt.id, tg.id),"
+                + " ranked AS ("
+                + " SELECT token, matched, tag, hits,"
+                + " ROW_NUMBER() OVER (PARTITION BY token_id ORDER BY hits DESC, tag ASC) rn"
+                + " FROM attr)"
+                + " SELECT token, matched, tag, hits FROM ranked WHERE rn = 1 ORDER BY matched DESC";
+        List<DbReportAttribution> result = new ArrayList<>();
+        try (PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                long matched = rs.getLong("matched");
+                long hits = rs.getLong("hits");
+                double sharePct = matched > 0 ? 100.0 * hits / matched : 0;
+                result.add(new DbReportAttribution(rs.getString("token"), matched, rs.getString("tag"), hits, sharePct));
+            }
+        }
+        return result;
+    }
+
     private Connection openAddressPoiTagsDbConnection(Path dbFile) throws SQLException {
         Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbFile.toAbsolutePath());
         conn.createStatement().execute("PRAGMA query_only = ON");

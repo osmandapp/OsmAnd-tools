@@ -708,6 +708,17 @@ public class SearchTestController {
 		}
 	}
 
+	@GetMapping(value = "/tags-datasources/{name}/report", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<OBFService.DbReport> getTagsDbReport(@PathVariable String name,
+	                                                           @RequestParam(defaultValue = "all") String objectType) throws IOException, SQLException {
+		try {
+			return ResponseEntity.ok(testSearchService.getTagsDbReport(name, objectType));
+		} catch (SQLException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
+		}
+	}
+
 	@GetMapping(value = "/generate/{jobId}/progress", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public ResponseEntity<GenerateDbJobStatus> getGenerateDbProgress(@PathVariable String jobId) {

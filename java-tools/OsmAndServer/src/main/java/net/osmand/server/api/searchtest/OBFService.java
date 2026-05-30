@@ -106,6 +106,14 @@ public interface OBFService extends BaseService {
 	                Map<String, Object> extraTags, String type, Long osmId, String osmType,
 	                boolean isAlone, String obfName, long tokens) {}
 	record DbObjectPage(List<DbObject> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages) {}
+	record DbReportDistribution(String bucket, long tokens, long postings) {}
+	record DbReportPruneToken(String name, boolean isCommon, boolean isFrequent, long matched, long alone,
+	                          long removable, double cumulativePct) {}
+	record DbReportCandidateTag(String tag, long objects, long distinctValues, double selectivity) {}
+	record DbReportAttribution(String token, long matched, String sourceTag, long tagHits, double sharePct) {}
+	record DbReport(long totalTokens, long totalPostings, List<DbReportDistribution> distribution,
+	                List<DbReportPruneToken> pruning, List<DbReportCandidateTag> candidates,
+	                List<DbReportAttribution> attribution) {}
 	@FunctionalInterface
 	interface GenerateDbProgressListener {
 		void onProgress(GenerateDbProgress progress);
