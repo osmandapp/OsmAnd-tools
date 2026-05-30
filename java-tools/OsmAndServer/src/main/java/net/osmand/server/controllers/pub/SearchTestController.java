@@ -644,8 +644,8 @@ public class SearchTestController {
 
 	@GetMapping(value = "/tags-datasources/{name}/tag-values", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<List<String>> getTagsDbTagValues(@PathVariable String name,
-	                                                       @RequestParam String tag) throws IOException, SQLException {
+	public ResponseEntity<List<OBFService.DbTagValue>> getTagsDbTagValues(@PathVariable String name,
+	                                                                      @RequestParam String tag) throws IOException, SQLException {
 		try {
 			return ResponseEntity.ok(testSearchService.getTagsDbTagValues(name, tag));
 		} catch (SQLException e) {
@@ -668,6 +668,41 @@ public class SearchTestController {
 	                                                                @RequestParam(required = false) String sortOrder) throws IOException, SQLException {
 		try {
 			return ResponseEntity.ok(testSearchService.getTagsDbObjects(name, tokenId, objectType, perObf, regExp, tag, values, pageToShow, pageSizeLimit, sortBy, sortOrder));
+		} catch (SQLException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
+		}
+	}
+
+	@GetMapping(value = "/tags-datasources/{name}/address-poi-objects", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<OBFService.DbObjectPage> getTagsDbAddressPoiObjects(@PathVariable String name,
+	                                                                          @RequestParam String objectType,
+	                                                                          @RequestParam(required = false) String regExp,
+	                                                                          @RequestParam(required = false) String tokenFind,
+	                                                                          @RequestParam(required = false) String tag,
+	                                                                          @RequestParam(required = false) List<String> values,
+	                                                                          @RequestParam(defaultValue = "0") int pageToShow,
+	                                                                          @RequestParam(defaultValue = "100") int pageSizeLimit,
+	                                                                          @RequestParam(required = false) String sortBy,
+	                                                                          @RequestParam(required = false) String sortOrder) throws IOException, SQLException {
+		try {
+			return ResponseEntity.ok(testSearchService.getTagsDbAddressPoiObjects(name, objectType, regExp, tokenFind, tag, values, pageToShow, pageSizeLimit, sortBy, sortOrder));
+		} catch (SQLException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
+		}
+	}
+
+	@GetMapping(value = "/tags-datasources/{name}/object-tokens", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<OBFService.DbObjectTokenPage> getTagsDbObjectTokens(@PathVariable String name,
+	                                                                          @RequestParam long objectId,
+	                                                                          @RequestParam(required = false) String find,
+	                                                                          @RequestParam(defaultValue = "0") int pageToShow,
+	                                                                          @RequestParam(defaultValue = "100") int pageSizeLimit,
+	                                                                          @RequestParam(required = false) String sortBy,
+	                                                                          @RequestParam(required = false) String sortOrder) throws IOException, SQLException {
+		try {
+			return ResponseEntity.ok(testSearchService.getTagsDbObjectTokens(name, objectId, find, pageToShow, pageSizeLimit, sortBy, sortOrder));
 		} catch (SQLException e) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
 		}
