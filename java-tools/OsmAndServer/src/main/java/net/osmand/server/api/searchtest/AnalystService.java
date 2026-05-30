@@ -1354,62 +1354,6 @@ public interface AnalystService extends AddressPOIAnalystService {
         }
     }
 
-    private List<ObjectAddress> readPoiObjectsAtShift(BinaryMapIndexReaderExt index,
-                                                      BinaryMapPoiReaderAdapter.PoiRegion region,
-                                                      Map<Integer, List<TagValuePair>> tagGroups,
-                                                      int relativeOffset,
-                                                      String lang) throws IOException {
-        List<ObjectAddress> objects = new ArrayList<>();
-        index.getInputStream().seek(region.getFilePointer() + relativeOffset);
-        long length = readInt(index.getInputStream());
-        long oldLimit = index.getInputStream().pushLimitLong(length);
-        try {
-            int x = 0;
-            int y = 0;
-            int zoom = 0;
-            while (true) {
-                int tagWithType = index.getInputStream().readTag();
-                int tag = WireFormat.getTagFieldNumber(tagWithType);
-                switch (tag) {
-                    case 0:
-                        return objects;
-                    case OsmandOdb.OsmAndPoiBoxData.X_FIELD_NUMBER:
-                        x = index.getInputStream().readUInt32();
-                        break;
-                    case OsmandOdb.OsmAndPoiBoxData.Y_FIELD_NUMBER:
-                        y = index.getInputStream().readUInt32();
-                        break;
-                    case OsmandOdb.OsmAndPoiBoxData.ZOOM_FIELD_NUMBER:
-                        zoom = index.getInputStream().readUInt32();
-                        break;
-                    case OsmandOdb.OsmAndPoiBoxData.POIDATA_FIELD_NUMBER:
-                        int poiLength = index.getInputStream().readRawVarint32();
-                        long poiOldLimit = index.getInputStream().pushLimitLong(poiLength);
-                        try {
-                            RawPoiObject rawPoiObject = readRawPoiObject(index.getInputStream(), x, y, zoom, region, tagGroups);
-                            if (rawPoiObject != null) {
-                                ObjectAddress objectAddress = toPoiObjectAddress(rawPoiObject, lang);
-                                int payloadSize = poiLength + computeVarint32Size(poiLength);
-                                int payloadOffset = (int) (index.getInputStream().getTotalBytesRead() - poiLength);
-                                objects.add(new ObjectAddress(0, objectAddress.name(), objectAddress.point(), objectAddress.commonTags(),
-                                        objectAddress.extraTags(), objectAddress.isPoi(), false, false, false, objectAddress.type(),
-                                        objectAddress.osmId(), objectAddress.osmType(), payloadOffset, payloadSize,
-                                        (int) (region.getFilePointer() + relativeOffset)));
-                            }
-                        } finally {
-                            index.getInputStream().popLimit(poiOldLimit);
-                        }
-                        break;
-                    default:
-                        InspectorService.skipUnknownField(index.getInputStream(), tagWithType);
-                        break;
-                }
-            }
-        } finally {
-            index.getInputStream().popLimit(oldLimit);
-        }
-    }
-
     private List<GenerateDbRawPoiObject> readGenerateDbRawPoiObjectsAtShift(BinaryMapIndexReaderExt index,
                                                                             BinaryMapPoiReaderAdapter.PoiRegion region,
                                                                             Map<Integer, List<TagValuePair>> tagGroups,
@@ -2014,101 +1958,6 @@ public interface AnalystService extends AddressPOIAnalystService {
         }
     }
 
-    private ObjectAddressPage getGenerateDbObjects(GenerateDbObfReader reader, IndexToken token) throws IOException {
-        if (reader == null || token == null || Algorithms.isEmpty(token.name())) {
-            return new ObjectAddressPage(List.of(), 0, Integer.MAX_VALUE, 0, 0, new int[10], new int[15], 0, 0);
-        }
-        AddressRef[] addressRefs = token.addressRefs();
-        int[] poiRefs = token.poiRefs();
-        boolean hasAddressRefs = addressRefs != null && addressRefs.length > 0;
-        boolean hasPoiRefs = poiRefs != null && poiRefs.length > 0;
-        if (!hasAddressRefs && !hasPoiRefs) {
-            return new ObjectAddressPage(List.of(), 0, Integer.MAX_VALUE, 0, 0, new int[10], new int[15], 0, 0);
-        }
-        List<ObjectAddress> results = new ArrayList<>();
-        if (hasAddressRefs) {
-            collectGenerateDbAddressObjects(reader, addressRefs, results, "en");
-        }
-        if (hasPoiRefs) {
-            CollatorStringMatcher matcher = new CollatorStringMatcher(token.name(),
-                    CollatorStringMatcher.StringMatcherMode.CHECK_EQUALS_FROM_SPACE);
-            collectPoiObjectsByStoredOffsets(reader.index(), mapPoiRefs(poiRefs, reader.poiRegions()), reader.poiRegions(), results, "en", matcher);
-        }
-        results = assignObjectSequenceIds(results);
-        results = markAloneObjects(results, token);
-        List<ObjectAddress> matchedResults = filterMatchedObjects(results);
-        ObjectAddressStats exactPoiStats = calculateObjectAddressStats(reader.index(), matchedResults, reader.poiRegions(), true);
-        ObjectAddressStats exactAddressStats = calculateObjectAddressStats(reader.index(), matchedResults, reader.poiRegions(), false);
-        int[] countMetrics = new int[10];
-        countMetrics[3] = exactPoiStats.count();
-        countMetrics[5] = exactAddressStats.count();
-        int[] sizeMetrics = new int[15];
-        sizeMetrics[6] = exactPoiStats.size();
-        sizeMetrics[8] = exactAddressStats.size();
-        return new ObjectAddressPage(matchedResults, 0, Integer.MAX_VALUE, matchedResults.size(), 1,
-                countMetrics, sizeMetrics, 0, 0);
-    }
-
-    private void collectGenerateDbAddressObjects(GenerateDbObfReader reader,
-                                                 AddressRef[] addressRefs,
-                                                 List<ObjectAddress> results,
-                                                 String lang) throws IOException {
-        if (reader == null || addressRefs == null || addressRefs.length == 0) {
-            return;
-        }
-        for (BinaryMapAddressReaderAdapter.AddressRegion region : reader.addressRegions()) {
-            List<AddressRef> cityRefs = new ArrayList<>();
-            List<AddressRef> streetRefs = new ArrayList<>();
-            for (AddressRef ref : addressRefs) {
-                if (ref == null || !isOffsetWithinPart(ref.objectOffset(), region)) {
-                    continue;
-                }
-                if (ref.typeIndex() == BinaryMapAddressReaderAdapter.CityBlocks.STREET_TYPE.index) {
-                    streetRefs.add(ref);
-                } else if (ref.typeIndex() < BinaryMapAddressReaderAdapter.CityBlocks.STREET_TYPE.index) {
-                    cityRefs.add(ref);
-                }
-            }
-            cityRefs.sort(Comparator.comparingInt(AddressRef::objectOffset));
-            for (AddressRef ref : cityRefs) {
-                ObjectAddress objectAddress = reader.addressObjectCache.computeIfAbsent(ref.objectOffset(), offset -> {
-                    try {
-                        return loadCityGenerateDbObjectAddress(reader.index(), region, offset, lang);
-                    } catch (IOException e) {
-                        throw new UncheckedIOException(e);
-                    }
-                });
-                if (objectAddress != null) {
-                    results.add(objectAddress);
-                }
-            }
-            streetRefs.sort(Comparator.comparingInt(AddressRef::objectOffset));
-            List<Integer> cityOffsets = streetRefs.stream()
-                    .map(AddressRef::cityOffset)
-                    .filter(offset -> offset != null && offset > 0)
-                    .distinct()
-                    .sorted()
-                    .toList();
-            for (Integer cityOffset : cityOffsets) {
-                if (!reader.cityCache.containsKey(cityOffset)) {
-                    reader.cityCache.put(cityOffset, loadCity(reader.index(), region, cityOffset));
-                }
-            }
-            for (AddressRef ref : streetRefs) {
-                ObjectAddress objectAddress = reader.addressObjectCache.computeIfAbsent(ref.objectOffset(), offset -> {
-                    try {
-                        return loadStreetGenerateDbObjectAddress(reader.index(), region, offset, reader.cityCache.get(ref.cityOffset()), lang);
-                    } catch (IOException e) {
-                        throw new UncheckedIOException(e);
-                    }
-                });
-                if (objectAddress != null) {
-                    results.add(objectAddress);
-                }
-            }
-        }
-    }
-
     private Boolean parseObjectTypeFilter(String objectType) {
         if (Algorithms.isEmpty(objectType)) {
             return null;
@@ -2173,7 +2022,7 @@ public interface AnalystService extends AddressPOIAnalystService {
         Files.deleteIfExists(dbFile);
         try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbFile.toAbsolutePath())) {
             configureGenerateDbBulkLoad(conn);
-            createGenerateDbSchema(conn);
+            createDbSchema(conn);
             try {
                 populateDb(conn, obfs, progressListener);
                 finalizeGenerateDb(conn);
@@ -2227,7 +2076,7 @@ public interface AnalystService extends AddressPOIAnalystService {
         }
     }
 
-    private void createGenerateDbSchema(Connection conn) throws SQLException {
+    private void createDbSchema(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement()) {
             stmt.execute("""
                     CREATE TABLE obf (
@@ -2449,9 +2298,7 @@ public interface AnalystService extends AddressPOIAnalystService {
                                     insertGenerateDbObjectTagValues(insertObjectTagValue, sqlBatcher, objectAddress.osmId(), addressTagValues);
                                     objectTagValues.put(objectAddress.osmId(), addressTagValues);
                                     writerBatch.recordRows(1 + addressTagValues.size(), estimateGenerateDbObjectBytes(objectAddress));
-                                } else {
-                                    addressTagValues = objectTagValues.getOrDefault(objectAddress.osmId(), Collections.emptyList());
-                                }
+                                } 
                                 objectCounts.get(chunk.obfIndex()).incrementAndGet();
                                 long postingStartNs = System.nanoTime();
                                 insertGenerateDbObfPosting(insertPosting, sqlBatcher, obfId, tokenId, objectAddress);
@@ -2867,10 +2714,6 @@ public interface AnalystService extends AddressPOIAnalystService {
             }
         }
         throw new SQLException("Failed to resolve token id for " + token.name());
-    }
-
-    private int metricValue(int[] metrics, int index) {
-        return metrics == null || index < 0 || index >= metrics.length ? 0 : metrics[index];
     }
 
     private boolean insertGenerateDbObject(PreparedStatement insertObject, ObjectAddress objectAddress) throws SQLException, IOException {
