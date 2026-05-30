@@ -578,7 +578,7 @@ public class WebUserdataService {
 	                                           CloudUserDevicesRepository.CloudUserDevice dev, HttpSession session) throws IOException {
 		Iterable<CloudUserFilesRepository.UserFile> files = userFilesRepository.findLatestFilesByFolderName(dev.userid, folderName + "/", type);
 		for (CloudUserFilesRepository.UserFile file : files) {
-			if (file.name.endsWith(INFO_FILE_EXT)) {
+			if (file.name.endsWith(INFO_FILE_SUFFIX)) {
 				continue; // handled inside renameFile via renameInfoFile
 			}
 			String newName = file.name.replaceFirst(Pattern.quote(folderName), newFolderName);
