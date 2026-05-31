@@ -116,21 +116,29 @@ public interface AddressPOIAnalystService extends TokenAnalystService {
         }
     }
 
-    default DbReport getTagsDbReport(String datasource, String objectType) throws IOException, SQLException {
+    default DbReport getReport(String datasource, String objectType, String pruneGenerated, String pruneSort,
+                               long bucketMin, long bucketMax) throws IOException, SQLException {
         Path dbFile = resolveTagsDatasource(datasource);
         String typeWhere = reportTypePredicate(objectType);
         String join = typeWhere.isEmpty() ? "" : " JOIN \"object\" o ON o.id = p.object_id";
         String cond = typeWhere.isEmpty() ? "" : " WHERE " + typeWhere;
         try (Connection conn = openAddressPoiTagsDbConnection(dbFile)) {
             long totalTokens = queryAddressPoiLong(conn,
-                    "SELECT COUNT(DISTINCT t.id) FROM token t JOIN posting p ON p.token_id = t.id" + join + cond);
+                    "SELECT COUNT(DISTINCT p.token_id) FROM posting p" + join + cond);
             long totalPostings = queryAddressPoiLong(conn,
                     "SELECT COUNT(*) FROM posting p" + join + cond);
             return new DbReport(totalTokens, totalPostings,
                     loadReportDistribution(conn, typeWhere),
-                    loadReportPruning(conn, totalPostings, typeWhere),
-                    loadReportCandidates(conn, typeWhere),
-                    loadReportAttribution(conn, typeWhere));
+                    loadReportRanking(conn, totalPostings, typeWhere, pruneGenerated, pruneSort, bucketMin, bucketMax),
+                    List.of());
+        }
+    }
+
+    default List<TestCaseObject> getTestCases(String datasource, String objectType) throws IOException, SQLException {
+        Path dbFile = resolveTagsDatasource(datasource);
+        String typeWhere = reportTypePredicate(objectType);
+        try (Connection conn = openAddressPoiTagsDbConnection(dbFile)) {
+            return loadReportMainWordInconsistency(conn, typeWhere);
         }
     }
 
@@ -139,6 +147,15 @@ public interface AddressPOIAnalystService extends TokenAnalystService {
         return switch (normalized) {
             case "poi" -> "o.type = 'POI'";
             case "address", "addr" -> "o.type <> 'POI'";
+            default -> "";
+        };
+    }
+
+    private String reportGeneratedPredicate(String generated) {
+        String normalized = generated == null ? "all" : generated.trim().toLowerCase(Locale.ROOT);
+        return switch (normalized) {
+            case "current" -> "t.isGenerated = 0";
+            case "new" -> "t.isGenerated = 1";
             default -> "";
         };
     }
@@ -153,103 +170,189 @@ public interface AddressPOIAnalystService extends TokenAnalystService {
     }
 
     private List<DbReportDistribution> loadReportDistribution(Connection conn, String typeWhere) throws SQLException {
-        String join = typeWhere.isEmpty() ? "" : " JOIN \"object\" o ON o.id = p.object_id";
-        String cond = typeWhere.isEmpty() ? "" : " WHERE " + typeWhere;
-        String sql = "WITH tm AS ("
-                + " SELECT t.id, COUNT(p.object_id) m"
-                + " FROM token t JOIN posting p ON p.token_id = t.id" + join + cond
-                + " GROUP BY t.id)"
-                + " SELECT bucket, ord, COUNT(*) tokens, SUM(m) postings FROM ("
-                + "   SELECT m,"
-                + "     CASE WHEN m = 1 THEN '1' WHEN m <= 5 THEN '2-5' WHEN m <= 20 THEN '6-20'"
+        String tokenMatched;
+        if (typeWhere.isEmpty()) {
+            tokenMatched = "SELECT t.id, t.isGenerated, COUNT(p.object_id) m"
+                    + " FROM token t LEFT JOIN posting p ON p.token_id = t.id"
+                    + " GROUP BY t.id";
+        } else {
+            tokenMatched = "SELECT t.id, t.isGenerated, COUNT(o.id) m"
+                    + " FROM token t LEFT JOIN posting p ON p.token_id = t.id"
+                    + " LEFT JOIN \"object\" o ON o.id = p.object_id AND " + typeWhere
+                    + " GROUP BY t.id";
+        }
+        String sql = "SELECT bucket, ord, COUNT(*) tokens, SUM(m) postings,"
+                + " SUM(CASE WHEN isGenerated = 1 THEN 1 ELSE 0 END) tokensNew,"
+                + " SUM(CASE WHEN isGenerated = 1 THEN m ELSE 0 END) postingsNew FROM ("
+                + "   SELECT m, isGenerated,"
+                + "     CASE WHEN m = 1 THEN '1' WHEN m <= 3 THEN '2-3' WHEN m <= 5 THEN '4-5'"
+                + "          WHEN m <= 10 THEN '6-10' WHEN m <= 20 THEN '11-20'"
                 + "          WHEN m <= 100 THEN '21-100' WHEN m <= 500 THEN '101-500' ELSE '500+' END bucket,"
-                + "     CASE WHEN m = 1 THEN 1 WHEN m <= 5 THEN 2 WHEN m <= 20 THEN 3"
-                + "          WHEN m <= 100 THEN 4 WHEN m <= 500 THEN 5 ELSE 6 END ord"
-                + "   FROM tm"
+                + "     CASE WHEN m = 1 THEN 1 WHEN m <= 3 THEN 2 WHEN m <= 5 THEN 3"
+                + "          WHEN m <= 10 THEN 4 WHEN m <= 20 THEN 5"
+                + "          WHEN m <= 100 THEN 6 WHEN m <= 500 THEN 7 ELSE 8 END ord"
+                + "   FROM (" + tokenMatched + ")"
+                + "   WHERE m > 0"
                 + " ) GROUP BY bucket, ord ORDER BY ord";
         List<DbReportDistribution> result = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
-                result.add(new DbReportDistribution(rs.getString("bucket"), rs.getLong("tokens"), rs.getLong("postings")));
+                result.add(new DbReportDistribution(rs.getString("bucket"), rs.getInt("ord"),
+                        rs.getLong("tokens"), rs.getLong("postings"),
+                        rs.getLong("tokensNew"), rs.getLong("postingsNew")));
             }
         }
         return result;
     }
 
-    private List<DbReportPruneToken> loadReportPruning(Connection conn, long totalPostings, String typeWhere) throws SQLException {
-        String join = typeWhere.isEmpty() ? "" : " JOIN \"object\" o ON o.id = p.object_id";
-        String cond = typeWhere.isEmpty() ? "" : " WHERE " + typeWhere;
-        String sql = "SELECT t.name, t.isCommon, t.isFrequent, COUNT(p.object_id) matched, SUM(p.isAlone) alone"
-                + " FROM token t JOIN posting p ON p.token_id = t.id" + join + cond
-                + " GROUP BY t.id"
-                + " HAVING alone = 0 OR length(t.name) < 2"
-                + " ORDER BY matched DESC LIMIT 100";
+    private List<DbReportPruneToken> loadReportRanking(Connection conn, long totalPostings, String typeWhere,
+                                                       String pruneGenerated, String pruneSort, long bucketMin, long bucketMax) throws SQLException {
+        List<String> conds = new ArrayList<>();
+        String generatedCond = reportGeneratedPredicate(pruneGenerated);
+        if (!generatedCond.isEmpty()) {
+            conds.add(generatedCond);
+        }
+        String where = conds.isEmpty() ? "" : " WHERE " + String.join(" AND ", conds);
+        List<String> having = new ArrayList<>();
+        having.add("matched > 0");
+        if (bucketMin >= 0) {
+            having.add("matched >= " + bucketMin);
+        }
+        if (bucketMax >= 0) {
+            having.add("matched <= " + bucketMax);
+        }
+        String havingClause = having.isEmpty() ? "" : " HAVING " + String.join(" AND ", having);
+        String order = "asc".equalsIgnoreCase(pruneSort) ? "ASC" : "DESC";
+        String matchedColumn = typeWhere.isEmpty() ? "COUNT(p.object_id)" : "COUNT(o.id)";
+        String aloneColumn = typeWhere.isEmpty()
+                ? "COALESCE(SUM(CASE WHEN p.isAlone = 1 THEN 1 ELSE 0 END), 0)"
+                : "COALESCE(SUM(CASE WHEN o.id IS NOT NULL AND p.isAlone = 1 THEN 1 ELSE 0 END), 0)";
+        String rankingJoin = typeWhere.isEmpty()
+                ? " LEFT JOIN posting p ON p.token_id = t.id"
+                : " LEFT JOIN posting p ON p.token_id = t.id LEFT JOIN \"object\" o ON o.id = p.object_id AND " + typeWhere;
+        String sql = "SELECT t.id, t.name, t.isCommon, t.isFrequent, " + matchedColumn + " matched, " + aloneColumn + " alone"
+                + " FROM token t" + rankingJoin + where
+                + " GROUP BY t.id" + havingClause
+                + " ORDER BY matched " + order + ", t.name ASC LIMIT 100";
+        List<long[]> rows = new ArrayList<>();
+        List<String> names = new ArrayList<>();
+        Map<Long, Long> matchedByToken = new LinkedHashMap<>();
+        try (PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                long id = rs.getLong("id");
+                long matched = rs.getLong("matched");
+                rows.add(new long[]{id, matched, rs.getLong("alone"), rs.getInt("isCommon"), rs.getInt("isFrequent")});
+                names.add(rs.getString("name"));
+                matchedByToken.put(id, matched);
+            }
+        }
+        Map<Long, List<DbReportTagHit>> topTags = loadTopTags(conn, matchedByToken, typeWhere);
         List<DbReportPruneToken> result = new ArrayList<>();
         long cumulative = 0;
-        try (PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
-            while (rs.next()) {
-                long matched = rs.getLong("matched");
-                long alone = rs.getLong("alone");
-                String name = rs.getString("name");
-                long removable = name != null && name.length() < 2 ? matched : matched - alone;
-                cumulative += removable;
-                double cumulativePct = totalPostings > 0 ? 100.0 * cumulative / totalPostings : 0;
-                result.add(new DbReportPruneToken(name, rs.getInt("isCommon") != 0,
-                        rs.getInt("isFrequent") != 0, matched, alone, removable, cumulativePct));
-            }
+        for (int i = 0; i < rows.size(); i++) {
+            long[] row = rows.get(i);
+            cumulative += row[1];
+            double cumulativePct = totalPostings > 0 ? 100.0 * cumulative / totalPostings : 0;
+            result.add(new DbReportPruneToken(names.get(i), row[3] != 0, row[4] != 0, row[1], row[2],
+                    cumulativePct, topTags.getOrDefault(row[0], List.of())));
         }
         return result;
     }
 
-    private List<DbReportCandidateTag> loadReportCandidates(Connection conn, String typeWhere) throws SQLException {
-        String join = typeWhere.isEmpty() ? "" : " JOIN \"object\" o ON o.id = otv.object_id";
-        String cond = typeWhere.isEmpty() ? "" : " WHERE " + typeWhere;
-        String sql = "SELECT t.name, COUNT(DISTINCT otv.object_id) objs, COUNT(DISTINCT otv.value_id) vals"
-                + " FROM tag t JOIN object_tag_value otv ON otv.tag_id = t.id" + join + cond
-                + " GROUP BY t.id"
-                + " HAVING objs >= 20"
-                + " ORDER BY (1.0 * vals / objs) DESC, objs DESC LIMIT 50";
-        List<DbReportCandidateTag> result = new ArrayList<>();
-        try (PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
-            while (rs.next()) {
-                long objects = rs.getLong("objs");
-                long distinctValues = rs.getLong("vals");
-                double selectivity = objects > 0 ? 1.0 * distinctValues / objects : 0;
-                result.add(new DbReportCandidateTag(rs.getString("name"), objects, distinctValues, selectivity));
-            }
-        }
-        return result;
-    }
-
-    private List<DbReportAttribution> loadReportAttribution(Connection conn, String typeWhere) throws SQLException {
-        String topJoin = typeWhere.isEmpty() ? "" : " JOIN \"object\" o ON o.id = p.object_id";
-        String topCond = typeWhere.isEmpty() ? "" : " WHERE " + typeWhere;
-        String attrCond = typeWhere.isEmpty() ? "" : " AND " + typeWhere;
-        String sql = "WITH top_tokens AS ("
-                + " SELECT t.id, t.name, COUNT(p.object_id) matched"
-                + " FROM token t JOIN posting p ON p.token_id = t.id" + topJoin + topCond
-                + " GROUP BY t.id ORDER BY matched DESC LIMIT 15),"
-                + " attr AS ("
-                + " SELECT tt.id token_id, tt.name token, tt.matched, tg.name tag, COUNT(DISTINCT otv.object_id) hits"
-                + " FROM top_tokens tt"
-                + " JOIN posting p ON p.token_id = tt.id"
+    private List<TestCaseObject> loadReportMainWordInconsistency(Connection conn, String typeWhere) throws SQLException {
+        String typeCond = typeWhere.isEmpty() ? "" : " WHERE " + typeWhere;
+        String matchedJoin = typeWhere.isEmpty() ? "" : " JOIN \"object\" mo ON mo.id = mp.object_id";
+        String matchedCond = typeWhere.isEmpty() ? "" : " WHERE " + typeWhere.replace("o.", "mo.");
+        String normalizedName = "(' ' || lower(replace(replace(replace(replace(replace(replace(o.name, '''', ' '), '.', ' '), ',', ' '), '-', ' '), '/', ' '), char(8217), ' ')) || ' ')";
+        String normalizedToken = "lower(replace(replace(replace(replace(replace(replace(t.name, '''', ' '), '.', ' '), ',', ' '), '-', ' '), '/', ' '), char(8217), ' '))";
+        String nameTokenMatch = "length(trim(" + normalizedToken + ")) > 0 AND instr(" + normalizedName + ", ' ' || " + normalizedToken + " || ' ') > 0";
+        String demotedNameToken = "nameToken = 1 AND (isCommon = 1 OR isFrequent = 1)";
+        String potentialMainToken = "nameToken = 1 AND isCommon = 0 AND isFrequent = 0";
+        String sql = "WITH token_matched AS ("
+                + " SELECT mp.token_id, COUNT(*) matched"
+                + " FROM posting mp" + matchedJoin + matchedCond
+                + " GROUP BY mp.token_id),"
+                + " name_tokens AS ("
+                + " SELECT o.id objectId, o.name, o.type, o.lat, o.lon, t.name tokenName, t.isCommon, t.isFrequent, t.isGenerated,"
+                + " COALESCE(tm.matched, 0) matched,"
+                + " CASE WHEN " + nameTokenMatch + " THEN 1 ELSE 0 END nameToken"
+                + " FROM (SELECT DISTINCT object_id, token_id FROM posting) p"
                 + " JOIN \"object\" o ON o.id = p.object_id"
-                + " JOIN object_tag_value otv ON otv.object_id = p.object_id"
-                + " JOIN tag tg ON tg.id = otv.tag_id"
-                + " WHERE instr(lower(otv.value), lower(tt.name)) > 0" + attrCond
-                + " GROUP BY tt.id, tg.id),"
-                + " ranked AS ("
-                + " SELECT token, matched, tag, hits,"
-                + " ROW_NUMBER() OVER (PARTITION BY token_id ORDER BY hits DESC, tag ASC) rn"
-                + " FROM attr)"
-                + " SELECT token, matched, tag, hits FROM ranked WHERE rn = 1 ORDER BY matched DESC";
-        List<DbReportAttribution> result = new ArrayList<>();
+                + " JOIN token t ON t.id = p.token_id"
+                + " LEFT JOIN token_matched tm ON tm.token_id = t.id"
+                + typeCond
+                + ")"
+                + " SELECT name, type, lat, lon,"
+                + " SUM(nameToken) tokens,"
+                + " SUM(CASE WHEN " + demotedNameToken + " THEN 1 ELSE 0 END) commonFrequentTokens,"
+                + " SUM(CASE WHEN nameToken = 1 AND isCommon = 1 THEN 1 ELSE 0 END) commonTokens,"
+                + " SUM(CASE WHEN nameToken = 1 AND isFrequent = 1 THEN 1 ELSE 0 END) frequentTokens,"
+                + " SUM(CASE WHEN nameToken = 1 AND isGenerated = 1 THEN 1 ELSE 0 END) newTokens,"
+                + " SUM(CASE WHEN " + potentialMainToken + " THEN 1 ELSE 0 END) potentialMainTokens,"
+                + " MAX(CASE WHEN " + potentialMainToken + " THEN matched ELSE 0 END) potentialMainMatched,"
+                + " MAX(CASE WHEN " + potentialMainToken + " AND isGenerated = 1 THEN 1 ELSE 0 END) hasGeneratedPotentialMain,"
+                + " GROUP_CONCAT(CASE WHEN " + demotedNameToken + " THEN tokenName ELSE NULL END, ', ') commonFrequentNames"
+                + " FROM name_tokens"
+                + " GROUP BY objectId"
+                + " HAVING commonFrequentTokens >= 2"
+                + " ORDER BY (1.0 * commonFrequentTokens * commonFrequentTokens / CASE WHEN tokens > 0 THEN tokens ELSE 1 END)"
+                + " * CASE WHEN potentialMainTokens <= 1 THEN 2.0 ELSE 1.0 / potentialMainTokens END"
+                + " * (1.0 + potentialMainMatched / 1000.0 + hasGeneratedPotentialMain) DESC,"
+                + " commonFrequentTokens DESC, potentialMainTokens ASC, potentialMainMatched DESC, tokens DESC, name ASC"
+                + " LIMIT 100";
+        List<TestCaseObject> result = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
-                long matched = rs.getLong("matched");
-                long hits = rs.getLong("hits");
-                double sharePct = matched > 0 ? 100.0 * hits / matched : 0;
-                result.add(new DbReportAttribution(rs.getString("token"), matched, rs.getString("tag"), hits, sharePct));
+                long tokens = rs.getLong("tokens");
+                long commonFrequentTokens = rs.getLong("commonFrequentTokens");
+                long potentialMainTokens = rs.getLong("potentialMainTokens");
+                long potentialMainMatched = rs.getLong("potentialMainMatched");
+                double baseScore = tokens > 0 ? 1.0 * commonFrequentTokens * commonFrequentTokens / tokens : 0;
+                double mainTokenScarcity = potentialMainTokens <= 1 ? 2.0 : 1.0 / potentialMainTokens;
+                double mainTokenFrequency = 1.0 + potentialMainMatched / 1000.0 + rs.getLong("hasGeneratedPotentialMain");
+                double proneScore = baseScore * mainTokenScarcity * mainTokenFrequency;
+                Double lat = rs.getObject("lat") == null ? null : rs.getDouble("lat");
+                Double lon = rs.getObject("lon") == null ? null : rs.getDouble("lon");
+                LatLon point = lat == null || lon == null ? null : new LatLon(lat, lon);
+                result.add(new TestCaseObject(rs.getString("name"), rs.getString("type"),
+                        point, tokens, commonFrequentTokens,
+                        rs.getLong("commonTokens"), rs.getLong("frequentTokens"),
+                        rs.getLong("newTokens"), proneScore, rs.getString("commonFrequentNames")));
+            }
+        }
+        return result;
+    }
+
+    private Map<Long, List<DbReportTagHit>> loadTopTags(Connection conn, Map<Long, Long> matchedByToken, String typeWhere)
+            throws SQLException {
+        Map<Long, List<DbReportTagHit>> result = new LinkedHashMap<>();
+        if (matchedByToken.isEmpty()) {
+            return result;
+        }
+        String objectJoin = typeWhere.isEmpty() ? "" : " JOIN \"object\" o ON o.id = otv.object_id";
+        String typeCond = typeWhere.isEmpty() ? "" : " AND " + typeWhere;
+        String placeholders = String.join(",", Collections.nCopies(matchedByToken.size(), "?"));
+        String sql = "SELECT token_id, tag, hits FROM ("
+                + " SELECT otv.token_id, tg.name tag, COUNT(DISTINCT otv.object_id) hits,"
+                + " ROW_NUMBER() OVER (PARTITION BY otv.token_id ORDER BY COUNT(DISTINCT otv.object_id) DESC, tg.name ASC) rn"
+                + " FROM object_tag_value otv JOIN tag tg ON tg.id = otv.tag_id" + objectJoin
+                + " WHERE otv.token_id IN (" + placeholders + ")" + typeCond
+                + " GROUP BY otv.token_id, tg.id)"
+                + " WHERE rn <= 3 ORDER BY token_id, hits DESC";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            int idx = 1;
+            for (Long id : matchedByToken.keySet()) {
+                ps.setLong(idx++, id);
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    long tokenId = rs.getLong("token_id");
+                    long hits = rs.getLong("hits");
+                    long matched = matchedByToken.getOrDefault(tokenId, 0L);
+                    double sharePct = matched > 0 ? 100.0 * hits / matched : 0;
+                    result.computeIfAbsent(tokenId, k -> new ArrayList<>())
+                            .add(new DbReportTagHit(rs.getString("tag"), hits, sharePct));
+                }
             }
         }
         return result;

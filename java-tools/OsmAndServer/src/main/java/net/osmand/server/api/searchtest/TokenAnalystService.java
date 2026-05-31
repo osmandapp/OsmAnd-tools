@@ -130,8 +130,8 @@ public interface TokenAnalystService extends OBFService {
                                         String tag, List<String> values,
                                         int pageToShow, int pageSizeLimit, String sortBy, String sortOrder) throws IOException, SQLException {
         Path dbFile = resolveTagsDatasource(datasource);
-        String tokenFilter = getTokenSourceFilter(objectType);
         TagFilter tagFilter = buildTagFilter(tag, values);
+        String tokenFilter = tagFilter.enabled() ? getTokenSourceFilter(objectType) : "";
         String where = buildTagsDbTokenWhere(prefix, tokenFilter, tagFilter);
         Map<String, String> orderColumns = Map.of(
                 "name", "t.name",

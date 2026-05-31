@@ -717,10 +717,25 @@ public class SearchTestController {
 
 	@GetMapping(value = "/tags-datasources/{name}/report", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<OBFService.DbReport> getTagsDbReport(@PathVariable String name,
-	                                                           @RequestParam(defaultValue = "all") String objectType) throws IOException, SQLException {
+	public ResponseEntity<OBFService.DbReport> getReport(@PathVariable String name,
+	                                                     @RequestParam(defaultValue = "all") String objectType,
+	                                                     @RequestParam(defaultValue = "all") String pruneGenerated,
+	                                                     @RequestParam(defaultValue = "desc") String pruneSort,
+	                                                     @RequestParam(defaultValue = "-1") long bucketMin,
+	                                                     @RequestParam(defaultValue = "-1") long bucketMax) throws IOException, SQLException {
 		try {
-			return ResponseEntity.ok(testSearchService.getTagsDbReport(name, objectType));
+			return ResponseEntity.ok(testSearchService.getReport(name, objectType, pruneGenerated, pruneSort, bucketMin, bucketMax));
+		} catch (SQLException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
+		}
+	}
+
+	@GetMapping(value = "/tags-datasources/{name}/test-cases", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<List<OBFService.TestCaseObject>> getTestCases(@PathVariable String name,
+	                                                                    @RequestParam(defaultValue = "all") String objectType) throws IOException, SQLException {
+		try {
+			return ResponseEntity.ok(testSearchService.getTestCases(name, objectType));
 		} catch (SQLException e) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
 		}

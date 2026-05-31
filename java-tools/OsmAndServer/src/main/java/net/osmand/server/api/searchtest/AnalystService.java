@@ -2305,18 +2305,14 @@ public interface AnalystService extends AddressPOIAnalystService {
                                 boolean insertedObject = insertGenerateDbObject(insertObject, objectAddress, options.skipObjectTags());
                                 metrics.objectDbNs.addAndGet(System.nanoTime() - objectStartNs);
                                 List<GenerateDbObjectTagValue> addressTagValues = objectTagValues.get(objectAddress.osmId());
-                                if (insertedObject && !options.skipObjectTags()) {
+                                if (insertedObject) {
                                     long tagStartNs = System.nanoTime();
                                     addressTagValues = insertGenerateDbTags(insertTag, selectTagId, insertValue, selectValueId, tagIds, valueIds, sqlBatcher, objectAddress);
                                     metrics.tagDbNs.addAndGet(System.nanoTime() - tagStartNs);
                                     objectTagValues.put(objectAddress.osmId(), addressTagValues);
                                     writerBatch.recordRows(1 + addressTagValues.size(), estimateGenerateDbObjectBytes(objectAddress));
-                                } else if (insertedObject) {
-                                    objectTagValues.put(objectAddress.osmId(), Collections.emptyList());
-                                    writerBatch.recordRows(1, estimateGenerateDbObjectBytes(objectAddress));
                                 }
-                                long generatedRows = options.skipObjectTags() ? 0
-                                        : insertGenerateDbGeneratedTokenRows(insertToken, selectTokenId, insertObjectTagValue,
+                                long generatedRows = insertGenerateDbGeneratedTokenRows(insertToken, selectTokenId, insertObjectTagValue,
                                         insertPosting, tokenIds, sqlBatcher, obfId, tokenId, token.name(), objectAddress, addressTagValues,
                                         options.skipNewTokens(), options.skipTokenInTagValue());
                                 writerBatch.recordRows(generatedRows, generatedRows * 64L);

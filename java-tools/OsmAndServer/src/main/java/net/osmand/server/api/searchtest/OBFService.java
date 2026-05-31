@@ -106,14 +106,15 @@ public interface OBFService extends BaseService {
 	                Map<String, Object> extraTags, String type, Long osmId, String osmType,
 	                boolean isAlone, String obfName, long tokens) {}
 	record DbObjectPage(List<DbObject> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages) {}
-	record DbReportDistribution(String bucket, long tokens, long postings) {}
+	record DbReportDistribution(String bucket, int ord, long tokens, long postings, long tokensNew, long postingsNew) {}
+	record DbReportTagHit(String tag, long hits, double sharePct) {}
 	record DbReportPruneToken(String name, boolean isCommon, boolean isFrequent, long matched, long alone,
-	                          long removable, double cumulativePct) {}
-	record DbReportCandidateTag(String tag, long objects, long distinctValues, double selectivity) {}
-	record DbReportAttribution(String token, long matched, String sourceTag, long tagHits, double sharePct) {}
+	                          double cumulativePct, List<DbReportTagHit> topTags) {}
+	record TestCaseObject(String name, String type, LatLon point, long tokens,
+	                      long commonFrequentTokens, long commonTokens, long frequentTokens,
+	                      long newTokens, double proneScore, String topCommonFrequentTokens) {}
 	record DbReport(long totalTokens, long totalPostings, List<DbReportDistribution> distribution,
-	                List<DbReportPruneToken> pruning, List<DbReportCandidateTag> candidates,
-	                List<DbReportAttribution> attribution) {}
+	                List<DbReportPruneToken> pruning, List<TestCaseObject> mainWordInconsistency) {}
 	@FunctionalInterface
 	interface GenerateDbProgressListener {
 		void onProgress(GenerateDbProgress progress);
