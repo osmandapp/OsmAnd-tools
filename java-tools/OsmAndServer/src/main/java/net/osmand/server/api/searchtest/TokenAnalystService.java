@@ -84,7 +84,7 @@ public interface TokenAnalystService extends OBFService {
     default List<DbTagName> getTagsDbTagNames(String datasource) throws IOException, SQLException {
         Path dbFile = resolveTagsDatasource(datasource);
         String sql = """
-                SELECT t.name, COUNT(DISTINCT otv.object_id) objects
+                SELECT t.name, COUNT(DISTINCT otv.object_id) objects, MIN(t.isSkipped) isSkipped
                 FROM tag t
                 LEFT JOIN object_tag_value otv ON otv.tag_id = t.id
                 GROUP BY t.name
@@ -95,7 +95,7 @@ public interface TokenAnalystService extends OBFService {
              ResultSet rs = ps.executeQuery()) {
             List<DbTagName> result = new ArrayList<>();
             while (rs.next()) {
-                result.add(new DbTagName(rs.getString(1), rs.getLong(2)));
+                result.add(new DbTagName(rs.getString(1), rs.getLong(2), rs.getInt(3) != 0));
             }
             return result;
         }
@@ -133,22 +133,22 @@ public interface TokenAnalystService extends OBFService {
         String tokenFilter = getTokenSourceFilter(objectType);
         TagFilter tagFilter = buildTagFilter(tag, values);
         String where = buildTagsDbTokenWhere(prefix, tokenFilter, tagFilter);
-        String normalizedSort = Algorithms.isEmpty(sortBy) ? "name" : sortBy.toLowerCase(Locale.ROOT);
-        String orderColumn = switch (normalizedSort) {
-            case "matched" -> "matched";
-            case "alone" -> "alone";
-            case "common" -> "t.isCommon";
-            case "frequent" -> "t.isFrequent";
-            default -> "t.name";
-        };
-        String order = "desc".equalsIgnoreCase(sortOrder) ? "DESC" : "ASC";
+        Map<String, String> orderColumns = Map.of(
+                "name", "t.name",
+                "matched", "matched",
+                "alone", "alone",
+                "common", "t.isCommon",
+                "frequent", "t.isFrequent",
+                "new", "t.isGenerated",
+                "generated", "t.isGenerated",
+                "isgenerated", "t.isGenerated");
         int safePage = Math.max(0, pageToShow);
         int safeSize = Math.max(1, Math.min(pageSizeLimit, 500));
         try (Connection conn = openTagsDbConnection(dbFile)) {
             String grouped = buildTagsDbTokenGroupedSql(objectType, tagFilter, where);
             List<Object> tokenParams = buildTagTokenParams(prefix, tagFilter);
             long total = queryLong(conn, "SELECT COUNT(*) FROM (" + grouped + ") q", tokenParams.toArray());
-            String sql = grouped + " ORDER BY " + orderColumn + " " + order + ", t.name ASC LIMIT ? OFFSET ?";
+            String sql = grouped + buildTagsDbOrderBy(sortBy, sortOrder, orderColumns, "t.name ASC") + " LIMIT ? OFFSET ?";
             List<DbToken> content = new ArrayList<>();
             DbTokenSummary summary;
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -157,8 +157,8 @@ public interface TokenAnalystService extends OBFService {
                 ps.setInt(idx, safePage * safeSize);
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
-                        content.add(new DbToken(rs.getLong(1), rs.getString(2), rs.getLong(5), rs.getLong(6),
-                                rs.getInt(3) != 0, rs.getInt(4) != 0));
+                        content.add(new DbToken(rs.getLong(1), rs.getString(2), rs.getLong(6), rs.getLong(7),
+                                rs.getInt(3) != 0, rs.getInt(4) != 0, rs.getInt(5) != 0));
                     }
                 }
             }
@@ -173,19 +173,19 @@ public interface TokenAnalystService extends OBFService {
         boolean poiOnly = "poi".equals(normalized);
         boolean addressOnly = "address".equals(normalized) || "addr".equals(normalized);
         if (tagFilter.enabled()) {
-            return "SELECT t.id, t.name, t.isCommon, t.isFrequent, COUNT(p.object_id) matched, COALESCE(SUM(CASE WHEN p.isAlone = 1 THEN 1 ELSE 0 END), 0) alone "
+            return "SELECT t.id, t.name, t.isCommon, t.isFrequent, t.isGenerated, COUNT(p.object_id) matched, COALESCE(SUM(CASE WHEN p.isAlone = 1 THEN 1 ELSE 0 END), 0) alone "
                     + " FROM token t JOIN posting p ON p.token_id = t.id JOIN \"object\" o ON o.id = p.object_id"
                     + appendObjectTypeWhere(where, objectType)
-                    + " GROUP BY t.id, t.name, t.isCommon, t.isFrequent";
+                    + " GROUP BY t.id, t.name, t.isCommon, t.isFrequent, t.isGenerated";
         }
         if (poiOnly || addressOnly) {
             String objectJoinFilter = poiOnly ? " AND o.type = 'POI'" : " AND o.type <> 'POI'";
-            return "SELECT t.id, t.name, t.isCommon, t.isFrequent, COUNT(o.id) matched, COALESCE(SUM(CASE WHEN o.id IS NOT NULL AND p.isAlone = 1 THEN 1 ELSE 0 END), 0) alone "
+            return "SELECT t.id, t.name, t.isCommon, t.isFrequent, t.isGenerated, COUNT(o.id) matched, COALESCE(SUM(CASE WHEN o.id IS NOT NULL AND p.isAlone = 1 THEN 1 ELSE 0 END), 0) alone "
                     + " FROM token t LEFT JOIN posting p ON p.token_id = t.id LEFT JOIN \"object\" o ON o.id = p.object_id" + objectJoinFilter
-                    + where + " GROUP BY t.id, t.name, t.isCommon, t.isFrequent";
+                    + where + " GROUP BY t.id, t.name, t.isCommon, t.isFrequent, t.isGenerated";
         }
         String postingAgg = "(SELECT token_id, COUNT(object_id) matched, COALESCE(SUM(CASE WHEN isAlone = 1 THEN 1 ELSE 0 END), 0) alone FROM posting GROUP BY token_id)";
-        return "SELECT t.id, t.name, t.isCommon, t.isFrequent, "
+        return "SELECT t.id, t.name, t.isCommon, t.isFrequent, t.isGenerated, "
                 + "COALESCE(pa.matched, 0) matched, COALESCE(pa.alone, 0) alone "
                 + " FROM token t LEFT JOIN " + postingAgg + " pa ON pa.token_id = t.id"
                 + where;
@@ -202,16 +202,15 @@ public interface TokenAnalystService extends OBFService {
         String tagSql = tagFilter.enabled() ? " AND " + tagFilter.sql() : "";
         String obfJoin = perObf ? " LEFT JOIN obf b ON b.id = p.obf_id" : "";
         String base = " FROM " + source + " p JOIN \"object\" o ON o.id = p.object_id" + obfJoin + " WHERE p.token_id = ?" + objectTypeFilter + filter + tagSql;
-        String normalizedSort = Algorithms.isEmpty(sortBy) ? "sequenceid" : sortBy.toLowerCase(Locale.ROOT);
-        String orderColumn = switch (normalizedSort) {
-            case "name" -> "o.name";
-            case "type" -> "o.type";
-            case "osmid" -> "o.id";
-            case "alone", "isalone" -> "p.isAlone";
-            case "obf", "obfname" -> perObf ? "b.name" : "p.sequenceId";
-            default -> "p.sequenceId";
-        };
-        String order = "desc".equalsIgnoreCase(sortOrder) ? "DESC" : "ASC";
+        Map<String, String> orderColumns = new HashMap<>();
+        orderColumns.put("sequenceid", "p.sequenceId");
+        orderColumns.put("name", "o.name");
+        orderColumns.put("type", "o.type");
+        orderColumns.put("osmid", "o.id");
+        orderColumns.put("alone", "p.isAlone");
+        orderColumns.put("isalone", "p.isAlone");
+        orderColumns.put("obf", perObf ? "b.name" : "p.sequenceId");
+        orderColumns.put("obfname", perObf ? "b.name" : "p.sequenceId");
         int safePage = Math.max(0, pageToShow);
         int safeSize = Math.max(1, Math.min(pageSizeLimit, 500));
         try (Connection conn = openTagsDbConnection(dbFile)) {
@@ -219,7 +218,7 @@ public interface TokenAnalystService extends OBFService {
             long total = queryLong(conn, "SELECT COUNT(*)" + base, objectParams.toArray());
             String sql = "SELECT p.sequenceId, o.name, o.lat, o.lon, o.commonTags, o.extraTags, o.type, o.id, o.osmType, p.isAlone"
                     + (perObf ? ", b.name" : ", NULL") + base
-                    + " ORDER BY " + orderColumn + " " + order + ", p.sequenceId ASC LIMIT ? OFFSET ?";
+                    + buildTagsDbOrderBy(sortBy, sortOrder, orderColumns, "p.sequenceId ASC") + " LIMIT ? OFFSET ?";
             List<DbObject> content = new ArrayList<>();
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 int idx = bindParams(ps, 1, objectParams);
@@ -289,6 +288,26 @@ public interface TokenAnalystService extends OBFService {
             conditions.add(tagFilter.sql());
         }
         return conditions.isEmpty() ? "" : " WHERE " + String.join(" AND ", conditions);
+    }
+
+    private String buildTagsDbOrderBy(String sortBy, String sortOrder, Map<String, String> columns, String fallback) {
+        String[] sortKeys = Algorithms.isEmpty(sortBy) ? new String[0] : sortBy.split(",");
+        String[] sortOrders = Algorithms.isEmpty(sortOrder) ? new String[0] : sortOrder.split(",");
+        List<String> terms = new ArrayList<>();
+        Set<String> usedColumns = new HashSet<>();
+        for (int i = 0; i < sortKeys.length; i++) {
+            String key = sortKeys[i] == null ? "" : sortKeys[i].trim().toLowerCase(Locale.ROOT);
+            String column = columns.get(key);
+            if (Algorithms.isEmpty(column) || !usedColumns.add(column)) {
+                continue;
+            }
+            String direction = i < sortOrders.length && "asc".equalsIgnoreCase(sortOrders[i].trim()) ? "ASC" : "DESC";
+            terms.add(column + " " + direction);
+        }
+        if (!Algorithms.isEmpty(fallback)) {
+            terms.add(fallback);
+        }
+        return " ORDER BY " + String.join(", ", terms);
     }
 
     private Connection openTagsDbConnection(Path dbFile) throws SQLException {
@@ -387,13 +406,13 @@ public interface TokenAnalystService extends OBFService {
     }
 
     private DbTokenSummary buildTagsDbTokenSummary(Connection conn, String groupedSql, List<Object> params) throws SQLException {
-        String sql = "SELECT SUM(matched), SUM(alone), SUM(isCommon), SUM(isFrequent), MAX(matched), MAX(alone) FROM ("
+        String sql = "SELECT SUM(matched), SUM(alone), SUM(isCommon), SUM(isFrequent), SUM(isGenerated), MAX(matched), MAX(alone) FROM ("
                 + groupedSql + ")";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             bindParams(ps, 1, params);
             try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? new DbTokenSummary(rs.getLong(1), rs.getLong(2), rs.getLong(3), rs.getLong(4), rs.getLong(5), rs.getLong(6))
-                        : new DbTokenSummary(0, 0, 0, 0, 0, 0);
+                return rs.next() ? new DbTokenSummary(rs.getLong(1), rs.getLong(2), rs.getLong(3), rs.getLong(4), rs.getLong(5), rs.getLong(6), rs.getLong(7))
+                        : new DbTokenSummary(0, 0, 0, 0, 0, 0, 0);
             }
         }
     }

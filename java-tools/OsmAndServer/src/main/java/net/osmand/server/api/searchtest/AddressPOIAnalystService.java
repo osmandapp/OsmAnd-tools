@@ -13,6 +13,7 @@ public interface AddressPOIAnalystService extends TokenAnalystService {
 
     default DbObjectPage getTagsDbAddressPoiObjects(String datasource, String objectType, String regExp,
                                                     String tokenFind, String tag, List<String> values,
+                                                    boolean perObf,
                                                     int pageToShow, int pageSizeLimit,
                                                     String sortBy, String sortOrder) throws IOException, SQLException {
         Path dbFile = resolveTagsDatasource(datasource);
@@ -23,26 +24,29 @@ public interface AddressPOIAnalystService extends TokenAnalystService {
         String tokenFilterSql = Algorithms.isEmpty(tokenFind) ? "" : " AND (" + tokenCountSql + ") > 0";
         AddressPoiTagFilter tagFilter = buildAddressPoiTagFilter(tag, values);
         String tagSql = tagFilter.enabled() ? " AND " + tagFilter.sql() : "";
-        String base = " FROM \"object\" o WHERE " + typeSql + nameSql + tagSql + tokenFilterSql;
-        String normalizedSort = Algorithms.isEmpty(sortBy) ? "sequenceid" : sortBy.toLowerCase(Locale.ROOT);
-        String orderColumn = switch (normalizedSort) {
-            case "name" -> "o.name";
-            case "type" -> "o.type";
-            case "osmid" -> "o.id";
-            case "tokens" -> "tokens";
-            default -> "o.id";
-        };
-        String order = "desc".equalsIgnoreCase(sortOrder) ? "DESC" : "ASC";
+        String obfJoin = perObf ? " JOIN (SELECT DISTINCT object_id, obf_id FROM posting) po ON po.object_id = o.id LEFT JOIN obf b ON b.id = po.obf_id" : "";
+        String base = " FROM \"object\" o" + obfJoin + " WHERE " + typeSql + nameSql + tagSql + tokenFilterSql;
+        Map<String, String> orderColumns = Map.of(
+                "sequenceid", "o.id",
+                "name", "o.name",
+                "type", "o.type",
+                "osmid", "o.id",
+                "tokens", "tokens",
+                "obf", perObf ? "obfName" : "o.id",
+                "obfname", perObf ? "obfName" : "o.id");
         int safePage = Math.max(0, pageToShow);
         int safeSize = Math.max(1, Math.min(pageSizeLimit, 500));
         try (Connection conn = openAddressPoiTagsDbConnection(dbFile)) {
             List<Object> params = buildAddressPoiObjectParams(regExp, tokenFind, tagFilter, false);
             long total = queryAddressPoiLong(conn, "SELECT COUNT(*)" + base, params.toArray());
             List<Object> selectParams = buildAddressPoiObjectParams(regExp, tokenFind, tagFilter, true);
-            String sql = "SELECT ROW_NUMBER() OVER (ORDER BY o.id ASC) sequenceId, "
-                    + "o.name, o.lat, o.lon, o.commonTags, o.extraTags, o.type, o.id, o.osmType, 0 isAlone, NULL obfName, "
-                    + tokenCountSql + " tokens"
-                    + base + " ORDER BY " + orderColumn + " " + order + ", o.id ASC LIMIT ? OFFSET ?";
+            String obfTokenFilter = perObf ? " AND p.obf_id = po.obf_id" : "";
+            String perObfTokenCountSql = tokenCountSql.replace("WHERE p.object_id = o.id", "WHERE p.object_id = o.id" + obfTokenFilter);
+            String sql = "SELECT ROW_NUMBER() OVER (ORDER BY o.id ASC" + (perObf ? ", b.name ASC" : "") + ") sequenceId, "
+                    + "o.name, o.lat, o.lon, o.commonTags, o.extraTags, o.type, o.id, o.osmType, 0 isAlone, "
+                    + (perObf ? "b.name" : "NULL") + " obfName, "
+                    + perObfTokenCountSql + " tokens"
+                    + base + buildAddressPoiOrderBy(sortBy, sortOrder, orderColumns, "o.id ASC") + " LIMIT ? OFFSET ?";
             List<DbObject> content = new ArrayList<>();
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 int idx = bindAddressPoiParams(ps, 1, selectParams);
@@ -56,7 +60,8 @@ public interface AddressPOIAnalystService extends TokenAnalystService {
                         content.add(new DbObject(rs.getInt(1), rs.getString(2), point,
                                 parseAddressPoiObjectValues(rs.getString(5)),
                                 parseAddressPoiObjectExtraTags(rs.getString(6)),
-                                rs.getString(7), rs.getLong(8), rs.getString(9), false, "", rs.getLong(12)));
+                                rs.getString(7), rs.getLong(8), rs.getString(9), false,
+                                getTagsObfDisplayName(rs.getString(11)), rs.getLong(12)));
                     }
                 }
             }
@@ -75,16 +80,16 @@ public interface AddressPOIAnalystService extends TokenAnalystService {
                                                     String sortBy, String sortOrder) throws IOException, SQLException {
         Path dbFile = resolveTagsDatasource(datasource);
         String filter = Algorithms.isEmpty(find) ? "" : " AND t.name REGEXP ?";
-        String normalizedSort = Algorithms.isEmpty(sortBy) ? "name" : sortBy.toLowerCase(Locale.ROOT);
-        String orderColumn = switch (normalizedSort) {
-            case "common" -> "t.isCommon";
-            case "frequent" -> "t.isFrequent";
-            default -> "t.name";
-        };
-        String order = "desc".equalsIgnoreCase(sortOrder) ? "DESC" : "ASC";
+        Map<String, String> orderColumns = Map.of(
+                "name", "t.name",
+                "common", "t.isCommon",
+                "frequent", "t.isFrequent",
+                "new", "t.isGenerated",
+                "generated", "t.isGenerated",
+                "isgenerated", "t.isGenerated");
         int safePage = Math.max(0, pageToShow);
         int safeSize = Math.max(1, Math.min(pageSizeLimit, 500));
-        String grouped = "SELECT DISTINCT t.id, t.name, t.isCommon, t.isFrequent "
+        String grouped = "SELECT DISTINCT t.id, t.name, t.isCommon, t.isFrequent, t.isGenerated, NULL obfName "
                 + "FROM posting p JOIN token t ON t.id = p.token_id WHERE p.object_id = ?" + filter;
         try (Connection conn = openAddressPoiTagsDbConnection(dbFile)) {
             List<Object> params = new ArrayList<>();
@@ -93,7 +98,7 @@ public interface AddressPOIAnalystService extends TokenAnalystService {
                 params.add(find);
             }
             long total = queryAddressPoiLong(conn, "SELECT COUNT(*) FROM (" + grouped + ") q", params.toArray());
-            String sql = grouped + " ORDER BY " + orderColumn + " " + order + ", t.name ASC LIMIT ? OFFSET ?";
+            String sql = grouped + buildAddressPoiOrderBy(sortBy, sortOrder, orderColumns, "t.name ASC") + " LIMIT ? OFFSET ?";
             List<DbObjectToken> content = new ArrayList<>();
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 int idx = bindAddressPoiParams(ps, 1, params);
@@ -101,7 +106,8 @@ public interface AddressPOIAnalystService extends TokenAnalystService {
                 ps.setInt(idx, safePage * safeSize);
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
-                        content.add(new DbObjectToken(rs.getLong(1), rs.getString(2), rs.getInt(3) != 0, rs.getInt(4) != 0));
+                        content.add(new DbObjectToken(rs.getLong(1), rs.getString(2), rs.getInt(3) != 0, rs.getInt(4) != 0,
+                                rs.getInt(5) != 0, getTagsObfDisplayName(rs.getString(6))));
                     }
                 }
             }
@@ -135,6 +141,15 @@ public interface AddressPOIAnalystService extends TokenAnalystService {
             case "address", "addr" -> "o.type <> 'POI'";
             default -> "";
         };
+    }
+
+    private String getTagsObfDisplayName(String name) {
+        if (Algorithms.isEmpty(name)) {
+            return "";
+        }
+        String fileName = Path.of(name).getFileName().toString();
+        int dot = fileName.lastIndexOf('.');
+        return dot > 0 ? fileName.substring(0, dot) : fileName;
     }
 
     private List<DbReportDistribution> loadReportDistribution(Connection conn, String typeWhere) throws SQLException {
@@ -252,6 +267,26 @@ public interface AddressPOIAnalystService extends TokenAnalystService {
             }
         });
         return conn;
+    }
+
+    private String buildAddressPoiOrderBy(String sortBy, String sortOrder, Map<String, String> columns, String fallback) {
+        String[] sortKeys = Algorithms.isEmpty(sortBy) ? new String[0] : sortBy.split(",");
+        String[] sortOrders = Algorithms.isEmpty(sortOrder) ? new String[0] : sortOrder.split(",");
+        List<String> terms = new ArrayList<>();
+        Set<String> usedColumns = new HashSet<>();
+        for (int i = 0; i < sortKeys.length; i++) {
+            String key = sortKeys[i] == null ? "" : sortKeys[i].trim().toLowerCase(Locale.ROOT);
+            String column = columns.get(key);
+            if (Algorithms.isEmpty(column) || !usedColumns.add(column)) {
+                continue;
+            }
+            String direction = i < sortOrders.length && "asc".equalsIgnoreCase(sortOrders[i].trim()) ? "ASC" : "DESC";
+            terms.add(column + " " + direction);
+        }
+        if (!Algorithms.isEmpty(fallback)) {
+            terms.add(fallback);
+        }
+        return " ORDER BY " + String.join(", ", terms);
     }
 
     private AddressPoiTagFilter buildAddressPoiTagFilter(String tag, List<String> values) {

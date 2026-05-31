@@ -1993,12 +1993,17 @@ public interface AnalystService extends AddressPOIAnalystService {
     }
 
     default void generateDb(List<String> obfs, OutputStream out, GenerateDbProgressListener progressListener) throws IOException, SQLException {
+        generateDb(obfs, out, progressListener, GenerateDbOptions.DEFAULT);
+    }
+
+    default void generateDb(List<String> obfs, OutputStream out, GenerateDbProgressListener progressListener,
+                            GenerateDbOptions options) throws IOException, SQLException {
         if (obfs == null || obfs.isEmpty()) {
             throw new IllegalArgumentException("OBF file list is required");
         }
         Path dbFile = Files.createTempFile("search-test-db-", ".sqlite");
         try {
-            generateDbFile(obfs, dbFile, progressListener);
+            generateDbFile(obfs, dbFile, progressListener, options);
             try (ZipOutputStream zip = new ZipOutputStream(out)) {
                 zip.putNextEntry(new ZipEntry("db.sqlite"));
                 Files.copy(dbFile, zip);
@@ -2014,17 +2019,19 @@ public interface AnalystService extends AddressPOIAnalystService {
         }
     }
 
-    default void generateDbFile(List<String> obfs, Path dbFile, GenerateDbProgressListener progressListener) throws IOException, SQLException {
+    default void generateDbFile(List<String> obfs, Path dbFile, GenerateDbProgressListener progressListener,
+                                GenerateDbOptions options) throws IOException, SQLException {
         if (obfs == null || obfs.isEmpty()) {
             throw new IllegalArgumentException("OBF file list is required");
         }
+        GenerateDbOptions safeOptions = options == null ? GenerateDbOptions.DEFAULT : options;
         Files.createDirectories(dbFile.toAbsolutePath().getParent());
         Files.deleteIfExists(dbFile);
         try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbFile.toAbsolutePath())) {
             configureGenerateDbBulkLoad(conn);
             createDbSchema(conn);
             try {
-                populateDb(conn, obfs, progressListener);
+                populateDb(conn, obfs, progressListener, safeOptions);
                 finalizeGenerateDb(conn);
             } catch (Exception e) {
                 rollbackGenerateDb(conn);
@@ -2089,7 +2096,8 @@ public interface AnalystService extends AddressPOIAnalystService {
                     	id INTEGER PRIMARY KEY AUTOINCREMENT,
                     	name TEXT NOT NULL UNIQUE,
                     	isCommon INTEGER NOT NULL,
-                    	isFrequent INTEGER NOT NULL
+                        isFrequent INTEGER NOT NULL,
+                        isGenerated INTEGER NOT NULL -- is token added during generation (true) or became from index (false)
                     )
                     """);
             stmt.execute("""
@@ -2109,6 +2117,7 @@ public interface AnalystService extends AddressPOIAnalystService {
                     	id INTEGER PRIMARY KEY AUTOINCREMENT,
                     	name TEXT NOT NULL,
                     	type TEXT,
+                        isSkipped INTEGER NOT NULL, -- is tag skipped (true) in matchesLegacy for POI/Address or not (false)
                     	UNIQUE(name, type)
                     )
                     """);
@@ -2122,11 +2131,12 @@ public interface AnalystService extends AddressPOIAnalystService {
                     """);
             stmt.execute("""
                     CREATE TABLE object_tag_value (
-                    	object_id INTEGER NOT NULL,
-                    	tag_id INTEGER NOT NULL,
-                    	value_id INTEGER NOT NULL,
+                        object_id INTEGER NOT NULL, -- what kind of object related to tag
+                        tag_id INTEGER NOT NULL, -- what kind of tag related to object
+                        token_id INTEGER NOT NULL, -- what kind of token related to object in corresponding tag value, -1 if tag isSkipped = true
+                        value_id INTEGER NOT NULL, -- what kind of value related to object in corresponding tag and token
                     	value TEXT NOT NULL,
-                    	PRIMARY KEY (object_id, tag_id, value_id)
+                        PRIMARY KEY (tag_id, value_id, object_id, token_id)
                     )
                     """);
             stmt.execute("""
@@ -2153,15 +2163,17 @@ public interface AnalystService extends AddressPOIAnalystService {
         }
     }
 
-    private void populateDb(Connection conn, List<String> obfs, GenerateDbProgressListener progressListener) throws SQLException, IOException {
+    private void populateDb(Connection conn, List<String> obfs, GenerateDbProgressListener progressListener,
+                            GenerateDbOptions options) throws SQLException, IOException {
         Map<String, Long> tokenIds = new HashMap<>();
         try (PreparedStatement insertObf = conn.prepareStatement("INSERT INTO OBF(name) VALUES (?)", Statement.RETURN_GENERATED_KEYS);
              PreparedStatement insertToken = conn.prepareStatement("""
-                     INSERT INTO token(name, isCommon, isFrequent)
-                     VALUES (?, ?, ?)
+                     INSERT INTO token(name, isCommon, isFrequent, isGenerated)
+                     VALUES (?, ?, ?, ?)
                      ON CONFLICT(name) DO UPDATE SET
                      	isCommon = CASE WHEN excluded.isCommon = 1 THEN 1 ELSE Token.isCommon END,
-                     	isFrequent = CASE WHEN excluded.isFrequent = 1 THEN 1 ELSE Token.isFrequent END
+                        isFrequent = CASE WHEN excluded.isFrequent = 1 THEN 1 ELSE Token.isFrequent END,
+                        isGenerated = CASE WHEN excluded.isGenerated = 0 THEN 0 ELSE Token.isGenerated END
                      """);
              PreparedStatement selectTokenId = conn.prepareStatement("SELECT id FROM token WHERE name = ?");
              PreparedStatement insertObject = conn.prepareStatement("""
@@ -2169,8 +2181,10 @@ public interface AnalystService extends AddressPOIAnalystService {
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                      """);
              PreparedStatement insertTag = conn.prepareStatement("""
-                     INSERT OR IGNORE INTO tag(name, type)
-                     VALUES (?, ?)
+                     INSERT INTO tag(name, type, isSkipped)
+                     VALUES (?, ?, ?)
+                     ON CONFLICT(name, type) DO UPDATE SET
+                        isSkipped = CASE WHEN excluded.isSkipped = 0 THEN 0 ELSE tag.isSkipped END
                      """);
              PreparedStatement selectTagId = conn.prepareStatement("SELECT id FROM tag WHERE name = ? AND type = ?");
              PreparedStatement insertValue = conn.prepareStatement("""
@@ -2179,8 +2193,8 @@ public interface AnalystService extends AddressPOIAnalystService {
                      """);
              PreparedStatement selectValueId = conn.prepareStatement("SELECT id FROM value WHERE tag_id = ? AND value = ?");
              PreparedStatement insertObjectTagValue = conn.prepareStatement("""
-                     INSERT OR IGNORE INTO object_tag_value(object_id, tag_id, value_id, value)
-                     VALUES (?, ?, ?, ?)
+                     INSERT OR IGNORE INTO object_tag_value(object_id, tag_id, token_id, value_id, value)
+                     VALUES (?, ?, ?, ?, ?)
                      """);
              PreparedStatement insertPosting = conn.prepareStatement("""
                      INSERT OR IGNORE INTO posting(obf_id, token_id, object_id, sequenceId, isAlone)
@@ -2288,17 +2302,24 @@ public interface AnalystService extends AddressPOIAnalystService {
                                     continue;
                                 }
                                 long objectStartNs = System.nanoTime();
-                                boolean insertedObject = insertGenerateDbObject(insertObject, objectAddress);
+                                boolean insertedObject = insertGenerateDbObject(insertObject, objectAddress, options.skipObjectTags());
                                 metrics.objectDbNs.addAndGet(System.nanoTime() - objectStartNs);
-                                List<GenerateDbObjectTagValue> addressTagValues;
-                                if (insertedObject) {
+                                List<GenerateDbObjectTagValue> addressTagValues = objectTagValues.get(objectAddress.osmId());
+                                if (insertedObject && !options.skipObjectTags()) {
                                     long tagStartNs = System.nanoTime();
                                     addressTagValues = insertGenerateDbTags(insertTag, selectTagId, insertValue, selectValueId, tagIds, valueIds, sqlBatcher, objectAddress);
                                     metrics.tagDbNs.addAndGet(System.nanoTime() - tagStartNs);
-                                    insertGenerateDbObjectTagValues(insertObjectTagValue, sqlBatcher, objectAddress.osmId(), addressTagValues);
                                     objectTagValues.put(objectAddress.osmId(), addressTagValues);
                                     writerBatch.recordRows(1 + addressTagValues.size(), estimateGenerateDbObjectBytes(objectAddress));
-                                } 
+                                } else if (insertedObject) {
+                                    objectTagValues.put(objectAddress.osmId(), Collections.emptyList());
+                                    writerBatch.recordRows(1, estimateGenerateDbObjectBytes(objectAddress));
+                                }
+                                long generatedRows = options.skipObjectTags() ? 0
+                                        : insertGenerateDbGeneratedTokenRows(insertToken, selectTokenId, insertObjectTagValue,
+                                        insertPosting, tokenIds, sqlBatcher, obfId, tokenId, token.name(), objectAddress, addressTagValues,
+                                        options.skipNewTokens(), options.skipTokenInTagValue());
+                                writerBatch.recordRows(generatedRows, generatedRows * 64L);
                                 objectCounts.get(chunk.obfIndex()).incrementAndGet();
                                 long postingStartNs = System.nanoTime();
                                 insertGenerateDbObfPosting(insertPosting, sqlBatcher, obfId, tokenId, objectAddress);
@@ -2697,26 +2718,39 @@ public interface AnalystService extends AddressPOIAnalystService {
                                        PreparedStatement selectTokenId,
                                        Map<String, Long> tokenIds,
                                        IndexToken token) throws SQLException {
-        insertToken.setString(1, token.name());
-        insertToken.setInt(2, token.isCommon() ? 1 : 0);
-        insertToken.setInt(3, token.isFrequent() ? 1 : 0);
+        return upsertGenerateDbToken(insertToken, selectTokenId, tokenIds, token.name(),
+                token.isCommon(), token.isFrequent(), false);
+    }
+
+    private long upsertGenerateDbToken(PreparedStatement insertToken,
+                                       PreparedStatement selectTokenId,
+                                       Map<String, Long> tokenIds,
+                                       String tokenName,
+                                       boolean isCommon,
+                                       boolean isFrequent,
+                                       boolean isGenerated) throws SQLException {
+        insertToken.setString(1, tokenName);
+        insertToken.setInt(2, isCommon ? 1 : 0);
+        insertToken.setInt(3, isFrequent ? 1 : 0);
+        insertToken.setInt(4, isGenerated ? 1 : 0);
         insertToken.executeUpdate();
-        Long cachedId = tokenIds.get(token.name());
+        Long cachedId = tokenIds.get(tokenName);
         if (cachedId != null) {
             return cachedId;
         }
-        selectTokenId.setString(1, token.name());
+        selectTokenId.setString(1, tokenName);
         try (java.sql.ResultSet rs = selectTokenId.executeQuery()) {
             if (rs.next()) {
                 long id = rs.getLong(1);
-                tokenIds.put(token.name(), id);
+                tokenIds.put(tokenName, id);
                 return id;
             }
         }
-        throw new SQLException("Failed to resolve token id for " + token.name());
+        throw new SQLException("Failed to resolve token id for " + tokenName);
     }
 
-    private boolean insertGenerateDbObject(PreparedStatement insertObject, ObjectAddress objectAddress) throws SQLException, IOException {
+    private boolean insertGenerateDbObject(PreparedStatement insertObject, ObjectAddress objectAddress,
+                                           boolean skipObjectTags) throws SQLException, IOException {
         LatLon point = objectAddress.point();
         insertObject.setLong(1, objectAddress.osmId());
         insertObject.setString(2, objectAddress.name());
@@ -2727,8 +2761,13 @@ public interface AnalystService extends AddressPOIAnalystService {
             insertObject.setDouble(3, point.getLatitude());
             insertObject.setDouble(4, point.getLongitude());
         }
-        insertObject.setString(5, getObjectMapper().writeValueAsString(objectAddress.commonTags()));
-        insertObject.setString(6, getObjectMapper().writeValueAsString(objectAddress.extraTags()));
+        if (skipObjectTags) {
+            insertObject.setNull(5, java.sql.Types.VARCHAR);
+            insertObject.setNull(6, java.sql.Types.VARCHAR);
+        } else {
+            insertObject.setString(5, getObjectMapper().writeValueAsString(objectAddress.commonTags()));
+            insertObject.setString(6, getObjectMapper().writeValueAsString(objectAddress.extraTags()));
+        }
         insertObject.setString(7, objectAddress.type());
         insertObject.setString(8, objectAddress.osmType());
         return insertObject.executeUpdate() > 0;
@@ -2747,8 +2786,10 @@ public interface AnalystService extends AddressPOIAnalystService {
         Set<String> duplicateNames = new HashSet<>(commonTags.keySet());
         duplicateNames.retainAll(extraTags.keySet());
         Set<GenerateDbObjectTagValue> result = new LinkedHashSet<>();
-        insertGenerateDbTags(insertTag, selectTagId, insertValue, selectValueId, tagIds, valueIds, sqlBatcher, result, commonTags, "common", duplicateNames);
-        insertGenerateDbTags(insertTag, selectTagId, insertValue, selectValueId, tagIds, valueIds, sqlBatcher, result, extraTags, "extra", duplicateNames);
+        insertGenerateDbTags(insertTag, selectTagId, insertValue, selectValueId, tagIds, valueIds, sqlBatcher, result, commonTags,
+                "common", duplicateNames, objectAddress.isPoi());
+        insertGenerateDbTags(insertTag, selectTagId, insertValue, selectValueId, tagIds, valueIds, sqlBatcher, result, extraTags,
+                "extra", duplicateNames, objectAddress.isPoi());
         return new ArrayList<>(result);
     }
 
@@ -2762,7 +2803,8 @@ public interface AnalystService extends AddressPOIAnalystService {
                                       Set<GenerateDbObjectTagValue> result,
                                       Map<String, List<String>> tags,
                                       String type,
-                                      Set<String> duplicateNames) throws SQLException {
+                                      Set<String> duplicateNames,
+                                      boolean isPoi) throws SQLException {
         if (tags == null || tags.isEmpty()) {
             return;
         }
@@ -2772,13 +2814,16 @@ public interface AnalystService extends AddressPOIAnalystService {
                 continue;
             }
             String storedTag = duplicateNames != null && duplicateNames.contains(tag) ? type + "." + tag : tag;
-            long tagId = upsertGenerateDbTag(insertTag, selectTagId, tagIds, storedTag, type);
+            Map<String, Set<String>> valueTokens = collectGenerateDbTagValueTokens(isPoi, tag, entry.getValue());
+            boolean tagSkipped = valueTokens.isEmpty();
+            long tagId = upsertGenerateDbTag(insertTag, selectTagId, tagIds, storedTag, type, tagSkipped);
             for (String value : entry.getValue()) {
                 if (Algorithms.isEmpty(value)) {
                     continue;
                 }
                 long valueId = upsertGenerateDbValue(insertValue, selectValueId, valueIds, sqlBatcher, tagId, value);
-                result.add(new GenerateDbObjectTagValue(tagId, valueId, value));
+                result.add(new GenerateDbObjectTagValue(tagId, valueId, value,
+                        valueTokens.getOrDefault(value, Collections.emptySet())));
                 break;
             }
         }
@@ -2815,15 +2860,17 @@ public interface AnalystService extends AddressPOIAnalystService {
                                      PreparedStatement selectTagId,
                                      Map<String, Long> tagIds,
                                      String name,
-                                     String type) throws SQLException {
+                                     String type,
+                                     boolean isSkipped) throws SQLException {
         String key = name + "\u0000" + type;
         Long cached = tagIds.get(key);
+        insertTag.setString(1, name);
+        insertTag.setString(2, type);
+        insertTag.setInt(3, isSkipped ? 1 : 0);
+        insertTag.executeUpdate();
         if (cached != null) {
             return cached;
         }
-        insertTag.setString(1, name);
-        insertTag.setString(2, type);
-        insertTag.executeUpdate();
         selectTagId.setString(1, name);
         selectTagId.setString(2, type);
         try (ResultSet rs = selectTagId.executeQuery()) {
@@ -2839,7 +2886,19 @@ public interface AnalystService extends AddressPOIAnalystService {
     private void insertGenerateDbObjectTagValues(PreparedStatement insertObjectTagValue,
                                                  GenerateDbSqlBatcher sqlBatcher,
                                                  long objectId,
-                                                 List<GenerateDbObjectTagValue> tagValues) throws SQLException {
+                                                 List<GenerateDbObjectTagValue> tagValues,
+                                                 long tokenId,
+                                                 String tokenName) throws SQLException {
+        insertGenerateDbObjectTagValues(insertObjectTagValue, sqlBatcher, objectId, tagValues, tokenId, tokenName, false);
+    }
+
+    private void insertGenerateDbObjectTagValues(PreparedStatement insertObjectTagValue,
+                                                 GenerateDbSqlBatcher sqlBatcher,
+                                                 long objectId,
+                                                 List<GenerateDbObjectTagValue> tagValues,
+                                                 long tokenId,
+                                                 String tokenName,
+                                                 boolean includeAllForSkippedToken) throws SQLException {
         if (tagValues == null || tagValues.isEmpty()) {
             return;
         }
@@ -2847,14 +2906,65 @@ public interface AnalystService extends AddressPOIAnalystService {
             if (tagValue == null) {
                 continue;
             }
+            if (tokenId >= 0 && !tagValue.tokens().contains(tokenName)) {
+                continue;
+            }
+            if (tokenId < 0 && !includeAllForSkippedToken && !tagValue.tokens().isEmpty()) {
+                continue;
+            }
             insertObjectTagValue.setLong(1, objectId);
             insertObjectTagValue.setLong(2, tagValue.tagId());
-            insertObjectTagValue.setLong(3, tagValue.valueId());
-            insertObjectTagValue.setString(4, tagValue.value());
+            insertObjectTagValue.setLong(3, tokenId);
+            insertObjectTagValue.setLong(4, tagValue.valueId());
+            insertObjectTagValue.setString(5, tagValue.value());
             insertObjectTagValue.addBatch();
             sqlBatcher.objectTagValueRows++;
             sqlBatcher.totalObjectTagValueRows++;
         }
+    }
+
+    private long insertGenerateDbGeneratedTokenRows(PreparedStatement insertToken,
+                                                    PreparedStatement selectTokenId,
+                                                    PreparedStatement insertObjectTagValue,
+                                                    PreparedStatement insertPosting,
+                                                    Map<String, Long> tokenIds,
+                                                    GenerateDbSqlBatcher sqlBatcher,
+                                                    long obfId,
+                                                    long currentTokenId,
+                                                    String currentTokenName,
+                                                    ObjectAddress objectAddress,
+                                                    List<GenerateDbObjectTagValue> tagValues,
+                                                    boolean skipNewTokens,
+                                                    boolean skipTokenInTagValue) throws SQLException {
+        if (objectAddress == null || objectAddress.osmId() == null || tagValues == null || tagValues.isEmpty()) {
+            return 0;
+        }
+        long rows = 0;
+        Set<String> objectTokens = new LinkedHashSet<>();
+        for (GenerateDbObjectTagValue tagValue : tagValues) {
+            objectTokens.addAll(tagValue.tokens());
+        }
+        for (String tokenName : objectTokens) {
+            if (Algorithms.isEmpty(tokenName)) {
+                continue;
+            }
+            boolean indexedToken = tokenName.equals(currentTokenName);
+            if (!indexedToken && skipNewTokens) {
+                continue;
+            }
+            long tokenId = indexedToken ? currentTokenId
+                    : upsertGenerateDbToken(insertToken, selectTokenId, tokenIds, tokenName, false, false, true);
+            if (!skipTokenInTagValue) {
+                insertGenerateDbObjectTagValues(insertObjectTagValue, sqlBatcher, objectAddress.osmId(), tagValues, tokenId, tokenName);
+            }
+            rows++;
+            if (!indexedToken) {
+                insertGenerateDbObfPosting(insertPosting, sqlBatcher, obfId, tokenId, objectAddress, false);
+                rows++;
+            }
+        }
+        insertGenerateDbObjectTagValues(insertObjectTagValue, sqlBatcher, objectAddress.osmId(), tagValues, -1, null, skipTokenInTagValue);
+        return rows;
     }
 
     private Map<String, List<String>> flattenTags(Map<String, ?> tags) {
@@ -2895,16 +3005,94 @@ public interface AnalystService extends AddressPOIAnalystService {
         }
     }
 
+    private Map<String, Set<String>> collectGenerateDbTagValueTokens(boolean isPoi, String tag, List<String> values) {
+        Map<String, Set<String>> result = new LinkedHashMap<>();
+        if (Algorithms.isEmpty(tag) || values == null || values.isEmpty() || !isGenerateDbSearchIndexedTag(isPoi, tag)) {
+            return result;
+        }
+        for (String value : values) {
+            if (Algorithms.isEmpty(value)) {
+                continue;
+            }
+            Set<String> tokens = new LinkedHashSet<>();
+            if (isPoi && Amenity.ROUTE_MEMBERS_IDS.equals(tag)) {
+                for (String id : value.split(" ")) {
+                    addGenerateDbSplitTokens(tokens, id, true);
+                }
+            } else {
+                addGenerateDbSplitTokens(tokens, value, isPoi);
+            }
+            if (!tokens.isEmpty()) {
+                result.put(value, tokens);
+            }
+        }
+        return result;
+    }
+
+    private boolean isGenerateDbSearchIndexedTag(boolean isPoi, String tag) {
+        if (Algorithms.isEmpty(tag)) {
+            return false;
+        }
+        if (Amenity.NAME.equals(tag) || "name:en".equals(tag) || tag.startsWith("name:") || tag.startsWith("name_")) {
+            return true;
+        }
+        if (isPoi) {
+            return isTagIndexedForSearchAsName(tag) || isTagIndexedForSearchAsId(tag)
+                    || isTagIndexedAsSearchRelated(tag) || Amenity.ROUTE_MEMBERS_IDS.equals(tag);
+        }
+        return "place".equals(tag) || isTagIndexedForSearchAsName(tag) || isTagIndexedForSearchAsId(tag);
+    }
+
+    private void addGenerateDbSplitTokens(Set<String> tokens, String value, boolean isPoi) {
+        if (Algorithms.isEmpty(value)) {
+            return;
+        }
+        String preparedValue = isPoi ? value : removeGenerateDbAddressBraces(value);
+        List<String> splitValues = SearchAlgorithms.splitAndNormalize(preparedValue);
+        SearchAlgorithms.removeCommonWords(splitValues);
+        for (String token : splitValues) {
+            if (!Algorithms.isEmpty(token)) {
+                tokens.add(token);
+            }
+        }
+    }
+
+    private String removeGenerateDbAddressBraces(String name) {
+        if (name == null) {
+            return null;
+        }
+        int i = name.indexOf('(');
+        String retName = name;
+        if (i > -1) {
+            retName = name.substring(0, i);
+            int j = name.indexOf(')', i);
+            if (j > -1) {
+                retName = retName.trim() + ' ' + name.substring(j + 1).trim();
+            }
+        }
+        return retName;
+    }
+
     private void insertGenerateDbObfPosting(PreparedStatement insertObfPosting,
                                             GenerateDbSqlBatcher sqlBatcher,
                                             long obfId,
                                             long tokenId,
                                             ObjectAddress objectAddress) throws SQLException {
+        insertGenerateDbObfPosting(insertObfPosting, sqlBatcher, obfId, tokenId, objectAddress,
+                objectAddress != null && objectAddress.isAlone());
+    }
+
+    private void insertGenerateDbObfPosting(PreparedStatement insertObfPosting,
+                                            GenerateDbSqlBatcher sqlBatcher,
+                                            long obfId,
+                                            long tokenId,
+                                            ObjectAddress objectAddress,
+                                            boolean isAlone) throws SQLException {
         insertObfPosting.setLong(1, obfId);
         insertObfPosting.setLong(2, tokenId);
         insertObfPosting.setLong(3, objectAddress.osmId());
         insertObfPosting.setInt(4, objectAddress.sequenceId());
-        insertObfPosting.setInt(5, objectAddress.isAlone() ? 1 : 0);
+        insertObfPosting.setInt(5, isAlone ? 1 : 0);
         insertObfPosting.addBatch();
         sqlBatcher.postingRows++;
         sqlBatcher.totalPostingRows++;
@@ -2938,12 +3126,17 @@ public interface AnalystService extends AddressPOIAnalystService {
         metrics.batchDbNs.addAndGet(System.nanoTime() - startNs);
     }
 
-    default void createTagsDatasource(String name, List<String> obfs, boolean overwrite, GenerateDbProgressListener progressListener) throws IOException, SQLException {
+    default void createTagsDatasource(String name, List<String> obfs, boolean overwrite, GenerateDbProgressListener progressListener,
+                                      GenerateDbOptions options) throws IOException, SQLException {
         Path dbFile = resolveTagsDatasource(name);
         if (Files.exists(dbFile) && !overwrite) {
             throw new IOException("Datasource already exists: " + dbFile.getFileName());
         }
-        generateDbFile(obfs, dbFile, progressListener);
+        generateDbFile(obfs, dbFile, progressListener, options);
+    }
+
+    record GenerateDbOptions(boolean skipObjectTags, boolean skipNewTokens, boolean skipTokenInTagValue) {
+        static final GenerateDbOptions DEFAULT = new GenerateDbOptions(false, false, false);
     }
 
     record AddressTokenRefs(List<Integer> cityOffsets, List<Integer> streetOffsets, List<Integer> streetCityOffsets,
@@ -2959,7 +3152,7 @@ public interface AnalystService extends AddressPOIAnalystService {
     record GenerateDbRawPoiObject(RawPoiObject rawPoiObject, int payloadOffset, int payloadSize, int sourceOffset) {
     }
 
-    record GenerateDbObjectTagValue(long tagId, long valueId, String value) {
+    record GenerateDbObjectTagValue(long tagId, long valueId, String value, Set<String> tokens) {
     }
 
     class BinaryMapIndexReaderExt extends BinaryMapIndexReader {

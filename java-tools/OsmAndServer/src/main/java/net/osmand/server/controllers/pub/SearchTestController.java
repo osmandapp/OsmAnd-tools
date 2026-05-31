@@ -3,6 +3,7 @@ package net.osmand.server.controllers.pub;
 import jakarta.servlet.http.HttpServletResponse;
 import net.osmand.server.SearchTestRepositoryConfiguration;
 import net.osmand.server.api.searchtest.BaseService.GenParam;
+import net.osmand.server.api.searchtest.AnalystService;
 import net.osmand.server.api.searchtest.DetectorService;
 import net.osmand.server.api.searchtest.OBFService;
 import net.osmand.server.api.searchtest.ReportService.RunStatus;
@@ -46,7 +47,9 @@ public class SearchTestController {
 
 	public record RunTestCaseRequest(RunParam payload, SearchService.SearchOption options) {}
 	public record GenerateDbJobResponse(String jobId) {}
-	public record CreateTagsDatasourceRequest(String name, Boolean overwrite, List<String> obfs) {}
+	public record CreateTagsDatasourceRequest(String name, Boolean overwrite, List<String> obfs,
+											  Boolean skipObjectTags, Boolean skipNewTokens,
+											  Boolean skipTokenInTagValue) {}
 	public record GenerateDbJobStatus(String jobId, String status, String obfName, int obfIndex, int totalObfs,
 									  int processedTokens, int totalTokens, long elapsedMs, long estimatedMs,
 									  boolean downloadReady, String error, List<OBFService.GenerateDbObfProgress> obfs) {}
@@ -570,6 +573,9 @@ public class SearchTestController {
 		CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
 			try {
 				job.status = "RUNNING";
+				AnalystService.GenerateDbOptions options = new AnalystService.GenerateDbOptions(
+						Boolean.TRUE.equals(request.skipObjectTags()), Boolean.TRUE.equals(request.skipNewTokens()),
+						Boolean.TRUE.equals(request.skipTokenInTagValue()));
 				testSearchService.createTagsDatasource(request.name(), request.obfs(), Boolean.TRUE.equals(request.overwrite()), progress -> {
 					if (job.cancelRequested) {
 						throw new CancellationException("Generate DB job was canceled");
@@ -584,7 +590,7 @@ public class SearchTestController {
 					job.estimatedMs = progress.estimatedMs();
 					job.error = progress.error();
 					job.obfs = progress.obfs() == null ? Collections.emptyList() : progress.obfs();
-				});
+				}, options);
 				job.status = job.cancelRequested ? "CANCELED" : "DONE";
 				job.estimatedMs = 0;
 			} catch (CancellationException e) {
@@ -681,12 +687,13 @@ public class SearchTestController {
 	                                                                          @RequestParam(required = false) String tokenFind,
 	                                                                          @RequestParam(required = false) String tag,
 	                                                                          @RequestParam(required = false) List<String> values,
+	                                                                          @RequestParam(defaultValue = "false") boolean perObf,
 	                                                                          @RequestParam(defaultValue = "0") int pageToShow,
 	                                                                          @RequestParam(defaultValue = "100") int pageSizeLimit,
 	                                                                          @RequestParam(required = false) String sortBy,
 	                                                                          @RequestParam(required = false) String sortOrder) throws IOException, SQLException {
 		try {
-			return ResponseEntity.ok(testSearchService.getTagsDbAddressPoiObjects(name, objectType, regExp, tokenFind, tag, values, pageToShow, pageSizeLimit, sortBy, sortOrder));
+			return ResponseEntity.ok(testSearchService.getTagsDbAddressPoiObjects(name, objectType, regExp, tokenFind, tag, values, perObf, pageToShow, pageSizeLimit, sortBy, sortOrder));
 		} catch (SQLException e) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
 		}
