@@ -86,9 +86,9 @@ public interface TokenAnalystService extends OBFService {
     default List<DbTagName> getTagsDbTagNames(String datasource) throws IOException, SQLException {
         Path dbFile = resolveTagsDatasource(datasource);
         String sql = """
-                SELECT t.name, COUNT(DISTINCT otv.object_id) objects, MIN(t.isSkipped) isSkipped
+                SELECT t.name, COALESCE(SUM(ts.objects_count), 0) objects, MIN(t.isSkipped) isSkipped
                 FROM tag t
-                LEFT JOIN object_tag_value otv ON otv.tag_id = t.id
+                LEFT JOIN tag_stats ts ON ts.tag_id = t.id
                 GROUP BY t.name
                 ORDER BY t.name COLLATE NOCASE ASC
                 """;
@@ -179,16 +179,11 @@ public interface TokenAnalystService extends OBFService {
                     + appendObjectTypeWhere(where, objectType)
                     + " GROUP BY t.id, t.name, t.isCommon, t.isFrequent, t.isGenerated";
         }
-        if (poiOnly || addressOnly) {
-            String objectJoinFilter = poiOnly ? " AND o.type = 'POI'" : " AND o.type <> 'POI'";
-            return "SELECT t.id, t.name, t.isCommon, t.isFrequent, t.isGenerated, COUNT(o.id) matched, COALESCE(SUM(CASE WHEN o.id IS NOT NULL AND p.isAlone = 1 THEN 1 ELSE 0 END), 0) alone "
-                    + " FROM token t LEFT JOIN posting p ON p.token_id = t.id LEFT JOIN \"object\" o ON o.id = p.object_id" + objectJoinFilter
-                    + where + " GROUP BY t.id, t.name, t.isCommon, t.isFrequent, t.isGenerated";
-        }
-        String postingAgg = "(SELECT token_id, COUNT(object_id) matched, COALESCE(SUM(CASE WHEN isAlone = 1 THEN 1 ELSE 0 END), 0) alone FROM posting GROUP BY token_id)";
+        String matchedColumn = poiOnly ? "ts.poi_matched_count" : addressOnly ? "ts.address_matched_count" : "ts.matched_count";
+        String aloneColumn = poiOnly ? "ts.poi_alone_count" : addressOnly ? "ts.address_alone_count" : "ts.alone_count";
         return "SELECT t.id, t.name, t.isCommon, t.isFrequent, t.isGenerated, "
-                + "COALESCE(pa.matched, 0) matched, COALESCE(pa.alone, 0) alone "
-                + " FROM token t LEFT JOIN " + postingAgg + " pa ON pa.token_id = t.id"
+                + matchedColumn + " matched, " + aloneColumn + " alone "
+                + " FROM token t JOIN token_stats ts ON ts.token_id = t.id"
                 + where;
     }
 
@@ -280,7 +275,7 @@ public interface TokenAnalystService extends OBFService {
     private String buildTagsDbTokenWhere(String prefix, String tokenFilter, TagFilter tagFilter) {
         List<String> conditions = new ArrayList<>();
         if (!Algorithms.isEmpty(prefix)) {
-            conditions.add("t.name REGEXP ?");
+            conditions.add("t.name LIKE ? || '%' COLLATE NOCASE");
         }
         if (!Algorithms.isEmpty(tokenFilter)) {
             conditions.add(tokenFilter);

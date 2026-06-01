@@ -2123,6 +2123,23 @@ public interface AnalystService extends AddressPOIAnalystService {
                     )
                     """);
             stmt.execute("""
+                    CREATE TABLE token_stats (
+                    	token_id INTEGER PRIMARY KEY,
+                    	matched_count INTEGER NOT NULL,
+                    	alone_count INTEGER NOT NULL,
+                    	poi_matched_count INTEGER NOT NULL,
+                    	poi_alone_count INTEGER NOT NULL,
+                    	address_matched_count INTEGER NOT NULL,
+                    	address_alone_count INTEGER NOT NULL
+                    )
+                    """);
+            stmt.execute("""
+                    CREATE TABLE tag_stats (
+                    	tag_id INTEGER PRIMARY KEY,
+                    	objects_count INTEGER NOT NULL
+                    )
+                    """);
+            stmt.execute("""
                     CREATE TABLE value (
                     	id INTEGER PRIMARY KEY AUTOINCREMENT,
                     	tag_id INTEGER NOT NULL,
@@ -2160,6 +2177,38 @@ public interface AnalystService extends AddressPOIAnalystService {
             stmt.execute("CREATE INDEX idx_object_tag_value_object_tag ON object_tag_value(object_id, tag_id)");
             stmt.execute("CREATE INDEX idx_posting_token_object_obf ON posting(token_id, object_id, obf_id)");
             stmt.execute("CREATE INDEX idx_posting_object_token ON posting(object_id, token_id)");
+            stmt.execute("CREATE INDEX idx_token_name_nocase ON token(name COLLATE NOCASE)");
+            stmt.execute("CREATE INDEX idx_object_type_id ON \"object\"(type, id)");
+            stmt.execute("""
+                    INSERT INTO token_stats(token_id, matched_count, alone_count, poi_matched_count, poi_alone_count, address_matched_count, address_alone_count)
+                    SELECT t.id,
+                           COALESCE(s.matched, 0),
+                           COALESCE(s.alone, 0),
+                           COALESCE(s.poi_matched, 0),
+                           COALESCE(s.poi_alone, 0),
+                           COALESCE(s.address_matched, 0),
+                           COALESCE(s.address_alone, 0)
+                    FROM token t
+                    LEFT JOIN (
+                        SELECT p.token_id,
+                               COUNT(p.object_id) matched,
+                               COALESCE(SUM(CASE WHEN p.isAlone = 1 THEN 1 ELSE 0 END), 0) alone,
+                               COALESCE(SUM(CASE WHEN o.type = 'POI' THEN 1 ELSE 0 END), 0) poi_matched,
+                               COALESCE(SUM(CASE WHEN o.type = 'POI' AND p.isAlone = 1 THEN 1 ELSE 0 END), 0) poi_alone,
+                               COALESCE(SUM(CASE WHEN o.type <> 'POI' THEN 1 ELSE 0 END), 0) address_matched,
+                               COALESCE(SUM(CASE WHEN o.type <> 'POI' AND p.isAlone = 1 THEN 1 ELSE 0 END), 0) address_alone
+                        FROM posting p
+                        JOIN "object" o ON o.id = p.object_id
+                        GROUP BY p.token_id
+                    ) s ON s.token_id = t.id
+                    """);
+            stmt.execute("""
+                    INSERT INTO tag_stats(tag_id, objects_count)
+                    SELECT t.id, COUNT(DISTINCT otv.object_id)
+                    FROM tag t
+                    LEFT JOIN object_tag_value otv ON otv.tag_id = t.id
+                    GROUP BY t.id
+                    """);
             getLogger().info("generateDb: post-load posting indexes completed in {} ms", System.currentTimeMillis() - start);
         }
     }

@@ -19,9 +19,9 @@ public interface AddressPOIAnalystService extends TokenAnalystService {
         Path dbFile = resolveTagsDatasource(datasource);
         String normalizedType = "poi".equalsIgnoreCase(objectType) ? "poi" : "address";
         String typeSql = "poi".equals(normalizedType) ? "o.type = 'POI'" : "o.type <> 'POI'";
-        String nameSql = Algorithms.isEmpty(regExp) ? "" : " AND o.name REGEXP ?";
+        String nameSql = Algorithms.isEmpty(regExp) ? "" : " AND o.name LIKE ? || '%' COLLATE NOCASE";
         String tokenCountSql = buildAddressPoiTokenCountSql(tokenFind);
-        String tokenFilterSql = Algorithms.isEmpty(tokenFind) ? "" : " AND (" + tokenCountSql + ") > 0";
+        String tokenFilterSql = Algorithms.isEmpty(tokenFind) ? "" : " AND " + buildAddressPoiTokenExistsSql(tokenFind);
         AddressPoiTagFilter tagFilter = buildAddressPoiTagFilter(tag, values);
         String tagSql = tagFilter.enabled() ? " AND " + tagFilter.sql() : "";
         String obfJoin = perObf ? " JOIN (SELECT DISTINCT object_id, obf_id FROM posting) po ON po.object_id = o.id LEFT JOIN obf b ON b.id = po.obf_id" : "";
@@ -70,15 +70,20 @@ public interface AddressPOIAnalystService extends TokenAnalystService {
     }
 
     private String buildAddressPoiTokenCountSql(String tokenFind) {
-        String tokenFilter = Algorithms.isEmpty(tokenFind) ? "" : " AND t.name REGEXP ?";
+        String tokenFilter = Algorithms.isEmpty(tokenFind) ? "" : " AND t.name LIKE ? || '%' COLLATE NOCASE";
         return "(SELECT COUNT(DISTINCT t.id) FROM posting p JOIN token t ON t.id = p.token_id WHERE p.object_id = o.id" + tokenFilter + ")";
+    }
+
+    private String buildAddressPoiTokenExistsSql(String tokenFind) {
+        String tokenFilter = Algorithms.isEmpty(tokenFind) ? "" : " AND t.name LIKE ? || '%' COLLATE NOCASE";
+        return "EXISTS (SELECT 1 FROM posting p JOIN token t ON t.id = p.token_id WHERE p.object_id = o.id" + tokenFilter + ")";
     }
 
     default DbObjectTokenPage getTagsDbObjectTokens(String datasource, long objectId, String find,
                                                     int pageToShow, int pageSizeLimit,
                                                     String sortBy, String sortOrder) throws IOException, SQLException {
         Path dbFile = resolveTagsDatasource(datasource);
-        String filter = Algorithms.isEmpty(find) ? "" : " AND t.name REGEXP ?";
+        String filter = Algorithms.isEmpty(find) ? "" : " AND t.name LIKE ? || '%' COLLATE NOCASE";
         Map<String, String> orderColumns = Map.of(
                 "name", "t.name",
                 "common", "t.isCommon",
