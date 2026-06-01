@@ -15,6 +15,8 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 public interface TokenAnalystService extends OBFService {
+    int TAGS_DB_PAGE_SIZE = 100;
+
     default Path getTagsDatasourceDir() throws IOException {
         String url = getSearchTestDatasourceUrl();
         if (Algorithms.isEmpty(url)) {
@@ -143,7 +145,6 @@ public interface TokenAnalystService extends OBFService {
                 "generated", "t.isGenerated",
                 "isgenerated", "t.isGenerated");
         int safePage = Math.max(0, pageToShow);
-        int safeSize = Math.max(1, Math.min(pageSizeLimit, 500));
         try (Connection conn = openTagsDbConnection(dbFile)) {
             String grouped = buildTagsDbTokenGroupedSql(objectType, tagFilter, where);
             List<Object> tokenParams = buildTagTokenParams(prefix, tagFilter);
@@ -153,8 +154,8 @@ public interface TokenAnalystService extends OBFService {
             DbTokenSummary summary;
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 int idx = bindParams(ps, 1, tokenParams);
-                ps.setInt(idx++, safeSize);
-                ps.setInt(idx, safePage * safeSize);
+                ps.setInt(idx++, TAGS_DB_PAGE_SIZE);
+                ps.setInt(idx, safePage * TAGS_DB_PAGE_SIZE);
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
                         content.add(new DbToken(rs.getLong(1), rs.getString(2), rs.getLong(6), rs.getLong(7),
@@ -163,8 +164,8 @@ public interface TokenAnalystService extends OBFService {
                 }
             }
             summary = buildTagsDbTokenSummary(conn, grouped, tokenParams);
-            int totalPages = total == 0 ? 0 : (int) ((total + safeSize - 1) / safeSize);
-            return new DbTokenPage(content, safePage, safeSize, total, totalPages, summary);
+            int totalPages = total == 0 ? 0 : (int) ((total + TAGS_DB_PAGE_SIZE - 1) / TAGS_DB_PAGE_SIZE);
+            return new DbTokenPage(content, safePage, TAGS_DB_PAGE_SIZE, total, totalPages, summary);
         }
     }
 
@@ -212,7 +213,7 @@ public interface TokenAnalystService extends OBFService {
         orderColumns.put("obf", perObf ? "b.name" : "p.sequenceId");
         orderColumns.put("obfname", perObf ? "b.name" : "p.sequenceId");
         int safePage = Math.max(0, pageToShow);
-        int safeSize = Math.max(1, Math.min(pageSizeLimit, 500));
+        int safeSize = TAGS_DB_PAGE_SIZE;
         try (Connection conn = openTagsDbConnection(dbFile)) {
             List<Object> objectParams = buildTagObjectParams(tokenId, regExp, tagFilter);
             long total = queryLong(conn, "SELECT COUNT(*)" + base, objectParams.toArray());

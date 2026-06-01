@@ -35,7 +35,6 @@ public interface AddressPOIAnalystService extends TokenAnalystService {
                 "obf", perObf ? "obfName" : "o.id",
                 "obfname", perObf ? "obfName" : "o.id");
         int safePage = Math.max(0, pageToShow);
-        int safeSize = Math.max(1, Math.min(pageSizeLimit, 500));
         try (Connection conn = openAddressPoiTagsDbConnection(dbFile)) {
             List<Object> params = buildAddressPoiObjectParams(regExp, tokenFind, tagFilter, false);
             long total = queryAddressPoiLong(conn, "SELECT COUNT(*)" + base, params.toArray());
@@ -50,8 +49,8 @@ public interface AddressPOIAnalystService extends TokenAnalystService {
             List<DbObject> content = new ArrayList<>();
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 int idx = bindAddressPoiParams(ps, 1, selectParams);
-                ps.setInt(idx++, safeSize);
-                ps.setInt(idx, safePage * safeSize);
+                ps.setInt(idx++, TAGS_DB_PAGE_SIZE);
+                ps.setInt(idx, safePage * TAGS_DB_PAGE_SIZE);
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
                         Double lat = rs.getObject(3) == null ? null : rs.getDouble(3);
@@ -65,8 +64,8 @@ public interface AddressPOIAnalystService extends TokenAnalystService {
                     }
                 }
             }
-            int totalPages = total == 0 ? 0 : (int) ((total + safeSize - 1) / safeSize);
-            return new DbObjectPage(content, safePage, safeSize, total, totalPages);
+            int totalPages = total == 0 ? 0 : (int) ((total + TAGS_DB_PAGE_SIZE - 1) / TAGS_DB_PAGE_SIZE);
+            return new DbObjectPage(content, safePage, TAGS_DB_PAGE_SIZE, total, totalPages);
         }
     }
 
@@ -88,7 +87,7 @@ public interface AddressPOIAnalystService extends TokenAnalystService {
                 "generated", "t.isGenerated",
                 "isgenerated", "t.isGenerated");
         int safePage = Math.max(0, pageToShow);
-        int safeSize = Math.max(1, Math.min(pageSizeLimit, 500));
+        int safeSize = TAGS_DB_PAGE_SIZE;
         String grouped = "SELECT DISTINCT t.id, t.name, t.isCommon, t.isFrequent, t.isGenerated, NULL obfName "
                 + "FROM posting p JOIN token t ON t.id = p.token_id WHERE p.object_id = ?" + filter;
         try (Connection conn = openAddressPoiTagsDbConnection(dbFile)) {
@@ -138,7 +137,7 @@ public interface AddressPOIAnalystService extends TokenAnalystService {
         Path dbFile = resolveTagsDatasource(datasource);
         String typeWhere = reportTypePredicate(objectType);
         try (Connection conn = openAddressPoiTagsDbConnection(dbFile)) {
-            return loadReportMainWordInconsistency(conn, typeWhere);
+            return loadObjectTestCases(conn, typeWhere);
         }
     }
 
@@ -259,7 +258,7 @@ public interface AddressPOIAnalystService extends TokenAnalystService {
         return result;
     }
 
-    private List<TestCaseObject> loadReportMainWordInconsistency(Connection conn, String typeWhere) throws SQLException {
+    private List<TestCaseObject> loadObjectTestCases(Connection conn, String typeWhere) throws SQLException {
         String typeCond = typeWhere.isEmpty() ? "" : " WHERE " + typeWhere;
         String matchedJoin = typeWhere.isEmpty() ? "" : " JOIN \"object\" mo ON mo.id = mp.object_id";
         String matchedCond = typeWhere.isEmpty() ? "" : " WHERE " + typeWhere.replace("o.", "mo.");

@@ -32,6 +32,7 @@ import java.util.zip.ZipOutputStream;
 import static net.osmand.binary.ObfConstants.*;
 
 public interface AnalystService extends AddressPOIAnalystService {
+    
     private void collectAddressObjects(BinaryMapIndexReaderExt index,
                                        BinaryMapAddressReaderAdapter.AddressRegion region,
                                        AddressRef[] addressRefs,
@@ -2207,7 +2208,6 @@ public interface AnalystService extends AddressPOIAnalystService {
             Map<Integer, AtomicInteger> skippedWithoutOsmIds = new HashMap<>();
             Map<String, Long> tagIds = new HashMap<>();
             Map<String, Long> valueIds = new HashMap<>();
-            Map<Long, List<GenerateDbObjectTagValue>> objectTagValues = new HashMap<>();
             GenerateDbMetrics metrics = new GenerateDbMetrics();
             GenerateDbWriterBatch writerBatch = new GenerateDbWriterBatch(conn, getLogger(), metrics);
             GenerateDbSqlBatcher sqlBatcher = new GenerateDbSqlBatcher();
@@ -2226,7 +2226,6 @@ public interface AnalystService extends AddressPOIAnalystService {
             }
             ExecutorService executor = createGenerateDbExecutor();
             try {
-                List<Future<GenerateDbObfTokens>> tokenFutures = new ArrayList<>();
                 for (int obfIndex = 0; obfIndex < obfs.size(); obfIndex++) {
                     String obf = obfs.get(obfIndex);
                     if (Algorithms.isEmpty(obf)) {
@@ -2234,19 +2233,13 @@ public interface AnalystService extends AddressPOIAnalystService {
                     }
                     int displayIndex = obfIndex + 1;
                     String obfName = OBFService.getObfFileName(obf);
-                    tokenFutures.add(executor.submit(() -> {
-                        long startMs = System.currentTimeMillis();
-                        long startNs = System.nanoTime();
-                        List<IndexToken> tokens = loadAllGenerateDbTokens(obf);
-                        metrics.tokenLoadNs.addAndGet(System.nanoTime() - startNs);
-                        getLogger().info("generateDb: loaded {} tokens for OBF {}", tokens.size(), obfName);
-                        return new GenerateDbObfTokens(obf, obfName, displayIndex, startMs, tokens);
-                    }));
-                }
-
-                CompletionService<GenerateDbTokenChunk> chunkService = new ExecutorCompletionService<>(executor);
-                for (Future<GenerateDbObfTokens> tokenFuture : tokenFutures) {
-                    GenerateDbObfTokens obfTokens = getGenerateDbFuture(tokenFuture);
+                    long startMs = System.currentTimeMillis();
+                    long startNs = System.nanoTime();
+                    List<IndexToken> tokens = loadAllGenerateDbTokens(obf);
+                    metrics.tokenLoadNs.addAndGet(System.nanoTime() - startNs);
+                    getLogger().info("generateDb: loaded {} tokens for OBF {}", tokens.size(), obfName);
+                    GenerateDbObfTokens obfTokens = new GenerateDbObfTokens(obf, obfName, displayIndex, startMs, tokens);
+                    CompletionService<GenerateDbTokenChunk> chunkService = new ExecutorCompletionService<>(executor);
                     GenerateDbObfState state = progressStates.get(obfTokens.obfIndex());
                     if (state != null) {
                         state.startMs = obfTokens.startMs();
@@ -2304,12 +2297,10 @@ public interface AnalystService extends AddressPOIAnalystService {
                                 long objectStartNs = System.nanoTime();
                                 boolean insertedObject = insertGenerateDbObject(insertObject, objectAddress, options.skipObjectTags());
                                 metrics.objectDbNs.addAndGet(System.nanoTime() - objectStartNs);
-                                List<GenerateDbObjectTagValue> addressTagValues = objectTagValues.get(objectAddress.osmId());
+                                long tagStartNs = System.nanoTime();
+                                List<GenerateDbObjectTagValue> addressTagValues = insertGenerateDbTags(insertTag, selectTagId, insertValue, selectValueId, tagIds, valueIds, sqlBatcher, objectAddress);
+                                metrics.tagDbNs.addAndGet(System.nanoTime() - tagStartNs);
                                 if (insertedObject) {
-                                    long tagStartNs = System.nanoTime();
-                                    addressTagValues = insertGenerateDbTags(insertTag, selectTagId, insertValue, selectValueId, tagIds, valueIds, sqlBatcher, objectAddress);
-                                    metrics.tagDbNs.addAndGet(System.nanoTime() - tagStartNs);
-                                    objectTagValues.put(objectAddress.osmId(), addressTagValues);
                                     writerBatch.recordRows(1 + addressTagValues.size(), estimateGenerateDbObjectBytes(objectAddress));
                                 }
                                 long generatedRows = insertGenerateDbGeneratedTokenRows(insertToken, selectTokenId, insertObjectTagValue,
