@@ -10,18 +10,20 @@ import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.osmand.util.SearchAlgorithms;
 import net.osmand.util.TransliterationHelper;
-import org.sqlite.Function;
+import org.slf4j.Logger;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import java.util.zip.ZipEntry;
@@ -29,7 +31,8 @@ import java.util.zip.ZipOutputStream;
 
 import static net.osmand.binary.ObfConstants.*;
 
-public interface IndexService extends OBFService {
+public interface AnalystService extends AddressPOIAnalystService {
+    
     private void collectAddressObjects(BinaryMapIndexReaderExt index,
                                        BinaryMapAddressReaderAdapter.AddressRegion region,
                                        AddressRef[] addressRefs,
@@ -912,6 +915,55 @@ public interface IndexService extends OBFService {
         }
     }
 
+    private ObjectAddress loadCityGenerateDbObjectAddress(BinaryMapIndexReaderExt index,
+                                                          BinaryMapAddressReaderAdapter.AddressRegion region,
+                                                          int offset,
+                                                          String lang) throws IOException {
+        index.getInputStream().seek(offset);
+        long length = index.getInputStream().readRawVarint32();
+        long oldLimit = index.getInputStream().pushLimitLong(length);
+        City city;
+        try {
+            city = readCityAtOffset(index.getInputStream(), offset, region.getAttributeTagsTable());
+        } finally {
+            index.getInputStream().popLimit(oldLimit);
+        }
+        if (city == null) {
+            return null;
+        }
+        Map<String, String> values = buildMapObjectValues(city, lang);
+        String type = city.getType() == null ? null : city.getType().name();
+        int payloadSize = safeMetricInt(length + computeVarint32Size(length));
+        String name = city.getName(lang);
+        return new ObjectAddress(0, name, city.getLocation(), arrangeObjectAddressValues(values), Collections.emptyMap(),
+                false, true, false, false, type, city.getId(), null, offset, payloadSize, offset);
+    }
+
+    private ObjectAddress loadStreetGenerateDbObjectAddress(BinaryMapIndexReaderExt index,
+                                                            BinaryMapAddressReaderAdapter.AddressRegion region,
+                                                            int offset,
+                                                            City city,
+                                                            String lang) throws IOException {
+        if (city == null || city.getLocation() == null) {
+            return null;
+        }
+        int cityX = MapUtils.get31TileNumberX(city.getLocation().getLongitude()) >> 7;
+        int cityY = MapUtils.get31TileNumberY(city.getLocation().getLatitude()) >> 7;
+        index.getInputStream().seek(offset);
+        long length = index.getInputStream().readRawVarint32();
+        long oldLimit = index.getInputStream().pushLimitLong(length);
+        try {
+            Street street = readStreetAtOffset(index.getInputStream(), city, cityX, cityY, region.getAttributeTagsTable());
+            Map<String, String> values = buildMapObjectValues(street, lang);
+            int payloadSize = safeMetricInt(length + computeVarint32Size(length));
+            String name = street.getName(lang);
+            return new ObjectAddress(0, name, street.getLocation(), arrangeObjectAddressValues(values), Collections.emptyMap(),
+                    false, true, false, false, "Street", street.getId(), null, offset, payloadSize, offset);
+        } finally {
+            index.getInputStream().popLimit(oldLimit);
+        }
+    }
+
     private City readCityAtOffset(CodedInputStream codedIS,
                                   long filePointer,
                                   List<String> additionalTagsTable) throws IOException {
@@ -1128,7 +1180,9 @@ public interface IndexService extends OBFService {
             }
             index.initCategories(poiRegion);
             Map<Integer, List<TagValuePair>> tagGroups = preloadPoiTagGroups(index.getInputStream(), poiRegion);
-            for (Integer relativeOffset : relativeOffsets) {
+            List<Integer> sortedOffsets = new ArrayList<>(relativeOffsets);
+            Collections.sort(sortedOffsets);
+            for (Integer relativeOffset : sortedOffsets) {
                 readPoiObjectsAtShift(index, poiRegion, tagGroups, relativeOffset, results, lang, matcher);
             }
         }
@@ -1299,6 +1353,66 @@ public interface IndexService extends OBFService {
         } finally {
             index.getInputStream().popLimit(oldLimit);
         }
+    }
+
+    private List<GenerateDbRawPoiObject> readGenerateDbRawPoiObjectsAtShift(BinaryMapIndexReaderExt index,
+                                                                            BinaryMapPoiReaderAdapter.PoiRegion region,
+                                                                            Map<Integer, List<TagValuePair>> tagGroups,
+                                                                            int relativeOffset) throws IOException {
+        List<GenerateDbRawPoiObject> objects = new ArrayList<>();
+        index.getInputStream().seek(region.getFilePointer() + relativeOffset);
+        long length = readInt(index.getInputStream());
+        long oldLimit = index.getInputStream().pushLimitLong(length);
+        try {
+            int x = 0;
+            int y = 0;
+            int zoom = 0;
+            while (true) {
+                int tagWithType = index.getInputStream().readTag();
+                int tag = WireFormat.getTagFieldNumber(tagWithType);
+                switch (tag) {
+                    case 0:
+                        return objects;
+                    case OsmandOdb.OsmAndPoiBoxData.X_FIELD_NUMBER:
+                        x = index.getInputStream().readUInt32();
+                        break;
+                    case OsmandOdb.OsmAndPoiBoxData.Y_FIELD_NUMBER:
+                        y = index.getInputStream().readUInt32();
+                        break;
+                    case OsmandOdb.OsmAndPoiBoxData.ZOOM_FIELD_NUMBER:
+                        zoom = index.getInputStream().readUInt32();
+                        break;
+                    case OsmandOdb.OsmAndPoiBoxData.POIDATA_FIELD_NUMBER:
+                        int poiLength = index.getInputStream().readRawVarint32();
+                        long poiOldLimit = index.getInputStream().pushLimitLong(poiLength);
+                        try {
+                            RawPoiObject rawPoiObject = readRawPoiObject(index.getInputStream(), x, y, zoom, region, tagGroups);
+                            if (rawPoiObject != null) {
+                                int payloadSize = poiLength + computeVarint32Size(poiLength);
+                                int payloadOffset = (int) (index.getInputStream().getTotalBytesRead() - poiLength);
+                                objects.add(new GenerateDbRawPoiObject(rawPoiObject, payloadOffset, payloadSize,
+                                        (int) (region.getFilePointer() + relativeOffset)));
+                            }
+                        } finally {
+                            index.getInputStream().popLimit(poiOldLimit);
+                        }
+                        break;
+                    default:
+                        InspectorService.skipUnknownField(index.getInputStream(), tagWithType);
+                        break;
+                }
+            }
+        } finally {
+            index.getInputStream().popLimit(oldLimit);
+        }
+    }
+
+    private ObjectAddress toGenerateDbPoiObjectAddress(GenerateDbRawPoiObject rawObject, String lang) {
+        ObjectAddress objectAddress = toPoiObjectAddress(rawObject.rawPoiObject(), lang);
+        return new ObjectAddress(0, objectAddress.name(), objectAddress.point(), objectAddress.commonTags(),
+                objectAddress.extraTags(), objectAddress.isPoi(), true, false, false, objectAddress.type(),
+                objectAddress.osmId(), objectAddress.osmType(), rawObject.payloadOffset(), rawObject.payloadSize(),
+                rawObject.sourceOffset());
     }
 
     private ObjectAddress toPoiObjectAddress(RawPoiObject rawPoiObject,
@@ -1880,12 +1994,17 @@ public interface IndexService extends OBFService {
     }
 
     default void generateDb(List<String> obfs, OutputStream out, GenerateDbProgressListener progressListener) throws IOException, SQLException {
+        generateDb(obfs, out, progressListener, GenerateDbOptions.DEFAULT);
+    }
+
+    default void generateDb(List<String> obfs, OutputStream out, GenerateDbProgressListener progressListener,
+                            GenerateDbOptions options) throws IOException, SQLException {
         if (obfs == null || obfs.isEmpty()) {
             throw new IllegalArgumentException("OBF file list is required");
         }
         Path dbFile = Files.createTempFile("search-test-db-", ".sqlite");
         try {
-            generateDbFile(obfs, dbFile, progressListener);
+            generateDbFile(obfs, dbFile, progressListener, options);
             try (ZipOutputStream zip = new ZipOutputStream(out)) {
                 zip.putNextEntry(new ZipEntry("db.sqlite"));
                 Files.copy(dbFile, zip);
@@ -1901,20 +2020,22 @@ public interface IndexService extends OBFService {
         }
     }
 
-    default void generateDbFile(List<String> obfs, Path dbFile, GenerateDbProgressListener progressListener) throws IOException, SQLException {
+    default void generateDbFile(List<String> obfs, Path dbFile, GenerateDbProgressListener progressListener,
+                                GenerateDbOptions options) throws IOException, SQLException {
         if (obfs == null || obfs.isEmpty()) {
             throw new IllegalArgumentException("OBF file list is required");
         }
+        GenerateDbOptions safeOptions = options == null ? GenerateDbOptions.DEFAULT : options;
         Files.createDirectories(dbFile.toAbsolutePath().getParent());
         Files.deleteIfExists(dbFile);
         try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbFile.toAbsolutePath())) {
-            createGenerateDbSchema(conn);
-            conn.setAutoCommit(false);
+            configureGenerateDbBulkLoad(conn);
+            createDbSchema(conn);
             try {
-                populateDb(conn, obfs, progressListener);
-                conn.commit();
+                populateDb(conn, obfs, progressListener, safeOptions);
+                finalizeGenerateDb(conn);
             } catch (Exception e) {
-                conn.rollback();
+                rollbackGenerateDb(conn);
                 if (e instanceof CancellationException cancellationException) {
                     throw cancellationException;
                 }
@@ -1929,11 +2050,42 @@ public interface IndexService extends OBFService {
         }
     }
 
-    private void createGenerateDbSchema(Connection conn) throws SQLException {
+    private void configureGenerateDbBulkLoad(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement()) {
-            stmt.execute("PRAGMA foreign_keys = ON");
+            stmt.execute("PRAGMA page_size = 32768");
             stmt.execute("PRAGMA journal_mode = OFF");
             stmt.execute("PRAGMA synchronous = OFF");
+            stmt.execute("PRAGMA locking_mode = EXCLUSIVE");
+            stmt.execute("PRAGMA temp_store = MEMORY");
+            stmt.execute("PRAGMA cache_size = -524288");
+            stmt.execute("PRAGMA foreign_keys = OFF");
+            stmt.execute("PRAGMA automatic_index = OFF");
+        }
+        conn.setAutoCommit(true);
+    }
+
+    private void finalizeGenerateDb(Connection conn) throws SQLException {
+        try (Statement stmt = conn.createStatement()) {
+            long start = System.currentTimeMillis();
+            stmt.execute("ANALYZE");
+            stmt.execute("PRAGMA optimize");
+            getLogger().info("generateDb: post-load ANALYZE/optimize completed in {} ms", System.currentTimeMillis() - start);
+        }
+    }
+
+    private void rollbackGenerateDb(Connection conn) {
+        try {
+            if (!conn.getAutoCommit()) {
+                conn.rollback();
+                conn.setAutoCommit(true);
+            }
+        } catch (SQLException rollbackError) {
+            getLogger().warn("generateDb: failed to rollback current SQLite transaction", rollbackError);
+        }
+    }
+
+    private void createDbSchema(Connection conn) throws SQLException {
+        try (Statement stmt = conn.createStatement()) {
             stmt.execute("""
                     CREATE TABLE obf (
                     	id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1945,13 +2097,8 @@ public interface IndexService extends OBFService {
                     	id INTEGER PRIMARY KEY AUTOINCREMENT,
                     	name TEXT NOT NULL UNIQUE,
                     	isCommon INTEGER NOT NULL,
-                    	isFrequent INTEGER NOT NULL,
-                    	poiSize INTEGER NOT NULL DEFAULT 0,
-                    	poiCount INTEGER NOT NULL DEFAULT 0,
-                    	addressSize INTEGER NOT NULL DEFAULT 0,
-                    	addressCount INTEGER NOT NULL DEFAULT 0,
-                    	poiRefs INTEGER NOT NULL DEFAULT 0,
-                    	addressRefs INTEGER NOT NULL DEFAULT 0
+                        isFrequent INTEGER NOT NULL,
+                        isGenerated INTEGER NOT NULL -- is token added during generation (true) or became from index (false)
                     )
                     """);
             stmt.execute("""
@@ -1971,7 +2118,25 @@ public interface IndexService extends OBFService {
                     	id INTEGER PRIMARY KEY AUTOINCREMENT,
                     	name TEXT NOT NULL,
                     	type TEXT,
+                        isSkipped INTEGER NOT NULL, -- is tag skipped (true) in matchesLegacy for POI/Address or not (false)
                     	UNIQUE(name, type)
+                    )
+                    """);
+            stmt.execute("""
+                    CREATE TABLE token_stats (
+                    	token_id INTEGER PRIMARY KEY,
+                    	matched_count INTEGER NOT NULL,
+                    	alone_count INTEGER NOT NULL,
+                    	poi_matched_count INTEGER NOT NULL,
+                    	poi_alone_count INTEGER NOT NULL,
+                    	address_matched_count INTEGER NOT NULL,
+                    	address_alone_count INTEGER NOT NULL
+                    )
+                    """);
+            stmt.execute("""
+                    CREATE TABLE tag_stats (
+                    	tag_id INTEGER PRIMARY KEY,
+                    	objects_count INTEGER NOT NULL
                     )
                     """);
             stmt.execute("""
@@ -1983,24 +2148,17 @@ public interface IndexService extends OBFService {
                     )
                     """);
             stmt.execute("""
-                    CREATE TABLE token_tag (
-                    	token_id INTEGER NOT NULL,
-                    	tag_id INTEGER NOT NULL,
-                    	PRIMARY KEY (tag_id, token_id)
+                    CREATE TABLE object_tag_value (
+                        object_id INTEGER NOT NULL, -- what kind of object related to tag
+                        tag_id INTEGER NOT NULL, -- what kind of tag related to object
+                        token_id INTEGER NOT NULL, -- what kind of token related to object in corresponding tag value, -1 if tag isSkipped = true
+                        value_id INTEGER NOT NULL, -- what kind of value related to object in corresponding tag and token
+                    	value TEXT NOT NULL,
+                        PRIMARY KEY (tag_id, value_id, object_id, token_id)
                     )
                     """);
             stmt.execute("""
-                    CREATE TABLE poi_posting (
-                    	obf_id INTEGER NOT NULL,
-                    	token_id INTEGER NOT NULL,
-                    	object_id INTEGER NOT NULL,
-                    	sequenceId INTEGER NOT NULL,
-                    	isAlone INTEGER NOT NULL DEFAULT 0,
-                    	PRIMARY KEY (token_id, object_id, obf_id)
-                    )
-                    """);
-            stmt.execute("""
-                    CREATE TABLE addr_posting (
+                    CREATE TABLE posting (
                     	obf_id INTEGER NOT NULL,
                     	token_id INTEGER NOT NULL,
                     	object_id INTEGER NOT NULL,
@@ -2012,21 +2170,60 @@ public interface IndexService extends OBFService {
         }
     }
 
-    private void populateDb(Connection conn, List<String> obfs, GenerateDbProgressListener progressListener) throws SQLException, IOException {
+    private void buildGenerateDbPostLoadIndexes(Connection conn) throws SQLException {
+        try (Statement stmt = conn.createStatement()) {
+            long start = System.currentTimeMillis();
+            stmt.execute("CREATE INDEX idx_object_tag_value_tag_value_object ON object_tag_value(tag_id, value_id, object_id)");
+            stmt.execute("CREATE INDEX idx_object_tag_value_object_tag ON object_tag_value(object_id, tag_id)");
+            stmt.execute("CREATE INDEX idx_posting_token_object_obf ON posting(token_id, object_id, obf_id)");
+            stmt.execute("CREATE INDEX idx_posting_object_token ON posting(object_id, token_id)");
+            stmt.execute("CREATE INDEX idx_token_name_nocase ON token(name COLLATE NOCASE)");
+            stmt.execute("CREATE INDEX idx_object_type_id ON \"object\"(type, id)");
+            stmt.execute("""
+                    INSERT INTO token_stats(token_id, matched_count, alone_count, poi_matched_count, poi_alone_count, address_matched_count, address_alone_count)
+                    SELECT t.id,
+                           COALESCE(s.matched, 0),
+                           COALESCE(s.alone, 0),
+                           COALESCE(s.poi_matched, 0),
+                           COALESCE(s.poi_alone, 0),
+                           COALESCE(s.address_matched, 0),
+                           COALESCE(s.address_alone, 0)
+                    FROM token t
+                    LEFT JOIN (
+                        SELECT p.token_id,
+                               COUNT(p.object_id) matched,
+                               COALESCE(SUM(CASE WHEN p.isAlone = 1 THEN 1 ELSE 0 END), 0) alone,
+                               COALESCE(SUM(CASE WHEN o.type = 'POI' THEN 1 ELSE 0 END), 0) poi_matched,
+                               COALESCE(SUM(CASE WHEN o.type = 'POI' AND p.isAlone = 1 THEN 1 ELSE 0 END), 0) poi_alone,
+                               COALESCE(SUM(CASE WHEN o.type <> 'POI' THEN 1 ELSE 0 END), 0) address_matched,
+                               COALESCE(SUM(CASE WHEN o.type <> 'POI' AND p.isAlone = 1 THEN 1 ELSE 0 END), 0) address_alone
+                        FROM posting p
+                        JOIN "object" o ON o.id = p.object_id
+                        GROUP BY p.token_id
+                    ) s ON s.token_id = t.id
+                    """);
+            stmt.execute("""
+                    INSERT INTO tag_stats(tag_id, objects_count)
+                    SELECT t.id, COUNT(DISTINCT otv.object_id)
+                    FROM tag t
+                    LEFT JOIN object_tag_value otv ON otv.tag_id = t.id
+                    GROUP BY t.id
+                    """);
+            getLogger().info("generateDb: post-load posting indexes completed in {} ms", System.currentTimeMillis() - start);
+        }
+    }
+
+    private void populateDb(Connection conn, List<String> obfs, GenerateDbProgressListener progressListener,
+                            GenerateDbOptions options) throws SQLException, IOException {
         Map<String, Long> tokenIds = new HashMap<>();
         try (PreparedStatement insertObf = conn.prepareStatement("INSERT INTO OBF(name) VALUES (?)", Statement.RETURN_GENERATED_KEYS);
              PreparedStatement insertToken = conn.prepareStatement("""
-                     INSERT INTO token(name, isCommon, isFrequent, poiSize, poiCount, addressSize, addressCount, poiRefs, addressRefs)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     INSERT INTO token(name, isCommon, isFrequent, isGenerated)
+                     VALUES (?, ?, ?, ?)
                      ON CONFLICT(name) DO UPDATE SET
                      	isCommon = CASE WHEN excluded.isCommon = 1 THEN 1 ELSE Token.isCommon END,
-                     	isFrequent = CASE WHEN excluded.isFrequent = 1 THEN 1 ELSE Token.isFrequent END,
-                     	poiSize = Token.poiSize + excluded.poiSize,
-                     	poiCount = Token.poiCount + excluded.poiCount,
-                     	addressSize = Token.addressSize + excluded.addressSize,
-                     	addressCount = Token.addressCount + excluded.addressCount,
-                     	poiRefs = Token.poiRefs + excluded.poiRefs,
-                     	addressRefs = Token.addressRefs + excluded.addressRefs
+                        isFrequent = CASE WHEN excluded.isFrequent = 1 THEN 1 ELSE Token.isFrequent END,
+                        isGenerated = CASE WHEN excluded.isGenerated = 0 THEN 0 ELSE Token.isGenerated END
                      """);
              PreparedStatement selectTokenId = conn.prepareStatement("SELECT id FROM token WHERE name = ?");
              PreparedStatement insertObject = conn.prepareStatement("""
@@ -2034,31 +2231,24 @@ public interface IndexService extends OBFService {
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                      """);
              PreparedStatement insertTag = conn.prepareStatement("""
-                     INSERT OR IGNORE INTO tag(name, type)
-                     VALUES (?, ?)
+                     INSERT INTO tag(name, type, isSkipped)
+                     VALUES (?, ?, ?)
+                     ON CONFLICT(name, type) DO UPDATE SET
+                        isSkipped = CASE WHEN excluded.isSkipped = 0 THEN 0 ELSE tag.isSkipped END
                      """);
              PreparedStatement selectTagId = conn.prepareStatement("SELECT id FROM tag WHERE name = ? AND type = ?");
              PreparedStatement insertValue = conn.prepareStatement("""
                      INSERT OR IGNORE INTO value(tag_id, value)
                      VALUES (?, ?)
                      """);
-             PreparedStatement insertTokenTag = conn.prepareStatement("""
-                     INSERT OR IGNORE INTO token_tag(token_id, tag_id)
-                     VALUES (?, ?)
-                     """);
-             PreparedStatement insertPoiPosting = conn.prepareStatement("""
-                     INSERT INTO poi_posting(obf_id, token_id, object_id, sequenceId, isAlone)
+             PreparedStatement selectValueId = conn.prepareStatement("SELECT id FROM value WHERE tag_id = ? AND value = ?");
+             PreparedStatement insertObjectTagValue = conn.prepareStatement("""
+                     INSERT OR IGNORE INTO object_tag_value(object_id, tag_id, token_id, value_id, value)
                      VALUES (?, ?, ?, ?, ?)
-                     ON CONFLICT(token_id, object_id, obf_id) DO UPDATE SET
-                     	sequenceId = MIN(poi_posting.sequenceId, excluded.sequenceId),
-                     	isAlone = CASE WHEN poi_posting.isAlone = 1 OR excluded.isAlone = 1 THEN 1 ELSE 0 END
                      """);
-             PreparedStatement insertAddrPosting = conn.prepareStatement("""
-                     INSERT INTO addr_posting(obf_id, token_id, object_id, sequenceId, isAlone)
+             PreparedStatement insertPosting = conn.prepareStatement("""
+                     INSERT OR IGNORE INTO posting(obf_id, token_id, object_id, sequenceId, isAlone)
                      VALUES (?, ?, ?, ?, ?)
-                     ON CONFLICT(token_id, object_id, obf_id) DO UPDATE SET
-                     	sequenceId = MIN(addr_posting.sequenceId, excluded.sequenceId),
-                     	isAlone = CASE WHEN addr_posting.isAlone = 1 OR excluded.isAlone = 1 THEN 1 ELSE 0 END
                      """)) {
             int totalObfs = obfs.size();
             Map<Integer, GenerateDbObfState> progressStates = new LinkedHashMap<>();
@@ -2066,7 +2256,10 @@ public interface IndexService extends OBFService {
             Map<Integer, AtomicInteger> objectCounts = new HashMap<>();
             Map<Integer, AtomicInteger> skippedWithoutOsmIds = new HashMap<>();
             Map<String, Long> tagIds = new HashMap<>();
-            Map<Long, List<Long>> objectTagIds = new HashMap<>();
+            Map<String, Long> valueIds = new HashMap<>();
+            GenerateDbMetrics metrics = new GenerateDbMetrics();
+            GenerateDbWriterBatch writerBatch = new GenerateDbWriterBatch(conn, getLogger(), metrics);
+            GenerateDbSqlBatcher sqlBatcher = new GenerateDbSqlBatcher();
             for (int obfIndex = 0; obfIndex < obfs.size(); obfIndex++) {
                 String obf = obfs.get(obfIndex);
                 if (Algorithms.isEmpty(obf)) {
@@ -2082,7 +2275,6 @@ public interface IndexService extends OBFService {
             }
             ExecutorService executor = createGenerateDbExecutor();
             try {
-                List<Future<GenerateDbObfTokens>> tokenFutures = new ArrayList<>();
                 for (int obfIndex = 0; obfIndex < obfs.size(); obfIndex++) {
                     String obf = obfs.get(obfIndex);
                     if (Algorithms.isEmpty(obf)) {
@@ -2090,18 +2282,13 @@ public interface IndexService extends OBFService {
                     }
                     int displayIndex = obfIndex + 1;
                     String obfName = OBFService.getObfFileName(obf);
-                    tokenFutures.add(executor.submit(() -> {
-                        long startMs = System.currentTimeMillis();
-                        List<IndexToken> tokens = loadAllGenerateDbTokens(obf);
-                        getLogger().info("generateDb: loaded {} tokens for OBF {}", tokens.size(), obfName);
-                        return new GenerateDbObfTokens(obf, obfName, displayIndex, startMs, tokens);
-                    }));
-                }
-
-                CompletionService<GenerateDbTokenChunk> chunkService = new ExecutorCompletionService<>(executor);
-                int submittedChunks = 0;
-                for (Future<GenerateDbObfTokens> tokenFuture : tokenFutures) {
-                    GenerateDbObfTokens obfTokens = getGenerateDbFuture(tokenFuture);
+                    long startMs = System.currentTimeMillis();
+                    long startNs = System.nanoTime();
+                    List<IndexToken> tokens = loadAllGenerateDbTokens(obf);
+                    metrics.tokenLoadNs.addAndGet(System.nanoTime() - startNs);
+                    getLogger().info("generateDb: loaded {} tokens for OBF {}", tokens.size(), obfName);
+                    GenerateDbObfTokens obfTokens = new GenerateDbObfTokens(obf, obfName, displayIndex, startMs, tokens);
+                    CompletionService<GenerateDbTokenChunk> chunkService = new ExecutorCompletionService<>(executor);
                     GenerateDbObfState state = progressStates.get(obfTokens.obfIndex());
                     if (state != null) {
                         state.startMs = obfTokens.startMs();
@@ -2110,12 +2297,6 @@ public interface IndexService extends OBFService {
                     }
                     notifyGenerateDbProgress(progressListener, "RUNNING", obfTokens.obfName(), obfTokens.obfIndex(), totalObfs,
                             0, obfTokens.tokens().size(), obfTokens.startMs(), null, progressStates);
-                    for (int start = 0; start < obfTokens.tokens().size(); start += 10) {
-                        int to = Math.min(start + 10, obfTokens.tokens().size());
-                        List<IndexToken> tokenChunk = obfTokens.tokens().subList(start, to);
-                        chunkService.submit(() -> loadGenerateDbTokenChunk(obfTokens, tokenChunk));
-                        submittedChunks++;
-                    }
                     if (obfTokens.tokens().isEmpty()) {
                         if (state != null) {
                             state.markDone();
@@ -2123,43 +2304,77 @@ public interface IndexService extends OBFService {
                         notifyGenerateDbProgress(progressListener, "RUNNING", obfTokens.obfName(), obfTokens.obfIndex(), totalObfs,
                                 0, 0, obfTokens.startMs(), null, progressStates);
                     }
-                }
-
-                for (int completedChunks = 0; completedChunks < submittedChunks; completedChunks++) {
-                    GenerateDbTokenChunk chunk = getGenerateDbFuture(chunkService.take());
-                    long obfId = obfIds.get(chunk.obfIndex());
-                    GenerateDbObfState state = progressStates.get(chunk.obfIndex());
-                    for (GenerateDbTokenObjects tokenObjects : chunk.tokens()) {
-                        IndexToken token = tokenObjects.token();
-                        if (token == null || Algorithms.isEmpty(token.name())) {
-                            incrementGenerateDbProgress(state, progressListener, chunk, totalObfs, progressStates);
-                            continue;
+                    int totalChunks = (obfTokens.tokens().size() + GenerateDbWriterBatch.TOKEN_CHUNK_SIZE - 1)
+                            / GenerateDbWriterBatch.TOKEN_CHUNK_SIZE;
+                    int nextChunkStart = 0;
+                    int submittedChunks = 0;
+                    int completedChunks = 0;
+                    while (submittedChunks < totalChunks && submittedChunks < GenerateDbWriterBatch.MAX_IN_FLIGHT_CHUNKS) {
+                        nextChunkStart = submitGenerateDbTokenChunk(chunkService, obfTokens, nextChunkStart, metrics);
+                        submittedChunks++;
+                    }
+                    while (completedChunks < totalChunks) {
+                        long waitStartNs = System.nanoTime();
+                        GenerateDbTokenChunk chunk = getGenerateDbFuture(chunkService.take());
+                        metrics.readerWaitNs.addAndGet(System.nanoTime() - waitStartNs);
+                        completedChunks++;
+                        while (submittedChunks < totalChunks
+                                && submittedChunks - completedChunks < GenerateDbWriterBatch.MAX_IN_FLIGHT_CHUNKS) {
+                            nextChunkStart = submitGenerateDbTokenChunk(chunkService, obfTokens, nextChunkStart, metrics);
+                            submittedChunks++;
                         }
-                        ObjectAddressPage objectsPage = tokenObjects.objectsPage();
-                        long tokenId = upsertGenerateDbToken(insertToken, selectTokenId, tokenIds, token, objectsPage);
-                        for (ObjectAddress objectAddress : objectsPage.content()) {
-                            if (objectAddress == null || !objectAddress.isMatched()) {
+                        long obfId = obfIds.get(chunk.obfIndex());
+                        GenerateDbObfState chunkState = progressStates.get(chunk.obfIndex());
+                        for (GenerateDbTokenObjects tokenObjects : chunk.tokens()) {
+                            IndexToken token = tokenObjects.token();
+                            if (token == null || Algorithms.isEmpty(token.name())) {
+                                incrementGenerateDbProgress(chunkState, progressListener, chunk, totalObfs, progressStates);
                                 continue;
                             }
-                            if (objectAddress.osmId() == null) {
-                                skippedWithoutOsmIds.get(chunk.obfIndex()).incrementAndGet();
-                                continue;
+                            long insertStartNs = System.nanoTime();
+                            long tokenId = upsertGenerateDbToken(insertToken, selectTokenId, tokenIds, token);
+                            metrics.tokenDbNs.addAndGet(System.nanoTime() - insertStartNs);
+                            writerBatch.recordRows(1, estimateGenerateDbTokenBytes(token));
+                            for (ObjectAddress objectAddress : tokenObjects.objectsPage().content()) {
+                                if (objectAddress == null || !objectAddress.isMatched()) {
+                                    continue;
+                                }
+                                if (objectAddress.osmId() == null) {
+                                    skippedWithoutOsmIds.get(chunk.obfIndex()).incrementAndGet();
+                                    continue;
+                                }
+                                long objectStartNs = System.nanoTime();
+                                boolean insertedObject = insertGenerateDbObject(insertObject, objectAddress, options.skipObjectTags());
+                                metrics.objectDbNs.addAndGet(System.nanoTime() - objectStartNs);
+                                long tagStartNs = System.nanoTime();
+                                List<GenerateDbObjectTagValue> addressTagValues = insertGenerateDbTags(insertTag, selectTagId, insertValue, selectValueId, tagIds, valueIds, sqlBatcher, objectAddress);
+                                metrics.tagDbNs.addAndGet(System.nanoTime() - tagStartNs);
+                                if (insertedObject) {
+                                    writerBatch.recordRows(1 + addressTagValues.size(), estimateGenerateDbObjectBytes(objectAddress));
+                                }
+                                long generatedRows = insertGenerateDbGeneratedTokenRows(insertToken, selectTokenId, insertObjectTagValue,
+                                        insertPosting, tokenIds, sqlBatcher, obfId, tokenId, token.name(), objectAddress, addressTagValues,
+                                        options.skipNewTokens(), options.skipTokenInTagValue());
+                                writerBatch.recordRows(generatedRows, generatedRows * 64L);
+                                objectCounts.get(chunk.obfIndex()).incrementAndGet();
+                                long postingStartNs = System.nanoTime();
+                                insertGenerateDbObfPosting(insertPosting, sqlBatcher, obfId, tokenId, objectAddress);
+                                flushGenerateDbSqlBatchesIfNeeded(insertObjectTagValue, insertPosting, sqlBatcher, metrics);
+                                metrics.postingDbNs.addAndGet(System.nanoTime() - postingStartNs);
+                                writerBatch.recordRows(1, 64L);
                             }
-                            boolean insertedObject = insertGenerateDbObject(insertObject, objectAddress);
-                            List<Long> addressTagIds;
-                            if (insertedObject) {
-                                addressTagIds = insertGenerateDbTags(insertTag, selectTagId, insertValue, tagIds, objectAddress);
-                                objectTagIds.put(objectAddress.osmId(), addressTagIds);
-                            } else {
-                                addressTagIds = objectTagIds.getOrDefault(objectAddress.osmId(), Collections.emptyList());
+                            incrementGenerateDbProgress(chunkState, progressListener, chunk, totalObfs, progressStates);
+                            flushGenerateDbSqlBatchesIfNeeded(insertObjectTagValue, insertPosting, sqlBatcher, metrics);
+                            writerBatch.commitIfNeeded(Math.max(0, submittedChunks - completedChunks));
+                            if (chunkState != null && (chunkState.processedTokens % 10000 == 0 || chunkState.processedTokens == chunkState.totalTokens)) {
+                                writerBatch.reportProgress();
                             }
-                            objectCounts.get(chunk.obfIndex()).incrementAndGet();
-                            insertGenerateDbObfPosting(objectAddress.isPoi() ? insertPoiPosting : insertAddrPosting, obfId, tokenId, objectAddress);
-                            insertGenerateDbTokenTags(insertTokenTag, tokenId, addressTagIds);
                         }
-                        incrementGenerateDbProgress(state, progressListener, chunk, totalObfs, progressStates);
                     }
                 }
+                flushGenerateDbSqlBatches(insertObjectTagValue, insertPosting, sqlBatcher, metrics);
+                writerBatch.commitFinal();
+                buildGenerateDbPostLoadIndexes(conn);
                 for (GenerateDbObfState state : progressStates.values()) {
                     state.markDone();
                     notifyGenerateDbProgress(progressListener, "RUNNING", state.obfName, state.obfIndex, totalObfs,
@@ -2170,6 +2385,17 @@ public interface IndexService extends OBFService {
                         getLogger().info("generateDb: skipped {} matched objects without OSM ID for OBF {}", skipped, state.obfName);
                     }
                 }
+                getLogger().info("generateDb: final counters total_time_ms={} token_load_ms={} object_chunk_load_ms={} address_chunk_load_ms={} poi_chunk_load_ms={} reader_wait_ms={} token_db_ms={} object_db_json_ms={} tag_flatten_db_ms={} posting_db_ms={} batch_db_ms={} value_rows={} object_tag_value_rows={} posting_rows={} poi_boxes={} poi_raw_objects={} poi_candidate_checks={} poi_matches={} commit_ms={} commits={} rows={} queue_depth_avg={} queue_depth_max={} commit_latency_p50={} ms commit_latency_p95={} ms max_memory_usage={} MB",
+                        metrics.elapsedMs(), metrics.nsToMs(metrics.tokenLoadNs.get()), metrics.nsToMs(metrics.objectChunkLoadNs.get()),
+                        metrics.nsToMs(metrics.addressChunkLoadNs.get()), metrics.nsToMs(metrics.poiChunkLoadNs.get()),
+                        metrics.nsToMs(metrics.readerWaitNs.get()), metrics.nsToMs(metrics.tokenDbNs.get()),
+                        metrics.nsToMs(metrics.objectDbNs.get()), metrics.nsToMs(metrics.tagDbNs.get()),
+                        metrics.nsToMs(metrics.postingDbNs.get()), metrics.nsToMs(metrics.batchDbNs.get()),
+                        sqlBatcher.totalValueRows, sqlBatcher.totalObjectTagValueRows, sqlBatcher.totalPostingRows,
+                        metrics.poiBoxes.get(), metrics.poiRawObjects.get(), metrics.poiCandidateChecks.get(), metrics.poiMatches.get(),
+                        metrics.nsToMs(metrics.commitNs.get()),
+                        writerBatch.commitCount(), writerBatch.totalRows(), writerBatch.averageQueueDepth(), writerBatch.queueDepthMax(),
+                        writerBatch.percentileLatency(50), writerBatch.percentileLatency(95), writerBatch.usedMemoryMb());
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new IOException("Interrupted while generating SQLite DB", e);
@@ -2177,6 +2403,59 @@ public interface IndexService extends OBFService {
                 executor.shutdownNow();
             }
         }
+    }
+
+    private long estimateGenerateDbTokenBytes(IndexToken token) {
+        return 64L + safeString(token.name()).length() * 2L;
+    }
+
+    private long estimateGenerateDbObjectBytes(ObjectAddress objectAddress) {
+        long bytes = 192L + safeString(objectAddress.name()).length() * 2L
+                + safeString(objectAddress.type()).length() * 2L
+                + safeString(objectAddress.osmType()).length() * 2L;
+        bytes += estimateTagMapBytes(objectAddress.commonTags());
+        bytes += estimateTagMapBytes(objectAddress.extraTags());
+        return bytes;
+    }
+
+    private long estimateTagMapBytes(Map<String, ?> tags) {
+        if (tags == null || tags.isEmpty()) {
+            return 0;
+        }
+        long bytes = 0;
+        for (Map.Entry<String, ?> entry : tags.entrySet()) {
+            bytes += safeString(entry.getKey()).length() * 2L + estimateObjectBytes(entry.getValue());
+        }
+        return bytes;
+    }
+
+    private long estimateObjectBytes(Object value) {
+        if (value == null) {
+            return 0;
+        }
+        if (value instanceof Map<?, ?> map) {
+            long bytes = 64;
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                bytes += estimateObjectBytes(entry.getKey()) + estimateObjectBytes(entry.getValue());
+            }
+            return bytes;
+        }
+        if (value instanceof Iterable<?> values) {
+            long bytes = 64;
+            for (Object item : values) {
+                bytes += estimateObjectBytes(item);
+            }
+            return bytes;
+        }
+        if (value.getClass().isArray()) {
+            long bytes = 64;
+            int length = java.lang.reflect.Array.getLength(value);
+            for (int i = 0; i < length; i++) {
+                bytes += estimateObjectBytes(java.lang.reflect.Array.get(value, i));
+            }
+            return bytes;
+        }
+        return 32L + String.valueOf(value).length() * 2L;
     }
 
     private ExecutorService createGenerateDbExecutor() {
@@ -2189,21 +2468,188 @@ public interface IndexService extends OBFService {
             t.setDaemon(true);
             return t;
         };
-        return Executors.newFixedThreadPool(maxCount, tf);
+        return new ThreadPoolExecutor(maxCount, maxCount, 0L, TimeUnit.MILLISECONDS,
+                new ArrayBlockingQueue<>(GenerateDbWriterBatch.QUEUE_CAPACITY), tf, new ThreadPoolExecutor.CallerRunsPolicy());
+    }
+
+    private int submitGenerateDbTokenChunk(CompletionService<GenerateDbTokenChunk> chunkService,
+                                           GenerateDbObfTokens obfTokens,
+                                           int start,
+                                           GenerateDbMetrics metrics) {
+        int to = Math.min(start + GenerateDbWriterBatch.TOKEN_CHUNK_SIZE, obfTokens.tokens().size());
+        List<IndexToken> tokenChunk = obfTokens.tokens().subList(start, to);
+        chunkService.submit(() -> {
+            GenerateDbMetrics.setCurrent(metrics);
+            try {
+                return loadGenerateDbTokenChunk(obfTokens, tokenChunk);
+            } finally {
+                GenerateDbMetrics.clearCurrent();
+            }
+        });
+        return to;
     }
 
     private GenerateDbTokenChunk loadGenerateDbTokenChunk(GenerateDbObfTokens obfTokens, List<IndexToken> tokens) {
+        long startMs = System.currentTimeMillis();
+        long startNs = System.nanoTime();
+        Map<IndexToken, List<ObjectAddress>> tokenObjects = new LinkedHashMap<>();
+        for (IndexToken token : tokens) {
+            tokenObjects.put(token, new ArrayList<>());
+        }
+        File file = new File(obfTokens.obf());
+        try (RandomAccessFile randomAccessFile = new RandomAccessFile(file.getAbsolutePath(), "r")) {
+            BinaryMapIndexReaderExt index = new BinaryMapIndexReaderExt(randomAccessFile, file);
+            try {
+                GenerateDbObfReader reader = new GenerateDbObfReader(index);
+                loadGenerateDbAddressObjects(reader, tokens, tokenObjects);
+                loadGenerateDbPoiObjects(reader, tokens, tokenObjects);
+            } finally {
+                index.close();
+            }
+        } catch (Exception e) {
+            getLogger().error("Failed to read OBF object chunk {}", file, e);
+            throw new RuntimeException("Failed to read OBF object chunk: " + e.getMessage(), e);
+        }
+        long elapsedMs = System.currentTimeMillis() - startMs;
+        GenerateDbMetrics.current().objectChunkLoadNs.addAndGet(System.nanoTime() - startNs);
+        if (elapsedMs > 5_000) {
+            getLogger().info("generateDb: loaded object chunk with {} tokens for OBF {} in {} ms", tokens.size(), obfTokens.obfName(), elapsedMs);
+        }
         List<GenerateDbTokenObjects> result = new ArrayList<>(tokens.size());
         for (IndexToken token : tokens) {
-            if (token == null || Algorithms.isEmpty(token.name())) {
+            List<ObjectAddress> objects = tokenObjects.getOrDefault(token, Collections.emptyList());
+            if (token == null || Algorithms.isEmpty(token.name()) || objects.isEmpty()) {
                 result.add(new GenerateDbTokenObjects(obfTokens.obf(), obfTokens.obfName(), obfTokens.obfIndex(), obfTokens.startMs(), token,
                         new ObjectAddressPage(Collections.emptyList(), 0, 0, 0, 0, new int[0], new int[0], 0, 0)));
                 continue;
             }
-            ObjectAddressPage objectsPage = getObjects(obfTokens.obf(), "en", token, null, 0, Integer.MAX_VALUE, null, null, true, false, null);
-            result.add(new GenerateDbTokenObjects(obfTokens.obf(), obfTokens.obfName(), obfTokens.obfIndex(), obfTokens.startMs(), token, objectsPage));
+            List<ObjectAddress> numberedObjects = assignObjectSequenceIds(objects);
+            numberedObjects = markAloneObjects(numberedObjects, token);
+            result.add(new GenerateDbTokenObjects(obfTokens.obf(), obfTokens.obfName(), obfTokens.obfIndex(), obfTokens.startMs(), token,
+                    new ObjectAddressPage(numberedObjects, 0, Integer.MAX_VALUE, numberedObjects.size(), 1, new int[0], new int[0], 0, 0)));
         }
         return new GenerateDbTokenChunk(obfTokens.obf(), obfTokens.obfName(), obfTokens.obfIndex(), obfTokens.startMs(), result);
+    }
+
+    private void loadGenerateDbAddressObjects(GenerateDbObfReader reader,
+                                              List<IndexToken> tokens,
+                                              Map<IndexToken, List<ObjectAddress>> tokenObjects) throws IOException {
+        long startNs = System.nanoTime();
+        try {
+            for (BinaryMapAddressReaderAdapter.AddressRegion region : reader.addressRegions()) {
+                Map<Integer, List<IndexToken>> cityTokens = new TreeMap<>();
+                Map<Integer, List<AddressTokenRef>> streetTokens = new TreeMap<>();
+                for (IndexToken token : tokens) {
+                    if (token == null || token.addressRefs() == null) {
+                        continue;
+                    }
+                    for (AddressRef ref : token.addressRefs()) {
+                        if (ref == null || !isOffsetWithinPart(ref.objectOffset(), region)) {
+                            continue;
+                        }
+                        if (ref.typeIndex() == BinaryMapAddressReaderAdapter.CityBlocks.STREET_TYPE.index) {
+                            streetTokens.computeIfAbsent(ref.objectOffset(), ignored -> new ArrayList<>())
+                                    .add(new AddressTokenRef(token, ref));
+                        } else if (ref.typeIndex() < BinaryMapAddressReaderAdapter.CityBlocks.STREET_TYPE.index) {
+                            cityTokens.computeIfAbsent(ref.objectOffset(), ignored -> new ArrayList<>()).add(token);
+                        }
+                    }
+                }
+                for (Map.Entry<Integer, List<IndexToken>> entry : cityTokens.entrySet()) {
+                    ObjectAddress objectAddress = reader.addressObjectCache.computeIfAbsent(entry.getKey(), offset -> {
+                        try {
+                            return loadCityGenerateDbObjectAddress(reader.index(), region, offset, "en");
+                        } catch (IOException e) {
+                            throw new UncheckedIOException(e);
+                        }
+                    });
+                    if (objectAddress != null) {
+                        for (IndexToken token : entry.getValue()) {
+                            tokenObjects.get(token).add(objectAddress);
+                        }
+                    }
+                }
+                TreeSet<Integer> cityOffsets = new TreeSet<>();
+                for (List<AddressTokenRef> refs : streetTokens.values()) {
+                    for (AddressTokenRef ref : refs) {
+                        if (ref.ref().cityOffset() > 0) {
+                            cityOffsets.add(ref.ref().cityOffset());
+                        }
+                    }
+                }
+                for (Integer cityOffset : cityOffsets) {
+                    if (!reader.cityCache.containsKey(cityOffset)) {
+                        reader.cityCache.put(cityOffset, loadCity(reader.index(), region, cityOffset));
+                    }
+                }
+                for (Map.Entry<Integer, List<AddressTokenRef>> entry : streetTokens.entrySet()) {
+                    AddressRef firstRef = entry.getValue().get(0).ref();
+                    ObjectAddress objectAddress = reader.addressObjectCache.computeIfAbsent(entry.getKey(), offset -> {
+                        try {
+                            return loadStreetGenerateDbObjectAddress(reader.index(), region, offset, reader.cityCache.get(firstRef.cityOffset()), "en");
+                        } catch (IOException e) {
+                            throw new UncheckedIOException(e);
+                        }
+                    });
+                    if (objectAddress != null) {
+                        for (AddressTokenRef tokenRef : entry.getValue()) {
+                            tokenObjects.get(tokenRef.token()).add(objectAddress);
+                        }
+                    }
+                }
+            }
+        } finally {
+            GenerateDbMetrics.current().addressChunkLoadNs.addAndGet(System.nanoTime() - startNs);
+        }
+    }
+
+    private void loadGenerateDbPoiObjects(GenerateDbObfReader reader,
+                                          List<IndexToken> tokens,
+                                          Map<IndexToken, List<ObjectAddress>> tokenObjects) throws IOException {
+        long startNs = System.nanoTime();
+        try {
+            for (BinaryMapPoiReaderAdapter.PoiRegion poiRegion : reader.poiRegions()) {
+                Map<Integer, List<IndexToken>> tokensByOffset = new TreeMap<>();
+                for (IndexToken token : tokens) {
+                    if (token == null || token.poiRefs() == null) {
+                        continue;
+                    }
+                    for (int poiRef : token.poiRefs()) {
+                        if (poiRef >= 0 && poiRef < poiRegion.getLength()) {
+                            tokensByOffset.computeIfAbsent(poiRef, ignored -> new ArrayList<>()).add(token);
+                        }
+                    }
+                }
+                if (tokensByOffset.isEmpty()) {
+                    continue;
+                }
+                reader.index().initCategories(poiRegion);
+                Map<Integer, List<TagValuePair>> tagGroups = preloadPoiTagGroups(reader.index().getInputStream(), poiRegion);
+                for (Map.Entry<Integer, List<IndexToken>> entry : tokensByOffset.entrySet()) {
+                    List<GenerateDbRawPoiObject> rawObjects = readGenerateDbRawPoiObjectsAtShift(reader.index(), poiRegion, tagGroups, entry.getKey());
+                    GenerateDbMetrics.current().poiBoxes.incrementAndGet();
+                    GenerateDbMetrics.current().poiRawObjects.addAndGet(rawObjects.size());
+                    if (rawObjects.isEmpty()) {
+                        continue;
+                    }
+                    Map<IndexToken, CollatorStringMatcher> matchers = new HashMap<>();
+                    for (IndexToken token : entry.getValue()) {
+                        matchers.put(token, new CollatorStringMatcher(token.name(), CollatorStringMatcher.StringMatcherMode.CHECK_EQUALS_FROM_SPACE));
+                    }
+                    for (GenerateDbRawPoiObject rawObject : rawObjects) {
+                        for (Map.Entry<IndexToken, CollatorStringMatcher> tokenMatcher : matchers.entrySet()) {
+                            GenerateDbMetrics.current().poiCandidateChecks.incrementAndGet();
+                            if (matchesLegacyPoi(rawObject.rawPoiObject(), tokenMatcher.getValue())) {
+                                GenerateDbMetrics.current().poiMatches.incrementAndGet();
+                                tokenObjects.get(tokenMatcher.getKey()).add(toGenerateDbPoiObjectAddress(rawObject, "en"));
+                            }
+                        }
+                    }
+                }
+            }
+        } finally {
+            GenerateDbMetrics.current().poiChunkLoadNs.addAndGet(System.nanoTime() - startNs);
+        }
     }
 
     private <T> T getGenerateDbFuture(Future<T> future) throws IOException {
@@ -2238,7 +2684,7 @@ public interface IndexService extends OBFService {
         }
         notifyGenerateDbProgress(progressListener, "RUNNING", chunk.obfName(), chunk.obfIndex(), totalObfs,
                 state.processedTokens, state.totalTokens, state.startMs, null, progressStates);
-        if (state.processedTokens % 1000 == 0 || state.processedTokens == state.totalTokens) {
+        if (state.processedTokens % 10000 == 0 || state.processedTokens == state.totalTokens) {
             getLogger().info("generateDb: processed {} of {} tokens for OBF {}", state.processedTokens, state.totalTokens, state.obfName);
         }
     }
@@ -2307,40 +2753,40 @@ public interface IndexService extends OBFService {
     private long upsertGenerateDbToken(PreparedStatement insertToken,
                                        PreparedStatement selectTokenId,
                                        Map<String, Long> tokenIds,
-                                       IndexToken token,
-                                       ObjectAddressPage objectsPage) throws SQLException {
-        int[] countMetrics = objectsPage == null ? null : objectsPage.countMetrics();
-        int[] sizeMetrics = objectsPage == null ? null : objectsPage.sizeMetrics();
-        insertToken.setString(1, token.name());
-        insertToken.setInt(2, token.isCommon() ? 1 : 0);
-        insertToken.setInt(3, token.isFrequent() ? 1 : 0);
-        insertToken.setInt(4, metricValue(sizeMetrics, 6));
-        insertToken.setInt(5, metricValue(countMetrics, 3));
-        insertToken.setInt(6, metricValue(sizeMetrics, 8));
-        insertToken.setInt(7, metricValue(countMetrics, 5));
-        insertToken.setInt(8, token.poiRefs() == null ? 0 : token.poiRefs().length);
-        insertToken.setInt(9, token.addressRefs() == null ? 0 : token.addressRefs().length);
+                                       IndexToken token) throws SQLException {
+        return upsertGenerateDbToken(insertToken, selectTokenId, tokenIds, token.name(),
+                token.isCommon(), token.isFrequent(), false);
+    }
+
+    private long upsertGenerateDbToken(PreparedStatement insertToken,
+                                       PreparedStatement selectTokenId,
+                                       Map<String, Long> tokenIds,
+                                       String tokenName,
+                                       boolean isCommon,
+                                       boolean isFrequent,
+                                       boolean isGenerated) throws SQLException {
+        insertToken.setString(1, tokenName);
+        insertToken.setInt(2, isCommon ? 1 : 0);
+        insertToken.setInt(3, isFrequent ? 1 : 0);
+        insertToken.setInt(4, isGenerated ? 1 : 0);
         insertToken.executeUpdate();
-        Long cachedId = tokenIds.get(token.name());
+        Long cachedId = tokenIds.get(tokenName);
         if (cachedId != null) {
             return cachedId;
         }
-        selectTokenId.setString(1, token.name());
+        selectTokenId.setString(1, tokenName);
         try (java.sql.ResultSet rs = selectTokenId.executeQuery()) {
             if (rs.next()) {
                 long id = rs.getLong(1);
-                tokenIds.put(token.name(), id);
+                tokenIds.put(tokenName, id);
                 return id;
             }
         }
-        throw new SQLException("Failed to resolve token id for " + token.name());
+        throw new SQLException("Failed to resolve token id for " + tokenName);
     }
 
-    private int metricValue(int[] metrics, int index) {
-        return metrics == null || index < 0 || index >= metrics.length ? 0 : metrics[index];
-    }
-
-    private boolean insertGenerateDbObject(PreparedStatement insertObject, ObjectAddress objectAddress) throws SQLException, IOException {
+    private boolean insertGenerateDbObject(PreparedStatement insertObject, ObjectAddress objectAddress,
+                                           boolean skipObjectTags) throws SQLException, IOException {
         LatLon point = objectAddress.point();
         insertObject.setLong(1, objectAddress.osmId());
         insertObject.setString(2, objectAddress.name());
@@ -2351,36 +2797,50 @@ public interface IndexService extends OBFService {
             insertObject.setDouble(3, point.getLatitude());
             insertObject.setDouble(4, point.getLongitude());
         }
-        insertObject.setString(5, getObjectMapper().writeValueAsString(objectAddress.commonTags()));
-        insertObject.setString(6, getObjectMapper().writeValueAsString(objectAddress.extraTags()));
+        if (skipObjectTags) {
+            insertObject.setNull(5, java.sql.Types.VARCHAR);
+            insertObject.setNull(6, java.sql.Types.VARCHAR);
+        } else {
+            insertObject.setString(5, getObjectMapper().writeValueAsString(objectAddress.commonTags()));
+            insertObject.setString(6, getObjectMapper().writeValueAsString(objectAddress.extraTags()));
+        }
         insertObject.setString(7, objectAddress.type());
         insertObject.setString(8, objectAddress.osmType());
         return insertObject.executeUpdate() > 0;
     }
 
-    private List<Long> insertGenerateDbTags(PreparedStatement insertTag,
-                                            PreparedStatement selectTagId,
-                                            PreparedStatement insertValue,
-                                            Map<String, Long> tagIds,
-                                            ObjectAddress objectAddress) throws SQLException {
+    private List<GenerateDbObjectTagValue> insertGenerateDbTags(PreparedStatement insertTag,
+                                                                PreparedStatement selectTagId,
+                                                                PreparedStatement insertValue,
+                                                                PreparedStatement selectValueId,
+                                                                Map<String, Long> tagIds,
+                                                                Map<String, Long> valueIds,
+                                                                GenerateDbSqlBatcher sqlBatcher,
+                                                                ObjectAddress objectAddress) throws SQLException {
         Map<String, List<String>> commonTags = flattenTags(objectAddress.commonTags());
         Map<String, List<String>> extraTags = flattenTags(objectAddress.extraTags());
         Set<String> duplicateNames = new HashSet<>(commonTags.keySet());
         duplicateNames.retainAll(extraTags.keySet());
-        Set<Long> result = new LinkedHashSet<>();
-        insertGenerateDbTags(insertTag, selectTagId, insertValue, tagIds, result, commonTags, "common", duplicateNames);
-        insertGenerateDbTags(insertTag, selectTagId, insertValue, tagIds, result, extraTags, "extra", duplicateNames);
+        Set<GenerateDbObjectTagValue> result = new LinkedHashSet<>();
+        insertGenerateDbTags(insertTag, selectTagId, insertValue, selectValueId, tagIds, valueIds, sqlBatcher, result, commonTags,
+                "common", duplicateNames, objectAddress.isPoi());
+        insertGenerateDbTags(insertTag, selectTagId, insertValue, selectValueId, tagIds, valueIds, sqlBatcher, result, extraTags,
+                "extra", duplicateNames, objectAddress.isPoi());
         return new ArrayList<>(result);
     }
 
     private void insertGenerateDbTags(PreparedStatement insertTag,
                                       PreparedStatement selectTagId,
                                       PreparedStatement insertValue,
+                                      PreparedStatement selectValueId,
                                       Map<String, Long> tagIds,
-                                      Set<Long> result,
+                                      Map<String, Long> valueIds,
+                                      GenerateDbSqlBatcher sqlBatcher,
+                                      Set<GenerateDbObjectTagValue> result,
                                       Map<String, List<String>> tags,
                                       String type,
-                                      Set<String> duplicateNames) throws SQLException {
+                                      Set<String> duplicateNames,
+                                      boolean isPoi) throws SQLException {
         if (tags == null || tags.isEmpty()) {
             return;
         }
@@ -2390,32 +2850,63 @@ public interface IndexService extends OBFService {
                 continue;
             }
             String storedTag = duplicateNames != null && duplicateNames.contains(tag) ? type + "." + tag : tag;
-            long tagId = upsertGenerateDbTag(insertTag, selectTagId, tagIds, storedTag, type);
-            result.add(tagId);
+            Map<String, Set<String>> valueTokens = collectGenerateDbTagValueTokens(isPoi, tag, entry.getValue());
+            boolean tagSkipped = valueTokens.isEmpty();
+            long tagId = upsertGenerateDbTag(insertTag, selectTagId, tagIds, storedTag, type, tagSkipped);
             for (String value : entry.getValue()) {
                 if (Algorithms.isEmpty(value)) {
                     continue;
                 }
-                insertValue.setLong(1, tagId);
-                insertValue.setString(2, value);
-                insertValue.executeUpdate();
+                long valueId = upsertGenerateDbValue(insertValue, selectValueId, valueIds, sqlBatcher, tagId, value);
+                result.add(new GenerateDbObjectTagValue(tagId, valueId, value,
+                        valueTokens.getOrDefault(value, Collections.emptySet())));
+                break;
             }
         }
+    }
+
+    private long upsertGenerateDbValue(PreparedStatement insertValue,
+                                       PreparedStatement selectValueId,
+                                       Map<String, Long> valueIds,
+                                       GenerateDbSqlBatcher sqlBatcher,
+                                       long tagId,
+                                       String value) throws SQLException {
+        String key = tagId + "\u0000" + value;
+        Long cached = valueIds.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        insertValue.setLong(1, tagId);
+        insertValue.setString(2, value);
+        insertValue.executeUpdate();
+        sqlBatcher.totalValueRows++;
+        selectValueId.setLong(1, tagId);
+        selectValueId.setString(2, value);
+        try (ResultSet rs = selectValueId.executeQuery()) {
+            if (rs.next()) {
+                long id = rs.getLong(1);
+                valueIds.put(key, id);
+                return id;
+            }
+        }
+        throw new SQLException("Failed to resolve value id for tag " + tagId + " value " + value);
     }
 
     private long upsertGenerateDbTag(PreparedStatement insertTag,
                                      PreparedStatement selectTagId,
                                      Map<String, Long> tagIds,
                                      String name,
-                                     String type) throws SQLException {
+                                     String type,
+                                     boolean isSkipped) throws SQLException {
         String key = name + "\u0000" + type;
         Long cached = tagIds.get(key);
+        insertTag.setString(1, name);
+        insertTag.setString(2, type);
+        insertTag.setInt(3, isSkipped ? 1 : 0);
+        insertTag.executeUpdate();
         if (cached != null) {
             return cached;
         }
-        insertTag.setString(1, name);
-        insertTag.setString(2, type);
-        insertTag.executeUpdate();
         selectTagId.setString(1, name);
         selectTagId.setString(2, type);
         try (ResultSet rs = selectTagId.executeQuery()) {
@@ -2428,18 +2919,88 @@ public interface IndexService extends OBFService {
         throw new SQLException("Failed to resolve tag id for " + name);
     }
 
-    private void insertGenerateDbTokenTags(PreparedStatement insertTokenTag, long tokenId, List<Long> tagIds) throws SQLException {
-        if (tagIds == null || tagIds.isEmpty()) {
+    private void insertGenerateDbObjectTagValues(PreparedStatement insertObjectTagValue,
+                                                 GenerateDbSqlBatcher sqlBatcher,
+                                                 long objectId,
+                                                 List<GenerateDbObjectTagValue> tagValues,
+                                                 long tokenId,
+                                                 String tokenName) throws SQLException {
+        insertGenerateDbObjectTagValues(insertObjectTagValue, sqlBatcher, objectId, tagValues, tokenId, tokenName, false);
+    }
+
+    private void insertGenerateDbObjectTagValues(PreparedStatement insertObjectTagValue,
+                                                 GenerateDbSqlBatcher sqlBatcher,
+                                                 long objectId,
+                                                 List<GenerateDbObjectTagValue> tagValues,
+                                                 long tokenId,
+                                                 String tokenName,
+                                                 boolean includeAllForSkippedToken) throws SQLException {
+        if (tagValues == null || tagValues.isEmpty()) {
             return;
         }
-        for (Long tagId : tagIds) {
-            if (tagId == null) {
+        for (GenerateDbObjectTagValue tagValue : tagValues) {
+            if (tagValue == null) {
                 continue;
             }
-            insertTokenTag.setLong(1, tokenId);
-            insertTokenTag.setLong(2, tagId);
-            insertTokenTag.executeUpdate();
+            if (tokenId >= 0 && !tagValue.tokens().contains(tokenName)) {
+                continue;
+            }
+            if (tokenId < 0 && !includeAllForSkippedToken && !tagValue.tokens().isEmpty()) {
+                continue;
+            }
+            insertObjectTagValue.setLong(1, objectId);
+            insertObjectTagValue.setLong(2, tagValue.tagId());
+            insertObjectTagValue.setLong(3, tokenId);
+            insertObjectTagValue.setLong(4, tagValue.valueId());
+            insertObjectTagValue.setString(5, tagValue.value());
+            insertObjectTagValue.addBatch();
+            sqlBatcher.objectTagValueRows++;
+            sqlBatcher.totalObjectTagValueRows++;
         }
+    }
+
+    private long insertGenerateDbGeneratedTokenRows(PreparedStatement insertToken,
+                                                    PreparedStatement selectTokenId,
+                                                    PreparedStatement insertObjectTagValue,
+                                                    PreparedStatement insertPosting,
+                                                    Map<String, Long> tokenIds,
+                                                    GenerateDbSqlBatcher sqlBatcher,
+                                                    long obfId,
+                                                    long currentTokenId,
+                                                    String currentTokenName,
+                                                    ObjectAddress objectAddress,
+                                                    List<GenerateDbObjectTagValue> tagValues,
+                                                    boolean skipNewTokens,
+                                                    boolean skipTokenInTagValue) throws SQLException {
+        if (objectAddress == null || objectAddress.osmId() == null || tagValues == null || tagValues.isEmpty()) {
+            return 0;
+        }
+        long rows = 0;
+        Set<String> objectTokens = new LinkedHashSet<>();
+        for (GenerateDbObjectTagValue tagValue : tagValues) {
+            objectTokens.addAll(tagValue.tokens());
+        }
+        for (String tokenName : objectTokens) {
+            if (Algorithms.isEmpty(tokenName)) {
+                continue;
+            }
+            boolean indexedToken = tokenName.equals(currentTokenName);
+            if (!indexedToken && skipNewTokens) {
+                continue;
+            }
+            long tokenId = indexedToken ? currentTokenId
+                    : upsertGenerateDbToken(insertToken, selectTokenId, tokenIds, tokenName, false, false, true);
+            if (!skipTokenInTagValue) {
+                insertGenerateDbObjectTagValues(insertObjectTagValue, sqlBatcher, objectAddress.osmId(), tagValues, tokenId, tokenName);
+            }
+            rows++;
+            if (!indexedToken) {
+                insertGenerateDbObfPosting(insertPosting, sqlBatcher, obfId, tokenId, objectAddress, false);
+                rows++;
+            }
+        }
+        insertGenerateDbObjectTagValues(insertObjectTagValue, sqlBatcher, objectAddress.osmId(), tagValues, -1, null, skipTokenInTagValue);
+        return rows;
     }
 
     private Map<String, List<String>> flattenTags(Map<String, ?> tags) {
@@ -2480,467 +3041,138 @@ public interface IndexService extends OBFService {
         }
     }
 
-    private void insertGenerateDbObfPosting(PreparedStatement insertObfPosting,
-                                            long obfId,
-                                            long tokenId,
-                                            ObjectAddress objectAddress) throws SQLException {
-        insertObfPosting.setLong(1, obfId);
-        insertObfPosting.setLong(2, tokenId);
-        insertObfPosting.setLong(3, objectAddress.osmId());
-        insertObfPosting.setInt(4, objectAddress.sequenceId());
-        insertObfPosting.setInt(5, objectAddress.isAlone() ? 1 : 0);
-        insertObfPosting.executeUpdate();
-    }
-
-    default Path getTagsDatasourceDir() throws IOException {
-        String url = getSearchTestDatasourceUrl();
-        if (Algorithms.isEmpty(url)) {
-            throw new IOException("spring.searchtestdatasource.url is not configured");
+    private Map<String, Set<String>> collectGenerateDbTagValueTokens(boolean isPoi, String tag, List<String> values) {
+        Map<String, Set<String>> result = new LinkedHashMap<>();
+        if (Algorithms.isEmpty(tag) || values == null || values.isEmpty() || !isGenerateDbSearchIndexedTag(isPoi, tag)) {
+            return result;
         }
-        String path = url.startsWith("jdbc:sqlite:") ? url.substring("jdbc:sqlite:".length()) : url;
-        Path parent = Path.of(path).toAbsolutePath().getParent();
-        if (parent == null) {
-            throw new IOException("Could not resolve datasource parent directory");
-        }
-        Path dir = parent.resolve("tags_db");
-        Files.createDirectories(dir);
-        return dir;
-    }
-
-    default Path resolveTagsDatasource(String name) throws IOException {
-        if (Algorithms.isEmpty(name)) {
-            throw new IOException("Datasource name is required");
-        }
-        String fileName = Path.of(name).getFileName().toString();
-        if (!fileName.endsWith(".db") && !fileName.endsWith(".sqlite")) {
-            fileName += ".db";
-        }
-        Path dir = getTagsDatasourceDir();
-        Path file = dir.resolve(fileName).normalize();
-        if (!file.startsWith(dir)) {
-            throw new IOException("Invalid datasource name");
-        }
-        return file;
-    }
-
-    default List<Datasource> getTagsDatasources() throws IOException {
-        Path dir = getTagsDatasourceDir();
-        List<Datasource> result = new ArrayList<>();
-        try (var stream = Files.list(dir)) {
-            stream.filter(Files::isRegularFile)
-                    .filter(path -> path.getFileName().toString().endsWith(".db") || path.getFileName().toString().endsWith(".sqlite"))
-                    .sorted(Comparator.comparing(path -> path.getFileName().toString(), String.CASE_INSENSITIVE_ORDER))
-                    .forEach(path -> {
-                        try {
-                            result.add(new Datasource(path.getFileName().toString(), Files.size(path),
-                                    Files.getLastModifiedTime(path).toMillis(), true, ""));
-                        } catch (IOException ignored) {
-                        }
-                    });
+        for (String value : values) {
+            if (Algorithms.isEmpty(value)) {
+                continue;
+            }
+            Set<String> tokens = new LinkedHashSet<>();
+            if (isPoi && Amenity.ROUTE_MEMBERS_IDS.equals(tag)) {
+                for (String id : value.split(" ")) {
+                    addGenerateDbSplitTokens(tokens, id, true);
+                }
+            } else {
+                addGenerateDbSplitTokens(tokens, value, isPoi);
+            }
+            if (!tokens.isEmpty()) {
+                result.put(value, tokens);
+            }
         }
         return result;
     }
 
-    default boolean deleteTagsDatasource(String name) throws IOException {
-        return Files.deleteIfExists(resolveTagsDatasource(name));
+    private boolean isGenerateDbSearchIndexedTag(boolean isPoi, String tag) {
+        if (Algorithms.isEmpty(tag)) {
+            return false;
+        }
+        if (Amenity.NAME.equals(tag) || "name:en".equals(tag) || tag.startsWith("name:") || tag.startsWith("name_")) {
+            return true;
+        }
+        if (isPoi) {
+            return isTagIndexedForSearchAsName(tag) || isTagIndexedForSearchAsId(tag)
+                    || isTagIndexedAsSearchRelated(tag) || Amenity.ROUTE_MEMBERS_IDS.equals(tag);
+        }
+        return "place".equals(tag) || isTagIndexedForSearchAsName(tag) || isTagIndexedForSearchAsId(tag);
     }
 
-    default void createTagsDatasource(String name, List<String> obfs, boolean overwrite, GenerateDbProgressListener progressListener) throws IOException, SQLException {
+    private void addGenerateDbSplitTokens(Set<String> tokens, String value, boolean isPoi) {
+        if (Algorithms.isEmpty(value)) {
+            return;
+        }
+        String preparedValue = isPoi ? value : removeGenerateDbAddressBraces(value);
+        List<String> splitValues = SearchAlgorithms.splitAndNormalize(preparedValue);
+        SearchAlgorithms.removeCommonWords(splitValues);
+        for (String token : splitValues) {
+            if (!Algorithms.isEmpty(token)) {
+                tokens.add(token);
+            }
+        }
+    }
+
+    private String removeGenerateDbAddressBraces(String name) {
+        if (name == null) {
+            return null;
+        }
+        int i = name.indexOf('(');
+        String retName = name;
+        if (i > -1) {
+            retName = name.substring(0, i);
+            int j = name.indexOf(')', i);
+            if (j > -1) {
+                retName = retName.trim() + ' ' + name.substring(j + 1).trim();
+            }
+        }
+        return retName;
+    }
+
+    private void insertGenerateDbObfPosting(PreparedStatement insertObfPosting,
+                                            GenerateDbSqlBatcher sqlBatcher,
+                                            long obfId,
+                                            long tokenId,
+                                            ObjectAddress objectAddress) throws SQLException {
+        insertGenerateDbObfPosting(insertObfPosting, sqlBatcher, obfId, tokenId, objectAddress,
+                objectAddress != null && objectAddress.isAlone());
+    }
+
+    private void insertGenerateDbObfPosting(PreparedStatement insertObfPosting,
+                                            GenerateDbSqlBatcher sqlBatcher,
+                                            long obfId,
+                                            long tokenId,
+                                            ObjectAddress objectAddress,
+                                            boolean isAlone) throws SQLException {
+        insertObfPosting.setLong(1, obfId);
+        insertObfPosting.setLong(2, tokenId);
+        insertObfPosting.setLong(3, objectAddress.osmId());
+        insertObfPosting.setInt(4, objectAddress.sequenceId());
+        insertObfPosting.setInt(5, isAlone ? 1 : 0);
+        insertObfPosting.addBatch();
+        sqlBatcher.postingRows++;
+        sqlBatcher.totalPostingRows++;
+    }
+
+    private void flushGenerateDbSqlBatchesIfNeeded(PreparedStatement insertObjectTagValue,
+                                                   PreparedStatement insertPosting,
+                                                   GenerateDbSqlBatcher sqlBatcher,
+                                                   GenerateDbMetrics metrics) throws SQLException {
+        if (sqlBatcher.pendingRows() >= GenerateDbSqlBatcher.FLUSH_ROWS) {
+            flushGenerateDbSqlBatches(insertObjectTagValue, insertPosting, sqlBatcher, metrics);
+        }
+    }
+
+    private void flushGenerateDbSqlBatches(PreparedStatement insertObjectTagValue,
+                                           PreparedStatement insertPosting,
+                                           GenerateDbSqlBatcher sqlBatcher,
+                                           GenerateDbMetrics metrics) throws SQLException {
+        if (sqlBatcher.pendingRows() == 0) {
+            return;
+        }
+        long startNs = System.nanoTime();
+        if (sqlBatcher.objectTagValueRows > 0) {
+            insertObjectTagValue.executeBatch();
+            sqlBatcher.objectTagValueRows = 0;
+        }
+        if (sqlBatcher.postingRows > 0) {
+            insertPosting.executeBatch();
+            sqlBatcher.postingRows = 0;
+        }
+        metrics.batchDbNs.addAndGet(System.nanoTime() - startNs);
+    }
+
+    default void createTagsDatasource(String name, List<String> obfs, boolean overwrite, GenerateDbProgressListener progressListener,
+                                      GenerateDbOptions options) throws IOException, SQLException {
         Path dbFile = resolveTagsDatasource(name);
         if (Files.exists(dbFile) && !overwrite) {
             throw new IOException("Datasource already exists: " + dbFile.getFileName());
         }
-        generateDbFile(obfs, dbFile, progressListener);
+        generateDbFile(obfs, dbFile, progressListener, options);
     }
 
-    default void downloadTagsDatasource(String name, OutputStream out) throws IOException {
-        Path dbFile = resolveTagsDatasource(name);
-        if (!Files.exists(dbFile)) {
-            throw new IOException("Datasource not found: " + name);
-        }
-        try (ZipOutputStream zip = new ZipOutputStream(out)) {
-            zip.putNextEntry(new ZipEntry("db.sqlite"));
-            Files.copy(dbFile, zip);
-            zip.closeEntry();
-            zip.finish();
-        }
-    }
-
-    default List<DbTagName> getTagsDbTagNames(String datasource) throws IOException, SQLException {
-        Path dbFile = resolveTagsDatasource(datasource);
-        String sql = """
-                SELECT t.name, COUNT(DISTINCT tt.token_id) tokens
-                FROM tag t
-                LEFT JOIN token_tag tt ON tt.tag_id = t.id
-                GROUP BY t.name
-                ORDER BY t.name COLLATE NOCASE ASC
-                """;
-        try (Connection conn = openTagsDbConnection(dbFile);
-             PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-            List<DbTagName> result = new ArrayList<>();
-            while (rs.next()) {
-                result.add(new DbTagName(rs.getString(1), rs.getLong(2)));
-            }
-            return result;
-        }
-    }
-
-    default List<String> getTagsDbTagValues(String datasource, String tag) throws IOException, SQLException {
-        Path dbFile = resolveTagsDatasource(datasource);
-        if (Algorithms.isEmpty(tag)) {
-            return Collections.emptyList();
-        }
-        try (Connection conn = openTagsDbConnection(dbFile);
-             PreparedStatement ps = conn.prepareStatement("""
-                     SELECT DISTINCT v.value
-                     FROM value v
-                     JOIN tag t ON t.id = v.tag_id
-                     WHERE t.name = ?
-                     ORDER BY v.value COLLATE NOCASE ASC
-                     """)) {
-            ps.setString(1, tag);
-            try (ResultSet rs = ps.executeQuery()) {
-                List<String> result = new ArrayList<>();
-                while (rs.next()) {
-                    result.add(rs.getString(1));
-                }
-                return result;
-            }
-        }
-    }
-
-    default DbTokenPage getTagsDbTokens(String datasource, String prefix, String objectType, boolean perObf,
-                                        String tag, List<String> values,
-                                        int pageToShow, int pageSizeLimit, String sortBy, String sortOrder) throws IOException, SQLException {
-        Path dbFile = resolveTagsDatasource(datasource);
-        String posting = getPostingSource(objectType);
-        String tokenFilter = getTokenSourceFilter(objectType);
-        TagFilter tagFilter = buildTagFilter(tag, values);
-        String where = buildTagsDbTokenWhere(prefix, tokenFilter, tagFilter);
-        String normalizedSort = Algorithms.isEmpty(sortBy) ? "name" : sortBy.toLowerCase(Locale.ROOT);
-        String orderColumn = switch (normalizedSort) {
-            case "matched" -> "matched";
-            case "alone" -> "alone";
-            case "common" -> "t.isCommon";
-            case "frequent" -> "t.isFrequent";
-            default -> "t.name";
-        };
-        String order = "desc".equalsIgnoreCase(sortOrder) ? "DESC" : "ASC";
-        int safePage = Math.max(0, pageToShow);
-        int safeSize = Math.max(1, Math.min(pageSizeLimit, 500));
-        try (Connection conn = openTagsDbConnection(dbFile)) {
-            String from = tagFilter.enabled()
-                    ? " FROM token t JOIN " + posting + " p ON p.token_id = t.id JOIN \"object\" o ON o.id = p.object_id"
-                    : " FROM token t LEFT JOIN " + posting + " p ON p.token_id = t.id";
-            String grouped = "SELECT t.id, t.name, t.isCommon, t.isFrequent, COUNT(p.object_id) matched, COALESCE(SUM(CASE WHEN p.isAlone = 1 THEN 1 ELSE 0 END), 0) alone "
-                    + from + where + " GROUP BY t.id, t.name, t.isCommon, t.isFrequent";
-            long total = queryLong(conn, "SELECT COUNT(*) FROM (" + grouped + ") q", buildTagTokenParams(prefix, tagFilter).toArray());
-            String sql = grouped + " ORDER BY " + orderColumn + " " + order + ", t.name ASC LIMIT ? OFFSET ?";
-            List<DbToken> content = new ArrayList<>();
-            DbTokenSummary summary = new DbTokenSummary(0, 0, 0, 0, 0, 0);
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                int idx = bindParams(ps, 1, buildTagTokenParams(prefix, tagFilter));
-                ps.setInt(idx++, safeSize);
-                ps.setInt(idx, safePage * safeSize);
-                try (ResultSet rs = ps.executeQuery()) {
-                    while (rs.next()) {
-                        content.add(new DbToken(rs.getLong(1), rs.getString(2), rs.getLong(5), rs.getLong(6),
-                                rs.getInt(3) != 0, rs.getInt(4) != 0));
-                    }
-                }
-            }
-            summary = buildTagsDbTokenSummary(conn, grouped, buildTagTokenParams(prefix, tagFilter));
-            int totalPages = total == 0 ? 0 : (int) ((total + safeSize - 1) / safeSize);
-            return new DbTokenPage(content, safePage, safeSize, total, totalPages, summary);
-        }
-    }
-
-    default DbObjectPage getTagsDbObjects(String datasource, long tokenId, String objectType, boolean perObf, String regExp,
-                                      String tag, List<String> values,
-                                      int pageToShow, int pageSizeLimit, String sortBy, String sortOrder) throws IOException, SQLException {
-        Path dbFile = resolveTagsDatasource(datasource);
-        String posting = getPostingSource(objectType);
-        String source = perObf ? posting : "(SELECT token_id, object_id, isAlone, MIN(sequenceId) sequenceId FROM " + posting + " GROUP BY token_id, object_id, isAlone)";
-        String filter = Algorithms.isEmpty(regExp) ? "" : " AND (o.name REGEXP ? OR o.commonTags REGEXP ? OR o.extraTags REGEXP ?)";
-        TagFilter tagFilter = buildTagFilter(tag, values);
-        String tagSql = tagFilter.enabled() ? " AND " + tagFilter.sql() : "";
-        String obfJoin = perObf ? " LEFT JOIN obf b ON b.id = p.obf_id" : "";
-        String base = " FROM " + source + " p JOIN \"object\" o ON o.id = p.object_id" + obfJoin + " WHERE p.token_id = ?" + filter + tagSql;
-        String normalizedSort = Algorithms.isEmpty(sortBy) ? "sequenceid" : sortBy.toLowerCase(Locale.ROOT);
-        String orderColumn = switch (normalizedSort) {
-            case "name" -> "o.name";
-            case "type" -> "o.type";
-            case "osmid" -> "o.id";
-            case "alone", "isalone" -> "p.isAlone";
-            case "obf", "obfname" -> perObf ? "b.name" : "p.sequenceId";
-            default -> "p.sequenceId";
-        };
-        String order = "desc".equalsIgnoreCase(sortOrder) ? "DESC" : "ASC";
-        int safePage = Math.max(0, pageToShow);
-        int safeSize = Math.max(1, Math.min(pageSizeLimit, 500));
-        try (Connection conn = openTagsDbConnection(dbFile)) {
-            List<Object> objectParams = buildTagObjectParams(tokenId, regExp, tagFilter);
-            long total = queryLong(conn, "SELECT COUNT(*)" + base, objectParams.toArray());
-            String sql = "SELECT p.sequenceId, o.name, o.lat, o.lon, o.commonTags, o.extraTags, o.type, o.id, o.osmType, p.isAlone"
-                    + (perObf ? ", b.name" : ", NULL") + base
-                    + " ORDER BY " + orderColumn + " " + order + ", p.sequenceId ASC LIMIT ? OFFSET ?";
-            List<DbObject> content = new ArrayList<>();
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                int idx = bindParams(ps, 1, objectParams);
-                ps.setInt(idx++, safeSize);
-                ps.setInt(idx, safePage * safeSize);
-                try (ResultSet rs = ps.executeQuery()) {
-                    while (rs.next()) {
-                        Double lat = rs.getObject(3) == null ? null : rs.getDouble(3);
-                        Double lon = rs.getObject(4) == null ? null : rs.getDouble(4);
-                        LatLon point = lat == null || lon == null ? null : new LatLon(lat, lon);
-                        Map<String, String> commonTags = parseObjectValues(rs.getString(5));
-                        Map<String, Object> extraTags = parseObjectExtraTags(rs.getString(6));
-                        content.add(new DbObject(rs.getInt(1), rs.getString(2), point, commonTags, extraTags, rs.getString(7),
-                                rs.getLong(8), rs.getString(9), rs.getInt(10) != 0, getTagsObfDisplayName(rs.getString(11))));
-                    }
-                }
-            }
-            int totalPages = total == 0 ? 0 : (int) ((total + safeSize - 1) / safeSize);
-            return new DbObjectPage(content, safePage, safeSize, total, totalPages);
-        }
-    }
-
-    private String getTagsObfDisplayName(String name) {
-        if (Algorithms.isEmpty(name)) {
-            return "";
-        }
-        String fileName = Path.of(name).getFileName().toString();
-        int dot = fileName.lastIndexOf('.');
-        return dot > 0 ? fileName.substring(0, dot) : fileName;
-    }
-
-    private String getPostingSource(String objectType) {
-        String normalized = Algorithms.isEmpty(objectType) ? "all" : objectType.trim().toLowerCase(Locale.ROOT);
-        return switch (normalized) {
-            case "poi" -> "poi_posting";
-            case "address", "addr" -> "addr_posting";
-            default ->
-                    "(SELECT token_id, object_id, obf_id, sequenceId, isAlone FROM poi_posting UNION ALL SELECT token_id, object_id, obf_id, sequenceId, isAlone FROM addr_posting)";
-        };
-    }
-
-    private String getTokenSourceFilter(String objectType) {
-        String normalized = Algorithms.isEmpty(objectType) ? "all" : objectType.trim().toLowerCase(Locale.ROOT);
-        return switch (normalized) {
-            case "poi" -> "t.poiRefs > 0";
-            case "address", "addr" -> "t.addressRefs > 0";
-            default -> "";
-        };
-    }
-
-    private String buildTagsDbTokenWhere(String prefix, String tokenFilter, TagFilter tagFilter) {
-        List<String> conditions = new ArrayList<>();
-        if (!Algorithms.isEmpty(prefix)) {
-            conditions.add("t.name REGEXP ?");
-        }
-        if (!Algorithms.isEmpty(tokenFilter)) {
-            conditions.add(tokenFilter);
-        }
-        if (tagFilter != null && tagFilter.enabled()) {
-            conditions.add(tagFilter.sql());
-        }
-        return conditions.isEmpty() ? "" : " WHERE " + String.join(" AND ", conditions);
-    }
-
-    private Connection openTagsDbConnection(Path dbFile) throws SQLException {
-        Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbFile.toAbsolutePath());
-        conn.createStatement().execute("PRAGMA query_only = ON");
-        Function.create(conn, "REGEXP", new Function() {
-            @Override
-            protected void xFunc() throws SQLException {
-                String pattern = value_text(0);
-                String value = value_text(1);
-                result(pattern != null && value != null && Pattern.compile(pattern, Pattern.CASE_INSENSITIVE).matcher(value).find() ? 1 : 0);
-            }
-        });
-        return conn;
-    }
-
-    private long queryLong(Connection conn, String sql, Object... params) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            int idx = 1;
-            for (Object param : params) {
-                if (param == null || (param instanceof String s && Algorithms.isEmpty(s))) {
-                    continue;
-                }
-                if (param instanceof Number number) {
-                    ps.setLong(idx++, number.longValue());
-                } else {
-                    ps.setString(idx++, String.valueOf(param));
-                }
-            }
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? rs.getLong(1) : 0;
-            }
-        }
-    }
-
-    private int bindParams(PreparedStatement ps, int idx, List<Object> params) throws SQLException {
-        for (Object param : params) {
-            if (param instanceof Number number) {
-                ps.setLong(idx++, number.longValue());
-            } else {
-                ps.setString(idx++, String.valueOf(param));
-            }
-        }
-        return idx;
-    }
-
-    private List<Object> buildTagTokenParams(String prefix, TagFilter tagFilter) {
-        List<Object> params = new ArrayList<>();
-        if (!Algorithms.isEmpty(prefix)) {
-            params.add(prefix);
-        }
-        if (tagFilter != null && tagFilter.enabled()) {
-            params.addAll(tagFilter.params());
-        }
-        return params;
-    }
-
-    private List<Object> buildTagObjectParams(long tokenId, String regExp, TagFilter tagFilter) {
-        List<Object> params = new ArrayList<>();
-        params.add(tokenId);
-        if (!Algorithms.isEmpty(regExp)) {
-            params.add(regExp);
-            params.add(regExp);
-            params.add(regExp);
-        }
-        if (tagFilter != null && tagFilter.enabled()) {
-            params.addAll(tagFilter.params());
-        }
-        return params;
-    }
-
-    private TagFilter buildTagFilter(String tag, List<String> values) {
-        if (Algorithms.isEmpty(tag)) {
-            return new TagFilter(false, "", Collections.emptyList());
-        }
-        if (values == null || values.isEmpty()) {
-            return buildTagExistenceFilter(tag);
-        }
-        List<String> cleanValues = values.stream().filter(v -> !Algorithms.isEmpty(v)).toList();
-        if (cleanValues.isEmpty()) {
-            return buildTagExistenceFilter(tag);
-        }
-        List<String> conditions = new ArrayList<>();
-        List<Object> params = new ArrayList<>();
-        String placeholders = String.join(", ", Collections.nCopies(cleanValues.size(), "?"));
-        if (tag.startsWith("common.")) {
-            conditions.add("json_extract(o.commonTags, ?) IN (" + placeholders + ")");
-            params.add(jsonPath(tag.substring("common.".length()), false));
-            params.addAll(cleanValues);
-        } else if (tag.startsWith("extra.")) {
-            conditions.add(extraTagJsonTreeCondition(tag.substring("extra.".length()), placeholders));
-            params.addAll(extraTagJsonTreeParams(tag.substring("extra.".length())));
-            params.addAll(cleanValues);
-        } else {
-            conditions.add("json_extract(o.commonTags, ?) IN (" + placeholders + ")");
-            params.add(jsonPath(tag, false));
-            params.addAll(cleanValues);
-            conditions.add(extraTagJsonTreeCondition(tag, placeholders));
-            params.addAll(extraTagJsonTreeParams(tag));
-            params.addAll(cleanValues);
-        }
-        return new TagFilter(true, "(" + String.join(" OR ", conditions) + ")", params);
-    }
-
-    private TagFilter buildTagExistenceFilter(String tag) {
-        List<String> conditions = new ArrayList<>();
-        List<Object> params = new ArrayList<>();
-        if (tag.startsWith("common.")) {
-            conditions.add("json_type(o.commonTags, ?) IS NOT NULL");
-            params.add(jsonPath(tag.substring("common.".length()), false));
-        } else if (tag.startsWith("extra.")) {
-            conditions.add(extraTagJsonTreeExistenceCondition(tag.substring("extra.".length())));
-            params.addAll(extraTagJsonTreeParams(tag.substring("extra.".length())));
-        } else {
-            conditions.add("json_type(o.commonTags, ?) IS NOT NULL");
-            params.add(jsonPath(tag, false));
-            conditions.add(extraTagJsonTreeExistenceCondition(tag));
-            params.addAll(extraTagJsonTreeParams(tag));
-        }
-        return new TagFilter(true, "(" + String.join(" OR ", conditions) + ")", params);
-    }
-
-    private String extraTagJsonTreeCondition(String tag, String placeholders) {
-        return "EXISTS (SELECT 1 FROM json_tree(o.extraTags) e WHERE e.atom IS NOT NULL AND e.key = ? "
-                + "AND (e.path = ? OR e.path LIKE ?) AND e.atom IN (" + placeholders + "))";
-    }
-
-    private String extraTagJsonTreeExistenceCondition(String tag) {
-        return "EXISTS (SELECT 1 FROM json_tree(o.extraTags) e WHERE e.atom IS NOT NULL AND e.key = ? "
-                + "AND (e.path = ? OR e.path LIKE ?))";
-    }
-
-    private List<Object> extraTagJsonTreeParams(String tag) {
-        String normalized = safeString(tag);
-        int dot = normalized.lastIndexOf('.');
-        String parent = dot < 0 ? "" : normalized.substring(0, dot);
-        String key = dot < 0 ? normalized : normalized.substring(dot + 1);
-        String path = jsonTreePath(parent);
-        return List.of(key, path, path + "[%]");
-    }
-
-    private String jsonTreePath(String tag) {
-        if (Algorithms.isEmpty(tag)) {
-            return "$";
-        }
-        return "$." + tag;
-    }
-
-    private String jsonPath(String tag, boolean nested) {
-        if (Algorithms.isEmpty(tag)) {
-            return "$";
-        }
-        if (!nested) {
-            return "$." + quoteJsonPathSegment(tag);
-        }
-        StringBuilder path = new StringBuilder("$");
-        for (String part : tag.split("\\.")) {
-            if (!Algorithms.isEmpty(part)) {
-                path.append(".").append(quoteJsonPathSegment(part));
-            }
-        }
-        return path.toString();
-    }
-
-    private String quoteJsonPathSegment(String value) {
-        return "\"" + safeString(value).replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
-    }
-
-    private DbTokenSummary buildTagsDbTokenSummary(Connection conn, String groupedSql, List<Object> params) throws SQLException {
-        String sql = "SELECT SUM(matched), SUM(alone), SUM(isCommon), SUM(isFrequent), MAX(matched), MAX(alone) FROM ("
-                + groupedSql + ")";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            bindParams(ps, 1, params);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? new DbTokenSummary(rs.getLong(1), rs.getLong(2), rs.getLong(3), rs.getLong(4), rs.getLong(5), rs.getLong(6))
-                        : new DbTokenSummary(0, 0, 0, 0, 0, 0);
-            }
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<String, String> parseObjectValues(String json) throws IOException {
-        if (Algorithms.isEmpty(json)) {
-            return Collections.emptyMap();
-        }
-        return getObjectMapper().readValue(json, Map.class);
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> parseObjectExtraTags(String json) throws IOException {
-        if (Algorithms.isEmpty(json)) {
-            return Collections.emptyMap();
-        }
-        return getObjectMapper().readValue(json, Map.class);
+    record GenerateDbOptions(boolean skipObjectTags, boolean skipNewTokens, boolean skipTokenInTagValue) {
+        static final GenerateDbOptions DEFAULT = new GenerateDbOptions(false, false, false);
     }
 
     record AddressTokenRefs(List<Integer> cityOffsets, List<Integer> streetOffsets, List<Integer> streetCityOffsets,
@@ -2948,6 +3180,15 @@ public interface IndexService extends OBFService {
         AddressTokenRefs() {
             this(new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
         }
+    }
+
+    record AddressTokenRef(IndexToken token, AddressRef ref) {
+    }
+
+    record GenerateDbRawPoiObject(RawPoiObject rawPoiObject, int payloadOffset, int payloadSize, int sourceOffset) {
+    }
+
+    record GenerateDbObjectTagValue(long tagId, long valueId, String value, Set<String> tokens) {
     }
 
     class BinaryMapIndexReaderExt extends BinaryMapIndexReader {
@@ -2983,6 +3224,238 @@ public interface IndexService extends OBFService {
         }
     }
 
-    record TagFilter(boolean enabled, String sql, List<Object> params) {
+    class GenerateDbObfReader {
+        private final BinaryMapIndexReaderExt index;
+        private final List<BinaryMapAddressReaderAdapter.AddressRegion> addressRegions = new ArrayList<>();
+        private final List<BinaryMapPoiReaderAdapter.PoiRegion> poiRegions = new ArrayList<>();
+        private final Map<Integer, City> cityCache = new HashMap<>();
+        private final Map<Integer, ObjectAddress> addressObjectCache = new HashMap<>();
+
+        GenerateDbObfReader(BinaryMapIndexReaderExt index) {
+            this.index = index;
+            for (BinaryIndexPart part : index.getIndexes()) {
+                if (part instanceof BinaryMapAddressReaderAdapter.AddressRegion addressRegion) {
+                    addressRegions.add(addressRegion);
+                } else if (part instanceof BinaryMapPoiReaderAdapter.PoiRegion poiRegion) {
+                    poiRegions.add(poiRegion);
+                }
+            }
+        }
+
+        BinaryMapIndexReaderExt index() {
+            return index;
+        }
+
+        List<BinaryMapAddressReaderAdapter.AddressRegion> addressRegions() {
+            return addressRegions;
+        }
+
+        List<BinaryMapPoiReaderAdapter.PoiRegion> poiRegions() {
+            return poiRegions;
+        }
+    }
+
+    class GenerateDbMetrics {
+        private static final ThreadLocal<GenerateDbMetrics> CURRENT = new ThreadLocal<>();
+
+        final long startedMs = System.currentTimeMillis();
+        final AtomicLong tokenLoadNs = new AtomicLong();
+        final AtomicLong objectChunkLoadNs = new AtomicLong();
+        final AtomicLong addressChunkLoadNs = new AtomicLong();
+        final AtomicLong poiChunkLoadNs = new AtomicLong();
+        final AtomicLong readerWaitNs = new AtomicLong();
+        final AtomicLong tokenDbNs = new AtomicLong();
+        final AtomicLong objectDbNs = new AtomicLong();
+        final AtomicLong tagDbNs = new AtomicLong();
+        final AtomicLong postingDbNs = new AtomicLong();
+        final AtomicLong batchDbNs = new AtomicLong();
+        final AtomicLong commitNs = new AtomicLong();
+        final AtomicLong poiBoxes = new AtomicLong();
+        final AtomicLong poiRawObjects = new AtomicLong();
+        final AtomicLong poiCandidateChecks = new AtomicLong();
+        final AtomicLong poiMatches = new AtomicLong();
+
+        static void setCurrent(GenerateDbMetrics metrics) {
+            CURRENT.set(metrics);
+        }
+
+        static GenerateDbMetrics current() {
+            GenerateDbMetrics metrics = CURRENT.get();
+            if (metrics == null) {
+                throw new IllegalStateException("Generate DB metrics are not bound to this thread");
+            }
+            return metrics;
+        }
+
+        static void clearCurrent() {
+            CURRENT.remove();
+        }
+
+        long elapsedMs() {
+            return Math.max(0, System.currentTimeMillis() - startedMs);
+        }
+
+        long nsToMs(long ns) {
+            return TimeUnit.NANOSECONDS.toMillis(ns);
+        }
+    }
+
+    class GenerateDbSqlBatcher {
+        static final int FLUSH_ROWS = 8_192;
+        int objectTagValueRows;
+        int postingRows;
+        long totalValueRows;
+        long totalObjectTagValueRows;
+        long totalPostingRows;
+
+        int pendingRows() {
+            return objectTagValueRows + postingRows;
+        }
+    }
+
+    class GenerateDbWriterBatch {
+        static final int TOKEN_CHUNK_SIZE = 250;
+        static final int QUEUE_CAPACITY = 16;
+        static final int MAX_IN_FLIGHT_CHUNKS = 16;
+        private static final int INITIAL_TARGET_ROWS = 10_000;
+        private static final int MAX_TARGET_ROWS = 100_000;
+        private static final long TARGET_BATCH_BYTES = 32L * 1024L * 1024L;
+        private static final long FLUSH_TIMEOUT_MS = 10_000L;
+
+        private final Connection conn;
+        private final Logger logger;
+        private final GenerateDbMetrics metrics;
+        private final List<Long> commitLatencies = new ArrayList<>();
+        private final long startedMs = System.currentTimeMillis();
+        private long transactionStartedMs;
+        private long batchRows;
+        private long batchBytes;
+        private long totalRows;
+        private long lastReportRows;
+        private long queueDepthSamples;
+        private long queueDepthTotal;
+        private int queueDepthMax;
+        private int targetRows = INITIAL_TARGET_ROWS;
+
+        GenerateDbWriterBatch(Connection conn, Logger logger, GenerateDbMetrics metrics) throws SQLException {
+            this.conn = conn;
+            this.logger = logger;
+            this.metrics = metrics;
+            begin();
+        }
+
+        void recordRows(long rows, long estimatedBytes) {
+            if (rows <= 0) {
+                return;
+            }
+            batchRows += rows;
+            totalRows += rows;
+            batchBytes += Math.max(0, estimatedBytes);
+        }
+
+        void commitIfNeeded(int queueDepth) throws SQLException {
+            recordQueueDepth(queueDepth);
+            long now = System.currentTimeMillis();
+            if (batchRows >= targetRows || batchBytes >= TARGET_BATCH_BYTES || now - transactionStartedMs >= FLUSH_TIMEOUT_MS) {
+                commit(false);
+            }
+        }
+
+        void commitFinal() throws SQLException {
+            commit(true);
+            reportProgress();
+        }
+
+        void reportProgress() {
+            if (totalRows == lastReportRows) {
+                return;
+            }
+            lastReportRows = totalRows;
+            logger.info("generateDb: writer_records_per_sec={} queue_depth_avg={} queue_depth_max={} batch_rows={} batch_bytes_estimate={} target_rows={} max_memory_usage={} MB",
+                    recordsPerSecond(totalRows, startedMs), averageQueueDepth(), queueDepthMax, batchRows, batchBytes, targetRows, usedMemoryMb());
+        }
+
+        private void begin() throws SQLException {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("BEGIN IMMEDIATE");
+            }
+            transactionStartedMs = System.currentTimeMillis();
+            batchRows = 0;
+            batchBytes = 0;
+        }
+
+        private void commit(boolean force) throws SQLException {
+            if (batchRows == 0 && !force) {
+                return;
+            }
+            long rows = batchRows;
+            long started = System.currentTimeMillis();
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("COMMIT");
+            }
+            long latency = System.currentTimeMillis() - started;
+            metrics.commitNs.addAndGet(TimeUnit.MILLISECONDS.toNanos(latency));
+            if (rows > 0) {
+                commitLatencies.add(latency);
+                tuneTargetRows(rows, latency);
+            }
+            if (!force) {
+                begin();
+            } else {
+                logger.info("generateDb: final writer summary total_load_time={} ms writer_records_per_sec={} queue_depth_avg={} queue_depth_max={} commit_latency_p50={} ms commit_latency_p95={} ms max_memory_usage={} MB",
+                        Math.max(0, System.currentTimeMillis() - startedMs), recordsPerSecond(totalRows, startedMs),
+                        averageQueueDepth(), queueDepthMax, percentileLatency(50), percentileLatency(95), usedMemoryMb());
+            }
+        }
+
+        private void tuneTargetRows(long rows, long latencyMs) {
+            if (latencyMs < 1_000 && rows >= targetRows && targetRows < MAX_TARGET_ROWS) {
+                targetRows = Math.min(MAX_TARGET_ROWS, targetRows * 2);
+            } else if (latencyMs > 5_000 && targetRows > INITIAL_TARGET_ROWS) {
+                targetRows = Math.max(INITIAL_TARGET_ROWS, targetRows / 2);
+            }
+        }
+
+        private void recordQueueDepth(int queueDepth) {
+            queueDepthSamples++;
+            queueDepthTotal += Math.max(0, queueDepth);
+            queueDepthMax = Math.max(queueDepthMax, queueDepth);
+        }
+
+        private long recordsPerSecond(long records, long startMs) {
+            long elapsedMs = Math.max(1, System.currentTimeMillis() - startMs);
+            return records * 1000L / elapsedMs;
+        }
+
+        long totalRows() {
+            return totalRows;
+        }
+
+        int commitCount() {
+            return commitLatencies.size();
+        }
+
+        long averageQueueDepth() {
+            return queueDepthSamples == 0 ? 0 : queueDepthTotal / queueDepthSamples;
+        }
+
+        int queueDepthMax() {
+            return queueDepthMax;
+        }
+
+        long percentileLatency(int percentile) {
+            if (commitLatencies.isEmpty()) {
+                return 0;
+            }
+            List<Long> sorted = new ArrayList<>(commitLatencies);
+            Collections.sort(sorted);
+            int index = Math.min(sorted.size() - 1, Math.max(0, (int) Math.ceil(sorted.size() * percentile / 100.0) - 1));
+            return sorted.get(index);
+        }
+
+        long usedMemoryMb() {
+            Runtime runtime = Runtime.getRuntime();
+            return (runtime.totalMemory() - runtime.freeMemory()) / (1024L * 1024L);
+        }
     }
 }

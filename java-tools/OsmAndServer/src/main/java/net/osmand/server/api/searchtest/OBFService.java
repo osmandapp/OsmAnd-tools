@@ -95,14 +95,26 @@ public interface OBFService extends BaseService {
 	record GenerateDbTokenObjects(String obf, String obfName, int obfIndex, long startMs, IndexToken token, ObjectAddressPage objectsPage) {}
 	record GenerateDbTokenChunk(String obf, String obfName, int obfIndex, long startMs, List<GenerateDbTokenObjects> tokens) {}
 	record Datasource(String name, long size, long lastModified, boolean valid, String error) {}
-	record DbTagName(String name, long tokens) {}
-	record DbToken(long id, String name, long matched, long alone, boolean isCommon, boolean isFrequent) {}
-	record DbTokenSummary(long matchedSum, long aloneSum, long commonSum, long frequentSum, long matchedMax, long aloneMax) {}
+	record DbTagName(String name, long objects, boolean isSkipped) {}
+	record DbTagValue(String value, long objects_count) {}
+	record DbToken(long id, String name, long matched, long alone, boolean isCommon, boolean isFrequent, boolean isGenerated) {}
+	record DbTokenSummary(long matchedSum, long aloneSum, long commonSum, long frequentSum, long generatedSum, long matchedMax, long aloneMax) {}
 	record DbTokenPage(List<DbToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, DbTokenSummary summary) {}
+	record DbObjectToken(long id, String name, boolean isCommon, boolean isFrequent, boolean isGenerated, String obfName) {}
+	record DbObjectTokenPage(List<DbObjectToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages) {}
 	record DbObject(int sequenceId, String name, LatLon point, Map<String, String> commonTags,
 	                Map<String, Object> extraTags, String type, Long osmId, String osmType,
-	                boolean isAlone, String obfName) {}
+	                boolean isAlone, String obfName, long tokens) {}
 	record DbObjectPage(List<DbObject> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages) {}
+	record DbReportDistribution(String bucket, int ord, long tokens, long postings, long tokensNew, long postingsNew) {}
+	record DbReportTagHit(String tag, long hits, double sharePct) {}
+	record DbReportPruneToken(String name, boolean isCommon, boolean isFrequent, long matched, long alone,
+	                          double cumulativePct, List<DbReportTagHit> topTags) {}
+	record TestCaseObject(String name, String type, LatLon point, long tokens,
+	                      long commonFrequentTokens, long commonTokens, long frequentTokens,
+	                      long newTokens, double proneScore, String topCommonFrequentTokens) {}
+	record DbReport(long totalTokens, long totalPostings, List<DbReportDistribution> distribution,
+	                List<DbReportPruneToken> pruning, List<TestCaseObject> mainWordInconsistency) {}
 	@FunctionalInterface
 	interface GenerateDbProgressListener {
 		void onProgress(GenerateDbProgress progress);
