@@ -121,9 +121,17 @@ public class ActionManagementController {
         return getRun(id);
     }
 
+    @DeleteMapping(value = "/runs/{id:\\d+}")
+    @ResponseBody
+    public ResponseEntity<Void> deleteRun(@PathVariable long id) {
+        actionManagementService.deleteRun(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping(value = "/runs/{id:\\d+}/cancel", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
     public ResponseEntity<RunItem> cancelRun(@PathVariable long id) {
         return ResponseEntity.ok(actionManagementService.cancelRun(id));
     }
 }
+

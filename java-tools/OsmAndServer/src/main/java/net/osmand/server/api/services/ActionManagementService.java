@@ -46,7 +46,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Service
 public class ActionManagementService {
     private static final Logger LOGGER = LoggerFactory.getLogger(ActionManagementService.class);
-    private static final String ACTION_PACKAGE = "net.osmand.server.api.action";
 
     private final AtomicInteger threadCounter = new AtomicInteger();
     private final ExecutorService executor = Executors.newCachedThreadPool(new ThreadFactory() {
@@ -143,7 +142,7 @@ public class ActionManagementService {
         Map<String, Object> beans = applicationContext.getBeansWithAnnotation(UiAction.class);
         for (Object bean : beans.values()) {
             Class<?> targetClass = org.springframework.aop.support.AopUtils.getTargetClass(bean);
-            if (targetClass == null || !targetClass.getName().startsWith(ACTION_PACKAGE + ".") || !Action.class.isAssignableFrom(targetClass)) {
+            if (!Action.class.isAssignableFrom(targetClass)) {
                 continue;
             }
             UiAction uiAction = targetClass.getAnnotation(UiAction.class);
@@ -363,6 +362,18 @@ public class ActionManagementService {
         if (type == float.class || type == Float.class) return value instanceof Number n ? n.floatValue() : Float.parseFloat(String.valueOf(value));
         if (type == double.class || type == Double.class) return value instanceof Number n ? n.doubleValue() : Double.parseDouble(String.valueOf(value));
         throw new IllegalArgumentException("Unsupported parameter type: " + type.getName());
+    }
+
+    public void deleteRun(long runId) {
+        Future<?> future = runningTasks.remove(runId);
+        if (future != null) {
+            future.cancel(true);
+        }
+        ActionContext context = runningContexts.remove(runId);
+        if (context != null) {
+            context.cancel();
+        }
+        jdbcTemplate.update("DELETE FROM run WHERE id = ?", runId);
     }
 
     public RunItem cancelRun(long runId) {
