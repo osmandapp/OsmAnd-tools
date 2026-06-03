@@ -1677,6 +1677,7 @@ public class BinaryMapIndexWriter {
 				OsmAndPoiSubtype.Builder subType = OsmandOdb.OsmAndPoiSubtype.newBuilder();
 				subType.setName(rt.getTag());
 				subType.setIsText(true);
+				subType.setFrequency(rt.getUsage());
 				builder.addSubtypes(subType);
 			}
 		}
@@ -1688,11 +1689,13 @@ public class BinaryMapIndexWriter {
 			subType.setIsText(false);
 			List<PoiAdditionalType> list = groupAdditionalByTagName.get(tag);
 			subType.setSubtypeValuesSize(list.size());
-			int subcInd = 0;
+			int subcInd = 0, freq = 0;
 			for (PoiAdditionalType subtypeVal : list) {
 				subtypeVal.setTargetPoiId(cInd, subcInd++);
 				subType.addSubtypeValue(subtypeVal.getValue());
+				freq += subtypeVal.getUsage();
 			}
+			subType.setFrequency(freq);
 			builder.addSubtypes(subType);
 		}
 		codedOutStream.writeMessage(OsmandOdb.OsmAndPoiIndex.SUBTYPESTABLE_FIELD_NUMBER, builder.build());
