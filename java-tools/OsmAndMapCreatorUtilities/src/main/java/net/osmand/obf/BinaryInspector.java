@@ -93,13 +93,13 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-//					"-vpoi",
+					"-vpoi",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
-					"-vaddress", "-vcities", "-vstreetgroups", "-vcitynames",
-					"-vstreets", //  "-vbuildings",// "-vintersections",
+//					"-vaddress", "-vcities", "-vstreetgroups", "-vcitynames",
+//					"-vstreets", //  "-vbuildings",// "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
 					// road
@@ -109,8 +109,7 @@ public class BinaryInspector {
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
-					
-					System.getProperty("maps.dir") + "Map.obf"
+					System.getProperty("maps.dir") + "/Liechtenstein_europe_2.obf",
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
@@ -1557,16 +1556,20 @@ public class BinaryInspector {
 		Set<String> text = new TreeSet<String>();
 		Set<String> refs = new TreeSet<String>();
 		Map<String, List<String>> singleValues = new TreeMap<String, List<String>>();
-		int singleVals = 0;
+		Map<String, Integer> singleValuesFreq = new TreeMap<String, Integer>();
+		int singleVals = 0, textFreq = 0, refsFreq = 0, singleFreq = 0;
 		MapPoiTypes poiTypes = MapPoiTypes.getDefault();
 		for (int i = 0; i < subtypes.size(); i++) {
 			PoiSubType st = subtypes.get(i);
+			String formatType = String.format("%s (%d)", st.name, st.frequency);
 			if (st.text) {
 				PoiType ref = poiTypes.getPoiTypeByKey(st.name);
 				if(ref != null && !ref.isAdditional()) {
-					refs.add(st.name);
+					refs.add(formatType);
+					refsFreq += st.frequency;
 				} else {
-					text.add(st.name);
+					text.add(formatType);
+					textFreq += st.frequency;
 				}
 			} else if (st.possibleValues.size() == 1) {
 				singleVals++;
@@ -1577,19 +1580,23 @@ public class BinaryInspector {
 				}
 				if (!singleValues.containsKey(key)) {
 					singleValues.put(key, new ArrayList<String>());
+					singleValuesFreq.put(key, 0);
 				}
+				singleFreq += st.frequency;
 				singleValues.get(key).add(st.name);
+				singleValuesFreq.put(key, singleValuesFreq.get(key) + st.frequency);
 			} else {
-				println(String.format("\t\t\t%s (%d): %s",  st.name, st.possibleValues.size(), st.possibleValues));
+				println(String.format("\t\t\t%s (%d, %,d): %s",  st.name, st.possibleValues.size(), st.frequency, st.possibleValues));
 			}
 		}
 		StringBuilder singleValuesFmt = new StringBuilder();
-		for(String key : singleValues.keySet()) {
-			singleValuesFmt.append(key + " (" + singleValues.get(key).size()+ "), ");
+		for (String key : singleValues.keySet()) {
+			singleValuesFmt
+					.append(String.format("%s (%d, %d), ", key, singleValues.get(key).size(), singleValuesFreq.get(key)));
 		}
-		println(String.format("\t\t\tReference to another poi (incorrect?) (%d): %s",  refs.size(), refs));
-		println(String.format("\t\t\tText based (%d): %s",  text.size(), text));
-		println(String.format("\t\t\tSingle value filters (%d): %s",  singleVals, singleValuesFmt));
+		println(String.format("\t\t\tReference to double poi (%d, %,d): %s",  refs.size(), refsFreq, refs));
+		println(String.format("\t\t\tText based (%d, %,d): %s",  text.size(), textFreq, text));
+		println(String.format("\t\t\tSingle value filters (%d, %,d): %s",  singleVals, singleFreq, singleValuesFmt));
 //		req.poiTypeFilter = null;//for test only
 		index.searchPoi(req, p);
 		
