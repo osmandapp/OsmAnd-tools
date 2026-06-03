@@ -1677,6 +1677,7 @@ public class BinaryMapIndexWriter {
 				OsmAndPoiSubtype.Builder subType = OsmandOdb.OsmAndPoiSubtype.newBuilder();
 				subType.setName(rt.getTag());
 				subType.setIsText(true);
+				subType.setFrequency(rt.getUsage());
 				builder.addSubtypes(subType);
 			}
 		}
