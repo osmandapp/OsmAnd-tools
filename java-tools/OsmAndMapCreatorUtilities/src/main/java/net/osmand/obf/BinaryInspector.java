@@ -70,6 +70,7 @@ import net.osmand.data.TransportStop;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.PoiType;
+import net.osmand.osm.edit.Entity;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 import net.osmand.router.TransportRoutePlanner;
 import net.osmand.util.Algorithms;
@@ -80,9 +81,9 @@ public class BinaryInspector {
 
 	public static final int BUFFER_SIZE = 1 << 20;
 	public static final int SHIFT_ID = 6;
-	
+
 	protected static final boolean DETECT_POI_ADDRESS = false;
-	
+
 	private VerboseInfo vInfo;
 	public static void main(String[] args) throws IOException {
 		BinaryInspector in = new BinaryInspector();
@@ -98,19 +99,19 @@ public class BinaryInspector {
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
-					"-vaddress", "-vcities", "-vstreetgroups", "-vcitynames",
+					"-vaddress", "-vcities", "-vstreetgroups",
 					"-vstreets", //  "-vbuildings",// "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
 					// road
 //					"-latlon=40.755934,-73.986425,0.005",
 //					"-latlon=48.804242,9.215574,0.005",
-					
+
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
-					
-					System.getProperty("maps.dir") + "Map.obf"
+
+					"/Users/ivan/OsmAnd/regions.ocbf"
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
@@ -625,7 +626,7 @@ public class BinaryInspector {
 					int ind = 0;
 					for (CitiesBlock c : cities) {
 						ind++;
-						CityBlocks block = CityBlocks.getByType(c.getType()); 
+						CityBlocks block = CityBlocks.getByType(c.getType());
 						println(String.format("\t %d.%d Address %s part size=%,d bytes",i , ind, block.toString(), c.getLength()));
 					}
 					if (vInfo != null && vInfo.isVaddress()) {
@@ -837,7 +838,7 @@ public class BinaryInspector {
 				continue;
 			}
 			final List<City> cities = index.getCities(null, type, region, null);
-			
+
 			print(String.format("\t %s %d entities", type.toString(), cities.size()));
 			if (CityBlocks.CITY_TOWN_TYPE == type) {
 				if (!verbose.vstreetgroups && !verbose.vcities) {
@@ -869,10 +870,17 @@ public class BinaryInspector {
 					bbottom= MapUtils.get31LatitudeY(c.getBbox31()[3]);
 					bboxStr = String.format("%.5f, %.5f - %.5f, %.5f", btop, bleft, bbottom, bright);
 				}
+                String ft = "";
+                Entity.EntityType entityType = ObfConstants.getOsmEntityType(c);
+                if (entityType != null) {
+                    ft = entityType.name();
+                } else {
+                    ft = c.getType().toString();
+                }
 				String cityDescription = (type == CityBlocks.POSTCODES_TYPE
 						? String.format("\t\t'%s' %d street(s) size %,d bytes %s", name, streets.size(), size, bboxStr)
 						: String.format("\t\t'%s' [%s], %d street(s) size %,d bytes %s", name,
-								ObfConstants.getOsmEntityType(c).name().charAt(0) + " "
+								ft.charAt(0) + " "
 										+ ObfConstants.getOsmObjectId(c),
 								streets.size(), size, bboxStr));
 				print(cityDescription);
@@ -902,7 +910,7 @@ public class BinaryInspector {
 					final List<Street> intersections = t.getIntersectedStreets();
 
 					println(MessageFormat.format("\t\t\t''{0}'' [{1,number,#}], {2,number,#} building(s), {3,number,#} intersections(s)",
-							new Object[]{ t.getName(verbose.lang) + " " + t.getNamesMap(true).toString(), 
+							new Object[]{ t.getName(verbose.lang) + " " + t.getNamesMap(true).toString(),
 									t.getId(), buildings.size(), intersections.size()}));
 					if (buildings != null && !buildings.isEmpty() && verbose.vbuildings) {
 						println("\t\t\t\tBuildings:");
@@ -1526,7 +1534,7 @@ public class BinaryInspector {
 						println(amenity.getType().getKeyName() + ": " + amenity.getSubType() + " " + amenity.getName() +
 								" " + amenity.getLocation() + " osmid=" + id + " " + s);
 						if(!Algorithms.isEmpty(amenity.getStreetName())) {
-							count[1] ++; 
+							count[1] ++;
 						} else if (!Algorithms.isEmpty(amenity.getName())) {
 							count[2]++;
 						}
@@ -1592,7 +1600,7 @@ public class BinaryInspector {
 		println(String.format("\t\t\tSingle value filters (%d): %s",  singleVals, singleValuesFmt));
 //		req.poiTypeFilter = null;//for test only
 		index.searchPoi(req, p);
-		
+
 		println(String.format("Found %d pois (%d with addr, %d with name without addr)", count[0],
 				count[1], count[2]));
 	}

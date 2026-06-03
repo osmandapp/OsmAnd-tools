@@ -396,10 +396,11 @@ public class CountryOcbfGeneration {
 
 		IndexCreatorSettings settings = new IndexCreatorSettings();
 		settings.indexMap = true;
-		settings.indexAddress = false;
+		settings.indexAddress = true;
 		settings.indexPOI = false;
 		settings.indexTransport = false;
 		settings.indexRouting = false;
+        settings.parseRegionBounds = true;
 
 		IndexCreator creator = new IndexCreator(new File(targetObf).getParentFile(), settings); //$NON-NLS-1$
 		creator.setMapFileName(new File(targetObf).getName());

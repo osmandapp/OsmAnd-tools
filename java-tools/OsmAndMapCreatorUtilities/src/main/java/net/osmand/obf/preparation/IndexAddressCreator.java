@@ -178,8 +178,10 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		// Used to be: if a place that has addr_place is a neighbourhood mark it as a suburb (made for the suburbs of Venice)
 		// Not needed as we start storing all NEIGHBOURHOOD, DISTRICT as BOUNDARY
 		// Bucharest has admin level 4
-		boolean boundaryValid = boundary != null && (!boundary.hasAdminLevel() || boundary.getAdminLevel() >= 4) &&
-				boundary.getCenterPoint() != null && !Algorithms.isEmpty(boundary.getName());
+		boolean boundaryValid = boundary != null
+                && (!boundary.hasAdminLevel() || boundary.getAdminLevel() >= 4 || settings.parseRegionBounds)
+                && boundary.getCenterPoint() != null
+                && !Algorithms.isEmpty(boundary.getName());
 		if (boundaryValid) {
 			LatLon boundaryCenter = boundary.getCenterPoint();
 			List<City> citiesToSearch = cityDataStorage.getClosestObjects(boundaryCenter.getLatitude(), boundaryCenter.getLongitude());
