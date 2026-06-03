@@ -13,6 +13,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.map.hash.TObjectIntHashMap;
 import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.IProgress;
 import net.osmand.IndexConstants;
@@ -535,6 +536,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	public static class PoiCreatorCategories {
 		Map<String, Set<String>> categories = new LinkedHashMap<String, Set<String>>();
+		TObjectIntHashMap<String> categoriesUsage = new TObjectIntHashMap<String>();
 		Set<PoiAdditionalType> additionalAttributes = new LinkedHashSet<PoiAdditionalType>();
 
 
@@ -568,13 +570,16 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			if (!categories.containsKey(cat)) {
 				categories.put(cat, new TreeSet<String>());
 			}
+			categoriesUsage.increment(cat);
 			if (toSplit(subCat)) {
 				String[] split = split(subCat);
 				for (String sub : split) {
 					categories.get(cat).add(sub.trim());
+					categoriesUsage.increment(cat + "_" + sub.trim());
 				}
 			} else {
 				categories.get(cat).add(subCat.trim());
+				categoriesUsage.increment(cat + "_" + subCat.trim());
 			}
 		}
 
