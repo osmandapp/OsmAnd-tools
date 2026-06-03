@@ -9,7 +9,7 @@ import java.sql.*;
 import java.util.*;
 import java.util.regex.Pattern;
 
-public interface AddressPOIAnalystService extends TokenAnalystService {
+public interface AddressPOIAnalystService extends GenDbService {
 
     default DbObjectPage getTagsDbAddressPoiObjects(String datasource, String objectType, String regExp,
                                                     String tokenFind, String tag, List<String> values,
