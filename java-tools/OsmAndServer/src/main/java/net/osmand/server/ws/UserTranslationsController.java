@@ -76,4 +76,15 @@ public class UserTranslationsController {
 		userTranslationsService.createTranslation(user, null, headers);
 	}
 
+	@MessageMapping("/translation/{translationId}/delete")
+	public void deleteTranslation(@DestinationVariable String translationId, SimpMessageHeaderAccessor headers,
+			Principal principal) {
+		UserTranslation ust = userTranslationsService.getTranslation(translationId, headers);
+		CloudUser user = userTranslationsService.getUser(principal, headers);
+		if (user == null || ust == null) {
+			return;
+		}
+		userTranslationsService.deleteTranslation(ust, user, headers);
+	}
+
 }

@@ -7,7 +7,8 @@ public class TranslationMessage {
 		LOCATION,
 		JOIN,
 		LEAVE,
-		METADATA
+		METADATA,
+		DELETE
 	}
 	
 	public static final String SENDER_SYSTEM = "System";

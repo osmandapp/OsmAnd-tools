@@ -150,6 +150,7 @@ public class UserTranslationsService {
 		locationByUser.remove(user.id);
 		shareLocationByUser(ust, user.id);
 		UserTranslationPlainObject obj = new UserTranslationPlainObject(ust.getId());
+		obj.ownerUserId = ust.getOwner();
 		if (headers != null) {
 			sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_TRANSLATION, obj);
 		}
@@ -174,11 +175,12 @@ public class UserTranslationsService {
 
 	public void load(UserTranslation ust, SimpMessageHeaderAccessor headers) {
 		UserTranslationPlainObject obj = new UserTranslationPlainObject(ust.getId());
+		obj.ownerUserId = ust.getOwner();
 		obj.setHistory(ust.getMessages());
 		obj.setShareLocations(ust);
 		sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_TRANSLATION, obj);
 	}
-	
+
 	public void startSharing(UserTranslation ust, CloudUser user, SimpMessageHeaderAccessor headers) {
 		TranslationSharingOptions opts = new TranslationSharingOptions();
 		opts.startTime = System.currentTimeMillis();
@@ -190,16 +192,30 @@ public class UserTranslationsService {
 		if (locations != null && !locations.isEmpty()) {
 			ust.sendLocation(user.id, locations.getFirst());
 		}
-		// for local 
+		// for local
 //		if (!environment.acceptsProfiles(Profiles.of("production"))) {
 //			startSimulation(user, ust);
 //		}
 		UserTranslationPlainObject obj = new UserTranslationPlainObject(ust.getId());
 		ust.getSharingOptions().add(opts);
 		shareLocationByUser(ust, user.id);
-		
+
+		obj.ownerUserId = ust.getOwner();
 		obj.setShareLocations(ust);
 		sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_TRANSLATION, obj);
+		template.convertAndSend(TOPIC_TRANSLATION + ust.getId(),
+				prepareMessageSystem().setType(TranslationMessageType.METADATA).setContent(obj));
+	}
+
+	public boolean deleteTranslation(UserTranslation ust, CloudUser user, SimpMessageHeaderAccessor headers) {
+		if (ust.getOwner() != user.id) {
+			sendError("Only the owner can delete the translation", headers);
+			return false;
+		}
+		translations.remove(ust.getId());
+		// Notify all viewers so they can clean up.
+		rawSendMessage(ust, prepareMessageSystem().setType(TranslationMessageType.DELETE).setContent(ust.getId()));
+		return true;
 	}
 	
 	public void startSimulation(CloudUser user, UserTranslation ust) {

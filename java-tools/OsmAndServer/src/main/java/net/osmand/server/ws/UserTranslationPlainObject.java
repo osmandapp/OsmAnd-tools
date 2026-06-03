@@ -11,11 +11,12 @@ import net.osmand.shared.gpx.primitives.WptPt;
 public class UserTranslationPlainObject {
 
 	public final String id;
-	
+	public long ownerUserId;
+
 	public List<TranslationMessage> history = null;
-	
+
 	public List<SharingLocation> shareLocations = null;
-	
+
 	public UserTranslationPlainObject(String id) {
 		this.id = id;
 	}
@@ -33,7 +34,7 @@ public class UserTranslationPlainObject {
 			sh.nickname = o.nickname;
 			Deque<WptPt> deque = us.getLocations().get(o.userId);
 			sh.allLocations = new ArrayList<WptPt>();
-			if (deque != null) {
+			if (deque != null && !deque.isEmpty()) {
 				sh.lastLocation = deque.getFirst();
 				sh.allLocations = new ArrayList<>(deque);
 			}
