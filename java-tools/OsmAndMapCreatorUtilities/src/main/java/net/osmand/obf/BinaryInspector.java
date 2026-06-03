@@ -1503,6 +1503,7 @@ public class BinaryInspector {
 		String value;
 		int freq;
 		static boolean SORT_BY_NAME = false;
+		static boolean COMBINE_SINGLE_TYPE_BY_PREFIX = true;
 		List<ValueFreq> subValues = null;
 		
 		public ValueFreq(String name, int frequency) {
@@ -1607,7 +1608,7 @@ public class BinaryInspector {
 				singleVals++;
 				int lastIndexOf = st.name.lastIndexOf('_');
 				String key = st.name;
-				if (lastIndexOf >= 0) {
+				if (lastIndexOf >= 0 && ValueFreq.COMBINE_SINGLE_TYPE_BY_PREFIX) {
 					key = key.substring(0, lastIndexOf);
 				}
 				ValueFreq singleGroup = singleValues.get(key);
