@@ -79,7 +79,7 @@ public interface OBFService extends BaseService {
 	record AddressRef(int shiftToIndex, int shiftToCityIndex, int objectOffset, int cityOffset, int typeIndex, int atomSize) {}
 
 	record ObjectAddress(int sequenceId, String name, LatLon point, Map<String, String> commonTags,
-	                     Map<String, Object> extraTags, boolean isPoi, boolean isMatched,
+	                     boolean isPoi, boolean isMatched,
 	                     boolean isInvalidAtom, boolean isAlone, String type, Long osmId,
 	                     String osmType, int payloadOffset, int payloadSize, int sourceOffset) {}
 	record ObjectAddressPage(List<ObjectAddress> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, int[] countMetrics, int[] sizeMetrics, int aloneCount, int aloneSize) {}
@@ -103,7 +103,7 @@ public interface OBFService extends BaseService {
 	record DbObjectToken(long id, String name, boolean isCommon, boolean isFrequent, boolean isGenerated, String obfName) {}
 	record DbObjectTokenPage(List<DbObjectToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages) {}
 	record DbObject(int sequenceId, String name, LatLon point, Map<String, String> commonTags,
-	                Map<String, Object> extraTags, String type, Long osmId, String osmType,
+	                String type, Long osmId, String osmType,
 	                boolean isAlone, String obfName, long tokens) {}
 	record DbObjectPage(List<DbObject> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages) {}
 	record DbReportDistribution(String bucket, int ord, long tokens, long postings, long tokensNew, long postingsNew) {}

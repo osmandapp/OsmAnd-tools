@@ -192,7 +192,7 @@ public interface TokenAnalystService extends OBFService {
                                       int pageToShow, int pageSizeLimit, String sortBy, String sortOrder) throws IOException, SQLException {
         Path dbFile = resolveTagsDatasource(datasource);
         String source = perObf ? "posting" : "(SELECT token_id, object_id, isAlone, MIN(sequenceId) sequenceId FROM posting GROUP BY token_id, object_id, isAlone)";
-        String filter = Algorithms.isEmpty(regExp) ? "" : " AND (o.name REGEXP ? OR o.commonTags REGEXP ? OR o.extraTags REGEXP ?)";
+        String filter = Algorithms.isEmpty(regExp) ? "" : " AND (o.name REGEXP ? OR o.commonTags REGEXP ?)";
         String objectTypeFilter = getObjectTypeObjectFilter(objectType);
         TagFilter tagFilter = buildTagFilter(tag, values);
         String tagSql = tagFilter.enabled() ? " AND " + tagFilter.sql() : "";
@@ -212,7 +212,7 @@ public interface TokenAnalystService extends OBFService {
         try (Connection conn = openTagsDbConnection(dbFile)) {
             List<Object> objectParams = buildTagObjectParams(tokenId, regExp, tagFilter);
             long total = queryLong(conn, "SELECT COUNT(*)" + base, objectParams.toArray());
-            String sql = "SELECT p.sequenceId, o.name, o.lat, o.lon, o.commonTags, o.extraTags, o.type, o.id, o.osmType, p.isAlone"
+            String sql = "SELECT p.sequenceId, o.name, o.lat, o.lon, o.commonTags, o.type, o.id, o.osmType, p.isAlone"
                     + (perObf ? ", b.name" : ", NULL") + base
                     + buildTagsDbOrderBy(sortBy, sortOrder, orderColumns, "p.sequenceId ASC") + " LIMIT ? OFFSET ?";
             List<DbObject> content = new ArrayList<>();
@@ -226,9 +226,8 @@ public interface TokenAnalystService extends OBFService {
                         Double lon = rs.getObject(4) == null ? null : rs.getDouble(4);
                         LatLon point = lat == null || lon == null ? null : new LatLon(lat, lon);
                         Map<String, String> commonTags = parseObjectValues(rs.getString(5));
-                        Map<String, Object> extraTags = parseObjectExtraTags(rs.getString(6));
-                        content.add(new DbObject(rs.getInt(1), rs.getString(2), point, commonTags, extraTags, rs.getString(7),
-                                rs.getLong(8), rs.getString(9), rs.getInt(10) != 0, getTagsObfDisplayName(rs.getString(11)), 0));
+                        content.add(new DbObject(rs.getInt(1), rs.getString(2), point, commonTags, rs.getString(6),
+                                rs.getLong(7), rs.getString(8), rs.getInt(9) != 0, getTagsObfDisplayName(rs.getString(10)), 0));
                     }
                 }
             }
@@ -367,7 +366,6 @@ public interface TokenAnalystService extends OBFService {
         if (!Algorithms.isEmpty(regExp)) {
             params.add(regExp);
             params.add(regExp);
-            params.add(regExp);
         }
         if (tagFilter != null && tagFilter.enabled()) {
             params.addAll(tagFilter.params());
@@ -415,14 +413,6 @@ public interface TokenAnalystService extends OBFService {
 
     @SuppressWarnings("unchecked")
     private Map<String, String> parseObjectValues(String json) throws IOException {
-        if (Algorithms.isEmpty(json)) {
-            return Collections.emptyMap();
-        }
-        return getObjectMapper().readValue(json, Map.class);
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> parseObjectExtraTags(String json) throws IOException {
         if (Algorithms.isEmpty(json)) {
             return Collections.emptyMap();
         }

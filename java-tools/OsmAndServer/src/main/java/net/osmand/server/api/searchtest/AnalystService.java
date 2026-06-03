@@ -884,7 +884,7 @@ public interface AnalystService extends AddressPOIAnalystService {
         int payloadSize = safeMetricInt(length + computeVarint32Size(length));
         String name = city.getName(lang);
         boolean isMatched = matchesLegacyCity(city, matcher);
-        return new ObjectAddress(0, name, city.getLocation(), arrangeObjectAddressValues(values), Collections.emptyMap(),
+        return new ObjectAddress(0, name, city.getLocation(), arrangeObjectAddressValues(values),
                 false, isMatched, false, false, type, city.getId(), null, offset, payloadSize, offset);
     }
 
@@ -908,7 +908,7 @@ public interface AnalystService extends AddressPOIAnalystService {
             int payloadSize = safeMetricInt(length + computeVarint32Size(length));
             String name = street.getName(lang);
             boolean isMatched = matchesLegacyStreet(street, matcher);
-            return new ObjectAddress(0, name, street.getLocation(), arrangeObjectAddressValues(values), Collections.emptyMap(),
+            return new ObjectAddress(0, name, street.getLocation(), arrangeObjectAddressValues(values),
                     false, isMatched, false, false, "Street", street.getId(), null, offset, payloadSize, offset);
         } finally {
             index.getInputStream().popLimit(oldLimit);
@@ -935,7 +935,7 @@ public interface AnalystService extends AddressPOIAnalystService {
         String type = city.getType() == null ? null : city.getType().name();
         int payloadSize = safeMetricInt(length + computeVarint32Size(length));
         String name = city.getName(lang);
-        return new ObjectAddress(0, name, city.getLocation(), arrangeObjectAddressValues(values), Collections.emptyMap(),
+        return new ObjectAddress(0, name, city.getLocation(), arrangeObjectAddressValues(values),
                 false, true, false, false, type, city.getId(), null, offset, payloadSize, offset);
     }
 
@@ -957,7 +957,7 @@ public interface AnalystService extends AddressPOIAnalystService {
             Map<String, String> values = buildMapObjectValues(street, lang);
             int payloadSize = safeMetricInt(length + computeVarint32Size(length));
             String name = street.getName(lang);
-            return new ObjectAddress(0, name, street.getLocation(), arrangeObjectAddressValues(values), Collections.emptyMap(),
+            return new ObjectAddress(0, name, street.getLocation(), arrangeObjectAddressValues(values),
                     false, true, false, false, "Street", street.getId(), null, offset, payloadSize, offset);
         } finally {
             index.getInputStream().popLimit(oldLimit);
@@ -1339,7 +1339,7 @@ public interface AnalystService extends AddressPOIAnalystService {
                                 int payloadSize = poiLength + computeVarint32Size(poiLength);
                                 int payloadOffset = (int) (index.getInputStream().getTotalBytesRead() - poiLength);
                                 boolean isMatched = matchesLegacyPoi(rawPoiObject, matcher);
-                                results.add(new ObjectAddress(0, objectAddress.name(), objectAddress.point(), objectAddress.commonTags(), objectAddress.extraTags(), objectAddress.isPoi(), isMatched, false, false, objectAddress.type(), objectAddress.osmId(), objectAddress.osmType(), payloadOffset, payloadSize, (int) (region.getFilePointer() + relativeOffset)));
+                                results.add(new ObjectAddress(0, objectAddress.name(), objectAddress.point(), objectAddress.commonTags(), objectAddress.isPoi(), isMatched, false, false, objectAddress.type(), objectAddress.osmId(), objectAddress.osmType(), payloadOffset, payloadSize, (int) (region.getFilePointer() + relativeOffset)));
                             }
                         } finally {
                             index.getInputStream().popLimit(poiOldLimit);
@@ -1409,8 +1409,7 @@ public interface AnalystService extends AddressPOIAnalystService {
 
     private ObjectAddress toGenerateDbPoiObjectAddress(GenerateDbRawPoiObject rawObject, String lang) {
         ObjectAddress objectAddress = toPoiObjectAddress(rawObject.rawPoiObject(), lang);
-        return new ObjectAddress(0, objectAddress.name(), objectAddress.point(), objectAddress.commonTags(),
-                objectAddress.extraTags(), objectAddress.isPoi(), true, false, false, objectAddress.type(),
+        return new ObjectAddress(0, objectAddress.name(), objectAddress.point(), objectAddress.commonTags(), objectAddress.isPoi(), true, false, false, objectAddress.type(),
                 objectAddress.osmId(), objectAddress.osmType(), rawObject.payloadOffset(), rawObject.payloadSize(),
                 rawObject.sourceOffset());
     }
@@ -1419,7 +1418,6 @@ public interface AnalystService extends AddressPOIAnalystService {
                                              String lang) {
         LatLon location = new LatLon(rawPoiObject.lat, rawPoiObject.lon);
         Map<String, String> values = new LinkedHashMap<>();
-        Map<String, Object> metaValues = new LinkedHashMap<>();
         if (!Algorithms.isEmpty(rawPoiObject.name)) {
             values.put(Amenity.NAME, rawPoiObject.name);
         }
@@ -1444,74 +1442,11 @@ public interface AnalystService extends AddressPOIAnalystService {
                 values.put(entry.getKey(), String.join("; ", entry.getValue()));
             }
         }
-        Map<String, String> subcategories = new LinkedHashMap<>();
-        for (Map.Entry<String, List<String>> entry : rawPoiObject.decodedSubcategories.entrySet()) {
-            if (!Algorithms.isEmpty(entry.getKey()) && entry.getValue() != null && !entry.getValue().isEmpty()) {
-                subcategories.put(entry.getKey(), String.join("; ", entry.getValue()));
-            }
-        }
-        if (!subcategories.isEmpty()) {
-            metaValues.put("subcategories", subcategories);
-        }
-        if (!rawPoiObject.decodedCategories.isEmpty()) {
-            metaValues.put("categories", formatPoiCategories(rawPoiObject.decodedCategories));
-        }
-        Map<String, String> tagGroup = new LinkedHashMap<>();
-        for (Map.Entry<Integer, List<TagValuePair>> entry : rawPoiObject.tagGroups.entrySet()) {
-            tagGroup.putAll(formatTagValuePairs(entry.getValue()));
-        }
-        if (!tagGroup.isEmpty()) {
-            metaValues.put("tagGroup", tagGroup);
-        }
         String displayName = selectPoiDisplayName(rawPoiObject, lang);
         Long osmId = rawPoiObject.id > 0 ? ObfConstants.getOsmIdFromMapObjectId(rawPoiObject.id) : null;
         String osmType = decodePoiOsmType(rawPoiObject.id);
         return new ObjectAddress(0, displayName, location, arrangeObjectAddressValues(values),
-                arrangeObjectAddressMetaValues(metaValues), true, false, false, false, "POI", osmId, osmType, 0, 0, 0);
-    }
-
-    private Object formatPoiCategories(List<PoiCategoryMeta> categories) {
-        if (categories.size() == 1) {
-            return formatPoiCategory(categories.get(0));
-        }
-        List<Map<String, String>> formatted = new ArrayList<>();
-        for (PoiCategoryMeta category : categories) {
-            formatted.add(formatPoiCategory(category));
-        }
-        return formatted;
-    }
-
-    private Map<String, String> formatPoiCategory(PoiCategoryMeta category) {
-        Map<String, String> formatted = new LinkedHashMap<>();
-        formatted.put(Amenity.SUBTYPE, safeString(category.subtype()));
-        formatted.put(Amenity.TYPE, safeString(category.type()));
-        return formatted;
-    }
-
-    private Map<String, String> formatTagValuePairs(List<TagValuePair> tagValues) {
-        Map<String, String> formatted = new LinkedHashMap<>();
-        if (tagValues == null || tagValues.isEmpty()) {
-            return formatted;
-        }
-        for (TagValuePair tagValue : tagValues) {
-            if (tagValue != null && !Algorithms.isEmpty(tagValue.tag)) {
-                formatted.put(tagValue.tag, safeString(tagValue.value));
-            }
-        }
-        return formatted;
-    }
-
-    private Map<String, Object> arrangeObjectAddressMetaValues(Map<String, Object> values) {
-        if (values == null || values.isEmpty()) {
-            return new LinkedHashMap<>();
-        }
-        Map<String, Object> arrangedValues = new LinkedHashMap<>();
-        for (Map.Entry<String, Object> entry : values.entrySet()) {
-            if (entry != null && !Algorithms.isEmpty(entry.getKey()) && entry.getValue() != null) {
-                arrangedValues.put(entry.getKey(), entry.getValue());
-            }
-        }
-        return arrangedValues;
+                true, false, false, false, "POI", osmId, osmType, 0, 0, 0);
     }
 
     private boolean matchesLegacyPoi(RawPoiObject rawPoiObject, CollatorStringMatcher matcher) {
@@ -1747,9 +1682,7 @@ public interface AnalystService extends AddressPOIAnalystService {
                 continue;
             }
             boolean isInvalidAtom = objectAddress.isPoi() && invalidPoiAtomOffsets.contains(objectAddress.sourceOffset());
-            markedResults.add(new ObjectAddress(objectAddress.sequenceId(), objectAddress.name(), objectAddress.point(), objectAddress.commonTags(),
-                    objectAddress.extraTags(),
-                    objectAddress.isPoi(), objectAddress.isMatched(), isInvalidAtom, objectAddress.isAlone(), objectAddress.type(),
+            markedResults.add(new ObjectAddress(objectAddress.sequenceId(), objectAddress.name(), objectAddress.point(), objectAddress.commonTags(), objectAddress.isPoi(), objectAddress.isMatched(), isInvalidAtom, objectAddress.isAlone(), objectAddress.type(),
                     objectAddress.osmId(), objectAddress.osmType(), objectAddress.payloadOffset(),
                     objectAddress.payloadSize(), objectAddress.sourceOffset()));
         }
@@ -1766,9 +1699,7 @@ public interface AnalystService extends AddressPOIAnalystService {
                 continue;
             }
             boolean isAlone = isAloneTokenObject(objectAddress, token == null ? null : token.name());
-            markedResults.add(new ObjectAddress(objectAddress.sequenceId(), objectAddress.name(), objectAddress.point(), objectAddress.commonTags(),
-                    objectAddress.extraTags(),
-                    objectAddress.isPoi(), objectAddress.isMatched(), objectAddress.isInvalidAtom(), isAlone, objectAddress.type(),
+            markedResults.add(new ObjectAddress(objectAddress.sequenceId(), objectAddress.name(), objectAddress.point(), objectAddress.commonTags(), objectAddress.isPoi(), objectAddress.isMatched(), objectAddress.isInvalidAtom(), isAlone, objectAddress.type(),
                     objectAddress.osmId(), objectAddress.osmType(), objectAddress.payloadOffset(),
                     objectAddress.payloadSize(), objectAddress.sourceOffset()));
         }
@@ -1789,9 +1720,7 @@ public interface AnalystService extends AddressPOIAnalystService {
             if (objectAddress == null) {
                 continue;
             }
-            numberedResults.add(new ObjectAddress(sequenceId++, objectAddress.name(), objectAddress.point(), objectAddress.commonTags(),
-                    objectAddress.extraTags(),
-                    objectAddress.isPoi(), objectAddress.isMatched(), objectAddress.isInvalidAtom(), objectAddress.isAlone(), objectAddress.type(),
+            numberedResults.add(new ObjectAddress(sequenceId++, objectAddress.name(), objectAddress.point(), objectAddress.commonTags(), objectAddress.isPoi(), objectAddress.isMatched(), objectAddress.isInvalidAtom(), objectAddress.isAlone(), objectAddress.type(),
                     objectAddress.osmId(), objectAddress.osmType(), objectAddress.payloadOffset(),
                     objectAddress.payloadSize(), objectAddress.sourceOffset()));
         }
@@ -2108,7 +2037,6 @@ public interface AnalystService extends AddressPOIAnalystService {
                     	lat REAL,
                     	lon REAL,
                     	commonTags TEXT,
-                    	extraTags TEXT,
                     	type TEXT,
                     	osmType TEXT
                     )
@@ -2227,8 +2155,8 @@ public interface AnalystService extends AddressPOIAnalystService {
                      """);
              PreparedStatement selectTokenId = conn.prepareStatement("SELECT id FROM token WHERE name = ?");
              PreparedStatement insertObject = conn.prepareStatement("""
-                     INSERT OR IGNORE INTO "object"(id, name, lat, lon, commonTags, extraTags, type, osmType)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                     INSERT OR IGNORE INTO "object"(id, name, lat, lon, commonTags, type, osmType)
+                     VALUES (?, ?, ?, ?, ?, ?, ?)
                      """);
              PreparedStatement insertTag = conn.prepareStatement("""
                      INSERT INTO tag(name, type, isSkipped)
@@ -2414,7 +2342,6 @@ public interface AnalystService extends AddressPOIAnalystService {
                 + safeString(objectAddress.type()).length() * 2L
                 + safeString(objectAddress.osmType()).length() * 2L;
         bytes += estimateTagMapBytes(objectAddress.commonTags());
-        bytes += estimateTagMapBytes(objectAddress.extraTags());
         return bytes;
     }
 
@@ -2799,13 +2726,11 @@ public interface AnalystService extends AddressPOIAnalystService {
         }
         if (skipObjectTags) {
             insertObject.setNull(5, java.sql.Types.VARCHAR);
-            insertObject.setNull(6, java.sql.Types.VARCHAR);
         } else {
             insertObject.setString(5, getObjectMapper().writeValueAsString(objectAddress.commonTags()));
-            insertObject.setString(6, getObjectMapper().writeValueAsString(objectAddress.extraTags()));
         }
-        insertObject.setString(7, objectAddress.type());
-        insertObject.setString(8, objectAddress.osmType());
+        insertObject.setString(6, objectAddress.type());
+        insertObject.setString(7, objectAddress.osmType());
         return insertObject.executeUpdate() > 0;
     }
 
@@ -2818,14 +2743,9 @@ public interface AnalystService extends AddressPOIAnalystService {
                                                                 GenerateDbSqlBatcher sqlBatcher,
                                                                 ObjectAddress objectAddress) throws SQLException {
         Map<String, List<String>> commonTags = flattenTags(objectAddress.commonTags());
-        Map<String, List<String>> extraTags = flattenTags(objectAddress.extraTags());
-        Set<String> duplicateNames = new HashSet<>(commonTags.keySet());
-        duplicateNames.retainAll(extraTags.keySet());
         Set<GenerateDbObjectTagValue> result = new LinkedHashSet<>();
         insertGenerateDbTags(insertTag, selectTagId, insertValue, selectValueId, tagIds, valueIds, sqlBatcher, result, commonTags,
-                "common", duplicateNames, objectAddress.isPoi());
-        insertGenerateDbTags(insertTag, selectTagId, insertValue, selectValueId, tagIds, valueIds, sqlBatcher, result, extraTags,
-                "extra", duplicateNames, objectAddress.isPoi());
+                "common", Collections.emptySet(), objectAddress.isPoi());
         return new ArrayList<>(result);
     }
 
@@ -3459,3 +3379,4 @@ public interface AnalystService extends AddressPOIAnalystService {
         }
     }
 }
+
