@@ -109,6 +109,7 @@ public class BinaryInspector {
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
+					System.getProperty("maps.dir") + "/Map.obf",
 					System.getProperty("maps.dir") + "/Liechtenstein_europe_2.obf",
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
@@ -170,6 +171,7 @@ public class BinaryInspector {
 		double lonright = 179.9;
 		String lang = null;
 		int zoom = 15;
+		PoiStats globalPoiStats = new PoiStats();
 
 		public boolean isVaddress() {
 			return vaddress;
@@ -406,7 +408,17 @@ public class BinaryInspector {
 					printUsage("Missing file parameter");
 				} else {
 					vInfo = new VerboseInfo(args);
-					printFileInformation(args[args.length - 1]);
+					
+					for (int i = 0; i < args.length; i++) {
+						if (args[i].startsWith("-")) {
+							continue;
+						}
+						printFileInformation(args[i]);
+					}
+					if (vInfo.isVpoi() && vInfo.globalPoiStats.files > 1) {
+						System.out.println("\nGlobal poi stats");
+						printPoiTypeStats(vInfo.globalPoiStats);
+					}
 					vInfo.close();
 				}
 			} else {
@@ -414,7 +426,9 @@ public class BinaryInspector {
 			}
 		} else {
 			vInfo = null;
-			printFileInformation(f);
+			for (int i = 0; i < args.length; i++) {
+				printFileInformation(args[i]);
+			}
 		}
 	}
 
@@ -434,7 +448,7 @@ public class BinaryInspector {
 		//written += 4;
 	}
 
-	public  static int combineParts(File fileToCreate, List<FileExtractFrom> partsToExtractFrom, String date) throws IOException {
+	public static int combineParts(File fileToCreate, List<FileExtractFrom> partsToExtractFrom, String date) throws IOException {
 		Set<String> uniqueNames = new LinkedHashSet<String>();
 
 		int version = IndexConstants.BINARY_MAP_VERSION;
@@ -553,8 +567,8 @@ public class BinaryInspector {
 			return;
 		}
 		if (file.isDirectory()) {
-			for(File f : file.listFiles()) {
-				if(f.getName().endsWith(".obf")) {
+			for (File f : file.listFiles()) {
+				if (f.getName().endsWith(".obf")) {
 					printFileInformation(f);
 				}
 			}
@@ -1499,6 +1513,30 @@ public class BinaryInspector {
 	}
 
 
+	public static class PoiStats {
+		int files = 0;
+		List<ValueFreq> text = new ArrayList<ValueFreq>();
+		List<ValueFreq> refs = new ArrayList<ValueFreq>();
+		List<ValueFreq> topMulti = new ArrayList<ValueFreq>();
+		Map<String, ValueFreq> singleValues = new TreeMap<String, ValueFreq>();
+		List<ValueFreq> categories = new ArrayList<ValueFreq>();
+		
+		
+		public void merge(PoiStats s) {
+			files += s.files;
+			text = new ArrayList<>(mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), text), s.text).values());
+			refs = new ArrayList<>(mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), refs), s.refs).values());
+			topMulti = new ArrayList<>(mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), topMulti), s.topMulti).values());
+			categories = new ArrayList<>(mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), categories), s.categories).values());
+			mergeArray(singleValues, s.categories);
+		}
+
+
+		private static Map<String, ValueFreq> mergeArray(Map<String, ValueFreq> res, List<ValueFreq> m) {
+			return ValueFreq.mergeArray(res, m);
+		}
+	}
+	
 	private static class ValueFreq implements Comparable<ValueFreq> {
 		String value;
 		int freq;
@@ -1509,6 +1547,29 @@ public class BinaryInspector {
 		public ValueFreq(String name, int frequency) {
 			this.value = name;
 			this.freq = frequency;
+		}
+
+		private  static Map<String, ValueFreq> mergeArray(Map<String, ValueFreq> res, List<ValueFreq> m) {
+			for (ValueFreq s : m) {
+				if (res.containsKey(s.value)) {
+					res.get(s.value).merge(s);
+				} else {
+					res.put(s.value, s);
+				}
+			}
+			return res;
+		}
+		
+		
+		public void merge(ValueFreq s) {
+			this.freq += s.freq;
+			if (subValues == null && s.subValues != null) {
+				s.subValues = new ArrayList<>();
+			}
+			if (subValues != null) {
+				subValues = new ArrayList<>(
+						mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), subValues), s.subValues).values());
+			}
 		}
 
 		@Override
@@ -1574,85 +1635,71 @@ public class BinaryInspector {
 				});
 
 		index.initCategories(p);
+		PoiStats ps = new PoiStats();
+		ps.files = 1;
+		
 		println("\tRegion: " + p.getName());
 
 		println("\t\tBounds " + formatLatBounds(MapUtils.get31LongitudeX(p.getLeft31()),
 				MapUtils.get31LongitudeX(p.getRight31()),
 				MapUtils.get31LatitudeY(p.getTop31()),
 				MapUtils.get31LatitudeY(p.getBottom31())));
-		println("\t\tCategories:");
+		
 		List<String> cs = p.getCategories();
 		List<List<String>> subcategories = p.getSubcategories();
 		TIntArrayList categoryFreqs = p.getCategoryFreqs();
 		List<TIntArrayList> subcategoryFreqs = p.getSubcategoryFreqs();
 		for (int i = 0; i < cs.size(); i++) {
 			List<String> lst = subcategories.get(i);
-			List<ValueFreq> subs = new ArrayList<ValueFreq>();
+			int f = i < categoryFreqs.size() ? categoryFreqs.get(i) : 0;
+			ValueFreq catF = new ValueFreq(cs.get(i), f);
+			catF.subValues = new ArrayList<>();
 			for (int j = 0; j < lst.size(); j++) {
-				int f = i < subcategoryFreqs.size() && j < subcategoryFreqs.get(i).size() ? subcategoryFreqs.get(i).get(j) : 0;
-				subs.add(new ValueFreq(lst.get(j), f));
+				int ft = i < subcategoryFreqs.size() && j < subcategoryFreqs.get(i).size() ? subcategoryFreqs.get(i).get(j) : 0;
+				catF.subValues.add(new ValueFreq(lst.get(j), ft));
 			}
-			Collections.sort(subs);
-			println(String.format("\t\t\t%s (%d, %d): %s", cs.get(i), subcategories.get(i).size(),
-					i < categoryFreqs.size() ? categoryFreqs.get(i) : 0, subs));
+			ps.categories.add(catF);
 		}
-		println("\t\tPOI Additionals:");
+		
 		List<PoiSubType> subtypes = p.getSubTypes();
-		List<ValueFreq> text = new ArrayList<ValueFreq>();
-		List<ValueFreq> refs = new ArrayList<ValueFreq>();
-		Map<String, ValueFreq> singleValues = new TreeMap<String, ValueFreq>();
-		int singleVals = 0, textFreq = 0, refsFreq = 0, singleFreq = 0;
+		
 		MapPoiTypes poiTypes = MapPoiTypes.getDefault();
 		for (int i = 0; i < subtypes.size(); i++) {
 			PoiSubType st = subtypes.get(i);
 			if (st.text) {
 				PoiType ref = poiTypes.getPoiTypeByKey(st.name);
 				if (ref != null && !ref.isAdditional()) {
-					refs.add(new ValueFreq(st.name, st.frequency));
-					refsFreq += st.frequency;
+					ps.refs.add(new ValueFreq(st.name, st.frequency));
 				} else {
-					text.add(new ValueFreq(st.name, st.frequency));
-					textFreq += st.frequency;
+					ps.text.add(new ValueFreq(st.name, st.frequency));
 				}
 			} else if (st.possibleValues.size() == 1) {
-				singleVals++;
 				int lastIndexOf = st.name.lastIndexOf('_');
 				String key = st.name;
 				if (lastIndexOf >= 0 && ValueFreq.COMBINE_SINGLE_TYPE_BY_PREFIX) {
 					key = key.substring(0, lastIndexOf);
 				}
-				ValueFreq singleGroup = singleValues.get(key);
+				ValueFreq singleGroup = ps.singleValues.get(key);
 				if (singleGroup == null) {
 					singleGroup = new ValueFreq(key, 0);
 					singleGroup.subValues = new ArrayList<>();
-					singleValues.put(key, singleGroup);
+					ps.singleValues.put(key, singleGroup);
 				}
 				singleGroup.freq += st.frequency;
 				singleGroup.subValues.add(new ValueFreq(st.name, st.frequency));
-				singleFreq += st.frequency;
 			} else {
-				List<ValueFreq> subs = new ArrayList<ValueFreq>();
+				ValueFreq main = new ValueFreq(st.name, st.frequency);
+				main.subValues = new ArrayList<BinaryInspector.ValueFreq>();
 				for (int j = 0; j < st.possibleValues.size(); j++) {
 					int f = j < st.possibleValuesFreqs.size() ? st.possibleValuesFreqs.get(j) : 0;
-					subs.add(new ValueFreq(st.possibleValues.get(j), f));
+					main.subValues.add(new ValueFreq(st.possibleValues.get(j), f));
 				}
-				Collections.sort(subs);
-				println(String.format("\t\t\t%s (%d, %,d): %s",  st.name, st.possibleValues.size(), 
-						st.frequency, subs));
+				ps.topMulti.add(main);
 			}
 		}
-		StringBuilder singleValuesFmt = new StringBuilder();
-		Collections.sort(text);
-		Collections.sort(refs);
-		List<ValueFreq> singleValuesLst = new ArrayList<>(singleValues.values());
-		Collections.sort(singleValuesLst);
-		for (ValueFreq key : singleValuesLst) {
-			singleValuesFmt
-					.append(String.format("%s (%d, %d), ", key.value, key.subValues.size(), key.freq));
-		}
-		println(String.format("\t\t\tReference to double poi (%d, %,d): %s",  refs.size(), refsFreq, refs));
-		println(String.format("\t\t\tText based (%d, %,d): %s",  text.size(), textFreq, text));
-		println(String.format("\t\t\tSingle value filters (%d, %,d): %s",  singleVals, singleFreq, singleValuesFmt));
+		
+		printPoiTypeStats(ps);
+		vInfo.globalPoiStats.merge(ps);
 //		req.poiTypeFilter = null;//for test only
 		if(vInfo.isVpoiObjects()) {
 			index.searchPoi(req, p);
@@ -1660,6 +1707,41 @@ public class BinaryInspector {
 		
 		println(String.format("Found %d pois (%d with addr, %d with name without addr)", count[0],
 				count[1], count[2]));
+	}
+
+	private void printPoiTypeStats(PoiStats ps) {
+		println("\t\tCategories:");
+		Collections.sort(ps.categories);
+		for (ValueFreq c : ps.categories) {
+			Collections.sort(c.subValues);
+			println(String.format("\t\t\t%s (%d, %d): %s", c.value, c.subValues.size(), c.freq, c.subValues));
+		}
+		println("\t\tPOI Additionals:");
+		for (ValueFreq c : ps.topMulti) {
+			Collections.sort(c.subValues);
+			println(String.format("\t\t\t%s (%d, %d): %s", c.value, c.subValues.size(), c.freq, c.subValues));
+		}
+		StringBuilder singleValuesFmt = new StringBuilder();
+		Collections.sort(ps.text);
+		Collections.sort(ps.refs);
+		List<ValueFreq> singleValuesLst = new ArrayList<>(ps.singleValues.values());
+		Collections.sort(singleValuesLst);
+		int s = 0;
+		for (ValueFreq key : singleValuesLst) {
+			s += key.subValues.size();
+			singleValuesFmt.append(String.format("%s (%d, %d), ", key.value, key.subValues.size(), key.freq));
+		}
+		println(String.format("\t\t\tReference to double poi (%d, %,d): %s",  ps.refs.size(), sumFreq(ps.refs), ps.refs));
+		println(String.format("\t\t\tText based (%d, %,d): %s",  ps.text.size(), sumFreq(ps.text), ps.text));
+		
+	}
+
+	private int sumFreq(List<ValueFreq> refs) {
+		int f = 0;
+		for (ValueFreq r : refs) {
+			f += r.freq;
+		}
+		return f;
 	}
 
 	public static void printUsage(String warning) {
