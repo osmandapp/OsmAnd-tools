@@ -93,7 +93,7 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-					"-vpoi",
+					"-vpoi", //"-vpoiobjects",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
@@ -154,6 +154,7 @@ public class BinaryInspector {
 		boolean vtransport;
 		boolean vtransportschedule;
 		boolean vpoi;
+		boolean vpoiobjects;
 		boolean vmap;
 		boolean vrouting;
 		boolean vhhrouting;
@@ -188,6 +189,10 @@ public class BinaryInspector {
 
 		public boolean isVpoi() {
 			return vpoi;
+		}
+		
+		public boolean isVpoiObjects() {
+			return vpoiobjects;
 		}
 
 		public boolean isVHHrouting() {
@@ -234,6 +239,8 @@ public class BinaryInspector {
 					vmapCoordinates = true;
 				} else if (params[i].equals("-vpoi")) {
 					vpoi = true;
+				} else if (params[i].equals("-vpoiobjects")) {
+					vpoiobjects = true;
 				} else if (params[i].startsWith("-osm")) {
 					osm = true;
 					if (params[i].startsWith("-osm=")) {
@@ -1492,6 +1499,33 @@ public class BinaryInspector {
 	}
 
 
+	private static class ValueFreq implements Comparable<ValueFreq> {
+		String value;
+		int freq;
+		static boolean SORT_BY_NAME = false;
+		List<ValueFreq> subValues = null;
+		
+		public ValueFreq(String name, int frequency) {
+			this.value = name;
+			this.freq = frequency;
+		}
+
+		@Override
+		public String toString() {
+			return String.format("%s (%d)", value ,freq);
+		}
+
+		@Override
+		public int compareTo(ValueFreq o) {
+			if (!SORT_BY_NAME) {
+				int c = -Integer.compare(freq, o.freq);
+				if (c != 0) {
+					return c;
+				}
+			}
+			return value.compareTo(o.value);
+		}
+	}
 
 	private void printPOIDetailInfo(VerboseInfo verbose, BinaryMapIndexReader index, PoiRegion p) throws IOException {
 		int[] count = new int[3];
@@ -1553,22 +1587,20 @@ public class BinaryInspector {
 		}
 		println("\t\tPOI Additionals:");
 		List<PoiSubType> subtypes = p.getSubTypes();
-		Set<String> text = new TreeSet<String>();
-		Set<String> refs = new TreeSet<String>();
-		Map<String, List<String>> singleValues = new TreeMap<String, List<String>>();
-		Map<String, Integer> singleValuesFreq = new TreeMap<String, Integer>();
+		List<ValueFreq> text = new ArrayList<ValueFreq>();
+		List<ValueFreq> refs = new ArrayList<ValueFreq>();
+		Map<String, ValueFreq> singleValues = new TreeMap<String, ValueFreq>();
 		int singleVals = 0, textFreq = 0, refsFreq = 0, singleFreq = 0;
 		MapPoiTypes poiTypes = MapPoiTypes.getDefault();
 		for (int i = 0; i < subtypes.size(); i++) {
 			PoiSubType st = subtypes.get(i);
-			String formatType = String.format("%s (%d)", st.name, st.frequency);
 			if (st.text) {
 				PoiType ref = poiTypes.getPoiTypeByKey(st.name);
 				if(ref != null && !ref.isAdditional()) {
-					refs.add(formatType);
+					refs.add(new ValueFreq(st.name, st.frequency));
 					refsFreq += st.frequency;
 				} else {
-					text.add(formatType);
+					text.add(new ValueFreq(st.name, st.frequency));
 					textFreq += st.frequency;
 				}
 			} else if (st.possibleValues.size() == 1) {
@@ -1578,27 +1610,35 @@ public class BinaryInspector {
 				if (lastIndexOf >= 0) {
 					key = key.substring(0, lastIndexOf);
 				}
-				if (!singleValues.containsKey(key)) {
-					singleValues.put(key, new ArrayList<String>());
-					singleValuesFreq.put(key, 0);
+				ValueFreq singleGroup = singleValues.get(key);
+				if (singleGroup == null) {
+					singleGroup = new ValueFreq(key, 0);
+					singleGroup.subValues = new ArrayList<>();
+					singleValues.put(key, singleGroup);
 				}
+				singleGroup.freq += st.frequency;
+				singleGroup.subValues.add(new ValueFreq(st.name, st.frequency));
 				singleFreq += st.frequency;
-				singleValues.get(key).add(st.name);
-				singleValuesFreq.put(key, singleValuesFreq.get(key) + st.frequency);
 			} else {
 				println(String.format("\t\t\t%s (%d, %,d): %s",  st.name, st.possibleValues.size(), st.frequency, st.possibleValues));
 			}
 		}
 		StringBuilder singleValuesFmt = new StringBuilder();
-		for (String key : singleValues.keySet()) {
+		Collections.sort(text);
+		Collections.sort(refs);
+		List<ValueFreq> singleValuesLst = new ArrayList<>(singleValues.values());
+		Collections.sort(singleValuesLst);
+		for (ValueFreq key : singleValuesLst) {
 			singleValuesFmt
-					.append(String.format("%s (%d, %d), ", key, singleValues.get(key).size(), singleValuesFreq.get(key)));
+					.append(String.format("%s (%d, %d), ", key.value, key.subValues.size(), key.freq));
 		}
 		println(String.format("\t\t\tReference to double poi (%d, %,d): %s",  refs.size(), refsFreq, refs));
 		println(String.format("\t\t\tText based (%d, %,d): %s",  text.size(), textFreq, text));
 		println(String.format("\t\t\tSingle value filters (%d, %,d): %s",  singleVals, singleFreq, singleValuesFmt));
 //		req.poiTypeFilter = null;//for test only
-		index.searchPoi(req, p);
+		if(vInfo.isVpoiObjects()) {
+			index.searchPoi(req, p);
+		}
 		
 		println(String.format("Found %d pois (%d with addr, %d with name without addr)", count[0],
 				count[1], count[2]));
