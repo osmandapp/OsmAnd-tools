@@ -1641,14 +1641,14 @@ public class BinaryMapIndexWriter {
 		for (String cat : cs.categories.keySet()) {
 			Builder builder = OsmandOdb.OsmAndCategoryTable.newBuilder();
 			builder.setCategory(cat);
-			builder.setFrequency(cs.categoriesUsage.get(cat));
+			builder.setFrequency((int) cs.categoriesUsage.get(cat));
 			Set<String> subcatSource = cs.categories.get(cat);
 			cs.setCategoryIndex(cat, i);
 			int j = 0;
 			for (String s : subcatSource) {
 				cs.setSubcategoryIndex(cat, s, j);
 				builder.addSubcategories(s);
-				builder.addSubcatfreq(cs.categoriesUsage.get(cat + "_" + s));
+				builder.addSubcatfreq((int) cs.categoriesUsage.get(cat + "_" + s));
 				j++;
 			}
 			codedOutStream.writeMessage(OsmandOdb.OsmAndPoiIndex.CATEGORIESTABLE_FIELD_NUMBER, builder.build());

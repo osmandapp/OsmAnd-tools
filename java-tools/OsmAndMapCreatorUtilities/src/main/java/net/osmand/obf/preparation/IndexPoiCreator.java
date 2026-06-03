@@ -13,7 +13,9 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
+import gnu.trove.map.hash.TObjectLongHashMap;
 import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.IProgress;
 import net.osmand.IndexConstants;
@@ -536,7 +538,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	public static class PoiCreatorCategories {
 		Map<String, Set<String>> categories = new LinkedHashMap<String, Set<String>>();
-		TObjectIntHashMap<String> categoriesUsage = new TObjectIntHashMap<String>();
+		Map<String, Integer> categoriesUsage = new HashMap<String, Integer>();
 		Set<PoiAdditionalType> additionalAttributes = new LinkedHashSet<PoiAdditionalType>();
 
 
@@ -559,27 +561,35 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			return subCat.contains(";") || subCat.contains(",");
 		}
 
-		public void addCategory(String cat, String subCat, Map<PoiAdditionalType, String> additionalTags) {
+		public void addCategory(String cat, String subCat, Map<PoiAdditionalType, String> additionalTags, boolean stats) {
 			for (PoiAdditionalType rt : additionalTags.keySet()) {
 				if (!rt.isText() && rt.getValue() == null) {
 					throw new NullPointerException("Null value for additional tag =" + rt.getTag());
 				}
-				rt.increment();
+				if (stats) {
+					rt.increment();
+				}
 				additionalAttributes.add(rt);
 			}
 			if (!categories.containsKey(cat)) {
 				categories.put(cat, new TreeSet<String>());
 			}
-			categoriesUsage.increment(cat);
+			if (stats) {
+				categoriesUsage.compute(cat, (t, u) -> u == null ? 1 : u + 1);
+			}
 			if (toSplit(subCat)) {
 				String[] split = split(subCat);
 				for (String sub : split) {
 					categories.get(cat).add(sub.trim());
-					categoriesUsage.increment(cat + "_" + sub.trim());
+					if (stats) {
+						categoriesUsage.compute(cat + "_" + sub.trim(), (t, u) -> u == null ? 1 : u + 1);
+					}
 				}
 			} else {
 				categories.get(cat).add(subCat.trim());
-				categoriesUsage.increment(cat + "_" + subCat.trim());
+				if (stats) {
+					categoriesUsage.compute(cat + "_" + subCat.trim(), (t, u) -> u == null ? 1 : u + 1);
+				}
 			}
 		}
 
@@ -668,7 +678,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		PoiCreatorCategories globalCategories = rootZoomsTree.node.categories;
 		writer.writePoiCategoriesTable(globalCategories);
 		writer.writePoiSubtypesTable(globalCategories, topIndexAdditional);
-
+		
 		// 2.5 write names table
 		Map<PoiTileBox, List<BinaryFileReference>> fpToWriteSeeks = writer.writePoiNameIndex(namesIndex, startFpPoiIndex);
 
@@ -686,6 +696,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			rootZoomsTree.extractChildrenFromLevel(level);
 			zoomToStart = zoomToStart + level;
 		}
+
 
 		// 3.2 write tree using stack
 		for (Tree<PoiTileBox> subs : rootZoomsTree.getSubtrees()) {
@@ -987,7 +998,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			}
 
 			Tree<PoiTileBox> prevTree = rootZoomsTree;
-			rootZoomsTree.getNode().categories.addCategory(type, subtype, additionalTags);
+			rootZoomsTree.getNode().categories.addCategory(type, subtype, additionalTags, true);
 			if (tagGroups.size() > 0) {
 				rootZoomsTree.getNode().tagGroups.addTagGroup(tagGroups);
 			}
@@ -1019,7 +1030,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 					prevTree.addSubTree(subtree);
 				}
-				subtree.getNode().categories.addCategory(type, subtype, additionalTags);
+				subtree.getNode().categories.addCategory(type, subtype, additionalTags, false);
 				subtree.getNode().tagGroups.addTagGroup(tagGroups);
 
 				prevTree = subtree;

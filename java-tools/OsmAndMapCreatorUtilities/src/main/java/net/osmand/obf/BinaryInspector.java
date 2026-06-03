@@ -1583,8 +1583,18 @@ public class BinaryInspector {
 		println("\t\tCategories:");
 		List<String> cs = p.getCategories();
 		List<List<String>> subcategories = p.getSubcategories();
+		TIntArrayList categoryFreqs = p.getCategoryFreqs();
+		List<TIntArrayList> subcategoryFreqs = p.getSubcategoryFreqs();
 		for (int i = 0; i < cs.size(); i++) {
-			println(String.format("\t\t\t%s (%d): %s", cs.get(i), subcategories.get(i).size(), subcategories.get(i)));
+			List<String> lst = subcategories.get(i);
+			List<ValueFreq> subs = new ArrayList<ValueFreq>();
+			for (int j = 0; j < lst.size(); j++) {
+				int f = i < subcategoryFreqs.size() && j < subcategoryFreqs.get(i).size() ? subcategoryFreqs.get(i).get(j) : 0;
+				subs.add(new ValueFreq(lst.get(j), f));
+			}
+			Collections.sort(subs);
+			println(String.format("\t\t\t%s (%d, %d): %s", cs.get(i), subcategories.get(i).size(),
+					i < categoryFreqs.size() ? categoryFreqs.get(i) : 0, subs));
 		}
 		println("\t\tPOI Additionals:");
 		List<PoiSubType> subtypes = p.getSubTypes();
@@ -1597,7 +1607,7 @@ public class BinaryInspector {
 			PoiSubType st = subtypes.get(i);
 			if (st.text) {
 				PoiType ref = poiTypes.getPoiTypeByKey(st.name);
-				if(ref != null && !ref.isAdditional()) {
+				if (ref != null && !ref.isAdditional()) {
 					refs.add(new ValueFreq(st.name, st.frequency));
 					refsFreq += st.frequency;
 				} else {
@@ -1621,7 +1631,14 @@ public class BinaryInspector {
 				singleGroup.subValues.add(new ValueFreq(st.name, st.frequency));
 				singleFreq += st.frequency;
 			} else {
-				println(String.format("\t\t\t%s (%d, %,d): %s",  st.name, st.possibleValues.size(), st.frequency, st.possibleValues));
+				List<ValueFreq> subs = new ArrayList<ValueFreq>();
+				for (int j = 0; j < st.possibleValues.size(); j++) {
+					int f = j < st.possibleValuesFreqs.size() ? st.possibleValuesFreqs.get(j) : 0;
+					subs.add(new ValueFreq(st.possibleValues.get(j), f));
+				}
+				Collections.sort(subs);
+				println(String.format("\t\t\t%s (%d, %,d): %s",  st.name, st.possibleValues.size(), 
+						st.frequency, subs));
 			}
 		}
 		StringBuilder singleValuesFmt = new StringBuilder();
@@ -1651,7 +1668,7 @@ public class BinaryInspector {
 		}
 		System.out.println("Inspector is console utility for working with binary indexes of OsmAnd.");
 		System.out.println("It allows print info about file, extract parts and merge indexes.");
-		System.out.println("\nUsage for print info : inspector [-vaddress] [-vcities] [-vcitynames] [-vstreetgroups] [-vstreets] [-vbuildings] [-vintersections] [-vmap] [-vfulldictionary] [-vstats] [-vmapobjects] [-vmapcoordinates] [-osm] [-vpoi] [-vrouting] [-vhhrouting] [-vtransport] [-zoom=Zoom] [-bbox=LeftLon,TopLat,RightLon,BottomLat] [file]");
+		System.out.println("\nUsage for print info : inspector [-vaddress] [-vcities] [-vcitynames] [-vstreetgroups] [-vstreets] [-vbuildings] [-vintersections] [-vmap] [-vfulldictionary] [-vstats] [-vmapobjects] [-vmapcoordinates] [-osm] [-vpoi] [-vpoiobjects] [-vrouting] [-vhhrouting] [-vtransport] [-zoom=Zoom] [-bbox=LeftLon,TopLat,RightLon,BottomLat] [file]");
 		System.out.println("  Prints information about [file] binary index of OsmAnd.");
 		System.out.println("  -v.. more verbose output (like all cities and their streets or all map objects with tags/values and coordinates)");
 		System.out.println("\nUsage for combining indexes : inspector -c file_to_create (file_from_extract ((+|-)parts_to_extract)? )* [--date=...]");
