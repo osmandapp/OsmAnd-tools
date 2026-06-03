@@ -70,7 +70,10 @@ public interface OBFService extends BaseService {
 			"centralamerica",
 			"southamerica");
 
-	record IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes, boolean isCommon, boolean isFrequent) {
+	record IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes, boolean isCommon, boolean isFrequent, String obf) {
+		public IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes, boolean isCommon, boolean isFrequent) {
+			this(name, addressRefs, poiRefs, poiAtomRefs, poiAtomSizes, isCommon, isFrequent, null);
+		}
 	}
 	record ObfFileInfo(String path, String name, String continent, String country, String region, long lastModified, long size) {}
 	record IndexTokenPage(List<IndexToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, IndexTokenSummary summary) {}
@@ -81,7 +84,15 @@ public interface OBFService extends BaseService {
 	record ObjectAddress(int sequenceId, String name, LatLon point, Map<String, String> commonTags,
 	                     boolean isPoi, boolean isMatched,
 	                     boolean isInvalidAtom, boolean isAlone, String type, Long osmId,
-	                     String osmType, int payloadOffset, int payloadSize, int sourceOffset) {}
+	                     String osmType, int payloadOffset, int payloadSize, int sourceOffset, String obf) {
+		public ObjectAddress(int sequenceId, String name, LatLon point, Map<String, String> commonTags,
+		                     boolean isPoi, boolean isMatched,
+		                     boolean isInvalidAtom, boolean isAlone, String type, Long osmId,
+		                     String osmType, int payloadOffset, int payloadSize, int sourceOffset) {
+			this(sequenceId, name, point, commonTags, isPoi, isMatched, isInvalidAtom, isAlone, type, osmId,
+					osmType, payloadOffset, payloadSize, sourceOffset, null);
+		}
+	}
 	record ObjectAddressPage(List<ObjectAddress> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, int[] countMetrics, int[] sizeMetrics, int aloneCount, int aloneSize) {}
 	record ObjectAddressStats(int size, int count) {}
 	record PoiTokenRefs(Set<Integer> offsets, List<Integer> atomSizes) {}
@@ -119,10 +130,26 @@ public interface OBFService extends BaseService {
 	interface GenerateDbProgressListener {
 		void onProgress(GenerateDbProgress progress);
 	}
-	record CityAddress(String name, LatLon point, List<StreetAddress> streets, int streetsCount, String type) {}
-	record PoiAddress(String name, LatLon point, String value) {}
-	record HouseAddress(String name, LatLon point) {}
-	record StreetAddress(String name, LatLon point, List<HouseAddress> houses, int houseCount) {}
+	record CityAddress(String name, LatLon point, List<StreetAddress> streets, int streetsCount, String type, String obf) {
+		public CityAddress(String name, LatLon point, List<StreetAddress> streets, int streetsCount, String type) {
+			this(name, point, streets, streetsCount, type, null);
+		}
+	}
+	record PoiAddress(String name, LatLon point, String value, String obf) {
+		public PoiAddress(String name, LatLon point, String value) {
+			this(name, point, value, null);
+		}
+	}
+	record HouseAddress(String name, LatLon point, String obf) {
+		public HouseAddress(String name, LatLon point) {
+			this(name, point, null);
+		}
+	}
+	record StreetAddress(String name, LatLon point, List<HouseAddress> houses, int houseCount, String obf) {
+		public StreetAddress(String name, LatLon point, List<HouseAddress> houses, int houseCount) {
+			this(name, point, houses, houseCount, null);
+		}
+	}
 
 	default List<ObfFileInfo> getObfFileInfos() throws IOException {
 		List<ObfFileInfo> result = new ArrayList<>();

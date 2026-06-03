@@ -975,6 +975,33 @@ public interface InspectorService extends OBFService {
 		}
 	}
 
+	default Map<String, long[]> getSectionSizes(List<String> obfs, String fieldPath) {
+		Map<String, long[]> merged = new HashMap<>();
+		if (obfs == null) {
+			return merged;
+		}
+		for (String obf : obfs) {
+			if (obf == null || obf.isBlank()) {
+				continue;
+			}
+			Map<String, long[]> sizes = getSectionSizes(obf, fieldPath);
+			if (sizes == null) {
+				continue;
+			}
+			for (Map.Entry<String, long[]> entry : sizes.entrySet()) {
+				long[] source = entry.getValue();
+				long[] target = merged.computeIfAbsent(entry.getKey(), key -> new long[3]);
+				if (source == null) {
+					continue;
+				}
+				for (int i = 0; i < Math.min(target.length, source.length); i++) {
+					target[i] += source[i];
+				}
+			}
+		}
+		return merged;
+	}
+
 	default List<Record> getAddresses(String obf, String lang, boolean includesBoundaryPostcode, String cityRegExp, String streetRegExp, String houseRegExp, String poiRegExp) {
 		List<Record> results = new ArrayList<>();
 		boolean isCityEmpty = cityRegExp == null || cityRegExp.trim().isEmpty();
@@ -1074,6 +1101,57 @@ public interface InspectorService extends OBFService {
 			getLogger().error("Failed to read OBF {}", file, e);
 			throw new RuntimeException("Failed to read OBF:BinaryMapIndexReader.buildSearchPoiRequest( " + e.getMessage(), e);
 		}
+	}
+
+	default List<Record> getAddresses(List<String> obfs, String lang, boolean includesBoundaryPostcode, String cityRegExp, String streetRegExp, String houseRegExp, String poiRegExp) {
+		List<Record> results = new ArrayList<>();
+		if (obfs != null) {
+			for (String obf : obfs) {
+				if (obf == null || obf.isBlank()) {
+					continue;
+				}
+				for (Record record : getAddresses(obf, lang, includesBoundaryPostcode, cityRegExp, streetRegExp, houseRegExp, poiRegExp)) {
+					results.add(withObf(record, obf));
+				}
+			}
+		}
+		results.sort(Comparator.comparing(o -> {
+			if (o instanceof CityAddress ca) {
+				return ca.name();
+			} else if (o instanceof PoiAddress a) {
+				return a.name();
+			}
+			return "";
+		}, String.CASE_INSENSITIVE_ORDER));
+		return results;
+	}
+
+	private Record withObf(Record record, String obf) {
+		if (record instanceof CityAddress city) {
+			List<StreetAddress> streets = new ArrayList<>();
+			if (city.streets() != null) {
+				for (StreetAddress street : city.streets()) {
+					streets.add((StreetAddress) withObf(street, obf));
+				}
+			}
+			return new CityAddress(city.name(), city.point(), streets, city.streetsCount(), city.type(), obf);
+		}
+		if (record instanceof StreetAddress street) {
+			List<HouseAddress> houses = new ArrayList<>();
+			if (street.houses() != null) {
+				for (HouseAddress house : street.houses()) {
+					houses.add((HouseAddress) withObf(house, obf));
+				}
+			}
+			return new StreetAddress(street.name(), street.point(), houses, street.houseCount(), obf);
+		}
+		if (record instanceof HouseAddress house) {
+			return new HouseAddress(house.name(), house.point(), obf);
+		}
+		if (record instanceof PoiAddress poi) {
+			return new PoiAddress(poi.name(), poi.point(), poi.value(), obf);
+		}
+		return record;
 	}
 
 }

@@ -113,6 +113,55 @@ public interface AnalystService extends AddressPOIAnalystService {
         }
     }
 
+    default IndexTokenPage getIndex(List<String> obfs, String prefix, int pageToShow, int pageSizeLimit, String sortBy, String sortOrder) {
+        Pattern prefixPattern = compileIndexPrefixPattern(prefix);
+        final int safePage = Math.max(pageToShow, 0);
+        final int safeSize = Math.max(1, Math.min(pageSizeLimit, 100));
+        try {
+            List<IndexToken> results = new ArrayList<>();
+            if (obfs != null) {
+                for (String obf : obfs) {
+                    if (Algorithms.isEmpty(obf)) {
+                        continue;
+                    }
+                    List<IndexToken> allTokens = getCachedOrLoadIndexTokens(new File(obf));
+                    if (prefixPattern == null) {
+                        for (IndexToken token : allTokens) {
+                            results.add(withObf(token, obf));
+                        }
+                    } else {
+                        for (IndexToken token : allTokens) {
+                            if (prefixPattern.matcher(token.name()).find()) {
+                                results.add(withObf(token, obf));
+                            }
+                        }
+                    }
+                }
+            }
+            IndexTokenSummary summary = buildIndexTokenSummary(results);
+            results.sort(buildIndexTokenComparator(sortBy, sortOrder));
+            long totalElements = results.size();
+            int totalPages = totalElements == 0 ? 0 : (int) ((totalElements + safeSize - 1) / safeSize);
+            int fromIndex = Math.min(safePage * safeSize, results.size());
+            int toIndex = Math.min(fromIndex + safeSize, results.size());
+            List<IndexToken> pageContent = fromIndex >= toIndex
+                    ? List.of()
+                    : new ArrayList<>(results.subList(fromIndex, toIndex));
+            return new IndexTokenPage(pageContent, safePage, safeSize, totalElements, totalPages, summary);
+        } catch (Exception e) {
+            getLogger().error("Failed to read OBF indexes {}", obfs, e);
+            throw new RuntimeException("Failed to read OBF indexes: " + e.getMessage(), e);
+        }
+    }
+
+    private IndexToken withObf(IndexToken token, String obf) {
+        if (token == null) {
+            return null;
+        }
+        return new IndexToken(token.name(), token.addressRefs(), token.poiRefs(), token.poiAtomRefs(), token.poiAtomSizes(),
+                token.isCommon(), token.isFrequent(), obf);
+    }
+
     private Comparator<IndexToken> buildIndexTokenComparator(String sortBy, String sortOrder) {
         String normalizedSortBy = Algorithms.isEmpty(sortBy) ? "name" : sortBy.trim().toLowerCase(Locale.ROOT);
         Comparator<IndexToken> comparator = switch (normalizedSortBy) {
@@ -1888,6 +1937,79 @@ public interface AnalystService extends AddressPOIAnalystService {
         }
     }
 
+    default ObjectAddressPage getObjects(List<String> obfs,
+                                         String lang,
+                                         IndexToken token,
+                                         String regExp,
+                                         int pageToShow,
+                                         int pageSizeLimit,
+                                         String sortBy,
+                                         String sortOrder,
+                                         boolean isFiltered,
+                                         boolean invalidOnly,
+                                         String objectType) {
+        final int safePage = Math.max(pageToShow, 0);
+        final int safeSize = Math.max(pageSizeLimit, 1);
+        if (token == null) {
+            return new ObjectAddressPage(List.of(), safePage, safeSize, 0, 0, new int[10], new int[15], 0, 0);
+        }
+        List<ObjectAddress> content = new ArrayList<>();
+        int[] countMetrics = new int[10];
+        int[] sizeMetrics = new int[15];
+        int aloneCount = 0;
+        int aloneSize = 0;
+        List<String> targetObfs = token.obf() == null || token.obf().isBlank() ? obfs : List.of(token.obf());
+        if (targetObfs != null) {
+            for (String obf : targetObfs) {
+                if (Algorithms.isEmpty(obf)) {
+                    continue;
+                }
+                ObjectAddressPage page = getObjects(obf, lang, token, regExp, 0, Integer.MAX_VALUE, sortBy, sortOrder, isFiltered, invalidOnly, objectType);
+                if (page == null) {
+                    continue;
+                }
+                if (page.content() != null) {
+                    for (ObjectAddress objectAddress : page.content()) {
+                        content.add(withObf(objectAddress, obf));
+                    }
+                }
+                addMetrics(countMetrics, page.countMetrics());
+                addMetrics(sizeMetrics, page.sizeMetrics());
+                aloneCount += page.aloneCount();
+                aloneSize += page.aloneSize();
+            }
+        }
+        content.sort(buildObjectAddressComparator(sortBy, sortOrder));
+        long totalElements = content.size();
+        int totalPages = totalElements == 0 ? 0 : (int) ((totalElements + safeSize - 1) / safeSize);
+        int fromIndex = Math.min(safePage * safeSize, content.size());
+        int toIndex = Math.min(fromIndex + safeSize, content.size());
+        List<ObjectAddress> pageContent = fromIndex >= toIndex
+                ? List.of()
+                : new ArrayList<>(content.subList(fromIndex, toIndex));
+        return new ObjectAddressPage(pageContent, safePage, safeSize, totalElements, totalPages, countMetrics, sizeMetrics, aloneCount, aloneSize);
+    }
+
+    private void addMetrics(int[] target, int[] source) {
+        if (target == null || source == null) {
+            return;
+        }
+        for (int i = 0; i < Math.min(target.length, source.length); i++) {
+            target[i] = safeMetricInt((long) target[i] + source[i]);
+        }
+    }
+
+    private ObjectAddress withObf(ObjectAddress objectAddress, String obf) {
+        if (objectAddress == null) {
+            return null;
+        }
+        return new ObjectAddress(objectAddress.sequenceId(), objectAddress.name(), objectAddress.point(),
+                objectAddress.commonTags(), objectAddress.isPoi(), objectAddress.isMatched(),
+                objectAddress.isInvalidAtom(), objectAddress.isAlone(), objectAddress.type(), objectAddress.osmId(),
+                objectAddress.osmType(), objectAddress.payloadOffset(), objectAddress.payloadSize(),
+                objectAddress.sourceOffset(), obf);
+    }
+
     private Boolean parseObjectTypeFilter(String objectType) {
         if (Algorithms.isEmpty(objectType)) {
             return null;
@@ -3379,4 +3501,3 @@ public interface AnalystService extends AddressPOIAnalystService {
         }
     }
 }
-
