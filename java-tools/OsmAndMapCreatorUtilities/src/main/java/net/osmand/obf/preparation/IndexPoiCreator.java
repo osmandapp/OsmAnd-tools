@@ -562,6 +562,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				if (!rt.isText() && rt.getValue() == null) {
 					throw new NullPointerException("Null value for additional tag =" + rt.getTag());
 				}
+				rt.increment();
 				additionalAttributes.add(rt);
 			}
 			if (!categories.containsKey(cat)) {
