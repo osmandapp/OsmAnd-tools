@@ -1697,7 +1697,7 @@ public class BinaryInspector {
 				ValueFreq main = new ValueFreq(st.name, st.frequency);
 				main.subValues = new ArrayList<BinaryInspector.ValueFreq>();
 				for (int j = 0; j < st.possibleValues.size(); j++) {
-					int f = j < st.possibleValuesFreqs.size() ? st.possibleValuesFreqs.get(j) : 0;
+					int f = st.possibleValuesFreqs != null && j < st.possibleValuesFreqs.size() ? st.possibleValuesFreqs.get(j) : 0;
 					main.subValues.add(new ValueFreq(st.possibleValues.get(j), f));
 				}
 				ps.topMulti.add(main);
