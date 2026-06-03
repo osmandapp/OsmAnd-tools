@@ -72,7 +72,7 @@ public interface OBFService extends BaseService {
 
 	record IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes, boolean isCommon, boolean isFrequent) {
 	}
-	record ObfFileInfo(String path, String name, String continent, String country, String region, long size) {}
+	record ObfFileInfo(String path, String name, String continent, String country, String region, long lastModified, long size) {}
 	record IndexTokenPage(List<IndexToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, IndexTokenSummary summary) {}
 	record IndexTokenSummary(int poiSum, int addressSum, int commonSum, int frequentSum, int poiMax, int addressMax) {}
 	record IndexTokenBuilder(String name, int[] addressOffsets, int[] addressSuffixIndexes, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes) {}
@@ -166,8 +166,9 @@ public interface OBFService extends BaseService {
 		} else if (continentIndex < 0 && parts.size() > 1) {
 			region = String.join("_", parts.subList(1, parts.size()));
 		}
-		long size = new File(obf).length();
-		return new ObfFileInfo(obf, name, continent, normalizeObfDisplayName(country), normalizeObfDisplayName(region), size);
+		File file = new File(obf);
+		return new ObfFileInfo(obf, name, continent, normalizeObfDisplayName(country), normalizeObfDisplayName(region),
+				file.lastModified(), file.length());
 	}
 
 	static String getObfFileName(String obf) {
