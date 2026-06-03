@@ -41,7 +41,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Service
-public class SearchTestService implements ReportService, DataService, OBFService {
+public class SearchTestService implements ReportService, DataService, DetectorService, InspectorService, AnalystService {
     /**
      * Lightweight DTO for listing test-cases with parent dataset name.
      */
@@ -78,6 +78,8 @@ public class SearchTestService implements ReportService, DataService, OBFService
 
 	@Value("${searchtest.csv.dir}")
 	private String csvDownloadingDir;
+	@Value("${spring.searchtestdatasource.url:}")
+	private String searchTestDatasourceUrl;
 	@Value("${osmand.web.location}")
 	private String webServerConfigDir;
 	@Value("${overpass.url}")
@@ -150,6 +152,11 @@ public class SearchTestService implements ReportService, DataService, OBFService
 	@Override
 	public OsmAndMapsService getMapsService() {
 		return mapsService;
+	}
+
+	@Override
+	public String getSearchTestDatasourceUrl() {
+		return searchTestDatasourceUrl;
 	}
 
 	@Override
@@ -631,7 +638,7 @@ public class SearchTestService implements ReportService, DataService, OBFService
 	}
 
 	public static void main(String[] args) {
-		OBFService svc = new SearchTestService(null);
+		InspectorService svc = new SearchTestService(null);
 		
 		String mapDir = System.getenv("MAP_DIR");
 		if (mapDir == null || mapDir.trim().isEmpty()) {

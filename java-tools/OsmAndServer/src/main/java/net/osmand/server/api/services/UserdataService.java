@@ -946,19 +946,6 @@ public class UserdataService {
     }
 
     @Transactional
-    public ResponseEntity<String> renameFolder(String folderName, String newFolderName, String type, CloudUserDevicesRepository.CloudUserDevice dev) throws IOException {
-        Iterable<UserFile> files = filesRepository.findLatestFilesByFolderName(dev.userid, folderName + "/", type);
-        for (UserFile file : files) {
-            String newName = file.name.replaceFirst(Pattern.quote(folderName), newFolderName);
-            ResponseEntity<String> response = renameFile(file.name, newName, type, dev, false);
-            if (!response.getStatusCode().is2xxSuccessful()) {
-                return response;
-            }
-        }
-        return ok();
-    }
-
-    @Transactional
     public ResponseEntity<String> deleteFolder(String folderName, String type, CloudUserDevicesRepository.CloudUserDevice dev) {
         Iterable<UserFile> files = filesRepository.findLatestFilesByFolderName(dev.userid, folderName + "/", type);
         for (UserFile file : files) {

@@ -44,6 +44,7 @@ public class StorageService {
 	protected static final Log LOGGER = LogFactory.getLog(StorageService.class);
 
 	protected static final String LOCAL_STORAGE = "local";
+	public static final String GZ_FILE_EXT = ".gz";
 
 	@Value("${storage.default}")
 	private String defaultStorage;
@@ -337,12 +338,19 @@ public class StorageService {
 			}
 			throw new IllegalStateException();
         }
+
+		private static File gzipOutputFile(String path) {
+			if (path.endsWith(GPX_FILE_EXT)) {
+				return new File(path.substring(0, path.lastIndexOf(GPX_FILE_EXT)) + GPX_GZ);
+			}
+			return new File(path + GZ_FILE_EXT);
+		}
 		
 		public static InternalZipFile buildFromFileAndDelete(File file) throws IOException {
 			InternalZipFile zipfile = new InternalZipFile();
 			byte[] buffer = new byte[1024];
 			String path = file.getPath();
-			zipfile.tempzipfile = new File(path.substring(0, path.lastIndexOf(GPX_FILE_EXT)) + GPX_GZ);
+			zipfile.tempzipfile = gzipOutputFile(path);
 			zipfile.contentSize = file.length();
 			try (FileInputStream fis = new FileInputStream(file);
 			     FileOutputStream fos = new FileOutputStream(zipfile.tempzipfile);
