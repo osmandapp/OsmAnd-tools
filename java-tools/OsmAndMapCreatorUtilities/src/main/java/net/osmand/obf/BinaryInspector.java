@@ -1528,7 +1528,13 @@ public class BinaryInspector {
 			refs = new ArrayList<>(mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), refs), s.refs).values());
 			topMulti = new ArrayList<>(mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), topMulti), s.topMulti).values());
 			categories = new ArrayList<>(mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), categories), s.categories).values());
-			mergeArray(singleValues, s.categories);
+			for (String key : s.singleValues.keySet()) {
+				if (singleValues.containsKey(key)) {
+					singleValues.get(key).merge(s.singleValues.get(key));
+				} else {
+					singleValues.put(key, s.singleValues.get(key));
+				}
+			}
 		}
 
 
@@ -1574,7 +1580,7 @@ public class BinaryInspector {
 
 		@Override
 		public String toString() {
-			return String.format("%s (%d)", value ,freq);
+			return String.format("%s (%,d)", value ,freq);
 		}
 
 		@Override
@@ -1733,6 +1739,7 @@ public class BinaryInspector {
 		}
 		println(String.format("\t\t\tReference to double poi (%d, %,d): %s",  ps.refs.size(), sumFreq(ps.refs), ps.refs));
 		println(String.format("\t\t\tText based (%d, %,d): %s",  ps.text.size(), sumFreq(ps.text), ps.text));
+		println(String.format("\t\t\tSingle value filters (%d, %,d): %s", s, sumFreq(singleValuesLst), singleValuesFmt));
 		
 	}
 
