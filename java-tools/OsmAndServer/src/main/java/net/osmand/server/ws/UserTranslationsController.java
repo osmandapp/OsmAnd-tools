@@ -9,10 +9,17 @@ import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.stereotype.Controller;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+
 import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
 
 @Controller
 public class UserTranslationsController {
+
+	private static final String TRANSLATION_DURATION_HOURS = "durationHours";
+
+	Gson gson = new Gson();
 
 	@Autowired
 	private UserTranslationsService userTranslationsService;
@@ -68,12 +75,20 @@ public class UserTranslationsController {
 
 	// One time call — response is sent via /user/queue/updates (sendPrivateMessage)
 	@MessageMapping("/translation/create")
-	public void createTranslation(SimpMessageHeaderAccessor headers, Principal principal) {
+	public void createTranslation(@Payload String body, SimpMessageHeaderAccessor headers, Principal principal) {
 		CloudUser user = userTranslationsService.getUser(principal, headers);
 		if (user == null) {
 			return;
 		}
-		userTranslationsService.createTranslation(user, null, headers);
+		int durationHours = 0;
+		try {
+			JsonObject json = gson.fromJson(body, JsonObject.class);
+			if (json.has(TRANSLATION_DURATION_HOURS)) {
+				durationHours = json.get(TRANSLATION_DURATION_HOURS).getAsInt();
+			}
+		} catch (Exception ignored) {
+		}
+		userTranslationsService.createTranslation(user, null, durationHours, headers);
 	}
 
 	@MessageMapping("/translation/{translationId}/delete")

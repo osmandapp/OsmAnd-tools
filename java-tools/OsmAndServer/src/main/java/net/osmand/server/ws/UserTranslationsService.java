@@ -137,13 +137,14 @@ public class UserTranslationsService {
 	}
 
 	// deleteTranslation
-	public UserTranslation createTranslation(CloudUser user, String translationId, SimpMessageHeaderAccessor headers) {
+	public UserTranslation createTranslation(CloudUser user, String translationId, int durationHours, SimpMessageHeaderAccessor headers) {
 		long time = System.currentTimeMillis();
 		if (translationId == null) {
 			translationId = Long.toHexString(time * 100L + random.nextInt(100));
 		}
 		UserTranslation ust = new UserTranslation(translationId, user == null ? -1: user.id);
 		ust.setCreationDate(time);
+		ust.setDurationMs(durationHours == 0 ? UserTranslation.PERMANENT_DURATION_MS : durationHours * 60 * 60 * 1000L);
 		translations.put(ust.getId(), ust);
 		// Clear stale location history so startSharing doesn't seed the new
 		// translation with a point from a previous session.
@@ -184,7 +185,7 @@ public class UserTranslationsService {
 	public void startSharing(UserTranslation ust, CloudUser user, SimpMessageHeaderAccessor headers) {
 		TranslationSharingOptions opts = new TranslationSharingOptions();
 		opts.startTime = System.currentTimeMillis();
-		opts.expireTime = System.currentTimeMillis() + 60 * 60 * 1000;
+		opts.expireTime = opts.startTime + ust.getDurationMs();
 		opts.userId = user.id;
 		opts.nickname = getNickname(user);
 
