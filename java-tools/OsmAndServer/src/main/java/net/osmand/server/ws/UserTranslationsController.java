@@ -18,6 +18,9 @@ import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
 public class UserTranslationsController {
 
 	private static final String TRANSLATION_DURATION_HOURS = "durationHours";
+	private static final String TRANSLATION_ID_FIELD = "translationId";
+	// Client sends first 16 hex chars of SHA-256(key) as the translation ID.
+	private static final int TRANSLATION_ID_HEX_LENGTH = 16;
 
 	Gson gson = new Gson();
 
@@ -73,7 +76,11 @@ public class UserTranslationsController {
 		}
 	}
 
-	// One time call — response is sent via /user/queue/updates (sendPrivateMessage)
+	// One time call — response is sent via /user/queue/updates (sendPrivateMessage).
+	// Body may include:
+	//   translationId — client-generated SHA-256(key) hex string (64 chars), required.
+	//                   The server uses it as-is so translation_id == SHA-256(key).
+	//   durationHours — 0 means permanent.
 	@MessageMapping("/translation/create")
 	public void createTranslation(@Payload String body, SimpMessageHeaderAccessor headers, Principal principal) {
 		CloudUser user = userTranslationsService.getUser(principal, headers);
@@ -81,14 +88,23 @@ public class UserTranslationsController {
 			return;
 		}
 		int durationHours = 0;
+		String clientTranslationId;
 		try {
 			JsonObject json = gson.fromJson(body, JsonObject.class);
 			if (json.has(TRANSLATION_DURATION_HOURS)) {
 				durationHours = json.get(TRANSLATION_DURATION_HOURS).getAsInt();
 			}
-		} catch (Exception ignored) {
+			String candidate = json.has(TRANSLATION_ID_FIELD) ? json.get(TRANSLATION_ID_FIELD).getAsString() : null;
+			if (candidate == null || !candidate.matches("[0-9a-f]{" + TRANSLATION_ID_HEX_LENGTH + "}")) {
+				userTranslationsService.sendError("translationId is required", headers);
+				return;
+			}
+			clientTranslationId = candidate;
+		} catch (Exception e) {
+			userTranslationsService.sendError("Invalid request body", headers);
+			return;
 		}
-		userTranslationsService.createTranslation(user, null, durationHours, headers);
+		userTranslationsService.createTranslation(user, clientTranslationId, durationHours, headers);
 	}
 
 	@MessageMapping("/translation/{translationId}/delete")

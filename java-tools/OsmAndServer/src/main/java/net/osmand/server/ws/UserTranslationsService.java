@@ -43,6 +43,7 @@ public class UserTranslationsService {
    
     public static final String TRANSLATION_ID = "translationId";
 	public static final String ALIAS = "alias";
+	public static final String ENCRYPTED_DATA = "encryptedData";
 
     
     static final String TOPIC_TRANSLATION = "/topic/translation/";
@@ -138,10 +139,11 @@ public class UserTranslationsService {
 
 	// deleteTranslation
 	public UserTranslation createTranslation(CloudUser user, String translationId, int durationHours, SimpMessageHeaderAccessor headers) {
-		long time = System.currentTimeMillis();
-		if (translationId == null) {
-			translationId = Long.toHexString(time * 100L + random.nextInt(100));
+		if (translations.containsKey(translationId)) {
+			sendError("translationId already exists", headers);
+			return null;
 		}
+		long time = System.currentTimeMillis();
 		UserTranslation ust = new UserTranslation(translationId, user == null ? -1: user.id);
 		ust.setCreationDate(time);
 		ust.setDurationMs(durationHours == 0 ? UserTranslation.PERMANENT_DURATION_MS : durationHours * 60 * 60 * 1000L);
@@ -309,6 +311,29 @@ public class UserTranslationsService {
 		try { wptPt.setSpeed((float) parseDouble(request.getParameter("speed"))); } catch (RuntimeException e) { }
 		sendLocation(dev, pu, wptPt);
 		return true;
+	}
+
+	public boolean sendEncryptedDeviceMessage(CloudUserDevice dev, CloudUser pu, String encData) {
+		int userId = dev != null ? dev.userid : pu.id;
+		Deque<UserTranslation> userTranslations = shareLocTranslationsByUser.get(userId);
+		if (userTranslations == null || userTranslations.isEmpty()) {
+			return false;
+		}
+		TranslationMessage msg = prepareMessageAuthor(dev, pu);
+		msg.content = Map.of(ENCRYPTED_DATA, encData);
+		msg.type = TranslationMessageType.LOCATION;
+		long timeMillis = System.currentTimeMillis();
+		boolean sent = false;
+		for (UserTranslation ust : userTranslations) {
+			for (TranslationSharingOptions o : ust.getSharingOptions()) {
+				if (o.userId == userId && timeMillis < o.expireTime) {
+					rawSendMessage(ust, msg);
+					sent = true;
+					break;
+				}
+			}
+		}
+		return sent;
 	}
 
 	public void sendLocation(CloudUserDevice dev, CloudUser pu, WptPt wptPt) {
