@@ -8,9 +8,9 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 
 @Component
-@UiAction(name = "sample-action", title = "Long text")
-public class TestAction implements Action {
+@UiAction(name = "error-action", title = "Long text")
+public class ErrorTestAction implements Action {
     public Map<String, Object> run(@UiParam(name = "param1", defaultValue = "val1", title = "help description") String input, int limit) {
-        return Map.of("input", input, "limit", limit);
+        throw new RuntimeException("Something goes wrong.");
     }
 }

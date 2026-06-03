@@ -12,12 +12,6 @@ public class ActionContext {
         this.cancelled = true;
     }
 
-    public void checkCancelled() throws InterruptedException {
-        if (isCancelled()) {
-            throw new InterruptedException("Action run was cancelled");
-        }
-    }
-
     public String getProgressText() {
         return progressText;
     }

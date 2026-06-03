@@ -396,8 +396,15 @@ public class ActionManagementService {
 
     private void markFailed(long runId, long started, Throwable e) {
         LOGGER.warn("Action run {} failed", runId, e);
-        jdbcTemplate.update("UPDATE run SET status = 'FAILED', error_text = ?, elapsed_ms = ?, finished_time = CURRENT_TIMESTAMP, updated_time = CURRENT_TIMESTAMP WHERE id = ?",
-                stackTrace(e), System.currentTimeMillis() - started, runId);
+        jdbcTemplate.update("UPDATE run SET status = 'FAILED', result_json = ?, error_text = ?, elapsed_ms = ?, finished_time = CURRENT_TIMESTAMP, updated_time = CURRENT_TIMESTAMP WHERE id = ?",
+                toJson(Collections.singletonMap("exception", exceptionMessage(e))), stackTrace(e), System.currentTimeMillis() - started, runId);
+    }
+
+    private String exceptionMessage(Throwable e) {
+        if (e.getMessage() != null && !e.getMessage().isBlank()) {
+            return e.getMessage();
+        }
+        return e.getClass().getName();
     }
 
     private RowMapper<ActionItem> actionMapper() {
