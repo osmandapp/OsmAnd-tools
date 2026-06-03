@@ -1716,30 +1716,44 @@ public class BinaryInspector {
 	}
 
 	private void printPoiTypeStats(PoiStats ps) {
-		println("\t\tCategories:");
 		Collections.sort(ps.categories);
+		int sum = 0, freq = 0;
 		for (ValueFreq c : ps.categories) {
 			Collections.sort(c.subValues);
+			sum += c.subValues.size();
+			freq += c.freq;
+		}
+		println(String.format("\t\tCategories (%d categories, %d types, %d objects):", ps.categories.size(), sum, freq));
+		for (ValueFreq c : ps.categories) {
 			println(String.format("\t\t\t%s (%d, %d): %s", c.value, c.subValues.size(), c.freq, c.subValues));
 		}
-		println("\t\tPOI Additionals:");
+		sum = ps.refs.size();
 		for (ValueFreq c : ps.topMulti) {
+			sum += c.subValues.size();
 			Collections.sort(c.subValues);
-			println(String.format("\t\t\t%s (%d, %d): %s", c.value, c.subValues.size(), c.freq, c.subValues));
 		}
 		StringBuilder singleValuesFmt = new StringBuilder();
 		Collections.sort(ps.text);
 		Collections.sort(ps.refs);
 		List<ValueFreq> singleValuesLst = new ArrayList<>(ps.singleValues.values());
 		Collections.sort(singleValuesLst);
-		int s = 0;
+		int sumSingleValue = 0;
 		for (ValueFreq key : singleValuesLst) {
-			s += key.subValues.size();
+			sumSingleValue += key.subValues.size();
 			singleValuesFmt.append(String.format("%s (%d, %d), ", key.value, key.subValues.size(), key.freq));
+		}
+		println(String.format("\t\tPOI Additionals (%d types, %d text):", sum + sumSingleValue,
+				ps.text.size()));
+		for (ValueFreq c : ps.topMulti) {
+			println(String.format("\t\t\t%s (%d, %d): %s", c.value, c.subValues.size(), c.freq, c.subValues));
+		}
+
+		for (ValueFreq c : ps.topMulti) {
+			Collections.sort(c.subValues);
 		}
 		println(String.format("\t\t\tReference to double poi (%d, %,d): %s",  ps.refs.size(), sumFreq(ps.refs), ps.refs));
 		println(String.format("\t\t\tText based (%d, %,d): %s",  ps.text.size(), sumFreq(ps.text), ps.text));
-		println(String.format("\t\t\tSingle value filters (%d, %,d): %s", s, sumFreq(singleValuesLst), singleValuesFmt));
+		println(String.format("\t\t\tSingle value filters (%d, %,d): %s", sumSingleValue, sumFreq(singleValuesLst), singleValuesFmt));
 		
 	}
 
