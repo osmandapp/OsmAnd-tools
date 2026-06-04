@@ -5,84 +5,12 @@ import net.osmand.util.Algorithms;
 import org.sqlite.Function;
 
 import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.*;
 import java.util.*;
 import java.util.regex.Pattern;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
 
-public interface TokenAnalystService extends OBFService {
-    int TAGS_DB_PAGE_SIZE = 100;
-
-    default Path getTagsDatasourceDir() throws IOException {
-        String url = getSearchTestDatasourceUrl();
-        if (Algorithms.isEmpty(url)) {
-            throw new IOException("spring.searchtestdatasource.url is not configured");
-        }
-        String path = url.startsWith("jdbc:sqlite:") ? url.substring("jdbc:sqlite:".length()) : url;
-        Path parent = Path.of(path).toAbsolutePath().getParent();
-        if (parent == null) {
-            throw new IOException("Could not resolve datasource parent directory");
-        }
-        Path dir = parent.resolve("tags_db");
-        Files.createDirectories(dir);
-        return dir;
-    }
-
-    default Path resolveTagsDatasource(String name) throws IOException {
-        if (Algorithms.isEmpty(name)) {
-            throw new IOException("Datasource name is required");
-        }
-        String fileName = Path.of(name).getFileName().toString();
-        if (!fileName.endsWith(".db") && !fileName.endsWith(".sqlite")) {
-            fileName += ".db";
-        }
-        Path dir = getTagsDatasourceDir();
-        Path file = dir.resolve(fileName).normalize();
-        if (!file.startsWith(dir)) {
-            throw new IOException("Invalid datasource name");
-        }
-        return file;
-    }
-
-    default List<Datasource> getTagsDatasources() throws IOException {
-        Path dir = getTagsDatasourceDir();
-        List<Datasource> result = new ArrayList<>();
-        try (var stream = Files.list(dir)) {
-            stream.filter(Files::isRegularFile)
-                    .filter(path -> path.getFileName().toString().endsWith(".db") || path.getFileName().toString().endsWith(".sqlite"))
-                    .sorted(Comparator.comparing(path -> path.getFileName().toString(), String.CASE_INSENSITIVE_ORDER))
-                    .forEach(path -> {
-                        try {
-                            result.add(new Datasource(path.getFileName().toString(), Files.size(path),
-                                    Files.getLastModifiedTime(path).toMillis(), true, ""));
-                        } catch (IOException ignored) {
-                        }
-                    });
-        }
-        return result;
-    }
-
-    default boolean deleteTagsDatasource(String name) throws IOException {
-        return Files.deleteIfExists(resolveTagsDatasource(name));
-    }
-
-    default void downloadTagsDatasource(String name, OutputStream out) throws IOException {
-        Path dbFile = resolveTagsDatasource(name);
-        if (!Files.exists(dbFile)) {
-            throw new IOException("Datasource not found: " + name);
-        }
-        try (ZipOutputStream zip = new ZipOutputStream(out)) {
-            zip.putNextEntry(new ZipEntry("db.sqlite"));
-            Files.copy(dbFile, zip);
-            zip.closeEntry();
-            zip.finish();
-        }
-    }
-
+public interface TokenAnalystService extends GenDbService {
     default List<DbTagName> getTagsDbTagNames(String datasource) throws IOException, SQLException {
         Path dbFile = resolveTagsDatasource(datasource);
         String sql = """
@@ -192,7 +120,7 @@ public interface TokenAnalystService extends OBFService {
                                       int pageToShow, int pageSizeLimit, String sortBy, String sortOrder) throws IOException, SQLException {
         Path dbFile = resolveTagsDatasource(datasource);
         String source = perObf ? "posting" : "(SELECT token_id, object_id, isAlone, MIN(sequenceId) sequenceId FROM posting GROUP BY token_id, object_id, isAlone)";
-        String filter = Algorithms.isEmpty(regExp) ? "" : " AND (o.name REGEXP ? OR o.commonTags REGEXP ? OR o.extraTags REGEXP ?)";
+        String filter = Algorithms.isEmpty(regExp) ? "" : " AND (o.name REGEXP ? OR o.commonTags REGEXP ?)";
         String objectTypeFilter = getObjectTypeObjectFilter(objectType);
         TagFilter tagFilter = buildTagFilter(tag, values);
         String tagSql = tagFilter.enabled() ? " AND " + tagFilter.sql() : "";
@@ -212,7 +140,7 @@ public interface TokenAnalystService extends OBFService {
         try (Connection conn = openTagsDbConnection(dbFile)) {
             List<Object> objectParams = buildTagObjectParams(tokenId, regExp, tagFilter);
             long total = queryLong(conn, "SELECT COUNT(*)" + base, objectParams.toArray());
-            String sql = "SELECT p.sequenceId, o.name, o.lat, o.lon, o.commonTags, o.extraTags, o.type, o.id, o.osmType, p.isAlone"
+            String sql = "SELECT p.sequenceId, o.name, o.lat, o.lon, o.commonTags, o.type, o.id, o.osmType, p.isAlone"
                     + (perObf ? ", b.name" : ", NULL") + base
                     + buildTagsDbOrderBy(sortBy, sortOrder, orderColumns, "p.sequenceId ASC") + " LIMIT ? OFFSET ?";
             List<DbObject> content = new ArrayList<>();
@@ -226,9 +154,8 @@ public interface TokenAnalystService extends OBFService {
                         Double lon = rs.getObject(4) == null ? null : rs.getDouble(4);
                         LatLon point = lat == null || lon == null ? null : new LatLon(lat, lon);
                         Map<String, String> commonTags = parseObjectValues(rs.getString(5));
-                        Map<String, Object> extraTags = parseObjectExtraTags(rs.getString(6));
-                        content.add(new DbObject(rs.getInt(1), rs.getString(2), point, commonTags, extraTags, rs.getString(7),
-                                rs.getLong(8), rs.getString(9), rs.getInt(10) != 0, getTagsObfDisplayName(rs.getString(11)), 0));
+                        content.add(new DbObject(rs.getInt(1), rs.getString(2), point, commonTags, rs.getString(6),
+                                rs.getLong(7), rs.getString(8), rs.getInt(9) != 0, getTagsObfDisplayName(rs.getString(10)), 0));
                     }
                 }
             }
@@ -367,7 +294,6 @@ public interface TokenAnalystService extends OBFService {
         if (!Algorithms.isEmpty(regExp)) {
             params.add(regExp);
             params.add(regExp);
-            params.add(regExp);
         }
         if (tagFilter != null && tagFilter.enabled()) {
             params.addAll(tagFilter.params());
@@ -415,14 +341,6 @@ public interface TokenAnalystService extends OBFService {
 
     @SuppressWarnings("unchecked")
     private Map<String, String> parseObjectValues(String json) throws IOException {
-        if (Algorithms.isEmpty(json)) {
-            return Collections.emptyMap();
-        }
-        return getObjectMapper().readValue(json, Map.class);
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> parseObjectExtraTags(String json) throws IOException {
         if (Algorithms.isEmpty(json)) {
             return Collections.emptyMap();
         }

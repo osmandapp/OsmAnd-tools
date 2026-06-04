@@ -9,7 +9,7 @@ import java.sql.*;
 import java.util.*;
 import java.util.regex.Pattern;
 
-public interface AddressPOIAnalystService extends TokenAnalystService {
+public interface AddressPOIAnalystService extends GenDbService {
 
     default DbObjectPage getTagsDbAddressPoiObjects(String datasource, String objectType, String regExp,
                                                     String tokenFind, String tag, List<String> values,
@@ -42,7 +42,7 @@ public interface AddressPOIAnalystService extends TokenAnalystService {
             String obfTokenFilter = perObf ? " AND p.obf_id = po.obf_id" : "";
             String perObfTokenCountSql = tokenCountSql.replace("WHERE p.object_id = o.id", "WHERE p.object_id = o.id" + obfTokenFilter);
             String sql = "SELECT ROW_NUMBER() OVER (ORDER BY o.id ASC" + (perObf ? ", b.name ASC" : "") + ") sequenceId, "
-                    + "o.name, o.lat, o.lon, o.commonTags, o.extraTags, o.type, o.id, o.osmType, 0 isAlone, "
+                    + "o.name, o.lat, o.lon, o.commonTags, o.type, o.id, o.osmType, 0 isAlone, "
                     + (perObf ? "b.name" : "NULL") + " obfName, "
                     + perObfTokenCountSql + " tokens"
                     + base + buildAddressPoiOrderBy(sortBy, sortOrder, orderColumns, "o.id ASC") + " LIMIT ? OFFSET ?";
@@ -58,9 +58,8 @@ public interface AddressPOIAnalystService extends TokenAnalystService {
                         LatLon point = lat == null || lon == null ? null : new LatLon(lat, lon);
                         content.add(new DbObject(rs.getInt(1), rs.getString(2), point,
                                 parseAddressPoiObjectValues(rs.getString(5)),
-                                parseAddressPoiObjectExtraTags(rs.getString(6)),
-                                rs.getString(7), rs.getLong(8), rs.getString(9), false,
-                                getTagsObfDisplayName(rs.getString(11)), rs.getLong(12)));
+                                rs.getString(6), rs.getLong(7), rs.getString(8), false,
+                                getTagsObfDisplayName(rs.getString(10)), rs.getLong(11)));
                     }
                 }
             }
@@ -453,14 +452,6 @@ public interface AddressPOIAnalystService extends TokenAnalystService {
 
     @SuppressWarnings("unchecked")
     private Map<String, String> parseAddressPoiObjectValues(String json) throws IOException {
-        if (Algorithms.isEmpty(json)) {
-            return Collections.emptyMap();
-        }
-        return getObjectMapper().readValue(json, Map.class);
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> parseAddressPoiObjectExtraTags(String json) throws IOException {
         if (Algorithms.isEmpty(json)) {
             return Collections.emptyMap();
         }
