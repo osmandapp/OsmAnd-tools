@@ -11,6 +11,7 @@ import java.text.MessageFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
@@ -54,8 +55,13 @@ import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.binary.BinaryMapTransportReaderAdapter.TransportIndex;
+import net.osmand.binary.NameIndexInspector;
+import net.osmand.binary.NameIndexInspector.PrefixNameValue;
+import net.osmand.binary.NameIndexInspector.ValueFreq;
 import net.osmand.binary.ObfConstants;
 import net.osmand.binary.OsmandOdb;
+import net.osmand.binary.OsmandOdb.OsmAndPoiNameIndex;
+import net.osmand.binary.OsmandOdb.OsmAndPoiNameIndex.OsmAndPoiNameIndexData;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.Amenity;
 import net.osmand.data.Building;
@@ -93,7 +99,7 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-					"-vpoi", //"-vpoiobjects",
+					"-vpoi", // "-vpoiobjects",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
@@ -1520,6 +1526,7 @@ public class BinaryInspector {
 		List<ValueFreq> topMulti = new ArrayList<ValueFreq>();
 		Map<String, ValueFreq> singleValues = new TreeMap<String, ValueFreq>();
 		List<ValueFreq> categories = new ArrayList<ValueFreq>();
+		List<ValueFreq> nameIndex = new ArrayList<ValueFreq>();
 		
 		
 		public void merge(PoiStats s) {
@@ -1527,6 +1534,7 @@ public class BinaryInspector {
 			text = new ArrayList<>(mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), text), s.text).values());
 			refs = new ArrayList<>(mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), refs), s.refs).values());
 			topMulti = new ArrayList<>(mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), topMulti), s.topMulti).values());
+			nameIndex = new ArrayList<>(mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), nameIndex), s.nameIndex).values());
 			categories = new ArrayList<>(mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), categories), s.categories).values());
 			for (String key : s.singleValues.keySet()) {
 				if (singleValues.containsKey(key)) {
@@ -1543,58 +1551,8 @@ public class BinaryInspector {
 		}
 	}
 	
-	private static class ValueFreq implements Comparable<ValueFreq> {
-		String value;
-		int freq;
-		static boolean SORT_BY_NAME = false;
-		static boolean COMBINE_SINGLE_TYPE_BY_PREFIX = true;
-		List<ValueFreq> subValues = null;
-		
-		public ValueFreq(String name, int frequency) {
-			this.value = name;
-			this.freq = frequency;
-		}
-
-		private  static Map<String, ValueFreq> mergeArray(Map<String, ValueFreq> res, List<ValueFreq> m) {
-			for (ValueFreq s : m) {
-				if (res.containsKey(s.value)) {
-					res.get(s.value).merge(s);
-				} else {
-					res.put(s.value, s);
-				}
-			}
-			return res;
-		}
-		
-		
-		public void merge(ValueFreq s) {
-			this.freq += s.freq;
-			if (subValues == null && s.subValues != null) {
-				s.subValues = new ArrayList<>();
-			}
-			if (subValues != null) {
-				subValues = new ArrayList<>(
-						mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), subValues), s.subValues).values());
-			}
-		}
-
-		@Override
-		public String toString() {
-			return String.format("%s (%,d)", value ,freq);
-		}
-
-		@Override
-		public int compareTo(ValueFreq o) {
-			if (!SORT_BY_NAME) {
-				int c = -Integer.compare(freq, o.freq);
-				if (c != 0) {
-					return c;
-				}
-			}
-			return value.compareTo(o.value);
-		}
-	}
-
+	public static boolean COMBINE_SINGLE_TYPE_BY_PREFIX = true;
+	
 	private void printPOIDetailInfo(VerboseInfo verbose, BinaryMapIndexReader index, PoiRegion p) throws IOException {
 		int[] count = new int[3];
 		SearchRequest<Amenity> req = BinaryMapIndexReader.buildSearchPoiRequest(
@@ -1682,7 +1640,7 @@ public class BinaryInspector {
 			} else if (st.possibleValues.size() == 1) {
 				int lastIndexOf = st.name.lastIndexOf('_');
 				String key = st.name;
-				if (lastIndexOf >= 0 && ValueFreq.COMBINE_SINGLE_TYPE_BY_PREFIX) {
+				if (lastIndexOf >= 0 && COMBINE_SINGLE_TYPE_BY_PREFIX) {
 					key = key.substring(0, lastIndexOf);
 				}
 				ValueFreq singleGroup = ps.singleValues.get(key);
@@ -1695,7 +1653,7 @@ public class BinaryInspector {
 				singleGroup.subValues.add(new ValueFreq(st.name, st.frequency));
 			} else {
 				ValueFreq main = new ValueFreq(st.name, st.frequency);
-				main.subValues = new ArrayList<BinaryInspector.ValueFreq>();
+				main.subValues = new ArrayList<ValueFreq>();
 				for (int j = 0; j < st.possibleValues.size(); j++) {
 					int f = st.possibleValuesFreqs != null && j < st.possibleValuesFreqs.size() ? st.possibleValuesFreqs.get(j) : 0;
 					main.subValues.add(new ValueFreq(st.possibleValues.get(j), f));
@@ -1703,8 +1661,10 @@ public class BinaryInspector {
 				ps.topMulti.add(main);
 			}
 		}
-		
+		NameIndexInspector fullNameIndex = index.readFullNameIndex(p);
+		ps.nameIndex = fullNameIndex.getPrefixes();
 		printPoiTypeStats(ps);
+		
 		vInfo.globalPoiStats.merge(ps);
 //		req.poiTypeFilter = null;//for test only
 		if(vInfo.isVpoiObjects()) {
@@ -1751,9 +1711,25 @@ public class BinaryInspector {
 		for (ValueFreq c : ps.topMulti) {
 			Collections.sort(c.subValues);
 		}
+		int tokens = 0; 
+		Collections.sort(ps.nameIndex);
+		for(ValueFreq pt : ps.nameIndex) {
+			Collections.sort(pt.subValues);
+			tokens += pt.subValues.size();
+			
+		}
 		println(String.format("\t\t\tReference to double poi (%d, %,d): %s",  ps.refs.size(), sumFreq(ps.refs), ps.refs));
 		println(String.format("\t\t\tText based (%d, %,d): %s",  ps.text.size(), sumFreq(ps.text), ps.text));
 		println(String.format("\t\t\tSingle value filters (%d, %,d): %s", sumSingleValue, sumFreq(singleValuesLst), singleValuesFmt));
+		List<ValueFreq> sublist = ps.nameIndex.subList(0, Math.min(60, ps.nameIndex.size()));
+		StringBuilder nameValuesFmt = new StringBuilder();
+		for (ValueFreq key : sublist) {
+			nameValuesFmt.append(String.format("%s (%d, %d - %s), ", key.value, key.subValues.size(), key.freq, key.getSubvalues(0.1)));
+		}
+		println(String.format("\t\tPOI Name index stats (%d prefixes, %d tokens, %d refs): %s ", ps.nameIndex.size(),
+				tokens, sumFreq(ps.nameIndex), nameValuesFmt));
+		
+		
 		
 	}
 
