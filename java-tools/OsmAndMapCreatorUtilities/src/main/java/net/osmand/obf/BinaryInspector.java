@@ -977,7 +977,7 @@ public class BinaryInspector {
 	private void printNameStats(List<ValueFreq> nameIndex, int alimit, String name) {
 		int tokens = 0; 
 		Collections.sort(nameIndex);
-		for(ValueFreq pt : nameIndex) {
+		for (ValueFreq pt : nameIndex) {
 			Collections.sort(pt.subValues);
 			tokens += pt.subValues.size();
 		}
@@ -1578,9 +1578,10 @@ public class BinaryInspector {
 				if (!nameByTypeIndex.containsKey(type)) {
 					nameByTypeIndex.put(type, s.nameByTypeIndex.get(type));
 				} else {
-					nameIndex = new ArrayList<>(
+					List<ValueFreq> rs = new ArrayList<>(
 							mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), nameByTypeIndex.get(type)),
 									s.nameByTypeIndex.get(type)).values());
+					nameByTypeIndex.put(type, rs);
 				}
 			}
 		}
@@ -1615,7 +1616,6 @@ public class BinaryInspector {
 
 	}
 	
-
 	private static Map<String, ValueFreq> mergeArray(Map<String, ValueFreq> res, List<ValueFreq> m) {
 		return ValueFreq.mergeArray(res, m);
 	}
