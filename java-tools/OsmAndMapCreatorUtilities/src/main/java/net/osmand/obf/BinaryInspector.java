@@ -1721,7 +1721,13 @@ public class BinaryInspector {
 		println(String.format("\t\t\tReference to double poi (%d, %,d): %s",  ps.refs.size(), sumFreq(ps.refs), ps.refs));
 		println(String.format("\t\t\tText based (%d, %,d): %s",  ps.text.size(), sumFreq(ps.text), ps.text));
 		println(String.format("\t\t\tSingle value filters (%d, %,d): %s", sumSingleValue, sumFreq(singleValuesLst), singleValuesFmt));
-		List<ValueFreq> sublist = ps.nameIndex.subList(0, Math.min(60, ps.nameIndex.size()));
+		int limit = Math.min(100, ps.nameIndex.size());
+		for (; limit < ps.nameIndex.size(); limit++) {
+			if (ps.nameIndex.get(limit).freq < 80) {
+				break;
+			}
+		}
+		List<ValueFreq> sublist = ps.nameIndex.subList(0, limit);
 		StringBuilder nameValuesFmt = new StringBuilder();
 		for (ValueFreq key : sublist) {
 			nameValuesFmt.append(String.format("%s (%d, %d - %s), ", key.value, key.subValues.size(), key.freq, key.getSubvalues(0.1)));
