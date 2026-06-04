@@ -44,6 +44,8 @@ public class UserTranslationsService {
     public static final String TRANSLATION_ID = "translationId";
 	public static final String ALIAS = "alias";
 	public static final String ENCRYPTED_DATA = "encryptedData";
+	public static final String DEVICE_ID = "deviceId";
+	public static final String ACCESS_TOKEN = "accessToken";
 
     
     static final String TOPIC_TRANSLATION = "/topic/translation/";
@@ -313,7 +315,13 @@ public class UserTranslationsService {
 		return true;
 	}
 
-	public boolean sendEncryptedDeviceMessage(CloudUserDevice dev, CloudUser pu, String encData) {
+	public boolean sendEncryptedDeviceMessage(CloudUserDevice dev, CloudUser pu, String encData, String clientDeviceId,
+	                                          String clientAccessToken) {
+		if (clientDeviceId != null && clientAccessToken != null
+				&& (dev == null || !dev.deviceid.equals(clientDeviceId) || !dev.accesstoken.equals(clientAccessToken))) {
+			return false;
+		}
+
 		int userId = dev != null ? dev.userid : pu.id;
 		Deque<UserTranslation> userTranslations = shareLocTranslationsByUser.get(userId);
 		if (userTranslations == null || userTranslations.isEmpty()) {

@@ -10,6 +10,8 @@ import okio.Buffer;
 import static net.osmand.IndexConstants.*;
 import static net.osmand.server.api.services.WebUserdataService.*;
 import static net.osmand.server.api.services.UserdataService.*;
+import static net.osmand.server.ws.UserTranslationsService.ACCESS_TOKEN;
+import static net.osmand.server.ws.UserTranslationsService.DEVICE_ID;
 import static net.osmand.server.ws.UserTranslationsService.ENCRYPTED_DATA;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
@@ -769,7 +771,9 @@ public class MapApiController {
 		if (encryptedData == null || encryptedData.isEmpty()) {
 			return ResponseEntity.badRequest().build();
 		}
-		boolean ok = userTranslationsService.sendEncryptedDeviceMessage(dev, user, encryptedData);
+		String clientDeviceId = request.getParameter(DEVICE_ID);
+		String clientAccessToken = request.getParameter(ACCESS_TOKEN);
+		boolean ok = userTranslationsService.sendEncryptedDeviceMessage(dev, user, encryptedData, clientDeviceId, clientAccessToken);
 		return ok ? ResponseEntity.ok("OK") : ResponseEntity.notFound().build();
 	}
 
