@@ -15,11 +15,13 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -95,12 +97,12 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-					"-vpoi", // "-vpoiobjects",
+//					"-vpoi", // "-vpoiobjects",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
-//					"-vaddress", "-vcities", "-vstreetgroups", "-vcitynames",
+					"-vaddress", //"-vcities", "-vstreetgroups", "-vcitynames",
 //					"-vstreets", //  "-vbuildings",// "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
@@ -111,8 +113,8 @@ public class BinaryInspector {
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
-					System.getProperty("maps.dir") + "/Us_minnesota_northamerica_2.obf",
-//					System.getProperty("maps.dir") + "/Liechtenstein_europe_2.obf",
+//					System.getProperty("maps.dir") + "/Us_minnesota_northamerica_2.obf",
+					System.getProperty("maps.dir") + "/Liechtenstein_europe_2.obf",
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
@@ -174,6 +176,7 @@ public class BinaryInspector {
 		String lang = null;
 		int zoom = 15;
 		PoiStats globalPoiStats = new PoiStats();
+		AddressStats globalAddressStats = new AddressStats();
 
 		public boolean isVaddress() {
 			return vaddress;
@@ -420,6 +423,10 @@ public class BinaryInspector {
 					if (vInfo.isVpoi() && vInfo.globalPoiStats.files > 1) {
 						System.out.println("\nGlobal poi stats");
 						printPoiTypeStats(vInfo.globalPoiStats);
+					}
+					if (vInfo.isVpoi() && vInfo.globalAddressStats.files > 1) {
+						System.out.println("\nGlobal address stats");
+						printAddressNameStats(vInfo.globalAddressStats);
 					}
 					vInfo.close();
 				}
@@ -944,6 +951,49 @@ public class BinaryInspector {
 				}
 			}
 		}
+		AddressStats as = new AddressStats();
+		as.files = 1;
+		NameIndexInspector fullNameIndex = index.readFullNameIndex(region);
+		for (CityBlocks type : CityBlocks.allTypes()) {
+			if (type.index >= 0) {
+				List<ValueFreq> lst = fullNameIndex.getAddrPrefixes(type.index);
+				if (lst.size() > 0) {
+					as.nameByTypeIndex.put(type, lst);
+				}
+			}
+		}
+		as.nameIndex = fullNameIndex.getAddrPrefixes(-1);
+		printAddressNameStats(as);
+		vInfo.globalAddressStats.merge(as);
+	}
+
+	private void printAddressNameStats(AddressStats as) {
+		for (CityBlocks type : as.nameByTypeIndex.keySet()) {
+			printNameStats(as.nameByTypeIndex.get(type), 1000, " * Address " + type);
+		}
+		printNameStats(as.nameIndex, 10_000, " * All address");
+	}
+
+	private void printNameStats(List<ValueFreq> nameIndex, int alimit, String name) {
+		int tokens = 0; 
+		Collections.sort(nameIndex);
+		for(ValueFreq pt : nameIndex) {
+			Collections.sort(pt.subValues);
+			tokens += pt.subValues.size();
+		}
+		int limit = Math.min(100, nameIndex.size());
+		for (; limit < nameIndex.size() && limit < alimit; limit++) {
+			if (nameIndex.get(limit).freq < 80) {
+				break;
+			}
+		}
+		List<ValueFreq> sublist = nameIndex.subList(0, limit);
+		StringBuilder nameValuesFmt = new StringBuilder();
+		for (ValueFreq key : sublist) {
+			nameValuesFmt.append(String.format("%s (%d, %,d) %s, ", key.value, key.subValues.size(), key.freq, key.getSubvalues(0.1, 1)));
+		}
+		println(String.format("\t%s Name index stats (%,d prefixes, %,d tokens, %,d refs): %s ", name, nameIndex.size(),
+				tokens, sumFreq(nameIndex), nameValuesFmt));		
 	}
 
 	private static class DamnCounter {
@@ -1514,6 +1564,27 @@ public class BinaryInspector {
 		}
 	}
 
+	
+	public static class AddressStats {
+		int files = 0;
+		List<ValueFreq> nameIndex = new ArrayList<ValueFreq>();
+		Map<CityBlocks, List<ValueFreq>> nameByTypeIndex = new HashMap<>();
+		
+		public void merge(AddressStats s) {
+			files += s.files;
+			nameIndex = new ArrayList<>(
+					mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), nameIndex), s.nameIndex).values());
+			for (CityBlocks type : s.nameByTypeIndex.keySet()) {
+				if (!nameByTypeIndex.containsKey(type)) {
+					nameByTypeIndex.put(type, s.nameByTypeIndex.get(type));
+				} else {
+					nameIndex = new ArrayList<>(
+							mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), nameByTypeIndex.get(type)),
+									s.nameByTypeIndex.get(type)).values());
+				}
+			}
+		}
+	}
 
 	public static class PoiStats {
 		int files = 0;
@@ -1542,9 +1613,11 @@ public class BinaryInspector {
 		}
 
 
-		private static Map<String, ValueFreq> mergeArray(Map<String, ValueFreq> res, List<ValueFreq> m) {
-			return ValueFreq.mergeArray(res, m);
-		}
+	}
+	
+
+	private static Map<String, ValueFreq> mergeArray(Map<String, ValueFreq> res, List<ValueFreq> m) {
+		return ValueFreq.mergeArray(res, m);
 	}
 	
 	public static boolean COMBINE_SINGLE_TYPE_BY_PREFIX = true;
@@ -1707,32 +1780,12 @@ public class BinaryInspector {
 		for (ValueFreq c : ps.topMulti) {
 			Collections.sort(c.subValues);
 		}
-		int tokens = 0; 
-		Collections.sort(ps.nameIndex);
-		for(ValueFreq pt : ps.nameIndex) {
-			Collections.sort(pt.subValues);
-			tokens += pt.subValues.size();
-			
-		}
+		
 		println(String.format("\t\t\tReference to double poi (%d, %,d): %s",  ps.refs.size(), sumFreq(ps.refs), ps.refs));
 		println(String.format("\t\t\tText based (%d, %,d): %s",  ps.text.size(), sumFreq(ps.text), ps.text));
 		println(String.format("\t\t\tSingle value filters (%d, %,d): %s", sumSingleValue, sumFreq(singleValuesLst), singleValuesFmt));
-		int limit = Math.min(100, ps.nameIndex.size());
-		for (; limit < ps.nameIndex.size(); limit++) {
-			if (ps.nameIndex.get(limit).freq < 80) {
-				break;
-			}
-		}
-		List<ValueFreq> sublist = ps.nameIndex.subList(0, limit);
-		StringBuilder nameValuesFmt = new StringBuilder();
-		for (ValueFreq key : sublist) {
-			nameValuesFmt.append(String.format("%s (%d, %,d) %s, ", key.value, key.subValues.size(), key.freq, key.getSubvalues(0.1, 1)));
-		}
-		println(String.format("\t\tPOI Name index stats (%,d prefixes, %,d tokens, %,d refs): %s ", ps.nameIndex.size(),
-				tokens, sumFreq(ps.nameIndex), nameValuesFmt));
 		
-		
-		
+		printNameStats(ps.nameIndex, 10_000, "\tPOI");
 	}
 
 	private int sumFreq(List<ValueFreq> refs) {
