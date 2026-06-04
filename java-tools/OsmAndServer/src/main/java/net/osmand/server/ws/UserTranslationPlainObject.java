@@ -2,11 +2,9 @@ package net.osmand.server.ws;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Deque;
 import java.util.List;
 
 import net.osmand.server.ws.UserTranslation.TranslationSharingOptions;
-import net.osmand.shared.gpx.primitives.WptPt;
 
 public class UserTranslationPlainObject {
 
@@ -22,7 +20,7 @@ public class UserTranslationPlainObject {
 	}
 	
 	public void setHistory(Collection<TranslationMessage> history) {
-		this.history = new ArrayList<TranslationMessage>(history);
+		this.history = new ArrayList<>(history);
 	}
 	
 	public void setShareLocations(UserTranslation us) {
@@ -32,12 +30,6 @@ public class UserTranslationPlainObject {
 			sh.expireTime = o.expireTime;
 			sh.startTime = o.startTime;
 			sh.nickname = o.nickname;
-			Deque<WptPt> deque = us.getLocations().get(o.userId);
-			sh.allLocations = new ArrayList<WptPt>();
-			if (deque != null && !deque.isEmpty()) {
-				sh.lastLocation = deque.getFirst();
-				sh.allLocations = new ArrayList<>(deque);
-			}
 			this.shareLocations.add(sh);
 		}
 	}
@@ -46,8 +38,6 @@ public class UserTranslationPlainObject {
 		public String nickname;
 		public long expireTime;
 		public long startTime;
-		public WptPt lastLocation;
-		public List<WptPt> allLocations;
 	}
 	
 }

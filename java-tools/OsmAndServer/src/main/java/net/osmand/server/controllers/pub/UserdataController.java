@@ -224,9 +224,9 @@ public class UserdataController {
 	}
 
 	@RequestMapping(value = "/translation/msg")
-	public ResponseEntity<String> sendTranslationMessage(@RequestParam(name = "deviceid", required = true) int deviceId,
-			@RequestParam(name = "accessToken", required = true) String accessToken, HttpServletRequest request)
-			throws IOException {
+	public ResponseEntity<String> sendTranslationMessage(@RequestParam(name = "deviceid") int deviceId,
+	                                                     @RequestParam(name = "accessToken") String accessToken,
+	                                                     @RequestParam(name = "encryptedData") String encryptedData) {
 		CachedInfoDevice dev = checkTokenСache(deviceId, accessToken);
 		if (dev == null) {
 			return userdataService.tokenNotValidError();
@@ -234,18 +234,12 @@ public class UserdataController {
 		if (dev.user == null) {
 			dev.user = usersRepository.findById(dev.device.userid);
 			if (dev.user == null) {
-				logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
+				return userdataService.tokenNotValidError();
 			}
-//			String errorMsg = userSubService.verifyAndRefreshProOrderId(pu);
-//			if (errorMsg != null) {
-//				logErrorWithThrow(request, ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
-//			}
 		}
-		boolean ok = userTranlsationService.sendDeviceMessage(dev.device, dev.user, request);
-		if (ok) {
-			return ResponseEntity.ok("OK");
-		}
-		return ResponseEntity.notFound().build();
+		boolean ok = userTranlsationService.sendEncryptedDeviceMessage(dev.device, dev.user, encryptedData,
+				dev.device.deviceid, dev.device.accesstoken);
+		return ok ? ResponseEntity.ok("OK") : ResponseEntity.notFound().build();
 	}
 
 	@PostMapping(value = "/user-update-orderid")

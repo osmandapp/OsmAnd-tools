@@ -2,18 +2,24 @@ package net.osmand.server.ws;
 
 import java.security.Principal;
 import java.security.SecureRandom;
+import java.time.Duration;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
@@ -23,22 +29,24 @@ import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 import org.springframework.web.socket.messaging.SessionSubscribeEvent;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 
-import jakarta.servlet.http.HttpServletRequest;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
 import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
 import net.osmand.server.ws.TranslationMessage.TranslationMessageType;
 import net.osmand.server.ws.UserTranslation.TranslationSharingOptions;
-import net.osmand.shared.gpx.primitives.WptPt;
+
 import net.osmand.util.Algorithms;
 
-import static java.lang.Double.parseDouble;
 
 @Service
 public class UserTranslationsService {
+
+    private static final Log LOG = LogFactory.getLog(UserTranslationsService.class);
 
    
     public static final String TRANSLATION_ID = "translationId";
@@ -57,17 +65,36 @@ public class UserTranslationsService {
     
     static final String TRANSLATION_MISSING = "Translation doesn't exist";
 
-    // implement 1-3 day storage for location
-    private Map<Integer, Deque<WptPt>> locationByUser = new ConcurrentHashMap<>();
-    // store last 1-3 days locations are present (?)
-    private Map<String, UserTranslation> translations = new ConcurrentHashMap<>();
-    
-    // no need to be persistent
-    private Map<Integer, Deque<UserTranslation>> shareLocTranslationsByUser = new ConcurrentHashMap<>();
-    private Map<String, String> anonymousUsers = new ConcurrentHashMap<>(); 
-    
-    Gson gson = new GsonBuilder().serializeSpecialFloatingPointValues().create();
-    Random random = new SecureRandom();
+    private static final String REDIS_MSG_KEY_PREFIX = "livetrack:msg:";
+    private static final Duration MESSAGES_TTL = Duration.ofDays(7);
+
+    @Autowired(required = false)
+    private RedisConnectionFactory redisConnectionFactory;
+
+    private StringRedisTemplate redisTemplate;
+
+    @PostConstruct
+    private void init() {
+        if (redisConnectionFactory != null) {
+            redisTemplate = new StringRedisTemplate(redisConnectionFactory);
+            redisTemplate.afterPropertiesSet();
+            LOG.info("UserTranslationsService: message store backed by Redis (7-day TTL)");
+        } else {
+            LOG.info("UserTranslationsService: message store backed by in-memory deque (single instance only)");
+        }
+    }
+
+    private static final String REDIS_TRANSLATION_KEY_PREFIX = "livetrack:translation:";
+
+    // Active translation sessions. Metadata is persisted in Redis; this map holds the live
+    // object with session state (sharingOptions) for the duration of the server process.
+    private final Map<String, UserTranslation> activeSessions = new ConcurrentHashMap<>();
+    private final Map<Integer, Deque<UserTranslation>> shareLocTranslationsByUser = new ConcurrentHashMap<>();
+    // alias → STOMP sessionId for anonymous connections.
+    private final Map<String, String> anonymousUsers = new ConcurrentHashMap<>();
+
+    private final Gson gson = new Gson();
+    private final Random random = new SecureRandom();
     
     @Autowired
     private SimpMessagingTemplate template;
@@ -139,9 +166,44 @@ public class UserTranslationsService {
 		return null;
 	}
 
-	// deleteTranslation
+	private static class TranslationMeta {
+		String id;
+		long owner;
+		long creationDate;
+		long durationMs;
+
+		TranslationMeta() {}
+
+		TranslationMeta(String id, long owner, long creationDate, long durationMs) {
+			this.id = id;
+			this.owner = owner;
+			this.creationDate = creationDate;
+			this.durationMs = durationMs;
+		}
+	}
+
+	private void saveTranslationToRedis(UserTranslation ust) {
+		if (redisTemplate == null) return;
+		TranslationMeta meta = new TranslationMeta(ust.getId(), ust.getOwner(), ust.getCreationDate(), ust.getDurationMs());
+		redisTemplate.opsForValue().set(REDIS_TRANSLATION_KEY_PREFIX + ust.getId(), gson.toJson(meta), MESSAGES_TTL);
+	}
+
+	private UserTranslation loadTranslationFromRedis(String translationId) {
+		if (redisTemplate == null) return null;
+		String json = redisTemplate.opsForValue().get(REDIS_TRANSLATION_KEY_PREFIX + translationId);
+		if (json == null) return null;
+		TranslationMeta meta = gson.fromJson(json, TranslationMeta.class);
+		UserTranslation ust = new UserTranslation(meta.id, (int) meta.owner);
+		ust.setCreationDate(meta.creationDate);
+		ust.setDurationMs(meta.durationMs);
+		return ust;
+	}
+
 	public UserTranslation createTranslation(CloudUser user, String translationId, int durationHours, SimpMessageHeaderAccessor headers) {
-		if (translations.containsKey(translationId)) {
+		boolean exists = redisTemplate != null
+				? redisTemplate.hasKey(REDIS_TRANSLATION_KEY_PREFIX + translationId)
+				: activeSessions.containsKey(translationId);  // fallback when Redis unavailable
+		if (exists) {
 			sendError("translationId already exists", headers);
 			return null;
 		}
@@ -149,10 +211,8 @@ public class UserTranslationsService {
 		UserTranslation ust = new UserTranslation(translationId, user == null ? -1: user.id);
 		ust.setCreationDate(time);
 		ust.setDurationMs(durationHours == 0 ? UserTranslation.PERMANENT_DURATION_MS : durationHours * 60 * 60 * 1000L);
-		translations.put(ust.getId(), ust);
-		// Clear stale location history so startSharing doesn't seed the new
-		// translation with a point from a previous session.
-		locationByUser.remove(user.id);
+		activeSessions.put(ust.getId(), ust);
+		saveTranslationToRedis(ust);
 		shareLocationByUser(ust, user.id);
 		UserTranslationPlainObject obj = new UserTranslationPlainObject(ust.getId());
 		obj.ownerUserId = ust.getOwner();
@@ -171,7 +231,7 @@ public class UserTranslationsService {
 	
 
 	public UserTranslation getTranslation(String translationId, SimpMessageHeaderAccessor headers) {
-		UserTranslation ust = translations.get(translationId);
+		UserTranslation ust = activeSessions.computeIfAbsent(translationId, this::loadTranslationFromRedis);
 		if (ust == null) {
 			sendError(TRANSLATION_MISSING, headers);
 		}
@@ -181,7 +241,15 @@ public class UserTranslationsService {
 	public void load(UserTranslation ust, SimpMessageHeaderAccessor headers) {
 		UserTranslationPlainObject obj = new UserTranslationPlainObject(ust.getId());
 		obj.ownerUserId = ust.getOwner();
-		obj.setHistory(ust.getMessages());
+		if (redisTemplate != null) {
+			String key = REDIS_MSG_KEY_PREFIX + ust.getId();
+			List<String> jsons = redisTemplate.opsForList().range(key, 0, -1);
+			List<TranslationMessage> messages = jsons == null ? Collections.emptyList() :
+				jsons.stream().map(j -> gson.fromJson(j, TranslationMessage.class)).toList();
+			obj.setHistory(messages);
+		} else {
+			obj.setHistory(ust.getMessages());
+		}
 		obj.setShareLocations(ust);
 		sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_TRANSLATION, obj);
 	}
@@ -193,14 +261,6 @@ public class UserTranslationsService {
 		opts.userId = user.id;
 		opts.nickname = getNickname(user);
 
-		Deque<WptPt> locations = locationByUser.get(user.id);
-		if (locations != null && !locations.isEmpty()) {
-			ust.sendLocation(user.id, locations.getFirst());
-		}
-		// for local
-//		if (!environment.acceptsProfiles(Profiles.of("production"))) {
-//			startSimulation(user, ust);
-//		}
 		UserTranslationPlainObject obj = new UserTranslationPlainObject(ust.getId());
 		ust.getSharingOptions().add(opts);
 		shareLocationByUser(ust, user.id);
@@ -217,44 +277,14 @@ public class UserTranslationsService {
 			sendError("Only the owner can delete the translation", headers);
 			return false;
 		}
-		translations.remove(ust.getId());
+		activeSessions.remove(ust.getId());
+		if (redisTemplate != null) {
+			redisTemplate.delete(REDIS_MSG_KEY_PREFIX + ust.getId());
+			redisTemplate.delete(REDIS_TRANSLATION_KEY_PREFIX + ust.getId());
+		}
 		// Notify all viewers so they can clean up.
 		rawSendMessage(ust, prepareMessageSystem().setType(TranslationMessageType.DELETE).setContent(ust.getId()));
 		return true;
-	}
-	
-	public void startSimulation(CloudUser user, UserTranslation ust) {
-		Thread simThread = new Thread(() -> {
-			double simLat = 50.4501;
-			double simLon = 30.5234;
-			boolean gone = false;
-			while (!gone) {
-				gone = true;
-				for (TranslationSharingOptions u : ust.getSharingOptions()) {
-					if (u.userId == user.id) {
-						gone = false;
-						break;
-					}
-				}
-				try {
-					Thread.sleep(5000); // Wait 5 seconds
-					simLat += (Math.random() - 0.5) * 0.001;
-					simLon += (Math.random() - 0.5) * 0.001;
-					WptPt pt = new WptPt(simLat, simLon);
-					pt.setTime(System.currentTimeMillis());
-					pt.setSpeed((float) (Math.random() * 5)); // Random speed 0-5 m/s
-					sendLocation(null, user, pt);
-				} catch (InterruptedException e) {
-					Thread.currentThread().interrupt();
-					break;
-				} catch (Exception e) {
-					System.err.println("Simulation error: " + e.getMessage());
-				}
-			}
-		});
-		simThread.setDaemon(true); // Ensure thread doesn't block app shutdown
-		simThread.setName("LocSim-" + user.nickname);
-		simThread.start();
 	}
 
 	public void stopSharing(UserTranslation ust, CloudUser user, SimpMessageHeaderAccessor headers) {
@@ -267,8 +297,6 @@ public class UserTranslationsService {
 				it.remove();
 			}
 		}
-		ust.clearLocation(userId);
-		locationByUser.remove(userId);
 		UserTranslationPlainObject obj = new UserTranslationPlainObject(ust.getId());
 		obj.setShareLocations(ust);
 		rawSendMessage(ust, prepareMessageSystem().setType(TranslationMessageType.METADATA).setContent(obj));
@@ -296,22 +324,6 @@ public class UserTranslationsService {
 		msg.content = message;
 		msg.type = TranslationMessageType.TEXT;
 		rawSendMessage(ust, msg);
-		return true;
-	}
-
-	public boolean sendDeviceMessage(CloudUserDevice dev, CloudUser pu, HttpServletRequest request) {
-		WptPt wptPt = new WptPt();
-		try {
-			wptPt.setLat(parseDouble(request.getParameter("lat")));
-			wptPt.setLon(parseDouble(request.getParameter("lon")));
-			wptPt.setTime(Long.parseLong(request.getParameter("timestamp")));
-		} catch (RuntimeException e) {
-			return false;
-		}
-		try { wptPt.setHdop((float) parseDouble(request.getParameter("hdop"))); } catch (RuntimeException e) { }
-		try { wptPt.setEle(parseDouble(request.getParameter("altitude"))); } catch (RuntimeException e) { }
-		try { wptPt.setSpeed((float) parseDouble(request.getParameter("speed"))); } catch (RuntimeException e) { }
-		sendLocation(dev, pu, wptPt);
 		return true;
 	}
 
@@ -344,32 +356,6 @@ public class UserTranslationsService {
 		return sent;
 	}
 
-	public void sendLocation(CloudUserDevice dev, CloudUser pu, WptPt wptPt) {
-		int userId = dev == null ? pu.id : dev.userid; 
-		Deque<WptPt> deque = locationByUser.get(userId);
-		if (deque == null) {
-			deque = new ConcurrentLinkedDeque<WptPt>();
-			locationByUser.put(userId, deque);
-		}
-		deque.push(wptPt);
-		TranslationMessage msg = prepareMessageAuthor(dev, pu);
-		msg.content = Map.of("point", wptPt);
-		msg.type = TranslationMessageType.LOCATION;
-		Deque<UserTranslation> translations = shareLocTranslationsByUser.get(userId);
-		long timeMillis = System.currentTimeMillis();
-		for (UserTranslation ust : translations) {
-			Deque<TranslationSharingOptions> sharingOptions = ust.getSharingOptions();
-			for (TranslationSharingOptions o : sharingOptions) {
-				if (o.userId == userId && timeMillis < o.expireTime) {
-					ust.sendLocation(userId, wptPt);
-					rawSendMessage(ust, msg);
-					break;
-				}
-			}
-		}
-	}
-    
-
 	private TranslationMessage prepareMessageSystem() {
 		TranslationMessage tm = new TranslationMessage();
 		tm.sendUserId = TranslationMessage.SENDER_SYSTEM_ID;
@@ -389,7 +375,13 @@ public class UserTranslationsService {
 
     private void rawSendMessage(UserTranslation ust, TranslationMessage msg) {
     	template.convertAndSend(TOPIC_TRANSLATION + ust.getId(), msg);
-    	ust.getMessages().add(msg);
+        if (redisTemplate != null) {
+            String key = REDIS_MSG_KEY_PREFIX + ust.getId();
+            redisTemplate.opsForList().rightPush(key, gson.toJson(msg));
+            redisTemplate.expire(key, MESSAGES_TTL);
+        } else {
+            ust.getMessages().add(msg);
+        }
 	}
     
 
