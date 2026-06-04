@@ -113,7 +113,7 @@ public class BinaryInspector {
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
-//					System.getProperty("maps.dir") + "/Us_minnesota_northamerica_2.obf",
+					System.getProperty("maps.dir") + "/Us_minnesota_northamerica_2.obf",
 					System.getProperty("maps.dir") + "/Liechtenstein_europe_2.obf",
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
@@ -424,7 +424,7 @@ public class BinaryInspector {
 						System.out.println("\nGlobal poi stats");
 						printPoiTypeStats(vInfo.globalPoiStats);
 					}
-					if (vInfo.isVpoi() && vInfo.globalAddressStats.files > 1) {
+					if (vInfo.isVaddress() && vInfo.globalAddressStats.files > 1) {
 						System.out.println("\nGlobal address stats");
 						printAddressNameStats(vInfo.globalAddressStats);
 					}
