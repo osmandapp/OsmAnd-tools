@@ -11,7 +11,6 @@ import java.text.MessageFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
@@ -56,12 +55,9 @@ import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.binary.BinaryMapTransportReaderAdapter.TransportIndex;
 import net.osmand.binary.NameIndexInspector;
-import net.osmand.binary.NameIndexInspector.PrefixNameValue;
 import net.osmand.binary.NameIndexInspector.ValueFreq;
 import net.osmand.binary.ObfConstants;
 import net.osmand.binary.OsmandOdb;
-import net.osmand.binary.OsmandOdb.OsmAndPoiNameIndex;
-import net.osmand.binary.OsmandOdb.OsmAndPoiNameIndex.OsmAndPoiNameIndexData;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.Amenity;
 import net.osmand.data.Building;
@@ -115,8 +111,8 @@ public class BinaryInspector {
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
-					System.getProperty("maps.dir") + "/Map.obf",
-					System.getProperty("maps.dir") + "/Liechtenstein_europe_2.obf",
+					System.getProperty("maps.dir") + "/Us_minnesota_northamerica_2.obf",
+//					System.getProperty("maps.dir") + "/Liechtenstein_europe_2.obf",
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
@@ -1730,9 +1726,9 @@ public class BinaryInspector {
 		List<ValueFreq> sublist = ps.nameIndex.subList(0, limit);
 		StringBuilder nameValuesFmt = new StringBuilder();
 		for (ValueFreq key : sublist) {
-			nameValuesFmt.append(String.format("%s (%d, %d - %s), ", key.value, key.subValues.size(), key.freq, key.getSubvalues(0.1)));
+			nameValuesFmt.append(String.format("%s (%d, %,d) %s, ", key.value, key.subValues.size(), key.freq, key.getSubvalues(0.1, 1)));
 		}
-		println(String.format("\t\tPOI Name index stats (%d prefixes, %d tokens, %d refs): %s ", ps.nameIndex.size(),
+		println(String.format("\t\tPOI Name index stats (%,d prefixes, %,d tokens, %,d refs): %s ", ps.nameIndex.size(),
 				tokens, sumFreq(ps.nameIndex), nameValuesFmt));
 		
 		
