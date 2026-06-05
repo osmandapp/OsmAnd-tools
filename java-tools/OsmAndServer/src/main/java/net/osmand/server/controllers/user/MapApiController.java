@@ -322,15 +322,40 @@ public class MapApiController {
 		return ResponseEntity.badRequest().body("Old track name and new track name are the same!");
 	}
 
-	@GetMapping(value = "/rename-folder")
-	public ResponseEntity<String> renameFolder(@RequestParam String folderName,
-	                                           @RequestParam String type,
-	                                           @RequestParam String newFolderName) throws IOException {
+	@GetMapping(value = "/rename-smart-folder")
+	public ResponseEntity<String> renameSmartFolder(@RequestParam String folderName,
+	                                                @RequestParam String newFolderName,
+	                                                HttpSession session) throws IOException {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
-		return userdataService.renameFolder(folderName, newFolderName, type, dev);
+		if (folderName.equals(newFolderName)) {
+			return ResponseEntity.badRequest().body("Old folder name and new folder name are the same!");
+		}
+		return smartFolderService.renameSmartFolderByUserId(folderName, newFolderName, dev, session);
+	}
+
+	@GetMapping(value = "/delete-smart-folder")
+	public ResponseEntity<String> deleteSmartFolder(@RequestParam String folderName,
+	                                                HttpSession session) throws IOException {
+		CloudUserDevice dev = osmAndMapsService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidResponse();
+		}
+		return smartFolderService.deleteSmartFolderByUserId(folderName, dev, session);
+	}
+
+	@GetMapping(value = "/rename-folder")
+	public ResponseEntity<String> renameFolder(@RequestParam String folderName,
+	                                           @RequestParam String type,
+	                                           @RequestParam String newFolderName,
+	                                           HttpSession session) throws IOException {
+		CloudUserDevice dev = osmAndMapsService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidResponse();
+		}
+		return webUserdataService.renameFolder(folderName, newFolderName, type, dev, session);
 	}
 
 	@GetMapping(value = "/delete-folder")
@@ -593,6 +618,7 @@ public class MapApiController {
 	                               @RequestParam String type,
 	                               @RequestParam(required = false) String folderName,
 								   @RequestParam(required = false) Boolean shared,
+								   @RequestParam(required = false) Boolean smart,
 	                               HttpServletResponse response) throws IOException {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
@@ -603,10 +629,18 @@ public class MapApiController {
 			}
 			return;
 		}
+		List<CloudUserFilesRepository.UserFile> files;
 		if (folderName != null) {
-			userdataService.getBackupFolder(response, dev, folderName, format, type, null);
-		} else if (shared != null && shared) {
-			List<CloudUserFilesRepository.UserFile> files = shareFileService.getOriginalSharedWithMeFiles(dev, type);
+			if (Boolean.TRUE.equals(smart)) {
+				files = smartFolderService.findSmartFolderFilesByName(folderName, dev);
+				if (files != null) {
+					userdataService.getBackupFolder(response, dev, null, format, type, files);
+				}
+			} else {
+				userdataService.getBackupFolder(response, dev, folderName, format, type, null);
+			}
+		} else if (Boolean.TRUE.equals(shared)) {
+			files = shareFileService.getOriginalSharedWithMeFiles(dev, type);
 			userdataService.getBackupFolder(response, dev, null, format, type, files);
 		}
 	}
@@ -733,9 +767,8 @@ public class MapApiController {
 	@GetMapping(path = {"/regions-by-latlon"})
 	public String getRegionsByLatlon(@RequestParam("lat") double lat, @RequestParam("lon") double lon) throws IOException {
 		List<String> regions = new ArrayList<>();
-		if(osmandRegions == null) {
-			osmandRegions = new OsmandRegions();
-			osmandRegions.prepareFile();
+		if (osmandRegions == null) {
+			osmandRegions = new OsmandRegions(null);
 		}
 		regions = osmandRegions.getRegionsToDownload(lat, lon, regions);
 		return gson.toJson(Map.of("regions", regions));

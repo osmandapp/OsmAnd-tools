@@ -43,6 +43,8 @@ public class ServerUtilities {
 			StyleDataExtractor.parseStylesXml(subArgsArray[0], subArgsArray[1]);
 		} else if (utl.equals("parse-poi-styles")) {
 			StyleDataExtractor.parsePoiStylesXml(subArgsArray[0], subArgsArray[1]);
+		} else if (utl.equals("parse-poi-categories")) {
+			StyleDataExtractor.generatePoiCategoriesJson(subArgsArray[0], subArgsArray[1]);
 		} else if (utl.equals("parse-wikidata-licenses")) {
 			WikidataUtilities.parseWikidataLicenses(subArgsArray[0]);
 		} else if (utl.equals("generate-reports")) {

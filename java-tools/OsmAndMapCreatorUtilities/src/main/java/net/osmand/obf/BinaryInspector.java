@@ -15,11 +15,13 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -54,6 +56,8 @@ import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.binary.BinaryMapTransportReaderAdapter.TransportIndex;
+import net.osmand.binary.NameIndexInspector;
+import net.osmand.binary.NameIndexInspector.ValueFreq;
 import net.osmand.binary.ObfConstants;
 import net.osmand.binary.OsmandOdb;
 import net.osmand.binary.RouteDataObject;
@@ -93,13 +97,14 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-//					"-vpoi",
+					
+					"-vpoi", // "-vpoiobjects",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
-					"-vaddress", "-vcities", "-vstreetgroups", "-vcitynames",
-					"-vstreets", //  "-vbuildings",// "-vintersections",
+					"-vaddress", "-vprefix=c", //"-vcities", "-vstreetgroups", "-vcitynames",
+//					"-vstreets", //  "-vbuildings",// "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
 					// road
@@ -109,8 +114,10 @@ public class BinaryInspector {
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
+					System.getProperty("maps.dir") + "/Us_minnesota_northamerica_2.obf",
+					System.getProperty("maps.dir") + "/Liechtenstein_europe_2.obf",
+					System.getProperty("maps.dir") + "/Ukraine_kyiv_europe_2.obf",
 					
-					System.getProperty("maps.dir") + "Map.obf"
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
@@ -155,6 +162,7 @@ public class BinaryInspector {
 		boolean vtransport;
 		boolean vtransportschedule;
 		boolean vpoi;
+		boolean vpoiobjects;
 		boolean vmap;
 		boolean vrouting;
 		boolean vhhrouting;
@@ -163,6 +171,7 @@ public class BinaryInspector {
 		boolean vfulldictionary;
 		boolean vstats;
 		boolean osm;
+		String vprefix;
 		FileOutputStream osmOut = null;
 		double lattop = 85;
 		double latbottom = -85;
@@ -170,9 +179,16 @@ public class BinaryInspector {
 		double lonright = 179.9;
 		String lang = null;
 		int zoom = 15;
+		PoiStats globalPoiStats = new PoiStats();
+		AddressStats globalAddressStats = new AddressStats();
+		
 
 		public boolean isVaddress() {
 			return vaddress;
+		}
+		
+		public String getPrefix() {
+			return vprefix;
 		}
 
 		public int getZoom() {
@@ -189,6 +205,10 @@ public class BinaryInspector {
 
 		public boolean isVpoi() {
 			return vpoi;
+		}
+		
+		public boolean isVpoiObjects() {
+			return vpoiobjects;
 		}
 
 		public boolean isVHHrouting() {
@@ -221,6 +241,8 @@ public class BinaryInspector {
 					vintersections = true;
 				} else if (params[i].equals("-vmap")) {
 					vmap = true;
+				} else if (params[i].startsWith("-vprefix=")) {
+					vprefix = params[i].substring("-vprefix=".length());
 				} else if (params[i].equals("-vfulldictionary")) {
 					vfulldictionary = true;
 				} else if (params[i].equals("-vstats")) {
@@ -235,6 +257,8 @@ public class BinaryInspector {
 					vmapCoordinates = true;
 				} else if (params[i].equals("-vpoi")) {
 					vpoi = true;
+				} else if (params[i].equals("-vpoiobjects")) {
+					vpoiobjects = true;
 				} else if (params[i].startsWith("-osm")) {
 					osm = true;
 					if (params[i].startsWith("-osm=")) {
@@ -400,7 +424,21 @@ public class BinaryInspector {
 					printUsage("Missing file parameter");
 				} else {
 					vInfo = new VerboseInfo(args);
-					printFileInformation(args[args.length - 1]);
+					
+					for (int i = 0; i < args.length; i++) {
+						if (args[i].startsWith("-")) {
+							continue;
+						}
+						printFileInformation(args[i]);
+					}
+					if (vInfo.isVpoi() && vInfo.globalPoiStats.files > 1) {
+						System.out.println("\nGlobal poi stats");
+						printPoiTypeStats(vInfo.globalPoiStats);
+					}
+					if (vInfo.isVaddress() && vInfo.globalAddressStats.files > 1) {
+						System.out.println("\nGlobal address stats");
+						printAddressNameStats(vInfo.globalAddressStats);
+					}
 					vInfo.close();
 				}
 			} else {
@@ -408,7 +446,9 @@ public class BinaryInspector {
 			}
 		} else {
 			vInfo = null;
-			printFileInformation(f);
+			for (int i = 0; i < args.length; i++) {
+				printFileInformation(args[i]);
+			}
 		}
 	}
 
@@ -428,7 +468,7 @@ public class BinaryInspector {
 		//written += 4;
 	}
 
-	public  static int combineParts(File fileToCreate, List<FileExtractFrom> partsToExtractFrom, String date) throws IOException {
+	public static int combineParts(File fileToCreate, List<FileExtractFrom> partsToExtractFrom, String date) throws IOException {
 		Set<String> uniqueNames = new LinkedHashSet<String>();
 
 		int version = IndexConstants.BINARY_MAP_VERSION;
@@ -547,8 +587,8 @@ public class BinaryInspector {
 			return;
 		}
 		if (file.isDirectory()) {
-			for(File f : file.listFiles()) {
-				if(f.getName().endsWith(".obf")) {
+			for (File f : file.listFiles()) {
+				if (f.getName().endsWith(".obf")) {
 					printFileInformation(f);
 				}
 			}
@@ -922,6 +962,49 @@ public class BinaryInspector {
 				}
 			}
 		}
+		AddressStats as = new AddressStats();
+		as.files = 1;
+		NameIndexInspector fullNameIndex = index.readFullNameIndex(region);
+		for (CityBlocks type : CityBlocks.allTypes()) {
+			if (type.index >= 0) {
+				List<ValueFreq> lst = fullNameIndex.getAddrPrefixes(type.index, vInfo.getPrefix());
+				if (lst.size() > 0) {
+					as.nameByTypeIndex.put(type, lst);
+				}
+			}
+		}
+		as.nameIndex = fullNameIndex.getAddrPrefixes(-1, vInfo.getPrefix());
+		printAddressNameStats(as);
+		vInfo.globalAddressStats.merge(as);
+	}
+
+	private void printAddressNameStats(AddressStats as) {
+		for (CityBlocks type : as.nameByTypeIndex.keySet()) {
+			printNameStats(as.nameByTypeIndex.get(type), 1000, " * Address " + type);
+		}
+		printNameStats(as.nameIndex, 10_000, " * All address");
+	}
+
+	private void printNameStats(List<ValueFreq> nameIndex, int alimit, String name) {
+		int tokens = 0; 
+		Collections.sort(nameIndex);
+		for (ValueFreq pt : nameIndex) {
+			Collections.sort(pt.subValues);
+			tokens += pt.subValues.size();
+		}
+		int limit = Math.min(100, nameIndex.size());
+		for (; limit < nameIndex.size() && limit < alimit; limit++) {
+			if (nameIndex.get(limit).freq < 80) {
+				break;
+			}
+		}
+		List<ValueFreq> sublist = nameIndex.subList(0, limit);
+		StringBuilder nameValuesFmt = new StringBuilder();
+		for (ValueFreq key : sublist) {
+			nameValuesFmt.append(String.format("%s (%d, %,d) %s, ", key.value, key.subValues.size(), key.freq, key.getSubvalues(0.1, 1)));
+		}
+		println(String.format("\t%s Name index stats (%,d prefixes, %,d tokens, %,d refs): %s ", name, nameIndex.size(),
+				tokens, sumFreq(nameIndex), nameValuesFmt));		
 	}
 
 	private static class DamnCounter {
@@ -1492,8 +1575,64 @@ public class BinaryInspector {
 		}
 	}
 
+	
+	public static class AddressStats {
+		int files = 0;
+		List<ValueFreq> nameIndex = new ArrayList<ValueFreq>();
+		Map<CityBlocks, List<ValueFreq>> nameByTypeIndex = new HashMap<>();
+		
+		public void merge(AddressStats s) {
+			files += s.files;
+			nameIndex = new ArrayList<>(
+					mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), nameIndex), s.nameIndex).values());
+			for (CityBlocks type : s.nameByTypeIndex.keySet()) {
+				if (!nameByTypeIndex.containsKey(type)) {
+					nameByTypeIndex.put(type, s.nameByTypeIndex.get(type));
+				} else {
+					List<ValueFreq> rs = new ArrayList<>(
+							mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), nameByTypeIndex.get(type)),
+									s.nameByTypeIndex.get(type)).values());
+					nameByTypeIndex.put(type, rs);
+				}
+			}
+		}
+	}
+
+	public static class PoiStats {
+		int files = 0;
+		List<ValueFreq> text = new ArrayList<ValueFreq>();
+		List<ValueFreq> refs = new ArrayList<ValueFreq>();
+		List<ValueFreq> topMulti = new ArrayList<ValueFreq>();
+		Map<String, ValueFreq> singleValues = new TreeMap<String, ValueFreq>();
+		List<ValueFreq> categories = new ArrayList<ValueFreq>();
+		List<ValueFreq> nameIndex = new ArrayList<ValueFreq>();
+		
+		
+		public void merge(PoiStats s) {
+			files += s.files;
+			text = new ArrayList<>(mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), text), s.text).values());
+			refs = new ArrayList<>(mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), refs), s.refs).values());
+			topMulti = new ArrayList<>(mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), topMulti), s.topMulti).values());
+			nameIndex = new ArrayList<>(mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), nameIndex), s.nameIndex).values());
+			categories = new ArrayList<>(mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), categories), s.categories).values());
+			for (String key : s.singleValues.keySet()) {
+				if (singleValues.containsKey(key)) {
+					singleValues.get(key).merge(s.singleValues.get(key));
+				} else {
+					singleValues.put(key, s.singleValues.get(key));
+				}
+			}
+		}
 
 
+	}
+	
+	private static Map<String, ValueFreq> mergeArray(Map<String, ValueFreq> res, List<ValueFreq> m) {
+		return ValueFreq.mergeArray(res, m);
+	}
+	
+	public static boolean COMBINE_SINGLE_TYPE_BY_PREFIX = true;
+	
 	private void printPOIDetailInfo(VerboseInfo verbose, BinaryMapIndexReader index, PoiRegion p) throws IOException {
 		int[] count = new int[3];
 		SearchRequest<Amenity> req = BinaryMapIndexReader.buildSearchPoiRequest(
@@ -1540,61 +1679,132 @@ public class BinaryInspector {
 				});
 
 		index.initCategories(p);
+		PoiStats ps = new PoiStats();
+		ps.files = 1;
+		
 		println("\tRegion: " + p.getName());
 
 		println("\t\tBounds " + formatLatBounds(MapUtils.get31LongitudeX(p.getLeft31()),
 				MapUtils.get31LongitudeX(p.getRight31()),
 				MapUtils.get31LatitudeY(p.getTop31()),
 				MapUtils.get31LatitudeY(p.getBottom31())));
-		println("\t\tCategories:");
+		
 		List<String> cs = p.getCategories();
 		List<List<String>> subcategories = p.getSubcategories();
+		TIntArrayList categoryFreqs = p.getCategoryFreqs();
+		List<TIntArrayList> subcategoryFreqs = p.getSubcategoryFreqs();
 		for (int i = 0; i < cs.size(); i++) {
-			println(String.format("\t\t\t%s (%d): %s", cs.get(i), subcategories.get(i).size(), subcategories.get(i)));
+			List<String> lst = subcategories.get(i);
+			int f = i < categoryFreqs.size() ? categoryFreqs.get(i) : 0;
+			ValueFreq catF = new ValueFreq(cs.get(i), f);
+			catF.subValues = new ArrayList<>();
+			for (int j = 0; j < lst.size(); j++) {
+				int ft = i < subcategoryFreqs.size() && j < subcategoryFreqs.get(i).size() ? subcategoryFreqs.get(i).get(j) : 0;
+				catF.subValues.add(new ValueFreq(lst.get(j), ft));
+			}
+			ps.categories.add(catF);
 		}
-		println("\t\tPOI Additionals:");
+		
 		List<PoiSubType> subtypes = p.getSubTypes();
-		Set<String> text = new TreeSet<String>();
-		Set<String> refs = new TreeSet<String>();
-		Map<String, List<String>> singleValues = new TreeMap<String, List<String>>();
-		int singleVals = 0;
+		
 		MapPoiTypes poiTypes = MapPoiTypes.getDefault();
 		for (int i = 0; i < subtypes.size(); i++) {
 			PoiSubType st = subtypes.get(i);
 			if (st.text) {
 				PoiType ref = poiTypes.getPoiTypeByKey(st.name);
-				if(ref != null && !ref.isAdditional()) {
-					refs.add(st.name);
+				if (ref != null && !ref.isAdditional()) {
+					ps.refs.add(new ValueFreq(st.name, st.frequency));
 				} else {
-					text.add(st.name);
+					ps.text.add(new ValueFreq(st.name, st.frequency));
 				}
 			} else if (st.possibleValues.size() == 1) {
-				singleVals++;
 				int lastIndexOf = st.name.lastIndexOf('_');
 				String key = st.name;
-				if (lastIndexOf >= 0) {
+				if (lastIndexOf >= 0 && COMBINE_SINGLE_TYPE_BY_PREFIX) {
 					key = key.substring(0, lastIndexOf);
 				}
-				if (!singleValues.containsKey(key)) {
-					singleValues.put(key, new ArrayList<String>());
+				ValueFreq singleGroup = ps.singleValues.get(key);
+				if (singleGroup == null) {
+					singleGroup = new ValueFreq(key, 0);
+					singleGroup.subValues = new ArrayList<>();
+					ps.singleValues.put(key, singleGroup);
 				}
-				singleValues.get(key).add(st.name);
+				singleGroup.freq += st.frequency;
+				singleGroup.subValues.add(new ValueFreq(st.name, st.frequency));
 			} else {
-				println(String.format("\t\t\t%s (%d): %s",  st.name, st.possibleValues.size(), st.possibleValues));
+				ValueFreq main = new ValueFreq(st.name, st.frequency);
+				main.subValues = new ArrayList<ValueFreq>();
+				for (int j = 0; j < st.possibleValues.size(); j++) {
+					int f = st.possibleValuesFreqs != null && j < st.possibleValuesFreqs.size() ? st.possibleValuesFreqs.get(j) : 0;
+					main.subValues.add(new ValueFreq(st.possibleValues.get(j), f));
+				}
+				ps.topMulti.add(main);
 			}
 		}
-		StringBuilder singleValuesFmt = new StringBuilder();
-		for(String key : singleValues.keySet()) {
-			singleValuesFmt.append(key + " (" + singleValues.get(key).size()+ "), ");
-		}
-		println(String.format("\t\t\tReference to another poi (incorrect?) (%d): %s",  refs.size(), refs));
-		println(String.format("\t\t\tText based (%d): %s",  text.size(), text));
-		println(String.format("\t\t\tSingle value filters (%d): %s",  singleVals, singleValuesFmt));
+		NameIndexInspector fullNameIndex = index.readFullNameIndex(p);
+		ps.nameIndex = fullNameIndex.getPrefixes(vInfo.getPrefix());
+		printPoiTypeStats(ps);
+		
+		vInfo.globalPoiStats.merge(ps);
 //		req.poiTypeFilter = null;//for test only
-		index.searchPoi(req, p);
+		if(vInfo.isVpoiObjects()) {
+			index.searchPoi(req, p);
+		}
 		
 		println(String.format("Found %d pois (%d with addr, %d with name without addr)", count[0],
 				count[1], count[2]));
+	}
+
+	private void printPoiTypeStats(PoiStats ps) {
+		Collections.sort(ps.categories);
+		int sum = 0, freq = 0;
+		for (ValueFreq c : ps.categories) {
+			Collections.sort(c.subValues);
+			sum += c.subValues.size();
+			freq += c.freq;
+		}
+		println(String.format("\t\tCategories (%,d categories, %,d types, %,d objects):", ps.categories.size(), sum, freq));
+		for (ValueFreq c : ps.categories) {
+			println(String.format("\t\t\t%s (%d, %,d): %s", c.value, c.subValues.size(), c.freq, c.subValues));
+		}
+		sum = ps.refs.size();
+		for (ValueFreq c : ps.topMulti) {
+			sum += c.subValues.size();
+			Collections.sort(c.subValues);
+		}
+		StringBuilder singleValuesFmt = new StringBuilder();
+		Collections.sort(ps.text);
+		Collections.sort(ps.refs);
+		List<ValueFreq> singleValuesLst = new ArrayList<>(ps.singleValues.values());
+		Collections.sort(singleValuesLst);
+		int sumSingleValue = 0;
+		for (ValueFreq key : singleValuesLst) {
+			sumSingleValue += key.subValues.size();
+			singleValuesFmt.append(String.format("%s (%d, %,d), ", key.value, key.subValues.size(), key.freq));
+		}
+		println(String.format("\t\tPOI Additionals (%,d types, %,d text):", sum + sumSingleValue,
+				ps.text.size()));
+		for (ValueFreq c : ps.topMulti) {
+			println(String.format("\t\t\t%s (%d, %,d): %s", c.value, c.subValues.size(), c.freq, c.subValues));
+		}
+
+		for (ValueFreq c : ps.topMulti) {
+			Collections.sort(c.subValues);
+		}
+		
+		println(String.format("\t\t\tReference to double poi (%d, %,d): %s",  ps.refs.size(), sumFreq(ps.refs), ps.refs));
+		println(String.format("\t\t\tText based (%d, %,d): %s",  ps.text.size(), sumFreq(ps.text), ps.text));
+		println(String.format("\t\t\tSingle value filters (%d, %,d): %s", sumSingleValue, sumFreq(singleValuesLst), singleValuesFmt));
+		
+		printNameStats(ps.nameIndex, 10_000, "\tPOI");
+	}
+
+	private int sumFreq(List<ValueFreq> refs) {
+		int f = 0;
+		for (ValueFreq r : refs) {
+			f += r.freq;
+		}
+		return f;
 	}
 
 	public static void printUsage(String warning) {
@@ -1603,7 +1813,7 @@ public class BinaryInspector {
 		}
 		System.out.println("Inspector is console utility for working with binary indexes of OsmAnd.");
 		System.out.println("It allows print info about file, extract parts and merge indexes.");
-		System.out.println("\nUsage for print info : inspector [-vaddress] [-vcities] [-vcitynames] [-vstreetgroups] [-vstreets] [-vbuildings] [-vintersections] [-vmap] [-vfulldictionary] [-vstats] [-vmapobjects] [-vmapcoordinates] [-osm] [-vpoi] [-vrouting] [-vhhrouting] [-vtransport] [-zoom=Zoom] [-bbox=LeftLon,TopLat,RightLon,BottomLat] [file]");
+		System.out.println("\nUsage for print info : inspector [-vaddress] [-vcities] [-vcitynames] [-vstreetgroups] [-vstreets] [-vbuildings] [-vintersections] [-vmap] [-vfulldictionary] [-vstats] [-vmapobjects] [-vmapcoordinates] [-osm] [-vpoi] [-vpoiobjects] [-vrouting] [-vhhrouting] [-vtransport] [-zoom=Zoom] [-bbox=LeftLon,TopLat,RightLon,BottomLat] [file]");
 		System.out.println("  Prints information about [file] binary index of OsmAnd.");
 		System.out.println("  -v.. more verbose output (like all cities and their streets or all map objects with tags/values and coordinates)");
 		System.out.println("\nUsage for combining indexes : inspector -c file_to_create (file_from_extract ((+|-)parts_to_extract)? )* [--date=...]");

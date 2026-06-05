@@ -37,8 +37,9 @@ public class StyleDataExtractor {
     private static final List<String> PREFERRED_KEY_ORDER = Arrays.asList("attrStringValue", "attrColorValue", "tag", "value", "additional");
     
     public static void main(String[] args) throws IOException, ParserConfigurationException, SAXException {
-        parseStylesXml("../../../osmand/web/map/src/resources/mapStyles/styles.json", "../../../osmand/web/map/src/resources/mapStyles/attributes.json");
-       // parsePoiStylesXml("../../../osmand/resources/poi/poi_types.xml", "../../../osmand/web/map/src/resources/generated/poi-types.json");
+        //parseStylesXml("../../../osmand/web/map/src/resources/mapStyles/styles.json", "../../../osmand/web/map/src/resources/mapStyles/attributes.json");
+        // parsePoiStylesXml("../../../osmand/resources/poi/poi_types.xml", "../../../osmand/web/map/src/resources/generated/poi-types.json");
+        generatePoiCategoriesJson("../../../osmand/resources/poi/poi_types.xml", "../../../osmand/web/map/src/resources/generated/poi_categories.json");
     }
     
     /**
@@ -263,6 +264,71 @@ public class StyleDataExtractor {
         Stream.concat(rule.getIfElseChildren().stream(), rule.getIfChildren().stream())
                 .forEach(r -> getRules(r, allRules));
         return allRules;
+    }
+
+    /**
+     * Reads poi_types.xml and generates poi_categories.json for the web.
+     * Groups poi_type names by their parent poi_category, mirroring Android's readOriginalPoiCategories().
+     * Icon key for each poi_type is its name attribute. The web resolves actual SVG URLs at render time
+     * via getIconUrlByName, which handles fallback to tag_value using the available poiicons list.
+     * Output format: {"categories": {"shop": {"icons": ["convenience", "supermarket", ...]}, ...}}
+     */
+    public static void generatePoiCategoriesJson(String xmlPath, String jsonPath) throws IOException, SAXException, ParserConfigurationException {
+        File xmlFile = new File(xmlPath);
+        if (!xmlFile.exists()) {
+            throw new IOException("File not found: " + xmlPath);
+        }
+
+        // Use LinkedHashMap to preserve insertion order (category order from XML)
+        Map<String, List<String>> categoryIcons = new LinkedHashMap<>();
+        SAXParserFactory factory = SAXParserFactory.newInstance();
+        SAXParser saxParser = factory.newSAXParser();
+
+        DefaultHandler handler = new DefaultHandler() {
+            private String currentCategory;
+            private Set<String> seenInCategory;
+
+            @Override
+            public void startElement(String uri, String localName, String qName, Attributes attributes) {
+                if ("poi_category".equals(qName)) {
+                    currentCategory = attributes.getValue("name");
+                    if (currentCategory != null) {
+                        categoryIcons.put(currentCategory, new ArrayList<>());
+                        seenInCategory = new LinkedHashSet<>();
+                    }
+                } else if ("poi_type".equals(qName) && currentCategory != null) {
+                    String name = attributes.getValue("name");
+                    if (name != null && seenInCategory.add(name)) {
+                        categoryIcons.get(currentCategory).add(name);
+                    }
+                }
+            }
+
+            @Override
+            public void endElement(String uri, String localName, String qName) {
+                if ("poi_category".equals(qName)) {
+                    currentCategory = null;
+                    seenInCategory = null;
+                }
+            }
+        };
+
+        saxParser.parse(xmlFile, handler);
+
+        Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
+
+        Map<String, Object> categoriesMap = new LinkedHashMap<>();
+        categoryIcons.entrySet().stream()
+                .filter(e -> !e.getValue().isEmpty())
+                .forEach(e -> {
+                    Map<String, Object> iconsObj = new LinkedHashMap<>();
+                    iconsObj.put("icons", e.getValue());
+                    categoriesMap.put(e.getKey(), iconsObj);
+                });
+        Map<String, Object> root = new LinkedHashMap<>();
+        root.put("categories", categoriesMap);
+
+        Files.write(Paths.get(jsonPath), gson.toJson(root).getBytes());
     }
 
     public static void parsePoiStylesXml(String xmlPath, String jsonPath) throws IOException, SAXException, ParserConfigurationException {

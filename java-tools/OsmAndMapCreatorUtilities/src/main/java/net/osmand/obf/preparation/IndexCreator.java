@@ -854,17 +854,17 @@ public class IndexCreator {
 		String rootFolder = System.getProperty("maps.dir");
 		IndexCreatorSettings settings = new IndexCreatorSettings();
 		// settings.poiZipLongStrings = true;
-		settings.indexMap = true;
+//		settings.indexMap = true;
 //		settings.indexAddress = true;
-//		settings.indexPOI = true;
+		settings.indexPOI = true;
 		// settings.indexTransport = true;
-		settings.indexRouting = true;
+//		settings.indexRouting = true;
 		// settings.keepOnlySeaObjects = true;
 		// settings.srtmDataFolder = new File(rootFolder + "/maps/srtm/");
 		// settings.gtfsData = new File(rootFolder + "/maps/transport/Netherlands.sqlite");
-		settings.wikidataMappingUrl = rootFolder + "/wikidata_mapping.sqlitedb";
-		settings.wikirankingMappingUrl = rootFolder + "/wiki_ranking.sqlitedb";
-		settings.srtmDataFolderUrl  = null;
+//		settings.wikidataMappingUrl = rootFolder + "/wikidata_mapping.sqlitedb";
+//		settings.wikirankingMappingUrl = rootFolder + "/wiki_ranking.sqlitedb";
+//		settings.srtmDataFolderUrl  = null;
 
 		// settings.zoomWaySmoothness = 2;
 

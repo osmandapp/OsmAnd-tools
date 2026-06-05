@@ -196,9 +196,8 @@ public class OsmExtractionUI implements IMapLocationListener {
 	    mapPanel.addMapLocationListener(this);
 
 	    statusBarLabel = new JLabel();
-	    osmandRegions = new OsmandRegions();
-		try {
-			osmandRegions.prepareFile();
+	    try {
+	    	osmandRegions = new OsmandRegions(null);
 		} catch (IOException e2) {
 			e2.printStackTrace();
 			log.error(e2.getMessage(), e2);

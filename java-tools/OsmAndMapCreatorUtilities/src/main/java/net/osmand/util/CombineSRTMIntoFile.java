@@ -67,10 +67,9 @@ public class CombineSRTMIntoFile {
 			}
 		}
 		System.out.println("CURRENT PID PROCESS: " + ProcessHandle.current().pid());
-		OsmandRegions or = new OsmandRegions();
-		BinaryMapIndexReader fl = or.prepareFile();
+		OsmandRegions or = new OsmandRegions(null);
 		Map<String, LinkedList<BinaryMapDataObject>> allCountries = or.cacheAllCountries();
-		MapIndex mapIndex = fl.getMapIndexes().get(0);
+		MapIndex mapIndex = or.getReader().getMapIndexes().get(0);
 		int srtm = mapIndex.getRule("region_srtm", "yes");
 		int downloadName = mapIndex.getRule("download_name", null);
 		int boundary = mapIndex.getRule("osmand_region", "boundary");

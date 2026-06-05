@@ -80,10 +80,9 @@ public class TileListsForRegions {
 				}
 			}
 		}
-		OsmandRegions or = new OsmandRegions();
-		BinaryMapIndexReader fl = or.prepareFile();
+		OsmandRegions or = new OsmandRegions(null);
 		Map<String, LinkedList<BinaryMapDataObject>> allCountries = or.cacheAllCountries();
-		MapIndex mapIndex = fl.getMapIndexes().get(0);
+		MapIndex mapIndex = or.getReader().getMapIndexes().get(0);
 		int regAttr = Algorithms.isEmpty(regionAttribute) ? -1 : mapIndex.getRule(regionAttribute, "yes");
 		int downloadName = mapIndex.getRule("download_name", null);
 		int boundary = mapIndex.getRule("osmand_region", "boundary");

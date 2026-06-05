@@ -219,9 +219,8 @@ public class ApiController {
 	@ResponseBody
 	public String getRegionsByLatlon(@RequestParam("lat") double lat, @RequestParam("lon") double lon) throws IOException {
 		List<String> regions = new ArrayList<String>();
-		if(osmandRegions == null) {
-			osmandRegions = new OsmandRegions();
-			osmandRegions.prepareFile();
+		if (osmandRegions == null) {
+			osmandRegions = new OsmandRegions(null);
 		}
 		regions = osmandRegions.getRegionsToDownload(lat, lon, regions);
 		return gson.toJson(Map.of("regions", regions));
