@@ -15,15 +15,12 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.TreeSet;
 
 import com.google.protobuf.CodedOutputStream;
@@ -969,11 +966,11 @@ public class BinaryInspector {
 			if (type.index >= 0) {
 				List<ValueFreq> lst = fullNameIndex.getAddrPrefixes(type.index, vInfo.getPrefix());
 				if (lst.size() > 0) {
-					as.nameByTypeIndex.put(type, lst);
+					as.nameByTypeIndex.put(type, ValueFreq.mergeArray(new HashMap<>(), lst));
 				}
 			}
 		}
-		as.nameIndex = fullNameIndex.getAddrPrefixes(-1, vInfo.getPrefix());
+		as.nameIndex = ValueFreq.mergeArray(new HashMap<>(), fullNameIndex.getAddrPrefixes(-1, vInfo.getPrefix()));
 		printAddressNameStats(as);
 		vInfo.globalAddressStats.merge(as);
 	}
@@ -985,8 +982,9 @@ public class BinaryInspector {
 		printNameStats(as.nameIndex, 10_000, " * All address");
 	}
 
-	private void printNameStats(List<ValueFreq> nameIndex, int alimit, String name) {
+	private void printNameStats(Map<String, ValueFreq> nameIndexMap, int alimit, String name) {
 		int tokens = 0; 
+		ArrayList<ValueFreq> nameIndex = new ArrayList<ValueFreq>(nameIndexMap.values());
 		Collections.sort(nameIndex);
 		for (ValueFreq pt : nameIndex) {
 			Collections.sort(pt.subValues);
@@ -1578,21 +1576,17 @@ public class BinaryInspector {
 	
 	public static class AddressStats {
 		int files = 0;
-		List<ValueFreq> nameIndex = new ArrayList<ValueFreq>();
-		Map<CityBlocks, List<ValueFreq>> nameByTypeIndex = new HashMap<>();
+		Map<String, ValueFreq> nameIndex = new HashMap<>();
+		Map<CityBlocks, Map<String, ValueFreq>> nameByTypeIndex = new HashMap<>();
 		
 		public void merge(AddressStats s) {
 			files += s.files;
-			nameIndex = new ArrayList<>(
-					mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), nameIndex), s.nameIndex).values());
+			ValueFreq.mergeArray(nameIndex, s.nameIndex);
 			for (CityBlocks type : s.nameByTypeIndex.keySet()) {
 				if (!nameByTypeIndex.containsKey(type)) {
 					nameByTypeIndex.put(type, s.nameByTypeIndex.get(type));
 				} else {
-					List<ValueFreq> rs = new ArrayList<>(
-							mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), nameByTypeIndex.get(type)),
-									s.nameByTypeIndex.get(type)).values());
-					nameByTypeIndex.put(type, rs);
+					ValueFreq.mergeArray(nameByTypeIndex.get(type), s.nameByTypeIndex.get(type));
 				}
 			}
 		}
@@ -1600,36 +1594,27 @@ public class BinaryInspector {
 
 	public static class PoiStats {
 		int files = 0;
-		List<ValueFreq> text = new ArrayList<ValueFreq>();
-		List<ValueFreq> refs = new ArrayList<ValueFreq>();
-		List<ValueFreq> topMulti = new ArrayList<ValueFreq>();
-		Map<String, ValueFreq> singleValues = new TreeMap<String, ValueFreq>();
-		List<ValueFreq> categories = new ArrayList<ValueFreq>();
-		List<ValueFreq> nameIndex = new ArrayList<ValueFreq>();
+		Map<String, ValueFreq> text = new HashMap<>();
+		Map<String, ValueFreq> refs = new HashMap<>();
+		Map<String, ValueFreq> topMulti = new HashMap<>();
+		Map<String, ValueFreq> singleValues = new HashMap<>();
+		Map<String, ValueFreq> categories = new HashMap<>();
+		Map<String, ValueFreq> nameIndex = new HashMap<>();
 		
 		
 		public void merge(PoiStats s) {
 			files += s.files;
-			text = new ArrayList<>(mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), text), s.text).values());
-			refs = new ArrayList<>(mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), refs), s.refs).values());
-			topMulti = new ArrayList<>(mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), topMulti), s.topMulti).values());
-			nameIndex = new ArrayList<>(mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), nameIndex), s.nameIndex).values());
-			categories = new ArrayList<>(mergeArray(mergeArray(new TreeMap<String, ValueFreq>(), categories), s.categories).values());
-			for (String key : s.singleValues.keySet()) {
-				if (singleValues.containsKey(key)) {
-					singleValues.get(key).merge(s.singleValues.get(key));
-				} else {
-					singleValues.put(key, s.singleValues.get(key));
-				}
-			}
+			ValueFreq.mergeArray(text, s.text);
+			ValueFreq.mergeArray(refs, s.refs);
+			ValueFreq.mergeArray(topMulti, s.topMulti);
+			ValueFreq.mergeArray(singleValues, s.singleValues);
+			ValueFreq.mergeArray(categories, s.categories);
+			ValueFreq.mergeArray(nameIndex, s.nameIndex);
 		}
 
 
 	}
 	
-	private static Map<String, ValueFreq> mergeArray(Map<String, ValueFreq> res, List<ValueFreq> m) {
-		return ValueFreq.mergeArray(res, m);
-	}
 	
 	public static boolean COMBINE_SINGLE_TYPE_BY_PREFIX = true;
 	
@@ -1702,7 +1687,7 @@ public class BinaryInspector {
 				int ft = i < subcategoryFreqs.size() && j < subcategoryFreqs.get(i).size() ? subcategoryFreqs.get(i).get(j) : 0;
 				catF.subValues.add(new ValueFreq(lst.get(j), ft));
 			}
-			ps.categories.add(catF);
+			ps.categories.put(catF.value, catF);
 		}
 		
 		List<PoiSubType> subtypes = p.getSubTypes();
@@ -1713,9 +1698,9 @@ public class BinaryInspector {
 			if (st.text) {
 				PoiType ref = poiTypes.getPoiTypeByKey(st.name);
 				if (ref != null && !ref.isAdditional()) {
-					ps.refs.add(new ValueFreq(st.name, st.frequency));
+					ps.refs.put(st.name, new ValueFreq(st.name, st.frequency));
 				} else {
-					ps.text.add(new ValueFreq(st.name, st.frequency));
+					ps.text.put(st.name, new ValueFreq(st.name, st.frequency));
 				}
 			} else if (st.possibleValues.size() == 1) {
 				int lastIndexOf = st.name.lastIndexOf('_');
@@ -1738,11 +1723,11 @@ public class BinaryInspector {
 					int f = st.possibleValuesFreqs != null && j < st.possibleValuesFreqs.size() ? st.possibleValuesFreqs.get(j) : 0;
 					main.subValues.add(new ValueFreq(st.possibleValues.get(j), f));
 				}
-				ps.topMulti.add(main);
+				ps.topMulti.put(main.value, main);
 			}
 		}
 		NameIndexInspector fullNameIndex = index.readFullNameIndex(p);
-		ps.nameIndex = fullNameIndex.getPrefixes(vInfo.getPrefix());
+		ps.nameIndex = ValueFreq.mergeArray(new HashMap<>(), fullNameIndex.getPrefixes(vInfo.getPrefix()));
 		printPoiTypeStats(ps);
 		
 		vInfo.globalPoiStats.merge(ps);
@@ -1756,25 +1741,29 @@ public class BinaryInspector {
 	}
 
 	private void printPoiTypeStats(PoiStats ps) {
-		Collections.sort(ps.categories);
+		List<ValueFreq> categories = new ArrayList<>(ps.categories.values());
+		List<ValueFreq> text = new ArrayList<>(ps.text.values());
+		List<ValueFreq> topMulti = new ArrayList<>(ps.topMulti.values());
+		List<ValueFreq> refs = new ArrayList<>(ps.refs.values());
+		Collections.sort(categories);
 		int sum = 0, freq = 0;
-		for (ValueFreq c : ps.categories) {
+		for (ValueFreq c : categories) {
 			Collections.sort(c.subValues);
 			sum += c.subValues.size();
 			freq += c.freq;
 		}
 		println(String.format("\t\tCategories (%,d categories, %,d types, %,d objects):", ps.categories.size(), sum, freq));
-		for (ValueFreq c : ps.categories) {
+		for (ValueFreq c : categories) {
 			println(String.format("\t\t\t%s (%d, %,d): %s", c.value, c.subValues.size(), c.freq, c.subValues));
 		}
 		sum = ps.refs.size();
-		for (ValueFreq c : ps.topMulti) {
+		for (ValueFreq c : topMulti) {
 			sum += c.subValues.size();
 			Collections.sort(c.subValues);
 		}
 		StringBuilder singleValuesFmt = new StringBuilder();
-		Collections.sort(ps.text);
-		Collections.sort(ps.refs);
+		Collections.sort(text);
+		Collections.sort(refs);
 		List<ValueFreq> singleValuesLst = new ArrayList<>(ps.singleValues.values());
 		Collections.sort(singleValuesLst);
 		int sumSingleValue = 0;
@@ -1784,16 +1773,16 @@ public class BinaryInspector {
 		}
 		println(String.format("\t\tPOI Additionals (%,d types, %,d text):", sum + sumSingleValue,
 				ps.text.size()));
-		for (ValueFreq c : ps.topMulti) {
+		for (ValueFreq c : topMulti) {
 			println(String.format("\t\t\t%s (%d, %,d): %s", c.value, c.subValues.size(), c.freq, c.subValues));
 		}
 
-		for (ValueFreq c : ps.topMulti) {
+		for (ValueFreq c : topMulti) {
 			Collections.sort(c.subValues);
 		}
 		
-		println(String.format("\t\t\tReference to double poi (%d, %,d): %s",  ps.refs.size(), sumFreq(ps.refs), ps.refs));
-		println(String.format("\t\t\tText based (%d, %,d): %s",  ps.text.size(), sumFreq(ps.text), ps.text));
+		println(String.format("\t\t\tReference to double poi (%d, %,d): %s",  ps.refs.size(), sumFreq(refs), refs));
+		println(String.format("\t\t\tText based (%d, %,d): %s",  ps.text.size(), sumFreq(text), text));
 		println(String.format("\t\t\tSingle value filters (%d, %,d): %s", sumSingleValue, sumFreq(singleValuesLst), singleValuesFmt));
 		
 		printNameStats(ps.nameIndex, 10_000, "\tPOI");
