@@ -1641,12 +1641,14 @@ public class BinaryMapIndexWriter {
 		for (String cat : cs.categories.keySet()) {
 			Builder builder = OsmandOdb.OsmAndCategoryTable.newBuilder();
 			builder.setCategory(cat);
+			builder.setFrequency((int) cs.categoriesUsage.get(cat));
 			Set<String> subcatSource = cs.categories.get(cat);
 			cs.setCategoryIndex(cat, i);
 			int j = 0;
 			for (String s : subcatSource) {
 				cs.setSubcategoryIndex(cat, s, j);
 				builder.addSubcategories(s);
+				builder.addSubcatfreq((int) cs.categoriesUsage.get(cat + "_" + s));
 				j++;
 			}
 			codedOutStream.writeMessage(OsmandOdb.OsmAndPoiIndex.CATEGORIESTABLE_FIELD_NUMBER, builder.build());
@@ -1677,6 +1679,7 @@ public class BinaryMapIndexWriter {
 				OsmAndPoiSubtype.Builder subType = OsmandOdb.OsmAndPoiSubtype.newBuilder();
 				subType.setName(rt.getTag());
 				subType.setIsText(true);
+				subType.setFrequency(rt.getUsage());
 				builder.addSubtypes(subType);
 			}
 		}
@@ -1688,12 +1691,19 @@ public class BinaryMapIndexWriter {
 			subType.setIsText(false);
 			List<PoiAdditionalType> list = groupAdditionalByTagName.get(tag);
 			subType.setSubtypeValuesSize(list.size());
-			int subcInd = 0;
+			int subcInd = 0, freq = 0;
+			boolean addSubFreqs = list.size() > 1;
 			for (PoiAdditionalType subtypeVal : list) {
 				subtypeVal.setTargetPoiId(cInd, subcInd++);
 				subType.addSubtypeValue(subtypeVal.getValue());
+				if (addSubFreqs) {
+					subType.addSubtypeValuesFreq(subtypeVal.getUsage());
+				}
+				freq += subtypeVal.getUsage();
 			}
+			subType.setFrequency(freq);
 			builder.addSubtypes(subType);
+			
 		}
 		codedOutStream.writeMessage(OsmandOdb.OsmAndPoiIndex.SUBTYPESTABLE_FIELD_NUMBER, builder.build());
 	}
