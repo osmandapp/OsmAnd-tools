@@ -85,6 +85,7 @@ public class BinaryInspector {
 	protected static final boolean DETECT_POI_ADDRESS = false;
 	
 	private VerboseInfo vInfo;
+	
 	public static void main(String[] args) throws IOException {
 		BinaryInspector in = new BinaryInspector();
 		if (args == null || args.length == 0) {
@@ -94,13 +95,14 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-					
-					"-vpoi", // "-vpoiobjects",
+					// "-vprefix=c",
+//					"-vpoi", // "-vpoiobjects",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
-					"-vaddress", "-vprefix=c", //"-vcities", "-vstreetgroups", "-vcitynames",
+					"-vaddress", "-vaddrsearchinspect",
+					//"-vcities", "-vstreetgroups", "-vcitynames",
 //					"-vstreets", //  "-vbuildings",// "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
@@ -111,9 +113,9 @@ public class BinaryInspector {
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
-					System.getProperty("maps.dir") + "/Us_minnesota_northamerica_2.obf",
-					System.getProperty("maps.dir") + "/Liechtenstein_europe_2.obf",
-					System.getProperty("maps.dir") + "/Ukraine_kyiv_europe_2.obf",
+//					System.getProperty("maps.dir") + "/Us_minnesota_northamerica_2.obf",
+//					System.getProperty("maps.dir") + "/Liechtenstein_europe_2.obf",
+					System.getProperty("maps.dir") + "/Ukraine/",
 					
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
@@ -150,6 +152,7 @@ public class BinaryInspector {
 
 	protected static class VerboseInfo {
 		boolean vaddress;
+		boolean vaddrsearchinspect;
 		boolean vcities;
 		boolean vcitynames;
 		boolean vstreetgroups;
@@ -178,6 +181,8 @@ public class BinaryInspector {
 		int zoom = 15;
 		PoiStats globalPoiStats = new PoiStats();
 		AddressStats globalAddressStats = new AddressStats();
+		MissingSearchStats missingSearchStats = new MissingSearchStats();
+		MissingSearchStats globalMissingSearchStats = new MissingSearchStats();
 		
 
 		public boolean isVaddress() {
@@ -219,11 +224,17 @@ public class BinaryInspector {
 		public boolean isVStats() {
 			return vstats;
 		}
+		
+		public boolean isVAddrSearchInspect() {
+			return vaddrsearchinspect;
+		}
 
 		public VerboseInfo(String[] params) throws FileNotFoundException {
 			for (int i = 0; i < params.length; i++) {
 				if (params[i].equals("-vaddress")) {
 					vaddress = true;
+				} else if (params[i].equals("-vaddrsearchinspect")) {
+					vaddrsearchinspect = true;
 				} else if (params[i].equals("-vstreets")) {
 					vstreets = true;
 				} else if (params[i].equals("-vstreetgroups")) {
@@ -435,6 +446,9 @@ public class BinaryInspector {
 					if (vInfo.isVaddress() && vInfo.globalAddressStats.files > 1) {
 						System.out.println("\nGlobal address stats");
 						printAddressNameStats(vInfo.globalAddressStats);
+					}
+					if (vInfo.vaddrsearchinspect && vInfo.globalMissingSearchStats.files > 1) {
+						println("\t " + vInfo.globalMissingSearchStats.toString());
 					}
 					vInfo.close();
 				}
@@ -666,7 +680,13 @@ public class BinaryInspector {
 						println(String.format("\t %d.%d Address %s part size=%,d bytes",i , ind, block.toString(), c.getLength()));
 					}
 					if (vInfo != null && vInfo.isVaddress()) {
+						vInfo.missingSearchStats = new MissingSearchStats();
 						printAddressDetailedInfo(vInfo, index, (AddressRegion) p);
+						printAdddrIndexStats(index, (AddressRegion) p);
+						if (vInfo.vaddrsearchinspect) {
+							println("\t " + vInfo.missingSearchStats.toString());
+							vInfo.globalMissingSearchStats.merge(vInfo.missingSearchStats);
+						}
 					}
 				}
 				i++;
@@ -679,6 +699,8 @@ public class BinaryInspector {
 		}
 
 	}
+
+	
 
 	/**
 	 * @param ri
@@ -877,11 +899,11 @@ public class BinaryInspector {
 			
 			print(String.format("\t %s %d entities", type.toString(), cities.size()));
 			if (CityBlocks.CITY_TOWN_TYPE == type) {
-				if (!verbose.vstreetgroups && !verbose.vcities) {
+				if (!verbose.vstreetgroups && !verbose.vcities && !verbose.vaddrsearchinspect) {
 					println("");
 					continue;
 				}
-			} else if (!verbose.vstreetgroups) {
+			} else if (!verbose.vstreetgroups && !verbose.vaddrsearchinspect) {
 				println("");
 				continue;
 			}
@@ -912,12 +934,16 @@ public class BinaryInspector {
 								ObfConstants.getOsmEntityType(c).name().charAt(0) + " "
 										+ ObfConstants.getOsmObjectId(c),
 								streets.size(), size, bboxStr));
-				print(cityDescription);
-				if (!verbose.vstreets) {
-					println("");
-		            continue;
-		        }
-				println(":");
+				if (verbose.vaddrsearchinspect) {
+					verbose.missingSearchStats.analyze(name, cityDescription, c, null);
+				} else {
+					print(cityDescription);
+					if (!verbose.vstreets) {
+						println("");
+			            continue;
+			        }
+					println(":");
+				}
 				if (c.getBbox31() != null) {
 					if (btop < verbose.latbottom || bbottom > verbose.lattop || bleft > verbose.lonright
 							|| bright < verbose.lonleft) {
@@ -938,9 +964,17 @@ public class BinaryInspector {
 					final List<Building> buildings = t.getBuildings();
 					final List<Street> intersections = t.getIntersectedStreets();
 
-					println(MessageFormat.format("\t\t\t''{0}'' [{1,number,#}], {2,number,#} building(s), {3,number,#} intersections(s)",
-							new Object[]{ t.getName(verbose.lang) + " " + t.getNamesMap(true).toString(), 
-									t.getId(), buildings.size(), intersections.size()}));
+					String streetName = MessageFormat.format("\t\t\t''{0}'' [{1,number,#}], {2,number,#} building(s), {3,number,#} intersections(s)",
+							new Object[]{ t.getName(verbose.lang) + " " + t.getNamesMap(true).toString(), t.getId(), buildings.size(), intersections.size()});
+					if (verbose.vaddrsearchinspect) {
+						verbose.missingSearchStats.analyze(t.getName(), t.getName() + " " + c.getName(), t, c);
+						for (Building b : buildings) {
+							verbose.missingSearchStats.analyze(b.getName(),
+									b.getName() + " " + t.getName() + " " + c.getName(), b, t);
+						}
+					} else {
+						println(streetName);
+					}
 					if (buildings != null && !buildings.isEmpty() && verbose.vbuildings) {
 						println("\t\t\t\tBuildings:");
 						for (Building b : buildings) {
@@ -959,6 +993,9 @@ public class BinaryInspector {
 				}
 			}
 		}
+	}
+	
+	private void printAdddrIndexStats(BinaryMapIndexReader index, AddressRegion region) throws IOException {
 		AddressStats as = new AddressStats();
 		as.files = 1;
 		NameIndexInspector fullNameIndex = index.readFullNameIndex(region);
@@ -972,7 +1009,7 @@ public class BinaryInspector {
 		}
 		as.nameIndex = ValueFreq.mergeArray(new HashMap<>(), fullNameIndex.getAddrPrefixes(-1, vInfo.getPrefix()));
 		printAddressNameStats(as);
-		vInfo.globalAddressStats.merge(as);
+		vInfo.globalAddressStats.merge(as);		
 	}
 
 	private void printAddressNameStats(AddressStats as) {
@@ -1486,6 +1523,7 @@ public class BinaryInspector {
 		return id;
 	}
 
+	@SuppressWarnings("deprecation")
 	private void printTransportDetailInfo(VerboseInfo verbose, BinaryMapIndexReader index, TransportIndex p) throws IOException {
 		SearchRequest<TransportStop> sr = BinaryMapIndexReader.buildSearchTransportRequest(
 				MapUtils.get31TileNumberX(verbose.lonleft),
@@ -1574,6 +1612,7 @@ public class BinaryInspector {
 	}
 
 	
+	
 	public static class AddressStats {
 		int files = 0;
 		Map<String, ValueFreq> nameIndex = new HashMap<>();
@@ -1614,7 +1653,6 @@ public class BinaryInspector {
 
 
 	}
-	
 	
 	public static boolean COMBINE_SINGLE_TYPE_BY_PREFIX = true;
 	
@@ -1727,12 +1765,12 @@ public class BinaryInspector {
 			}
 		}
 		NameIndexInspector fullNameIndex = index.readFullNameIndex(p);
-		ps.nameIndex = ValueFreq.mergeArray(new HashMap<>(), fullNameIndex.getPrefixes(vInfo.getPrefix()));
+		ps.nameIndex = ValueFreq.mergeArray(new HashMap<>(), fullNameIndex.getPrefixes(verbose.getPrefix()));
 		printPoiTypeStats(ps);
 		
-		vInfo.globalPoiStats.merge(ps);
+		verbose.globalPoiStats.merge(ps);
 //		req.poiTypeFilter = null;//for test only
-		if(vInfo.isVpoiObjects()) {
+		if (verbose.isVpoiObjects()) {
 			index.searchPoi(req, p);
 		}
 		
@@ -1788,7 +1826,7 @@ public class BinaryInspector {
 		printNameStats(ps.nameIndex, 10_000, "\tPOI");
 	}
 
-	private int sumFreq(List<ValueFreq> refs) {
+	private static int sumFreq(List<ValueFreq> refs) {
 		int f = 0;
 		for (ValueFreq r : refs) {
 			f += r.freq;
