@@ -103,7 +103,7 @@ public class BinaryInspector {
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
-					"-vaddress", "-vprefix=cen", //"-vcities", "-vstreetgroups", "-vcitynames",
+					"-vaddress", "-vprefix=c", //"-vcities", "-vstreetgroups", "-vcitynames",
 //					"-vstreets", //  "-vbuildings",// "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
@@ -116,6 +116,8 @@ public class BinaryInspector {
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
 					System.getProperty("maps.dir") + "/Us_minnesota_northamerica_2.obf",
 					System.getProperty("maps.dir") + "/Liechtenstein_europe_2.obf",
+					System.getProperty("maps.dir") + "/Ukraine_kyiv_europe_2.obf",
+					
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
@@ -1761,9 +1763,9 @@ public class BinaryInspector {
 			sum += c.subValues.size();
 			freq += c.freq;
 		}
-		println(String.format("\t\tCategories (%d categories, %d types, %d objects):", ps.categories.size(), sum, freq));
+		println(String.format("\t\tCategories (%,d categories, %,d types, %,d objects):", ps.categories.size(), sum, freq));
 		for (ValueFreq c : ps.categories) {
-			println(String.format("\t\t\t%s (%d, %d): %s", c.value, c.subValues.size(), c.freq, c.subValues));
+			println(String.format("\t\t\t%s (%d, %,d): %s", c.value, c.subValues.size(), c.freq, c.subValues));
 		}
 		sum = ps.refs.size();
 		for (ValueFreq c : ps.topMulti) {
@@ -1778,12 +1780,12 @@ public class BinaryInspector {
 		int sumSingleValue = 0;
 		for (ValueFreq key : singleValuesLst) {
 			sumSingleValue += key.subValues.size();
-			singleValuesFmt.append(String.format("%s (%d, %d), ", key.value, key.subValues.size(), key.freq));
+			singleValuesFmt.append(String.format("%s (%d, %,d), ", key.value, key.subValues.size(), key.freq));
 		}
-		println(String.format("\t\tPOI Additionals (%d types, %d text):", sum + sumSingleValue,
+		println(String.format("\t\tPOI Additionals (%,d types, %,d text):", sum + sumSingleValue,
 				ps.text.size()));
 		for (ValueFreq c : ps.topMulti) {
-			println(String.format("\t\t\t%s (%d, %d): %s", c.value, c.subValues.size(), c.freq, c.subValues));
+			println(String.format("\t\t\t%s (%d, %,d): %s", c.value, c.subValues.size(), c.freq, c.subValues));
 		}
 
 		for (ValueFreq c : ps.topMulti) {
