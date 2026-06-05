@@ -10,6 +10,7 @@ public class UserTranslationPlainObject {
 
 	public final String id;
 	public long ownerUserId;
+	public long creationDate;
 
 	public List<TranslationMessage> history = null;
 

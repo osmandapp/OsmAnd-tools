@@ -27,12 +27,19 @@ public class UserTranslationsController {
 	@Autowired
 	private UserTranslationsService userTranslationsService;
 
+	// Body may include fromTime / toTime (epoch ms) to load only messages in that
+	// interval. Missing or <= 0 bounds mean unbounded, so {} loads the full history.
+	public record LoadRequest(long fromTime, long toTime) {}
+
 	@MessageMapping("/translation/{translationId}/load")
-	public void loadTranslation(@DestinationVariable String translationId, SimpMessageHeaderAccessor headers) {
+	public void loadTranslation(@DestinationVariable String translationId,
+	                            @Payload LoadRequest req,
+	                            SimpMessageHeaderAccessor headers) {
 		UserTranslation ust = userTranslationsService.getTranslation(translationId, headers);
-		if (ust != null) {
-			userTranslationsService.load(ust, headers);
+		if (ust == null) {
+			return;
 		}
+		userTranslationsService.load(ust, req.fromTime(), req.toTime(), headers);
 	}
 	
 	@MessageMapping("/whoami")

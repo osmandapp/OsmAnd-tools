@@ -21,6 +21,7 @@ public class TranslationMessage {
 	public long sendUserId;
 	public Object content;
 	public TranslationMessageType type;
+	public long serverReceiveTime;
 	
 	public TranslationMessage() {}
 

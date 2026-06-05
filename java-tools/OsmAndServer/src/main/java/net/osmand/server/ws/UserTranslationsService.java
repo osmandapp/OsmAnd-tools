@@ -10,6 +10,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
@@ -238,17 +239,24 @@ public class UserTranslationsService {
 		return ust;
 	}
 
-	public void load(UserTranslation ust, SimpMessageHeaderAccessor headers) {
+	public void load(UserTranslation ust, long fromTime, long toTime, SimpMessageHeaderAccessor headers) {
 		UserTranslationPlainObject obj = new UserTranslationPlainObject(ust.getId());
 		obj.ownerUserId = ust.getOwner();
+		obj.creationDate = ust.getCreationDate();
+		double minScore = fromTime <= 0 ? Double.NEGATIVE_INFINITY : fromTime;
+		double maxScore = toTime <= 0 ? Double.POSITIVE_INFINITY : toTime;
 		if (redisTemplate != null) {
 			String key = REDIS_MSG_KEY_PREFIX + ust.getId();
-			List<String> jsons = redisTemplate.opsForList().range(key, 0, -1);
+			Set<String> jsons = redisTemplate.opsForZSet().rangeByScore(key, minScore, maxScore);
 			List<TranslationMessage> messages = jsons == null ? Collections.emptyList() :
 				jsons.stream().map(j -> gson.fromJson(j, TranslationMessage.class)).toList();
 			obj.setHistory(messages);
 		} else {
-			obj.setHistory(ust.getMessages());
+			List<TranslationMessage> messages = ust.getMessages().stream()
+					.filter(m -> (fromTime <= 0 || m.serverReceiveTime >= fromTime)
+							&& (toTime <= 0 || m.serverReceiveTime <= toTime))
+					.toList();
+			obj.setHistory(messages);
 		}
 		obj.setShareLocations(ust);
 		sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_TRANSLATION, obj);
@@ -374,10 +382,13 @@ public class UserTranslationsService {
 	}
 
     private void rawSendMessage(UserTranslation ust, TranslationMessage msg) {
+        if (msg.serverReceiveTime == 0) {
+            msg.serverReceiveTime = System.currentTimeMillis();
+        }
     	template.convertAndSend(TOPIC_TRANSLATION + ust.getId(), msg);
         if (redisTemplate != null) {
             String key = REDIS_MSG_KEY_PREFIX + ust.getId();
-            redisTemplate.opsForList().rightPush(key, gson.toJson(msg));
+            redisTemplate.opsForZSet().add(key, gson.toJson(msg), msg.serverReceiveTime);
             redisTemplate.expire(key, MESSAGES_TTL);
         } else {
             ust.getMessages().add(msg);
