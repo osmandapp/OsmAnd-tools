@@ -97,12 +97,13 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-//					"-vpoi", // "-vpoiobjects",
+					
+					"-vpoi", // "-vpoiobjects",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
-					"-vaddress", //"-vcities", "-vstreetgroups", "-vcitynames",
+					"-vaddress", "-vprefix=cen", //"-vcities", "-vstreetgroups", "-vcitynames",
 //					"-vstreets", //  "-vbuildings",// "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
@@ -168,6 +169,7 @@ public class BinaryInspector {
 		boolean vfulldictionary;
 		boolean vstats;
 		boolean osm;
+		String vprefix;
 		FileOutputStream osmOut = null;
 		double lattop = 85;
 		double latbottom = -85;
@@ -177,9 +179,14 @@ public class BinaryInspector {
 		int zoom = 15;
 		PoiStats globalPoiStats = new PoiStats();
 		AddressStats globalAddressStats = new AddressStats();
+		
 
 		public boolean isVaddress() {
 			return vaddress;
+		}
+		
+		public String getPrefix() {
+			return vprefix;
 		}
 
 		public int getZoom() {
@@ -232,6 +239,8 @@ public class BinaryInspector {
 					vintersections = true;
 				} else if (params[i].equals("-vmap")) {
 					vmap = true;
+				} else if (params[i].startsWith("-vprefix=")) {
+					vprefix = params[i].substring("-vprefix=".length());
 				} else if (params[i].equals("-vfulldictionary")) {
 					vfulldictionary = true;
 				} else if (params[i].equals("-vstats")) {
@@ -956,13 +965,13 @@ public class BinaryInspector {
 		NameIndexInspector fullNameIndex = index.readFullNameIndex(region);
 		for (CityBlocks type : CityBlocks.allTypes()) {
 			if (type.index >= 0) {
-				List<ValueFreq> lst = fullNameIndex.getAddrPrefixes(type.index);
+				List<ValueFreq> lst = fullNameIndex.getAddrPrefixes(type.index, vInfo.getPrefix());
 				if (lst.size() > 0) {
 					as.nameByTypeIndex.put(type, lst);
 				}
 			}
 		}
-		as.nameIndex = fullNameIndex.getAddrPrefixes(-1);
+		as.nameIndex = fullNameIndex.getAddrPrefixes(-1, vInfo.getPrefix());
 		printAddressNameStats(as);
 		vInfo.globalAddressStats.merge(as);
 	}
@@ -1731,7 +1740,7 @@ public class BinaryInspector {
 			}
 		}
 		NameIndexInspector fullNameIndex = index.readFullNameIndex(p);
-		ps.nameIndex = fullNameIndex.getPrefixes();
+		ps.nameIndex = fullNameIndex.getPrefixes(vInfo.getPrefix());
 		printPoiTypeStats(ps);
 		
 		vInfo.globalPoiStats.merge(ps);
