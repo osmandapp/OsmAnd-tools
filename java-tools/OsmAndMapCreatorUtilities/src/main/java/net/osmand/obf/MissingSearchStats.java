@@ -17,14 +17,28 @@ import net.osmand.util.SearchAlgorithms;
 
 public class MissingSearchStats {
 
-	Map<String, String> errors = new HashMap<String, String>();
-	Map<String, ValueFreq> commonFreqs = new HashMap<>();
+	Map<String, List<String>> errors = new HashMap<>();
+	Map<String, ValueFreq> allFreqs = new HashMap<>();
+	Map<String, Map<String, ValueFreq>> objFreqs = new HashMap<>();
 	int files = 0;
 
 	public void merge(MissingSearchStats s) {
 		files++;
-		this.errors.putAll(s.errors);
-		ValueFreq.mergeArray(commonFreqs, s.commonFreqs);
+		for(String key : s.errors.keySet()) {
+			if(!this.errors.containsKey(key)) {
+				errors.put(key, s.errors.get(key));
+			} else {
+				errors.get(key).addAll(s.errors.get(key));
+			}
+		}
+		ValueFreq.mergeArray(allFreqs, s.allFreqs);
+		for (String t : s.objFreqs.keySet()) {
+			if (!objFreqs.containsKey(t)) {
+				objFreqs.put(t, s.objFreqs.get(t));
+			} else {
+				ValueFreq.mergeArray(objFreqs.get(t), s.objFreqs.get(t));
+			}
+		}
 	}
 
 	public void analyze(String name, String descr, MapObject obj, MapObject extra) {
@@ -33,17 +47,27 @@ public class MissingSearchStats {
 		List<String> splitAndNormalize = SearchAlgorithms.splitAndNormalize(name);
 		int cmn = 0;
 		int num = 0;
+		String objType = obj.getClass().getSimpleName();
+//		if (obj instanceof City c) {
+//			objType = c.getType().toString();
+//		}
 		for (String n : splitAndNormalize) {
 			if (CommonWords.getCommon(n) > 0) {
 				boolean number = CommonWords.isNumber2Letters(n);
 				if (!number) {
-					ValueFreq vf = commonFreqs.get(n);
-					if (vf == null) {
-						vf = new ValueFreq(n, 0);
-						commonFreqs.put(vf.value, vf);
+					if (!allFreqs.containsKey(n)) {
+						allFreqs.put(n, new ValueFreq(n, 0));
 					}
-					vf.freq++;
-				} else {
+					allFreqs.get(n).freq++;
+					if (!objFreqs.containsKey(objType)) {
+						objFreqs.put(objType, new HashMap<>());
+					}
+					if (!objFreqs.get(objType).containsKey(n)) {
+						objFreqs.get(objType).put(n, new ValueFreq(n, 0));
+					}
+					objFreqs.get(objType).get(n).freq++;
+				}
+				if (number) {
 					num++;
 				}
 				cmn++;
@@ -52,11 +76,11 @@ public class MissingSearchStats {
 		if (obj instanceof City c && cmn == splitAndNormalize.size()) {
 			CityType t = c.getType();
 			if (t == CityType.CITY || t == CityType.TOWN || t == CityType.VILLAGE) {
-				errors.put("CITY_COMMON " + name, descr);
+				addError("CITY_COMMON", name + " " + descr);
 			}
 		}
 		if (obj instanceof Street s && num == splitAndNormalize.size()) {
-			errors.put("STR_NUM " + name, descr + " " + s.getCity());
+			addError("STR_NUM", name + " " + descr + " " + s.getCity());
 		}
 		if (obj instanceof Building && cmn == 0) {
 			if (extra instanceof Street s) {
@@ -64,22 +88,50 @@ public class MissingSearchStats {
 					return;
 				}
 			}
-			errors.put("BUILD_NAME " + name, descr);
+			addError("BUILD_NAME", name + " " + descr);
 		}
+	}
+
+	private void addError(String key, String error) {
+		if (!errors.containsKey(key)) {
+			errors.put(key, new ArrayList<String>());
+		}
+		errors.get(key).add(error);
 	}
 
 	@Override
 	public String toString() {
-		List<ValueFreq> lst = new ArrayList<>(commonFreqs.values());
-		Collections.sort(lst);
 		StringBuilder b = new StringBuilder(String.format("Missing search issues (%d):  \n", errors.size()));
-		int cm = lst.size(), token = sumFreq(lst);
-		lst = lst.subList(0, Math.min(50, lst.size()));
-		b.append(String.format("\t Skipped Common words (%,d, %,d): %s\n", cm, token, lst));
+		for (String type : objFreqs.keySet()) {
+			appendCommonWords(objFreqs.get(type), type, b);
+		}
+		appendCommonWords(allFreqs, "All", b);
+		
 		for (String e : errors.keySet()) {
-			b.append(String.format("\t'%s': %s\n", e, errors.get(e)));
+			b.append(String.format("\t %s (%,d):\n", e, errors.get(e).size()));
+			int i = 0;
+			for (String err : errors.get(e)) {
+				if (i++ > 10) {
+					b.append("....\n");
+					break;
+				}
+				b.append(String.format("\t\t %s\n", err));
+			}
 		}
 		return b.toString();
+	}
+
+	private void appendCommonWords(Map<String, ValueFreq> freqs, String type, StringBuilder b) {
+		List<ValueFreq> lst = new ArrayList<>(freqs.values());
+		Collections.sort(lst);
+		int cm = lst.size(), token = sumFreq(lst);
+		List<ValueFreq> rare = new ArrayList<>(lst);
+		Collections.reverse(rare);
+		lst = lst.subList(0, Math.min(50, lst.size()));
+		rare = rare.subList(0, Math.min(50, rare.size()));
+		
+		b.append(String.format("\t Frequent %s Common words (%,d, %,d): %s\n", type, cm, token, lst));
+		b.append(String.format("\t Rare %s Common words (%,d, %,d): %s\n", type, rare.size(), sumFreq(rare), rare));
 	}
 	
 	private static int sumFreq(List<ValueFreq> refs) {

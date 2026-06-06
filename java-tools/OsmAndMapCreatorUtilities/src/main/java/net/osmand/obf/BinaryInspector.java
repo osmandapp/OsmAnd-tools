@@ -54,6 +54,7 @@ import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.binary.BinaryMapTransportReaderAdapter.TransportIndex;
 import net.osmand.binary.NameIndexInspector;
+import net.osmand.binary.NameIndexInspector.SuffixesStat;
 import net.osmand.binary.NameIndexInspector.ValueFreq;
 import net.osmand.binary.ObfConstants;
 import net.osmand.binary.OsmandOdb;
@@ -96,12 +97,12 @@ public class BinaryInspector {
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
 					// "-vprefix=c",
-//					"-vpoi", // "-vpoiobjects",
+					"-vpoi", // "-vpoiobjects",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
-					"-vaddress", "-vaddrsearchinspect",
+					"-vaddress", "-vsearchinspect",
 					//"-vcities", "-vstreetgroups", "-vcitynames",
 //					"-vstreets", //  "-vbuildings",// "-vintersections",
 //					"-lang=ru",
@@ -113,9 +114,9 @@ public class BinaryInspector {
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
-//					System.getProperty("maps.dir") + "/Us_minnesota_northamerica_2.obf",
-//					System.getProperty("maps.dir") + "/Liechtenstein_europe_2.obf",
-					System.getProperty("maps.dir") + "/Ukraine/",
+					System.getProperty("maps.dir") + "/Us_minnesota_northamerica_2.obf",
+					System.getProperty("maps.dir") + "/Liechtenstein_europe_2.obf",
+//					System.getProperty("maps.dir") + "/Ukraine/",
 					
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
@@ -152,7 +153,7 @@ public class BinaryInspector {
 
 	protected static class VerboseInfo {
 		boolean vaddress;
-		boolean vaddrsearchinspect;
+		boolean vsearchinspect;
 		boolean vcities;
 		boolean vcitynames;
 		boolean vstreetgroups;
@@ -179,7 +180,10 @@ public class BinaryInspector {
 		double lonright = 179.9;
 		String lang = null;
 		int zoom = 15;
+		
+		// stats for search
 		PoiStats globalPoiStats = new PoiStats();
+		SuffixesStat globalSuffixesStat = new SuffixesStat();
 		AddressStats globalAddressStats = new AddressStats();
 		MissingSearchStats missingSearchStats = new MissingSearchStats();
 		MissingSearchStats globalMissingSearchStats = new MissingSearchStats();
@@ -226,15 +230,15 @@ public class BinaryInspector {
 		}
 		
 		public boolean isVAddrSearchInspect() {
-			return vaddrsearchinspect;
+			return vsearchinspect;
 		}
 
 		public VerboseInfo(String[] params) throws FileNotFoundException {
 			for (int i = 0; i < params.length; i++) {
 				if (params[i].equals("-vaddress")) {
 					vaddress = true;
-				} else if (params[i].equals("-vaddrsearchinspect")) {
-					vaddrsearchinspect = true;
+				} else if (params[i].equals("-vsearchinspect")) {
+					vsearchinspect = true;
 				} else if (params[i].equals("-vstreets")) {
 					vstreets = true;
 				} else if (params[i].equals("-vstreetgroups")) {
@@ -447,8 +451,11 @@ public class BinaryInspector {
 						System.out.println("\nGlobal address stats");
 						printAddressNameStats(vInfo.globalAddressStats);
 					}
-					if (vInfo.vaddrsearchinspect && vInfo.globalMissingSearchStats.files > 1) {
+					if (vInfo.vsearchinspect && vInfo.globalMissingSearchStats.files > 1) {
 						println("\t " + vInfo.globalMissingSearchStats.toString());
+					}
+					if (vInfo.vsearchinspect) {
+						println("\t " + vInfo.globalSuffixesStat.toString());	
 					}
 					vInfo.close();
 				}
@@ -611,6 +618,11 @@ public class BinaryInspector {
 	public void printFileInformation(File file) throws IOException {
 		RandomAccessFile r = new RandomAccessFile(file.getAbsolutePath(), "r");
 		printFileInformation(r, file);
+		if (vInfo.vsearchinspect) {
+			println("\t " + vInfo.missingSearchStats.toString());
+			vInfo.globalMissingSearchStats.merge(vInfo.missingSearchStats);
+			vInfo.missingSearchStats = new MissingSearchStats();
+		}
 	}
 
 	public void printFileInformation(RandomAccessFile r, File file) throws IOException {
@@ -680,13 +692,8 @@ public class BinaryInspector {
 						println(String.format("\t %d.%d Address %s part size=%,d bytes",i , ind, block.toString(), c.getLength()));
 					}
 					if (vInfo != null && vInfo.isVaddress()) {
-						vInfo.missingSearchStats = new MissingSearchStats();
 						printAddressDetailedInfo(vInfo, index, (AddressRegion) p);
 						printAdddrIndexStats(index, (AddressRegion) p);
-						if (vInfo.vaddrsearchinspect) {
-							println("\t " + vInfo.missingSearchStats.toString());
-							vInfo.globalMissingSearchStats.merge(vInfo.missingSearchStats);
-						}
 					}
 				}
 				i++;
@@ -899,11 +906,11 @@ public class BinaryInspector {
 			
 			print(String.format("\t %s %d entities", type.toString(), cities.size()));
 			if (CityBlocks.CITY_TOWN_TYPE == type) {
-				if (!verbose.vstreetgroups && !verbose.vcities && !verbose.vaddrsearchinspect) {
+				if (!verbose.vstreetgroups && !verbose.vcities && !verbose.vsearchinspect) {
 					println("");
 					continue;
 				}
-			} else if (!verbose.vstreetgroups && !verbose.vaddrsearchinspect) {
+			} else if (!verbose.vstreetgroups && !verbose.vsearchinspect) {
 				println("");
 				continue;
 			}
@@ -934,7 +941,7 @@ public class BinaryInspector {
 								ObfConstants.getOsmEntityType(c).name().charAt(0) + " "
 										+ ObfConstants.getOsmObjectId(c),
 								streets.size(), size, bboxStr));
-				if (verbose.vaddrsearchinspect) {
+				if (verbose.vsearchinspect) {
 					verbose.missingSearchStats.analyze(name, cityDescription, c, null);
 				} else {
 					print(cityDescription);
@@ -966,7 +973,7 @@ public class BinaryInspector {
 
 					String streetName = MessageFormat.format("\t\t\t''{0}'' [{1,number,#}], {2,number,#} building(s), {3,number,#} intersections(s)",
 							new Object[]{ t.getName(verbose.lang) + " " + t.getNamesMap(true).toString(), t.getId(), buildings.size(), intersections.size()});
-					if (verbose.vaddrsearchinspect) {
+					if (verbose.vsearchinspect) {
 						verbose.missingSearchStats.analyze(t.getName(), t.getName() + " " + c.getName(), t, c);
 						for (Building b : buildings) {
 							verbose.missingSearchStats.analyze(b.getName(),
@@ -1008,6 +1015,7 @@ public class BinaryInspector {
 			}
 		}
 		as.nameIndex = ValueFreq.mergeArray(new HashMap<>(), fullNameIndex.getAddrPrefixes(-1, vInfo.getPrefix()));
+		vInfo.globalSuffixesStat.merge(fullNameIndex.getSuffixesStat());
 		printAddressNameStats(as);
 		vInfo.globalAddressStats.merge(as);		
 	}
@@ -1640,7 +1648,6 @@ public class BinaryInspector {
 		Map<String, ValueFreq> categories = new HashMap<>();
 		Map<String, ValueFreq> nameIndex = new HashMap<>();
 		
-		
 		public void merge(PoiStats s) {
 			files += s.files;
 			ValueFreq.mergeArray(text, s.text);
@@ -1670,6 +1677,10 @@ public class BinaryInspector {
 					public boolean publish(Amenity amenity) {
 						count[0]++;
 						String s = String.valueOf(amenity.printNamesAndAdditional());
+						if(verbose.vsearchinspect) {
+							verbose.missingSearchStats.analyze(amenity.getName(), s, amenity, null);
+							return false;
+						}
 						long id = (amenity.getId());
 						if(id > 0) {
 							id = id >> 1;
@@ -1768,9 +1779,10 @@ public class BinaryInspector {
 		ps.nameIndex = ValueFreq.mergeArray(new HashMap<>(), fullNameIndex.getPrefixes(verbose.getPrefix()));
 		printPoiTypeStats(ps);
 		
+		verbose.globalSuffixesStat.merge(fullNameIndex.getSuffixesStat());
 		verbose.globalPoiStats.merge(ps);
 //		req.poiTypeFilter = null;//for test only
-		if (verbose.isVpoiObjects()) {
+		if (verbose.isVpoiObjects() || verbose.vsearchinspect) {
 			index.searchPoi(req, p);
 		}
 		
