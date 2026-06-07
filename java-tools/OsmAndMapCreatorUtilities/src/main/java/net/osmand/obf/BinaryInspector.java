@@ -102,7 +102,7 @@ public class BinaryInspector {
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
-					"-vaddress", "-vsearchinspect",
+					"-vaddress", // "-vsearchinspect",
 					//"-vcities", "-vstreetgroups", "-vcitynames",
 //					"-vstreets", //  "-vbuildings",// "-vintersections",
 //					"-lang=ru",
@@ -115,7 +115,8 @@ public class BinaryInspector {
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
 					System.getProperty("maps.dir") + "/Us_minnesota_northamerica_2.obf",
-					System.getProperty("maps.dir") + "/Liechtenstein_europe_2.obf",
+					System.getProperty("maps.dir") + "/Us_california_san-francisco_northamerica_2.obf",
+//					System.getProperty("maps.dir") + "/Liechtenstein_europe_2.obf",
 //					System.getProperty("maps.dir") + "/Ukraine/",
 					
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
@@ -454,9 +455,9 @@ public class BinaryInspector {
 					if (vInfo.vsearchinspect && vInfo.globalMissingSearchStats.files > 1) {
 						println("\t " + vInfo.globalMissingSearchStats.toString());
 					}
-					if (vInfo.vsearchinspect) {
+//					if (vInfo.vsearchinspect) {
 						println("\t " + vInfo.globalSuffixesStat.toString());	
-					}
+//					}
 					vInfo.close();
 				}
 			} else {
