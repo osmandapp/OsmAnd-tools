@@ -166,11 +166,11 @@ public class FullSearchStats {
 			allFreq += v.freq;
 			allIndexed += v.extra;
 			StringBuilder s = null;
-			if (ind < 50) {
+			if (ind < 300) {
 				s = freq;
 				fFreq += v.freq;
 				fIndexed += v.extra;
-			} else if (lst.size() - 15 < ind) {
+			} else if (lst.size() - 100 < ind) {
 				s = rare;
 				rFreq += v.freq;
 				rIndexed += v.extra;
