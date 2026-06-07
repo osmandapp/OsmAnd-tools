@@ -102,7 +102,7 @@ public class BinaryInspector {
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
-					"-vaddress", //"-vsearchinspect",
+					"-vaddress", "-vsearchinspect",
 					//"-vcities", "-vstreetgroups", "-vcitynames",
 //					"-vstreets", //  "-vbuildings",// "-vintersections",
 //					"-lang=ru",
@@ -116,7 +116,7 @@ public class BinaryInspector {
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
 					System.getProperty("maps.dir") + "/Us_minnesota_northamerica_2.obf",
 					System.getProperty("maps.dir") + "/Us_california_san-francisco_northamerica_2.obf",
-					System.getProperty("maps.dir") + "/Liechtenstein_europe_2.obf",
+//					System.getProperty("maps.dir") + "/Liechtenstein_europe_2.obf",
 //					System.getProperty("maps.dir") + "/Turkey_southeastern-anatolia_europe_2.obf",
 //					System.getProperty("maps.dir") + "/Ukraine/",
 					
@@ -455,7 +455,8 @@ public class BinaryInspector {
 						printAddressNameStats(vInfo.globalAddressStats);
 					}
 					if (vInfo.vsearchinspect && vInfo.globalSearchStats.files > 1) {
-						println("Global " + vInfo.globalSearchStats.info(vInfo.globalPoiStats, vInfo.globalAddressStats));
+						println("Global " + 
+								vInfo.globalSearchStats.info("\n\t", vInfo.globalPoiStats, vInfo.globalAddressStats));
 					}
 					vInfo.close();
 				}
@@ -621,7 +622,7 @@ public class BinaryInspector {
 		vInfo.globalPoiStats.merge(vInfo.poiStats);
 		vInfo.globalAddressStats.merge(vInfo.addressStats);
 		if (vInfo.vsearchinspect) {
-			println("\t " + vInfo.searchStats.info(vInfo.poiStats, vInfo.addressStats));
+			println(vInfo.searchStats.info("\n\t", vInfo.poiStats, vInfo.addressStats).toString());
 			vInfo.globalSearchStats.merge(vInfo.searchStats);
 			vInfo.searchStats = new FullSearchStats();
 		}

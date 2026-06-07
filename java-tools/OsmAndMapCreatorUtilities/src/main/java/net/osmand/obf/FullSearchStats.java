@@ -16,6 +16,7 @@ import net.osmand.data.MapObject;
 import net.osmand.data.Street;
 import net.osmand.obf.BinaryInspector.AddressStats;
 import net.osmand.obf.BinaryInspector.PoiStats;
+import net.osmand.util.Algorithms;
 import net.osmand.util.SearchAlgorithms;
 
 public class FullSearchStats {
@@ -54,27 +55,36 @@ public class FullSearchStats {
 //		if (obj instanceof City c) {
 //			objType = c.getType().toString();
 //		}
-		for (String n : splitAndNormalize) {
-			if (CommonWords.getCommon(n) > 0) {
-				boolean number = CommonWords.isNumber2Letters(n);
-				if (!number) {
-					if (!allFreqs.containsKey(n)) {
-						allFreqs.put(n, new ValueFreq(n, 0));
+		boolean bld = obj instanceof Building;
+		for (String word : splitAndNormalize) {
+			if (CommonWords.getCommon(word) > 0 || bld) {
+				boolean number = CommonWords.isNumber2Letters(word);
+				String n = word;
+				if (number) {
+					if (Algorithms.parseIntSilently(n, -1) < 0) {
+						n = bld ? "NUMBLD": "NUM2LETTER";
+					} else {
+						n = bld ? "NUMBLD": "INTEGER";
 					}
-					allFreqs.get(n).freq++;
-					if (!objFreqs.containsKey(objType)) {
-						objFreqs.put(objType, new HashMap<>());
-					}
-					if (!objFreqs.get(objType).containsKey(n)) {
-						objFreqs.get(objType).put(n, new ValueFreq(n, 0));
-					}
-					objFreqs.get(objType).get(n).freq++;
+				} else if (bld) {
+					n = "OTHERBLD";
 				}
+				if (!allFreqs.containsKey(n)) {
+					allFreqs.put(n, new ValueFreq(n, 0));
+				}
+				allFreqs.get(n).freq++;
+				if (!objFreqs.containsKey(objType)) {
+					objFreqs.put(objType, new HashMap<>());
+				}
+				if (!objFreqs.get(objType).containsKey(n)) {
+					objFreqs.get(objType).put(n, new ValueFreq(n, 0));
+				}
+				objFreqs.get(objType).get(n).freq++;
 				if (number) {
 					num++;
 				}
 				cmn++;
-			}
+			}	
 		}
 		if (obj instanceof City c && cmn == splitAndNormalize.size()) {
 			CityType t = c.getType();
@@ -104,73 +114,84 @@ public class FullSearchStats {
 
 	@Override
 	public String toString() {
-		StringBuilder b = info(null, null);
+		StringBuilder b = info("", null, null);
 		return b.toString();
 	}
 
-	public StringBuilder info(PoiStats poiStats, AddressStats addressStats) {
-		StringBuilder b = new StringBuilder(String.format("Search issues (%d):  \n", errors.size()));
-		for (String type : objFreqs.keySet()) {
-			if (type.equalsIgnoreCase("amenity")) {
-				appendCommonWords(objFreqs.get(type), type, b, poiStats, null);
-			} else {
-				appendCommonWords(objFreqs.get(type), type, b, null, addressStats);
-			}
-		}
-		appendCommonWords(allFreqs, "All", b, poiStats, addressStats);
-		
+	public StringBuilder info(String prefixnl, PoiStats poiStats, AddressStats addressStats) {
+		StringBuilder b = new StringBuilder(String.format("Full Name Search analysis. Known Search issues (%d):  " , errors.size()));
 		for (String e : errors.keySet()) {
-			b.append(String.format("\t %s (%,d):", e, errors.get(e).size()));
+			b.append(String.format(prefixnl + "%s (%,d):", e, errors.get(e).size()));
 			int i = 0;
 			for (String err : errors.get(e)) {
 				if (i++ > 10) {
-					b.append("....");
+					b.append("...");
 					break;
 				}
-				b.append(String.format("\n\t\t %s", err));
+				b.append(String.format(prefixnl + "  %s", err));
 			}
 		}
+		for (String type : objFreqs.keySet()) {
+			if (type.equalsIgnoreCase("amenity")) {
+				appendCommonWords(prefixnl, objFreqs.get(type), type, b, poiStats, null);
+			} else {
+				appendCommonWords(prefixnl, objFreqs.get(type), type, b, null, addressStats);
+			}
+		}
+		appendCommonWords(prefixnl, allFreqs, "All", b, poiStats, addressStats);
 		b.append("\n");
 		return b;
 	}
 
-	private void appendCommonWords(Map<String, ValueFreq> freqs, String type, StringBuilder b, 
+	private void appendCommonWords(String prefixnl, Map<String, ValueFreq> freqs, String type, StringBuilder b, 
 			PoiStats poiStats, AddressStats addressStats) {
 		List<ValueFreq> lst = new ArrayList<>(freqs.values());
 		Collections.sort(lst);
-		List<ValueFreq> rare = new ArrayList<>(lst);
-		Collections.reverse(rare);
-		appendWithIndexed(b, 50, "Frequent " + type, poiStats, addressStats, lst);
-		appendWithIndexed(b, 50, "Rare " + type, poiStats, addressStats, rare);
-	}
-
-	private void appendWithIndexed(StringBuilder str, int limit, String prefix, 
-			PoiStats poiStats, AddressStats addressStats, List<ValueFreq> lst) {
-		
-		StringBuilder b = new StringBuilder();
-		int ind = 0, allFreq = 0, allIndexed = 0;
 		for (ValueFreq v : lst) {
-			int indexed = 0;
+			v.extra = 0;
 			if (poiStats != null) {
-				indexed += calcIndexed(poiStats.nameIndex.values(), v.value);
+				v.extra += calcIndexed(poiStats.nameIndex.values(), v.value);
 			}
 			if (addressStats != null) {
-				indexed += calcIndexed(addressStats.nameIndex.values(), v.value);
+				v.extra += calcIndexed(addressStats.nameIndex.values(), v.value);
 			}
-			if (ind < limit) {
-				ind++;
-				allFreq += v.freq;
-				allIndexed += indexed;
-				if (indexed == 0) {
-					b.append(String.format("%s (%d), ", v.value, v.freq));
+		}
+		int allFreq = 0, allIndexed = 0;
+		int fFreq = 0, fIndexed = 0, rFreq = 0, rIndexed = 0;
+		int ind = 0;
+		StringBuilder freq = new StringBuilder();
+		StringBuilder rare = new StringBuilder();
+		for (ValueFreq v : lst) {
+			ind++;
+			allFreq += v.freq;
+			allIndexed += v.extra;
+			StringBuilder s = null;
+			if (ind < 50) {
+				s = freq;
+				fFreq += v.freq;
+				fIndexed += v.extra;
+			} else if (lst.size() - 15 < ind) {
+				s = rare;
+				rFreq += v.freq;
+				rIndexed += v.extra;
+			}
+
+			if (s != null) {
+				if (v.extra == 0) {
+					s.append(String.format("%s (%d), ", v.value, v.freq));
 				} else {
-					b.append(String.format("%s (%d, %d), ", v.value, v.freq, indexed));
+					s.append(String.format("%s (%d, %d), ", v.value, v.freq, v.extra));
 				}
 			}
 		}
-		str.append(String.format("\t %s Common words (distinct %,d, all %,d, indexed %,d): %s\n", prefix, ind, allFreq,
-				allIndexed, b.toString()));
-		b.append("\n");
+		b.append(String.format(prefixnl + "%s Common words - %,d (matched %,d, indexed %,d). ", type, lst.size(),
+				allFreq, allIndexed));
+
+		if (rare.length() > 0) {
+			b.append(String.format(" Rare (matched %,d, indexed %,d): %s", rFreq, rIndexed, rare.toString()));
+		}
+		b.append(prefixnl).append(String.format("  Frequent common words (matched %,d, indexed %,d): %s", fFreq,
+				fIndexed, freq.toString()));
 	}
 
 	private int calcIndexed(Collection<ValueFreq> nameIndex, String value) {
