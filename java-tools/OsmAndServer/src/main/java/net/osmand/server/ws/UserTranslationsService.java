@@ -453,8 +453,9 @@ public class UserTranslationsService {
 			redisTemplate.delete(REDIS_MSG_KEY_PREFIX + ust.getId());
 			redisTemplate.delete(REDIS_TRANSLATION_KEY_PREFIX + ust.getId());
 		}
-		// Notify all viewers so they can clean up.
-		rawSendMessage(ust, prepareMessageSystem().setType(TranslationMessageType.DELETE).setContent(ust.getId()));
+		// Notify all viewers so they can clean up
+		template.convertAndSend(TOPIC_TRANSLATION + ust.getId(),
+				prepareMessageSystem().setType(TranslationMessageType.DELETE).setContent(ust.getId()));
 		return true;
 	}
 
@@ -479,7 +480,9 @@ public class UserTranslationsService {
 		saveTranslationToRedis(ust);
 		UserTranslationPlainObject obj = new UserTranslationPlainObject(ust.getId());
 		obj.setShareLocations(ust);
-		rawSendMessage(ust, prepareMessageSystem().setType(TranslationMessageType.METADATA).setContent(obj));
+		// METADATA is broadcast only, not persisted to history
+		template.convertAndSend(TOPIC_TRANSLATION + ust.getId(),
+				prepareMessageSystem().setType(TranslationMessageType.METADATA).setContent(obj));
 	}
 	
 	public String sendError(String error, SimpMessageHeaderAccessor headers) {
