@@ -60,17 +60,16 @@ CREATE TABLE object_tag (
 CREATE TABLE tag (
     id INTEGER PRIMARY KEY AUTOINCREMENT, -- tag id
     name TEXT NOT NULL, -- tag/classifier name
-    type TEXT, -- tag kind, 'type' / 'additional' / 'brand'
-    UNIQUE(name, type)
+    type TEXT, -- tag kind, where 'type' - OsmAndCategoryTable (poi_type + poi_subtype), 'additional' - OsmAndSubtypesTable (poi_additional)
+    UNIQUE(type, name)
 );
 
 CREATE TABLE subtag (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, -- subtag/classifier value id
-    tag_id INTEGER NOT NULL, -- parent tag/classifier id
+    id INTEGER PRIMARY KEY AUTOINCREMENT, -- subtag value id
+    tag_id INTEGER NOT NULL, -- parent tag id
     name TEXT NOT NULL, -- subtag name or classifier child key
-    value TEXT, -- optional raw value for subtype/group entries
-    type TEXT, -- subtag kind, for example category, subtype, or group
-    UNIQUE(tag_id, name, type)
+    value TEXT, -- optional raw value for subtype entries
+    UNIQUE(tag_id, name)
 );
 
 CREATE TABLE source_tag ( -- source tag used for token provenance
