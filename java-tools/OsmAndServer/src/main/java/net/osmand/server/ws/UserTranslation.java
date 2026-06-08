@@ -9,7 +9,8 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 public class UserTranslation {
 
 	private static final long MS_PER_HOUR = 60 * 60 * 1000L;
-	public static final long PERMANENT_DURATION_MS = 365 * 24 * MS_PER_HOUR;
+	// Max duration used when no limit is chosen ("permanent" in UI) — capped at 1 year.
+	public static final long MAX_DURATION_MS = 365 * 24 * MS_PER_HOUR;
 
 	private final String id;
 	private final long owner;

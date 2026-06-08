@@ -240,7 +240,7 @@ public class UserTranslationsService {
 		long time = System.currentTimeMillis();
 		UserTranslation ust = new UserTranslation(translationId, user.id);
 		ust.setCreationDate(time);
-		ust.setDurationMs(durationHours <= 0 ? UserTranslation.PERMANENT_DURATION_MS : durationHours * 60 * 60 * 1000L);
+		ust.setDurationMs(durationHours <= 0 ? UserTranslation.MAX_DURATION_MS : durationHours * 60 * 60 * 1000L);
 		activeSessions.put(ust.getId(), ust);
 		saveTranslationToRedis(ust);
 		shareLocationByUser(ust, user.id);
