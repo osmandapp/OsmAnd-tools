@@ -238,7 +238,9 @@ public class UserTranslationsService {
 		long time = System.currentTimeMillis();
 		UserTranslation ust = new UserTranslation(translationId, user.id);
 		ust.setCreationDate(time);
-		ust.setDurationMs(durationHours <= 0 ? UserTranslation.MAX_DURATION_MS : durationHours * 60 * 60 * 1000L);
+		ust.setDurationMs(durationHours <= 0 || durationHours > UserTranslation.MAX_DURATION_HOURS
+				? UserTranslation.MAX_DURATION_MS
+				: durationHours * UserTranslation.MS_PER_HOUR);
 		activeSessions.put(ust.getId(), ust);
 		saveTranslationToRedis(ust);
 		shareLocationByUser(ust, user.id);
@@ -569,6 +571,9 @@ public class UserTranslationsService {
 	private String getNickname(CloudUser user) {
 		if (!Algorithms.isEmpty(user.nickname)) {
 			return user.nickname;
+		}
+		if (Algorithms.isEmpty(user.email)) {
+			return TranslationMessage.SENDER_ANONYMOUS;
 		}
 		return user.email.substring(0, user.email.length() / 2) + "...";
 	}
