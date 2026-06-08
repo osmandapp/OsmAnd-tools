@@ -40,14 +40,14 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 	}
 	
 	@Bean
-    public TaskScheduler heartbeatScheduler() {
-        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
-        scheduler.setPoolSize(1);
-        scheduler.setThreadNamePrefix("wss-heartbeat-thread-");
-        scheduler.initialize();
-        return scheduler;
-    }
-	
+	public TaskScheduler heartbeatScheduler() {
+		ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
+		scheduler.setPoolSize(1);
+		scheduler.setThreadNamePrefix("wss-heartbeat-thread-");
+		scheduler.initialize();
+		return scheduler;
+	}
+
 	@Override
 	public void registerStompEndpoints(StompEndpointRegistry registry) {
 		String[] origins = environment.acceptsProfiles(Profiles.of("production"))
