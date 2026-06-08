@@ -7,17 +7,18 @@ import java.util.Map;
 
 import net.osmand.server.ws.UserTranslation.TranslationSharingOptions;
 
+// Serializable snapshot of a translation sent to the client (load reply / METADATA).
 public class UserTranslationPlainObject {
 
 	public final String id;
 	public long ownerUserId;
 	public long creationDate;
 
-	public List<TranslationMessage> history = null;
+	public List<TranslationMessage> history = null;     // past messages in the requested time range
 
-	public List<SharingLocation> shareLocations = null;
-	public List<String> viewers = null;
-	public List<ShareRequest> pendingRequests = null;
+	public List<SharingLocation> shareLocations = null; // who is currently sharing
+	public List<String> viewers = null;                 // current viewer nicknames
+	public List<ShareRequest> pendingRequests = null;   // owner-only: requests awaiting approval
 
 	public UserTranslationPlainObject(String id) {
 		this.id = id;
@@ -37,15 +38,17 @@ public class UserTranslationPlainObject {
 		public int userId;
 		public String nickname;
 	}
-	
+
 	public void setHistory(Collection<TranslationMessage> history) {
 		this.history = new ArrayList<>(history);
 	}
 
+	// Broadcast variant: no card is marked as "mine".
 	public void setShareLocations(UserTranslation us) {
 		setShareLocations(us, 0);
 	}
 
+	// Personal variant (load): marks the viewer's own card with mine = true.
 	public void setShareLocations(UserTranslation us, int viewerUserId) {
 		this.shareLocations = new ArrayList<>();
 		for (TranslationSharingOptions o : us.getSharingOptions()) {
@@ -66,7 +69,7 @@ public class UserTranslationPlainObject {
 		public long expireTime;
 		public long startTime;
 		public boolean owner;
-		public Boolean mine;
+		public Boolean mine;   // set only in the personal load reply for the viewer's own card
 	}
 	
 }
