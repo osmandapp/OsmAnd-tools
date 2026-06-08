@@ -138,10 +138,10 @@ public class UserTranslationsService {
 
     
     public CloudUser getUser(Principal principal, SimpMessageHeaderAccessor headers) {
-		boolean production = environment.acceptsProfiles(Profiles.of("production"));		
+		boolean production = environment.acceptsProfiles(Profiles.of("production"));
 		return getUser(principal, headers, !production);
 	}
-	
+
 	public CloudUser getUser(Principal principal, SimpMessageHeaderAccessor headers, boolean allowAnonymous) {
 		CloudUser us = getUserFromPrincipal(principal);
 		if (us == null && allowAnonymous) {
@@ -171,19 +171,15 @@ public class UserTranslationsService {
 		return us;
 	}
 	
-	private  CloudUser getUserFromPrincipal(Principal principal) {
-		if (principal instanceof Authentication) {
-			Object user = ((Authentication) principal).getPrincipal();
-			if (user instanceof WebSecurityConfiguration.OsmAndProUser) {
-				CloudUser userObj = ((WebSecurityConfiguration.OsmAndProUser) user).getUser();
-				if (userObj != null) {
-					return userObj;
-				}
-			}
+	private CloudUser getUserFromPrincipal(Principal principal) {
+		if (principal instanceof Authentication authentication
+				&& authentication.getPrincipal() instanceof WebSecurityConfiguration.OsmAndProUser proUser) {
+			return proUser.getUser();
 		}
 		return null;
 	}
 
+	// What gets persisted to Redis per translation (live object state minus the message history).
 	private static class TranslationMeta {
 		String id;
 		long owner;
@@ -290,6 +286,8 @@ public class UserTranslationsService {
 		return ust;
 	}
 
+	// Sends the requester a snapshot: history in [fromTime, toTime], current sharers, viewers, and
+	// (for the owner) pending requests.
 	public void load(UserTranslation ust, long fromTime, long toTime, CloudUser user, SimpMessageHeaderAccessor headers) {
 		UserTranslationPlainObject obj = new UserTranslationPlainObject(ust.getId());
 		obj.ownerUserId = ust.getOwner();
@@ -317,6 +315,7 @@ public class UserTranslationsService {
 		sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_TRANSLATION, obj);
 	}
 
+	// Registers the user as a sharer (owner or approved) and announces it to the room.
 	public void startSharing(UserTranslation ust, CloudUser user, SimpMessageHeaderAccessor headers) {
 		if (!isAllowedToShare(ust, user.id)) {
 			sendError("Not allowed to share in this translation", headers);
@@ -392,6 +391,7 @@ public class UserTranslationsService {
 		return true;
 	}
 
+	// Owner approves a pending request: allow-list + register sharer + notify the requester.
 	public void approveShare(UserTranslation ust, CloudUser owner, int targetUserId, SimpMessageHeaderAccessor headers) {
 		if (ust.getOwner() != owner.id) {
 			sendError("Only the owner can approve sharing", headers);
@@ -407,6 +407,7 @@ public class UserTranslationsService {
 		notifyUser(target, USER_UPD_TYPE_SHARE_APPROVED, ust.getId());
 	}
 
+	// Owner denies/revokes a sharer: clear pending + allow-list + any active sharing.
 	public void denyShare(UserTranslation ust, CloudUser owner, int targetUserId, SimpMessageHeaderAccessor headers) {
 		if (ust.getOwner() != owner.id) {
 			sendError("Only the owner can deny sharing", headers);
@@ -419,6 +420,7 @@ public class UserTranslationsService {
 		notifyUser(targetUserId, USER_UPD_TYPE_SHARE_DENIED, ust.getId());
 	}
 
+	// Pushes a {type, data} update to all of a user's sessions (resolved by email/principal name).
 	private void notifyUser(int userId, String type, Object data) {
 		notifyUser(usersRepository.findById(userId), type, data);
 	}
@@ -433,6 +435,7 @@ public class UserTranslationsService {
 		template.convertAndSendToUser(u.email, QUEUE_USER_UPDATES, payload);
 	}
 
+	// Owner deletes the translation: clear all state (memory + Redis) and tell viewers to clean up.
 	public boolean deleteTranslation(UserTranslation ust, CloudUser user, SimpMessageHeaderAccessor headers) {
 		if (ust.getOwner() != user.id) {
 			sendError("Only the owner can delete the translation", headers);
@@ -459,6 +462,7 @@ public class UserTranslationsService {
 		return true;
 	}
 
+	// Stops the user's own broadcast in this translation and announces the updated sharer list.
 	public void stopSharing(UserTranslation ust, CloudUser user, SimpMessageHeaderAccessor headers) {
 		Deque<TranslationSharingOptions> opts = ust.getSharingOptions();
 		Iterator<TranslationSharingOptions> it = opts.iterator();
@@ -484,14 +488,14 @@ public class UserTranslationsService {
 		template.convertAndSend(TOPIC_TRANSLATION + ust.getId(),
 				prepareMessageSystem().setType(TranslationMessageType.METADATA).setContent(obj));
 	}
-	
+
 	public String sendError(String error, SimpMessageHeaderAccessor headers) {
 		if (headers != null) {
 			sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_ERROR, error);
 		}
 		return error;
 	}
-	
+
 	public boolean sendEncryptedDeviceMessage(CloudUserDevice dev, CloudUser pu, String encData, String clientDeviceId,
 	                                          String clientAccessToken) {
 		if (clientDeviceId != null && clientAccessToken != null
@@ -526,6 +530,7 @@ public class UserTranslationsService {
 		return sent;
 	}
 
+	// Base message for server-generated events (JOIN/LEAVE/METADATA/DELETE).
 	private TranslationMessage prepareMessageSystem() {
 		TranslationMessage tm = new TranslationMessage();
 		tm.sendUserId = TranslationMessage.SENDER_SYSTEM_ID;
@@ -533,6 +538,7 @@ public class UserTranslationsService {
 		return tm;
 	}
     
+	// Base message authored by a user/device (used for LOCATION points).
 	private TranslationMessage prepareMessageAuthor(CloudUserDevice dev, CloudUser pu) {
 		TranslationMessage tm = new TranslationMessage();
 		if (dev != null) {
@@ -543,6 +549,7 @@ public class UserTranslationsService {
 		return tm;
 	}
 
+    // Broadcasts a message to the topic AND persists it to history (Redis ZSet) — used for LOCATION.
     private void rawSendMessage(UserTranslation ust, TranslationMessage msg) {
         if (msg.serverReceiveTime == 0) {
             msg.serverReceiveTime = System.currentTimeMillis();
@@ -558,6 +565,7 @@ public class UserTranslationsService {
 	}
     
 
+	// Display name: nickname if set, otherwise a masked half of the email.
 	private String getNickname(CloudUser user) {
 		if (!Algorithms.isEmpty(user.nickname)) {
 			return user.nickname;
@@ -565,6 +573,7 @@ public class UserTranslationsService {
 		return user.email.substring(0, user.email.length() / 2) + "...";
 	}
 
+	// A client subscribed to a translation topic → record the viewer and broadcast JOIN.
 	@EventListener
 	public void handleSessionSubscribeEvent(SessionSubscribeEvent event) {
 		StompHeaderAccessor headers = StompHeaderAccessor.wrap(event.getMessage());
@@ -581,12 +590,14 @@ public class UserTranslationsService {
 				prepareMessageSystem().setType(TranslationMessageType.JOIN).setContent(nickname));
 	}
 
+	// A client unsubscribed → broadcast LEAVE for that subscription.
 	@EventListener
 	public void handleSessionUnsubscribeEvent(SessionUnsubscribeEvent event) {
 		StompHeaderAccessor headers = StompHeaderAccessor.wrap(event.getMessage());
 		removeViewer(headers.getSessionId(), headers.getSubscriptionId());
 	}
 
+	// A client disconnected → LEAVE for all its subscriptions and drop its anonymous alias.
 	@EventListener
 	public void onDisconnectEvent(SessionDisconnectEvent event) {
 		String sessionId = event.getSessionId();
@@ -604,6 +615,7 @@ public class UserTranslationsService {
 		}
 	}
 
+	// Removes one subscription and emits its LEAVE.
 	private void removeViewer(String sessionId, String subId) {
 		Map<String, String> subs = sessionSubscriptions.get(sessionId);
 		if (subs == null) {
@@ -616,6 +628,7 @@ public class UserTranslationsService {
 		emitLeave(sessionId, destination);
 	}
 
+	// Removes the viewer from the topic roster and broadcasts LEAVE with their nickname.
 	private void emitLeave(String sessionId, String destination) {
 		Map<String, String> viewers = destination != null ? viewersByTopic.get(destination) : null;
 		if (viewers == null) {
