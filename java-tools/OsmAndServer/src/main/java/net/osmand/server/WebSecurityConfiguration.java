@@ -96,7 +96,7 @@ public class WebSecurityConfiguration {
 
 	public static class OsmAndProUser extends User {
 
-		private static final long serialVersionUID = -881322456618342435L;
+		private static final long serialVersionUID = -881322456618342436L;
 		private final CloudUserDevice userDevice;
 		private final CloudUser pu;
 
