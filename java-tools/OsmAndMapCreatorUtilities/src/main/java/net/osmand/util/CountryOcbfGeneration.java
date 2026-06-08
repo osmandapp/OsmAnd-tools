@@ -357,7 +357,7 @@ public class CountryOcbfGeneration {
 	}
 
 	private void generate(String repo) throws XmlPullParserException, IOException, SAXException, SQLException, InterruptedException {
-		String targetObf = repo + "regions.ocbf";
+		String targetObf = repo + "regions.obf";
 		String targetOsmXml = repo + "regions.osm.xml";
 		Map<String, Set<TranslateEntity>> translates = getTranslates(repo);
 		Map<String, File> polygonFiles = getPolygons(repo);
