@@ -13,14 +13,11 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -53,6 +50,7 @@ import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
 import net.osmand.server.api.repo.SupportersRepository;
 import net.osmand.server.api.repo.SupportersRepository.Supporter;
+import net.osmand.server.api.services.DeviceTokenCache;
 import net.osmand.server.api.services.DownloadIndexesService;
 import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
 import net.osmand.server.api.services.EmailSenderService;
@@ -61,7 +59,6 @@ import net.osmand.server.api.services.UserSubscriptionService;
 import net.osmand.server.api.services.UserdataService;
 import net.osmand.server.controllers.user.MapApiController;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
-import net.osmand.server.ws.UserTranslation;
 import net.osmand.server.ws.UserTranslationsService;
 import net.osmand.util.Algorithms;
 
@@ -81,9 +78,8 @@ public class UserdataController {
 	// identity differently
 	public static final int SPECIAL_PERMANENT_TOKEN = 8;
 
-	private final Map<Integer, CachedInfoDevice> cacheByDeviceId = new ConcurrentHashMap<>();
-
-	private static final long CACHE_TTL = 15 * 60 * 1000; // Minutes Validity
+	@Autowired
+	protected DeviceTokenCache deviceTokenCache;
 
 	Gson gson = new Gson();
 
@@ -109,7 +105,7 @@ public class UserdataController {
 	protected UserSubscriptionService userSubService;
 
 	@Autowired
-	protected UserTranslationsService userTranlsationService;
+	protected UserTranslationsService userTranslationService;
 
 	@Autowired
 	EmailSenderService emailSender;
@@ -138,39 +134,12 @@ public class UserdataController {
 		public String lang;
 	}
 
-	private static class CachedInfoDevice {
-		final CloudUserDevice device;
-		final long timestamp;
-		public CloudUser user;
-
-		CachedInfoDevice(CloudUserDevice device, CloudUser user) {
-			this.device = device;
-			this.timestamp = System.currentTimeMillis();
-		}
-	}
-	
-	private CachedInfoDevice checkTokenСache(int deviceId, String accessToken) {
-		CachedInfoDevice cached = cacheByDeviceId.get(deviceId);
-		if (cached != null && (System.currentTimeMillis() - cached.timestamp) < CACHE_TTL) {
-			if (Algorithms.stringsEqual(cached.device.accesstoken, accessToken)) {
-				return cached;
-			}
-		}
-		CloudUserDevice d = devicesRepository.findById(deviceId);
-		if (d != null && Algorithms.stringsEqual(d.accesstoken, accessToken)) {
-			CachedInfoDevice cache = new CachedInfoDevice(d, null);
-			cacheByDeviceId.put(deviceId, new CachedInfoDevice(d, null));
-			return cache;
-		}
-		return null;
-	}
-
 	private CloudUserDevice checkToken(int deviceId, String accessToken) {
-		CachedInfoDevice checkTokenСache = checkTokenСache(deviceId, accessToken);
-		if (checkTokenСache == null) {
+		DeviceTokenCache.CachedInfoDevice cached = deviceTokenCache.getValidatedDevice(deviceId, accessToken);
+		if (cached == null) {
 			return null;
 		}
-		return checkTokenСache.device;
+		return cached.device;
 	}
 
 	public ResponseEntity<String> invalidateUser(@RequestParam(required = true) int userId) throws IOException {
@@ -227,7 +196,7 @@ public class UserdataController {
 	public ResponseEntity<String> sendTranslationMessage(@RequestParam(name = "deviceid") int deviceId,
 	                                                     @RequestParam(name = "accessToken") String accessToken,
 	                                                     @RequestParam(name = "encryptedData") String encryptedData) {
-		CachedInfoDevice dev = checkTokenСache(deviceId, accessToken);
+		DeviceTokenCache.CachedInfoDevice dev = deviceTokenCache.getValidatedDevice(deviceId, accessToken);
 		if (dev == null) {
 			return userdataService.tokenNotValidError();
 		}
@@ -237,7 +206,7 @@ public class UserdataController {
 				return userdataService.tokenNotValidError();
 			}
 		}
-		boolean ok = userTranlsationService.sendEncryptedDeviceMessage(dev.device, dev.user, encryptedData,
+		boolean ok = userTranslationService.sendEncryptedDeviceMessage(dev.device, dev.user, encryptedData,
 				dev.device.deviceid, dev.device.accesstoken);
 		return ok ? ResponseEntity.ok("OK") : ResponseEntity.notFound().build();
 	}
@@ -586,11 +555,5 @@ public class UserdataController {
 			return userdataService.confirmCode(username, token);
 		}
 		return ResponseEntity.badRequest().body("Please enter valid email");
-	}
-
-	@Scheduled(fixedRate = 1, timeUnit = TimeUnit.HOURS) // Run every hour
-	public void clearExpiredTokens() {
-		long now = System.currentTimeMillis();
-		cacheByDeviceId.values().removeIf(c -> (now - c.timestamp) > CACHE_TTL);
 	}
 }
