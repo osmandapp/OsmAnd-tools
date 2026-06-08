@@ -482,26 +482,24 @@ public interface InspectorService extends OBFService {
         final int safePage = Math.max(pageToShow, 0);
         final int safeSize = Math.max(1, Math.min(pageSizeLimit, 100));
         try {
-            List<IndexToken> results = new ArrayList<>();
+            Map<String, IndexToken> mergedByName = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
             if (obfs != null) {
                 for (String obf : obfs) {
                     if (Algorithms.isEmpty(obf)) {
                         continue;
                     }
                     List<IndexToken> allTokens = getCachedOrLoadIndexTokens(new File(obf));
-                    if (prefixPattern == null) {
-                        for (IndexToken token : allTokens) {
-                            results.add(withObf(token, obf));
+                    for (IndexToken token : allTokens) {
+                        if (token == null || token.name() == null) {
+                            continue;
                         }
-                    } else {
-                        for (IndexToken token : allTokens) {
-                            if (prefixPattern.matcher(token.name()).find()) {
-                                results.add(withObf(token, obf));
-                            }
+                        if (prefixPattern == null || prefixPattern.matcher(token.name()).find()) {
+                            mergedByName.merge(token.name(), token, this::mergeIndexTokens);
                         }
                     }
                 }
             }
+            List<IndexToken> results = new ArrayList<>(mergedByName.values());
             IndexTokenSummary summary = buildIndexTokenSummary(results);
             results.sort(buildIndexTokenComparator(sortBy, sortOrder));
             long totalElements = results.size();
@@ -518,12 +516,45 @@ public interface InspectorService extends OBFService {
         }
     }
 
-    default IndexToken withObf(IndexToken token, String obf) {
-        if (token == null) {
-            return null;
+    default IndexToken mergeIndexTokens(IndexToken left, IndexToken right) {
+        if (left == null) {
+            return right;
         }
-        return new IndexToken(token.name(), token.addressRefs(), token.poiRefs(), token.poiAtomRefs(), token.poiAtomSizes(),
-                token.isCommon(), token.isFrequent(), obf);
+        if (right == null) {
+            return left;
+        }
+        return new IndexToken(left.name() != null ? left.name() : right.name(),
+                concatAddressRefs(left.addressRefs(), right.addressRefs()),
+                concatIntArrays(left.poiRefs(), right.poiRefs()),
+                concatIntArrays(left.poiAtomRefs(), right.poiAtomRefs()),
+                concatIntArrays(left.poiAtomSizes(), right.poiAtomSizes()),
+                left.isCommon() || right.isCommon(),
+                left.isFrequent() || right.isFrequent(),
+                null);
+    }
+
+    default AddressRef[] concatAddressRefs(AddressRef[] left, AddressRef[] right) {
+        if (left == null || left.length == 0) {
+            return right == null ? new AddressRef[0] : Arrays.copyOf(right, right.length);
+        }
+        if (right == null || right.length == 0) {
+            return Arrays.copyOf(left, left.length);
+        }
+        AddressRef[] merged = Arrays.copyOf(left, left.length + right.length);
+        System.arraycopy(right, 0, merged, left.length, right.length);
+        return merged;
+    }
+
+    default int[] concatIntArrays(int[] left, int[] right) {
+        if (left == null || left.length == 0) {
+            return right == null ? new int[0] : Arrays.copyOf(right, right.length);
+        }
+        if (right == null || right.length == 0) {
+            return Arrays.copyOf(left, left.length);
+        }
+        int[] merged = Arrays.copyOf(left, left.length + right.length);
+        System.arraycopy(right, 0, merged, left.length, right.length);
+        return merged;
     }
 
     default Comparator<IndexToken> buildIndexTokenComparator(String sortBy, String sortOrder) {
@@ -2328,7 +2359,11 @@ public interface InspectorService extends OBFService {
                 if (Algorithms.isEmpty(obf)) {
                     continue;
                 }
-                ObjectAddressPage page = getObjects(obf, lang, token, regExp, 0, Integer.MAX_VALUE, sortBy, sortOrder, isFiltered, invalidOnly, objectType);
+                IndexToken obfToken = findIndexTokenByName(obf, token.name());
+                if (obfToken == null) {
+                    continue;
+                }
+                ObjectAddressPage page = getObjects(obf, lang, obfToken, regExp, 0, Integer.MAX_VALUE, sortBy, sortOrder, isFiltered, invalidOnly, objectType);
                 if (page == null) {
                     continue;
                 }
@@ -2352,6 +2387,24 @@ public interface InspectorService extends OBFService {
                 ? List.of()
                 : new ArrayList<>(content.subList(fromIndex, toIndex));
         return new ObjectAddressPage(pageContent, safePage, safeSize, totalElements, totalPages, countMetrics, sizeMetrics, aloneCount, aloneSize);
+    }
+
+    default IndexToken findIndexTokenByName(String obf, String tokenName) {
+        if (Algorithms.isEmpty(obf) || tokenName == null) {
+            return null;
+        }
+        File file = new File(obf);
+        try {
+            for (IndexToken token : getCachedOrLoadIndexTokens(file)) {
+                if (token != null && tokenName.equalsIgnoreCase(token.name())) {
+                    return token;
+                }
+            }
+            return null;
+        } catch (IOException e) {
+            getLogger().error("Failed to read OBF index {}", file, e);
+            throw new RuntimeException("Failed to read OBF index: " + e.getMessage(), e);
+        }
     }
 
     default void addMetrics(int[] target, int[] source) {
