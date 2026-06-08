@@ -13,6 +13,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class SubscriptionInterceptor implements ChannelInterceptor {
 
+	// Runs for every inbound STOMP frame: on CONNECT, stores the client-provided anonymous
+	// alias in the session attributes so it can be used later as the anonymous user's nickname.
 	@Override
 	public Message<?> preSend(@NonNull Message<?> message, @NonNull MessageChannel channel) {
 		StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
