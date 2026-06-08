@@ -96,13 +96,13 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-					// "-vprefix=c",
-					"-vpoi", // "-vpoiobjects",
+//					"-vpoi", // "-vpoiobjects",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
-					"-vaddress", "-vsearchinspect",
+					"-vaddress",
+					"-vsearchinspect", //  "-vprefix=plat",
 					//"-vcities", "-vstreetgroups", "-vcitynames",
 //					"-vstreets", //  "-vbuildings",// "-vintersections",
 //					"-lang=ru",
@@ -114,9 +114,9 @@ public class BinaryInspector {
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
-					System.getProperty("maps.dir") + "/Us_minnesota_northamerica_2.obf",
-					System.getProperty("maps.dir") + "/Us_california_san-francisco_northamerica_2.obf",
-//					System.getProperty("maps.dir") + "/Liechtenstein_europe_2.obf",
+//					System.getProperty("maps.dir") + "/Us_minnesota_northamerica_2.obf",
+//					System.getProperty("maps.dir") + "/Us_california_san-francisco_northamerica_2.obf",
+					System.getProperty("maps.dir") + "Netherlands_friesland_europe_2.obf",
 //					System.getProperty("maps.dir") + "/Turkey_southeastern-anatolia_europe_2.obf",
 //					System.getProperty("maps.dir") + "/Ukraine/",
 					
@@ -1032,7 +1032,7 @@ public class BinaryInspector {
 
 	private void printNameStats(Map<String, ValueFreq> nameIndexMap, int alimit, String name, SuffixesStat suffixesStat) {
 		int tokens = 0; 
-		ArrayList<ValueFreq> nameIndex = new ArrayList<ValueFreq>(nameIndexMap.values());
+		List<ValueFreq> nameIndex = new ArrayList<ValueFreq>(nameIndexMap.values());
 		Collections.sort(nameIndex);
 		for (ValueFreq pt : nameIndex) {
 			Collections.sort(pt.subValues);
@@ -1047,7 +1047,7 @@ public class BinaryInspector {
 		List<ValueFreq> sublist = nameIndex.subList(0, limit);
 		StringBuilder nameValuesFmt = new StringBuilder();
 		for (ValueFreq key : sublist) {
-			nameValuesFmt.append(String.format("%s (%d, %,d) %s, ", key.value, key.subValues.size(), key.freq, key.getSubvalues(0.1, 1)));
+			nameValuesFmt.append(String.format("%s (%d, %,d) %s, ", key.value, key.subValues.size(), key.freq, key.getSubvalues(0.06, 1))); // 6%
 		}
 		println(String.format("\t%s Name index stats (%,d prefixes, %,d tokens, %,d refs/atoms): %s ", name, nameIndex.size(),
 				tokens, sumFreq(nameIndex), nameValuesFmt));

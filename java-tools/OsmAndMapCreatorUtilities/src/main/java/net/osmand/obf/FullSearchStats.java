@@ -57,7 +57,8 @@ public class FullSearchStats {
 //		}
 		boolean bld = obj instanceof Building;
 		for (String word : splitAndNormalize) {
-			if (CommonWords.getCommon(word) > 0 || bld) {
+			int commonIndex = CommonWords.getCommon(word);
+			if (commonIndex >= 0 || bld) {
 				boolean number = CommonWords.isNumber2Letters(word);
 				String n = word;
 				if (number) {
@@ -83,7 +84,9 @@ public class FullSearchStats {
 				if (number) {
 					num++;
 				}
-				cmn++;
+				if (commonIndex >= 0) {
+					cmn++;
+				}
 			}	
 		}
 		if (obj instanceof City c && cmn == splitAndNormalize.size()) {
@@ -95,7 +98,7 @@ public class FullSearchStats {
 		if (obj instanceof Street s && num == splitAndNormalize.size()) {
 			addError("STR_NUM", name + " " + descr + " " + s.getCity());
 		}
-		if (obj instanceof Building && cmn == 0) {
+		if (bld && cmn == 0) {
 			if (extra instanceof Street s) {
 				if (s.getName().length() > name.length()) {
 					return;
