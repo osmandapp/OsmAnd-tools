@@ -44,7 +44,7 @@ public class IndexCreationContext {
 	IndexCreationContext(IndexCreator indexCreator, String regionName, boolean basemap) {
 		this.indexCreator = indexCreator;
 		this.basemap = basemap;
-        if (indexCreator.getSettings().parseRegionBounds) {
+        if (indexCreator.getSettings().indexCountryRegions) {
             return;
         }
         this.allRegions = prepareRegions();

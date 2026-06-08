@@ -45,9 +45,14 @@ public class FullSearchStats {
 		}
 	}
 
-	public void analyze(String name, String descr, MapObject obj, MapObject extra) {
-		// all names could be used
+	public void analyze(String descr, MapObject obj, MapObject extra) {
 		descr += " " + String.format("%.5f,%.5f", obj.getLocation().getLatitude(), obj.getLocation().getLongitude());
+		analyze(obj.getName(), descr, obj, extra, true);
+		for (String oname : obj.getOtherNames(true, obj.getName())) {
+			analyze(oname, descr, obj, extra, false);
+		}
+	}
+	private void analyze(String name, String descr, MapObject obj, MapObject extra, boolean def) {
 		List<String> splitAndNormalize = SearchAlgorithms.splitAndNormalize(name);
 		int cmn = 0;
 		int num = 0;
@@ -89,16 +94,16 @@ public class FullSearchStats {
 				}
 			}	
 		}
-		if (obj instanceof City c && cmn == splitAndNormalize.size()) {
+		if (def && obj instanceof City c && cmn == splitAndNormalize.size()) {
 			CityType t = c.getType();
 			if (t == CityType.CITY || t == CityType.TOWN || t == CityType.VILLAGE) {
 				addError("CITY_COMMON", name + " " + descr);
 			}
 		}
-		if (obj instanceof Street s && num == splitAndNormalize.size()) {
+		if (def && obj instanceof Street s && num == splitAndNormalize.size()) {
 			addError("STR_NUM", name + " " + descr + " " + s.getCity());
 		}
-		if (bld && cmn == 0) {
+		if (def && bld && cmn == 0) {
 			if (extra instanceof Street s) {
 				if (s.getName().length() > name.length()) {
 					return;
@@ -142,21 +147,24 @@ public class FullSearchStats {
 			}
 		}
 		int limit = 1000;
-		List<ValueFreq> all = appendCommonWords(prefixnl, allFreqs, "All", b, poiStats, addressStats);
+		appendCommonWords(prefixnl, allFreqs, "All", b, poiStats, addressStats);
 		b.append(prefixnl);
-		calculateMergedWords(b, poiStats, addressStats, all, limit);
+		calculateMergedWords(b, poiStats, addressStats, allFreqs, limit);
 		b.append("\n");
 		return b;
 	}
 
 	private void calculateMergedWords(StringBuilder b, PoiStats poiStats, AddressStats addressStats,
-			List<ValueFreq> commonWords, int limit) {
-		Map<String, ValueFreq> merged = ValueFreq.mergeArray(new HashMap<>(), commonWords);
+			Map<String, ValueFreq> allFreqs, int limit) {
+		Map<String, ValueFreq> merged = new HashMap<>();
 		if (poiStats != null) {
 			ValueFreq.mergeFlatten(merged, poiStats.nameIndex.values());
 		}
 		if (addressStats != null) {
 			ValueFreq.mergeFlatten(merged, addressStats.nameIndex.values());
+		}
+		for (ValueFreq v : allFreqs.values()) {
+			merged.put(v.value, v.copy());
 		}
 		List<ValueFreq> mergedAllWords = new ArrayList<ValueFreq>(merged.values());
 		Collections.sort(mergedAllWords);
@@ -166,10 +174,10 @@ public class FullSearchStats {
 			if (ind++ > limit) {
 				break;
 			}
-			if (v.extra == 0) {
+			if (!allFreqs.containsKey(v.value)) {
 				b.append(String.format("\"%s\" [%d], ", v.value, v.freq));
 			} else {
-				b.append(String.format("\"%s\" [%d, %d], ", v.value, v.freq, v.extra));
+				b.append(String.format("\"%s\" [%d -> %d], ", v.value, v.freq, v.extra));
 			}
 		}
 	}

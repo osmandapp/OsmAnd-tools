@@ -41,8 +41,8 @@ public class CountryOcbfGeneration {
 	private static final Log log = PlatformUtil.getLog(CountryOcbfGeneration.class);
 
 	public static void main(String[] args) throws XmlPullParserException, IOException, SAXException, SQLException, InterruptedException {
-		String repo =  "/Users/ivan/OsmAnd/";
-		if(args != null && args.length > 0) {
+		String repo = "../../../";
+		if (args != null && args.length > 0) {
 			repo = args[0];
 		}
 		new CountryOcbfGeneration().generate(repo);
@@ -400,7 +400,7 @@ public class CountryOcbfGeneration {
 		settings.indexPOI = false;
 		settings.indexTransport = false;
 		settings.indexRouting = false;
-        settings.parseRegionBounds = true;
+        settings.indexCountryRegions = true;
 
 		IndexCreator creator = new IndexCreator(new File(targetObf).getParentFile(), settings); //$NON-NLS-1$
 		creator.setMapFileName(new File(targetObf).getName());

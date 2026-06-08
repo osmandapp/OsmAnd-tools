@@ -179,7 +179,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		// Not needed as we start storing all NEIGHBOURHOOD, DISTRICT as BOUNDARY
 		// Bucharest has admin level 4
 		boolean boundaryValid = boundary != null
-                && (!boundary.hasAdminLevel() || boundary.getAdminLevel() >= 4 || settings.parseRegionBounds)
+                && (!boundary.hasAdminLevel() || boundary.getAdminLevel() >= 4 || settings.indexCountryRegions)
                 && boundary.getCenterPoint() != null
                 && !Algorithms.isEmpty(boundary.getName());
 		if (boundaryValid) {
@@ -1418,9 +1418,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
                                               IndexCreatorSettings settings) {
     	name = removeBraces(name);
 		List<String> splitNames = splitAndNormalize(name);
-        if (!settings.parseRegionBounds) {
-            SearchAlgorithms.removeCommonWords(splitNames);
-        }
+        SearchAlgorithms.removeCommonWords(splitNames);
 		// add to the map
 		for (String token : splitNames) {
 			String val = SearchAlgorithms.nameIndexPreparePrefix(token, settings.charsToBuildAddressNameIndex);

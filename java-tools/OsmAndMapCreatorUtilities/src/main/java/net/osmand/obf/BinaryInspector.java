@@ -103,8 +103,8 @@ public class BinaryInspector {
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 					"-vaddress",
-//					"-vsearchinspect", 
-					"-vcities", "-vstreetgroups", "-vcitynames",
+					"-vsearchinspect", 
+//					"-vcities", "-vstreetgroups", "-vcitynames",
 //					"-vstreets", //  "-vbuildings",// "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
@@ -124,7 +124,7 @@ public class BinaryInspector {
 //					System.getProperty("maps.dir") + "Netherlands_friesland_europe_2.obf",
 //					System.getProperty("maps.dir") + "/Turkey_southeastern-anatolia_europe_2.obf",
 //					System.getProperty("maps.dir") + "/Ukraine/",
-					System.getProperty("maps.dir") + "regions.ocbf"
+//					System.getProperty("maps.dir") + "regions2.ocbf"
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
@@ -957,7 +957,7 @@ public class BinaryInspector {
 										+ ObfConstants.getOsmObjectId(c),
 								streets.size(), size, bboxStr));
 				if (verbose.vsearchinspect) {
-					verbose.searchStats.analyze(name, cityDescription, c, null);
+					verbose.searchStats.analyze(cityDescription, c, null);
 				} else {
 					print(cityDescription);
 					if (!verbose.vstreets) {
@@ -989,10 +989,9 @@ public class BinaryInspector {
 					String streetName = MessageFormat.format("\t\t\t''{0}'' [{1,number,#}], {2,number,#} building(s), {3,number,#} intersections(s)",
 							new Object[]{ t.getName(verbose.lang) + " " + t.getNamesMap(true).toString(), t.getId(), buildings.size(), intersections.size()});
 					if (verbose.vsearchinspect) {
-						verbose.searchStats.analyze(t.getName(), t.getName() + " " + c.getName(), t, c);
+						verbose.searchStats.analyze(t.getName() + " " + c.getName(), t, c);
 						for (Building b : buildings) {
-							verbose.searchStats.analyze(b.getName(),
-									b.getName() + " " + t.getName() + " " + c.getName(), b, t);
+							verbose.searchStats.analyze(b.getName() + " " + t.getName() + " " + c.getName(), b, t);
 						}
 					} else {
 						println(streetName);
@@ -1700,7 +1699,7 @@ public class BinaryInspector {
 						count[0]++;
 						String s = String.valueOf(amenity.printNamesAndAdditional());
 						if(verbose.vsearchinspect) {
-							verbose.searchStats.analyze(amenity.getName(), s, amenity, null);
+							verbose.searchStats.analyze(s, amenity, null);
 							return false;
 						}
 						long id = (amenity.getId());

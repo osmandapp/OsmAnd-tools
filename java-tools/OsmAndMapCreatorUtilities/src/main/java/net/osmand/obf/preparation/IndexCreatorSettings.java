@@ -87,7 +87,7 @@ public class IndexCreatorSettings {
 
 	public boolean poiGeocodingPrecise = false; // to house number
 
-    public boolean parseRegionBounds = false;
+    public boolean indexCountryRegions = false;
 
 	public String getString(String key) {
 		// IndexCreator.INDEX_LO_LEVEL_WAYS
