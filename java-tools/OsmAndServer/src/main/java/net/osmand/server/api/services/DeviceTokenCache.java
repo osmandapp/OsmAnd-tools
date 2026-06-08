@@ -64,7 +64,8 @@ public class DeviceTokenCache {
 		cacheByDeviceId.values().removeIf(c -> c.device.userid == userId);
 	}
 
-	@Scheduled(fixedRate = 1, timeUnit = TimeUnit.HOURS) // Run every hour
+	// Removes expired entries from memory. Runs at the TTL interval (15 min).
+	@Scheduled(fixedRate = 15, timeUnit = TimeUnit.MINUTES)
 	public void clearExpired() {
 		long now = System.currentTimeMillis();
 		cacheByDeviceId.values().removeIf(c -> (now - c.timestamp) > CACHE_TTL);
