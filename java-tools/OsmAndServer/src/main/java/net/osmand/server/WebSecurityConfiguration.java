@@ -96,7 +96,7 @@ public class WebSecurityConfiguration {
 
 	public static class OsmAndProUser extends User {
 
-		private static final long serialVersionUID = -881322456618342436L;
+		private static final long serialVersionUID = -881322456618342435L;
 		private final CloudUserDevice userDevice;
 		private final CloudUser pu;
 
@@ -136,7 +136,7 @@ public class WebSecurityConfiguration {
 
 	@Configuration
 	@ConditionalOnExpression("!T(org.springframework.util.StringUtils).isEmpty('${REDIS_HOST:}') && !T(org.springframework.util.StringUtils).isEmpty('${REDIS_PORT:}')")
-	@EnableRedisHttpSession(maxInactiveIntervalInSeconds = SESSION_TTL_SECONDS)
+	@EnableRedisHttpSession(maxInactiveIntervalInSeconds = SESSION_TTL_SECONDS, redisNamespace = "osmand:session:v2")
 	public class ConditionalRedisConfig {
 
 		@Bean
