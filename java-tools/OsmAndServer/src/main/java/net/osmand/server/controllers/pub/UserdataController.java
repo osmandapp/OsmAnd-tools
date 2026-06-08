@@ -173,15 +173,9 @@ public class UserdataController {
 	public ResponseEntity<String> sendTranslationMessage(@RequestParam(name = "deviceid") int deviceId,
 			@RequestParam(name = "accessToken") String accessToken,
 			@RequestParam(name = "encryptedData") String encryptedData) {
-		DeviceTokenCache.CachedInfoDevice dev = deviceTokenCache.getValidatedDevice(deviceId, accessToken);
+		DeviceTokenCache.CachedInfoDevice dev = validatedDeviceWithUser(deviceId, accessToken);
 		if (dev == null) {
 			return userdataService.tokenNotValidError();
-		}
-		if (dev.user == null) {
-			dev.user = usersRepository.findById(dev.device.userid);
-			if (dev.user == null) {
-				return userdataService.tokenNotValidError();
-			}
 		}
 		boolean ok = userTranslationService.sendEncryptedDeviceMessage(dev.device, dev.user, encryptedData,
 				dev.device.deviceid, dev.device.accesstoken);
@@ -192,18 +186,23 @@ public class UserdataController {
 	public ResponseEntity<String> requestShareTranslation(@RequestParam(name = "deviceid") int deviceId,
 	                                                      @RequestParam(name = "accessToken") String accessToken,
 	                                                      @RequestParam(name = "tid") String tid) {
-		DeviceTokenCache.CachedInfoDevice dev = deviceTokenCache.getValidatedDevice(deviceId, accessToken);
+		DeviceTokenCache.CachedInfoDevice dev = validatedDeviceWithUser(deviceId, accessToken);
 		if (dev == null) {
 			return userdataService.tokenNotValidError();
 		}
-		if (dev.user == null) {
-			dev.user = usersRepository.findById(dev.device.userid);
-			if (dev.user == null) {
-				return userdataService.tokenNotValidError();
-			}
-		}
 		boolean ok = userTranslationService.requestShareFromDevice(tid, dev.user);
 		return ok ? ResponseEntity.ok("OK") : ResponseEntity.notFound().build();
+	}
+
+	private DeviceTokenCache.CachedInfoDevice validatedDeviceWithUser(int deviceId, String accessToken) {
+		DeviceTokenCache.CachedInfoDevice dev = deviceTokenCache.getValidatedDevice(deviceId, accessToken);
+		if (dev == null) {
+			return null;
+		}
+		if (dev.user == null) {
+			dev.user = usersRepository.findById(dev.device.userid);
+		}
+		return dev.user != null ? dev : null;
 	}
 
 	@PostMapping(value = "/user-update-orderid")
