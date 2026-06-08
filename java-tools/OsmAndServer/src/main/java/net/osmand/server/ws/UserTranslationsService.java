@@ -143,7 +143,9 @@ public class UserTranslationsService {
 				alias = oalias + " " + random.nextInt(1000);
 				anonymousUsers.putIfAbsent(alias, sessionId);
 			}
-			attributes.put(ALIAS, alias);
+			if (attributes != null) {
+				attributes.put(ALIAS, alias);
+			}
 			us.id = TranslationMessage.SENDER_ANONYMOUS_ID;
 			us.nickname = alias;
 			us.email = us.nickname + "@example.com";
@@ -209,7 +211,7 @@ public class UserTranslationsService {
 			return null;
 		}
 		long time = System.currentTimeMillis();
-		UserTranslation ust = new UserTranslation(translationId, user == null ? -1: user.id);
+		UserTranslation ust = new UserTranslation(translationId, user.id);
 		ust.setCreationDate(time);
 		ust.setDurationMs(durationHours == 0 ? UserTranslation.PERMANENT_DURATION_MS : durationHours * 60 * 60 * 1000L);
 		activeSessions.put(ust.getId(), ust);
@@ -308,7 +310,6 @@ public class UserTranslationsService {
 		UserTranslationPlainObject obj = new UserTranslationPlainObject(ust.getId());
 		obj.setShareLocations(ust);
 		rawSendMessage(ust, prepareMessageSystem().setType(TranslationMessageType.METADATA).setContent(obj));
-//		sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_TRANSLATION, obj);
 	}
 	
 	public boolean whoami(CloudUser user, SimpMessageHeaderAccessor headers) {
@@ -412,12 +413,6 @@ public class UserTranslationsService {
 			TranslationMessage msg = prepareMessageSystem().setType(TranslationMessageType.JOIN)
 					.setContent(getNickname(user));
 			template.convertAndSend(destination, msg);
-			
-//			String translationId = destination.replace(TOPIC_TRANSLATION, "");
-//			UserTranslation ust = getTranslation(translationId, headers);
-//			if (user.id > 0) {
-//				userJoinTranslation(ust, user.id);
-//			}
 		}
 	}
 	
