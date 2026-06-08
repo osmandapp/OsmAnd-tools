@@ -3,9 +3,11 @@ package net.osmand.server.ws;
 import java.security.Principal;
 import java.security.SecureRandom;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +30,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 import org.springframework.web.socket.messaging.SessionSubscribeEvent;
+import org.springframework.web.socket.messaging.SessionUnsubscribeEvent;
 
 import com.google.gson.Gson;
 
@@ -37,6 +40,7 @@ import org.apache.commons.logging.LogFactory;
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
+import net.osmand.server.api.repo.CloudUsersRepository;
 import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
 import net.osmand.server.ws.TranslationMessage.TranslationMessageType;
 import net.osmand.server.ws.UserTranslation.TranslationSharingOptions;
@@ -62,7 +66,9 @@ public class UserTranslationsService {
     
     static final String USER_UPD_TYPE_ERROR = "ERROR";
     static final String USER_UPD_TYPE_TRANSLATION = "TRANSLATION";
-    static final String USER_UPD_TYPE_USER_INFO = "USER_INFO";
+    static final String USER_UPD_TYPE_SHARE_REQUEST = "SHARE_REQUEST";
+    static final String USER_UPD_TYPE_SHARE_APPROVED = "SHARE_APPROVED";
+    static final String USER_UPD_TYPE_SHARE_DENIED = "SHARE_DENIED";
     
     static final String TRANSLATION_MISSING = "Translation doesn't exist";
 
@@ -86,6 +92,7 @@ public class UserTranslationsService {
     }
 
     private static final String REDIS_TRANSLATION_KEY_PREFIX = "livetrack:translation:";
+    private static final String REDIS_USER_SHARES_PREFIX = "livetrack:usershares:";
 
     // Active translation sessions. Metadata is persisted in Redis; this map holds the live
     // object with session state (sharingOptions) for the duration of the server process.
@@ -93,6 +100,10 @@ public class UserTranslationsService {
     private final Map<Integer, Deque<UserTranslation>> shareLocTranslationsByUser = new ConcurrentHashMap<>();
     // alias → STOMP sessionId for anonymous connections.
     private final Map<String, String> anonymousUsers = new ConcurrentHashMap<>();
+    // sessionId → (subscriptionId → subscribed translation topic) — to emit LEAVE on unsubscribe/disconnect.
+    private final Map<String, Map<String, String>> sessionSubscriptions = new ConcurrentHashMap<>();
+    // translation topic → (sessionId → viewer nickname) — current viewers, for the roster snapshot.
+    private final Map<String, Map<String, String>> viewersByTopic = new ConcurrentHashMap<>();
 
     private final Gson gson = new Gson();
     private final Random random = new SecureRandom();
@@ -102,6 +113,9 @@ public class UserTranslationsService {
     
     @Autowired
 	protected CloudUserDevicesRepository devicesRepository;
+
+    @Autowired
+	protected CloudUsersRepository usersRepository;
     
     private final Environment environment;
 
@@ -174,20 +188,21 @@ public class UserTranslationsService {
 		long owner;
 		long creationDate;
 		long durationMs;
-
-		TranslationMeta() {}
-
-		TranslationMeta(String id, long owner, long creationDate, long durationMs) {
-			this.id = id;
-			this.owner = owner;
-			this.creationDate = creationDate;
-			this.durationMs = durationMs;
-		}
+		Set<Integer> allowedSharers;
+		List<TranslationSharingOptions> sharingOptions;
+		Map<Integer, String> pendingRequests;
 	}
 
 	private void saveTranslationToRedis(UserTranslation ust) {
 		if (redisTemplate == null) return;
-		TranslationMeta meta = new TranslationMeta(ust.getId(), ust.getOwner(), ust.getCreationDate(), ust.getDurationMs());
+		TranslationMeta meta = new TranslationMeta();
+		meta.id = ust.getId();
+		meta.owner = ust.getOwner();
+		meta.creationDate = ust.getCreationDate();
+		meta.durationMs = ust.getDurationMs();
+		meta.allowedSharers = new HashSet<>(ust.getAllowedSharers());
+		meta.sharingOptions = new ArrayList<>(ust.getSharingOptions());
+		meta.pendingRequests = new HashMap<>(ust.getPendingShareRequests());
 		redisTemplate.opsForValue().set(REDIS_TRANSLATION_KEY_PREFIX + ust.getId(), gson.toJson(meta), MESSAGES_TTL);
 	}
 
@@ -199,6 +214,18 @@ public class UserTranslationsService {
 		UserTranslation ust = new UserTranslation(meta.id, (int) meta.owner);
 		ust.setCreationDate(meta.creationDate);
 		ust.setDurationMs(meta.durationMs);
+		if (meta.allowedSharers != null) {
+			ust.getAllowedSharers().addAll(meta.allowedSharers);
+		}
+		if (meta.pendingRequests != null) {
+			ust.getPendingShareRequests().putAll(meta.pendingRequests);
+		}
+		if (meta.sharingOptions != null) {
+			for (TranslationSharingOptions o : meta.sharingOptions) {
+				ust.getSharingOptions().add(o);
+				shareLocationByUser(ust, o.userId);
+			}
+		}
 		return ust;
 	}
 
@@ -213,7 +240,7 @@ public class UserTranslationsService {
 		long time = System.currentTimeMillis();
 		UserTranslation ust = new UserTranslation(translationId, user.id);
 		ust.setCreationDate(time);
-		ust.setDurationMs(durationHours == 0 ? UserTranslation.PERMANENT_DURATION_MS : durationHours * 60 * 60 * 1000L);
+		ust.setDurationMs(durationHours <= 0 ? UserTranslation.PERMANENT_DURATION_MS : durationHours * 60 * 60 * 1000L);
 		activeSessions.put(ust.getId(), ust);
 		saveTranslationToRedis(ust);
 		shareLocationByUser(ust, user.id);
@@ -230,6 +257,26 @@ public class UserTranslationsService {
 		if (!deque.contains(ust)) {
 			deque.add(ust);
 		}
+		if (redisTemplate != null) {
+			String key = REDIS_USER_SHARES_PREFIX + uid;
+			redisTemplate.opsForSet().add(key, ust.getId());
+			redisTemplate.expire(key, MESSAGES_TTL);
+		}
+	}
+
+	// Rebuilds in-memory routing for a user from Redis (used after a restart when a device posts
+	// before any viewer has reloaded the translation).
+	private void restoreUserShares(int uid) {
+		if (redisTemplate == null) {
+			return;
+		}
+		Set<String> tids = redisTemplate.opsForSet().members(REDIS_USER_SHARES_PREFIX + uid);
+		if (tids == null) {
+			return;
+		}
+		for (String tid : tids) {
+			getTranslation(tid, null);
+		}
 	}
 	
 
@@ -241,10 +288,13 @@ public class UserTranslationsService {
 		return ust;
 	}
 
-	public void load(UserTranslation ust, long fromTime, long toTime, SimpMessageHeaderAccessor headers) {
+	public void load(UserTranslation ust, long fromTime, long toTime, CloudUser user, SimpMessageHeaderAccessor headers) {
 		UserTranslationPlainObject obj = new UserTranslationPlainObject(ust.getId());
 		obj.ownerUserId = ust.getOwner();
 		obj.creationDate = ust.getCreationDate();
+		if (user != null && ust.getOwner() == user.id && !ust.getPendingShareRequests().isEmpty()) {
+			obj.setPendingRequests(ust.getPendingShareRequests());
+		}
 		double minScore = fromTime <= 0 ? Double.NEGATIVE_INFINITY : fromTime;
 		double maxScore = toTime <= 0 ? Double.POSITIVE_INFINITY : toTime;
 		if (redisTemplate != null) {
@@ -260,26 +310,125 @@ public class UserTranslationsService {
 					.toList();
 			obj.setHistory(messages);
 		}
-		obj.setShareLocations(ust);
+		obj.setShareLocations(ust, user != null ? user.id : 0);
+		obj.viewers = currentViewers(ust.getId());
 		sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_TRANSLATION, obj);
 	}
 
 	public void startSharing(UserTranslation ust, CloudUser user, SimpMessageHeaderAccessor headers) {
-		TranslationSharingOptions opts = new TranslationSharingOptions();
-		opts.startTime = System.currentTimeMillis();
-		opts.expireTime = opts.startTime + ust.getDurationMs();
-		opts.userId = user.id;
-		opts.nickname = getNickname(user);
-
-		UserTranslationPlainObject obj = new UserTranslationPlainObject(ust.getId());
-		ust.getSharingOptions().add(opts);
-		shareLocationByUser(ust, user.id);
-
-		obj.ownerUserId = ust.getOwner();
-		obj.setShareLocations(ust);
+		if (!isAllowedToShare(ust, user.id)) {
+			sendError("Not allowed to share in this translation", headers);
+			return;
+		}
+		UserTranslationPlainObject obj = addSharer(ust, user.id, getNickname(user));
 		sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_TRANSLATION, obj);
 		template.convertAndSend(TOPIC_TRANSLATION + ust.getId(),
 				prepareMessageSystem().setType(TranslationMessageType.METADATA).setContent(obj));
+	}
+
+	private boolean isAllowedToShare(UserTranslation ust, int userId) {
+		return ust.getOwner() == userId || ust.getAllowedSharers().contains(userId);
+	}
+
+	// Registers (or refreshes) userId as a sharer of the translation with a room-unique nickname.
+	private UserTranslationPlainObject addSharer(UserTranslation ust, int userId, String baseNickname) {
+		ust.getSharingOptions().removeIf(o -> o.userId == userId);
+		TranslationSharingOptions opts = new TranslationSharingOptions();
+		opts.startTime = System.currentTimeMillis();
+		opts.expireTime = opts.startTime + ust.getDurationMs();
+		opts.userId = userId;
+		opts.nickname = uniqueNickname(ust, userId, baseNickname);
+		ust.getSharingOptions().add(opts);
+		shareLocationByUser(ust, userId);
+		saveTranslationToRedis(ust);
+
+		UserTranslationPlainObject obj = new UserTranslationPlainObject(ust.getId());
+		obj.ownerUserId = ust.getOwner();
+		obj.setShareLocations(ust);
+		return obj;
+	}
+
+	// Ensures the nickname is unique among other sharers in the same room (appends " 2", " 3", ...).
+	private String uniqueNickname(UserTranslation ust, int userId, String base) {
+		Set<String> taken = new HashSet<>();
+		for (TranslationSharingOptions o : ust.getSharingOptions()) {
+			if (o.userId != userId) {
+				taken.add(o.nickname);
+			}
+		}
+		if (!taken.contains(base)) {
+			return base;
+		}
+		int n = 2;
+		while (taken.contains(base + " " + n)) {
+			n++;
+		}
+		return base + " " + n;
+	}
+
+	// A viewer (with the link) asks the owner for permission to broadcast into the translation.
+	public void requestShare(UserTranslation ust, CloudUser user) {
+		if (isAllowedToShare(ust, user.id)) {
+			return;
+		}
+		String nickname = getNickname(user);
+		ust.getPendingShareRequests().put(user.id, nickname);
+		saveTranslationToRedis(ust);
+		Map<String, Object> data = new HashMap<>();
+		data.put("translationId", ust.getId());
+		data.put("userId", user.id);
+		data.put("nickname", nickname);
+		notifyUser((int) ust.getOwner(), USER_UPD_TYPE_SHARE_REQUEST, data);
+	}
+
+	public boolean requestShareFromDevice(String translationId, CloudUser user) {
+		UserTranslation ust = getTranslation(translationId, null);
+		if (ust == null) {
+			return false;
+		}
+		requestShare(ust, user);
+		return true;
+	}
+
+	public void approveShare(UserTranslation ust, CloudUser owner, int targetUserId, SimpMessageHeaderAccessor headers) {
+		if (ust.getOwner() != owner.id) {
+			sendError("Only the owner can approve sharing", headers);
+			return;
+		}
+		ust.getPendingShareRequests().remove(targetUserId);
+		ust.getAllowedSharers().add(targetUserId);
+		CloudUser target = usersRepository.findById(targetUserId);
+		String base = target != null ? getNickname(target) : "User " + targetUserId;
+		UserTranslationPlainObject obj = addSharer(ust, targetUserId, base);
+		template.convertAndSend(TOPIC_TRANSLATION + ust.getId(),
+				prepareMessageSystem().setType(TranslationMessageType.METADATA).setContent(obj));
+		notifyUser(target, USER_UPD_TYPE_SHARE_APPROVED, ust.getId());
+	}
+
+	public void denyShare(UserTranslation ust, CloudUser owner, int targetUserId, SimpMessageHeaderAccessor headers) {
+		if (ust.getOwner() != owner.id) {
+			sendError("Only the owner can deny sharing", headers);
+			return;
+		}
+		ust.getPendingShareRequests().remove(targetUserId);
+		ust.getAllowedSharers().remove(targetUserId);
+		ust.getSharingOptions().removeIf(o -> o.userId == targetUserId);
+		saveTranslationToRedis(ust);
+		notifyUser(targetUserId, USER_UPD_TYPE_SHARE_DENIED, ust.getId());
+	}
+
+	private void notifyUser(int userId, String type, Object data) {
+		notifyUser(usersRepository.findById(userId), type, data);
+	}
+
+	private void notifyUser(CloudUser u, String type, Object data) {
+		if (u == null || Algorithms.isEmpty(u.email)) {
+			return;
+		}
+		Map<String, Object> payload = new HashMap<>();
+		payload.put("type", type);
+		payload.put("data", data);
+		template.convertAndSendToUser(u.email, QUEUE_USER_UPDATES, payload);
 	}
 
 	public boolean deleteTranslation(UserTranslation ust, CloudUser user, SimpMessageHeaderAccessor headers) {
@@ -288,6 +437,16 @@ public class UserTranslationsService {
 			return false;
 		}
 		activeSessions.remove(ust.getId());
+		// Drop this translation from every sharer's routing index (in-memory and Redis).
+		for (TranslationSharingOptions o : ust.getSharingOptions()) {
+			Deque<UserTranslation> deque = shareLocTranslationsByUser.get(o.userId);
+			if (deque != null) {
+				deque.remove(ust);
+			}
+			if (redisTemplate != null) {
+				redisTemplate.opsForSet().remove(REDIS_USER_SHARES_PREFIX + o.userId, ust.getId());
+			}
+		}
 		if (redisTemplate != null) {
 			redisTemplate.delete(REDIS_MSG_KEY_PREFIX + ust.getId());
 			redisTemplate.delete(REDIS_TRANSLATION_KEY_PREFIX + ust.getId());
@@ -307,20 +466,20 @@ public class UserTranslationsService {
 				it.remove();
 			}
 		}
+		// User no longer shares here — drop the routing index entry (in-memory and Redis).
+		Deque<UserTranslation> deque = shareLocTranslationsByUser.get(userId);
+		if (deque != null) {
+			deque.remove(ust);
+		}
+		if (redisTemplate != null) {
+			redisTemplate.opsForSet().remove(REDIS_USER_SHARES_PREFIX + userId, ust.getId());
+		}
+		saveTranslationToRedis(ust);
 		UserTranslationPlainObject obj = new UserTranslationPlainObject(ust.getId());
 		obj.setShareLocations(ust);
 		rawSendMessage(ust, prepareMessageSystem().setType(TranslationMessageType.METADATA).setContent(obj));
 	}
 	
-	public boolean whoami(CloudUser user, SimpMessageHeaderAccessor headers) {
-		Map<String, Object> u = new HashMap<>();
-		u.put("nickname", user.nickname);
-		u.put("email", user.email);
-		u.put("id", user.id);
-		sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_USER_INFO, u);
-		return true;
-	}
-
 	public String sendError(String error, SimpMessageHeaderAccessor headers) {
 		if (headers != null) {
 			sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_ERROR, error);
@@ -328,14 +487,6 @@ public class UserTranslationsService {
 		return error;
 	}
 	
-    public boolean sendMessage(UserTranslation ust, CloudUser user, Object message) {
-		TranslationMessage msg = prepareMessageAuthor(null, user);
-		msg.content = message;
-		msg.type = TranslationMessageType.TEXT;
-		rawSendMessage(ust, msg);
-		return true;
-	}
-
 	public boolean sendEncryptedDeviceMessage(CloudUserDevice dev, CloudUser pu, String encData, String clientDeviceId,
 	                                          String clientAccessToken) {
 		if (clientDeviceId != null && clientAccessToken != null
@@ -345,6 +496,10 @@ public class UserTranslationsService {
 
 		int userId = dev != null ? dev.userid : pu.id;
 		Deque<UserTranslation> userTranslations = shareLocTranslationsByUser.get(userId);
+		if (userTranslations == null || userTranslations.isEmpty()) {
+			restoreUserShares(userId);
+			userTranslations = shareLocTranslationsByUser.get(userId);
+		}
 		if (userTranslations == null || userTranslations.isEmpty()) {
 			return false;
 		}
@@ -356,6 +511,7 @@ public class UserTranslationsService {
 		for (UserTranslation ust : userTranslations) {
 			for (TranslationSharingOptions o : ust.getSharingOptions()) {
 				if (o.userId == userId && timeMillis < o.expireTime) {
+					msg.sender = o.nickname;
 					rawSendMessage(ust, msg);
 					sent = true;
 					break;
@@ -408,22 +564,71 @@ public class UserTranslationsService {
 	public void handleSessionSubscribeEvent(SessionSubscribeEvent event) {
 		StompHeaderAccessor headers = StompHeaderAccessor.wrap(event.getMessage());
 		String destination = headers.getDestination();
-		if (destination != null && destination.startsWith(TOPIC_TRANSLATION)) {
-			CloudUser user = getUser(headers.getUser(), headers, true);
-			TranslationMessage msg = prepareMessageSystem().setType(TranslationMessageType.JOIN)
-					.setContent(getNickname(user));
-			template.convertAndSend(destination, msg);
+		if (destination == null || !destination.startsWith(TOPIC_TRANSLATION)) {
+			return;
 		}
+		String sessionId = headers.getSessionId();
+		String nickname = getNickname(getUser(headers.getUser(), headers, true));
+		sessionSubscriptions.computeIfAbsent(sessionId, k -> new ConcurrentHashMap<>())
+				.put(headers.getSubscriptionId(), destination);
+		viewersByTopic.computeIfAbsent(destination, k -> new ConcurrentHashMap<>()).put(sessionId, nickname);
+		template.convertAndSend(destination,
+				prepareMessageSystem().setType(TranslationMessageType.JOIN).setContent(nickname));
 	}
-	
+
+	@EventListener
+	public void handleSessionUnsubscribeEvent(SessionUnsubscribeEvent event) {
+		StompHeaderAccessor headers = StompHeaderAccessor.wrap(event.getMessage());
+		removeViewer(headers.getSessionId(), headers.getSubscriptionId());
+	}
+
 	@EventListener
 	public void onDisconnectEvent(SessionDisconnectEvent event) {
+		String sessionId = event.getSessionId();
+		Map<String, String> subs = sessionSubscriptions.remove(sessionId);
+		if (subs != null) {
+			for (String destination : subs.values()) {
+				emitLeave(sessionId, destination);
+			}
+		}
 		StompHeaderAccessor headers = StompHeaderAccessor.wrap(event.getMessage());
 		Map<String, Object> attributes = headers.getSessionAttributes();
 		String oalias = (attributes != null) ? (String) attributes.get(ALIAS) : null;
-		if (oalias != null && event.getSessionId().equals(anonymousUsers.get(oalias))) {
+		if (oalias != null && sessionId.equals(anonymousUsers.get(oalias))) {
 			anonymousUsers.remove(oalias);
 		}
+	}
+
+	private void removeViewer(String sessionId, String subId) {
+		Map<String, String> subs = sessionSubscriptions.get(sessionId);
+		if (subs == null) {
+			return;
+		}
+		String destination = subs.remove(subId);
+		if (subs.isEmpty()) {
+			sessionSubscriptions.remove(sessionId);
+		}
+		emitLeave(sessionId, destination);
+	}
+
+	private void emitLeave(String sessionId, String destination) {
+		Map<String, String> viewers = destination != null ? viewersByTopic.get(destination) : null;
+		if (viewers == null) {
+			return;
+		}
+		String nickname = viewers.remove(sessionId);
+		if (viewers.isEmpty()) {
+			viewersByTopic.remove(destination);
+		}
+		if (nickname != null) {
+			template.convertAndSend(destination,
+					prepareMessageSystem().setType(TranslationMessageType.LEAVE).setContent(nickname));
+		}
+	}
+
+	private List<String> currentViewers(String translationId) {
+		Map<String, String> viewers = viewersByTopic.get(TOPIC_TRANSLATION + translationId);
+		return viewers == null ? Collections.emptyList() : new ArrayList<>(new HashSet<>(viewers.values()));
 	}
 
     

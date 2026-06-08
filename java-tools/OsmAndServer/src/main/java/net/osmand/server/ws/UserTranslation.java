@@ -1,6 +1,9 @@
 package net.osmand.server.ws;
 
 import java.util.Deque;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
 public class UserTranslation {
@@ -17,6 +20,11 @@ public class UserTranslation {
 
 	// Used as in-memory fallback when Redis is unavailable.
 	private final Deque<TranslationMessage> messages = new ConcurrentLinkedDeque<>();
+
+	// userIds allowed to broadcast into this translation (besides the owner).
+	private final Set<Integer> allowedSharers = ConcurrentHashMap.newKeySet();
+	// userId -> nickname of users who asked to share and await the owner's approval.
+	private final Map<Integer, String> pendingShareRequests = new ConcurrentHashMap<>();
 
 	public UserTranslation(String id, long ownerId) {
 		this.id = id;
@@ -53,6 +61,14 @@ public class UserTranslation {
 
 	public Deque<TranslationMessage> getMessages() {
 		return messages;
+	}
+
+	public Set<Integer> getAllowedSharers() {
+		return allowedSharers;
+	}
+
+	public Map<Integer, String> getPendingShareRequests() {
+		return pendingShareRequests;
 	}
 
 	public static class TranslationSharingOptions {

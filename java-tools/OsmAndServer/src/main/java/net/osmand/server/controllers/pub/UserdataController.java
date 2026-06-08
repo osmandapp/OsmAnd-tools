@@ -188,6 +188,24 @@ public class UserdataController {
 		return ok ? ResponseEntity.ok("OK") : ResponseEntity.notFound().build();
 	}
 
+	@RequestMapping(value = "/translation/requestShare")
+	public ResponseEntity<String> requestShareTranslation(@RequestParam(name = "deviceid") int deviceId,
+	                                                      @RequestParam(name = "accessToken") String accessToken,
+	                                                      @RequestParam(name = "tid") String tid) {
+		DeviceTokenCache.CachedInfoDevice dev = deviceTokenCache.getValidatedDevice(deviceId, accessToken);
+		if (dev == null) {
+			return userdataService.tokenNotValidError();
+		}
+		if (dev.user == null) {
+			dev.user = usersRepository.findById(dev.device.userid);
+			if (dev.user == null) {
+				return userdataService.tokenNotValidError();
+			}
+		}
+		boolean ok = userTranslationService.requestShareFromDevice(tid, dev.user);
+		return ok ? ResponseEntity.ok("OK") : ResponseEntity.notFound().build();
+	}
+
 	@PostMapping(value = "/user-update-orderid")
 	public ResponseEntity<String> userUpdateOrderid(@RequestParam String email,
 	                                                @RequestParam(name = "deviceid", required = false) String deviceId,

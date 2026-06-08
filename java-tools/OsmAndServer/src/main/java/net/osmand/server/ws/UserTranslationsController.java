@@ -30,24 +30,20 @@ public class UserTranslationsController {
 	// Body may include fromTime / toTime (epoch ms) to load only messages in that
 	// interval. Missing or <= 0 bounds mean unbounded, so {} loads the full history.
 	public record LoadRequest(long fromTime, long toTime) {}
+	// Target user for approve/deny share commands.
+	public record ShareUserRequest(int userId) {}
 
 	@MessageMapping("/translation/{translationId}/load")
 	public void loadTranslation(@DestinationVariable String translationId,
 	                            @Payload LoadRequest req,
-	                            SimpMessageHeaderAccessor headers) {
+	                            SimpMessageHeaderAccessor headers,
+	                            Principal principal) {
 		UserTranslation ust = userTranslationsService.getTranslation(translationId, headers);
 		if (ust == null) {
 			return;
 		}
-		userTranslationsService.load(ust, req.fromTime(), req.toTime(), headers);
-	}
-	
-	@MessageMapping("/whoami")
-	public void whoami(SimpMessageHeaderAccessor headers, Principal principal) {
 		CloudUser user = userTranslationsService.getUser(principal, headers, true);
-		if (user != null) {
-			userTranslationsService.whoami(user, headers);
-		}
+		userTranslationsService.load(ust, req.fromTime(), req.toTime(), user, headers);
 	}
 	
 	@MessageMapping("/translation/{translationId}/startSharing")
@@ -62,8 +58,9 @@ public class UserTranslationsController {
 	}
 
 	@MessageMapping("/translation/{translationId}/stopSharing")
-	public void stopSharing(@DestinationVariable String translationId, SimpMessageHeaderAccessor headers,
-			Principal principal) {
+	public void stopSharing(@DestinationVariable String translationId,
+	                        SimpMessageHeaderAccessor headers,
+	                        Principal principal) {
 		UserTranslation ust = userTranslationsService.getTranslation(translationId, headers);
 		CloudUser user = userTranslationsService.getUser(principal, headers);
 		if (user == null || ust == null) {
@@ -72,21 +69,53 @@ public class UserTranslationsController {
 		userTranslationsService.stopSharing(ust, user, headers);
 	}
 
-
-	@MessageMapping("/translation/{translationId}/sendMessage")
-	public void sendMessage(@DestinationVariable String translationId, @Payload String message,
-			Principal principal, SimpMessageHeaderAccessor headers) {
+	@MessageMapping("/translation/{translationId}/requestShare")
+	public void requestShare(@DestinationVariable String translationId,
+	                         SimpMessageHeaderAccessor headers,
+	                         Principal principal) {
 		UserTranslation ust = userTranslationsService.getTranslation(translationId, headers);
-		if (ust != null) {
-			CloudUser user = userTranslationsService.getUser(principal, headers, true);
-			userTranslationsService.sendMessage(ust, user, message);
+		CloudUser user = userTranslationsService.getUser(principal, headers);
+		if (user == null || ust == null) {
+			return;
 		}
+		userTranslationsService.requestShare(ust, user);
+	}
+
+	@MessageMapping("/translation/{translationId}/approveShare")
+	public void approveShare(@DestinationVariable String translationId, @Payload ShareUserRequest req,
+	                         SimpMessageHeaderAccessor headers,
+	                         Principal principal) {
+		UserTranslation ust = userTranslationsService.getTranslation(translationId, headers);
+		CloudUser user = userTranslationsService.getUser(principal, headers);
+		if (user == null || ust == null) {
+			return;
+		}
+		if (req == null || req.userId() <= 0) {
+			userTranslationsService.sendError("userId is required", headers);
+			return;
+		}
+		userTranslationsService.approveShare(ust, user, req.userId(), headers);
+	}
+
+	@MessageMapping("/translation/{translationId}/denyShare")
+	public void denyShare(@DestinationVariable String translationId, @Payload ShareUserRequest req,
+	                      SimpMessageHeaderAccessor headers,
+	                      Principal principal) {
+		UserTranslation ust = userTranslationsService.getTranslation(translationId, headers);
+		CloudUser user = userTranslationsService.getUser(principal, headers);
+		if (user == null || ust == null) {
+			return;
+		}
+		if (req == null || req.userId() <= 0) {
+			userTranslationsService.sendError("userId is required", headers);
+			return;
+		}
+		userTranslationsService.denyShare(ust, user, req.userId(), headers);
 	}
 
 	// One time call — response is sent via /user/queue/updates (sendPrivateMessage).
 	// Body may include:
-	//   translationId — client-generated SHA-256(key) hex string (64 chars), required.
-	//                   The server uses it as-is so translation_id == SHA-256(key).
+	//   translationId — first 16 hex chars of SHA-256(key), required (see TRANSLATION_ID_HEX_LENGTH).
 	//   durationHours — 0 means permanent.
 	@MessageMapping("/translation/create")
 	public void createTranslation(@Payload String body, SimpMessageHeaderAccessor headers, Principal principal) {
