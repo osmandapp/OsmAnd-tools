@@ -23,6 +23,7 @@ import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.lang.NonNull;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
@@ -229,7 +230,8 @@ public class UserTranslationsService {
 		return ust;
 	}
 
-	public UserTranslation createTranslation(CloudUser user, String translationId, int durationHours, SimpMessageHeaderAccessor headers) {
+	public UserTranslation createTranslation(@NonNull CloudUser user, String translationId, int durationHours,
+	                                         SimpMessageHeaderAccessor headers) {
 		boolean exists = redisTemplate != null
 				? redisTemplate.hasKey(REDIS_TRANSLATION_KEY_PREFIX + translationId)
 				: activeSessions.containsKey(translationId);  // fallback when Redis unavailable

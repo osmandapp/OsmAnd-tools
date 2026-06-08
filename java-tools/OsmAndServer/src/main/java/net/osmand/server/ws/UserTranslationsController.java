@@ -132,7 +132,8 @@ public class UserTranslationsController {
 			}
 			String candidate = json.has(TRANSLATION_ID_FIELD) ? json.get(TRANSLATION_ID_FIELD).getAsString() : null;
 			if (candidate == null || !candidate.matches("[0-9a-f]{" + TRANSLATION_ID_HEX_LENGTH + "}")) {
-				userTranslationsService.sendError("translationId is required", headers);
+				userTranslationsService.sendError(
+						"translationId must be " + TRANSLATION_ID_HEX_LENGTH + " lowercase hex characters", headers);
 				return;
 			}
 			clientTranslationId = candidate;
