@@ -1417,7 +1417,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
                                               IndexCreatorSettings settings) {
     	name = removeBraces(name);
 		List<String> splitNames = splitAndNormalize(name);
-        SearchAlgorithms.removeCommonWords(splitNames);
+        if (!settings.parseRegionBounds) {
+            SearchAlgorithms.removeCommonWords(splitNames);
+        }
 		// add to the map
 		for (String token : splitNames) {
 			String val = SearchAlgorithms.nameIndexPreparePrefix(token, settings.charsToBuildAddressNameIndex);
