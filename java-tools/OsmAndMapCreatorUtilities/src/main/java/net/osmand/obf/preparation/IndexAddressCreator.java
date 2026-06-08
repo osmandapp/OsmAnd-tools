@@ -1388,7 +1388,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 										 IndexCreatorSettings settings) {
 		String name = o.getName();
 		parsePrefix(name, o, namesIndex, settings);
-		for (String nm : o.getNamesMap(true).values()) {
+		// getOtherNames ignores "admin_level", "place"
+		for (String nm : o.getOtherNames(true, name)) {
 			if (!nm.equals(name)) {
 				parsePrefix(nm, o, namesIndex, settings);
 			}

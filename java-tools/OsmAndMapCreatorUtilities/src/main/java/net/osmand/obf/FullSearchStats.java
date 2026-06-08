@@ -141,12 +141,40 @@ public class FullSearchStats {
 				appendCommonWords(prefixnl, objFreqs.get(type), type, b, null, addressStats);
 			}
 		}
-		appendCommonWords(prefixnl, allFreqs, "All", b, poiStats, addressStats);
+		int limit = 1000;
+		List<ValueFreq> all = appendCommonWords(prefixnl, allFreqs, "All", b, poiStats, addressStats);
+		b.append(prefixnl);
+		calculateMergedWords(b, poiStats, addressStats, all, limit);
 		b.append("\n");
 		return b;
 	}
 
-	private void appendCommonWords(String prefixnl, Map<String, ValueFreq> freqs, String type, StringBuilder b, 
+	private void calculateMergedWords(StringBuilder b, PoiStats poiStats, AddressStats addressStats,
+			List<ValueFreq> commonWords, int limit) {
+		Map<String, ValueFreq> merged = ValueFreq.mergeArray(new HashMap<>(), commonWords);
+		if (poiStats != null) {
+			ValueFreq.mergeFlatten(merged, poiStats.nameIndex.values());
+		}
+		if (addressStats != null) {
+			ValueFreq.mergeFlatten(merged, addressStats.nameIndex.values());
+		}
+		List<ValueFreq> mergedAllWords = new ArrayList<ValueFreq>(merged.values());
+		Collections.sort(mergedAllWords);
+		b.append("All name words: ");
+		int ind = 0;
+		for (ValueFreq v : mergedAllWords) {
+			if (ind++ > limit) {
+				break;
+			}
+			if (v.extra == 0) {
+				b.append(String.format("\"%s\" [%d], ", v.value, v.freq));
+			} else {
+				b.append(String.format("\"%s\" [%d, %d], ", v.value, v.freq, v.extra));
+			}
+		}
+	}
+
+	private List<ValueFreq> appendCommonWords(String prefixnl, Map<String, ValueFreq> freqs, String type, StringBuilder b, 
 			PoiStats poiStats, AddressStats addressStats) {
 		List<ValueFreq> lst = new ArrayList<>(freqs.values());
 		Collections.sort(lst);
@@ -195,6 +223,7 @@ public class FullSearchStats {
 		}
 		b.append(prefixnl).append(String.format("  Frequent common words (matched %,d, indexed %,d): %s", fFreq,
 				fIndexed, freq.toString()));
+		return lst;
 	}
 
 	private int calcIndexed(Collection<ValueFreq> nameIndex, String value) {

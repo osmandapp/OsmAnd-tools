@@ -103,8 +103,8 @@ public class BinaryInspector {
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 					"-vaddress",
-					"-vsearchinspect", //  "-vprefix=plat",
-					//"-vcities", "-vstreetgroups", "-vcitynames",
+//					"-vsearchinspect", 
+					"-vcities", "-vstreetgroups", "-vcitynames",
 //					"-vstreets", //  "-vbuildings",// "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
@@ -117,10 +117,14 @@ public class BinaryInspector {
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
 //					System.getProperty("maps.dir") + "/Us_minnesota_northamerica_2.obf",
 //					System.getProperty("maps.dir") + "/Us_california_san-francisco_northamerica_2.obf",
+//					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_tubingen_europe_2.obf",
+//					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_karlsruhe_europe_2.obf",
+//					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_stuttgart_europe_2.obf",
+//					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_freiburg_europe_2.obf",
+//					System.getProperty("maps.dir") + "Netherlands_friesland_europe_2.obf",
 //					System.getProperty("maps.dir") + "/Turkey_southeastern-anatolia_europe_2.obf",
 //					System.getProperty("maps.dir") + "/Ukraine/",
-					
-					System.getProperty("maps.dir") + "Map.obf"
+					System.getProperty("maps.dir") + "regions.ocbf"
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
