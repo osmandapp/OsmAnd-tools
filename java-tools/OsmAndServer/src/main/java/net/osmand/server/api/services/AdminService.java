@@ -29,8 +29,8 @@ public class AdminService {
 
 	private static final String BACKUP_USERS_SQL =
 			"SELECT DISTINCT 'user-' || userid || '/' FROM user_files "
-					+ "WHERE updatetime > NOW() AT TIME ZONE 'UTC' - INTERVAL '2 hours'";
-	public static final int BACKUP_SCHEDULED_INTERVAL_1_H = 60 * 60 * 1000;
+					+ "WHERE updatetime > NOW() - INTERVAL '2 hours'";
+	private static final int BACKUP_SCHEDULED_INTERVAL_1_HOUR = 60 * 60 * 1000;
 
     @Autowired
     private EmailSenderService emailSender;
@@ -55,7 +55,7 @@ public class AdminService {
 	private final String backupUserFile = System.getenv("INCREMENTAL_CLOUD_USERS_FILE");
 
 	// Hourly: writes user ids with recent file changes to INCREMENTAL_CLOUD_USERS_FILE
-	@Scheduled(fixedRate = BACKUP_SCHEDULED_INTERVAL_1_H)
+	@Scheduled(fixedRate = BACKUP_SCHEDULED_INTERVAL_1_HOUR)
 	public void backupUserListScheduledTask() {
 		if (backupUserFile == null) {
 			return;
@@ -66,11 +66,15 @@ public class AdminService {
 			Files.createDirectories(target.getParent());
 			String content = users.isEmpty() ? "" : String.join("\n", users) + "\n";
 			Path tmp = Files.createTempFile(target.getParent(), target.getFileName().toString(), "");
-			Files.writeString(tmp, content, StandardCharsets.UTF_8);
-			Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-			LOG.info("Updated backup users : " + users.size());
+			try {
+				Files.writeString(tmp, content, StandardCharsets.UTF_8);
+				Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+				LOG.info("Updated backup users : " + users.size());
+			} finally {
+				Files.deleteIfExists(tmp);
+			}
 		} catch (Exception e) {
-			LOG.error("Failed to update backup users file" + backupUserFile, e);
+			LOG.error("Failed to update backup users file: " + backupUserFile, e);
 		}
 	}
 
