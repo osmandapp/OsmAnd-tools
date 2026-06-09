@@ -1133,7 +1133,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			Entity e = entry.getEntity();
 			icc.translitJapaneseNames(e);
 			icc.translitChineseNames(e);
-			if (role.startsWith("platform")) {
+			if (isPlatformRelationMember(e, role)) {
 				platformsAndStops.add(e);
 				platforms.add(e);
 			} else if (role.startsWith("stop")) {
@@ -1168,6 +1168,11 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		registerPlatformAliasStops(route, platformAliases);
 
 		return true;
+	}
+
+	private boolean isPlatformRelationMember(Entity entity, String role) {
+        boolean isTransportPlatform = "platform".equals(entity.getTag(OSMTagKey.PUBLIC_TRANSPORT)) || "platform".equals(entity.getTag(OSMTagKey.RAILWAY));
+		return role.startsWith("platform") || role.isEmpty() && isTransportPlatform;
 	}
 
 	private void mergePlatformsStops(List<Entity> platformsAndStopsToProcess, List<Entity> platforms, List<Entity> stops,
