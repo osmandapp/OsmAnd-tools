@@ -333,6 +333,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	}
 
 	public void createDatabaseStructure(Connection conn, DBDialect dialect, String rtreeStopsFileName) throws SQLException, IOException {
+		platformAliasRouteIdsByStop.clear();
+		platformAliasStopsByRoute.clear();
 		Statement stat = conn.createStatement();
 
 		stat.executeUpdate("create table transport_route (id bigint primary key, type varchar(1024), operator varchar(1024)," +
