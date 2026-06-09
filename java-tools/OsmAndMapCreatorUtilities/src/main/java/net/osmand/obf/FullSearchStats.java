@@ -238,7 +238,7 @@ public class FullSearchStats {
 		int indexed = 0;
 		if (nameIndex != null) {
 			for (ValueFreq key : nameIndex) {
-				if (value.equalsIgnoreCase(key.value)) {
+				if (value.equalsIgnoreCase(key.value) && key.subValues == null) {
 					indexed += key.freq;
 				} else if (value.startsWith(key.value)) {
 					indexed += calcIndexed(key.subValues, value);
