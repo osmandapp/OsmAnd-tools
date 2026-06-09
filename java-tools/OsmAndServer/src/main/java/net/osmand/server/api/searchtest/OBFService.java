@@ -129,15 +129,25 @@ public interface OBFService extends BaseService {
 			"centralamerica",
 			"southamerica");
 
-	record IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes, boolean isCommon, boolean isFrequent, String obf) {
+	record SuffixMetrics(int partial, int integer, int literal, int extra) {}
+	record IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes,
+	                  boolean isCommon, boolean isFrequent, String obf, SuffixMetrics suffixMetrics) {
 		public IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes, boolean isCommon, boolean isFrequent) {
-			this(name, addressRefs, poiRefs, poiAtomRefs, poiAtomSizes, isCommon, isFrequent, null);
+			this(name, addressRefs, poiRefs, poiAtomRefs, poiAtomSizes, isCommon, isFrequent, null, new SuffixMetrics(0, 0, 0, 0));
+		}
+		public IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes,
+		                  boolean isCommon, boolean isFrequent, SuffixMetrics suffixMetrics) {
+			this(name, addressRefs, poiRefs, poiAtomRefs, poiAtomSizes, isCommon, isFrequent, null, suffixMetrics);
 		}
 	}
 	record ObfFileInfo(String path, String name, String continent, String country, String region, long lastModified, long size) {}
 	record IndexTokenPage(List<IndexToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, IndexTokenSummary summary) {}
-	record IndexTokenSummary(int poiSum, int addressSum, int commonSum, int frequentSum, int poiMax, int addressMax) {}
-	record IndexTokenBuilder(String name, int[] addressOffsets, int[] addressSuffixIndexes, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes) {}
+	record IndexTokenSummary(int poiSum, int addressSum, int commonSum, int frequentSum,
+	                         int partialSuffixSum, int integerSuffixSum, int literalSuffixSum, int extraSuffixSum,
+	                         int poiMax, int addressMax,
+	                         int partialSuffixMax, int integerSuffixMax, int literalSuffixMax, int extraSuffixMax) {}
+	record IndexTokenBuilder(String name, int[] addressOffsets, int[] addressSuffixIndexes, AddressRef[] addressRefs,
+	                         int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes, SuffixMetrics suffixMetrics) {}
 	record AddressRef(int shiftToIndex, int shiftToCityIndex, int objectOffset, int cityOffset, int typeIndex, int atomSize) {}
 
 	record ObjectAddress(int sequenceId, String name, LatLon point, Map<String, String> commonTags,
@@ -772,11 +782,15 @@ public interface OBFService extends BaseService {
 
 		addObfSpec(schema, "OsmAndPoiNameIndex", 3, "table", "IndexedStringTable", InspectorService.ObfLengthType.FIXED32);
 		addObfSpec(schema, "OsmAndPoiNameIndex", 5, "data", "OsmAndPoiNameIndexData", InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "OsmAndPoiNameIndexData", 2, "suffixesDictionary", null, InspectorService.ObfLengthType.VAR_INT, false, true);
 		addObfSpec(schema, "OsmAndPoiNameIndexData", 3, "atoms", "OsmAndPoiNameIndexDataAtom", InspectorService.ObfLengthType.VAR_INT, false, true);
 		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 2, "zoom", null, InspectorService.ObfLengthType.VAR_INT);
 		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 3, "x", null, InspectorService.ObfLengthType.VAR_INT);
 		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 4, "y", null, InspectorService.ObfLengthType.VAR_INT);
-		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 5, "bloomIndex", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 5, "suffixesBitsetIndex", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 6, "suffixesBitset", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 7, "extraSuffix", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 9, "poiIndInBlock", null, InspectorService.ObfLengthType.VAR_INT);
 		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 14, "shiftTo", null, InspectorService.ObfLengthType.FIXED32);
 
 		addObfSpec(schema, "IndexedStringTable", 1, "prefix", null, InspectorService.ObfLengthType.VAR_INT);
@@ -837,7 +851,11 @@ public interface OBFService extends BaseService {
 
 		addObfSpec(schema, "OsmAndAddressNameIndexData", 4, "table", "IndexedStringTable", InspectorService.ObfLengthType.FIXED32);
 		addObfSpec(schema, "OsmAndAddressNameIndexData", 7, "atom", "AddressNameIndexData", InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "AddressNameIndexData", 2, "suffixesDictionary", null, InspectorService.ObfLengthType.VAR_INT, false, true);
 		addObfSpec(schema, "AddressNameIndexData", 4, "atom", "AddressNameIndexDataAtom", InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "AddressNameIndexDataAtom", 4, "suffixesBitset", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "AddressNameIndexDataAtom", 8, "suffixesBitsetIndex", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "AddressNameIndexDataAtom", 9, "extraSuffix", null, InspectorService.ObfLengthType.VAR_INT);
 
 		addObfSpec(schema, "OsmAndMapIndex", 4, "rules", "OsmAndMapIndex.MapEncodingRule", InspectorService.ObfLengthType.VAR_INT, false, true);
 		addObfSpec(schema, "OsmAndMapIndex", 5, "levels", "OsmAndMapIndex.MapRootLevel", InspectorService.ObfLengthType.FIXED32, false, true);

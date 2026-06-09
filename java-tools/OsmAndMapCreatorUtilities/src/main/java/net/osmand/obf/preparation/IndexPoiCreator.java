@@ -1160,6 +1160,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			for (String suffixToken : splitName) {
 				data.addToken(suffixToken);
 			}
+			data.addPrefixFullToken(str, poiIndInBlock, token);
 			List<String> suffixTokens = new ArrayList<String>();
 			for (String suffixToken : splitName) {
 				if (!Algorithms.objectEquals(suffixToken, token)) {
@@ -1240,6 +1241,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		PoiCreatorTagGroups tagGroups = new PoiCreatorTagGroups();
 		final Set<String> tokens = new LinkedHashSet<>();
 		final Map<String, Map<Integer, LinkedHashSet<String>>> prefixTokens = new LinkedHashMap<>();
+		final Map<String, Map<Integer, LinkedHashSet<String>>> prefixFullTokens = new LinkedHashMap<>();
 
 		public int getX() {
 			return x;
@@ -1265,8 +1267,21 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			tokensByPoi.computeIfAbsent(poiIndInBlock, ignored -> new LinkedHashSet<>()).addAll(tokens);
 		}
 
+		public void addPrefixFullToken(String prefix, int poiIndInBlock, String token) {
+			if (poiIndInBlock < 0 || Algorithms.isEmpty(token)) {
+				return;
+			}
+			Map<Integer, LinkedHashSet<String>> tokensByPoi = prefixFullTokens.computeIfAbsent(prefix, ignored -> new LinkedHashMap<>());
+			tokensByPoi.computeIfAbsent(poiIndInBlock, ignored -> new LinkedHashSet<>()).add(token);
+		}
+
 		public Map<Integer, LinkedHashSet<String>> getPrefixTokens(String prefix) {
 			Map<Integer, LinkedHashSet<String>> tokensByPoi = prefixTokens.get(prefix);
+			return tokensByPoi == null ? Collections.emptyMap() : tokensByPoi;
+		}
+
+		public Map<Integer, LinkedHashSet<String>> getPrefixFullTokens(String prefix) {
+			Map<Integer, LinkedHashSet<String>> tokensByPoi = prefixFullTokens.get(prefix);
 			return tokensByPoi == null ? Collections.emptyMap() : tokensByPoi;
 		}
 
@@ -1276,6 +1291,16 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 		public void remapPrefixTokens(Map<Integer, Integer> oldToNewIndex) {
 			for (Map.Entry<String, Map<Integer, LinkedHashSet<String>>> entry : prefixTokens.entrySet()) {
+				Map<Integer, LinkedHashSet<String>> remapped = new LinkedHashMap<Integer, LinkedHashSet<String>>();
+				for (Map.Entry<Integer, LinkedHashSet<String>> poiEntry : entry.getValue().entrySet()) {
+					Integer newIndex = oldToNewIndex.get(poiEntry.getKey());
+					if (newIndex != null) {
+						remapped.computeIfAbsent(newIndex, ignored -> new LinkedHashSet<String>()).addAll(poiEntry.getValue());
+					}
+				}
+				entry.setValue(remapped);
+			}
+			for (Map.Entry<String, Map<Integer, LinkedHashSet<String>>> entry : prefixFullTokens.entrySet()) {
 				Map<Integer, LinkedHashSet<String>> remapped = new LinkedHashMap<Integer, LinkedHashSet<String>>();
 				for (Map.Entry<Integer, LinkedHashSet<String>> poiEntry : entry.getValue().entrySet()) {
 					Integer newIndex = oldToNewIndex.get(poiEntry.getKey());

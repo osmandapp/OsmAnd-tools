@@ -1011,8 +1011,8 @@ public class BinaryMapIndexWriter {
 			AddressNameIndexData.Builder builder = AddressNameIndexData.newBuilder();
 			IndexAddressCreator.MapObjectIndex indexEntry = entry.getValue();
 			List<MapObject> objects = new ArrayList<>(indexEntry.getObjects());
-			CompactSuffixDictionary<MapObject> suffixDictionary = nameIndexBuildCompactSuffixDictionary(entry.getKey(), objects,
-					indexEntry::getTokens);
+			SuffixDictionary<MapObject> suffixDictionary = nameIndexBuildSuffixDictionary(entry.getKey(), objects,
+					indexEntry::getPrefixTokens);
 			if (suffixDictionary.dictionaryEntries.isEmpty()) {
 				builder.addSuffixesDictionary(EMPTY_SUFFIX_DICTIONARY_SENTINEL);
 			} else {
@@ -1049,7 +1049,13 @@ public class BinaryMapIndexWriter {
 				if (o instanceof Street) {
 					atom.addShiftToCityIndex((int) (pointer - ((Street) o).getCity().getFileOffset()));
 				}
-				addCompactSuffixes(atom, suffixDictionary.suffixes.get(o));
+				int[] bitsetWords = suffixDictionary.bitsets.get(o);
+				if (bitsetWords != null) {
+					for (int bitsetWord : bitsetWords) {
+						atom.addSuffixesBitset(bitsetWord);
+					}
+				}
+				addCompactSuffixes(atom, buildSeparatedCompactSuffixes(indexEntry.getTokens(o)));
 				builder.addAtom(atom.build());
 			}
 			codedOutStream.writeMessageNoTag(builder.build());
@@ -1087,6 +1093,40 @@ public class BinaryMapIndexWriter {
 		}
 		if (!Algorithms.isEmpty(suffixes.extraSuffix)) {
 			atom.setExtraSuffix(suffixes.extraSuffix);
+		}
+	}
+
+	private CompactSuffixes buildSeparatedCompactSuffixes(Collection<String> tokens) {
+		CompactSuffixes suffixes = new CompactSuffixes();
+		if (tokens == null || tokens.isEmpty()) {
+			return suffixes;
+		}
+		List<String> extraSuffixes = new ArrayList<String>();
+		for (String token : new LinkedHashSet<String>(tokens)) {
+			Integer encodedNumber = encodePureDecimalCompactSuffix(token);
+			if (encodedNumber != null) {
+				suffixes.suffixesBitsetIndex.add(encodedNumber);
+			} else if (!Algorithms.isEmpty(token)) {
+				extraSuffixes.add(token);
+			}
+		}
+		Collections.sort(suffixes.suffixesBitsetIndex);
+		Collections.sort(extraSuffixes);
+		if (!extraSuffixes.isEmpty()) {
+			suffixes.extraSuffix = String.join(" ", extraSuffixes);
+		}
+		return suffixes;
+	}
+
+	private Integer encodePureDecimalCompactSuffix(String token) {
+		if (!isPureDecimalInteger(token)) {
+			return null;
+		}
+		try {
+			long value = Long.parseLong(token);
+			return value <= 0x7fffffffL ? (int) ((value << 1) | 1) : null;
+		} catch (NumberFormatException e) {
+			return null;
 		}
 	}
 
@@ -1779,11 +1819,13 @@ public class BinaryMapIndexWriter {
 		final PoiTileBox box;
 		final int poiIndInBlock;
 		final Set<String> tokens;
+		final Set<String> prefixTokens;
 
-		PoiNameIndexRef(PoiTileBox box, int poiIndInBlock, Set<String> tokens) {
+		PoiNameIndexRef(PoiTileBox box, int poiIndInBlock, Set<String> tokens, Set<String> prefixTokens) {
 			this.box = box;
 			this.poiIndInBlock = poiIndInBlock;
 			this.tokens = tokens;
+			this.prefixTokens = prefixTokens;
 		}
 	}
 
@@ -1816,18 +1858,20 @@ public class BinaryMapIndexWriter {
 			for (PoiTileBox box : tileBoxes) {
 				compactPrefixMetadata = compactPrefixMetadata || box.hasPrefixTokens(e.getKey());
 				for (Entry<Integer, LinkedHashSet<String>> entry : box.getPrefixTokens(e.getKey()).entrySet()) {
-					refs.add(new PoiNameIndexRef(box, entry.getKey(), entry.getValue()));
+					Set<String> prefixTokens = box.getPrefixFullTokens(e.getKey()).get(entry.getKey());
+					refs.add(new PoiNameIndexRef(box, entry.getKey(), entry.getValue(),
+							prefixTokens == null ? Collections.emptySet() : prefixTokens));
 				}
 			}
-			CompactSuffixDictionary<PoiNameIndexRef> suffixDictionary = null;
+			SuffixDictionary<PoiNameIndexRef> compactPartialSuffixDictionary = null;
 			SuffixDictionary<PoiTileBox> legacySuffixDictionary = null;
 			boolean useCompactSuffixes = compactPrefixMetadata;
 			if (useCompactSuffixes) {
-				suffixDictionary = nameIndexBuildCompactSuffixDictionary(e.getKey(), refs, ref -> ref.tokens);
+				compactPartialSuffixDictionary = nameIndexBuildSuffixDictionary(e.getKey(), refs, ref -> ref.prefixTokens);
 			} else {
 				legacySuffixDictionary = nameIndexBuildSuffixDictionary(e.getKey(), tileBoxes, box -> box.tokens);
 			}
-			List<SuffixEntry> dictionaryEntries = useCompactSuffixes ? suffixDictionary.dictionaryEntries : legacySuffixDictionary.dictionaryEntries;
+			List<SuffixEntry> dictionaryEntries = useCompactSuffixes ? compactPartialSuffixDictionary.dictionaryEntries : legacySuffixDictionary.dictionaryEntries;
 			if (dictionaryEntries.isEmpty()) {
 				builder.addSuffixesDictionary(EMPTY_SUFFIX_DICTIONARY_SENTINEL);
 			} else {
@@ -1839,9 +1883,10 @@ public class BinaryMapIndexWriter {
 			if (useCompactSuffixes) {
 				Map<String, List<PoiNameIndexRef>> groupedRefs = new LinkedHashMap<String, List<PoiNameIndexRef>>();
 				for (PoiNameIndexRef ref : refs) {
-					CompactSuffixes suffixes = suffixDictionary.suffixes.get(ref);
+					int[] partialBitsetWords = compactPartialSuffixDictionary.bitsets.get(ref);
+					CompactSuffixes suffixes = buildSeparatedCompactSuffixes(ref.tokens);
 					String key = ref.box.getX() + ":" + ref.box.getY() + ":" + ref.box.getZoom() + ":"
-							+ suffixes.suffixesBitsetIndex + ":" + suffixes.extraSuffix;
+							+ java.util.Arrays.toString(partialBitsetWords) + ":" + suffixes.suffixesBitsetIndex + ":" + suffixes.extraSuffix;
 					groupedRefs.computeIfAbsent(key, ignored -> new ArrayList<PoiNameIndexRef>()).add(ref);
 				}
 				for (List<PoiNameIndexRef> group : groupedRefs.values()) {
@@ -1850,7 +1895,13 @@ public class BinaryMapIndexWriter {
 					bs.setX(firstRef.box.getX());
 					bs.setY(firstRef.box.getY());
 					bs.setZoom(firstRef.box.getZoom());
-					addCompactSuffixes(bs, suffixDictionary.suffixes.get(firstRef));
+					int[] partialBitsetWords = compactPartialSuffixDictionary.bitsets.get(firstRef);
+					if (partialBitsetWords != null) {
+						for (int bitsetWord : partialBitsetWords) {
+							bs.addSuffixesBitset(bitsetWord);
+						}
+					}
+					addCompactSuffixes(bs, buildSeparatedCompactSuffixes(firstRef.tokens));
 					for (PoiNameIndexRef ref : group) {
 						bs.addPoiIndInBlock(ref.poiIndInBlock);
 					}

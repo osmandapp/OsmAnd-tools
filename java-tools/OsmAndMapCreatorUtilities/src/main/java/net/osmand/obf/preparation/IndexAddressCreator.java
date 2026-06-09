@@ -71,13 +71,19 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	public static class MapObjectIndex {
 		private final Map<MapObject, LinkedHashSet<String>> objectTokens = new LinkedHashMap<>();
+		private final Map<MapObject, LinkedHashSet<String>> objectPrefixTokens = new LinkedHashMap<>();
 
 		public void addToken(MapObject object, String token) {
 			objectTokens.computeIfAbsent(object, ignored -> new LinkedHashSet<>()).add(token);
 		}
 
+		public void addPrefixToken(MapObject object, String token) {
+			objectPrefixTokens.computeIfAbsent(object, ignored -> new LinkedHashSet<>()).add(token);
+		}
+
 		public void addObject(MapObject object) {
 			objectTokens.computeIfAbsent(object, ignored -> new LinkedHashSet<>());
+			objectPrefixTokens.computeIfAbsent(object, ignored -> new LinkedHashSet<>());
 		}
 
 		public Set<MapObject> getObjects() {
@@ -86,6 +92,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 		public Set<String> getTokens(MapObject object) {
 			LinkedHashSet<String> tokens = objectTokens.get(object);
+			return tokens == null ? Collections.emptySet() : tokens;
+		}
+
+		public Set<String> getPrefixTokens(MapObject object) {
+			LinkedHashSet<String> tokens = objectPrefixTokens.get(object);
 			return tokens == null ? Collections.emptySet() : tokens;
 		}
 	}
@@ -1436,6 +1447,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				namesIndex.put(val, entry);
 			}
 			entry.addObject(data);
+			entry.addPrefixToken(data, token);
 			for (String suffixToken : splitNames) {
 				if (!Algorithms.objectEquals(suffixToken, token)) {
 					entry.addToken(data, suffixToken);
