@@ -76,6 +76,10 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			objectTokens.computeIfAbsent(object, ignored -> new LinkedHashSet<>()).add(token);
 		}
 
+		public void addObject(MapObject object) {
+			objectTokens.computeIfAbsent(object, ignored -> new LinkedHashSet<>());
+		}
+
 		public Set<MapObject> getObjects() {
 			return objectTokens.keySet();
 		}
@@ -1418,9 +1422,10 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
                                               IndexCreatorSettings settings) {
     	name = removeBraces(name);
 		List<String> splitNames = splitAndNormalize(name);
-        SearchAlgorithms.removeCommonWords(splitNames);
+		boolean allowNumberPrefixes = data instanceof City && ((City) data).getType() == CityType.POSTCODE;
+		Set<String> prefixes = SearchAlgorithms.nameIndexPrepareComplexPrefixes(splitNames, allowNumberPrefixes);
 		// add to the map
-		for (String token : splitNames) {
+		for (String token : prefixes) {
 			String val = SearchAlgorithms.nameIndexPreparePrefix(token, settings.charsToBuildAddressNameIndex);
 			if (val.isEmpty()) {
 				continue;
@@ -1430,7 +1435,12 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				entry = new MapObjectIndex();
 				namesIndex.put(val, entry);
 			}
-			entry.addToken(data, token);
+			entry.addObject(data);
+			for (String suffixToken : splitNames) {
+				if (!Algorithms.objectEquals(suffixToken, token)) {
+					entry.addToken(data, suffixToken);
+				}
+			}
 		}
 
 	}
