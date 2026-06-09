@@ -10,7 +10,6 @@ import net.osmand.util.Algorithms;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -28,7 +27,6 @@ public class AdminService {
 
 	private static final Log LOG = LogFactory.getLog(AdminService.class);
 
-	private static final String BACKUP_USER_FILE = "/.well-known/backup-users.txt";
 	private static final String BACKUP_USERS_SQL =
 			"SELECT DISTINCT 'user-' || userid || '/' FROM user_files "
 					+ "WHERE updatetime > NOW() AT TIME ZONE 'UTC' - INTERVAL '2 hours'";
@@ -52,21 +50,19 @@ public class AdminService {
 	@Autowired
 	JdbcTemplate jdbcTemplate;
 
-	@Value("${osmand.files.location}")
-	private String filesLocation;
-
     private final Gson gson = new Gson();
 
-	// Hourly: writes user ids with recent file changes to osmand.backup.users-file
-	// enabled via INCREMENTAL_CLOUD_USERS_FILE.
+	private final String backupUserFile = System.getenv("INCREMENTAL_CLOUD_USERS_FILE");
+
+	// Hourly: writes user ids with recent file changes to INCREMENTAL_CLOUD_USERS_FILE
 	@Scheduled(fixedRate = BACKUP_SCHEDULED_INTERVAL_1_H)
 	public void backupUserListScheduledTask() {
-		if (System.getenv("INCREMENTAL_CLOUD_USERS_FILE") == null) {
+		if (backupUserFile == null) {
 			return;
 		}
 		try {
 			List<String> users = jdbcTemplate.queryForList(BACKUP_USERS_SQL, String.class);
-			Path target = Path.of(filesLocation, BACKUP_USER_FILE);
+			Path target = Path.of(backupUserFile);
 			Files.createDirectories(target.getParent());
 			String content = users.isEmpty() ? "" : String.join("\n", users) + "\n";
 			Path tmp = Files.createTempFile(target.getParent(), target.getFileName().toString(), "");
@@ -74,7 +70,7 @@ public class AdminService {
 			Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
 			LOG.info("Updated backup users : " + users.size());
 		} catch (Exception e) {
-			LOG.error("Failed to update backup users file" + BACKUP_USER_FILE, e);
+			LOG.error("Failed to update backup users file" + backupUserFile, e);
 		}
 	}
 
