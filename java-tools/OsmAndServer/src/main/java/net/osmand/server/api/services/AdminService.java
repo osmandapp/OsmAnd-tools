@@ -28,9 +28,11 @@ public class AdminService {
 
 	private static final Log LOG = LogFactory.getLog(AdminService.class);
 
+	private static final String BACKUP_USER_FILE = "/.well-known/backup-users.txt";
 	private static final String BACKUP_USERS_SQL =
 			"SELECT DISTINCT 'user-' || userid || '/' FROM user_files "
-					+ "WHERE updatetime > NOW() AT TIME ZONE 'UTC' - INTERVAL '1 hours'";
+					+ "WHERE updatetime > NOW() AT TIME ZONE 'UTC' - INTERVAL '2 hours'";
+	public static final int BACKUP_SCHEDULED_INTERVAL_1_H = 60 * 60 * 1000;
 
     @Autowired
     private EmailSenderService emailSender;
@@ -50,24 +52,21 @@ public class AdminService {
 	@Autowired
 	JdbcTemplate jdbcTemplate;
 
-	@Value("${osmand.backup.users-enabled}")
-	private boolean backupUsersEnabled;
-
-	@Value("${osmand.backup.users-file}")
-	private String backupUsersFile;
+	@Value("${osmand.files.location}")
+	private String filesLocation;
 
     private final Gson gson = new Gson();
 
 	// Hourly: writes user ids with recent file changes to osmand.backup.users-file
-	// enabled via OSMAND_BACKUP_USERS_ENABLED.
-	@Scheduled(fixedRate = 60 * 60 * 1000)
+	// enabled via INCREMENTAL_CLOUD_USERS_FILE.
+	@Scheduled(fixedRate = BACKUP_SCHEDULED_INTERVAL_1_H)
 	public void backupUserListScheduledTask() {
-		if (!backupUsersEnabled) {
+		if (System.getenv("INCREMENTAL_CLOUD_USERS_FILE") == null) {
 			return;
 		}
 		try {
 			List<String> users = jdbcTemplate.queryForList(BACKUP_USERS_SQL, String.class);
-			Path target = Path.of(backupUsersFile);
+			Path target = Path.of(filesLocation, BACKUP_USER_FILE);
 			Files.createDirectories(target.getParent());
 			String content = users.isEmpty() ? "" : String.join("\n", users) + "\n";
 			Path tmp = Files.createTempFile(target.getParent(), target.getFileName().toString(), "");
@@ -75,7 +74,7 @@ public class AdminService {
 			Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
 			LOG.info("Updated backup users : " + users.size());
 		} catch (Exception e) {
-			LOG.error("Failed to update backup users file" + backupUsersFile, e);
+			LOG.error("Failed to update backup users file" + BACKUP_USER_FILE, e);
 		}
 	}
 

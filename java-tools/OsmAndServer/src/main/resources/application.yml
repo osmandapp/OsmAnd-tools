@@ -25,8 +25,6 @@ osmand:
   night-builds-json.location: https://dl2.osmand.net/night-builds-json/
   # ! should contain folders or symlinks indexes, night-builds, gen !
   files.location: ${user.dir}/../../../
-  backup.users-enabled: ${OSMAND_BACKUP_USERS_ENABLED:false}
-  backup.users-file: ${osmand.files.location}/.well-known/backup-users.txt
   gen.location: ${osmand.files.location}/gen
   web.location: ${osmand.files.location}/web-server-config
   srtm.location: ${SRTM_LOCATION:}
