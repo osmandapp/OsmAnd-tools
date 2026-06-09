@@ -10,18 +10,8 @@ import java.text.DecimalFormat;
 import java.text.MessageFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.WireFormat;
@@ -69,12 +59,17 @@ import net.osmand.data.Street;
 import net.osmand.data.TransportRoute;
 import net.osmand.data.TransportSchedule;
 import net.osmand.data.TransportStop;
+import net.osmand.map.OsmandRegions;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.PoiType;
 import net.osmand.osm.edit.Entity;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 import net.osmand.router.TransportRoutePlanner;
+import net.osmand.search.SearchUICore;
+import net.osmand.search.core.SearchPhrase;
+import net.osmand.search.core.SearchResult;
+import net.osmand.search.core.SearchSettings;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
@@ -87,13 +82,17 @@ public class BinaryInspector {
 	protected static final boolean DETECT_POI_ADDRESS = false;
 
 	private VerboseInfo vInfo;
-	
+    public Set<String> cityNames;
+    public List<BinaryMapIndexReader> indexes;
+
 	public static void main(String[] args) throws IOException {
 		BinaryInspector in = new BinaryInspector();
 		if (args == null || args.length == 0) {
 			BinaryInspector.printUsage(null);
 			return;
 		}
+        in.cityNames = new HashSet<>();
+        in.indexes = new ArrayList<>();
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
@@ -103,8 +102,8 @@ public class BinaryInspector {
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 					"-vaddress",
-					"-vsearchinspect", //  "-vprefix=plat",
-					//"-vcities", "-vstreetgroups", "-vcitynames",
+//					"-vsearchinspect", //  "-vprefix=plat",
+					"-vcities", "-vstreetgroups", "-vcitynames",
 //					"-vstreets", //  "-vbuildings",// "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
@@ -114,20 +113,55 @@ public class BinaryInspector {
 
 					//"-xyz=12071,26142,16",
 //					"-c",
-//					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
+					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
 //					System.getProperty("maps.dir") + "/Us_minnesota_northamerica_2.obf",
 //					System.getProperty("maps.dir") + "/Us_california_san-francisco_northamerica_2.obf",
 //					System.getProperty("maps.dir") + "/Turkey_southeastern-anatolia_europe_2.obf",
 //					System.getProperty("maps.dir") + "/Ukraine/",
-					
-					System.getProperty("maps.dir") + "Map.obf"
+
+					"/Users/ivan/OsmAnd/regions.ocbf"
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
 			in.inspector(args);
 		}
+        in.searchTest();
 	}
+
+    private void searchTest() throws IOException {
+        System.out.println(cityNames);
+        final SearchUICore core = new SearchUICore(MapPoiTypes.getDefault(), "en", false);
+        core.init();
+
+        ResultMatcher<SearchResult> rm = new ResultMatcher<SearchResult>() {
+            @Override
+            public boolean publish(SearchResult object) {
+                return true;
+            }
+
+            @Override
+            public boolean isCancelled() {
+                return false;
+            }
+        };
+        SearchSettings s = new SearchSettings(indexes);
+        s.setOriginalLocation(new LatLon(50, 30));
+        s.setRadiusLevel(1000000);
+        QuadRect bbox = new QuadRect(0, 0, Integer.MAX_VALUE, Integer.MAX_VALUE);
+        s.setRegions(new OsmandRegions(null));
+        s = s.setSearchBBox31(bbox);
+        SearchPhrase emptyPhrase = SearchPhrase.emptyPhrase(s);
+        for (String c : cityNames) {
+            SearchPhrase phrase = emptyPhrase.generateNewPhrase(c, s);
+            SearchUICore.SearchResultMatcher matcher = new SearchUICore.SearchResultMatcher(rm, phrase, 1, new AtomicInteger(1), -1);
+            core.searchInternal(phrase, matcher);
+            SearchUICore.SearchResultCollection collection = new SearchUICore.SearchResultCollection(phrase);
+            collection.addSearchResults(matcher.getRequestResults(), true, true);
+            List<SearchResult> result = collection.getCurrentSearchResults();
+        }
+        System.out.println("FINISH");
+    }
 
 	private void printToFile(String s) throws IOException {
 		if (vInfo.osmOut != null) {
@@ -183,7 +217,7 @@ public class BinaryInspector {
 		double lonright = 179.9;
 		String lang = null;
 		int zoom = 15;
-		
+
 		// stats for search
 		PoiStats poiStats = new PoiStats();
 		PoiStats globalPoiStats = new PoiStats();
@@ -191,12 +225,12 @@ public class BinaryInspector {
 		AddressStats globalAddressStats = new AddressStats();
 		FullSearchStats searchStats = new FullSearchStats();
 		FullSearchStats globalSearchStats = new FullSearchStats();
-		
+
 
 		public boolean isVaddress() {
 			return vaddress;
 		}
-		
+
 		public String getPrefix() {
 			return vprefix;
 		}
@@ -216,7 +250,7 @@ public class BinaryInspector {
 		public boolean isVpoi() {
 			return vpoi;
 		}
-		
+
 		public boolean isVpoiObjects() {
 			return vpoiobjects;
 		}
@@ -232,7 +266,7 @@ public class BinaryInspector {
 		public boolean isVStats() {
 			return vstats;
 		}
-		
+
 		public boolean isVAddrSearchInspect() {
 			return vsearchinspect;
 		}
@@ -440,7 +474,7 @@ public class BinaryInspector {
 					printUsage("Missing file parameter");
 				} else {
 					vInfo = new VerboseInfo(args);
-					
+
 					for (int i = 0; i < args.length; i++) {
 						if (args[i].startsWith("-")) {
 							continue;
@@ -456,7 +490,7 @@ public class BinaryInspector {
 						printAddressNameStats(vInfo.globalAddressStats);
 					}
 					if (vInfo.vsearchinspect && vInfo.globalSearchStats.files > 1) {
-						println("Global " + 
+						println("Global " +
 								vInfo.globalSearchStats.info("\n\t", vInfo.globalPoiStats, vInfo.globalAddressStats));
 					}
 					vInfo.close();
@@ -635,6 +669,7 @@ public class BinaryInspector {
 			BinaryMapIndexReader index = new BinaryMapIndexReader(r, file);
 			String owner = index.getOwner() != null ? "\n" + index.getOwner().toString() : "";
 			int i = 1;
+            indexes.add(index);
 			println("Binary index " + filename + " version = " + index.getVersion() + " edition = " + new Date(index.getDateCreated()) + owner);
 			for (BinaryIndexPart p : index.getIndexes()) {
 				String partname = p.getPartName();
@@ -711,7 +746,7 @@ public class BinaryInspector {
 
 	}
 
-	
+
 
 	/**
 	 * @param ri
@@ -928,7 +963,9 @@ public class BinaryInspector {
 				String name = c.getName(verbose.lang);
 				if (verbose.vcitynames) {
 					boolean includeEnName = verbose.lang == null || !verbose.lang.equals("en");
-					name += " " + c.getNamesMap(includeEnName).toString();
+                    Map<String, String> names = c.getNamesMap(includeEnName);
+                    cityNames.addAll(names.values());
+					name += " " + names.toString();
 				}
 				String bboxStr = "";
 				double bleft = 0, btop = 0, bbottom = 0,  bright = 0;
@@ -1012,7 +1049,7 @@ public class BinaryInspector {
 			}
 		}
 	}
-	
+
 	private void printAdddrIndexStats(BinaryMapIndexReader index, AddressRegion region) throws IOException {
 		AddressStats as = new AddressStats();
 		vInfo.addressStats = as;
@@ -1039,7 +1076,7 @@ public class BinaryInspector {
 	}
 
 	private void printNameStats(Map<String, ValueFreq> nameIndexMap, int alimit, String name, SuffixesStat suffixesStat) {
-		int tokens = 0; 
+		int tokens = 0;
 		List<ValueFreq> nameIndex = new ArrayList<ValueFreq>(nameIndexMap.values());
 		Collections.sort(nameIndex);
 		for (ValueFreq pt : nameIndex) {
@@ -1633,14 +1670,14 @@ public class BinaryInspector {
 		}
 	}
 
-	
-	
+
+
 	public static class AddressStats {
 		int files = 0;
 		Map<String, ValueFreq> nameIndex = new HashMap<>();
 		Map<CityBlocks, Map<String, ValueFreq>> nameByTypeIndex = new HashMap<>();
 		SuffixesStat suffixesStat = new SuffixesStat();
-		
+
 		public void merge(AddressStats s) {
 			files += s.files;
 			suffixesStat.merge(s.suffixesStat);
@@ -1664,7 +1701,7 @@ public class BinaryInspector {
 		Map<String, ValueFreq> categories = new HashMap<>();
 		Map<String, ValueFreq> nameIndex = new HashMap<>();
 		SuffixesStat suffixesStat = new SuffixesStat();
-		
+
 		public void merge(PoiStats s) {
 			files += s.files;
 			suffixesStat.merge(s.suffixesStat);
@@ -1678,9 +1715,9 @@ public class BinaryInspector {
 
 
 	}
-	
+
 	public static boolean COMBINE_SINGLE_TYPE_BY_PREFIX = true;
-	
+
 	private void printPOIDetailInfo(VerboseInfo verbose, BinaryMapIndexReader index, PoiRegion p) throws IOException {
 		int[] count = new int[3];
 		SearchRequest<Amenity> req = BinaryMapIndexReader.buildSearchPoiRequest(
@@ -1734,14 +1771,14 @@ public class BinaryInspector {
 		PoiStats ps = new PoiStats();
 		vInfo.poiStats = ps;
 		ps.files = 1;
-		
+
 		println("\tRegion: " + p.getName());
 
 		println("\t\tBounds " + formatLatBounds(MapUtils.get31LongitudeX(p.getLeft31()),
 				MapUtils.get31LongitudeX(p.getRight31()),
 				MapUtils.get31LatitudeY(p.getTop31()),
 				MapUtils.get31LatitudeY(p.getBottom31())));
-		
+
 		List<String> cs = p.getCategories();
 		List<List<String>> subcategories = p.getSubcategories();
 		TIntArrayList categoryFreqs = p.getCategoryFreqs();
@@ -1757,9 +1794,9 @@ public class BinaryInspector {
 			}
 			ps.categories.put(catF.value, catF);
 		}
-		
+
 		List<PoiSubType> subtypes = p.getSubTypes();
-		
+
 		MapPoiTypes poiTypes = MapPoiTypes.getDefault();
 		for (int i = 0; i < subtypes.size(); i++) {
 			PoiSubType st = subtypes.get(i);
@@ -1798,12 +1835,12 @@ public class BinaryInspector {
 		ps.nameIndex = ValueFreq.mergeArray(new HashMap<>(), fullNameIndex.getPrefixes(verbose.getPrefix()));
 		ps.suffixesStat = fullNameIndex.getSuffixesStat();
 		printPoiTypeStats(ps);
-		
+
 //		req.poiTypeFilter = null;//for test only
 		if (verbose.isVpoiObjects() || verbose.vsearchinspect) {
 			index.searchPoi(req, p);
 		}
-		
+
 		println(String.format("Found %d pois (%d with addr, %d with name without addr)", count[0],
 				count[1], count[2]));
 	}
@@ -1848,11 +1885,11 @@ public class BinaryInspector {
 		for (ValueFreq c : topMulti) {
 			Collections.sort(c.subValues);
 		}
-		
+
 		println(String.format("\t\t\tReference to double poi (%d, %,d): %s",  ps.refs.size(), sumFreq(refs), refs));
 		println(String.format("\t\t\tText based (%d, %,d): %s",  ps.text.size(), sumFreq(text), text));
 		println(String.format("\t\t\tSingle value filters (%d, %,d): %s", sumSingleValue, sumFreq(singleValuesLst), singleValuesFmt));
-		
+
 		printNameStats(ps.nameIndex, 10_000, "\tPOI", ps.suffixesStat);
 	}
 
