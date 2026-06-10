@@ -13,6 +13,7 @@ import static net.osmand.server.api.services.UserdataService.*;
 import static net.osmand.server.ws.UserTranslationsService.ACCESS_TOKEN;
 import static net.osmand.server.ws.UserTranslationsService.DEVICE_ID;
 import static net.osmand.server.ws.UserTranslationsService.ENCRYPTED_DATA;
+import static net.osmand.server.ws.UserTranslationsService.TRANSLATION_ID;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 import java.io.IOException;
@@ -39,6 +40,7 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.*;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -768,13 +770,21 @@ public class MapApiController {
 			return userdataService.tokenNotValidResponse();
 		}
 		String encryptedData = request.getParameter(ENCRYPTED_DATA);
-		if (encryptedData == null || encryptedData.isEmpty()) {
+		String translationId = request.getParameter(TRANSLATION_ID);
+		if (encryptedData == null || encryptedData.isEmpty() || translationId == null || translationId.isEmpty()) {
 			return ResponseEntity.badRequest().build();
 		}
 		String clientDeviceId = request.getParameter(DEVICE_ID);
 		String clientAccessToken = request.getParameter(ACCESS_TOKEN);
-		boolean ok = userTranslationsService.sendEncryptedDeviceMessage(dev, user, encryptedData, clientDeviceId, clientAccessToken);
-		return ok ? ResponseEntity.ok("OK") : ResponseEntity.notFound().build();
+		UserTranslationsService.SendResult result = userTranslationsService.sendEncryptedDeviceMessage(
+				dev, user, encryptedData, clientDeviceId, clientAccessToken, translationId);
+		if (result == UserTranslationsService.SendResult.DELIVERED) {
+			return ResponseEntity.status(HttpStatus.OK).build();
+		}
+		if (result == UserTranslationsService.SendResult.GONE) {
+			return ResponseEntity.status(HttpStatus.GONE).build();
+		}
+		return ResponseEntity.notFound().build();
 	}
 
 }

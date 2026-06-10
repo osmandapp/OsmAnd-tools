@@ -226,12 +226,15 @@ public class UserTranslationsService {
 		return ust;
 	}
 
+	private boolean translationExists(String translationId) {
+		return redisTemplate != null
+				? Boolean.TRUE.equals(redisTemplate.hasKey(REDIS_TRANSLATION_KEY_PREFIX + translationId))
+				: activeSessions.containsKey(translationId);
+	}
+
 	public UserTranslation createTranslation(@NonNull CloudUser user, String translationId, int durationHours,
 	                                         SimpMessageHeaderAccessor headers) {
-		boolean exists = redisTemplate != null
-				? redisTemplate.hasKey(REDIS_TRANSLATION_KEY_PREFIX + translationId)
-				: activeSessions.containsKey(translationId);  // fallback when Redis unavailable
-		if (exists) {
+		if (translationExists(translationId)) {
 			sendError("translationId already exists", headers);
 			return null;
 		}
@@ -498,11 +501,21 @@ public class UserTranslationsService {
 		return error;
 	}
 
-	public boolean sendEncryptedDeviceMessage(CloudUserDevice dev, CloudUser pu, String encData, String clientDeviceId,
-	                                          String clientAccessToken) {
+	// DELIVERED — point sent
+	// NOT_SHARED — translation exists but isn't actively shared (e.g. paused)
+	// GONE — translation no longer exists (deleted/expired), so the broadcaster should drop its key
+	public enum SendResult {
+		DELIVERED, NOT_SHARED, GONE
+	}
+
+	public SendResult sendEncryptedDeviceMessage(CloudUserDevice dev, CloudUser pu, String encData, String clientDeviceId,
+	                                             String clientAccessToken, String targetTid) {
+		if (Algorithms.isEmpty(targetTid)) {
+			return SendResult.NOT_SHARED;
+		}
 		if (clientDeviceId != null && clientAccessToken != null
 				&& (dev == null || !dev.deviceid.equals(clientDeviceId) || !dev.accesstoken.equals(clientAccessToken))) {
-			return false;
+			return SendResult.NOT_SHARED;
 		}
 
 		int userId = dev != null ? dev.userid : pu.id;
@@ -511,25 +524,30 @@ public class UserTranslationsService {
 			restoreUserShares(userId);
 			userTranslations = shareLocTranslationsByUser.get(userId);
 		}
-		if (userTranslations == null || userTranslations.isEmpty()) {
-			return false;
-		}
-		TranslationMessage msg = prepareMessageAuthor(dev, pu);
-		msg.content = Map.of(ENCRYPTED_DATA, encData);
-		msg.type = TranslationMessageType.LOCATION;
-		long timeMillis = System.currentTimeMillis();
-		boolean sent = false;
-		for (UserTranslation ust : userTranslations) {
-			for (TranslationSharingOptions o : ust.getSharingOptions()) {
-				if (o.userId == userId && timeMillis < o.expireTime) {
-					msg.sender = o.nickname;
-					rawSendMessage(ust, msg);
-					sent = true;
+		UserTranslation ust = null;
+		if (userTranslations != null) {
+			for (UserTranslation t : userTranslations) {
+				if (targetTid.equals(t.getId())) {
+					ust = t;
 					break;
 				}
 			}
 		}
-		return sent;
+		if (ust != null) {
+			long timeMillis = System.currentTimeMillis();
+			for (TranslationSharingOptions o : ust.getSharingOptions()) {
+				if (o.userId == userId && timeMillis < o.expireTime) {
+					TranslationMessage msg = prepareMessageAuthor(dev, pu);
+					msg.content = Map.of(ENCRYPTED_DATA, encData);
+					msg.type = TranslationMessageType.LOCATION;
+					msg.sender = o.nickname;
+					rawSendMessage(ust, msg);
+					return SendResult.DELIVERED;
+				}
+			}
+		}
+
+		return translationExists(targetTid) ? SendResult.NOT_SHARED : SendResult.GONE;
 	}
 
 	// Base message for server-generated events (JOIN/LEAVE/METADATA/DELETE).
