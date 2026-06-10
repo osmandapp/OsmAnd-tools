@@ -57,7 +57,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 	public void registerStompEndpoints(StompEndpointRegistry registry) {
 		String[] origins = UserTranslationsService.isDevTestMode()
 				? new String[]{"*"}
-				: new String[]{"https://osmand.net", "https://test.osmand.net"};
+				: new String[]{"https://osmand.net", "https://*.osmand.net"};
 		registry.addEndpoint("/osmand-websocket").setAllowedOriginPatterns(origins);
 	}
 
