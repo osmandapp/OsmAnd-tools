@@ -1144,7 +1144,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
     private void parsePrefix(String name, PoiTileBox data, int poiIndInBlock, Map<String, Set<PoiTileBox>> poiData, int ind) {
         List<String> splitName = SearchAlgorithms.splitAndNormalize(name);
-		Set<String> prefixes = SearchAlgorithms.nameIndexPrepareComplexPrefixes(splitName);
+		// Standalone number-like POI names keep old prefix search behavior; mixed number tokens stay suffix-only.
+		Set<String> prefixes = SearchAlgorithms.nameIndexPrepareComplexPrefixes(splitName,
+				SearchAlgorithms.nameIndexIsSingleRawNumberValue(name, splitName));
         for (String token : prefixes) {
 	        if (Algorithms.isEmpty(token)) {
 		        continue;
@@ -1161,12 +1163,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				data.addToken(suffixToken);
 			}
 			data.addPrefixFullToken(str, poiIndInBlock, token);
-			List<String> suffixTokens = new ArrayList<String>();
-			for (String suffixToken : splitName) {
-				if (!Algorithms.objectEquals(suffixToken, token)) {
-					suffixTokens.add(suffixToken);
-				}
-			}
+			// Store only category-eligible separated suffixes for this prefix. This keeps compact
+			// POI atoms aligned with the new no-cross-suffix contract while preserving full tokens above.
+			List<String> suffixTokens = SearchAlgorithms.nameIndexPrepareComplexSuffixes(splitName, token);
 			data.addPrefixTokens(str, poiIndInBlock, suffixTokens);
         }
     }

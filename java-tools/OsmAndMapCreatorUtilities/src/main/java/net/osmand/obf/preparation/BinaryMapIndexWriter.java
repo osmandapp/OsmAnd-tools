@@ -1011,8 +1011,10 @@ public class BinaryMapIndexWriter {
 			AddressNameIndexData.Builder builder = AddressNameIndexData.newBuilder();
 			IndexAddressCreator.MapObjectIndex indexEntry = entry.getValue();
 			List<MapObject> objects = new ArrayList<>(indexEntry.getObjects());
-			SuffixDictionary<MapObject> suffixDictionary = nameIndexBuildSuffixDictionary(entry.getKey(), objects,
-					indexEntry::getPrefixTokens);
+			// Build one usage-ranked compact dictionary per trie key. It stores partial suffixes and
+			// separated suffixes together, so suffixesBitsetIndex can share the top 128 entries.
+			CombinedSuffixDictionary<MapObject> suffixDictionary = nameIndexBuildCombinedSuffixDictionary(
+					entry.getKey(), objects, indexEntry::getPrefixTokens, indexEntry::getTokens);
 			if (suffixDictionary.dictionaryEntries.isEmpty()) {
 				builder.addSuffixesDictionary(EMPTY_SUFFIX_DICTIONARY_SENTINEL);
 			} else {
@@ -1049,13 +1051,15 @@ public class BinaryMapIndexWriter {
 				if (o instanceof Street) {
 					atom.addShiftToCityIndex((int) (pointer - ((Street) o).getCity().getFileOffset()));
 				}
+				// New compact indexes write suffixesBitsetIndex/extraSuffix below. suffixesBitset is kept
+				// here only for compatibility if the dictionary builder ever returns legacy bitsets.
 				int[] bitsetWords = suffixDictionary.bitsets.get(o);
 				if (bitsetWords != null) {
 					for (int bitsetWord : bitsetWords) {
 						atom.addSuffixesBitset(bitsetWord);
 					}
 				}
-				addCompactSuffixes(atom, buildSeparatedCompactSuffixes(indexEntry.getTokens(o)));
+				addCompactSuffixes(atom, suffixDictionary.compactSuffixes.get(o));
 				builder.addAtom(atom.build());
 			}
 			codedOutStream.writeMessageNoTag(builder.build());
@@ -1076,6 +1080,8 @@ public class BinaryMapIndexWriter {
 		if (suffixes == null) {
 			return;
 		}
+		// Even values point to the shared suffixesDictionary; odd values inline pure decimal suffixes.
+		// Rare non-integer suffixes are written to extraSuffix so the dictionary stays capped at 128.
 		for (int suffixBitsetIndex : suffixes.suffixesBitsetIndex) {
 			atom.addSuffixesBitsetIndex(suffixBitsetIndex);
 		}
@@ -1088,45 +1094,13 @@ public class BinaryMapIndexWriter {
 		if (suffixes == null) {
 			return;
 		}
+		// POI atoms use the same compact encoding as address atoms: dictionary indexes for common
+		// suffixes, odd inline numbers, and extraSuffix for rare overflow entries.
 		for (int suffixBitsetIndex : suffixes.suffixesBitsetIndex) {
 			atom.addSuffixesBitsetIndex(suffixBitsetIndex);
 		}
 		if (!Algorithms.isEmpty(suffixes.extraSuffix)) {
 			atom.setExtraSuffix(suffixes.extraSuffix);
-		}
-	}
-
-	private CompactSuffixes buildSeparatedCompactSuffixes(Collection<String> tokens) {
-		CompactSuffixes suffixes = new CompactSuffixes();
-		if (tokens == null || tokens.isEmpty()) {
-			return suffixes;
-		}
-		List<String> extraSuffixes = new ArrayList<String>();
-		for (String token : new LinkedHashSet<String>(tokens)) {
-			Integer encodedNumber = encodePureDecimalCompactSuffix(token);
-			if (encodedNumber != null) {
-				suffixes.suffixesBitsetIndex.add(encodedNumber);
-			} else if (!Algorithms.isEmpty(token)) {
-				extraSuffixes.add(token);
-			}
-		}
-		Collections.sort(suffixes.suffixesBitsetIndex);
-		Collections.sort(extraSuffixes);
-		if (!extraSuffixes.isEmpty()) {
-			suffixes.extraSuffix = String.join(" ", extraSuffixes);
-		}
-		return suffixes;
-	}
-
-	private Integer encodePureDecimalCompactSuffix(String token) {
-		if (!isPureDecimalInteger(token)) {
-			return null;
-		}
-		try {
-			long value = Long.parseLong(token);
-			return value <= 0x7fffffffL ? (int) ((value << 1) | 1) : null;
-		} catch (NumberFormatException e) {
-			return null;
 		}
 	}
 
@@ -1815,29 +1789,9 @@ public class BinaryMapIndexWriter {
 		codedOutStream.writeMessageNoTag(groupsBuilder.build());
 	}
 
-	private static class PoiNameIndexRef {
-		final PoiTileBox box;
-		final int poiIndInBlock;
-		final Set<String> tokens;
-		final Set<String> prefixTokens;
+	private record PoiNameIndexRef(PoiTileBox box, int poiIndInBlock, Set<String> tokens, Set<String> prefixTokens) {}
 
-		PoiNameIndexRef(PoiTileBox box, int poiIndInBlock, Set<String> tokens, Set<String> prefixTokens) {
-			this.box = box;
-			this.poiIndInBlock = poiIndInBlock;
-			this.tokens = tokens;
-			this.prefixTokens = prefixTokens;
-		}
-	}
-
-	private static class PoiNameIndexAtomRef {
-		final PoiTileBox box;
-		final OsmAndPoiNameIndexDataAtom atom;
-
-		PoiNameIndexAtomRef(PoiTileBox box, OsmAndPoiNameIndexDataAtom atom) {
-			this.box = box;
-			this.atom = atom;
-		}
-	}
+	private record PoiNameIndexAtomRef(PoiTileBox box, OsmAndPoiNameIndexDataAtom atom) {}
 
 	public Map<PoiTileBox, List<BinaryFileReference>> writePoiNameIndex(Map<String, Set<PoiTileBox>> namesIndex, long startPoiIndex) throws IOException {
 		checkPeekState(POI_INDEX_INIT);
@@ -1863,15 +1817,18 @@ public class BinaryMapIndexWriter {
 							prefixTokens == null ? Collections.emptySet() : prefixTokens));
 				}
 			}
-			SuffixDictionary<PoiNameIndexRef> compactPartialSuffixDictionary = null;
+			CombinedSuffixDictionary<PoiNameIndexRef> combinedSuffixDictionary = null;
 			SuffixDictionary<PoiTileBox> legacySuffixDictionary = null;
 			boolean useCompactSuffixes = compactPrefixMetadata;
 			if (useCompactSuffixes) {
-				compactPartialSuffixDictionary = nameIndexBuildSuffixDictionary(e.getKey(), refs, ref -> ref.prefixTokens);
+				// Compact POI refs carry full-prefix metadata, allowing partial prefix suffixes and
+				// separated word suffixes to share one 128-entry usage-ranked dictionary.
+				combinedSuffixDictionary = nameIndexBuildCombinedSuffixDictionary(e.getKey(), refs,
+						ref -> ref.prefixTokens, ref -> ref.tokens);
 			} else {
 				legacySuffixDictionary = nameIndexBuildSuffixDictionary(e.getKey(), tileBoxes, box -> box.tokens);
 			}
-			List<SuffixEntry> dictionaryEntries = useCompactSuffixes ? compactPartialSuffixDictionary.dictionaryEntries : legacySuffixDictionary.dictionaryEntries;
+			List<SuffixEntry> dictionaryEntries = useCompactSuffixes ? combinedSuffixDictionary.dictionaryEntries : legacySuffixDictionary.dictionaryEntries;
 			if (dictionaryEntries.isEmpty()) {
 				builder.addSuffixesDictionary(EMPTY_SUFFIX_DICTIONARY_SENTINEL);
 			} else {
@@ -1883,10 +1840,14 @@ public class BinaryMapIndexWriter {
 			if (useCompactSuffixes) {
 				Map<String, List<PoiNameIndexRef>> groupedRefs = new LinkedHashMap<String, List<PoiNameIndexRef>>();
 				for (PoiNameIndexRef ref : refs) {
-					int[] partialBitsetWords = compactPartialSuffixDictionary.bitsets.get(ref);
-					CompactSuffixes suffixes = buildSeparatedCompactSuffixes(ref.tokens);
+					int[] partialBitsetWords = combinedSuffixDictionary.bitsets.get(ref);
+					CompactSuffixes suffixes = combinedSuffixDictionary.compactSuffixes.get(ref);
+					// Group only POIs with identical compact suffix state; poiIndInBlock then narrows
+					// the shared spatial leaf to the POIs that actually match this prefix/suffix set.
 					String key = ref.box.getX() + ":" + ref.box.getY() + ":" + ref.box.getZoom() + ":"
-							+ java.util.Arrays.toString(partialBitsetWords) + ":" + suffixes.suffixesBitsetIndex + ":" + suffixes.extraSuffix;
+							+ java.util.Arrays.toString(partialBitsetWords) + ":"
+							+ (suffixes == null ? null : suffixes.suffixesBitsetIndex) + ":"
+							+ (suffixes == null ? null : suffixes.extraSuffix);
 					groupedRefs.computeIfAbsent(key, ignored -> new ArrayList<PoiNameIndexRef>()).add(ref);
 				}
 				for (List<PoiNameIndexRef> group : groupedRefs.values()) {
@@ -1895,13 +1856,15 @@ public class BinaryMapIndexWriter {
 					bs.setX(firstRef.box.getX());
 					bs.setY(firstRef.box.getY());
 					bs.setZoom(firstRef.box.getZoom());
-					int[] partialBitsetWords = compactPartialSuffixDictionary.bitsets.get(firstRef);
+					// suffixesBitset is deprecated for compact refs; keep this branch harmless for
+					// backward-compatible builder output, but new suffix data is emitted below.
+					int[] partialBitsetWords = combinedSuffixDictionary.bitsets.get(firstRef);
 					if (partialBitsetWords != null) {
 						for (int bitsetWord : partialBitsetWords) {
 							bs.addSuffixesBitset(bitsetWord);
 						}
 					}
-					addCompactSuffixes(bs, buildSeparatedCompactSuffixes(firstRef.tokens));
+					addCompactSuffixes(bs, combinedSuffixDictionary.compactSuffixes.get(firstRef));
 					for (PoiNameIndexRef ref : group) {
 						bs.addPoiIndInBlock(ref.poiIndInBlock);
 					}

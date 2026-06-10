@@ -469,10 +469,14 @@ public class SearchTestController {
 															  @RequestParam(required = false) String sortBy,
 															  @RequestParam(required = false) String sortOrder) {
 		List<String> selectedObfs = normalizeObfs(obf, obfs);
-		if (selectedObfs.size() == 1) {
-			return ResponseEntity.ok(testSearchService.getIndex(selectedObfs.get(0), prefix, pageToShow, pageSizeLimit, sortBy, sortOrder));
+		try {
+			if (selectedObfs.size() == 1) {
+				return ResponseEntity.ok(testSearchService.getIndex(selectedObfs.get(0), prefix, pageToShow, pageSizeLimit, sortBy, sortOrder));
+			}
+			return ResponseEntity.ok(testSearchService.getIndex(selectedObfs, prefix, pageToShow, pageSizeLimit, sortBy, sortOrder));
+		} catch (IllegalArgumentException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
 		}
-		return ResponseEntity.ok(testSearchService.getIndex(selectedObfs, prefix, pageToShow, pageSizeLimit, sortBy, sortOrder));
 	}
 
 	@PostMapping(value = "/objects", produces = MediaType.APPLICATION_JSON_VALUE)

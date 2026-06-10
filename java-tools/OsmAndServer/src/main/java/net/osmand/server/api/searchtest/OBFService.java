@@ -129,7 +129,7 @@ public interface OBFService extends BaseService {
 			"centralamerica",
 			"southamerica");
 
-	record SuffixMetrics(int partial, int integer, int literal, int extra) {}
+	record SuffixMetrics(int dict, int integer, int literal, int extra) {}
 	record IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes,
 	                  boolean isCommon, boolean isFrequent, String obf, SuffixMetrics suffixMetrics) {
 		public IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes, boolean isCommon, boolean isFrequent) {
@@ -143,9 +143,9 @@ public interface OBFService extends BaseService {
 	record ObfFileInfo(String path, String name, String continent, String country, String region, long lastModified, long size) {}
 	record IndexTokenPage(List<IndexToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, IndexTokenSummary summary) {}
 	record IndexTokenSummary(int poiSum, int addressSum, int commonSum, int frequentSum,
-	                         int partialSuffixSum, int integerSuffixSum, int literalSuffixSum, int extraSuffixSum,
+	                         int dictSuffixSum, int integerSuffixSum, int literalSuffixSum, int extraSuffixSum,
 	                         int poiMax, int addressMax,
-	                         int partialSuffixMax, int integerSuffixMax, int literalSuffixMax, int extraSuffixMax) {}
+	                         int dictSuffixMax, int integerSuffixMax, int literalSuffixMax, int extraSuffixMax) {}
 	record IndexTokenBuilder(String name, int[] addressOffsets, int[] addressSuffixIndexes, AddressRef[] addressRefs,
 	                         int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes, SuffixMetrics suffixMetrics) {}
 	record AddressRef(int shiftToIndex, int shiftToCityIndex, int objectOffset, int cityOffset, int typeIndex, int atomSize) {}
