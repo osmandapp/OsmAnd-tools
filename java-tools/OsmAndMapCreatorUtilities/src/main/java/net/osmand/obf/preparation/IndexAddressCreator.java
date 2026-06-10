@@ -651,7 +651,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				if (names == null) {
 					names = new HashMap<String, String>();
 				}
-				names.put("name:" + PLACE_ATTR, CityType.valueToString(c.getType()));
+				names.put(PLACE_ATTR, CityType.valueToString(c.getType()));
 			}
 			if (!c.getType().storedAsSeparateAdminEntity()) {
 				continue;
@@ -723,7 +723,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 					Entry<String, String> e = it.next();
 					names.put(e.getKey(), "<" + e.getValue() + ">");
 				}
-				names.put("name:" + PLACE_ATTR, CityType.valueToString(city.getType()));
+				names.put(PLACE_ATTR, CityType.valueToString(city.getType()));
 			}
 			long streetId = getOrRegisterStreetIdForCity(nameInCity, names, location, city);
 			values.add(streetId);
@@ -735,7 +735,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	private long getOrRegisterStreetIdForCity(String name, Map<String, String> names, LatLon location, City city)
 			throws SQLException {
 		String cityPart;
-		boolean place = names != null && names.containsKey("name:" + PLACE_ATTR);
+		boolean place = names != null && names.containsKey(PLACE_ATTR);
 
 		// don't assign suburbs for existing places
 		if (settings.indexByProximity && !place) {

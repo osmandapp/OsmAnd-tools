@@ -54,6 +54,7 @@ import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.binary.BinaryMapTransportReaderAdapter.TransportIndex;
 import net.osmand.binary.NameIndexInspector;
+import net.osmand.binary.NameIndexInspector.StreetsIndexStat;
 import net.osmand.binary.NameIndexInspector.SuffixesStat;
 import net.osmand.binary.NameIndexInspector.ValueFreq;
 import net.osmand.binary.ObfConstants;
@@ -116,7 +117,8 @@ public class BinaryInspector {
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
 //					System.getProperty("maps.dir") + "/Us_minnesota_northamerica_2.obf",
-					System.getProperty("maps.dir") + "/Germany_bayern_lower-bavaria_europe_2.obf",
+//					System.getProperty("maps.dir") + "/Germany_bayern_lower-bavaria_europe_2.obf",
+					System.getProperty("maps.dir") + "/Liechtenstein_europe.obf",
 //					System.getProperty("maps.dir") + "/Turkey_southeastern-anatolia_europe_2.obf",
 //					System.getProperty("maps.dir") + "/Ukraine/",
 //					System.getProperty("maps.dir") + "regions3.ocbf"
@@ -619,6 +621,9 @@ public class BinaryInspector {
 	public void printFileInformation(File file) throws IOException {
 		RandomAccessFile r = new RandomAccessFile(file.getAbsolutePath(), "r");
 		printFileInformation(r, file);
+		if (vInfo == null) {
+			return;
+		}
 		vInfo.globalPoiStats.merge(vInfo.poiStats);
 		vInfo.globalAddressStats.merge(vInfo.addressStats);
 		if (vInfo.vsearchinspect) {
@@ -1026,6 +1031,7 @@ public class BinaryInspector {
 		}
 		as.nameIndex = ValueFreq.mergeArray(new HashMap<>(), fullNameIndex.getAddrPrefixes(-1, vInfo.getPrefix()));
 		as.suffixesStat = fullNameIndex.getSuffixesStat();
+		as.streetsStat = fullNameIndex.getStreetsStat();
 		printAddressNameStats(as);
 	}
 
@@ -1034,6 +1040,17 @@ public class BinaryInspector {
 			printNameStats(as.nameByTypeIndex.get(type), 1000, " * Address " + type, null);
 		}
 		printNameStats(as.nameIndex, 10_000, " * All address", as.suffixesStat);
+		List<ValueFreq> lst = new ArrayList<>(as.streetsStat.getValues().values());
+		Collections.sort(lst);
+		
+		List<ValueFreq> streetsLst = lst.subList(0, Math.min(lst.size(), 1000));
+		StringBuilder nameValuesFmt = new StringBuilder();
+		for (ValueFreq v : streetsLst) {
+			nameValuesFmt.append(String.format("%s (%d, str %,d, enc %,d / max %,d) %s, ", v.value, v.freq, v.extra, 
+					v.enclosing, v.maxSingleAtomEnc,
+					v.getSubvalues(0.06, 1)));
+		}
+		println(String.format("\t * Streets stats: %s ", nameValuesFmt.toString()));
 	}
 
 	private void printNameStats(Map<String, ValueFreq> nameIndexMap, int alimit, String name, SuffixesStat suffixesStat) {
@@ -1046,12 +1063,8 @@ public class BinaryInspector {
 			Collections.sort(pt.subValues);
 			tokens += pt.subValues.size();
 			enclosing += pt.enclosing;
-			int singleTokenEnc = 0;
-			for(ValueFreq s : pt.subValues) {
-				singleTokenEnc = Math.max(s.enclosing, singleTokenEnc);
-			}
 			maxSingleAtomEnc = Math.max(maxSingleAtomEnc, pt.maxSingleAtomEnc);
-			maxSingleTokenEnc = Math.max(singleTokenEnc, maxSingleTokenEnc);
+			maxSingleTokenEnc = Math.max(maxSingleTokenEnc, pt.maxSingleSubValueEnc);
 		}
 		int limit = Math.min(100, nameIndex.size());
 		for (; limit < nameIndex.size() && limit < alimit; limit++) {
@@ -1062,13 +1075,14 @@ public class BinaryInspector {
 		List<ValueFreq> sublist = nameIndex.subList(0, limit);
 		StringBuilder nameValuesFmt = new StringBuilder();
 		for (ValueFreq key : sublist) {
-			String streetsNum = key.enclosing == 0 ? "" : String.format(", %, d (max %d) enc", key.enclosing, key.maxSingleAtomEnc);
+			String streetsNum = key.enclosing == 0 ? "" : 
+				String.format(", enc %,d/%,d/%,d", key.enclosing, key.maxSingleSubValueEnc, key.maxSingleAtomEnc);
 			nameValuesFmt.append(String.format("%s (%d, %,d%s) %s, ", key.value, key.subValues.size(), key.freq,
 					streetsNum, key.getSubvalues(0.06, 1))); // 6%
 		}
 		println(String.format("\t%s Name index stats (%,d prefixes, %,d tokens, %,d refs/atoms,"
-				+ " enclosed: %,d total, max atom %,d, max token %,d): %s ", name, nameIndex.size(),
-				tokens, sumFreq(nameIndex), enclosing, maxSingleAtomEnc, maxSingleTokenEnc,  nameValuesFmt));
+				+ " enclosed: %,d total / max token %,d / max atom %,d): %s ", name, nameIndex.size(),
+				tokens, sumFreq(nameIndex), enclosing, maxSingleTokenEnc, maxSingleAtomEnc,  nameValuesFmt));
 		if (suffixesStat != null) {
 			println(String.format("\t%s %s", name, suffixesStat.toString(" ")));
 		}
@@ -1650,10 +1664,12 @@ public class BinaryInspector {
 		Map<String, ValueFreq> nameIndex = new HashMap<>();
 		Map<CityBlocks, Map<String, ValueFreq>> nameByTypeIndex = new HashMap<>();
 		SuffixesStat suffixesStat = new SuffixesStat();
+		StreetsIndexStat streetsStat = new StreetsIndexStat();
 		
 		public void merge(AddressStats s) {
 			files += s.files;
 			suffixesStat.merge(s.suffixesStat);
+			streetsStat.merge(s.streetsStat);
 			ValueFreq.mergeArray(nameIndex, s.nameIndex);
 			for (CityBlocks type : s.nameByTypeIndex.keySet()) {
 				if (!nameByTypeIndex.containsKey(type)) {
@@ -1805,7 +1821,7 @@ public class BinaryInspector {
 			}
 		}
 		NameIndexInspector fullNameIndex = index.readFullNameIndex(p);
-		ps.nameIndex = ValueFreq.mergeArray(new HashMap<>(), fullNameIndex.getPrefixes(verbose.getPrefix()));
+		ps.nameIndex = ValueFreq.mergeArray(new HashMap<>(), fullNameIndex.getPOIPrefixes(verbose.getPrefix()));
 		ps.suffixesStat = fullNameIndex.getSuffixesStat();
 		printPoiTypeStats(ps);
 		
