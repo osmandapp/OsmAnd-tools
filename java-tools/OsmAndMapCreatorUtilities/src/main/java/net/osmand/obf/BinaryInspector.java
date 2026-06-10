@@ -1069,7 +1069,7 @@ public class BinaryInspector {
 		println(String.format("\t%s Name index stats (%,d prefixes, %,d tokens, %,d refs/atoms,"
 				+ " enclosed: %,d total, max atom %,d, max token %,d): %s ", name, nameIndex.size(),
 				tokens, sumFreq(nameIndex), enclosing, maxSingleAtomEnc, maxSingleTokenEnc,  nameValuesFmt));
-		if(suffixesStat != null) {
+		if (suffixesStat != null) {
 			println(String.format("\t%s %s", name, suffixesStat.toString(" ")));
 		}
 	}
