@@ -13,6 +13,7 @@ import static net.osmand.server.api.services.UserdataService.*;
 import static net.osmand.server.ws.UserTranslationsService.ACCESS_TOKEN;
 import static net.osmand.server.ws.UserTranslationsService.DEVICE_ID;
 import static net.osmand.server.ws.UserTranslationsService.ENCRYPTED_DATA;
+import static net.osmand.server.ws.UserTranslationsService.SERVER_RECEIVE_TIME;
 import static net.osmand.server.ws.UserTranslationsService.TRANSLATION_ID;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
@@ -776,8 +777,15 @@ public class MapApiController {
 		}
 		String clientDeviceId = request.getParameter(DEVICE_ID);
 		String clientAccessToken = request.getParameter(ACCESS_TOKEN);
-		UserTranslationsService.SendResult result = userTranslationsService.sendEncryptedDeviceMessage(
-				dev, user, encryptedData, clientDeviceId, clientAccessToken, translationId);
+		UserTranslationsService.SendResult result;
+		if (UserTranslationsService.isDevTestMode()) {
+			long serverReceiveTime = Algorithms.parseLongSilently(request.getParameter(SERVER_RECEIVE_TIME), 0);
+			result = userTranslationsService.sendEncryptedDeviceMessage(
+					dev, user, encryptedData, clientDeviceId, clientAccessToken, translationId, serverReceiveTime);
+		} else {
+			result = userTranslationsService.sendEncryptedDeviceMessage(
+					dev, user, encryptedData, clientDeviceId, clientAccessToken, translationId);
+		}
 		if (result == UserTranslationsService.SendResult.DELIVERED) {
 			return ResponseEntity.status(HttpStatus.OK).build();
 		}

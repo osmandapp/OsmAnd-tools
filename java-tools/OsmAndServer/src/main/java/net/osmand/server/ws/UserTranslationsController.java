@@ -106,8 +106,7 @@ public class UserTranslationsController {
 		userTranslationsService.denyShare(ust, user, req.userId(), headers);
 	}
 
-	// translationId — first 16 hex chars of SHA-256(key), required; durationHours — 0 means permanent.
-	public record CreateRequest(String translationId, int durationHours) {}
+	public record CreateRequest(String translationId, int durationHours, long creationDate) {}
 
 	// One time call — response is sent via /user/queue/updates (sendPrivateMessage).
 	@MessageMapping("/translation/create")
@@ -122,7 +121,11 @@ public class UserTranslationsController {
 					"translationId must be " + TRANSLATION_ID_HEX_LENGTH + " lowercase hex characters", headers);
 			return;
 		}
-		userTranslationsService.createTranslation(user, translationId, req.durationHours(), headers);
+		if (UserTranslationsService.isDevTestMode()) {
+			userTranslationsService.createTranslation(user, translationId, req.durationHours(), req.creationDate(), headers);
+		} else {
+			userTranslationsService.createTranslation(user, translationId, req.durationHours(), headers);
+		}
 	}
 
 	@MessageMapping("/translation/{translationId}/delete")

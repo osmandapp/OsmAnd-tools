@@ -19,8 +19,6 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
-import org.springframework.core.env.Environment;
-import org.springframework.core.env.Profiles;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.lang.NonNull;
@@ -60,6 +58,9 @@ public class UserTranslationsService {
 	public static final String ENCRYPTED_DATA = "encryptedData";
 	public static final String DEVICE_ID = "deviceId";
 	public static final String ACCESS_TOKEN = "accessToken";
+	public static final String SERVER_RECEIVE_TIME = "serverReceiveTime";
+
+	public static final String DEV_TEST_ENV = "OSMAND_DEV_TEST";
 
     
     static final String TOPIC_TRANSLATION = "/topic/translation/";
@@ -117,11 +118,9 @@ public class UserTranslationsService {
 
     @Autowired
 	protected CloudUsersRepository usersRepository;
-    
-    private final Environment environment;
 
-    public UserTranslationsService(Environment environment) {
-        this.environment = environment;
+    public static boolean isDevTestMode() {
+        return Boolean.parseBoolean(System.getenv(DEV_TEST_ENV));
     }
     
     public void sendPrivateMessage(String sessionId, String type, Object data) {
@@ -138,8 +137,7 @@ public class UserTranslationsService {
 
     
     public CloudUser getUser(Principal principal, SimpMessageHeaderAccessor headers) {
-		boolean production = environment.acceptsProfiles(Profiles.of("production"));
-		return getUser(principal, headers, !production);
+		return getUser(principal, headers, isDevTestMode());
 	}
 
 	public CloudUser getUser(Principal principal, SimpMessageHeaderAccessor headers, boolean allowAnonymous) {
@@ -228,17 +226,22 @@ public class UserTranslationsService {
 
 	private boolean translationExists(String translationId) {
 		return redisTemplate != null
-				? Boolean.TRUE.equals(redisTemplate.hasKey(REDIS_TRANSLATION_KEY_PREFIX + translationId))
+				? redisTemplate.hasKey(REDIS_TRANSLATION_KEY_PREFIX + translationId)
 				: activeSessions.containsKey(translationId);
 	}
 
 	public UserTranslation createTranslation(@NonNull CloudUser user, String translationId, int durationHours,
 	                                         SimpMessageHeaderAccessor headers) {
+		return createTranslation(user, translationId, durationHours, 0, headers);
+	}
+
+	public UserTranslation createTranslation(@NonNull CloudUser user, String translationId, int durationHours, long creationDate,
+	                                         SimpMessageHeaderAccessor headers) {
 		if (translationExists(translationId)) {
 			sendError("translationId already exists", headers);
 			return null;
 		}
-		long time = System.currentTimeMillis();
+		long time = creationDate > 0 ? creationDate : System.currentTimeMillis();
 		UserTranslation ust = new UserTranslation(translationId, user.id);
 		ust.setCreationDate(time);
 		ust.setDurationMs(durationHours <= 0 || durationHours > UserTranslation.MAX_DURATION_HOURS
@@ -508,8 +511,14 @@ public class UserTranslationsService {
 		DELIVERED, NOT_SHARED, GONE
 	}
 
+	// Normal live broadcast: server stamps the receive time (no client-supplied serverReceiveTime).
 	public SendResult sendEncryptedDeviceMessage(CloudUserDevice dev, CloudUser pu, String encData, String clientDeviceId,
 	                                             String clientAccessToken, String targetTid) {
+		return sendEncryptedDeviceMessage(dev, pu, encData, clientDeviceId, clientAccessToken, targetTid, 0);
+	}
+
+	public SendResult sendEncryptedDeviceMessage(CloudUserDevice dev, CloudUser pu, String encData, String clientDeviceId,
+	                                             String clientAccessToken, String targetTid, long serverReceiveTime) {
 		if (Algorithms.isEmpty(targetTid)) {
 			return SendResult.NOT_SHARED;
 		}
@@ -541,6 +550,11 @@ public class UserTranslationsService {
 					msg.content = Map.of(ENCRYPTED_DATA, encData);
 					msg.type = TranslationMessageType.LOCATION;
 					msg.sender = o.nickname;
+					// Dev/test only: honour a back-dated server time (rawSendMessage keeps it if non-zero) so
+					// a simulated history spreads over real serverReceiveTime and loadEarlier paging can be tested.
+					if (serverReceiveTime > 0 && isDevTestMode()) {
+						msg.serverReceiveTime = serverReceiveTime;
+					}
 					rawSendMessage(ust, msg);
 					return SendResult.DELIVERED;
 				}
