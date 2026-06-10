@@ -103,7 +103,7 @@ public class BinaryInspector {
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 					"-vaddress",
-					"-vsearchinspect", 
+//					"-vsearchinspect", 
 //					"-vcities", "-vstreetgroups", "-vcitynames",
 //					"-vstreets", //  "-vbuildings",// "-vintersections",
 //					"-lang=ru",
@@ -116,12 +116,7 @@ public class BinaryInspector {
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
 //					System.getProperty("maps.dir") + "/Us_minnesota_northamerica_2.obf",
-//					System.getProperty("maps.dir") + "/Us_california_san-francisco_northamerica_2.obf",
-//					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_tubingen_europe_2.obf",
-//					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_karlsruhe_europe_2.obf",
-//					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_stuttgart_europe_2.obf",
-					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_freiburg_europe_2.obf",
-//					System.getProperty("maps.dir") + "Netherlands_friesland_europe_2.obf",
+					System.getProperty("maps.dir") + "/Andorra_europe.obf",
 //					System.getProperty("maps.dir") + "/Turkey_southeastern-anatolia_europe_2.obf",
 //					System.getProperty("maps.dir") + "/Ukraine/",
 //					System.getProperty("maps.dir") + "regions3.ocbf"
@@ -1045,9 +1040,11 @@ public class BinaryInspector {
 		int tokens = 0; 
 		List<ValueFreq> nameIndex = new ArrayList<ValueFreq>(nameIndexMap.values());
 		Collections.sort(nameIndex);
+		int streets = 0;
 		for (ValueFreq pt : nameIndex) {
 			Collections.sort(pt.subValues);
 			tokens += pt.subValues.size();
+			streets += pt.enclosing;
 		}
 		int limit = Math.min(100, nameIndex.size());
 		for (; limit < nameIndex.size() && limit < alimit; limit++) {
@@ -1058,10 +1055,12 @@ public class BinaryInspector {
 		List<ValueFreq> sublist = nameIndex.subList(0, limit);
 		StringBuilder nameValuesFmt = new StringBuilder();
 		for (ValueFreq key : sublist) {
-			nameValuesFmt.append(String.format("%s (%d, %,d) %s, ", key.value, key.subValues.size(), key.freq, key.getSubvalues(0.06, 1))); // 6%
+			String streetsNum = key.enclosing == 0 ? "" : String.format(", %, d streets", key.enclosing);
+			nameValuesFmt.append(String.format("%s (%d, %,d%s) %s, ", key.value, key.subValues.size(), key.freq,
+					streetsNum, key.getSubvalues(0.06, 1))); // 6%
 		}
-		println(String.format("\t%s Name index stats (%,d prefixes, %,d tokens, %,d refs/atoms): %s ", name, nameIndex.size(),
-				tokens, sumFreq(nameIndex), nameValuesFmt));
+		println(String.format("\t%s Name index stats (%,d prefixes, %,d tokens, %,d refs/atoms, %,d streets): %s ", name, nameIndex.size(),
+				tokens, sumFreq(nameIndex), streets, nameValuesFmt));
 		if(suffixesStat != null) {
 			println(String.format("\t%s %s", name, suffixesStat.toString(" ")));
 		}

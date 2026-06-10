@@ -1032,10 +1032,14 @@ public class BinaryMapIndexWriter {
 					CityType ct = ((City) o).getType();
 					if (ct == CityType.POSTCODE) {
 						type = CityBlocks.BOUNDARY_TYPE;
+						atom.setEnclosingObjects(((City) o).getStreets().size());
 					} else if (ct == CityType.BOUNDARY) {
 						type = CityBlocks.BOUNDARY_TYPE;
 					} else if (ct != CityType.CITY && ct != CityType.TOWN) {
 						type = CityBlocks.VILLAGES_TYPE;
+					}
+					if (type != CityBlocks.BOUNDARY_TYPE) {
+						atom.setEnclosingObjects(((City) o).getStreets().size());
 					}
 				} else if (o instanceof Street) {
 					type = CityBlocks.STREET_TYPE;
