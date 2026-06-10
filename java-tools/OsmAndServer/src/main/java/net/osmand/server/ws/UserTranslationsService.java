@@ -61,6 +61,7 @@ public class UserTranslationsService {
 	public static final String SERVER_RECEIVE_TIME = "serverReceiveTime";
 
 	public static final String DEV_TEST_ENV = "OSMAND_DEV_TEST";
+	private static final int LOAD_HISTORY_CHUNK_SIZE = 500;
 
     
     static final String TOPIC_TRANSLATION = "/topic/translation/";
@@ -305,22 +306,39 @@ public class UserTranslationsService {
 		}
 		double minScore = fromTime <= 0 ? Double.NEGATIVE_INFINITY : fromTime;
 		double maxScore = toTime <= 0 ? Double.POSITIVE_INFINITY : toTime;
+		List<TranslationMessage> messages;
 		if (redisTemplate != null) {
 			String key = REDIS_MSG_KEY_PREFIX + ust.getId();
 			Set<String> jsons = redisTemplate.opsForZSet().rangeByScore(key, minScore, maxScore);
-			List<TranslationMessage> messages = jsons == null ? Collections.emptyList() :
+			messages = jsons == null ? Collections.emptyList() :
 				jsons.stream().map(j -> gson.fromJson(j, TranslationMessage.class)).toList();
-			obj.setHistory(messages);
 		} else {
-			List<TranslationMessage> messages = ust.getMessages().stream()
+			messages = ust.getMessages().stream()
 					.filter(m -> (fromTime <= 0 || m.serverReceiveTime >= fromTime)
 							&& (toTime <= 0 || m.serverReceiveTime <= toTime))
 					.toList();
-			obj.setHistory(messages);
 		}
 		obj.setShareLocations(ust, user != null ? user.id : 0);
 		obj.viewers = currentViewers(ust.getId());
-		sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_TRANSLATION, obj);
+		sendHistoryChunks(headers.getSessionId(), obj, messages);
+	}
+
+	// Split a long history across several frames so none exceeds the WS send-buffer limit.
+	private void sendHistoryChunks(String sessionId, UserTranslationPlainObject meta, List<TranslationMessage> messages) {
+		int total = messages.size();
+		int chunks = Math.max(1, (total + LOAD_HISTORY_CHUNK_SIZE - 1) / LOAD_HISTORY_CHUNK_SIZE);
+		for (int i = 0; i < chunks; i++) {
+			UserTranslationPlainObject chunk = new UserTranslationPlainObject(meta.id);
+			chunk.ownerUserId = meta.ownerUserId;
+			chunk.creationDate = meta.creationDate;
+			chunk.shareLocations = meta.shareLocations;
+			chunk.viewers = meta.viewers;
+			chunk.pendingRequests = meta.pendingRequests;
+			int from = i * LOAD_HISTORY_CHUNK_SIZE;
+			chunk.history = new ArrayList<>(messages.subList(from, Math.min(from + LOAD_HISTORY_CHUNK_SIZE, total)));
+			chunk.lastChunk = i == chunks - 1;
+			sendPrivateMessage(sessionId, USER_UPD_TYPE_TRANSLATION, chunk);
+		}
 	}
 
 	// Registers the user as a sharer (owner or approved) and announces it to the room.

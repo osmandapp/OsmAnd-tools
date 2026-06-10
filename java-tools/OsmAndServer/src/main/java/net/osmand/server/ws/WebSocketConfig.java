@@ -10,15 +10,25 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+import org.springframework.web.socket.config.annotation.WebSocketTransportRegistration;
 
 @Configuration
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
 	private static final long HEARTBEAT_TIMEOUT = 10000;
+	private static final int SEND_BUFFER_SIZE_LIMIT = 8 * 1024 * 1024;
+	private static final int SEND_TIME_LIMIT = 20 * 1000;
 
 	@Autowired
 	private SubscriptionInterceptor subscriptionInterceptor;
+
+	
+	@Override
+	public void configureWebSocketTransport(WebSocketTransportRegistration registration) {
+		registration.setSendBufferSizeLimit(SEND_BUFFER_SIZE_LIMIT);
+		registration.setSendTimeLimit(SEND_TIME_LIMIT);
+	}
 
 	@Override
 	public void configureClientInboundChannel(ChannelRegistration registration) {

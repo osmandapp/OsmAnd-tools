@@ -19,6 +19,7 @@ public class UserTranslationPlainObject {
 	public List<SharingLocation> shareLocations = null; // who is currently sharing
 	public List<String> viewers = null;                 // current viewer nicknames
 	public List<ShareRequest> pendingRequests = null;   // owner-only: requests awaiting approval
+	public Boolean lastChunk = null;                    // load reply: false on every history chunk but the last
 
 	public UserTranslationPlainObject(String id) {
 		this.id = id;
