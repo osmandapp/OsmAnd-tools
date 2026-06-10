@@ -116,7 +116,7 @@ public class BinaryInspector {
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
 //					System.getProperty("maps.dir") + "/Us_minnesota_northamerica_2.obf",
-					System.getProperty("maps.dir") + "/Andorra_europe.obf",
+					System.getProperty("maps.dir") + "/Germany_bayern_lower-bavaria_europe_2.obf",
 //					System.getProperty("maps.dir") + "/Turkey_southeastern-anatolia_europe_2.obf",
 //					System.getProperty("maps.dir") + "/Ukraine/",
 //					System.getProperty("maps.dir") + "regions3.ocbf"
@@ -1040,11 +1040,18 @@ public class BinaryInspector {
 		int tokens = 0; 
 		List<ValueFreq> nameIndex = new ArrayList<ValueFreq>(nameIndexMap.values());
 		Collections.sort(nameIndex);
-		int streets = 0;
+		int enclosing = 0, maxSingleAtomEnc = 0, maxSingleTokenEnc = 0;
+		
 		for (ValueFreq pt : nameIndex) {
 			Collections.sort(pt.subValues);
 			tokens += pt.subValues.size();
-			streets += pt.enclosing;
+			enclosing += pt.enclosing;
+			int singleTokenEnc = 0;
+			for(ValueFreq s : pt.subValues) {
+				singleTokenEnc = Math.max(s.enclosing, singleTokenEnc);
+			}
+			maxSingleAtomEnc = Math.max(maxSingleAtomEnc, pt.maxSingleAtomEnc);
+			maxSingleTokenEnc = Math.max(singleTokenEnc, maxSingleTokenEnc);
 		}
 		int limit = Math.min(100, nameIndex.size());
 		for (; limit < nameIndex.size() && limit < alimit; limit++) {
@@ -1055,12 +1062,13 @@ public class BinaryInspector {
 		List<ValueFreq> sublist = nameIndex.subList(0, limit);
 		StringBuilder nameValuesFmt = new StringBuilder();
 		for (ValueFreq key : sublist) {
-			String streetsNum = key.enclosing == 0 ? "" : String.format(", %, d streets", key.enclosing);
+			String streetsNum = key.enclosing == 0 ? "" : String.format(", %, d (max %d) enc", key.enclosing, key.maxSingleAtomEnc);
 			nameValuesFmt.append(String.format("%s (%d, %,d%s) %s, ", key.value, key.subValues.size(), key.freq,
 					streetsNum, key.getSubvalues(0.06, 1))); // 6%
 		}
-		println(String.format("\t%s Name index stats (%,d prefixes, %,d tokens, %,d refs/atoms, %,d streets): %s ", name, nameIndex.size(),
-				tokens, sumFreq(nameIndex), streets, nameValuesFmt));
+		println(String.format("\t%s Name index stats (%,d prefixes, %,d tokens, %,d refs/atoms,"
+				+ " enclosed: %,d total, max atom %,d, max token %,d): %s ", name, nameIndex.size(),
+				tokens, sumFreq(nameIndex), enclosing, maxSingleAtomEnc, maxSingleTokenEnc,  nameValuesFmt));
 		if(suffixesStat != null) {
 			println(String.format("\t%s %s", name, suffixesStat.toString(" ")));
 		}
