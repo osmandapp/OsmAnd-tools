@@ -75,8 +75,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	private RTree transportStopsTree;
 	private Map<Long, Relation> masterRoutes = new HashMap<Long, Relation>();
 	private Connection gtfsConnection;
-	private Map<Long, Set<Long>> platformRouteIdsByStopId = new HashMap<Long, Set<Long>>();
-	private Map<Long, List<TransportStop>> platformStopsByRouteId = new HashMap<Long, List<TransportStop>>();
+	private Map<Long, Set<Long>> mergedPlatformRouteIdsByStopId = new HashMap<Long, Set<Long>>();
+	private Map<Long, List<TransportStop>> mergedPlatformStopsByRouteId = new HashMap<Long, List<TransportStop>>();
 
 	private static final long TEST_ROUTE_ID_MISSING_STOPS = 192037l;
 	
@@ -190,7 +190,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 							routesIds.add(routeId);
 						}
 					}
-					addPlatformAliasRouteIds(id, routesIds, transportRoutes);
+					writeMergedPlatformsIfNeeded(id, routesIds, transportRoutes);
 					routesIds.sort();
 					for(long routeId : routesIds.toArray()) {
 						Long routeOffset = transportRoutes.get(routeId);
@@ -212,8 +212,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	private void addPlatformAliasRouteIds(long stopId, TLongArrayList routesIds, Map<Long, Long> transportRoutes) {
-		Set<Long> platformRouteIds = platformRouteIdsByStopId.get(stopId);
+	private void writeMergedPlatformsIfNeeded(long stopId, TLongArrayList routesIds, Map<Long, Long> transportRoutes) {
+		Set<Long> platformRouteIds = mergedPlatformRouteIdsByStopId.get(stopId);
 		if (platformRouteIds != null) {
 			for (long routeId : platformRouteIds) {
 				Long routeOffset = transportRoutes.get(routeId);
@@ -333,8 +333,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	}
 
 	public void createDatabaseStructure(Connection conn, DBDialect dialect, String rtreeStopsFileName) throws SQLException, IOException {
-		platformRouteIdsByStopId.clear();
-		platformStopsByRouteId.clear();
+		mergedPlatformRouteIdsByStopId.clear();
+		mergedPlatformStopsByRouteId.clear();
 		Statement stat = conn.createStatement();
 
 		stat.executeUpdate("create table transport_route (id bigint primary key, type varchar(1024), operator varchar(1024)," +
@@ -405,7 +405,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			String[] colNames = s.substring(spl+1).split(",");
 			for(String colName : colNames) {
 				String indName = tableName + "_" + colName;
-				String ddl = "CREATE INDEX IF NOT EXISTS " + indName + " on " + tableName + " (" + colName + ")";
+				String ddl = "CREATE INDEX IF NOT EXISTS " + indName + " on " + tableName + " (" + colName + ")"; 
 				log.info(ddl);
 				gtfsConnection.createStatement().execute(ddl);
 			}
@@ -496,7 +496,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			}
 		}
 		writeRouteStops(route, route.getForwardStops());
-		writePlatformAliasStops(route);
+		writeMergedPlatformStops(route);
 	}
 
 
@@ -537,8 +537,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	private void writePlatformAliasStops(TransportRoute route) throws SQLException {
-		List<TransportStop> platformStops = platformStopsByRouteId.get(route.getId());
+	private void writeMergedPlatformStops(TransportRoute route) throws SQLException {
+		List<TransportStop> platformStops = mergedPlatformStopsByRouteId.get(route.getId());
 		if (platformStops != null) {
 			for (TransportStop stop : platformStops) {
 				writeTransportStop(stop);
@@ -1121,7 +1121,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		}
 		List<Entity> platformsAndStops = new ArrayList<Entity>();
 		List<Entity> platforms = new ArrayList<Entity>();
-		List<Entity> replacedPlatforms = new ArrayList<Entity>();
+		List<Entity> mergedPlatforms = new ArrayList<Entity>();
 		List<Entity> stops = new ArrayList<Entity>();
 
 		Map<EntityId, Entity> platformNames = new LinkedHashMap<>();
@@ -1145,7 +1145,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				}
 			}
 		}
-		mergePlatformsStops(platformsAndStops, platforms, stops, platformNames, replacedPlatforms);
+		mergePlatformsStops(platformsAndStops, platforms, stops, platformNames, mergedPlatforms);
 		if (platformsAndStops.isEmpty()) {
 			return true; // nothing to get from this relation - there is no stop
 		}
@@ -1165,7 +1165,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			
 			route.getForwardStops().add(stop);
 		}
-		registerPlatformAliasStops(route, replacedPlatforms);
+		registerMergedPlatformsStops(route, mergedPlatforms);
 
 		return true;
 	}
@@ -1176,7 +1176,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	}
 
 	private void mergePlatformsStops(List<Entity> platformsAndStopsToProcess, List<Entity> platforms, List<Entity> stops,
-			Map<EntityId, Entity> nameReplacement, List<Entity> replacedPlatforms) {
+			Map<EntityId, Entity> nameReplacement, List<Entity> mergedPlatforms) {
 		// walk through platforms  and verify names from the second:
 		for(Entity platform : platforms) {
 			Entity replaceStop = null;
@@ -1202,7 +1202,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			if(replaceStop != null) {
 				platformsAndStopsToProcess.remove(platform);
 				if (!EntityId.valueOf(platform).equals(EntityId.valueOf(replaceStop))) {
-					replacedPlatforms.add(platform);
+					mergedPlatforms.add(platform);
 				}
 				if (!Algorithms.isEmpty(platform.getTag(OSMTagKey.NAME))) {
 					nameReplacement.put(EntityId.valueOf(replaceStop), platform);
@@ -1211,19 +1211,20 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	private void registerPlatformAliasStops(TransportRoute route, List<Entity> replacedPlatforms) {
-		for (Entity platform : replacedPlatforms) {
+	private void registerMergedPlatformsStops(TransportRoute route, List<Entity> mergedPlatforms) {
+		for (Entity platform : mergedPlatforms) {
 			TransportStop aliasStop = EntityParser.parseTransportStop(platform);
-			List<TransportStop> aliasStops = platformStopsByRouteId.get(route.getId());
+			List<TransportStop> aliasStops = mergedPlatformStopsByRouteId.get(route.getId());
 			if (aliasStops == null) {
 				aliasStops = new ArrayList<TransportStop>();
-				platformStopsByRouteId.put(route.getId(), aliasStops);
+				mergedPlatformStopsByRouteId.put(route.getId(), aliasStops);
 			}
 			aliasStops.add(aliasStop);
-			Set<Long> routeIds = platformRouteIdsByStopId.get(aliasStop.getId());
+
+			Set<Long> routeIds = mergedPlatformRouteIdsByStopId.get(aliasStop.getId());
 			if (routeIds == null) {
 				routeIds = new HashSet<Long>();
-				platformRouteIdsByStopId.put(aliasStop.getId(), routeIds);
+				mergedPlatformRouteIdsByStopId.put(aliasStop.getId(), routeIds);
 			}
 			routeIds.add(route.getId());
 		}
