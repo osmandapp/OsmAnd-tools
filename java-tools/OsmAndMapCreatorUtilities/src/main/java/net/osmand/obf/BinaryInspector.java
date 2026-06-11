@@ -123,9 +123,9 @@ public class BinaryInspector {
 //					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_tubingen_europe_2.obf",
 //					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_karlsruhe_europe_2.obf",
 //					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_freiburg_europe_2.obf",
-					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_stuttgart_europe_2.obf",
-					System.getProperty("maps.dir") + "Liechtenstein_europe.obf",
-//					System.getProperty("maps.dir") + "/Andorra_europe.obf",
+//					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_stuttgart_europe_2.obf",
+//					System.getProperty("maps.dir") + "Liechtenstein_europe.obf",
+					System.getProperty("maps.dir") + "/regionsTest.ocbf",
 //					System.getProperty("maps.dir") + "Spain_aragon_europe_2.obf"
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
@@ -1063,12 +1063,17 @@ public class BinaryInspector {
 		}
 		ValueFreq.sortMain(bndsLst);
 		StringBuilder bndsLstB = new StringBuilder();
+		int alllimit = 10_000;
 		for (ValueFreq s : bndsLst) {
-			if (s.freq == 1) {
+			if (s.freq == 1 || alllimit-- <= 0) {
 				break;
 			}
 			List<String> l = new ArrayList<String>();
+			int limit = 100;
 			for (ValueFreq m : s.subValues) {
+				if (limit-- <= 0) {
+					break;
+				}
 				l.add(m.extra + "-" + m.freq);
 			}
 			bndsLstB.append(String.format("%s (%,d - %s), ", s.value, s.freq, l));
