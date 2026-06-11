@@ -9,7 +9,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 public class UserTranslation {
 
 	public static final long MS_PER_HOUR = 60 * 60 * 1000L;
-	public static final int MAX_DURATION_HOURS = 365 * 24;
+	public static final int MAX_DURATION_HOURS = 24;
 	public static final long MAX_DURATION_MS = MAX_DURATION_HOURS * MS_PER_HOUR;
 
 	private final String id;
