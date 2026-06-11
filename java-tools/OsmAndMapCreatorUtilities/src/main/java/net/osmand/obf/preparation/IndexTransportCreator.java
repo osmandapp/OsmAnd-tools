@@ -1121,8 +1121,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		}
 		List<Entity> platformsAndStops = new ArrayList<Entity>();
 		List<Entity> platforms = new ArrayList<Entity>();
+		List<Entity> replacedPlatforms = new ArrayList<Entity>();
 		List<Entity> stops = new ArrayList<Entity>();
-		List<Entity> platformAliases = new ArrayList<Entity>();
 
 		Map<EntityId, Entity> platformNames = new LinkedHashMap<>();
 		for (RelationMember entry : rel.getMembers()) {
@@ -1145,7 +1145,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				}
 			}
 		}
-		mergePlatformsStops(platformsAndStops, platforms, stops, platformNames, platformAliases);
+		mergePlatformsStops(platformsAndStops, platforms, stops, platformNames, replacedPlatforms);
 		if (platformsAndStops.isEmpty()) {
 			return true; // nothing to get from this relation - there is no stop
 		}
@@ -1165,7 +1165,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			
 			route.getForwardStops().add(stop);
 		}
-		registerPlatformAliasStops(route, platformAliases);
+		registerPlatformAliasStops(route, replacedPlatforms);
 
 		return true;
 	}
@@ -1176,7 +1176,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	}
 
 	private void mergePlatformsStops(List<Entity> platformsAndStopsToProcess, List<Entity> platforms, List<Entity> stops,
-			Map<EntityId, Entity> nameReplacement, List<Entity> platformAliases) {
+			Map<EntityId, Entity> nameReplacement, List<Entity> replacedPlatforms) {
 		// walk through platforms  and verify names from the second:
 		for(Entity platform : platforms) {
 			Entity replaceStop = null;
@@ -1202,7 +1202,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			if(replaceStop != null) {
 				platformsAndStopsToProcess.remove(platform);
 				if (!EntityId.valueOf(platform).equals(EntityId.valueOf(replaceStop))) {
-					platformAliases.add(platform);
+					replacedPlatforms.add(platform);
 				}
 				if (!Algorithms.isEmpty(platform.getTag(OSMTagKey.NAME))) {
 					nameReplacement.put(EntityId.valueOf(replaceStop), platform);
@@ -1211,8 +1211,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	private void registerPlatformAliasStops(TransportRoute route, List<Entity> platformAliases) {
-		for (Entity platform : platformAliases) {
+	private void registerPlatformAliasStops(TransportRoute route, List<Entity> replacedPlatforms) {
+		for (Entity platform : replacedPlatforms) {
 			TransportStop aliasStop = EntityParser.parseTransportStop(platform);
 			List<TransportStop> aliasStops = platformStopsByRouteId.get(route.getId());
 			if (aliasStops == null) {
