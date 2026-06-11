@@ -190,7 +190,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 							routesIds.add(routeId);
 						}
 					}
-					writeMergedPlatformsIfNeeded(id, routesIds, transportRoutes);
+					addMergedPlatformIfNeeded(id, routesIds, transportRoutes);
 					routesIds.sort();
 					for(long routeId : routesIds.toArray()) {
 						Long routeOffset = transportRoutes.get(routeId);
@@ -212,10 +212,10 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	private void writeMergedPlatformsIfNeeded(long stopId, TLongArrayList routesIds, Map<Long, Long> transportRoutes) {
-		Set<Long> platformRouteIds = mergedPlatformRouteIdsByStopId.get(stopId);
-		if (platformRouteIds != null) {
-			for (long routeId : platformRouteIds) {
+	private void addMergedPlatformIfNeeded(long stopId, TLongArrayList routesIds, Map<Long, Long> transportRoutes) {
+		Set<Long> mergedPlatformRouteIds = mergedPlatformRouteIdsByStopId.get(stopId);
+		if (mergedPlatformRouteIds != null) {
+			for (long routeId : mergedPlatformRouteIds) {
 				Long routeOffset = transportRoutes.get(routeId);
 				if (routeOffset != null && !routesIds.contains(routeId)) {
 					routesIds.add(routeId);
