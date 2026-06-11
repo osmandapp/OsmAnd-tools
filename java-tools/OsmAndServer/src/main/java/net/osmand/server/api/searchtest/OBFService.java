@@ -129,11 +129,22 @@ public interface OBFService extends BaseService {
 			"centralamerica",
 			"southamerica");
 
-	record SuffixMetrics(int dict, int integer, int literal, int extra) {}
+	record SuffixMetrics(int dict, int part, int integer, int literal, int extra) {}
+	record SuffixTexts(List<String> dict, List<String> part, List<String> literal, List<String> integer, List<String> extra) {}
 	record IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes,
-	                  boolean isCommon, boolean isFrequent, String obf, SuffixMetrics suffixMetrics) {
+	                  boolean isCommon, boolean isFrequent, String obf, SuffixMetrics suffixMetrics,
+	                  SuffixMetrics poiSuffixMetrics, SuffixMetrics addressSuffixMetrics,
+	                  SuffixTexts suffixTexts, SuffixTexts poiSuffixTexts, SuffixTexts addressSuffixTexts) {
+		public IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes,
+		                  boolean isCommon, boolean isFrequent, String obf, SuffixMetrics suffixMetrics) {
+			this(name, addressRefs, poiRefs, poiAtomRefs, poiAtomSizes, isCommon, isFrequent, obf, suffixMetrics,
+					new SuffixMetrics(0, 0, 0, 0, 0), new SuffixMetrics(0, 0, 0, 0, 0),
+					new SuffixTexts(List.of(), List.of(), List.of(), List.of(), List.of()),
+					new SuffixTexts(List.of(), List.of(), List.of(), List.of(), List.of()),
+					new SuffixTexts(List.of(), List.of(), List.of(), List.of(), List.of()));
+		}
 		public IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes, boolean isCommon, boolean isFrequent) {
-			this(name, addressRefs, poiRefs, poiAtomRefs, poiAtomSizes, isCommon, isFrequent, null, new SuffixMetrics(0, 0, 0, 0));
+			this(name, addressRefs, poiRefs, poiAtomRefs, poiAtomSizes, isCommon, isFrequent, null, new SuffixMetrics(0, 0, 0, 0, 0));
 		}
 		public IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes,
 		                  boolean isCommon, boolean isFrequent, SuffixMetrics suffixMetrics) {
@@ -147,7 +158,8 @@ public interface OBFService extends BaseService {
 	                         int poiMax, int addressMax,
 	                         int dictSuffixMax, int integerSuffixMax, int literalSuffixMax, int extraSuffixMax) {}
 	record IndexTokenBuilder(String name, int[] addressOffsets, int[] addressSuffixIndexes, AddressRef[] addressRefs,
-	                         int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes, SuffixMetrics suffixMetrics) {}
+	                         int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes, SuffixMetrics suffixMetrics,
+	                         SuffixMetrics poiSuffixMetrics, SuffixMetrics addressSuffixMetrics) {}
 	record AddressRef(int shiftToIndex, int shiftToCityIndex, int objectOffset, int cityOffset, int typeIndex, int atomSize) {}
 
 	record ObjectAddress(int sequenceId, String name, LatLon point, Map<String, String> commonTags,
