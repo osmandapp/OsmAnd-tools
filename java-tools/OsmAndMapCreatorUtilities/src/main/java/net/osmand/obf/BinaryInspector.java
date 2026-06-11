@@ -118,14 +118,15 @@ public class BinaryInspector {
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
 //					System.getProperty("maps.dir") + "/Us_minnesota_northamerica_2.obf",
-					System.getProperty("maps.dir") + "Germany_bayern_lower-franconia_europe_2.obf",
-					System.getProperty("maps.dir") + "Germany_bayern_lower-bavaria_europe_2.obf",
-					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_tubingen_europe_2.obf",
-					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_karlsruhe_europe_2.obf",
-					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_freiburg_europe_2.obf",
+//					System.getProperty("maps.dir") + "Germany_bayern_lower-franconia_europe_2.obf",
+//					System.getProperty("maps.dir") + "Germany_bayern_lower-bavaria_europe_2.obf",
+//					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_tubingen_europe_2.obf",
+//					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_karlsruhe_europe_2.obf",
+//					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_freiburg_europe_2.obf",
 					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_stuttgart_europe_2.obf",
-//					System.getProperty("maps.dir") + "/Liechtenstein_europe.obf",
-//					System.getProperty("maps.dir") + "regionsTest.ocbf"
+					System.getProperty("maps.dir") + "Liechtenstein_europe.obf",
+//					System.getProperty("maps.dir") + "/Andorra_europe.obf",
+//					System.getProperty("maps.dir") + "Spain_aragon_europe_2.obf"
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
@@ -1057,6 +1058,9 @@ public class BinaryInspector {
 		}
 		println(String.format("\t * Streets stats: %s ", nameValuesFmt.toString()));
 		List<ValueFreq> bndsLst = new ArrayList<>(as.bndsStat.getBoundaries().values());
+		for (ValueFreq v : bndsLst) {
+			v.freq = as.bndsStat.calculateNumberOfDistinctBBox(v.subValues);
+		}
 		ValueFreq.sortMain(bndsLst);
 		StringBuilder bndsLstB = new StringBuilder();
 		for (ValueFreq s : bndsLst) {
