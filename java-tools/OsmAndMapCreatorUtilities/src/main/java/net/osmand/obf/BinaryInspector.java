@@ -1063,13 +1063,13 @@ public class BinaryInspector {
 		}
 		ValueFreq.sortMain(bndsLst);
 		StringBuilder bndsLstB = new StringBuilder();
-		int alllimit = 10_000;
+		int alllimit = Math.min(100, Math.max(10_000, bndsLst.size() / 100));
 		for (ValueFreq s : bndsLst) {
 			if (s.freq == 1 || alllimit-- <= 0) {
 				break;
 			}
 			List<String> l = new ArrayList<String>();
-			int limit = 100;
+			int limit = 50;
 			for (ValueFreq m : s.subValues) {
 				if (limit-- <= 0) {
 					break;
