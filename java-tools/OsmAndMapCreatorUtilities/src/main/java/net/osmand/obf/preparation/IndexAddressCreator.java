@@ -178,8 +178,10 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		// Used to be: if a place that has addr_place is a neighbourhood mark it as a suburb (made for the suburbs of Venice)
 		// Not needed as we start storing all NEIGHBOURHOOD, DISTRICT as BOUNDARY
 		// Bucharest has admin level 4
-		boolean boundaryValid = boundary != null && (!boundary.hasAdminLevel() || boundary.getAdminLevel() >= 4) &&
-				boundary.getCenterPoint() != null && !Algorithms.isEmpty(boundary.getName());
+		boolean boundaryValid = boundary != null
+                && (!boundary.hasAdminLevel() || boundary.getAdminLevel() >= 4 || settings.indexCountryRegions)
+                && boundary.getCenterPoint() != null
+                && !Algorithms.isEmpty(boundary.getName());
 		if (boundaryValid) {
 			LatLon boundaryCenter = boundary.getCenterPoint();
 			List<City> citiesToSearch = cityDataStorage.getClosestObjects(boundaryCenter.getLatitude(), boundaryCenter.getLongitude());
@@ -649,7 +651,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				if (names == null) {
 					names = new HashMap<String, String>();
 				}
-				names.put("name:" + PLACE_ATTR, CityType.valueToString(c.getType()));
+				names.put(PLACE_ATTR, CityType.valueToString(c.getType()));
 			}
 			if (!c.getType().storedAsSeparateAdminEntity()) {
 				continue;
@@ -721,7 +723,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 					Entry<String, String> e = it.next();
 					names.put(e.getKey(), "<" + e.getValue() + ">");
 				}
-				names.put("name:" + PLACE_ATTR, CityType.valueToString(city.getType()));
+				names.put(PLACE_ATTR, CityType.valueToString(city.getType()));
 			}
 			long streetId = getOrRegisterStreetIdForCity(nameInCity, names, location, city);
 			values.add(streetId);
@@ -733,7 +735,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	private long getOrRegisterStreetIdForCity(String name, Map<String, String> names, LatLon location, City city)
 			throws SQLException {
 		String cityPart;
-		boolean place = names != null && names.containsKey("name:" + PLACE_ATTR);
+		boolean place = names != null && names.containsKey(PLACE_ATTR);
 
 		// don't assign suburbs for existing places
 		if (settings.indexByProximity && !place) {
@@ -1386,7 +1388,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 										 IndexCreatorSettings settings) {
 		String name = o.getName();
 		parsePrefix(name, o, namesIndex, settings);
-		for (String nm : o.getNamesMap(true).values()) {
+		// getOtherNames ignores "admin_level", "place"
+		for (String nm : o.getOtherNames(true, name)) {
 			if (!nm.equals(name)) {
 				parsePrefix(nm, o, namesIndex, settings);
 			}

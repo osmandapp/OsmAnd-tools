@@ -43,8 +43,11 @@ public class IndexCreationContext {
 
 	IndexCreationContext(IndexCreator indexCreator, String regionName, boolean basemap) {
 		this.indexCreator = indexCreator;
-		this.allRegions = prepareRegions();
 		this.basemap = basemap;
+        if (indexCreator.getSettings().indexCountryRegions) {
+            return;
+        }
+        this.allRegions = prepareRegions();
 		if (regionName != null) {
 			this.translitJapaneseNames = regionName.toLowerCase().startsWith(JAPAN);
 			this.translitChineseNames = regionName.toLowerCase().startsWith(CHINA);
