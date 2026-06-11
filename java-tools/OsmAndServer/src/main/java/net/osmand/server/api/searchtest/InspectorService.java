@@ -1099,11 +1099,12 @@ public interface InspectorService extends OBFService {
             // Only partial compact suffixes create visible full-token rows in Inspector. Separated suffixes
             // are atom match constraints for multi-word search and do not mean that the suffix token has its
             // own prefix entry in the name index, so showing them here creates false rows like "zobelsreuth".
+            List<String> atomExtraSuffixes = compactAtomExtraSuffixes(atom);
             addIndexTokenDirect(tokens, suffixToken, atom.addressRefs(), poi, atom.poiRefs(), atom.poiAtomSizes(),
                     mergeSuffixMetrics(new SuffixMetrics(suffixDictionary.size(), 0, 0, 0, 0),
                             atom.compactPartialSuffixMetricsByToken().get(suffixToken)),
                     suffixTexts(suffixDictionary, dictionaryPartSuffixes, dictionarySeparatedSuffixes,
-                            List.of(), suffixTextList(atom.extraSuffixByToken().get(suffixToken))));
+                            List.of(), atomExtraSuffixes));
         }
     }
 
@@ -1131,6 +1132,24 @@ public interface InspectorService extends OBFService {
             }
         }
         return result;
+    }
+
+    default List<String> compactAtomExtraSuffixes(NameIndexAtomTokens atom) {
+        Set<String> result = new LinkedHashSet<>();
+        if (atom != null) {
+            addSuffixTexts(result, new ArrayList<>(atom.extraSuffixByToken().values()));
+            addSuffixTexts(result, new ArrayList<>(atom.separatedSuffixByToken().values()));
+        }
+        return List.copyOf(result);
+    }
+
+    default List<String> compactAtomExtraSuffixes(CompactIndexAtom atom) {
+        Set<String> result = new LinkedHashSet<>();
+        if (atom != null) {
+            addSuffixTexts(result, new ArrayList<>(atom.extraSuffixByToken().values()));
+            addSuffixTexts(result, new ArrayList<>(atom.separatedSuffixByToken().values()));
+        }
+        return List.copyOf(result);
     }
 
     default SuffixMetrics sumSuffixMetrics(Collection<SuffixMetrics> metrics) {
@@ -1490,12 +1509,13 @@ public interface InspectorService extends OBFService {
                     }
                     List<String> dictionaryPartSuffixes = compactDictionaryPartSuffixes(suffixDictionary);
                     List<String> dictionarySeparatedSuffixes = compactDictionarySeparatedSuffixes(suffixDictionary);
+                    List<String> atomExtraSuffixes = compactAtomExtraSuffixes(atom);
                     for (String suffixToken : atom.suffixTokens()) {
                         addIndexTokenDirect(tokens, suffixToken, atom.addressRefs(), poi, atom.poiRefs(), atom.poiAtomSizes(),
                                 mergeSuffixMetrics(new SuffixMetrics(suffixDictionary.size(), 0, 0, 0, 0),
                                         atom.suffixMetricsByToken().get(suffixToken)),
                                 suffixTexts(suffixDictionary, dictionaryPartSuffixes, dictionarySeparatedSuffixes,
-                                        List.of(), suffixTextList(atom.extraSuffixByToken().get(suffixToken))));
+                                        List.of(), atomExtraSuffixes));
                     }
                 } finally {
                     index.getInputStream().popLimit(atomOldLimit);
@@ -1644,7 +1664,6 @@ public interface InspectorService extends OBFService {
         int dictionaryIndex = encodedIndex >> 1;
         String suffix = dictionaryIndex >= 0 && dictionaryIndex < suffixDictionary.size() ? suffixDictionary.get(dictionaryIndex) : null;
         if (suffix != null && suffix.startsWith(" ")) {
-            separatedSuffixByToken.putIfAbsent(prefix + suffix, suffix);
             return;
         }
         String token = resolveCompactSuffixToken(prefix, suffix);
