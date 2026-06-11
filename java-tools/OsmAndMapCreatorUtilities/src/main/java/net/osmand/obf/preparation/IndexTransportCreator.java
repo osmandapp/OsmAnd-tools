@@ -75,8 +75,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	private RTree transportStopsTree;
 	private Map<Long, Relation> masterRoutes = new HashMap<Long, Relation>();
 	private Connection gtfsConnection;
-	private Map<Long, Set<Long>> platformAliasRouteIdsByStop = new HashMap<Long, Set<Long>>();
-	private Map<Long, List<TransportStop>> platformAliasStopsByRoute = new HashMap<Long, List<TransportStop>>();
+	private Map<Long, Set<Long>> platformRouteIdsByStopId = new HashMap<Long, Set<Long>>();
+	private Map<Long, List<TransportStop>> platformStopsByRouteId = new HashMap<Long, List<TransportStop>>();
 
 	private static final long TEST_ROUTE_ID_MISSING_STOPS = 192037l;
 	
@@ -213,9 +213,9 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	}
 
 	private void addPlatformAliasRouteIds(long stopId, TLongArrayList routesIds, Map<Long, Long> transportRoutes) {
-		Set<Long> aliasRouteIds = platformAliasRouteIdsByStop.get(stopId);
-		if (aliasRouteIds != null) {
-			for (long routeId : aliasRouteIds) {
+		Set<Long> platformRouteIds = platformRouteIdsByStopId.get(stopId);
+		if (platformRouteIds != null) {
+			for (long routeId : platformRouteIds) {
 				Long routeOffset = transportRoutes.get(routeId);
 				if (routeOffset != null && !routesIds.contains(routeId)) {
 					routesIds.add(routeId);
@@ -254,7 +254,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					}
 					Map<Entity.EntityId, List<TransportStopExit>> exits = new HashMap<>();
 					exits.put(new EntityId(Entity.EntityType.NODE, stop.getId()), stop.getExits());
-					writer.writeTransportStop(id, x24, y24, stop.getName(), stop.getEnName(false), stop.getNamesMap(false),
+					writer.writeTransportStop(id, x24, y24, stop.getName(), stop.getEnName(false), stop.getNamesMap(false), 
 							stringTable, routesOffsets, routesIds, deletedRoutes, exits);
 				} else {
 					log.error("Something goes wrong with transport id = " + id);
@@ -333,8 +333,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	}
 
 	public void createDatabaseStructure(Connection conn, DBDialect dialect, String rtreeStopsFileName) throws SQLException, IOException {
-		platformAliasRouteIdsByStop.clear();
-		platformAliasStopsByRoute.clear();
+		platformRouteIdsByStopId.clear();
+		platformStopsByRouteId.clear();
 		Statement stat = conn.createStatement();
 
 		stat.executeUpdate("create table transport_route (id bigint primary key, type varchar(1024), operator varchar(1024)," +
@@ -405,7 +405,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			String[] colNames = s.substring(spl+1).split(",");
 			for(String colName : colNames) {
 				String indName = tableName + "_" + colName;
-				String ddl = "CREATE INDEX IF NOT EXISTS " + indName + " on " + tableName + " (" + colName + ")"; 
+				String ddl = "CREATE INDEX IF NOT EXISTS " + indName + " on " + tableName + " (" + colName + ")";
 				log.info(ddl);
 				gtfsConnection.createStatement().execute(ddl);
 			}
@@ -538,9 +538,9 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	}
 
 	private void writePlatformAliasStops(TransportRoute route) throws SQLException {
-		List<TransportStop> aliasStops = platformAliasStopsByRoute.get(route.getId());
-		if (aliasStops != null) {
-			for (TransportStop stop : aliasStops) {
+		List<TransportStop> platformStops = platformStopsByRouteId.get(route.getId());
+		if (platformStops != null) {
+			for (TransportStop stop : platformStops) {
 				writeTransportStop(stop);
 			}
 		}
@@ -772,7 +772,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					char[] newRef = new char[subnames.length];
 					for (int i = 0; i < subnames.length; i++) {
 						if (!Algorithms.isEmpty(subnames[i])) {
-							newRef[i] = subnames[i].charAt(0);
+							newRef[i] = subnames[i].charAt(0);	
 						}
 					}
 					ref = newRef.length <= 5 ? new String(newRef).toUpperCase() : new String(newRef).substring(0, 4).toUpperCase();
@@ -962,7 +962,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			ResultSet rs = gtfsSelectRoute.executeQuery();
 			String routeId = null, routeShortName = null, routeLongName = null;
 			TransportSchedule schedule = new TransportSchedule();
-			TIntArrayList timeDeparturesFirst = new TIntArrayList();
+			TIntArrayList timeDeparturesFirst = new TIntArrayList(); 
 			while (rs.next()) {
 				String nrouteId = rs.getString(1);
 				if (!Algorithms.objectEquals(routeId, nrouteId)) {
@@ -1214,16 +1214,16 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	private void registerPlatformAliasStops(TransportRoute route, List<Entity> platformAliases) {
 		for (Entity platform : platformAliases) {
 			TransportStop aliasStop = EntityParser.parseTransportStop(platform);
-			List<TransportStop> aliasStops = platformAliasStopsByRoute.get(route.getId());
+			List<TransportStop> aliasStops = platformStopsByRouteId.get(route.getId());
 			if (aliasStops == null) {
 				aliasStops = new ArrayList<TransportStop>();
-				platformAliasStopsByRoute.put(route.getId(), aliasStops);
+				platformStopsByRouteId.put(route.getId(), aliasStops);
 			}
 			aliasStops.add(aliasStop);
-			Set<Long> routeIds = platformAliasRouteIdsByStop.get(aliasStop.getId());
+			Set<Long> routeIds = platformRouteIdsByStopId.get(aliasStop.getId());
 			if (routeIds == null) {
 				routeIds = new HashSet<Long>();
-				platformAliasRouteIdsByStop.put(aliasStop.getId(), routeIds);
+				platformRouteIdsByStopId.put(aliasStop.getId(), routeIds);
 			}
 			routeIds.add(route.getId());
 		}
