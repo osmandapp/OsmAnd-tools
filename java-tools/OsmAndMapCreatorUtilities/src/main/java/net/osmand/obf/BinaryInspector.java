@@ -117,7 +117,7 @@ public class BinaryInspector {
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
-//					System.getProperty("maps.dir") + "/Us_minnesota_northamerica_2.obf",
+//					System.getProperty("maps.dir") + "/Ukraine_zhytomyr_europe_2 2.obf",
 //					System.getProperty("maps.dir") + "Germany_bayern_lower-franconia_europe_2.obf",
 //					System.getProperty("maps.dir") + "Germany_bayern_lower-bavaria_europe_2.obf",
 //					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_tubingen_europe_2.obf",

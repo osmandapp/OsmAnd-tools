@@ -1026,6 +1026,11 @@ public class BinaryMapIndexWriter {
 			for (MapObject o : objects) {
 				AddressNameIndexDataAtom.Builder atom = AddressNameIndexDataAtom.newBuilder();
 				CityBlocks type = CityBlocks.CITY_TOWN_TYPE;
+				LatLon ll = o.getLocation();
+				int x = (int) MapUtils.getTileNumberX(16, ll.getLongitude());
+				int y = (int) MapUtils.getTileNumberY(16, ll.getLatitude());
+				atom.addXy16((x << 16) + y);
+
 				int[] bbox31 = null;
 				if (o instanceof City cityObj) {
 					CityType ct = cityObj.getType();
@@ -1044,6 +1049,7 @@ public class BinaryMapIndexWriter {
 				} else if (o instanceof Street s) {
 					type = CityBlocks.STREET_TYPE;
 					QuadRect bb = s.getBboxPoints();
+					
 					if (bb != null) {
 						bbox31 = new int[] { MapUtils.get31TileNumberX(bb.left), MapUtils.get31TileNumberY(bb.top),
 								MapUtils.get31TileNumberX(bb.right), MapUtils.get31TileNumberY(bb.bottom) };
@@ -1051,17 +1057,17 @@ public class BinaryMapIndexWriter {
 				}
 				if (bbox31 != null) {
 					int[] bytes = SearchAlgorithms.encodeBboxForNameAtoms(ZOOM_ENCODE_BBOX_NAME_ATOMS, bbox31);
-					mapDataBuf.clear();
-					for (Integer i : bytes) {
-						writeRawVarint32(mapDataBuf, i);
+					// double bbox or bbox larger than 15th zoom tile 
+					if (bytes.length != 5 || (bytes[2] > 1 || bytes[4] > 1)) {
+						mapDataBuf.clear();
+						for (Integer i : bytes) {
+							writeRawVarint32(mapDataBuf, i);
+						}
+						atom.setBbox(ByteString.copyFrom(mapDataBuf.toArray()));
 					}
-					atom.setBbox(ByteString.copyFrom(mapDataBuf.toArray()));
 				}
 				atom.setType(type.index);
-				LatLon ll = o.getLocation();
-				int x = (int) MapUtils.getTileNumberX(16, ll.getLongitude());
-				int y = (int) MapUtils.getTileNumberY(16, ll.getLatitude());
-				atom.addXy16((x << 16) + y);
+				
 				atom.addShiftToIndex((int) (pointer - o.getFileOffset()));
 				if (o instanceof Street) {
 					atom.addShiftToCityIndex((int) (pointer - ((Street) o).getCity().getFileOffset()));
