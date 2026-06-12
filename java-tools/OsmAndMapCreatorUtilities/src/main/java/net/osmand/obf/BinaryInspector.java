@@ -99,13 +99,13 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-//					"-vpoi", // "-vpoiobjects",
+					"-vpoi", // "-vpoiobjects",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
-					"-vaddress",
-//					"-vsearchinspect", 
+					//"-vsearchinspect", // "-vsearchglobalonly", // "-vprefix=hh" // search index extended anlays 
+					"-vaddress",   
 //					"-vcities", //"-vstreetgroups", "-vcitynames",
 //					"-vstreets", //  "-vbuildings",// "-vintersections",
 //					"-lang=ru",
@@ -124,8 +124,8 @@ public class BinaryInspector {
 //					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_karlsruhe_europe_2.obf",
 //					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_freiburg_europe_2.obf",
 //					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_stuttgart_europe_2.obf",
-//					System.getProperty("maps.dir") + "Liechtenstein_europe.obf",
-					System.getProperty("maps.dir") + "/regionsTest.ocbf",
+					System.getProperty("maps.dir") + "Liechtenstein_europe.obf",
+//					System.getProperty("maps.dir") + "/regionsTest.ocbf",
 //					System.getProperty("maps.dir") + "Spain_aragon_europe_2.obf"
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
@@ -163,6 +163,7 @@ public class BinaryInspector {
 	protected static class VerboseInfo {
 		boolean vaddress;
 		boolean vsearchinspect;
+		boolean vsearchglobalonly;
 		boolean vcities;
 		boolean vcitynames;
 		boolean vstreetgroups;
@@ -239,16 +240,14 @@ public class BinaryInspector {
 			return vstats;
 		}
 		
-		public boolean isVAddrSearchInspect() {
-			return vsearchinspect;
-		}
-
 		public VerboseInfo(String[] params) throws FileNotFoundException {
 			for (int i = 0; i < params.length; i++) {
 				if (params[i].equals("-vaddress")) {
 					vaddress = true;
 				} else if (params[i].equals("-vsearchinspect")) {
 					vsearchinspect = true;
+				} else if (params[i].equals("-vsearchglobalonly")) {
+					vsearchglobalonly = true;
 				} else if (params[i].equals("-vstreets")) {
 					vstreets = true;
 				} else if (params[i].equals("-vstreetgroups")) {
@@ -1037,8 +1036,11 @@ public class BinaryInspector {
 			}
 		}
 		as.nameIndex = ValueFreq.mergeArray(new HashMap<>(), fullNameIndex.getAddrPrefixes(-1, vInfo.getPrefix()));
+		as.suffixesStat = fullNameIndex.getSuffixesStat();
 		as.streetsStat = fullNameIndex.getStreetsStat();
-		printAddressNameStats(as);
+		if (!vInfo.vsearchglobalonly) {
+			printAddressNameStats(as);
+		}
 	}
 
 	private void printAddressNameStats(AddressStats as) {
@@ -1854,15 +1856,19 @@ public class BinaryInspector {
 		NameIndexInspector fullNameIndex = index.readFullNameIndex(p);
 		ps.nameIndex = ValueFreq.mergeArray(new HashMap<>(), fullNameIndex.getPOIPrefixes(verbose.getPrefix()));
 		ps.suffixesStat = fullNameIndex.getSuffixesStat();
-		printPoiTypeStats(ps);
+		
+		if (!verbose.vsearchglobalonly) {
+			printPoiTypeStats(ps);
+		}
 		
 //		req.poiTypeFilter = null;//for test only
 		if (verbose.isVpoiObjects() || verbose.vsearchinspect) {
 			index.searchPoi(req, p);
+			if (!verbose.vsearchinspect) {
+				println(String.format("Found %d pois (%d with addr, %d with name without addr)", count[0], count[1],
+						count[2]));
+			}
 		}
-		
-		println(String.format("Found %d pois (%d with addr, %d with name without addr)", count[0],
-				count[1], count[2]));
 	}
 
 	private void printPoiTypeStats(PoiStats ps) {

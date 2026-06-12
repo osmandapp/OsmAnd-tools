@@ -84,6 +84,7 @@ import net.osmand.data.City;
 import net.osmand.data.City.CityType;
 import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
+import net.osmand.data.QuadRect;
 import net.osmand.data.Street;
 import net.osmand.data.TransportSchedule;
 import net.osmand.data.TransportStop;
@@ -103,6 +104,7 @@ import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 import net.osmand.router.HHRoutingOBFWriter.NetworkDBPointWrite;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
+import net.osmand.util.SearchAlgorithms;
 import net.sf.junidecode.Junidecode;
 
 import static net.osmand.util.SearchAlgorithms.*;
@@ -163,8 +165,9 @@ public class BinaryMapIndexWriter {
 	
 	
 	private final static int HH_INDEX_INIT = 17;
-	private final static int HH_BLOCK_SEGMENTS =18;
-
+	private final static int HH_BLOCK_SEGMENTS = 18;
+	private static final int ZOOM_ENCODE_BBOX_NAME_ATOMS = 15;
+	
 
 	public BinaryMapIndexWriter(final RandomAccessFile raf, long timestamp) throws IOException {
 		this.raf = raf;
@@ -1022,27 +1025,37 @@ public class BinaryMapIndexWriter {
 			}
 			for (MapObject o : objects) {
 				AddressNameIndexDataAtom.Builder atom = AddressNameIndexDataAtom.newBuilder();
-				// this is optional
-//				atom.setName(o.getName());
-//				if(checkEnNameToWrite(o)){
-//					atom.setNameEn(o.getEnName());
-//				}
 				CityBlocks type = CityBlocks.CITY_TOWN_TYPE;
-				if (o instanceof City) {
-					CityType ct = ((City) o).getType();
+				int[] bbox31 = null;
+				if (o instanceof City cityObj) {
+					CityType ct = cityObj.getType();
 					if (ct == CityType.POSTCODE) {
 						type = CityBlocks.POSTCODES_TYPE;
-						atom.setEnclosingObjects(((City) o).getStreets().size());
+						atom.setEnclosingObjects(cityObj.getStreets().size());
 					} else if (ct == CityType.BOUNDARY) {
 						type = CityBlocks.BOUNDARY_TYPE;
 					} else if (ct != CityType.CITY && ct != CityType.TOWN) {
 						type = CityBlocks.VILLAGES_TYPE;
 					}
 					if (type != CityBlocks.BOUNDARY_TYPE) {
-						atom.setEnclosingObjects(((City) o).getStreets().size());
+						atom.setEnclosingObjects(cityObj.getStreets().size());
 					}
-				} else if (o instanceof Street) {
+					bbox31 = cityObj.getBbox31();
+				} else if (o instanceof Street s) {
 					type = CityBlocks.STREET_TYPE;
+					QuadRect bb = s.getBboxPoints();
+					if (bb != null) {
+						bbox31 = new int[] { MapUtils.get31TileNumberX(bb.left), MapUtils.get31TileNumberY(bb.top),
+								MapUtils.get31TileNumberX(bb.right), MapUtils.get31TileNumberY(bb.bottom) };
+					}
+				}
+				if (bbox31 != null) {
+					int[] bytes = SearchAlgorithms.encodeBboxForNameAtoms(ZOOM_ENCODE_BBOX_NAME_ATOMS, bbox31);
+					mapDataBuf.clear();
+					for (Integer i : bytes) {
+						writeRawVarint32(mapDataBuf, i);
+					}
+					atom.setBbox(ByteString.copyFrom(mapDataBuf.toArray()));
 				}
 				atom.setType(type.index);
 				LatLon ll = o.getLocation();
