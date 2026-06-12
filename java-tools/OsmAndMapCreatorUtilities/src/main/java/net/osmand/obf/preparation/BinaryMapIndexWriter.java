@@ -7,6 +7,7 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -26,6 +27,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import com.google.protobuf.ByteString;
+import com.google.protobuf.CodedInputStream;
 import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.Message;
 import com.google.protobuf.WireFormat;
@@ -1028,7 +1030,7 @@ public class BinaryMapIndexWriter {
 				CityBlocks type = CityBlocks.CITY_TOWN_TYPE;
 				LatLon ll = o.getLocation();
 				int x = (int) MapUtils.getTileNumberX(16, ll.getLongitude());
-				int y = (int) MapUtils.getTileNumberY(16, ll.getLatitude());
+				int y = (int) MapUtils.getTileNumberY(16, ll.getLatitude()); // should be inside tile
 				atom.addXy16((x << 16) + y);
 
 				int[] bbox31 = null;
@@ -1049,7 +1051,6 @@ public class BinaryMapIndexWriter {
 				} else if (o instanceof Street s) {
 					type = CityBlocks.STREET_TYPE;
 					QuadRect bb = s.getBboxPoints();
-					
 					if (bb != null) {
 						bbox31 = new int[] { MapUtils.get31TileNumberX(bb.left), MapUtils.get31TileNumberY(bb.top),
 								MapUtils.get31TileNumberX(bb.right), MapUtils.get31TileNumberY(bb.bottom) };
@@ -1060,8 +1061,16 @@ public class BinaryMapIndexWriter {
 					// double bbox or bbox larger than 15th zoom tile 
 					if (bytes.length != 5 || (bytes[2] > 1 || bytes[4] > 1)) {
 						mapDataBuf.clear();
-						for (Integer i : bytes) {
-							writeRawVarint32(mapDataBuf, i);
+						writeRawVarint32(mapDataBuf, bytes[0]);
+						for (int k = 1; k < bytes.length; k += 4) {
+							if (x / 2 - bytes[k] < -1 || y / 2 - bytes[k + 2] < -1) {
+								throw new IllegalStateException(String.format("Safe check for wrong bbox %s %s - %d %d",
+										o, Arrays.toString(bytes), x / 2, y / 2));
+							}
+							writeRawVarint32(mapDataBuf, Math.max(0, x / 2 - bytes[k]));
+							writeRawVarint32(mapDataBuf, bytes[k + 1]);
+							writeRawVarint32(mapDataBuf, Math.max(0,y / 2 - bytes[k + 2]));
+							writeRawVarint32(mapDataBuf, bytes[k + 3]);
 						}
 						atom.setBbox(ByteString.copyFrom(mapDataBuf.toArray()));
 					}
