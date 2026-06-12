@@ -1063,7 +1063,7 @@ public class BinaryMapIndexWriter {
 						mapDataBuf.clear();
 						writeRawVarint32(mapDataBuf, bytes[0]);
 						for (int k = 1; k < bytes.length; k += 4) {
-							if (x / 2 - bytes[k] < -2 || y / 2 - bytes[k + 2] < -2) {
+							if (x / 2 - bytes[k] < 0 || y / 2 - bytes[k + 2] < 0) {
 								throw new IllegalStateException(String.format("Safe check for wrong bbox %s %s - %d %d",
 										o, Arrays.toString(bytes), x / 2, y / 2));
 							}
