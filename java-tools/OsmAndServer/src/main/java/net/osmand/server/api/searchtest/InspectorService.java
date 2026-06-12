@@ -450,6 +450,10 @@ public interface InspectorService extends OBFService {
 
     default IndexTokenPage getIndex(String obf, String prefix, int pageToShow, int pageSizeLimit, String sortBy, String sortOrder, String objectType) {
         File file = new File(obf);
+        IndexMultiTokenQuery multiQuery = parseIndexMultiTokenQuery(prefix);
+        if (multiQuery != null) {
+            return getIndexDirect(file, multiQuery, pageToShow, pageSizeLimit, sortBy, sortOrder, parseIndexObjectType(objectType));
+        }
         Pattern prefixPattern = compileIndexPrefixPattern(prefix);
         final int safePage = Math.max(pageToShow, 0);
         final int safeSize = Math.max(1, Math.min(pageSizeLimit, 100));
@@ -458,11 +462,15 @@ public interface InspectorService extends OBFService {
             List<IndexToken> allTokens = getCachedOrLoadIndexTokens(file);
             List<IndexToken> results = new ArrayList<>();
             if (prefixPattern == null) {
-                results.addAll(allTokens);
+                for (IndexToken token : allTokens) {
+                    if (matchesIndexObjectType(token, poiScope)) {
+                        results.add(scopeIndexToken(token, poiScope));
+                    }
+                }
             } else {
                 for (IndexToken token : allTokens) {
-                    if (prefixPattern.matcher(token.name()).find()) {
-                        results.add(token);
+                    if (matchesIndexObjectType(token, poiScope) && prefixPattern.matcher(token.name()).find()) {
+                        results.add(scopeIndexToken(token, poiScope));
                     }
                 }
             }
@@ -487,6 +495,10 @@ public interface InspectorService extends OBFService {
     }
 
     default IndexTokenPage getIndex(List<String> obfs, String prefix, int pageToShow, int pageSizeLimit, String sortBy, String sortOrder, String objectType) {
+        IndexMultiTokenQuery multiQuery = parseIndexMultiTokenQuery(prefix);
+        if (multiQuery != null) {
+            return getIndexDirect(obfs, multiQuery, pageToShow, pageSizeLimit, sortBy, sortOrder, parseIndexObjectType(objectType));
+        }
         Pattern prefixPattern = compileIndexPrefixPattern(prefix);
         final int safePage = Math.max(pageToShow, 0);
         final int safeSize = Math.max(1, Math.min(pageSizeLimit, 100));
@@ -503,8 +515,8 @@ public interface InspectorService extends OBFService {
                         if (token == null || token.name() == null) {
                             continue;
                         }
-                        if (prefixPattern == null || prefixPattern.matcher(token.name()).find()) {
-                            mergedByName.merge(token.name(), token, this::mergeIndexTokens);
+                        if (matchesIndexObjectType(token, poiScope) && (prefixPattern == null || prefixPattern.matcher(token.name()).find())) {
+                            mergedByName.merge(token.name(), scopeIndexToken(token, poiScope), this::mergeIndexTokens);
                         }
                     }
                 }
@@ -546,7 +558,114 @@ public interface InspectorService extends OBFService {
                 mergeSuffixMetrics(left.addressSuffixMetrics(), right.addressSuffixMetrics()),
                 mergeSuffixTexts(left.suffixTexts(), right.suffixTexts()),
                 mergeSuffixTexts(left.poiSuffixTexts(), right.poiSuffixTexts()),
-                mergeSuffixTexts(left.addressSuffixTexts(), right.addressSuffixTexts()));
+                mergeSuffixTexts(left.addressSuffixTexts(), right.addressSuffixTexts()),
+                concatPoiRefs(left.exactPoiRefs(), right.exactPoiRefs()));
+    }
+
+    default boolean matchesIndexObjectType(IndexToken token, Boolean poiScope) {
+        if (token == null || poiScope == null) {
+            return token != null;
+        }
+        return poiScope ? getIndexTokenPoiCount(token) > 0 : getIndexTokenAddressCount(token) > 0;
+    }
+
+    default IndexToken scopeIndexToken(IndexToken token, Boolean poiScope) {
+        if (token == null || poiScope == null) {
+            return token;
+        }
+        if (poiScope) {
+            return new IndexToken(token.name(), new AddressRef[0], token.poiRefs(), token.poiAtomRefs(),
+                    token.poiAtomSizes(), token.isCommon(), token.isFrequent(), token.obf(),
+                    token.poiSuffixMetrics(), token.poiSuffixMetrics(), emptySuffixMetrics(),
+                    token.poiSuffixTexts(), token.poiSuffixTexts(), emptySuffixTexts(), token.exactPoiRefs());
+        }
+        return new IndexToken(token.name(), token.addressRefs(), new int[0], new int[0],
+                new int[0], token.isCommon(), token.isFrequent(), token.obf(),
+                token.addressSuffixMetrics(), emptySuffixMetrics(), token.addressSuffixMetrics(),
+                token.addressSuffixTexts(), emptySuffixTexts(), token.addressSuffixTexts(), new PoiRef[0]);
+    }
+
+    record IndexMultiTokenQuery(String firstToken, Set<String> requiredSuffixes) {}
+
+    default IndexMultiTokenQuery parseIndexMultiTokenQuery(String prefix) {
+        if (Algorithms.isEmpty(prefix)) {
+            return null;
+        }
+        List<String> tokens = SearchAlgorithms.splitAndNormalize(prefix);
+        if (tokens == null || tokens.size() <= 1) {
+            return null;
+        }
+        Set<String> suffixes = new LinkedHashSet<>();
+        for (int i = 1; i < tokens.size(); i++) {
+            if (!Algorithms.isEmpty(tokens.get(i))) {
+                suffixes.add(tokens.get(i));
+            }
+        }
+        return suffixes.isEmpty() ? null : new IndexMultiTokenQuery(tokens.get(0), suffixes);
+    }
+
+    default IndexTokenPage getIndexDirect(List<String> obfs, IndexMultiTokenQuery query, int pageToShow, int pageSizeLimit,
+                                          String sortBy, String sortOrder, Boolean poiScope) {
+        final int safePage = Math.max(pageToShow, 0);
+        final int safeSize = Math.max(1, Math.min(pageSizeLimit, 100));
+        try {
+            Map<String, IndexToken> mergedByName = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+            if (obfs != null) {
+                for (String obf : obfs) {
+                    if (Algorithms.isEmpty(obf)) {
+                        continue;
+                    }
+                    IndexTokenPage page = getIndexDirect(new File(obf), query, 0, Integer.MAX_VALUE, sortBy, sortOrder, poiScope);
+                    for (IndexToken token : page.content()) {
+                        mergedByName.merge(token.name(), withObf(token, obf), this::mergeIndexTokens);
+                    }
+                }
+            }
+            List<IndexToken> results = new ArrayList<>(mergedByName.values());
+            IndexTokenSummary summary = buildIndexTokenSummary(results);
+            results.sort(buildIndexTokenComparator(sortBy, sortOrder, poiScope));
+            long totalElements = results.size();
+            int totalPages = totalElements == 0 ? 0 : (int) ((totalElements + safeSize - 1) / safeSize);
+            int fromIndex = Math.min(safePage * safeSize, results.size());
+            int toIndex = Math.min(fromIndex + safeSize, results.size());
+            List<IndexToken> pageContent = fromIndex >= toIndex ? List.of() : new ArrayList<>(results.subList(fromIndex, toIndex));
+            return new IndexTokenPage(pageContent, safePage, safeSize, totalElements, totalPages, summary);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to read OBF indexes: " + e.getMessage(), e);
+        }
+    }
+
+    default IndexTokenPage getIndexDirect(File file, IndexMultiTokenQuery query, int pageToShow, int pageSizeLimit,
+                                          String sortBy, String sortOrder, Boolean poiScope) {
+        final int safePage = Math.max(pageToShow, 0);
+        final int safeSize = Math.max(1, Math.min(pageSizeLimit, 100));
+        try (RandomAccessFile randomAccessFile = new RandomAccessFile(file.getAbsolutePath(), "r")) {
+            BinaryMapIndexReaderExt index = new BinaryMapIndexReaderExt(randomAccessFile, file);
+            try {
+                Map<String, MutableIndexTokenBuilder> tokens = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+                for (BinaryIndexPart part : index.getIndexes()) {
+                    if ((poiScope == null || !poiScope) && part instanceof BinaryMapAddressReaderAdapter.AddressRegion addressRegion) {
+                        collectAddressIndexTokensDirect(index, addressRegion, query, tokens);
+                    } else if ((poiScope == null || poiScope) && part instanceof BinaryMapPoiReaderAdapter.PoiRegion poiRegion) {
+                        collectPoiIndexTokensDirect(index, poiRegion, query, tokens);
+                    }
+                }
+                List<IndexToken> results = buildIndexTokensWithRefs(index, tokens);
+                IndexTokenSummary summary = buildIndexTokenSummary(results);
+                results.sort(buildIndexTokenComparator(sortBy, sortOrder, poiScope));
+                long totalElements = results.size();
+                int totalPages = totalElements == 0 ? 0 : (int) ((totalElements + safeSize - 1) / safeSize);
+                int fromIndex = Math.min(safePage * safeSize, results.size());
+                int toIndex = Math.min(fromIndex + safeSize, results.size());
+                List<IndexToken> pageContent = fromIndex >= toIndex ? List.of() : new ArrayList<>(results.subList(fromIndex, toIndex));
+                return new IndexTokenPage(pageContent, safePage, safeSize, totalElements, totalPages, summary);
+            } finally {
+                index.close();
+            }
+        } catch (Exception e) {
+            getLogger().error("Failed to read OBF index {}", file, e);
+            throw new RuntimeException("Failed to read OBF index: " + e.getMessage(), e);
+        }
     }
 
     default SuffixTexts mergeSuffixTexts(SuffixTexts left, SuffixTexts right) {
@@ -619,6 +738,18 @@ public interface InspectorService extends OBFService {
             return Arrays.copyOf(left, left.length);
         }
         int[] merged = Arrays.copyOf(left, left.length + right.length);
+        System.arraycopy(right, 0, merged, left.length, right.length);
+        return merged;
+    }
+
+    default PoiRef[] concatPoiRefs(PoiRef[] left, PoiRef[] right) {
+        if (left == null || left.length == 0) {
+            return right == null ? new PoiRef[0] : Arrays.copyOf(right, right.length);
+        }
+        if (right == null || right.length == 0) {
+            return Arrays.copyOf(left, left.length);
+        }
+        PoiRef[] merged = Arrays.copyOf(left, left.length + right.length);
         System.arraycopy(right, 0, merged, left.length, right.length);
         return merged;
     }
@@ -1108,6 +1239,155 @@ public interface InspectorService extends OBFService {
         }
     }
 
+    default void collectAddressIndexTokensDirect(BinaryMapIndexReaderExt index, BinaryMapAddressReaderAdapter.AddressRegion region,
+                                                 IndexMultiTokenQuery query, Map<String, MutableIndexTokenBuilder> tokens) throws IOException {
+        long indexNameOffset = region.getIndexNameOffset();
+        if (indexNameOffset < 0) {
+            return;
+        }
+        index.getInputStream().seek(indexNameOffset);
+        long length = index.readInt();
+        long oldLimit = index.getInputStream().pushLimitLong(length);
+        try {
+            readAddressNameIndexTokensDirect(index, query, tokens);
+        } finally {
+            index.getInputStream().popLimit(oldLimit);
+        }
+    }
+
+    default void collectPoiIndexTokensDirect(BinaryMapIndexReaderExt index, BinaryMapPoiReaderAdapter.PoiRegion region,
+                                             IndexMultiTokenQuery query, Map<String, MutableIndexTokenBuilder> tokens) throws IOException {
+        index.getInputStream().seek(region.getFilePointer());
+        long oldLimit = index.getInputStream().pushLimitLong(region.getLength());
+        try {
+            while (true) {
+                int tagWithType = index.getInputStream().readTag();
+                int tag = WireFormat.getTagFieldNumber(tagWithType);
+                switch (tag) {
+                    case 0:
+                        return;
+                    case OsmandOdb.OsmAndPoiIndex.NAMEINDEX_FIELD_NUMBER:
+                        long length2 = index.readInt();
+                        long nameIndexOldLimit = index.getInputStream().pushLimitLong(length2);
+                        try {
+                            readPoiNameIndexTokensDirect(index, query, tokens);
+                        } finally {
+                            index.getInputStream().popLimit(nameIndexOldLimit);
+                        }
+                        return;
+                    default:
+                        InspectorService.skipUnknownField(index.getInputStream(), tagWithType);
+                        break;
+                }
+            }
+        } finally {
+            index.getInputStream().popLimit(oldLimit);
+        }
+    }
+
+    default void readAddressNameIndexTokensDirect(BinaryMapIndexReaderExt index, IndexMultiTokenQuery query,
+                                                  Map<String, MutableIndexTokenBuilder> tokens) throws IOException {
+        while (true) {
+            int tagWithType = index.getInputStream().readTag();
+            int tag = WireFormat.getTagFieldNumber(tagWithType);
+            switch (tag) {
+                case 0:
+                    return;
+                case OsmandOdb.OsmAndAddressNameIndexData.TABLE_FIELD_NUMBER:
+                    readNameIndexTableTokensDirect(index, query, false, tokens);
+                    return;
+                default:
+                    InspectorService.skipUnknownField(index.getInputStream(), tagWithType);
+                    break;
+            }
+        }
+    }
+
+    default void readPoiNameIndexTokensDirect(BinaryMapIndexReaderExt index, IndexMultiTokenQuery query,
+                                              Map<String, MutableIndexTokenBuilder> tokens) throws IOException {
+        while (true) {
+            int tagWithType = index.getInputStream().readTag();
+            int tag = WireFormat.getTagFieldNumber(tagWithType);
+            switch (tag) {
+                case 0:
+                    return;
+                case OsmandOdb.OsmAndPoiNameIndex.TABLE_FIELD_NUMBER:
+                    readNameIndexTableTokensDirect(index, query, true, tokens);
+                    return;
+                default:
+                    InspectorService.skipUnknownField(index.getInputStream(), tagWithType);
+                    break;
+            }
+        }
+    }
+
+    default void readNameIndexTableTokensDirect(BinaryMapIndexReaderExt index, IndexMultiTokenQuery query, boolean poi,
+                                                Map<String, MutableIndexTokenBuilder> tokens) throws IOException {
+        long tableLength = index.readInt();
+        long tableContentStart = index.getInputStream().getTotalBytesRead();
+        Map<String, Integer> prefixOffsets = new TreeMap<>();
+        long oldLimit = index.getInputStream().pushLimitLong(tableLength);
+        try {
+            readIndexedStringTableOffsets(index, "", prefixOffsets);
+        } finally {
+            index.getInputStream().popLimit(oldLimit);
+        }
+        for (Map.Entry<String, Integer> entry : prefixOffsets.entrySet()) {
+            if (query.firstToken().startsWith(entry.getKey())) {
+                readNameIndexDataTokensDirect(index, entry.getKey(), (int) (tableContentStart + entry.getValue()), poi, query, tokens);
+            }
+        }
+    }
+
+    default void readNameIndexDataTokensDirect(BinaryMapIndexReaderExt index, String prefix, int tokenOffset, boolean poi,
+                                               IndexMultiTokenQuery query, Map<String, MutableIndexTokenBuilder> tokens) throws IOException {
+        index.getInputStream().seek(tokenOffset);
+        long length = index.getInputStream().readRawVarint32();
+        long oldLimit = index.getInputStream().pushLimitLong(length);
+        try {
+            List<String> suffixDictionary = new ArrayList<>();
+            while (true) {
+                int tagWithType = index.getInputStream().readTag();
+                int tag = WireFormat.getTagFieldNumber(tagWithType);
+                if (tag == 0) {
+                    return;
+                }
+                boolean isSuffixField = poi
+                        ? tag == OsmandOdb.OsmAndPoiNameIndex.OsmAndPoiNameIndexData.SUFFIXESDICTIONARY_FIELD_NUMBER
+                        : tag == OsmandOdb.OsmAndAddressNameIndexData.AddressNameIndexData.SUFFIXESDICTIONARY_FIELD_NUMBER;
+                boolean isAtomField = poi
+                        ? tag == OsmandOdb.OsmAndPoiNameIndex.OsmAndPoiNameIndexData.ATOMS_FIELD_NUMBER
+                        : tag == OsmandOdb.OsmAndAddressNameIndexData.AddressNameIndexData.ATOM_FIELD_NUMBER;
+                if (isSuffixField) {
+                    String encodedSuffix = index.getInputStream().readString();
+                    if (!SearchAlgorithms.EMPTY_SUFFIX_DICTIONARY_SENTINEL.equals(encodedSuffix)) {
+                        String previousSuffix = suffixDictionary.isEmpty() ? null : suffixDictionary.get(suffixDictionary.size() - 1);
+                        suffixDictionary.add(SearchAlgorithms.nameIndexDecodeDictionarySuffix(previousSuffix, encodedSuffix));
+                    }
+                    continue;
+                }
+                if (isAtomField) {
+                    int atomLength = index.getInputStream().readRawVarint32();
+                    long atomOldLimit = index.getInputStream().pushLimitLong(atomLength);
+                    try {
+                        CompactIndexAtom atom = poi
+                                ? readCompactPoiIndexAtom(index, prefix, atomLength + computeVarint32Size(atomLength), suffixDictionary)
+                                : readCompactAddressIndexAtom(index, prefix, tokenOffset, atomLength + computeVarint32Size(atomLength), suffixDictionary);
+                        if (matchesMultiTokenAtom(atom, query)) {
+                            addMultiTokenAtom(tokens, prefix, suffixDictionary, poi, atom, query.firstToken());
+                        }
+                    } finally {
+                        index.getInputStream().popLimit(atomOldLimit);
+                    }
+                    continue;
+                }
+                InspectorService.skipUnknownField(index.getInputStream(), tagWithType);
+            }
+        } finally {
+            index.getInputStream().popLimit(oldLimit);
+        }
+    }
+
     default List<String> compactDictionaryPartSuffixes(List<String> suffixDictionary) {
         if (suffixDictionary == null || suffixDictionary.isEmpty()) {
             return List.of();
@@ -1138,7 +1418,6 @@ public interface InspectorService extends OBFService {
         Set<String> result = new LinkedHashSet<>();
         if (atom != null) {
             addSuffixTexts(result, new ArrayList<>(atom.extraSuffixByToken().values()));
-            addSuffixTexts(result, new ArrayList<>(atom.separatedSuffixByToken().values()));
         }
         return List.copyOf(result);
     }
@@ -1147,9 +1426,85 @@ public interface InspectorService extends OBFService {
         Set<String> result = new LinkedHashSet<>();
         if (atom != null) {
             addSuffixTexts(result, new ArrayList<>(atom.extraSuffixByToken().values()));
-            addSuffixTexts(result, new ArrayList<>(atom.separatedSuffixByToken().values()));
         }
         return List.copyOf(result);
+    }
+
+    default PoiRef[] toPoiRefs(int blockOffset, Set<Integer> poiIndexesInBlock, int atomSize) {
+        if (blockOffset == Integer.MIN_VALUE) {
+            return new PoiRef[0];
+        }
+        if (poiIndexesInBlock == null || poiIndexesInBlock.isEmpty()) {
+            return new PoiRef[]{new PoiRef(blockOffset, -1, atomSize)};
+        }
+        PoiRef[] refs = new PoiRef[poiIndexesInBlock.size()];
+        int i = 0;
+        for (Integer poiIndex : poiIndexesInBlock) {
+            refs[i++] = new PoiRef(blockOffset, poiIndex == null ? -1 : poiIndex, atomSize);
+        }
+        return refs;
+    }
+
+    default int[] toPoiBlockOffsets(PoiRef[] refs, int fallbackBlockOffset) {
+        if (refs == null || refs.length == 0) {
+            return fallbackBlockOffset == Integer.MIN_VALUE ? new int[0] : new int[]{fallbackBlockOffset};
+        }
+        int[] offsets = new int[refs.length];
+        for (int i = 0; i < refs.length; i++) {
+            offsets[i] = refs[i] == null ? fallbackBlockOffset : refs[i].blockOffset();
+        }
+        return offsets;
+    }
+
+    default int[] toPoiAtomSizes(PoiRef[] refs, int fallbackAtomSize) {
+        if (refs == null || refs.length == 0) {
+            return fallbackAtomSize > 0 ? new int[]{fallbackAtomSize} : new int[0];
+        }
+        int[] sizes = new int[refs.length];
+        for (int i = 0; i < refs.length; i++) {
+            sizes[i] = refs[i] == null ? fallbackAtomSize : refs[i].atomSize();
+        }
+        return sizes;
+    }
+
+    default boolean matchesMultiTokenAtom(CompactIndexAtom atom, IndexMultiTokenQuery query) {
+        if (atom == null || query == null || Algorithms.isEmpty(query.firstToken())) {
+            return false;
+        }
+        if (atom.partSuffixByToken() == null || !atom.partSuffixByToken().containsKey(query.firstToken())) {
+            return false;
+        }
+        Set<String> separated = new LinkedHashSet<>();
+        addSeparatedSuffixTokens(separated, atom.separatedSuffixByToken());
+        addSeparatedSuffixTokens(separated, atom.integerSuffixByToken());
+        return separated.containsAll(query.requiredSuffixes());
+    }
+
+    default void addSeparatedSuffixTokens(Set<String> target, Map<String, String> suffixByToken) {
+        if (target == null || suffixByToken == null) {
+            return;
+        }
+        for (String suffix : suffixByToken.values()) {
+            if (Algorithms.isEmpty(suffix)) {
+                continue;
+            }
+            target.add(suffix.startsWith(" ") ? suffix.substring(1) : suffix);
+        }
+    }
+
+    default void addMultiTokenAtom(Map<String, MutableIndexTokenBuilder> tokens, String prefix, List<String> suffixDictionary,
+                                   boolean poi, CompactIndexAtom atom, String firstToken) {
+        if (atom == null || Algorithms.isEmpty(firstToken)) {
+            return;
+        }
+        List<String> dictionaryPartSuffixes = compactDictionaryPartSuffixes(suffixDictionary);
+        List<String> dictionarySeparatedSuffixes = compactDictionarySeparatedSuffixes(suffixDictionary);
+        List<String> atomExtraSuffixes = compactAtomExtraSuffixes(atom);
+        SuffixMetrics metrics = mergeSuffixMetrics(new SuffixMetrics(suffixDictionary == null ? 0 : suffixDictionary.size(), 0, 0, 0, 0),
+                atom.suffixMetricsByToken().get(firstToken));
+        addIndexTokenDirect(tokens, firstToken, atom.addressRefs(), poi, atom.poiRefs(), atom.poiAtomSizes(),
+                metrics, suffixTexts(suffixDictionary, dictionaryPartSuffixes, dictionarySeparatedSuffixes,
+                        List.copyOf(atom.integerSuffixByToken().values()), atomExtraSuffixes), atom.exactPoiRefs());
     }
 
     default SuffixMetrics sumSuffixMetrics(Collection<SuffixMetrics> metrics) {
@@ -1251,6 +1606,7 @@ public interface InspectorService extends OBFService {
         final Set<Integer> poiRefs = new LinkedHashSet<>();
         final List<Integer> poiAtomRefs = new ArrayList<>();
         final List<Integer> poiAtomSizes = new ArrayList<>();
+        final List<PoiRef> exactPoiRefs = new ArrayList<>();
         SuffixMetrics suffixMetrics = new SuffixMetrics(0, 0, 0, 0, 0);
         SuffixMetrics poiSuffixMetrics = new SuffixMetrics(0, 0, 0, 0, 0);
         SuffixMetrics addressSuffixMetrics = new SuffixMetrics(0, 0, 0, 0, 0);
@@ -1305,12 +1661,19 @@ public interface InspectorService extends OBFService {
     default void addIndexTokenDirect(Map<String, MutableIndexTokenBuilder> tokens, String name, AddressRef[] addressRefs,
                                      boolean poi, int[] poiRefs, int[] poiAtomSizes, SuffixMetrics suffixMetrics,
                                      SuffixTexts suffixTexts) {
+        addIndexTokenDirect(tokens, name, addressRefs, poi, poiRefs, poiAtomSizes, suffixMetrics, suffixTexts, new PoiRef[0]);
+    }
+
+    default void addIndexTokenDirect(Map<String, MutableIndexTokenBuilder> tokens, String name, AddressRef[] addressRefs,
+                                     boolean poi, int[] poiRefs, int[] poiAtomSizes, SuffixMetrics suffixMetrics,
+                                     SuffixTexts suffixTexts, PoiRef[] exactPoiRefs) {
         if (Algorithms.isEmpty(name)) {
             return;
         }
         MutableIndexTokenBuilder builder = tokens.computeIfAbsent(name, MutableIndexTokenBuilder::new);
         if (poi) {
             addPoiRefs(builder, poiRefs, poiAtomSizes);
+            addExactPoiRefs(builder, exactPoiRefs);
             builder.poiSuffixMetrics = mergeSuffixMetrics(builder.poiSuffixMetrics, suffixMetrics);
             addSuffixTexts(builder.poiDictSuffixTexts, suffixTexts.dict());
             addSuffixTexts(builder.poiPartSuffixTexts, suffixTexts.part());
@@ -1332,6 +1695,17 @@ public interface InspectorService extends OBFService {
         addSuffixTexts(builder.literalSuffixTexts, suffixTexts.literal());
         addSuffixTexts(builder.integerSuffixTexts, suffixTexts.integer());
         addSuffixTexts(builder.extraSuffixTexts, suffixTexts.extra());
+    }
+
+    default void addExactPoiRefs(MutableIndexTokenBuilder builder, PoiRef[] exactPoiRefs) {
+        if (builder == null || exactPoiRefs == null) {
+            return;
+        }
+        for (PoiRef ref : exactPoiRefs) {
+            if (ref != null) {
+                builder.exactPoiRefs.add(ref);
+            }
+        }
     }
 
     default SuffixTexts emptySuffixTexts() {
@@ -1529,11 +1903,12 @@ public interface InspectorService extends OBFService {
     record CompactIndexAtom(Set<String> suffixTokens, Map<String, SuffixMetrics> suffixMetricsByToken,
                             Map<String, String> partSuffixByToken, Map<String, String> separatedSuffixByToken,
                             Map<String, String> integerSuffixByToken, Map<String, String> extraSuffixByToken,
-                            AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomSizes) {}
+                            AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomSizes, PoiRef[] exactPoiRefs) {}
 
     default CompactIndexAtom readCompactPoiIndexAtom(BinaryMapIndexReaderExt index, String prefix, int atomSize,
                                                     List<String> suffixDictionary) throws IOException {
         int shift = Integer.MIN_VALUE;
+        Set<Integer> poiIndexesInBlock = new LinkedHashSet<>();
         Set<String> suffixTokens = new LinkedHashSet<>();
         Map<String, SuffixMetrics> suffixMetricsByToken = new LinkedHashMap<>();
         Map<String, String> partSuffixByToken = new LinkedHashMap<>();
@@ -1549,14 +1924,18 @@ public interface InspectorService extends OBFService {
                     if (!compact || shift == Integer.MIN_VALUE) {
                         return null;
                     }
+                    PoiRef[] exactRefs = toPoiRefs(shift, poiIndexesInBlock, atomSize);
                     return new CompactIndexAtom(suffixTokens, suffixMetricsByToken, partSuffixByToken,
                             separatedSuffixByToken, integerSuffixByToken, extraSuffixByToken,
-                            new AddressRef[0], new int[]{shift}, new int[]{atomSize});
+                            new AddressRef[0], toPoiBlockOffsets(exactRefs, shift), toPoiAtomSizes(exactRefs, atomSize),
+                            exactRefs);
                 case OsmandOdb.OsmAndPoiNameIndexDataAtom.X_FIELD_NUMBER,
                      OsmandOdb.OsmAndPoiNameIndexDataAtom.Y_FIELD_NUMBER,
-                     OsmandOdb.OsmAndPoiNameIndexDataAtom.ZOOM_FIELD_NUMBER,
-                     OsmandOdb.OsmAndPoiNameIndexDataAtom.POIINDINBLOCK_FIELD_NUMBER:
+                     OsmandOdb.OsmAndPoiNameIndexDataAtom.ZOOM_FIELD_NUMBER:
                     index.getInputStream().readUInt32();
+                    break;
+                case OsmandOdb.OsmAndPoiNameIndexDataAtom.POIINDINBLOCK_FIELD_NUMBER:
+                    poiIndexesInBlock.add(index.getInputStream().readUInt32());
                     break;
                 case OsmandOdb.OsmAndPoiNameIndexDataAtom.SUFFIXESBITSETINDEX_FIELD_NUMBER:
                     compact = true;
@@ -1608,7 +1987,7 @@ public interface InspectorService extends OBFService {
                     AddressRef ref = new AddressRef(shiftToIndex, shiftToCityIndex, objectOffset, cityOffset, typeIndex, atomSize);
                     return new CompactIndexAtom(suffixTokens, suffixMetricsByToken, partSuffixByToken,
                             separatedSuffixByToken, integerSuffixByToken, extraSuffixByToken,
-                            new AddressRef[]{ref}, new int[0], new int[0]);
+                            new AddressRef[]{ref}, new int[0], new int[0], new PoiRef[0]);
                 }
             }
             switch (tag) {
@@ -1664,6 +2043,7 @@ public interface InspectorService extends OBFService {
         int dictionaryIndex = encodedIndex >> 1;
         String suffix = dictionaryIndex >= 0 && dictionaryIndex < suffixDictionary.size() ? suffixDictionary.get(dictionaryIndex) : null;
         if (suffix != null && suffix.startsWith(" ")) {
+            separatedSuffixByToken.putIfAbsent(prefix + suffix, suffix);
             return;
         }
         String token = resolveCompactSuffixToken(prefix, suffix);
@@ -1731,7 +2111,8 @@ public interface InspectorService extends OBFService {
                     token.poiSuffixMetrics, token.addressSuffixMetrics,
                     toSuffixTexts(token.dictSuffixTexts, token.partSuffixTexts, token.literalSuffixTexts, token.integerSuffixTexts, token.extraSuffixTexts),
                     toSuffixTexts(token.poiDictSuffixTexts, token.poiPartSuffixTexts, token.poiLiteralSuffixTexts, token.poiIntegerSuffixTexts, token.poiExtraSuffixTexts),
-                    toSuffixTexts(token.addressDictSuffixTexts, token.addressPartSuffixTexts, token.addressLiteralSuffixTexts, token.addressIntegerSuffixTexts, token.addressExtraSuffixTexts)));
+                    toSuffixTexts(token.addressDictSuffixTexts, token.addressPartSuffixTexts, token.addressLiteralSuffixTexts, token.addressIntegerSuffixTexts, token.addressExtraSuffixTexts),
+                    token.exactPoiRefs.toArray(new PoiRef[0])));
         }
         return tokensWithRefs;
     }
@@ -2505,6 +2886,36 @@ public interface InspectorService extends OBFService {
         }
     }
 
+    default void collectPoiObjectsByExactRefs(BinaryMapIndexReaderExt index,
+                                              PoiRef[] refs,
+                                              List<BinaryMapPoiReaderAdapter.PoiRegion> poiRegions,
+                                              List<ObjectAddress> results,
+                                              String lang,
+                                              CollatorStringMatcher matcher) throws IOException {
+        Map<BinaryMapPoiReaderAdapter.PoiRegion, Map<Integer, Set<Integer>>> byRegion = new LinkedHashMap<>();
+        for (PoiRef ref : refs) {
+            if (ref == null) {
+                continue;
+            }
+            for (BinaryMapPoiReaderAdapter.PoiRegion poiRegion : poiRegions) {
+                if (ref.blockOffset() >= 0 && ref.blockOffset() < poiRegion.getLength()) {
+                    byRegion.computeIfAbsent(poiRegion, ignored -> new TreeMap<>())
+                            .computeIfAbsent(ref.blockOffset(), ignored -> new LinkedHashSet<>())
+                            .add(ref.poiIndexInBlock());
+                    break;
+                }
+            }
+        }
+        for (Map.Entry<BinaryMapPoiReaderAdapter.PoiRegion, Map<Integer, Set<Integer>>> regionEntry : byRegion.entrySet()) {
+            BinaryMapPoiReaderAdapter.PoiRegion poiRegion = regionEntry.getKey();
+            index.initCategories(poiRegion);
+            Map<Integer, List<TagValuePair>> tagGroups = preloadPoiTagGroups(index.getInputStream(), poiRegion);
+            for (Map.Entry<Integer, Set<Integer>> blockEntry : regionEntry.getValue().entrySet()) {
+                readPoiObjectsAtShift(index, poiRegion, tagGroups, blockEntry.getKey(), blockEntry.getValue(), results, lang, matcher);
+            }
+        }
+    }
+
     default Map<BinaryMapPoiReaderAdapter.PoiRegion, Set<Integer>> mapPoiRefs(int[] poiRefs,
                                                                               List<BinaryMapPoiReaderAdapter.PoiRegion> poiRegions) {
         Map<BinaryMapPoiReaderAdapter.PoiRegion, Set<Integer>> offsetsByRegion = new LinkedHashMap<>();
@@ -2624,6 +3035,17 @@ public interface InspectorService extends OBFService {
                                        List<ObjectAddress> results,
                                        String lang,
                                        CollatorStringMatcher matcher) throws IOException {
+        readPoiObjectsAtShift(index, region, tagGroups, relativeOffset, null, results, lang, matcher);
+    }
+
+    default void readPoiObjectsAtShift(BinaryMapIndexReaderExt index,
+                                       BinaryMapPoiReaderAdapter.PoiRegion region,
+                                       Map<Integer, List<TagValuePair>> tagGroups,
+                                       int relativeOffset,
+                                       Set<Integer> poiIndexesInBlock,
+                                       List<ObjectAddress> results,
+                                       String lang,
+                                       CollatorStringMatcher matcher) throws IOException {
         index.getInputStream().seek(region.getFilePointer() + relativeOffset);
         long length = readInt(index.getInputStream());
         long oldLimit = index.getInputStream().pushLimitLong(length);
@@ -2631,6 +3053,7 @@ public interface InspectorService extends OBFService {
             int x = 0;
             int y = 0;
             int zoom = 0;
+            int poiIndex = 0;
             while (true) {
                 int tagWithType = index.getInputStream().readTag();
                 int tag = WireFormat.getTagFieldNumber(tagWithType);
@@ -2650,8 +3073,10 @@ public interface InspectorService extends OBFService {
                         int poiLength = index.getInputStream().readRawVarint32();
                         long poiOldLimit = index.getInputStream().pushLimitLong(poiLength);
                         try {
+                            boolean includePoi = poiIndexesInBlock == null || poiIndexesInBlock.isEmpty()
+                                    || poiIndexesInBlock.contains(-1) || poiIndexesInBlock.contains(poiIndex);
                             RawPoiObject rawPoiObject = readRawPoiObject(index.getInputStream(), x, y, zoom, region, tagGroups);
-                            if (rawPoiObject != null) {
+                            if (includePoi && rawPoiObject != null) {
                                 ObjectAddress objectAddress = toPoiObjectAddress(rawPoiObject, lang);
                                 int payloadSize = poiLength + computeVarint32Size(poiLength);
                                 int payloadOffset = (int) (index.getInputStream().getTotalBytesRead() - poiLength);
@@ -2661,6 +3086,7 @@ public interface InspectorService extends OBFService {
                         } finally {
                             index.getInputStream().popLimit(poiOldLimit);
                         }
+                        poiIndex++;
                         break;
                     default:
                         InspectorService.skipUnknownField(index.getInputStream(), tagWithType);
@@ -3068,7 +3494,27 @@ public interface InspectorService extends OBFService {
                                          boolean isFiltered,
                                          boolean invalidOnly,
                                          String objectType) {
+        return getObjects(obf, lang, token, regExp, pageToShow, pageSizeLimit, sortBy, sortOrder, isFiltered, invalidOnly, objectType, null);
+    }
+
+    default ObjectAddressPage getObjects(String obf,
+                                         String lang,
+                                         IndexToken token,
+                                         String regExp,
+                                         int pageToShow,
+                                         int pageSizeLimit,
+                                         String sortBy,
+                                         String sortOrder,
+                                         boolean isFiltered,
+                                         boolean invalidOnly,
+                                         String objectType,
+                                         String indexQuery) {
         List<ObjectAddress> results = new ArrayList<>();
+        IndexMultiTokenQuery multiQuery = parseIndexMultiTokenQuery(indexQuery);
+        if (multiQuery != null) {
+            IndexTokenPage tokenPage = getIndexDirect(new File(obf), multiQuery, 0, Integer.MAX_VALUE, "name", "asc", parseObjectTypeFilter(objectType));
+            token = tokenPage.content().isEmpty() ? null : tokenPage.content().get(0);
+        }
         if (token == null) {
             return new ObjectAddressPage(List.of(), Math.max(pageToShow, 0), Math.max(pageSizeLimit, 1), 0, 0, new int[7], new int[12], 0, 0);
         }
@@ -3100,8 +3546,10 @@ public interface InspectorService extends OBFService {
                 }
                 AddressRef[] addressRefs = token.addressRefs();
                 int[] poiRefs = token.poiRefs();
+                PoiRef[] exactPoiRefs = token.exactPoiRefs();
                 boolean hasAddressRefs = addressRefs != null && addressRefs.length > 0;
-                boolean hasPoiRefs = poiRefs != null && poiRefs.length > 0;
+                boolean hasExactPoiRefs = exactPoiRefs != null && exactPoiRefs.length > 0;
+                boolean hasPoiRefs = hasExactPoiRefs || (poiRefs != null && poiRefs.length > 0);
                 if (!hasAddressRefs && !hasPoiRefs) {
                     return new ObjectAddressPage(List.of(), safePage, safeSize, 0, 0, new int[7], new int[12], 0, 0);
                 }
@@ -3117,7 +3565,11 @@ public interface InspectorService extends OBFService {
                     }
                 }
                 if (hasPoiRefs) {
-                    collectPoiObjectsByStoredOffsets(index, storedPoiOffsets, poiRegions, results, lang, matcher);
+                    if (hasExactPoiRefs) {
+                        collectPoiObjectsByExactRefs(index, exactPoiRefs, poiRegions, results, lang, matcher);
+                    } else {
+                        collectPoiObjectsByStoredOffsets(index, storedPoiOffsets, poiRegions, results, lang, matcher);
+                    }
                 }
                 results = assignObjectSequenceIds(results);
                 results = markInvalidPoiAtoms(results);
@@ -3216,6 +3668,21 @@ public interface InspectorService extends OBFService {
                                          boolean isFiltered,
                                          boolean invalidOnly,
                                          String objectType) {
+        return getObjects(obfs, lang, token, regExp, pageToShow, pageSizeLimit, sortBy, sortOrder, isFiltered, invalidOnly, objectType, null);
+    }
+
+    default ObjectAddressPage getObjects(List<String> obfs,
+                                         String lang,
+                                         IndexToken token,
+                                         String regExp,
+                                         int pageToShow,
+                                         int pageSizeLimit,
+                                         String sortBy,
+                                         String sortOrder,
+                                         boolean isFiltered,
+                                         boolean invalidOnly,
+                                         String objectType,
+                                         String indexQuery) {
         final int safePage = Math.max(pageToShow, 0);
         final int safeSize = Math.max(pageSizeLimit, 1);
         if (token == null) {
@@ -3232,11 +3699,17 @@ public interface InspectorService extends OBFService {
                 if (Algorithms.isEmpty(obf)) {
                     continue;
                 }
-                IndexToken obfToken = findIndexTokenByName(obf, token.name());
+                IndexToken obfToken;
+                if (parseIndexMultiTokenQuery(indexQuery) != null) {
+                    IndexTokenPage tokenPage = getIndexDirect(new File(obf), parseIndexMultiTokenQuery(indexQuery), 0, Integer.MAX_VALUE, "name", "asc", parseObjectTypeFilter(objectType));
+                    obfToken = tokenPage.content().isEmpty() ? null : tokenPage.content().get(0);
+                } else {
+                    obfToken = findIndexTokenByName(obf, token.name());
+                }
                 if (obfToken == null) {
                     continue;
                 }
-                ObjectAddressPage page = getObjects(obf, lang, obfToken, regExp, 0, Integer.MAX_VALUE, sortBy, sortOrder, isFiltered, invalidOnly, objectType);
+                ObjectAddressPage page = getObjects(obf, lang, obfToken, regExp, 0, Integer.MAX_VALUE, sortBy, sortOrder, isFiltered, invalidOnly, objectType, null);
                 if (page == null) {
                     continue;
                 }
@@ -3298,6 +3771,16 @@ public interface InspectorService extends OBFService {
                 objectAddress.isInvalidAtom(), objectAddress.isAlone(), objectAddress.type(), objectAddress.osmId(),
                 objectAddress.osmType(), objectAddress.payloadOffset(), objectAddress.payloadSize(),
                 objectAddress.sourceOffset(), obf);
+    }
+
+    default IndexToken withObf(IndexToken token, String obf) {
+        if (token == null) {
+            return null;
+        }
+        return new IndexToken(token.name(), token.addressRefs(), token.poiRefs(), token.poiAtomRefs(),
+                token.poiAtomSizes(), token.isCommon(), token.isFrequent(), obf, token.suffixMetrics(),
+                token.poiSuffixMetrics(), token.addressSuffixMetrics(), token.suffixTexts(),
+                token.poiSuffixTexts(), token.addressSuffixTexts(), token.exactPoiRefs());
     }
 
     default Boolean parseObjectTypeFilter(String objectType) {

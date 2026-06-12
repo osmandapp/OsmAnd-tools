@@ -93,13 +93,6 @@ public interface DataService extends BaseService {
 				dataset.selCols = getObjectMapper().writeValueAsString(Arrays.stream(columns).filter(s ->
 						s.startsWith("road") || s.startsWith("city") || s.startsWith("street")));
 			if (reload) {
-				List<String> sample = reservoirSample(fullPath, dataset.sizeLimit);
-
-				dataset.total = sample.size() - 1;
-				dataset.setSourceStatus(Dataset.ConfigStatus.UNKNOWN);
-				dataset = getDatasetRepo().save(dataset);
-				getJdbcTemplate().update("DELETE FROM dataset_result WHERE dataset_id = ?", dataset.id);
-
 				char delim = delimiter.charAt(0);
 				CSVFormat format = CSVFormat.DEFAULT.builder()
 						.setDelimiter(delim)
@@ -107,24 +100,15 @@ public interface DataService extends BaseService {
 						.setIgnoreSurroundingSpaces(false)
 						.setTrim(false)
 						.build();
+				List<String[]> sample = reservoirSampleCsvRecords(fullPath, format, dataset.sizeLimit);
+
+				dataset.total = sample.size();
+				dataset.setSourceStatus(Dataset.ConfigStatus.UNKNOWN);
+				dataset = getDatasetRepo().save(dataset);
+				getJdbcTemplate().update("DELETE FROM dataset_result WHERE dataset_id = ?", dataset.id);
 
 				List<Object[]> batchArgs = new ArrayList<>();
-				for (int i = 1; i < sample.size(); i++) {
-					String line = sample.get(i);
-					// Parse the CSV line using Apache Commons CSV to handle quoted fields with delimiters
-					String[] record;
-					try (CSVParser parser = CSVParser.parse(line, format)) {
-						List<CSVRecord> recs = parser.getRecords();
-						if (recs.isEmpty()) {
-							record = new String[0];
-						} else {
-							CSVRecord r = recs.get(0);
-							record = new String[r.size()];
-							for (int c = 0; c < r.size(); c++) {
-								record[c] = r.get(c);
-							}
-						}
-					}
+				for (String[] record : sample) {
 					String[] values = Collections.nCopies(columns.length, "").toArray(new String[0]);
 					for (int j = 0; j < values.length && j < record.length; j++) {
 						values[j] = crop(unquote(record[j]), 255);
@@ -140,7 +124,7 @@ public interface DataService extends BaseService {
 				String insertSql = "INSERT INTO dataset_result (dataset_id, value) VALUES (?, ?)";
 				getJdbcTemplate().batchUpdate(insertSql, batchArgs);
 
-				getLogger().info("Stored {} rows into dataset: {}", sample.size() - 1, dataset.name);
+				getLogger().info("Stored {} rows into dataset: {}", sample.size(), dataset.name);
 			}
 
 			dataset.setSourceStatus(dataset.total != null ? Dataset.ConfigStatus.OK : Dataset.ConfigStatus.UNKNOWN);
@@ -161,6 +145,43 @@ public interface DataService extends BaseService {
 				}
 			}
 		}
+	}
+
+	private List<String[]> reservoirSampleCsvRecords(Path filePath, CSVFormat format, int n) throws IOException {
+		List<String[]> sample = new ArrayList<>();
+		if (n <= 0) {
+			return sample;
+		}
+		Random random = new Random();
+		try (BufferedReader reader = Files.newBufferedReader(filePath);
+				CSVParser parser = format.parse(reader)) {
+			Iterator<CSVRecord> iterator = parser.iterator();
+			if (iterator.hasNext()) {
+				iterator.next(); // header
+			}
+			int i = 1;
+			while (iterator.hasNext()) {
+				String[] record = toArray(iterator.next());
+				if (i <= n) {
+					sample.add(record);
+				} else {
+					int j = random.nextInt(i);
+					if (j < n) {
+						sample.set(j, record);
+					}
+				}
+				i++;
+			}
+		}
+		return sample;
+	}
+
+	private String[] toArray(CSVRecord record) {
+		String[] result = new String[record.size()];
+		for (int i = 0; i < record.size(); i++) {
+			result[i] = record.get(i);
+		}
+		return result;
 	}
 
 	default TestCase generate(Dataset dataset, TestCase test) {

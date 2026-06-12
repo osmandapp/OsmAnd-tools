@@ -131,17 +131,20 @@ public interface OBFService extends BaseService {
 
 	record SuffixMetrics(int dict, int part, int integer, int literal, int extra) {}
 	record SuffixTexts(List<String> dict, List<String> part, List<String> literal, List<String> integer, List<String> extra) {}
+	record PoiRef(int blockOffset, int poiIndexInBlock, int atomSize) {}
 	record IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes,
 	                  boolean isCommon, boolean isFrequent, String obf, SuffixMetrics suffixMetrics,
 	                  SuffixMetrics poiSuffixMetrics, SuffixMetrics addressSuffixMetrics,
-	                  SuffixTexts suffixTexts, SuffixTexts poiSuffixTexts, SuffixTexts addressSuffixTexts) {
+	                  SuffixTexts suffixTexts, SuffixTexts poiSuffixTexts, SuffixTexts addressSuffixTexts,
+	                  PoiRef[] exactPoiRefs) {
 		public IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes,
 		                  boolean isCommon, boolean isFrequent, String obf, SuffixMetrics suffixMetrics) {
 			this(name, addressRefs, poiRefs, poiAtomRefs, poiAtomSizes, isCommon, isFrequent, obf, suffixMetrics,
 					new SuffixMetrics(0, 0, 0, 0, 0), new SuffixMetrics(0, 0, 0, 0, 0),
 					new SuffixTexts(List.of(), List.of(), List.of(), List.of(), List.of()),
 					new SuffixTexts(List.of(), List.of(), List.of(), List.of(), List.of()),
-					new SuffixTexts(List.of(), List.of(), List.of(), List.of(), List.of()));
+					new SuffixTexts(List.of(), List.of(), List.of(), List.of(), List.of()),
+					new PoiRef[0]);
 		}
 		public IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes, boolean isCommon, boolean isFrequent) {
 			this(name, addressRefs, poiRefs, poiAtomRefs, poiAtomSizes, isCommon, isFrequent, null, new SuffixMetrics(0, 0, 0, 0, 0));
