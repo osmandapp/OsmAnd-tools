@@ -1025,7 +1025,7 @@ public class BinaryInspector {
 	
 	private void printAdddrIndexStats(BinaryMapIndexReader index, AddressRegion region) throws IOException {
 		AddressStats as = vInfo.addressStats;
-		NameIndexInspector fullNameIndex = index.readFullNameIndex(region);
+		NameIndexInspector fullNameIndex = index.readFullNameIndex(region, null);
 		fullNameIndex.setBoundariesStat(as.bndsStat);
 		for (CityBlocks type : CityBlocks.allTypes()) {
 			if (type.index >= 0) {
@@ -1853,7 +1853,7 @@ public class BinaryInspector {
 				ps.topMulti.put(main.value, main);
 			}
 		}
-		NameIndexInspector fullNameIndex = index.readFullNameIndex(p);
+		NameIndexInspector fullNameIndex = index.readFullNameIndex(p, null);
 		ps.nameIndex = ValueFreq.mergeArray(new HashMap<>(), fullNameIndex.getPOIPrefixes(verbose.getPrefix()));
 		ps.suffixesStat = fullNameIndex.getSuffixesStat();
 		

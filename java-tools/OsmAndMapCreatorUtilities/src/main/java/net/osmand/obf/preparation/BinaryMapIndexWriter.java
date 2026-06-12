@@ -1063,14 +1063,13 @@ public class BinaryMapIndexWriter {
 						mapDataBuf.clear();
 						writeRawVarint32(mapDataBuf, bytes[0]);
 						for (int k = 1; k < bytes.length; k += 4) {
-							if (x / 2 - bytes[k] < -1 || y / 2 - bytes[k + 2] < -1) {
-								throw new IllegalStateException(String.format("Safe check for wrong bbox %s %s - %d %d",
-										o, Arrays.toString(bytes), x / 2, y / 2));
-							}
+							// city outside boundary https://www.openstreetmap.org/relation/13737358
+							int shiftX = -Math.min(0, x / 2 - bytes[k]);
+							int shiftY = -Math.min(0, y / 2 - bytes[k + 2]);
 							writeRawVarint32(mapDataBuf, Math.max(0, x / 2 - bytes[k]));
-							writeRawVarint32(mapDataBuf, bytes[k + 1]);
-							writeRawVarint32(mapDataBuf, Math.max(0,y / 2 - bytes[k + 2]));
-							writeRawVarint32(mapDataBuf, bytes[k + 3]);
+							writeRawVarint32(mapDataBuf, bytes[k + 1] + shiftX);
+							writeRawVarint32(mapDataBuf, Math.max(0, y / 2 - bytes[k + 2]));
+							writeRawVarint32(mapDataBuf, bytes[k + 3] + shiftY);
 						}
 						atom.setBbox(ByteString.copyFrom(mapDataBuf.toArray()));
 					}
