@@ -1106,8 +1106,7 @@ public interface InspectorService extends OBFService {
                     break;
                 case OsmandOdb.OsmAndPoiNameIndexDataAtom.EXTRASUFFIX_FIELD_NUMBER:
                     addExtraPartialSuffixTokens(compactPartialSuffixTokens, compactPartialSuffixMetricsByToken,
-                            separatedSuffixByToken, extraSuffixByToken, prefix,
-                            index.getInputStream().readString());
+                            extraSuffixByToken, prefix, index.getInputStream().readString());
                     break;
                 case OsmandOdb.OsmAndPoiNameIndexDataAtom.SHIFTTO_FIELD_NUMBER:
                     long value = readInt(index.getInputStream());
@@ -1170,8 +1169,7 @@ public interface InspectorService extends OBFService {
                     break;
                 case OsmandOdb.AddressNameIndexDataAtom.EXTRASUFFIX_FIELD_NUMBER:
                     addExtraPartialSuffixTokens(compactPartialSuffixTokens, compactPartialSuffixMetricsByToken,
-                            separatedSuffixByToken, extraSuffixByToken, prefix,
-                            index.getInputStream().readString());
+                            extraSuffixByToken, prefix, index.getInputStream().readString());
                     break;
                 case OsmandOdb.AddressNameIndexDataAtom.SHIFTTOCITYINDEX_FIELD_NUMBER:
                     shiftToCityIndex = index.getInputStream().readInt32();
@@ -1213,8 +1211,6 @@ public interface InspectorService extends OBFService {
         if (refCount == 0) {
             return;
         }
-        List<String> dictionaryPartSuffixes = compactDictionaryPartSuffixes(suffixDictionary);
-        List<String> dictionarySeparatedSuffixes = compactDictionarySeparatedSuffixes(suffixDictionary);
         for (Integer suffixIndex : atom.partialSuffixIndexes()) {
             if (suffixIndex == null || suffixIndex < 0 || suffixIndex >= suffixDictionary.size()) {
                 continue;
@@ -1230,12 +1226,9 @@ public interface InspectorService extends OBFService {
             // Only partial compact suffixes create visible full-token rows in Inspector. Separated suffixes
             // are atom match constraints for multi-word search and do not mean that the suffix token has its
             // own prefix entry in the name index, so showing them here creates false rows like "zobelsreuth".
-            List<String> atomExtraSuffixes = compactAtomExtraSuffixes(atom);
+            SuffixTexts atomSuffixTexts = compactAtomSuffixTexts(suffixDictionary, atom);
             addIndexTokenDirect(tokens, suffixToken, atom.addressRefs(), poi, atom.poiRefs(), atom.poiAtomSizes(),
-                    mergeSuffixMetrics(new SuffixMetrics(suffixDictionary.size(), 0, 0, 0, 0),
-                            atom.compactPartialSuffixMetricsByToken().get(suffixToken)),
-                    suffixTexts(suffixDictionary, dictionaryPartSuffixes, dictionarySeparatedSuffixes,
-                            List.of(), atomExtraSuffixes));
+                    compactAtomSuffixMetrics(suffixDictionary, atomSuffixTexts), atomSuffixTexts);
         }
     }
 
@@ -1430,6 +1423,36 @@ public interface InspectorService extends OBFService {
         return List.copyOf(result);
     }
 
+    default SuffixTexts compactAtomSuffixTexts(List<String> suffixDictionary, NameIndexAtomTokens atom) {
+        if (atom == null) {
+            return suffixTexts(suffixDictionary, List.of(), List.of(), List.of(), List.of());
+        }
+        return suffixTexts(suffixDictionary,
+                List.copyOf(new LinkedHashSet<>(atom.partSuffixByToken().values())),
+                List.copyOf(new LinkedHashSet<>(atom.separatedSuffixByToken().values())),
+                List.copyOf(new LinkedHashSet<>(atom.integerSuffixByToken().values())),
+                List.copyOf(new LinkedHashSet<>(atom.extraSuffixByToken().values())));
+    }
+
+    default SuffixTexts compactAtomSuffixTexts(List<String> suffixDictionary, CompactIndexAtom atom) {
+        if (atom == null) {
+            return suffixTexts(suffixDictionary, List.of(), List.of(), List.of(), List.of());
+        }
+        return suffixTexts(suffixDictionary,
+                List.copyOf(new LinkedHashSet<>(atom.partSuffixByToken().values())),
+                List.copyOf(new LinkedHashSet<>(atom.separatedSuffixByToken().values())),
+                List.copyOf(new LinkedHashSet<>(atom.integerSuffixByToken().values())),
+                List.copyOf(new LinkedHashSet<>(atom.extraSuffixByToken().values())));
+    }
+
+    default SuffixMetrics compactAtomSuffixMetrics(List<String> suffixDictionary, SuffixTexts suffixTexts) {
+        return new SuffixMetrics(suffixDictionary == null ? 0 : suffixDictionary.size(),
+                suffixTexts == null || suffixTexts.part() == null ? 0 : suffixTexts.part().size(),
+                suffixTexts == null || suffixTexts.integer() == null ? 0 : suffixTexts.integer().size(),
+                suffixTexts == null || suffixTexts.literal() == null ? 0 : suffixTexts.literal().size(),
+                suffixTexts == null || suffixTexts.extra() == null ? 0 : suffixTexts.extra().size());
+    }
+
     default PoiRef[] toPoiRefs(int blockOffset, Set<Integer> poiIndexesInBlock, int atomSize) {
         if (blockOffset == Integer.MIN_VALUE) {
             return new PoiRef[0];
@@ -1477,6 +1500,7 @@ public interface InspectorService extends OBFService {
         Set<String> separated = new LinkedHashSet<>();
         addSeparatedSuffixTokens(separated, atom.separatedSuffixByToken());
         addSeparatedSuffixTokens(separated, atom.integerSuffixByToken());
+        addSeparatedSuffixTokens(separated, atom.extraSuffixByToken());
         return separated.containsAll(query.requiredSuffixes());
     }
 
@@ -1497,14 +1521,9 @@ public interface InspectorService extends OBFService {
         if (atom == null || Algorithms.isEmpty(firstToken)) {
             return;
         }
-        List<String> dictionaryPartSuffixes = compactDictionaryPartSuffixes(suffixDictionary);
-        List<String> dictionarySeparatedSuffixes = compactDictionarySeparatedSuffixes(suffixDictionary);
-        List<String> atomExtraSuffixes = compactAtomExtraSuffixes(atom);
-        SuffixMetrics metrics = mergeSuffixMetrics(new SuffixMetrics(suffixDictionary == null ? 0 : suffixDictionary.size(), 0, 0, 0, 0),
-                atom.suffixMetricsByToken().get(firstToken));
+        SuffixTexts atomSuffixTexts = compactAtomSuffixTexts(suffixDictionary, atom);
         addIndexTokenDirect(tokens, firstToken, atom.addressRefs(), poi, atom.poiRefs(), atom.poiAtomSizes(),
-                metrics, suffixTexts(suffixDictionary, dictionaryPartSuffixes, dictionarySeparatedSuffixes,
-                        List.copyOf(atom.integerSuffixByToken().values()), atomExtraSuffixes), atom.exactPoiRefs());
+                compactAtomSuffixMetrics(suffixDictionary, atomSuffixTexts), atomSuffixTexts, atom.exactPoiRefs());
     }
 
     default SuffixMetrics sumSuffixMetrics(Collection<SuffixMetrics> metrics) {
@@ -1881,15 +1900,10 @@ public interface InspectorService extends OBFService {
                     if (atom == null) {
                         continue;
                     }
-                    List<String> dictionaryPartSuffixes = compactDictionaryPartSuffixes(suffixDictionary);
-                    List<String> dictionarySeparatedSuffixes = compactDictionarySeparatedSuffixes(suffixDictionary);
-                    List<String> atomExtraSuffixes = compactAtomExtraSuffixes(atom);
                     for (String suffixToken : atom.suffixTokens()) {
+                        SuffixTexts atomSuffixTexts = compactAtomSuffixTexts(suffixDictionary, atom);
                         addIndexTokenDirect(tokens, suffixToken, atom.addressRefs(), poi, atom.poiRefs(), atom.poiAtomSizes(),
-                                mergeSuffixMetrics(new SuffixMetrics(suffixDictionary.size(), 0, 0, 0, 0),
-                                        atom.suffixMetricsByToken().get(suffixToken)),
-                                suffixTexts(suffixDictionary, dictionaryPartSuffixes, dictionarySeparatedSuffixes,
-                                        List.of(), atomExtraSuffixes));
+                                compactAtomSuffixMetrics(suffixDictionary, atomSuffixTexts), atomSuffixTexts);
                     }
                 } finally {
                     index.getInputStream().popLimit(atomOldLimit);
@@ -1945,7 +1959,7 @@ public interface InspectorService extends OBFService {
                     break;
                 case OsmandOdb.OsmAndPoiNameIndexDataAtom.EXTRASUFFIX_FIELD_NUMBER:
                     compact = true;
-                    addExtraPartialSuffixTokens(suffixTokens, suffixMetricsByToken, separatedSuffixByToken,
+                    addExtraPartialSuffixTokens(suffixTokens, suffixMetricsByToken,
                             extraSuffixByToken, prefix, index.getInputStream().readString());
                     break;
                 case OsmandOdb.OsmAndPoiNameIndexDataAtom.SHIFTTO_FIELD_NUMBER:
@@ -2003,7 +2017,7 @@ public interface InspectorService extends OBFService {
                     break;
                 case OsmandOdb.AddressNameIndexDataAtom.EXTRASUFFIX_FIELD_NUMBER:
                     compact = true;
-                    addExtraPartialSuffixTokens(suffixTokens, suffixMetricsByToken, separatedSuffixByToken,
+                    addExtraPartialSuffixTokens(suffixTokens, suffixMetricsByToken,
                             extraSuffixByToken, prefix, index.getInputStream().readString());
                     break;
                 case OsmandOdb.AddressNameIndexDataAtom.SUFFIXESBITSET_FIELD_NUMBER:
@@ -2055,7 +2069,6 @@ public interface InspectorService extends OBFService {
     }
 
     default void addExtraPartialSuffixTokens(Set<String> suffixTokens, Map<String, SuffixMetrics> suffixMetricsByToken,
-                                             Map<String, String> separatedSuffixByToken,
                                              Map<String, String> extraSuffixByToken,
                                              String prefix, String extraSuffix) {
         if (Algorithms.isEmpty(extraSuffix)) {
@@ -2063,7 +2076,7 @@ public interface InspectorService extends OBFService {
         }
         for (String suffix : splitExtraSuffixes(extraSuffix)) {
             if (suffix.startsWith(" ")) {
-                separatedSuffixByToken.putIfAbsent(prefix + suffix, suffix);
+                extraSuffixByToken.putIfAbsent(prefix + suffix, suffix);
                 continue;
             }
             String token = resolveCompactSuffixToken(prefix, suffix);
@@ -2105,16 +2118,31 @@ public interface InspectorService extends OBFService {
         List<IndexToken> tokensWithRefs = new ArrayList<>(tokens.size());
         for (MutableIndexTokenBuilder token : tokens.values()) {
             AddressRef[] tokenAddressRefs = collectAddressRefs(index, token);
+            SuffixMetrics suffixMetrics = uniqueSuffixMetrics(token.suffixMetrics, token.partSuffixTexts,
+                    token.literalSuffixTexts, token.integerSuffixTexts, token.extraSuffixTexts);
+            SuffixMetrics poiSuffixMetrics = uniqueSuffixMetrics(token.poiSuffixMetrics, token.poiPartSuffixTexts,
+                    token.poiLiteralSuffixTexts, token.poiIntegerSuffixTexts, token.poiExtraSuffixTexts);
+            SuffixMetrics addressSuffixMetrics = uniqueSuffixMetrics(token.addressSuffixMetrics, token.addressPartSuffixTexts,
+                    token.addressLiteralSuffixTexts, token.addressIntegerSuffixTexts, token.addressExtraSuffixTexts);
             tokensWithRefs.add(new IndexToken(token.name, tokenAddressRefs, toIntArray(token.poiRefs),
                     toIntArray(token.poiAtomRefs), toIntArray(token.poiAtomSizes), CommonWords.getCommon(token.name) != -1,
-                    CommonWords.getFrequentlyUsed(token.name) != -1, null, token.suffixMetrics,
-                    token.poiSuffixMetrics, token.addressSuffixMetrics,
+                    CommonWords.getFrequentlyUsed(token.name) != -1, null, suffixMetrics,
+                    poiSuffixMetrics, addressSuffixMetrics,
                     toSuffixTexts(token.dictSuffixTexts, token.partSuffixTexts, token.literalSuffixTexts, token.integerSuffixTexts, token.extraSuffixTexts),
                     toSuffixTexts(token.poiDictSuffixTexts, token.poiPartSuffixTexts, token.poiLiteralSuffixTexts, token.poiIntegerSuffixTexts, token.poiExtraSuffixTexts),
                     toSuffixTexts(token.addressDictSuffixTexts, token.addressPartSuffixTexts, token.addressLiteralSuffixTexts, token.addressIntegerSuffixTexts, token.addressExtraSuffixTexts),
                     token.exactPoiRefs.toArray(new PoiRef[0])));
         }
         return tokensWithRefs;
+    }
+
+    default SuffixMetrics uniqueSuffixMetrics(SuffixMetrics source, Set<String> part, Set<String> literal,
+                                              Set<String> integer, Set<String> extra) {
+        return new SuffixMetrics(source == null ? 0 : source.dict(),
+                part == null ? 0 : part.size(),
+                integer == null ? 0 : integer.size(),
+                literal == null ? 0 : literal.size(),
+                extra == null ? 0 : extra.size());
     }
 
     default SuffixTexts toSuffixTexts(Set<String> dict, Set<String> part, Set<String> literal,
