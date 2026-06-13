@@ -1085,7 +1085,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			String prefix =  null;
 			if (t.startsWith("name:")) {
 				String lang = t.substring(5);
-				if (MapRenderingTypes.langsSet.contains(lang)) {
+				if (MapRenderingTypes.langsSet.contains(lang) || "en".equals(lang)) {
 					prefix = "name:";
 				}
 			} else if(t.startsWith("old_name")){
