@@ -51,6 +51,7 @@ import net.osmand.router.RoutingContext;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.osmand.util.SearchAlgorithms;
+import net.osmand.util.SearchIndexPrepareAlgorithms;
 import net.osmand.util.TopTagValuesAnalyzer;
 import net.sf.junidecode.Junidecode;
 
@@ -658,7 +659,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 		poiConnection.commit();
 
-		Map<String, Set<PoiTileBox>> namesIndex = new TreeMap<String, Set<PoiTileBox>>();
+		NameIndexCreator namesIndex = new NameIndexCreator();
 
 		int zoomToStart = ZOOM_TO_SAVE_START;
 		IntBbox bbox = new IntBbox();
@@ -879,7 +880,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
     private static final int MAX_OBJECTS_PER_BLOCK_LIMIT = 64;
 
-	private void processPOIIntoTree(File poiGeocoding, Map<String, Set<PoiTileBox>> namesIndex, int zoomToStart, IntBbox bbox,
+	private void processPOIIntoTree(File poiGeocoding, NameIndexCreator namesIndex, int zoomToStart, IntBbox bbox,
 			Tree<PoiTileBox> rootZoomsTree) throws SQLException, IOException {
 		ResultSet rs = poiConnection.createStatement().executeQuery("SELECT x,y,type,subtype,id,additionalTags,taggroups from poi ORDER BY id, priority");
 		rootZoomsTree.setNode(new PoiTileBox());
@@ -1060,8 +1061,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					}
 				}
 			}
-			addNamePrefix(additionalTags.get(nameRuleType), additionalTags.get(nameEnRuleType), prevTree.getNode(),
-					namesIndex, otherNames, idNames);
+			namesIndex.putPoiObjectPrefix(additionalTags.get(nameRuleType), 
+					additionalTags.get(nameEnRuleType), prevTree.getNode(), otherNames, idNames, settings);
 
 			if (tagGroupIds.size() == 0) {
 				for (PoiCreatorTagGroup p : tagGroups) {
@@ -1092,52 +1093,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		log.info("Poi processing finished");
 	}
 
-	private void addNamePrefix(String name, String nameEn, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData,
-			Set<String> names, Set<String> idNames) {
-		if (name != null) {
-			parsePrefix(name, data, poiData, settings.charsToBuildPoiNameIndex);
-			if (Algorithms.isEmpty(nameEn)) {
-				nameEn = Junidecode.unidecode(name);
-			}
-
-		}
-		if (!Algorithms.objectEquals(nameEn, name) && !Algorithms.isEmpty(nameEn)) {
-			parsePrefix(nameEn, data, poiData, settings.charsToBuildPoiNameIndex);
-		}
-		if (names != null) {
-			for (String nk : names) {
-				if (!Algorithms.objectEquals(nk, name) && !Algorithms.isEmpty(nk)) {
-					parsePrefix(nk, data, poiData, settings.charsToBuildPoiNameIndex);
-				}
-			}
-		}
-		if (idNames != null) {
-			for (String nk : idNames) {
-				if (!Algorithms.isEmpty(nk)) {
-					parsePrefix(nk, data, poiData, settings.charsToBuildPoiIdNameIndex);
-				}
-			}
-		}
-	}
-
-    private void parsePrefix(String name, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData, int ind) {
-        List<String> splitName = SearchAlgorithms.splitAndNormalize(name);
-        SearchAlgorithms.removeCommonWords(splitName);
-        for (String token : splitName) {
-	        if (Algorithms.isEmpty(token)) {
-		        continue;
-	        }
-			String str = SearchAlgorithms.nameIndexPreparePrefix(token, ind);
-			if (Algorithms.isEmpty(str)) {
-				continue;
-			}
-		    if (!poiData.containsKey(str)) {
-		        poiData.put(str, new LinkedHashSet<>());
-		    }
-		    poiData.get(str).add(data);
-	        data.addToken(token);
-        }
-    }
+	
 
 	private void writePoiBoxes(BinaryMapIndexWriter writer, Tree<PoiTileBox> tree,
 			long startFpPoiIndex, Map<PoiTileBox, List<BinaryFileReference>> fpToWriteSeeks,

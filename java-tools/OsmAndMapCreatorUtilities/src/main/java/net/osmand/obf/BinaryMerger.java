@@ -446,7 +446,7 @@ public class BinaryMerger {
 		List<String> attributeTagsTable = new ArrayList<String>();
 		attributeTagsTable.addAll(attributeTagsTableSet);
 		Map<String, Integer> tagRules = new HashMap<String, Integer>();
-		Map<String, IndexAddressCreator.MapObjectIndex> namesIndex = new TreeMap<String, IndexAddressCreator.MapObjectIndex>(Collator.getInstance());
+		NameIndexCreator namesIndex = new NameIndexCreator();
 		ListIterator<String> it = attributeTagsTable.listIterator();
 		while (it.hasNext()) {
 			tagRules.put(it.next(), it.previousIndex());
@@ -504,10 +504,10 @@ public class BinaryMerger {
 				BinaryFileReference ref = writer.writeCityHeader(city, city.getType().ordinal(), tagRules);
 				refs.add(ref);
 				writer.writeCityIndex(city, city.getStreets(), namesakesStreetNodes.get(city), ref, tagRules);
-				IndexAddressCreator.putNamedMapObject(namesIndex, city, ref.getStartPointer(), settings);
+				namesIndex.putAddrNamedMapObject(city, ref.getStartPointer(), settings);
 				if (!city.isPostcode()) {
 					for (Street s : city.getStreets()) {
-						IndexAddressCreator.putNamedMapObject(namesIndex, s, s.getFileOffset(), settings);
+						namesIndex.putAddrNamedMapObject(s, s.getFileOffset(), settings);
 					}
 				}
 
