@@ -51,6 +51,7 @@ import net.osmand.router.RoutingContext;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.osmand.util.SearchAlgorithms;
+import net.osmand.util.SearchIndexPrepareAlgorithms;
 import net.osmand.util.TopTagValuesAnalyzer;
 import net.sf.junidecode.Junidecode;
 
@@ -1145,13 +1146,13 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
     private void parsePrefix(String name, PoiTileBox data, int poiIndInBlock, Map<String, Set<PoiTileBox>> poiData, int ind) {
         List<String> splitName = SearchAlgorithms.splitAndNormalize(name);
 		// Standalone number-like POI names keep old prefix search behavior; mixed number tokens stay suffix-only.
-		Set<String> prefixes = SearchAlgorithms.nameIndexPrepareComplexPrefixes(splitName,
-				SearchAlgorithms.nameIndexIsSingleRawNumberValue(name, splitName));
+		Set<String> prefixes = SearchIndexPrepareAlgorithms.nameIndexPrepareComplexPrefixes(splitName,
+				SearchIndexPrepareAlgorithms.nameIndexIsSingleAlmostNumberValue(name, splitName));
         for (String token : prefixes) {
 	        if (Algorithms.isEmpty(token)) {
 		        continue;
 	        }
-			String str = SearchAlgorithms.nameIndexPreparePrefix(token, ind);
+			String str = SearchIndexPrepareAlgorithms.nameIndexPreparePrefix(token, ind);
 			if (Algorithms.isEmpty(str)) {
 				continue;
 			}
@@ -1165,7 +1166,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			data.addPrefixFullToken(str, poiIndInBlock, token);
 			// Store only category-eligible separated suffixes for this prefix. This keeps compact
 			// POI atoms aligned with the new no-cross-suffix contract while preserving full tokens above.
-			List<String> suffixTokens = SearchAlgorithms.nameIndexPrepareComplexSuffixes(splitName, token);
+			List<String> suffixTokens = SearchIndexPrepareAlgorithms.nameIndexPrepareComplexSuffixes(splitName, token);
 			data.addPrefixTokens(str, poiIndInBlock, suffixTokens);
         }
     }

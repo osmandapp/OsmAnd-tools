@@ -61,7 +61,7 @@ import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
-import net.osmand.util.SearchAlgorithms;
+import net.osmand.util.SearchIndexPrepareAlgorithms;
 
 
 public class IndexAddressCreator extends AbstractIndexPartCreator {
@@ -1435,11 +1435,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		List<String> splitNames = splitAndNormalize(name);
 		// Preserve standalone number-like names as searchable prefixes, but keep mixed number tokens as suffixes.
 		boolean allowNumberPrefixes = data instanceof City && ((City) data).getType() == CityType.POSTCODE
-				|| SearchAlgorithms.nameIndexIsSingleRawNumberValue(name, splitNames);
-		Set<String> prefixes = SearchAlgorithms.nameIndexPrepareComplexPrefixes(splitNames, allowNumberPrefixes);
+				|| SearchIndexPrepareAlgorithms.nameIndexIsSingleAlmostNumberValue(name, splitNames);
+		Set<String> prefixes = SearchIndexPrepareAlgorithms.nameIndexPrepareComplexPrefixes(splitNames, allowNumberPrefixes);
 		// add to the map
 		for (String token : prefixes) {
-			String val = SearchAlgorithms.nameIndexPreparePrefix(token, settings.charsToBuildAddressNameIndex);
+			String val = SearchIndexPrepareAlgorithms.nameIndexPreparePrefix(token, settings.charsToBuildAddressNameIndex);
 			if (val.isEmpty()) {
 				continue;
 			}
@@ -1452,7 +1452,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			entry.addPrefixToken(data, token);
 			// Compact name indexes do not attach every other word as a suffix: USUAL and FREQUENT
 			// prefixes have different allowed suffix classes to avoid cross-category false matches.
-			for (String suffixToken : SearchAlgorithms.nameIndexPrepareComplexSuffixes(splitNames, token)) {
+			for (String suffixToken : SearchIndexPrepareAlgorithms.nameIndexPrepareComplexSuffixes(splitNames, token)) {
 				entry.addToken(data, suffixToken);
 			}
 		}

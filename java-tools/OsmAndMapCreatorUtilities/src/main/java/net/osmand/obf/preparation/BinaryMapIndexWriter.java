@@ -107,6 +107,9 @@ import net.osmand.router.HHRoutingOBFWriter.NetworkDBPointWrite;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.osmand.util.SearchAlgorithms;
+import net.osmand.util.SearchIndexPrepareAlgorithms.CombinedSuffixDictionary;
+import net.osmand.util.SearchIndexPrepareAlgorithms.CommonIndexedTokens;
+import static net.osmand.util.SearchIndexPrepareAlgorithms.*;
 import net.sf.junidecode.Junidecode;
 
 import static net.osmand.util.SearchAlgorithms.*;
