@@ -7,6 +7,7 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -26,6 +27,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import com.google.protobuf.ByteString;
+import com.google.protobuf.CodedInputStream;
 import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.Message;
 import com.google.protobuf.WireFormat;
@@ -84,6 +86,7 @@ import net.osmand.data.City;
 import net.osmand.data.City.CityType;
 import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
+import net.osmand.data.QuadRect;
 import net.osmand.data.Street;
 import net.osmand.data.TransportSchedule;
 import net.osmand.data.TransportStop;
@@ -103,6 +106,7 @@ import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 import net.osmand.router.HHRoutingOBFWriter.NetworkDBPointWrite;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
+import net.osmand.util.SearchAlgorithms;
 import net.sf.junidecode.Junidecode;
 
 import static net.osmand.util.SearchAlgorithms.*;
@@ -163,8 +167,9 @@ public class BinaryMapIndexWriter {
 	
 	
 	private final static int HH_INDEX_INIT = 17;
-	private final static int HH_BLOCK_SEGMENTS =18;
-
+	private final static int HH_BLOCK_SEGMENTS = 18;
+	private static final int ZOOM_ENCODE_BBOX_NAME_ATOMS = 15;
+	
 
 	public BinaryMapIndexWriter(final RandomAccessFile raf, long timestamp) throws IOException {
 		this.raf = raf;
@@ -1024,29 +1029,55 @@ public class BinaryMapIndexWriter {
 			}
 			for (MapObject o : objects) {
 				AddressNameIndexDataAtom.Builder atom = AddressNameIndexDataAtom.newBuilder();
-				// this is optional
-//				atom.setName(o.getName());
-//				if(checkEnNameToWrite(o)){
-//					atom.setNameEn(o.getEnName());
-//				}
 				CityBlocks type = CityBlocks.CITY_TOWN_TYPE;
-				if (o instanceof City) {
-					CityType ct = ((City) o).getType();
+				LatLon ll = o.getLocation();
+				int x = (int) MapUtils.getTileNumberX(16, ll.getLongitude());
+				int y = (int) MapUtils.getTileNumberY(16, ll.getLatitude()); // should be inside tile
+				atom.addXy16((x << 16) + y);
+
+				int[] bbox31 = null;
+				if (o instanceof City cityObj) {
+					CityType ct = cityObj.getType();
 					if (ct == CityType.POSTCODE) {
-						type = CityBlocks.BOUNDARY_TYPE;
+						type = CityBlocks.POSTCODES_TYPE;
+						atom.setEnclosingObjects(cityObj.getStreets().size());
 					} else if (ct == CityType.BOUNDARY) {
 						type = CityBlocks.BOUNDARY_TYPE;
 					} else if (ct != CityType.CITY && ct != CityType.TOWN) {
 						type = CityBlocks.VILLAGES_TYPE;
 					}
-				} else if (o instanceof Street) {
+					if (type != CityBlocks.BOUNDARY_TYPE) {
+						atom.setEnclosingObjects(cityObj.getStreets().size());
+					}
+					bbox31 = cityObj.getBbox31();
+				} else if (o instanceof Street s) {
 					type = CityBlocks.STREET_TYPE;
+					QuadRect bb = s.getBboxPoints();
+					if (bb != null) {
+						bbox31 = new int[] { MapUtils.get31TileNumberX(bb.left), MapUtils.get31TileNumberY(bb.top),
+								MapUtils.get31TileNumberX(bb.right), MapUtils.get31TileNumberY(bb.bottom) };
+					}
+				}
+				if (bbox31 != null) {
+					int[] bytes = SearchAlgorithms.encodeBboxForNameAtoms(ZOOM_ENCODE_BBOX_NAME_ATOMS, bbox31);
+					// double bbox or bbox larger than 15th zoom tile 
+					if (bytes.length != 5 || (bytes[2] > 1 || bytes[4] > 1)) {
+						mapDataBuf.clear();
+						writeRawVarint32(mapDataBuf, bytes[0]);
+						for (int k = 1; k < bytes.length; k += 4) {
+							// city outside boundary https://www.openstreetmap.org/relation/13737358
+							int shiftX = -Math.min(0, x / 2 - bytes[k]);
+							int shiftY = -Math.min(0, y / 2 - bytes[k + 2]);
+							writeRawVarint32(mapDataBuf, Math.max(0, x / 2 - bytes[k]));
+							writeRawVarint32(mapDataBuf, bytes[k + 1] + shiftX);
+							writeRawVarint32(mapDataBuf, Math.max(0, y / 2 - bytes[k + 2]));
+							writeRawVarint32(mapDataBuf, bytes[k + 3] + shiftY);
+						}
+						atom.setBbox(ByteString.copyFrom(mapDataBuf.toArray()));
+					}
 				}
 				atom.setType(type.index);
-				LatLon ll = o.getLocation();
-				int x = (int) MapUtils.getTileNumberX(16, ll.getLongitude());
-				int y = (int) MapUtils.getTileNumberY(16, ll.getLatitude());
-				atom.addXy16((x << 16) + y);
+				
 				atom.addShiftToIndex((int) (pointer - o.getFileOffset()));
 				if (o instanceof Street) {
 					atom.addShiftToCityIndex((int) (pointer - ((Street) o).getCity().getFileOffset()));

@@ -530,22 +530,22 @@ public class CountryOcbfGeneration {
 		} else {
 			String[] tags = r.translate.split(";");
 			Set<TranslateEntity> set = null;
-			for(String t : tags) {
-				if(!t.contains("=")) {
-					if(translates.containsKey("name="+t)) {
-						t = "name=" +t;
-					} else if(translates.containsKey("name:en="+t)) {
+			for (String t : tags) {
+				if (!t.contains("=")) {
+					if (translates.containsKey("name=" + t)) {
+						t = "name=" + t;
+					} else if (translates.containsKey("name:en=" + t)) {
 						t = "name:en=" + t;
 					}
 				}
-				if(set == null) {
+				if (set == null) {
 					set = translates.get(t);
-					if(set == null) {
+					if (set == null) {
 						break;
 					}
 				} else {
 					Set<TranslateEntity> st2 = translates.get(t);
-					if(st2 != null) {
+					if (st2 != null) {
 						set = new HashSet<TranslateEntity>(set);
 						set.retainAll(st2);
 					} else {
@@ -572,15 +572,13 @@ public class CountryOcbfGeneration {
 		// COMMENT TO SEE ONLY WARNINGS
 		System.out.println(indent + line);
 
-
-		if(boundaryPoints.size() > 0) {
+		if (boundaryPoints.size() > 0) {
 			serializer.endTag(null, "way");
 		} else {
 			serializer.endTag(null, "node");
 		}
 
-
-		for(CountryRegion c : r.children) {
+		for (CountryRegion c : r.children) {
 			processRegion(c, translates, polygonFiles, targetObf, targetOsmXml, indent + "  ", serializer);
 		}
 	}
