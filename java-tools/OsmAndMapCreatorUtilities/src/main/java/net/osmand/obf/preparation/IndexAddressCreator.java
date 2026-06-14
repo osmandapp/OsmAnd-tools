@@ -61,7 +61,7 @@ import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
-import net.osmand.util.SearchAlgorithms;
+import net.osmand.util.SearchIndexPrepareAlgorithms;
 
 
 public class IndexAddressCreator extends AbstractIndexPartCreator {
@@ -71,9 +71,19 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	public static class MapObjectIndex {
 		private final Map<MapObject, LinkedHashSet<String>> objectTokens = new LinkedHashMap<>();
+		private final Map<MapObject, LinkedHashSet<String>> objectPrefixTokens = new LinkedHashMap<>();
 
 		public void addToken(MapObject object, String token) {
 			objectTokens.computeIfAbsent(object, ignored -> new LinkedHashSet<>()).add(token);
+		}
+
+		public void addPrefixToken(MapObject object, String token) {
+			objectPrefixTokens.computeIfAbsent(object, ignored -> new LinkedHashSet<>()).add(token);
+		}
+
+		public void addObject(MapObject object) {
+			objectTokens.computeIfAbsent(object, ignored -> new LinkedHashSet<>());
+			objectPrefixTokens.computeIfAbsent(object, ignored -> new LinkedHashSet<>());
 		}
 
 		public Set<MapObject> getObjects() {
@@ -82,6 +92,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 		public Set<String> getTokens(MapObject object) {
 			LinkedHashSet<String> tokens = objectTokens.get(object);
+			return tokens == null ? Collections.emptySet() : tokens;
+		}
+
+		public Set<String> getPrefixTokens(MapObject object) {
+			LinkedHashSet<String> tokens = objectPrefixTokens.get(object);
 			return tokens == null ? Collections.emptySet() : tokens;
 		}
 	}
@@ -1418,10 +1433,13 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
                                               IndexCreatorSettings settings) {
     	name = removeBraces(name);
 		List<String> splitNames = splitAndNormalize(name);
-        SearchAlgorithms.removeCommonWords(splitNames);
+		// Preserve standalone number-like names as searchable prefixes, but keep mixed number tokens as suffixes.
+		boolean allowNumberPrefixes = data instanceof City && ((City) data).getType() == CityType.POSTCODE
+				|| SearchIndexPrepareAlgorithms.nameIndexIsSingleAlmostNumberValue(name, splitNames);
+		Set<String> prefixes = SearchIndexPrepareAlgorithms.nameIndexPrepareComplexPrefixes(splitNames, allowNumberPrefixes);
 		// add to the map
-		for (String token : splitNames) {
-			String val = SearchAlgorithms.nameIndexPreparePrefix(token, settings.charsToBuildAddressNameIndex);
+		for (String token : prefixes) {
+			String val = SearchIndexPrepareAlgorithms.nameIndexPreparePrefix(token, settings.charsToBuildAddressNameIndex);
 			if (val.isEmpty()) {
 				continue;
 			}
@@ -1430,7 +1448,13 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				entry = new MapObjectIndex();
 				namesIndex.put(val, entry);
 			}
-			entry.addToken(data, token);
+			entry.addObject(data);
+			entry.addPrefixToken(data, token);
+			// Compact name indexes do not attach every other word as a suffix: USUAL and FREQUENT
+			// prefixes have different allowed suffix classes to avoid cross-category false matches.
+			for (String suffixToken : SearchIndexPrepareAlgorithms.nameIndexPrepareComplexSuffixes(splitNames, token)) {
+				entry.addToken(data, suffixToken);
+			}
 		}
 
 	}
