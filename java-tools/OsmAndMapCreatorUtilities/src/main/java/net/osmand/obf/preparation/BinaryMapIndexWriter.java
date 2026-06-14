@@ -1004,6 +1004,14 @@ public class BinaryMapIndexWriter {
 		preserveInt32Size();
 
 		Map<String, BinaryFileReference> res = writeIndexedTable(OsmAndAddressNameIndexData.TABLE_FIELD_NUMBER, namesIndex.keySet());
+		Map<String, List<MapObject>> objectsByPrefix = new LinkedHashMap<>();
+		for (Entry<String, IndexAddressCreator.MapObjectIndex> entry : namesIndex.entrySet()) {
+			objectsByPrefix.put(entry.getKey(), new ArrayList<>(entry.getValue().getObjects()));
+		}
+		CommonIndexedTokens commonTokens = nameIndexBuildCommonIndexedTokens(objectsByPrefix,
+				(prefix, object) -> namesIndex.get(prefix).getPrefixTokens(object),
+				(prefix, object) -> namesIndex.get(prefix).getTokens(object));
+		writeCommonStats(OsmAndAddressNameIndexData.COMMONSTATS_FIELD_NUMBER, commonTokens);
 		for (Entry<String, IndexAddressCreator.MapObjectIndex> entry : namesIndex.entrySet()) {
 			BinaryFileReference ref = res.get(entry.getKey());
 
@@ -1019,13 +1027,16 @@ public class BinaryMapIndexWriter {
 			// Build one usage-ranked compact dictionary per trie key. It stores partial suffixes and
 			// separated suffixes together, so suffixesBitsetIndex can share the top 128 entries.
 			CombinedSuffixDictionary<MapObject> suffixDictionary = nameIndexBuildCombinedSuffixDictionary(
-					entry.getKey(), objects, indexEntry::getPrefixTokens, indexEntry::getTokens);
+					entry.getKey(), objects, indexEntry::getPrefixTokens, indexEntry::getTokens, commonTokens);
 			if (suffixDictionary.dictionaryEntries.isEmpty()) {
 				builder.addSuffixesDictionary(EMPTY_SUFFIX_DICTIONARY_SENTINEL);
 			} else {
 				for (SuffixEntry dictionaryEntry : suffixDictionary.dictionaryEntries) {
 					builder.addSuffixesDictionary(dictionaryEntry.encodedSuffix());
 				}
+			}
+			for (int commonDictionaryEntry : suffixDictionary.commonDictionaryEntries) {
+				builder.addSuffixesCommonDictionary(commonDictionaryEntry);
 			}
 			for (MapObject o : objects) {
 				AddressNameIndexDataAtom.Builder atom = AddressNameIndexDataAtom.newBuilder();
@@ -1119,6 +1130,9 @@ public class BinaryMapIndexWriter {
 		if (!Algorithms.isEmpty(suffixes.extraSuffix)) {
 			atom.setExtraSuffix(suffixes.extraSuffix);
 		}
+		if (suffixes.nonCommonWords > 0) {
+			atom.setNonCommonWords(suffixes.nonCommonWords);
+		}
 	}
 
 	private void addCompactSuffixes(OsmAndPoiNameIndexDataAtom.Builder atom, CompactSuffixes suffixes) {
@@ -1133,6 +1147,22 @@ public class BinaryMapIndexWriter {
 		if (!Algorithms.isEmpty(suffixes.extraSuffix)) {
 			atom.setExtraSuffix(suffixes.extraSuffix);
 		}
+		if (suffixes.nonCommonWords > 0) {
+			atom.setNonCommonWords(suffixes.nonCommonWords);
+		}
+	}
+
+	private void writeCommonStats(int fieldNumber, CommonIndexedTokens commonTokens) throws IOException {
+		if (commonTokens == null || commonTokens.values.isEmpty()) {
+			return;
+		}
+		OsmandOdb.CommonIndexedStats.Builder builder = OsmandOdb.CommonIndexedStats.newBuilder();
+		for (int i = 0; i < commonTokens.values.size(); i++) {
+			builder.addValue(commonTokens.values.get(i));
+			builder.addMatched(commonTokens.matched.get(i));
+			builder.addNonindexed(commonTokens.nonindexed.get(i));
+		}
+		codedOutStream.writeMessage(fieldNumber, builder.build());
 	}
 
 	public BinaryFileReference writeCityHeader(City city, int cityType, Map<String, Integer> tagRules) throws IOException {
@@ -1830,6 +1860,25 @@ public class BinaryMapIndexWriter {
 		preserveInt32Size();
 		Map<PoiTileBox, List<BinaryFileReference>> fpToWriteSeeks = new LinkedHashMap<PoiTileBox, List<BinaryFileReference>>();
 		Map<String, BinaryFileReference> indexedTable = writeIndexedTable(OsmandOdb.OsmAndPoiNameIndex.TABLE_FIELD_NUMBER, namesIndex.keySet());
+		Map<String, List<PoiNameIndexRef>> refsByPrefix = new LinkedHashMap<>();
+		Map<String, Boolean> compactPrefixMetadataByPrefix = new LinkedHashMap<>();
+		for (Map.Entry<String, Set<PoiTileBox>> e : namesIndex.entrySet()) {
+			List<PoiNameIndexRef> refs = new ArrayList<PoiNameIndexRef>();
+			boolean compactPrefixMetadata = false;
+			for (PoiTileBox box : e.getValue()) {
+				compactPrefixMetadata = compactPrefixMetadata || box.hasPrefixTokens(e.getKey());
+				for (Entry<Integer, LinkedHashSet<String>> entry : box.getPrefixTokens(e.getKey()).entrySet()) {
+					Set<String> prefixTokens = box.getPrefixFullTokens(e.getKey()).get(entry.getKey());
+					refs.add(new PoiNameIndexRef(box, entry.getKey(), entry.getValue(),
+							prefixTokens == null ? Collections.emptySet() : prefixTokens));
+				}
+			}
+			refsByPrefix.put(e.getKey(), refs);
+			compactPrefixMetadataByPrefix.put(e.getKey(), compactPrefixMetadata);
+		}
+		CommonIndexedTokens commonTokens = nameIndexBuildCommonIndexedTokens(refsByPrefix,
+				ref -> ref.prefixTokens, ref -> ref.tokens);
+		writeCommonStats(OsmandOdb.OsmAndPoiNameIndex.COMMONSTATS_FIELD_NUMBER, commonTokens);
 		for (Map.Entry<String, Set<PoiTileBox>> e : namesIndex.entrySet()) {
 			codedOutStream.writeTag(OsmandOdb.OsmAndPoiNameIndex.DATA_FIELD_NUMBER, FieldType.MESSAGE.getWireType());
 			BinaryFileReference nameTableRef = indexedTable.get(e.getKey());
@@ -1838,16 +1887,8 @@ public class BinaryMapIndexWriter {
 
 			OsmAndPoiNameIndex.OsmAndPoiNameIndexData.Builder builder = OsmAndPoiNameIndex.OsmAndPoiNameIndexData.newBuilder();
 			List<PoiTileBox> tileBoxes = new ArrayList<PoiTileBox>(e.getValue());
-			List<PoiNameIndexRef> refs = new ArrayList<PoiNameIndexRef>();
-			boolean compactPrefixMetadata = false;
-			for (PoiTileBox box : tileBoxes) {
-				compactPrefixMetadata = compactPrefixMetadata || box.hasPrefixTokens(e.getKey());
-				for (Entry<Integer, LinkedHashSet<String>> entry : box.getPrefixTokens(e.getKey()).entrySet()) {
-					Set<String> prefixTokens = box.getPrefixFullTokens(e.getKey()).get(entry.getKey());
-					refs.add(new PoiNameIndexRef(box, entry.getKey(), entry.getValue(),
-							prefixTokens == null ? Collections.emptySet() : prefixTokens));
-				}
-			}
+			List<PoiNameIndexRef> refs = refsByPrefix.get(e.getKey());
+			boolean compactPrefixMetadata = Boolean.TRUE.equals(compactPrefixMetadataByPrefix.get(e.getKey()));
 			CombinedSuffixDictionary<PoiNameIndexRef> combinedSuffixDictionary = null;
 			SuffixDictionary<PoiTileBox> legacySuffixDictionary = null;
 			boolean useCompactSuffixes = compactPrefixMetadata;
@@ -1855,7 +1896,7 @@ public class BinaryMapIndexWriter {
 				// Compact POI refs carry full-prefix metadata, allowing partial prefix suffixes and
 				// separated word suffixes to share one 128-entry usage-ranked dictionary.
 				combinedSuffixDictionary = nameIndexBuildCombinedSuffixDictionary(e.getKey(), refs,
-						ref -> ref.prefixTokens, ref -> ref.tokens);
+						ref -> ref.prefixTokens, ref -> ref.tokens, commonTokens);
 			} else {
 				legacySuffixDictionary = nameIndexBuildSuffixDictionary(e.getKey(), tileBoxes, box -> box.tokens);
 			}
@@ -1865,6 +1906,11 @@ public class BinaryMapIndexWriter {
 			} else {
 				for (SuffixEntry dictionaryEntry : dictionaryEntries) {
 					builder.addSuffixesDictionary(dictionaryEntry.encodedSuffix());
+				}
+			}
+			if (useCompactSuffixes) {
+				for (int commonDictionaryEntry : combinedSuffixDictionary.commonDictionaryEntries) {
+					builder.addSuffixesCommonDictionary(commonDictionaryEntry);
 				}
 			}
 			List<PoiNameIndexAtomRef> atomRefs = new ArrayList<PoiNameIndexAtomRef>();
@@ -1923,15 +1969,34 @@ public class BinaryMapIndexWriter {
 				}
 			}
 			OsmAndPoiNameIndex.OsmAndPoiNameIndexData msg = builder.build();
-			byte[] msgBytes = msg.toByteArray();
-			codedOutStream.writeUInt32NoTag(msgBytes.length);
+			int messageSize = 0;
+			for (String encodedSuffix : msg.getSuffixesDictionaryList()) {
+				messageSize += CodedOutputStream.computeStringSize(
+						OsmAndPoiNameIndex.OsmAndPoiNameIndexData.SUFFIXESDICTIONARY_FIELD_NUMBER, encodedSuffix);
+			}
+			for (int commonDictionaryEntry : msg.getSuffixesCommonDictionaryList()) {
+				messageSize += CodedOutputStream.computeUInt32Size(
+						OsmAndPoiNameIndex.OsmAndPoiNameIndexData.SUFFIXESCOMMONDICTIONARY_FIELD_NUMBER, commonDictionaryEntry);
+			}
+			for (OsmAndPoiNameIndexDataAtom atom : msg.getAtomsList()) {
+				messageSize += CodedOutputStream.computeMessageSize(
+						OsmAndPoiNameIndex.OsmAndPoiNameIndexData.ATOMS_FIELD_NUMBER, atom);
+			}
+			codedOutStream.writeUInt32NoTag(messageSize);
 			codedOutStream.flush();
 			long messageBodyStart = getFilePointer();
-			codedOutStream.writeRawBytes(msgBytes);
 			long currentOffsetInBody = 0;
 			for (String encodedSuffix : msg.getSuffixesDictionaryList()) {
+				codedOutStream.writeString(
+						OsmAndPoiNameIndex.OsmAndPoiNameIndexData.SUFFIXESDICTIONARY_FIELD_NUMBER, encodedSuffix);
 				currentOffsetInBody += CodedOutputStream.computeStringSize(
 						OsmAndPoiNameIndex.OsmAndPoiNameIndexData.SUFFIXESDICTIONARY_FIELD_NUMBER, encodedSuffix);
+			}
+			for (int commonDictionaryEntry : msg.getSuffixesCommonDictionaryList()) {
+				codedOutStream.writeUInt32(
+						OsmAndPoiNameIndex.OsmAndPoiNameIndexData.SUFFIXESCOMMONDICTIONARY_FIELD_NUMBER, commonDictionaryEntry);
+				currentOffsetInBody += CodedOutputStream.computeUInt32Size(
+						OsmAndPoiNameIndex.OsmAndPoiNameIndexData.SUFFIXESCOMMONDICTIONARY_FIELD_NUMBER, commonDictionaryEntry);
 			}
 			for (int i = 0; i < atomRefs.size(); i++) {
 				PoiTileBox box = atomRefs.get(i).box;
@@ -1944,6 +2009,7 @@ public class BinaryMapIndexWriter {
 						+ CodedOutputStream.computeRawVarint32Size(atomSerializedSize);
 				long shiftPointer = messageBodyStart + currentOffsetInBody + atomFieldHeaderSize + atomSerializedSize - Integer.BYTES;
 				fpToWriteSeeks.get(box).add(net.osmand.obf.preparation.BinaryFileReference.createShiftReference(shiftPointer, startPoiIndex));
+				codedOutStream.writeMessage(OsmAndPoiNameIndex.OsmAndPoiNameIndexData.ATOMS_FIELD_NUMBER, atom);
 				currentOffsetInBody += CodedOutputStream.computeMessageSize(
 						OsmAndPoiNameIndex.OsmAndPoiNameIndexData.ATOMS_FIELD_NUMBER, atom);
 			}
