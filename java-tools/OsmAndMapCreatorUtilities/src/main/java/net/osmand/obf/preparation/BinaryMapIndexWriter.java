@@ -1153,9 +1153,10 @@ public class BinaryMapIndexWriter {
 	}
 
 	private void writeCommonStats(int fieldNumber, CommonIndexedTokens commonTokens) throws IOException {
-		if (commonTokens == null || commonTokens.values.isEmpty()) {
+		if (commonTokens == null) {
 			return;
 		}
+		// Even an empty message marks the new encoded suffixesBitsetIndex format; old OBFs omit it.
 		OsmandOdb.CommonIndexedStats.Builder builder = OsmandOdb.CommonIndexedStats.newBuilder();
 		for (int i = 0; i < commonTokens.values.size(); i++) {
 			builder.addValue(commonTokens.values.get(i));
