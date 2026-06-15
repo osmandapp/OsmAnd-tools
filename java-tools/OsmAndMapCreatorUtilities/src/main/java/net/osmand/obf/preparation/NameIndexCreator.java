@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -26,21 +27,24 @@ import net.osmand.util.SearchAlgorithms;
 public class NameIndexCreator<T> {
 
 	private static final int NAMED_WORDS_SEPARATOR = 0;
+	private static final int MIN_LIMIT_FREQ_COMMON = 10; // minimum required
+	private static final int ADD_TOP_X_FREQ_WORDS = 10; // minimum required
 	public static boolean NOT_INDEX_COMMON_IF_THERE_ARE_RARE = true;
 	public static boolean INDEX_RARE_WORDS_FOR_COMMON = false;
 	public static boolean INDEX_RARE_WORDS_FOR_NON_COMMON = false;
 	
-	Map<String, Integer> tokenFrequencies = new HashMap<String, Integer>();
-
+	Map<String, NamedObjectsByPrefix<T>> namesIndex = new TreeMap<>(Collator.getInstance());
+	
 	PrepareWordsIndex commonWords;
 	
-	Map<String, NamedObjectsByPrefix<T>> namesIndex = new TreeMap<>(Collator.getInstance());
+	Map<String, Integer> tokenFrequencies = new HashMap<String, Integer>();
+	Map<String, Integer> commonNonIndexedFrequencies = new HashMap<String, Integer>();
 	
 	
 	public record PoiNameObject(PoiTileBox tileBox, int ind) {  }
 	
 	// common words
-	public record PrepareWordIndex (String word, int frequency, int nonmatched, int index) { }
+	public record PrepareWordIndex (int index, String word, int frequency, int nonindexed) { }
 	
 	public record PrepareWordsIndex (Map<String, PrepareWordIndex> words, List<PrepareWordIndex> wordsLst) { }
 	
@@ -132,7 +136,7 @@ public class NameIndexCreator<T> {
 			for (NamedObject<T> namedObject : namedObjects) {
 				for (NameObjectSingleNameIndex singleName : namedObject.singleNames) {
 					PrepareWordIndex word = commonWords.words.get(singleName.token);
-					boolean isCommon = word != null && word.nonmatched != 0;
+					boolean isCommon = word != null && word.nonindexed != 0;
 					if (isCommon) {
 						boolean rare = false;
 						for (String r : singleName.allNames) {
@@ -151,7 +155,7 @@ public class NameIndexCreator<T> {
 					}
 					boolean isCommonWord = commonWords.words.containsKey(singleName.token);
 					String suffix = calculateSuffix(singleName.token, prefix);
-					namedObject.bitsetIndex.add(suffixes.resolvedSuffixToIndex.get(suffix) << 1);
+					namedObject.bitsetIndex.add((suffixes.resolvedSuffixToIndex.get(suffix) + 1) << 1);
 					int otherWords = 0;
 					for (String otherName : singleName.allNames) {
 						if (!otherName.equals(singleName.token)) {
@@ -167,7 +171,7 @@ public class NameIndexCreator<T> {
 								}
 								int calcRef = suffixes.dictionaryEntries.size();
 								calcRef += suffixes.usedCommons.get(otherName);
-								namedObject.bitsetIndex.add(calcRef << 1);
+								namedObject.bitsetIndex.add((calcRef + 1) << 1);
 								// skip indexed common words
 							} else if(isCommonWord){
 								if (INDEX_RARE_WORDS_FOR_COMMON) {
@@ -198,13 +202,61 @@ public class NameIndexCreator<T> {
 	}
 	
 	public PrepareWordsIndex buildCommonWords(Map<String, NamedObjectsByPrefix<T>> map) {
-		// TODO Auto-generated method stub
+		List<String> commonStrings = new ArrayList<String>();
+		Set<String> topXFrequent = new HashSet<>();
+		for (int i = 0; i < ADD_TOP_X_FREQ_WORDS; i++) {
+			int max = -1;
+			String top = null;
+			for (Map.Entry<String, Integer> e : tokenFrequencies.entrySet()) {
+				if (e.getValue() > max && !topXFrequent.contains(e.getKey())) {
+					max = e.getValue();
+					top = e.getKey();
+				}
+			}
+			if (top != null) {
+				topXFrequent.add(top);
+			}
+		}
+		
+		// Here we could also compute and add some top 5 frequent
+		for (Map.Entry<String, Integer> e : tokenFrequencies.entrySet()) {
+			// don't add all common ! for some maps they could have different meaning
+			if (e.getValue() < MIN_LIMIT_FREQ_COMMON) {
+				continue;
+			}
+			String s = e.getKey();
+			boolean common = CommonWords.isCommon(s);
+			boolean freq = CommonWords.getFrequentlyUsed(s) >= 0;
+			if (common || freq || topXFrequent.contains(e.getKey())) {
+				commonStrings.add(s);
+			}
+		}
+		
+		Collections.sort(commonStrings);
+		Map<String, PrepareWordIndex> words = new HashMap<String, NameIndexCreator.PrepareWordIndex>();
+		List<PrepareWordIndex> wordsList = new ArrayList<>();
+		int ind = 0;
+		for(String c : commonStrings) {
+			Integer matched = tokenFrequencies.get(c);
+			Integer nonIndexed = commonNonIndexedFrequencies.get(c);
+			PrepareWordIndex word = new PrepareWordIndex(ind++, c, matched, nonIndexed == null ? 0 : nonIndexed);
+			words.put(c, word);
+			wordsList.add(word);
+		}
+		commonWords = new PrepareWordsIndex(words, wordsList);
 		return commonWords;
 	}
 	
 	
 	public void addToNameIndex(String name, T obj, int maxPrefixLength, boolean indexNumbers) {
 		List<String> splitName = SearchAlgorithms.splitAndNormalize(name);
+		boolean nonCommonName = false;
+		for (String token : splitName) {
+			if(!CommonWords.isCommon(token)) {
+				nonCommonName = true;
+				break;
+			}
+		}
 		for (String token : splitName) {
 			if (Algorithms.isEmpty(token)) {
 				continue;
@@ -223,6 +275,10 @@ public class NameIndexCreator<T> {
 				namesIndex.put(prefix, entry);
 			}
 			tokenFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
+			boolean c = CommonWords.isCommon(token);
+			if (c && nonCommonName) {
+				commonNonIndexedFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
+			}
 			entry.addToken(obj, token, splitName);
 		}		
 	}

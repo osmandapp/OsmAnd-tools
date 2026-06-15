@@ -106,7 +106,7 @@ public class BinaryInspector {
 //					"-vtransport", "-vtransportschedule",
 					//"-vsearchinspect", // "-vsearchglobalonly", // "-vprefix=hh" // search index extended anlays 
 					"-vaddress",   
-					"-vcities", "-vstreetgroups", "-vcitynames",
+//					"-vcities", "-vstreetgroups", "-vcitynames",
 //					"-vstreets", //  "-vbuildings",// "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
