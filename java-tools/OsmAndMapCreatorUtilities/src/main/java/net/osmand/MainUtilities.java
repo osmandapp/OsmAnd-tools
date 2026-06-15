@@ -18,6 +18,7 @@ import net.osmand.render.SvgMapLegendGenerator;
 import net.osmand.router.*;
 import net.osmand.router.tester.RandomRouteTester;
 import net.osmand.routes.RouteRelationExtractor;
+import net.osmand.search.core.spatial.SpatialTextSearch;
 import net.osmand.tester.RandomClickGenerator;
 import net.osmand.travel.TravelGuideCreatorMain;
 import net.osmand.travel.WikivoyageDataGenerator;
@@ -135,6 +136,8 @@ public class MainUtilities {
 				net.osmand.router.TestRouting.main(subArgsArray);
 			} else if (utl.equals("test-icons")) {
 				IconVisibility.main(subArgsArray);
+			} else if (utl.equals("spatial-search-test")) {
+				SpatialTextSearch.mainTest(subArgsArray);
 			} else if (utl.equals("generate-ocbf")) {
 				CountryOcbfGeneration.main(subArgsArray);
 			} else if (utl.equals("generate-obf")) {

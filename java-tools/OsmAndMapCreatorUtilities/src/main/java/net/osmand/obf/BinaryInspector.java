@@ -99,14 +99,14 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-//					"-vpoi", // "-vpoiobjects",
+					"-vpoi", // "-vpoiobjects",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
-					"-vaddress",
-//					"-vsearchinspect", 
-//					"-vcities", //"-vstreetgroups", "-vcitynames",
+					//"-vsearchinspect", // "-vsearchglobalonly", // "-vprefix=hh" // search index extended anlays 
+					"-vaddress",   
+					"-vcities", "-vstreetgroups", "-vcitynames",
 //					"-vstreets", //  "-vbuildings",// "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
@@ -117,7 +117,7 @@ public class BinaryInspector {
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
-//					System.getProperty("maps.dir") + "/Us_minnesota_northamerica_2.obf",
+//					System.getProperty("maps.dir") + "/Ukraine_zhytomyr_europe_2 2.obf",
 //					System.getProperty("maps.dir") + "Germany_bayern_lower-franconia_europe_2.obf",
 //					System.getProperty("maps.dir") + "Germany_bayern_lower-bavaria_europe_2.obf",
 //					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_tubingen_europe_2.obf",
@@ -125,7 +125,7 @@ public class BinaryInspector {
 //					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_freiburg_europe_2.obf",
 //					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_stuttgart_europe_2.obf",
 //					System.getProperty("maps.dir") + "Liechtenstein_europe.obf",
-					System.getProperty("maps.dir") + "/regionsTest.ocbf",
+					System.getProperty("maps.dir") + "regions.ocbf",
 //					System.getProperty("maps.dir") + "Spain_aragon_europe_2.obf"
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
@@ -163,6 +163,7 @@ public class BinaryInspector {
 	protected static class VerboseInfo {
 		boolean vaddress;
 		boolean vsearchinspect;
+		boolean vsearchglobalonly;
 		boolean vcities;
 		boolean vcitynames;
 		boolean vstreetgroups;
@@ -239,16 +240,14 @@ public class BinaryInspector {
 			return vstats;
 		}
 		
-		public boolean isVAddrSearchInspect() {
-			return vsearchinspect;
-		}
-
 		public VerboseInfo(String[] params) throws FileNotFoundException {
 			for (int i = 0; i < params.length; i++) {
 				if (params[i].equals("-vaddress")) {
 					vaddress = true;
 				} else if (params[i].equals("-vsearchinspect")) {
 					vsearchinspect = true;
+				} else if (params[i].equals("-vsearchglobalonly")) {
+					vsearchglobalonly = true;
 				} else if (params[i].equals("-vstreets")) {
 					vstreets = true;
 				} else if (params[i].equals("-vstreetgroups")) {
@@ -1026,7 +1025,7 @@ public class BinaryInspector {
 	
 	private void printAdddrIndexStats(BinaryMapIndexReader index, AddressRegion region) throws IOException {
 		AddressStats as = vInfo.addressStats;
-		NameIndexInspector fullNameIndex = index.readFullNameIndex(region);
+		NameIndexInspector fullNameIndex = index.readFullNameIndex(region, null);
 		fullNameIndex.setBoundariesStat(as.bndsStat);
 		for (CityBlocks type : CityBlocks.allTypes()) {
 			if (type.index >= 0) {
@@ -1037,8 +1036,11 @@ public class BinaryInspector {
 			}
 		}
 		as.nameIndex = ValueFreq.mergeArray(new HashMap<>(), fullNameIndex.getAddrPrefixes(-1, vInfo.getPrefix()));
+		as.suffixesStat = fullNameIndex.getSuffixesStat();
 		as.streetsStat = fullNameIndex.getStreetsStat();
-		printAddressNameStats(as);
+		if (!vInfo.vsearchglobalonly) {
+			printAddressNameStats(as);
+		}
 	}
 
 	private void printAddressNameStats(AddressStats as) {
@@ -1851,18 +1853,22 @@ public class BinaryInspector {
 				ps.topMulti.put(main.value, main);
 			}
 		}
-		NameIndexInspector fullNameIndex = index.readFullNameIndex(p);
+		NameIndexInspector fullNameIndex = index.readFullNameIndex(p, null);
 		ps.nameIndex = ValueFreq.mergeArray(new HashMap<>(), fullNameIndex.getPOIPrefixes(verbose.getPrefix()));
 		ps.suffixesStat = fullNameIndex.getSuffixesStat();
-		printPoiTypeStats(ps);
+		
+		if (!verbose.vsearchglobalonly) {
+			printPoiTypeStats(ps);
+		}
 		
 //		req.poiTypeFilter = null;//for test only
 		if (verbose.isVpoiObjects() || verbose.vsearchinspect) {
 			index.searchPoi(req, p);
+			if (!verbose.vsearchinspect) {
+				println(String.format("Found %d pois (%d with addr, %d with name without addr)", count[0], count[1],
+						count[2]));
+			}
 		}
-		
-		println(String.format("Found %d pois (%d with addr, %d with name without addr)", count[0],
-				count[1], count[2]));
 	}
 
 	private void printPoiTypeStats(PoiStats ps) {

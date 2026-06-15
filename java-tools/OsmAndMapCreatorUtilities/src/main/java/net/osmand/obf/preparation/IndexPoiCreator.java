@@ -13,9 +13,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import gnu.trove.list.array.TIntArrayList;
-import gnu.trove.map.hash.TIntObjectHashMap;
-import gnu.trove.map.hash.TObjectIntHashMap;
-import gnu.trove.map.hash.TObjectLongHashMap;
 import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.IProgress;
 import net.osmand.IndexConstants;
@@ -54,6 +51,7 @@ import net.osmand.router.RoutingContext;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.osmand.util.SearchAlgorithms;
+import net.osmand.util.SearchIndexPrepareAlgorithms;
 import net.osmand.util.TopTagValuesAnalyzer;
 import net.sf.junidecode.Junidecode;
 
@@ -670,6 +668,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		collectTagGroups();
 		// 0. process all entities
 		processPOIIntoTree(poiGeocoding, namesIndex, zoomToStart, bbox, rootZoomsTree);
+		if (useInMemoryCreator) {
+			finalizePoiDataOrder(rootZoomsTree);
+		}
 
 		// 1. write header
 		long startFpPoiIndex = writer.startWritePoiIndex(regionName, bbox.minX, bbox.maxX, bbox.maxY, bbox.minY);
@@ -717,14 +718,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 			if (useInMemoryCreator) {
 				List<PoiData> poiData = entry.getKey().poiData;
-				Collections.sort(poiData, new Comparator<PoiData>() {
-
-					@Override
-					public int compare(PoiData o1, PoiData o2) {
-						return -Integer.compare(o1.getRating(), o2.getRating());
-					}
-				});
-
 				for (PoiData poi : poiData) {
 					int x31 = poi.x;
 					int y31 = poi.y;
@@ -775,6 +768,32 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		prepareStatement.close();
 
 		writer.endWritePoiIndex();
+	}
+
+	private void finalizePoiDataOrder(Tree<PoiTileBox> tree) {
+		PoiTileBox box = tree.getNode();
+		if (box != null && box.poiData != null) {
+			List<IndexedPoiData> sortedPoiData = new ArrayList<IndexedPoiData>();
+			for (int i = 0; i < box.poiData.size(); i++) {
+				PoiData poi = box.poiData.get(i);
+				if (poi.id <= ObfConstants.PROPAGATE_NODE_BIT) {
+					sortedPoiData.add(new IndexedPoiData(i, poi));
+				}
+			}
+			sortedPoiData.sort((o1, o2) -> -Integer.compare(o1.poiData.getRating(), o2.poiData.getRating()));
+			Map<Integer, Integer> oldToNewIndex = new HashMap<Integer, Integer>();
+			List<PoiData> finalizedPoiData = new ArrayList<PoiData>(sortedPoiData.size());
+			for (int i = 0; i < sortedPoiData.size(); i++) {
+				IndexedPoiData indexedPoiData = sortedPoiData.get(i);
+				oldToNewIndex.put(indexedPoiData.oldIndex, i);
+				finalizedPoiData.add(indexedPoiData.poiData);
+			}
+			box.poiData = finalizedPoiData;
+			box.remapPrefixTokens(oldToNewIndex);
+		}
+		for (Tree<PoiTileBox> subtree : tree.getSubtrees()) {
+			finalizePoiDataOrder(subtree);
+		}
 	}
 
 	private void collectTopIndexMap() throws SQLException, IOException {
@@ -1063,8 +1082,12 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					}
 				}
 			}
+			if (useInMemoryCreator && prevTree.getNode().poiData == null) {
+				prevTree.getNode().poiData = new ArrayList<PoiData>();
+			}
+			int poiIndInBlock = useInMemoryCreator ? prevTree.getNode().poiData.size() : -1;
 			addNamePrefix(additionalTags.get(nameRuleType), additionalTags.get(nameEnRuleType), prevTree.getNode(),
-					namesIndex, otherNames, idNames);
+					poiIndInBlock, namesIndex, otherNames, idNames);
 
 			if (tagGroupIds.size() == 0) {
 				for (PoiCreatorTagGroup p : tagGroups) {
@@ -1072,9 +1095,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				}
 			}
 			if (useInMemoryCreator) {
-				if (prevTree.getNode().poiData == null) {
-					prevTree.getNode().poiData = new ArrayList<PoiData>();
-				}
 				PoiData poiData = new PoiData();
 				poiData.x = x;
 				poiData.y = y;
@@ -1095,42 +1115,44 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		log.info("Poi processing finished");
 	}
 
-	private void addNamePrefix(String name, String nameEn, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData,
+	private void addNamePrefix(String name, String nameEn, PoiTileBox data, int poiIndInBlock, Map<String, Set<PoiTileBox>> poiData,
 			Set<String> names, Set<String> idNames) {
 		if (name != null) {
-			parsePrefix(name, data, poiData, settings.charsToBuildPoiNameIndex);
+			parsePrefix(name, data, poiIndInBlock, poiData, settings.charsToBuildPoiNameIndex);
 			if (Algorithms.isEmpty(nameEn)) {
 				nameEn = Junidecode.unidecode(name);
 			}
 
 		}
 		if (!Algorithms.objectEquals(nameEn, name) && !Algorithms.isEmpty(nameEn)) {
-			parsePrefix(nameEn, data, poiData, settings.charsToBuildPoiNameIndex);
+			parsePrefix(nameEn, data, poiIndInBlock, poiData, settings.charsToBuildPoiNameIndex);
 		}
 		if (names != null) {
 			for (String nk : names) {
 				if (!Algorithms.objectEquals(nk, name) && !Algorithms.isEmpty(nk)) {
-					parsePrefix(nk, data, poiData, settings.charsToBuildPoiNameIndex);
+					parsePrefix(nk, data, poiIndInBlock, poiData, settings.charsToBuildPoiNameIndex);
 				}
 			}
 		}
 		if (idNames != null) {
 			for (String nk : idNames) {
 				if (!Algorithms.isEmpty(nk)) {
-					parsePrefix(nk, data, poiData, settings.charsToBuildPoiIdNameIndex);
+					parsePrefix(nk, data, poiIndInBlock, poiData, settings.charsToBuildPoiIdNameIndex);
 				}
 			}
 		}
 	}
 
-    private void parsePrefix(String name, PoiTileBox data, Map<String, Set<PoiTileBox>> poiData, int ind) {
+    private void parsePrefix(String name, PoiTileBox data, int poiIndInBlock, Map<String, Set<PoiTileBox>> poiData, int ind) {
         List<String> splitName = SearchAlgorithms.splitAndNormalize(name);
-        SearchAlgorithms.removeCommonWords(splitName);
-        for (String token : splitName) {
+		// Standalone number-like POI names keep old prefix search behavior; mixed number tokens stay suffix-only.
+		Set<String> prefixes = SearchIndexPrepareAlgorithms.nameIndexPrepareComplexPrefixes(splitName,
+				SearchIndexPrepareAlgorithms.nameIndexIsSingleAlmostNumberValue(name, splitName));
+        for (String token : prefixes) {
 	        if (Algorithms.isEmpty(token)) {
 		        continue;
 	        }
-			String str = SearchAlgorithms.nameIndexPreparePrefix(token, ind);
+			String str = SearchIndexPrepareAlgorithms.nameIndexPreparePrefix(token, ind);
 			if (Algorithms.isEmpty(str)) {
 				continue;
 			}
@@ -1138,7 +1160,14 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		        poiData.put(str, new LinkedHashSet<>());
 		    }
 		    poiData.get(str).add(data);
-	        data.addToken(token);
+			for (String suffixToken : splitName) {
+				data.addToken(suffixToken);
+			}
+			data.addPrefixFullToken(str, poiIndInBlock, token);
+			// Store only category-eligible separated suffixes for this prefix. This keeps compact
+			// POI atoms aligned with the new no-cross-suffix contract while preserving full tokens above.
+			List<String> suffixTokens = SearchIndexPrepareAlgorithms.nameIndexPrepareComplexSuffixes(splitName, token);
+			data.addPrefixTokens(str, poiIndInBlock, suffixTokens);
         }
     }
 
@@ -1201,6 +1230,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 	}
 
+	private record IndexedPoiData(int oldIndex, PoiData poiData) {}
+
 	public static class PoiTileBox {
 		int x;
 		int y;
@@ -1209,6 +1240,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		List<PoiData> poiData = null;
 		PoiCreatorTagGroups tagGroups = new PoiCreatorTagGroups();
 		final Set<String> tokens = new LinkedHashSet<>();
+		final Map<String, Map<Integer, LinkedHashSet<String>>> prefixTokens = new LinkedHashMap<>();
+		final Map<String, Map<Integer, LinkedHashSet<String>>> prefixFullTokens = new LinkedHashMap<>();
 
 		public int getX() {
 			return x;
@@ -1224,6 +1257,59 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 		public void addToken(String token) {
 			tokens.add(token);
+		}
+
+		public void addPrefixTokens(String prefix, int poiIndInBlock, Collection<String> tokens) {
+			if (poiIndInBlock < 0) {
+				return;
+			}
+			Map<Integer, LinkedHashSet<String>> tokensByPoi = prefixTokens.computeIfAbsent(prefix, ignored -> new LinkedHashMap<>());
+			tokensByPoi.computeIfAbsent(poiIndInBlock, ignored -> new LinkedHashSet<>()).addAll(tokens);
+		}
+
+		public void addPrefixFullToken(String prefix, int poiIndInBlock, String token) {
+			if (poiIndInBlock < 0 || Algorithms.isEmpty(token)) {
+				return;
+			}
+			Map<Integer, LinkedHashSet<String>> tokensByPoi = prefixFullTokens.computeIfAbsent(prefix, ignored -> new LinkedHashMap<>());
+			tokensByPoi.computeIfAbsent(poiIndInBlock, ignored -> new LinkedHashSet<>()).add(token);
+		}
+
+		public Map<Integer, LinkedHashSet<String>> getPrefixTokens(String prefix) {
+			Map<Integer, LinkedHashSet<String>> tokensByPoi = prefixTokens.get(prefix);
+			return tokensByPoi == null ? Collections.emptyMap() : tokensByPoi;
+		}
+
+		public Map<Integer, LinkedHashSet<String>> getPrefixFullTokens(String prefix) {
+			Map<Integer, LinkedHashSet<String>> tokensByPoi = prefixFullTokens.get(prefix);
+			return tokensByPoi == null ? Collections.emptyMap() : tokensByPoi;
+		}
+
+		public boolean hasPrefixTokens(String prefix) {
+			return prefixTokens.containsKey(prefix);
+		}
+
+		public void remapPrefixTokens(Map<Integer, Integer> oldToNewIndex) {
+			for (Map.Entry<String, Map<Integer, LinkedHashSet<String>>> entry : prefixTokens.entrySet()) {
+				Map<Integer, LinkedHashSet<String>> remapped = new LinkedHashMap<Integer, LinkedHashSet<String>>();
+				for (Map.Entry<Integer, LinkedHashSet<String>> poiEntry : entry.getValue().entrySet()) {
+					Integer newIndex = oldToNewIndex.get(poiEntry.getKey());
+					if (newIndex != null) {
+						remapped.computeIfAbsent(newIndex, ignored -> new LinkedHashSet<String>()).addAll(poiEntry.getValue());
+					}
+				}
+				entry.setValue(remapped);
+			}
+			for (Map.Entry<String, Map<Integer, LinkedHashSet<String>>> entry : prefixFullTokens.entrySet()) {
+				Map<Integer, LinkedHashSet<String>> remapped = new LinkedHashMap<Integer, LinkedHashSet<String>>();
+				for (Map.Entry<Integer, LinkedHashSet<String>> poiEntry : entry.getValue().entrySet()) {
+					Integer newIndex = oldToNewIndex.get(poiEntry.getKey());
+					if (newIndex != null) {
+						remapped.computeIfAbsent(newIndex, ignored -> new LinkedHashSet<String>()).addAll(poiEntry.getValue());
+					}
+				}
+				entry.setValue(remapped);
+			}
 		}
 	}
 

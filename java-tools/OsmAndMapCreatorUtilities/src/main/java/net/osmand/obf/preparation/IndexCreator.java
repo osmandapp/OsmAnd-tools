@@ -913,7 +913,7 @@ public class IndexCreator {
 		log.info("- STRING_TABLE_SIZE " + BinaryMapIndexWriter.STRING_TABLE_SIZE); //$NON-NLS-1$
 		log.info("-- MAP_DATA_AND_STRINGS SIZE " //$NON-NLS-1$
 				+ (BinaryMapIndexWriter.MAP_DATA_SIZE + BinaryMapIndexWriter.STRING_TABLE_SIZE));
-
+		
 	}
 
 	public static void generateRegionsFile()
