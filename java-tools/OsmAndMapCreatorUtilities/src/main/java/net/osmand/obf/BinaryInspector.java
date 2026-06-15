@@ -124,8 +124,8 @@ public class BinaryInspector {
 //					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_karlsruhe_europe_2.obf",
 //					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_freiburg_europe_2.obf",
 //					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_stuttgart_europe_2.obf",
-//					System.getProperty("maps.dir") + "Liechtenstein_europe.obf",
-					System.getProperty("maps.dir") + "regions.ocbf",
+					System.getProperty("maps.dir") + "Liechtenstein_europe.obf",
+//					System.getProperty("maps.dir") + "regions.ocbf",
 //					System.getProperty("maps.dir") + "Spain_aragon_europe_2.obf"
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"

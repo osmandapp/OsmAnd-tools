@@ -28,7 +28,6 @@ import rtree.RTreeException;
 
 import java.io.*;
 import java.sql.SQLException;
-import java.text.Collator;
 import java.text.MessageFormat;
 import java.util.*;
 import java.util.zip.ZipEntry;
@@ -446,7 +445,7 @@ public class BinaryMerger {
 		List<String> attributeTagsTable = new ArrayList<String>();
 		attributeTagsTable.addAll(attributeTagsTableSet);
 		Map<String, Integer> tagRules = new HashMap<String, Integer>();
-		NameIndexCreator namesIndex = new NameIndexCreator();
+		NameIndexCreator<MapObject> namesIndex = new NameIndexCreator<MapObject>();
 		ListIterator<String> it = attributeTagsTable.listIterator();
 		while (it.hasNext()) {
 			tagRules.put(it.next(), it.previousIndex());
@@ -504,10 +503,10 @@ public class BinaryMerger {
 				BinaryFileReference ref = writer.writeCityHeader(city, city.getType().ordinal(), tagRules);
 				refs.add(ref);
 				writer.writeCityIndex(city, city.getStreets(), namesakesStreetNodes.get(city), ref, tagRules);
-				namesIndex.putAddrNamedMapObject(city, ref.getStartPointer(), settings);
+				NameIndexCreator.putAddrNamedMapObject(namesIndex, city, ref.getStartPointer(), settings);
 				if (!city.isPostcode()) {
 					for (Street s : city.getStreets()) {
-						namesIndex.putAddrNamedMapObject(s, s.getFileOffset(), settings);
+						NameIndexCreator.putAddrNamedMapObject(namesIndex, s, s.getFileOffset(), settings);
 					}
 				}
 

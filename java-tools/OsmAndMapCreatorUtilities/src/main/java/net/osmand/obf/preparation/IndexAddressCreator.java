@@ -1,7 +1,6 @@
 package net.osmand.obf.preparation;
 
 
-import static net.osmand.util.SearchAlgorithms.splitAndNormalize;
 
 import java.io.IOException;
 import java.sql.Connection;
@@ -61,8 +60,6 @@ import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
-import net.osmand.util.SearchAlgorithms;
-import net.osmand.util.SearchIndexPrepareAlgorithms;
 
 
 public class IndexAddressCreator extends AbstractIndexPartCreator {
@@ -1217,7 +1214,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 
 
-		NameIndexCreator namesIndex = new NameIndexCreator();
+		NameIndexCreator<MapObject> namesIndex = new NameIndexCreator<>();
 
 		progress.startTask(settings.getString("IndexCreator.SERIALIZING_ADDRESS"), cityTowns.size() + villages.size() / 100 + 1); //$NON-NLS-1$
 
@@ -1238,7 +1235,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		for (int i = 0; i < posts.size(); i++) {
 			City postCode = posts.get(i);
 			BinaryFileReference ref = refs.get(i);
-			namesIndex.putAddrNamedMapObject( postCode, ref.getStartPointer(), settings);
+			NameIndexCreator.putAddrNamedMapObject(namesIndex, postCode, ref.getStartPointer(), settings);
 			ArrayList<Street> streets = new ArrayList<Street>(postCode.getStreets());
 			Collections.sort(streets, new Comparator<Street>() {
 				final net.osmand.Collator clt = OsmAndCollator.primaryCollator();
@@ -1302,7 +1299,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		for (int i = 0; i < boundariesAsCities.size(); i++) {
 			City b = boundariesAsCities.get(i);
 			BinaryFileReference ref = refs.get(i);
-			namesIndex.putAddrNamedMapObject(b, ref.getStartPointer(), settings);
+			NameIndexCreator.putAddrNamedMapObject(namesIndex, b, ref.getStartPointer(), settings);
 			writer.writeCityIndex(b, Collections.emptyList(), null, ref, tagRules);
 		}
 		writer.endCityBlockIndex();
@@ -1374,7 +1371,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	
 
 	private void writeCityBlockIndex(BinaryMapIndexWriter writer, int type, PreparedStatement streetstat, PreparedStatement waynodesStat,
-			Map<String, List<City>> isInGroups, List<City> cities, Map<String, City> postcodes, NameIndexCreator namesIndex,
+			Map<String, List<City>> isInGroups, List<City> cities, Map<String, City> postcodes, NameIndexCreator<MapObject> namesIndex,
 			Map<String, Integer> tagRules, IProgress progress)
 			throws IOException, SQLException {
 		List<BinaryFileReference> refs = new ArrayList<BinaryFileReference>();
@@ -1387,7 +1384,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		for (int i = 0; i < cities.size(); i++) {
 			City city = cities.get(i);
 			BinaryFileReference ref = refs.get(i);
-			namesIndex.putAddrNamedMapObject(city, ref.getStartPointer(), settings);
+			NameIndexCreator.putAddrNamedMapObject(namesIndex, city, ref.getStartPointer(), settings);
 			if (type == CityBlocks.CITY_TOWN_TYPE.index) {
 				progress.progress(1);
 			} else {
@@ -1420,7 +1417,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			int bCount = 0;
 			// register postcodes and name index
 			for (Street s : streets) {
-				namesIndex.putAddrNamedMapObject(s, s.getFileOffset(), settings);
+				NameIndexCreator.putAddrNamedMapObject(namesIndex, s, s.getFileOffset(), settings);
 
 				for (Building b : s.getBuildings()) {
 					bCount++;
