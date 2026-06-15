@@ -41,7 +41,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Service
-public class SearchTestService implements ReportService, DataService, DetectorService, InspectorService, IndexService {
+public class SearchTestService implements ReportService, DataService, DetectorService, InspectorService, AnalystService, TokenAnalystService, AddressPOIAnalystService {
     /**
      * Lightweight DTO for listing test-cases with parent dataset name.
      */

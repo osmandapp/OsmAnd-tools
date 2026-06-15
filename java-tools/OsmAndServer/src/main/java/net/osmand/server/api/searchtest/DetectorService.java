@@ -41,21 +41,22 @@ public interface DetectorService extends OBFService {
 	                        Map<BinaryMapIndexReaderStats.BinaryMapIndexReaderApiName, BinaryMapIndexReaderStats.StatByAPI> statsByApi) {}
 	record ResultMetric(String obf, int depth, double foundWordCount, double unknownPhraseMatchWeight,
 	                    Collection<String> otherWordsMatch, Double distance, boolean isEqual, boolean inResult) {}
-	record AddressResult(String name, String type, String address, AddressResult parent, ResultMetric metric, LatLon location) {}
+	record AddressResult(String name, String type, String address, AddressResult parent, ResultMetric metric, LatLon location, String mainWord) {}
 
 	default ResultsWithStats getResults(SearchService.SearchContext ctx, SearchService.SearchOption options) throws IOException {
 		SearchService.SearchResults result = getSearchService().getImmediateSearchResults(ctx, options, null);
+		String mainWord = result.phrase() == null ? "" : result.phrase().getUnknownWordToSearch();
 
 		List<AddressResult> results = new ArrayList<>();
 		for (SearchResult r : result.results()) {
-			AddressResult rec = toResult(r, Collections.newSetFromMap(new IdentityHashMap<>()));
+			AddressResult rec = toResult(r, mainWord, Collections.newSetFromMap(new IdentityHashMap<>()));
 			results.add(rec);
 		}
 
 		return new ResultsWithStats(results, result.settings().getStat().getWordStats().values(), result.settings().getStat().getByApis());
 	}
 
-	private AddressResult toResult(SearchResult r, Set<SearchResult> seen) {
+	private AddressResult toResult(SearchResult r, String mainWord, Set<SearchResult> seen) {
 		if (r == null || r == r.parentSearchResult)
 			return null;
 
@@ -64,10 +65,10 @@ public interface DetectorService extends OBFService {
 
 		// If we've already visited this node, break the cycle by not traversing further
 		if (!seen.add(r))
-			return new AddressResult(r.toString(), type, r.addressName, null, metric, r.location);
+			return new AddressResult(r.toString(), type, r.addressName, null, metric, r.location, mainWord);
 
-		AddressResult parent = toResult(r.parentSearchResult, seen);
-		return new AddressResult(r.toString(), type, r.addressName, parent, metric, r.location);
+		AddressResult parent = toResult(r.parentSearchResult, mainWord, seen);
+		return new AddressResult(r.toString(), type, r.addressName, parent, metric, r.location, mainWord);
 	}
 
 	record UnitTestPayload(

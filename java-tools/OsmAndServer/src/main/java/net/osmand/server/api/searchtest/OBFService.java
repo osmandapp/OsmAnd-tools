@@ -31,6 +31,55 @@ public interface OBFService extends BaseService {
 				}
 			});
 
+	Map<String, Map<Integer, InspectorService.ObfFieldSpec>> OBF_MESSAGE_SCHEMA = buildObfMessageSchema();
+
+	Map<Integer, String> OBF_STRUCTURE_FIELD_NAMES = buildObfStructureFieldNames();
+
+	record ObfFieldSpec(String fieldName, String childMessageType, InspectorService.ObfLengthType lengthType, boolean packedVarInt, boolean repeated) {}
+
+	static String toLowerCamelFromUpperUnderscore(String upperUnderscore) {
+		String[] parts = upperUnderscore.toLowerCase(Locale.ROOT).split("_");
+		if (parts.length == 0) {
+			return upperUnderscore;
+		}
+		StringBuilder sb = new StringBuilder(parts[0]);
+		for (int i = 1; i < parts.length; i++) {
+			String p = parts[i];
+			if (p.isEmpty()) {
+				continue;
+			}
+			sb.append(Character.toUpperCase(p.charAt(0)));
+			if (p.length() > 1) {
+				sb.append(p.substring(1));
+			}
+		}
+		return sb.toString();
+	}
+	
+	static Map<Integer, String> buildObfStructureFieldNames() {
+		Map<Integer, String> out = new HashMap<>();
+		try {
+			for (java.lang.reflect.Field f : OsmandOdb.OsmAndStructure.class.getDeclaredFields()) {
+				if (!java.lang.reflect.Modifier.isStatic(f.getModifiers())) {
+					continue;
+				}
+				if (f.getType() != int.class) {
+					continue;
+				}
+				String name = f.getName();
+				if (!name.endsWith("_FIELD_NUMBER")) {
+					continue;
+				}
+				int fieldNumber = f.getInt(null);
+				String base = name.substring(0, name.length() - "_FIELD_NUMBER".length());
+				String fieldName = toLowerCamelFromUpperUnderscore(base);
+				out.put(fieldNumber, fieldName);
+			}
+		} catch (IllegalAccessException e) {
+			throw new RuntimeException(e);
+		}
+		return out;
+	}
 	OsmAndMapsService getMapsService();
 	String getSearchTestDatasourceUrl();
 
@@ -60,6 +109,16 @@ public interface OBFService extends BaseService {
 
 	record CachedIndexTokens(String cacheKey, long fileLength, long lastModified, List<IndexToken> tokens) {}
 
+    class BinaryMapIndexReaderExt extends BinaryMapIndexReader {
+        BinaryMapIndexReaderExt(final RandomAccessFile raf, File file) throws IOException {
+            super(raf, file);
+        }
+
+        CodedInputStream getInputStream() {
+            return codedIS;
+        }
+    }
+
 	List<String> OBF_CONTINENTS = List.of(
 			"asia",
 			"europe",
@@ -70,18 +129,54 @@ public interface OBFService extends BaseService {
 			"centralamerica",
 			"southamerica");
 
-	record IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes, boolean isCommon, boolean isFrequent) {
+	record SuffixMetrics(int dict, int part, int integer, int literal, int extra) {}
+	record SuffixTexts(List<String> dict, List<String> part, List<String> literal, List<String> integer, List<String> extra) {}
+	record PoiRef(int blockOffset, int poiIndexInBlock, int atomSize) {}
+	record IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes,
+	                  boolean isCommon, boolean isFrequent, String obf, SuffixMetrics suffixMetrics,
+	                  SuffixMetrics poiSuffixMetrics, SuffixMetrics addressSuffixMetrics,
+	                  SuffixTexts suffixTexts, SuffixTexts poiSuffixTexts, SuffixTexts addressSuffixTexts,
+	                  PoiRef[] exactPoiRefs) {
+		public IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes,
+		                  boolean isCommon, boolean isFrequent, String obf, SuffixMetrics suffixMetrics) {
+			this(name, addressRefs, poiRefs, poiAtomRefs, poiAtomSizes, isCommon, isFrequent, obf, suffixMetrics,
+					new SuffixMetrics(0, 0, 0, 0, 0), new SuffixMetrics(0, 0, 0, 0, 0),
+					new SuffixTexts(List.of(), List.of(), List.of(), List.of(), List.of()),
+					new SuffixTexts(List.of(), List.of(), List.of(), List.of(), List.of()),
+					new SuffixTexts(List.of(), List.of(), List.of(), List.of(), List.of()),
+					new PoiRef[0]);
+		}
+		public IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes, boolean isCommon, boolean isFrequent) {
+			this(name, addressRefs, poiRefs, poiAtomRefs, poiAtomSizes, isCommon, isFrequent, null, new SuffixMetrics(0, 0, 0, 0, 0));
+		}
+		public IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes,
+		                  boolean isCommon, boolean isFrequent, SuffixMetrics suffixMetrics) {
+			this(name, addressRefs, poiRefs, poiAtomRefs, poiAtomSizes, isCommon, isFrequent, null, suffixMetrics);
+		}
 	}
-	record ObfFileInfo(String path, String name, String continent, String country, String region, long size) {}
+	record ObfFileInfo(String path, String name, String continent, String country, String region, long lastModified, long size) {}
 	record IndexTokenPage(List<IndexToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, IndexTokenSummary summary) {}
-	record IndexTokenSummary(int poiSum, int addressSum, int commonSum, int frequentSum, int poiMax, int addressMax) {}
-	record IndexTokenBuilder(String name, int[] addressOffsets, int[] addressSuffixIndexes, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes) {}
+	record IndexTokenSummary(int poiSum, int addressSum, int commonSum, int frequentSum,
+	                         int dictSuffixSum, int integerSuffixSum, int literalSuffixSum, int extraSuffixSum,
+	                         int poiMax, int addressMax,
+	                         int dictSuffixMax, int integerSuffixMax, int literalSuffixMax, int extraSuffixMax) {}
+	record IndexTokenBuilder(String name, int[] addressOffsets, int[] addressSuffixIndexes, AddressRef[] addressRefs,
+	                         int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes, SuffixMetrics suffixMetrics,
+	                         SuffixMetrics poiSuffixMetrics, SuffixMetrics addressSuffixMetrics) {}
 	record AddressRef(int shiftToIndex, int shiftToCityIndex, int objectOffset, int cityOffset, int typeIndex, int atomSize) {}
 
 	record ObjectAddress(int sequenceId, String name, LatLon point, Map<String, String> commonTags,
-	                     Map<String, Object> extraTags, boolean isPoi, boolean isMatched,
+	                     boolean isPoi, boolean isMatched,
 	                     boolean isInvalidAtom, boolean isAlone, String type, Long osmId,
-	                     String osmType, int payloadOffset, int payloadSize, int sourceOffset) {}
+	                     String osmType, int payloadOffset, int payloadSize, int sourceOffset, String obf) {
+		public ObjectAddress(int sequenceId, String name, LatLon point, Map<String, String> commonTags,
+		                     boolean isPoi, boolean isMatched,
+		                     boolean isInvalidAtom, boolean isAlone, String type, Long osmId,
+		                     String osmType, int payloadOffset, int payloadSize, int sourceOffset) {
+			this(sequenceId, name, point, commonTags, isPoi, isMatched, isInvalidAtom, isAlone, type, osmId,
+					osmType, payloadOffset, payloadSize, sourceOffset, null);
+		}
+	}
 	record ObjectAddressPage(List<ObjectAddress> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, int[] countMetrics, int[] sizeMetrics, int aloneCount, int aloneSize) {}
 	record ObjectAddressStats(int size, int count) {}
 	record PoiTokenRefs(Set<Integer> offsets, List<Integer> atomSizes) {}
@@ -95,22 +190,50 @@ public interface OBFService extends BaseService {
 	record GenerateDbTokenObjects(String obf, String obfName, int obfIndex, long startMs, IndexToken token, ObjectAddressPage objectsPage) {}
 	record GenerateDbTokenChunk(String obf, String obfName, int obfIndex, long startMs, List<GenerateDbTokenObjects> tokens) {}
 	record Datasource(String name, long size, long lastModified, boolean valid, String error) {}
-	record DbTagName(String name, long tokens) {}
-	record DbToken(long id, String name, long matched, long alone, boolean isCommon, boolean isFrequent) {}
-	record DbTokenSummary(long matchedSum, long aloneSum, long commonSum, long frequentSum, long matchedMax, long aloneMax) {}
+	record DbTagName(String name, long objects, boolean isSkipped) {}
+	record DbTagValue(String value, long objects_count) {}
+	record DbToken(long id, String name, long matched, long alone, boolean isCommon, boolean isFrequent, boolean isGenerated) {}
+	record DbTokenSummary(long matchedSum, long aloneSum, long commonSum, long frequentSum, long generatedSum, long matchedMax, long aloneMax) {}
 	record DbTokenPage(List<DbToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, DbTokenSummary summary) {}
+	record DbObjectToken(long id, String name, boolean isCommon, boolean isFrequent, boolean isGenerated, String obfName) {}
+	record DbObjectTokenPage(List<DbObjectToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages) {}
 	record DbObject(int sequenceId, String name, LatLon point, Map<String, String> commonTags,
-	                Map<String, Object> extraTags, String type, Long osmId, String osmType,
-	                boolean isAlone, String obfName) {}
+	                String type, Long osmId, String osmType,
+	                boolean isAlone, String obfName, long tokens) {}
 	record DbObjectPage(List<DbObject> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages) {}
+	record DbReportDistribution(String bucket, int ord, long tokens, long postings, long tokensNew, long postingsNew) {}
+	record DbReportTagHit(String tag, long hits, double sharePct) {}
+	record DbReportPruneToken(String name, boolean isCommon, boolean isFrequent, long matched, long alone,
+	                          double cumulativePct, List<DbReportTagHit> topTags) {}
+	record TestCaseObject(String name, String type, LatLon point, long tokens,
+	                      long commonFrequentTokens, long commonTokens, long frequentTokens,
+	                      long newTokens, double proneScore, String topCommonFrequentTokens) {}
+	record DbReport(long totalTokens, long totalPostings, List<DbReportDistribution> distribution,
+	                List<DbReportPruneToken> pruning, List<TestCaseObject> mainWordInconsistency) {}
 	@FunctionalInterface
 	interface GenerateDbProgressListener {
 		void onProgress(GenerateDbProgress progress);
 	}
-	record CityAddress(String name, LatLon point, List<StreetAddress> streets, int streetsCount, String type) {}
-	record PoiAddress(String name, LatLon point, String value) {}
-	record HouseAddress(String name, LatLon point) {}
-	record StreetAddress(String name, LatLon point, List<HouseAddress> houses, int houseCount) {}
+	record CityAddress(String name, LatLon point, List<StreetAddress> streets, int streetsCount, String type, String obf) {
+		public CityAddress(String name, LatLon point, List<StreetAddress> streets, int streetsCount, String type) {
+			this(name, point, streets, streetsCount, type, null);
+		}
+	}
+	record PoiAddress(String name, LatLon point, String value, String obf) {
+		public PoiAddress(String name, LatLon point, String value) {
+			this(name, point, value, null);
+		}
+	}
+	record HouseAddress(String name, LatLon point, String obf) {
+		public HouseAddress(String name, LatLon point) {
+			this(name, point, null);
+		}
+	}
+	record StreetAddress(String name, LatLon point, List<HouseAddress> houses, int houseCount, String obf) {
+		public StreetAddress(String name, LatLon point, List<HouseAddress> houses, int houseCount) {
+			this(name, point, houses, houseCount, null);
+		}
+	}
 
 	default List<ObfFileInfo> getObfFileInfos() throws IOException {
 		List<ObfFileInfo> result = new ArrayList<>();
@@ -154,8 +277,9 @@ public interface OBFService extends BaseService {
 		} else if (continentIndex < 0 && parts.size() > 1) {
 			region = String.join("_", parts.subList(1, parts.size()));
 		}
-		long size = new File(obf).length();
-		return new ObfFileInfo(obf, name, continent, normalizeObfDisplayName(country), normalizeObfDisplayName(region), size);
+		File file = new File(obf);
+		return new ObfFileInfo(obf, name, continent, normalizeObfDisplayName(country), normalizeObfDisplayName(region),
+				file.lastModified(), file.length());
 	}
 
 	static String getObfFileName(String obf) {
@@ -644,5 +768,135 @@ public interface OBFService extends BaseService {
 		}
 		String normalizedValue = Normalizer.normalize(value, Normalizer.Form.NFKC).toLowerCase(Locale.ROOT);
 		return normalizedValue.replace("\u0307", "");
+	}
+
+	static Map<String, Map<Integer, InspectorService.ObfFieldSpec>> buildObfMessageSchema() {
+		Map<String, Map<Integer, InspectorService.ObfFieldSpec>> schema = new HashMap<>();
+		addObfSpec(schema, "OsmAndStructure", 7, "addressIndex", "OsmAndAddressIndex", InspectorService.ObfLengthType.FIXED32, false, true);
+		addObfSpec(schema, "OsmAndStructure", 4, "transportIndex", "OsmAndTransportIndex", InspectorService.ObfLengthType.FIXED32, false, true);
+		addObfSpec(schema, "OsmAndStructure", 8, "poiIndex", "OsmAndPoiIndex", InspectorService.ObfLengthType.FIXED32, false, true);
+		addObfSpec(schema, "OsmAndStructure", 6, "mapIndex", "OsmAndMapIndex", InspectorService.ObfLengthType.FIXED32, false, true);
+		addObfSpec(schema, "OsmAndStructure", 9, "routingIndex", "OsmAndRoutingIndex", InspectorService.ObfLengthType.FIXED32, false, true);
+		addObfSpec(schema, "OsmAndStructure", 10, "hhRoutingIndex", "OsmAndHHRoutingIndex", InspectorService.ObfLengthType.FIXED32, false, true);
+
+		addObfSpec(schema, "OsmAndTileBox", 1, "left", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndTileBox", 2, "right", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndTileBox", 3, "top", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndTileBox", 4, "bottom", null, InspectorService.ObfLengthType.VAR_INT);
+
+		addObfSpec(schema, "OsmAndPoiIndex", 1, "name", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiIndex", 2, "boundaries", "OsmAndTileBox", InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiIndex", 3, "categoriesTable", "OsmAndCategoryTable", InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "OsmAndPoiIndex", 4, "nameIndex", "OsmAndPoiNameIndex", InspectorService.ObfLengthType.FIXED32);
+		addObfSpec(schema, "OsmAndPoiIndex", 5, "subtypesTable", "OsmAndSubtypesTable", InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiIndex", 6, "boxes", "OsmAndPoiBox", InspectorService.ObfLengthType.FIXED32, false, true);
+		addObfSpec(schema, "OsmAndPoiIndex", 9, "poiData", "OsmAndPoiBoxData", InspectorService.ObfLengthType.FIXED32, false, true);
+		addObfSpec(schema, "OsmAndSubtypesTable", 4, "subtypes", "OsmAndPoiSubtype", InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "OsmAndCategoryTable", 1, "category", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndCategoryTable", 3, "subcategories", null, InspectorService.ObfLengthType.VAR_INT);
+
+		addObfSpec(schema, "OsmAndPoiNameIndex", 3, "table", "IndexedStringTable", InspectorService.ObfLengthType.FIXED32);
+		addObfSpec(schema, "OsmAndPoiNameIndex", 5, "data", "OsmAndPoiNameIndexData", InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "OsmAndPoiNameIndexData", 2, "suffixesDictionary", null, InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "OsmAndPoiNameIndexData", 3, "atoms", "OsmAndPoiNameIndexDataAtom", InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 2, "zoom", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 3, "x", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 4, "y", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 5, "suffixesBitsetIndex", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 6, "suffixesBitset", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 7, "extraSuffix", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 9, "poiIndInBlock", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 14, "shiftTo", null, InspectorService.ObfLengthType.FIXED32);
+
+		addObfSpec(schema, "IndexedStringTable", 1, "prefix", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "IndexedStringTable", 3, "key", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "IndexedStringTable", 4, "val", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "IndexedStringTable", 5, "subtables", "IndexedStringTable", InspectorService.ObfLengthType.VAR_INT, false, true);
+
+		addObfSpec(schema, "OsmAndPoiBox", 1, "zoom", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBox", 2, "left", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBox", 3, "top", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBox", 4, "categories", "OsmAndPoiCategories", InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBox", 8, "tagGroups", "OsmAndPoiTagGroups", InspectorService.ObfLengthType.FIXED32);
+		addObfSpec(schema, "OsmAndPoiBox", 10, "subBoxes", "OsmAndPoiBox", InspectorService.ObfLengthType.FIXED32, false, true);
+		addObfSpec(schema, "OsmAndPoiBox", 14, "shiftToData", null, InspectorService.ObfLengthType.FIXED32);
+		addObfPackedVarIntSpec(schema, "OsmAndPoiCategories", 3, "categories");
+		addObfPackedVarIntSpec(schema, "OsmAndPoiCategories", 5, "subcategories");
+		addObfPackedVarIntSpec(schema, "OsmAndPoiTagGroups", 2, "ids");
+		addObfSpec(schema, "OsmAndPoiTagGroups", 5, "groups", "OsmAndPoiTagGroup", InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "OsmAndPoiBoxData", 5, "poiData", "OsmAndPoiBoxDataAtom", InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "OsmAndPoiTagGroup", 1, "id", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiTagGroup", 5, "tagValues", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiSubtype", 1, "name", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiSubtype", 2, "tagname", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiSubtype", 3, "isText", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiSubtype", 5, "frequency", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiSubtype", 6, "subtypeValuesSize", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiSubtype", 8, "subtypeValue", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBoxData", 1, "zoom", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBoxData", 2, "x", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBoxData", 3, "y", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 2, "dx", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 3, "dy", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfPackedVarIntSpec(schema, "OsmAndPoiBoxDataAtom", 4, "categories");
+		addObfPackedVarIntSpec(schema, "OsmAndPoiBoxDataAtom", 5, "subcategories");
+		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 6, "name", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 7, "nameEn", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 8, "id", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 10, "openingHours", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 11, "site", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 12, "phone", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 13, "note", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfPackedVarIntSpec(schema, "OsmAndPoiBoxDataAtom", 14, "textCategories");
+		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 15, "textValues", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiBoxDataAtom", 16, "precisionXY", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfPackedVarIntSpec(schema, "OsmAndPoiBoxDataAtom", 17, "tagGroups");
+
+		addObfSpec(schema, "OsmAndAddressIndex", 3, "boundaries", "OsmAndTileBox", InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndAddressIndex", 4, "attributeTagsTable", "StringTable", InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndAddressIndex", 6, "cities", "CitiesIndex", InspectorService.ObfLengthType.FIXED32, false, true);
+		addObfSpec(schema, "OsmAndAddressIndex", 7, "nameIndex", "OsmAndAddressNameIndexData", InspectorService.ObfLengthType.FIXED32);
+
+		addObfSpec(schema, "CitiesIndex", 5, "cities", "CityIndex", InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "CitiesIndex", 7, "blocks", "CityBlockIndex", InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "CityBlockIndex", 10, "buildings", "BuildingIndex", InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "CityBlockIndex", 12, "streets", "StreetIndex", InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "StreetIndex", 5, "intersections", "StreetIntersection", InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "StreetIndex", 12, "buildings", "BuildingIndex", InspectorService.ObfLengthType.VAR_INT, false, true);
+
+		addObfSpec(schema, "OsmAndAddressNameIndexData", 4, "table", "IndexedStringTable", InspectorService.ObfLengthType.FIXED32);
+		addObfSpec(schema, "OsmAndAddressNameIndexData", 7, "atom", "AddressNameIndexData", InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "AddressNameIndexData", 2, "suffixesDictionary", null, InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "AddressNameIndexData", 4, "atom", "AddressNameIndexDataAtom", InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "AddressNameIndexDataAtom", 4, "suffixesBitset", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "AddressNameIndexDataAtom", 8, "suffixesBitsetIndex", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "AddressNameIndexDataAtom", 9, "extraSuffix", null, InspectorService.ObfLengthType.VAR_INT);
+
+		addObfSpec(schema, "OsmAndMapIndex", 4, "rules", "OsmAndMapIndex.MapEncodingRule", InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "OsmAndMapIndex", 5, "levels", "OsmAndMapIndex.MapRootLevel", InspectorService.ObfLengthType.FIXED32, false, true);
+		addObfSpec(schema, "OsmAndMapIndex.MapRootLevel", 7, "boxes", "OsmAndMapIndex.MapDataBox", InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "OsmAndMapIndex.MapRootLevel", 15, "blocks", "MapDataBlock", InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "OsmAndMapIndex.MapDataBox", 7, "boxes", "OsmAndMapIndex.MapDataBox", InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "MapDataBlock", 12, "dataObjects", "MapData", InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "MapDataBlock", 15, "stringTable", "StringTable", InspectorService.ObfLengthType.VAR_INT);
+
+		return schema;
+	}
+
+	static void addObfPackedVarIntSpec(Map<String, Map<Integer, InspectorService.ObfFieldSpec>> schema, String messageType,
+	                                   int fieldNumber, String fieldName) {
+		addObfSpec(schema, messageType, fieldNumber, fieldName, null, InspectorService.ObfLengthType.VAR_INT, true, false);
+	}
+
+	static void addObfSpec(Map<String, Map<Integer, InspectorService.ObfFieldSpec>> schema, String messageType,
+	                       int fieldNumber, String fieldName, String childMessageType, InspectorService.ObfLengthType lengthType) {
+		addObfSpec(schema, messageType, fieldNumber, fieldName, childMessageType, lengthType, false, false);
+	}
+
+	static void addObfSpec(Map<String, Map<Integer, InspectorService.ObfFieldSpec>> schema, String messageType,
+	                       int fieldNumber, String fieldName, String childMessageType, InspectorService.ObfLengthType lengthType,
+	                       boolean packedVarInt, boolean repeated) {
+		Map<Integer, InspectorService.ObfFieldSpec> byField = schema.computeIfAbsent(messageType, k -> new HashMap<>());
+		byField.put(fieldNumber, new InspectorService.ObfFieldSpec(fieldName, childMessageType, lengthType, packedVarInt, repeated));
 	}
 }
