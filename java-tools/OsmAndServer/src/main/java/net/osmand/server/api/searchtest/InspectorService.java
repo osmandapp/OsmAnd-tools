@@ -1261,10 +1261,6 @@ public interface InspectorService extends OBFService {
                 return;
             }
             switch (tag) {
-                case OsmandOdb.AddressNameIndexDataAtom.NAMEEN_FIELD_NUMBER:
-                case OsmandOdb.AddressNameIndexDataAtom.NAME_FIELD_NUMBER:
-                    index.getInputStream().readString();
-                    break;
                 case OsmandOdb.AddressNameIndexDataAtom.SUFFIXESBITSET_FIELD_NUMBER:
                     int mask = index.getInputStream().readUInt32();
                     if (isFiltered && !matched && matchesSuffixMask(maskIndex, mask, matchedSuffixIndexes)) {
