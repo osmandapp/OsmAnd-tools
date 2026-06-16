@@ -1,7 +1,6 @@
 package net.osmand.obf.preparation;
 
 
-import static net.osmand.util.SearchAlgorithms.splitAndNormalize;
 
 import java.io.IOException;
 import java.sql.Connection;
@@ -61,7 +60,6 @@ import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
-import net.osmand.util.SearchIndexPrepareAlgorithms;
 
 
 public class IndexAddressCreator extends AbstractIndexPartCreator {
@@ -69,38 +67,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	private static final Log log = LogFactory.getLog(IndexAddressCreator.class);
 	private final Log logMapDataWarn;
 
-	public static class MapObjectIndex {
-		private final Map<MapObject, LinkedHashSet<String>> objectTokens = new LinkedHashMap<>();
-		private final Map<MapObject, LinkedHashSet<String>> objectPrefixTokens = new LinkedHashMap<>();
-
-		public void addToken(MapObject object, String token) {
-			objectTokens.computeIfAbsent(object, ignored -> new LinkedHashSet<>()).add(token);
-		}
-
-		public void addPrefixToken(MapObject object, String token) {
-			objectPrefixTokens.computeIfAbsent(object, ignored -> new LinkedHashSet<>()).add(token);
-		}
-
-		public void addObject(MapObject object) {
-			objectTokens.computeIfAbsent(object, ignored -> new LinkedHashSet<>());
-			objectPrefixTokens.computeIfAbsent(object, ignored -> new LinkedHashSet<>());
-		}
-
-		public Set<MapObject> getObjects() {
-			return objectTokens.keySet();
-		}
-
-		public Set<String> getTokens(MapObject object) {
-			LinkedHashSet<String> tokens = objectTokens.get(object);
-			return tokens == null ? Collections.emptySet() : tokens;
-		}
-
-		public Set<String> getPrefixTokens(MapObject object) {
-			LinkedHashSet<String> tokens = objectPrefixTokens.get(object);
-			return tokens == null ? Collections.emptySet() : tokens;
-		}
-	}
-
+	
 	private PreparedStatement addressCityStat;
 
 	// MEMORY address : choose what to use ?
@@ -1247,7 +1214,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 
 
-		Map<String, MapObjectIndex> namesIndex = new TreeMap<String, MapObjectIndex>(Collator.getInstance());
+		NameIndexCreator<MapObject> namesIndex = new NameIndexCreator<>();
 
 		progress.startTask(settings.getString("IndexCreator.SERIALIZING_ADDRESS"), cityTowns.size() + villages.size() / 100 + 1); //$NON-NLS-1$
 
@@ -1268,7 +1235,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		for (int i = 0; i < posts.size(); i++) {
 			City postCode = posts.get(i);
 			BinaryFileReference ref = refs.get(i);
-			putNamedMapObject(namesIndex, postCode, ref.getStartPointer(), settings);
+			NameIndexCreator.putAddrNamedMapObject(namesIndex, postCode, ref.getStartPointer(), settings);
 			ArrayList<Street> streets = new ArrayList<Street>(postCode.getStreets());
 			Collections.sort(streets, new Comparator<Street>() {
 				final net.osmand.Collator clt = OsmAndCollator.primaryCollator();
@@ -1332,7 +1299,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		for (int i = 0; i < boundariesAsCities.size(); i++) {
 			City b = boundariesAsCities.get(i);
 			BinaryFileReference ref = refs.get(i);
-			putNamedMapObject(namesIndex, b, ref.getStartPointer(), settings);
+			NameIndexCreator.putAddrNamedMapObject(namesIndex, b, ref.getStartPointer(), settings);
 			writer.writeCityIndex(b, Collections.emptyList(), null, ref, tagRules);
 		}
 		writer.endCityBlockIndex();
@@ -1399,68 +1366,12 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	}
 
 
-	public static void putNamedMapObject(Map<String, MapObjectIndex> namesIndex, MapObject o, long fileOffset,
-										 IndexCreatorSettings settings) {
-		String name = o.getName();
-		parsePrefix(name, o, namesIndex, settings);
-		// getOtherNames ignores "admin_level", "place"
-		for (String nm : o.getOtherNames(true, name)) {
-			if (!nm.equals(name)) {
-				parsePrefix(nm, o, namesIndex, settings);
-			}
-		}
-		if (fileOffset > Integer.MAX_VALUE) {
-			throw new IllegalArgumentException("File offset > 2 GB.");
-		}
-		o.setFileOffset((int) fileOffset);
-	}
+	
 
-	private static String removeBraces(String localeName) {
-		int i = localeName.indexOf('(');
-		String retName = localeName;
-		if (i > -1) {
-			retName = localeName.substring(0, i);
-			int j = localeName.indexOf(')', i);
-			if (j > -1) {
-				// remove
-				retName = retName.trim() + ' ' + localeName.substring(j + 1).trim();
-			}
-		}
-		return retName;
-	}
-
-    private static void parsePrefix(String name, MapObject data, Map<String, MapObjectIndex> namesIndex,
-                                              IndexCreatorSettings settings) {
-    	name = removeBraces(name);
-		List<String> splitNames = splitAndNormalize(name);
-		// Preserve standalone number-like names as searchable prefixes, but keep mixed number tokens as suffixes.
-		boolean allowNumberPrefixes = data instanceof City && ((City) data).getType() == CityType.POSTCODE
-				|| SearchIndexPrepareAlgorithms.nameIndexIsSingleAlmostNumberValue(name, splitNames);
-		Set<String> prefixes = SearchIndexPrepareAlgorithms.nameIndexPrepareComplexPrefixes(splitNames, allowNumberPrefixes);
-		// add to the map
-		for (String token : prefixes) {
-			String val = SearchIndexPrepareAlgorithms.nameIndexPreparePrefix(token, settings.charsToBuildAddressNameIndex);
-			if (val.isEmpty()) {
-				continue;
-			}
-			MapObjectIndex entry = namesIndex.get(val);
-			if (entry == null) {
-				entry = new MapObjectIndex();
-				namesIndex.put(val, entry);
-			}
-			entry.addObject(data);
-			entry.addPrefixToken(data, token);
-			// Compact name indexes do not attach every other word as a suffix: USUAL and FREQUENT
-			// prefixes have different allowed suffix classes to avoid cross-category false matches.
-			for (String suffixToken : SearchIndexPrepareAlgorithms.nameIndexPrepareComplexSuffixes(splitNames, token)) {
-				entry.addToken(data, suffixToken);
-			}
-		}
-
-	}
+	
 
 	private void writeCityBlockIndex(BinaryMapIndexWriter writer, int type, PreparedStatement streetstat, PreparedStatement waynodesStat,
-			Map<String, List<City>> isInGroups, List<City> cities, Map<String, City> postcodes, Map<String, MapObjectIndex> namesIndex,
+			Map<String, List<City>> isInGroups, List<City> cities, Map<String, City> postcodes, NameIndexCreator<MapObject> namesIndex,
 			Map<String, Integer> tagRules, IProgress progress)
 			throws IOException, SQLException {
 		List<BinaryFileReference> refs = new ArrayList<BinaryFileReference>();
@@ -1473,7 +1384,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		for (int i = 0; i < cities.size(); i++) {
 			City city = cities.get(i);
 			BinaryFileReference ref = refs.get(i);
-			putNamedMapObject(namesIndex, city, ref.getStartPointer(), settings);
+			NameIndexCreator.putAddrNamedMapObject(namesIndex, city, ref.getStartPointer(), settings);
 			if (type == CityBlocks.CITY_TOWN_TYPE.index) {
 				progress.progress(1);
 			} else {
@@ -1506,7 +1417,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			int bCount = 0;
 			// register postcodes and name index
 			for (Street s : streets) {
-				putNamedMapObject(namesIndex, s, s.getFileOffset(), settings);
+				NameIndexCreator.putAddrNamedMapObject(namesIndex, s, s.getFileOffset(), settings);
 
 				for (Building b : s.getBuildings()) {
 					bCount++;

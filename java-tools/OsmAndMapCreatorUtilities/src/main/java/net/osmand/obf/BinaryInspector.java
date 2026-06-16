@@ -53,11 +53,11 @@ import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.binary.BinaryMapTransportReaderAdapter.TransportIndex;
-import net.osmand.binary.NameIndexInspector;
-import net.osmand.binary.NameIndexInspector.BoundariesIndexStat;
-import net.osmand.binary.NameIndexInspector.StreetsIndexStat;
-import net.osmand.binary.NameIndexInspector.SuffixesStat;
-import net.osmand.binary.NameIndexInspector.ValueFreq;
+import net.osmand.binary.NameIndexReader;
+import net.osmand.binary.NameIndexReader.BoundariesIndexStat;
+import net.osmand.binary.NameIndexReader.StreetsIndexStat;
+import net.osmand.binary.NameIndexReader.SuffixesStat;
+import net.osmand.binary.NameIndexReader.ValueFreq;
 import net.osmand.binary.ObfConstants;
 import net.osmand.binary.OsmandOdb;
 import net.osmand.binary.RouteDataObject;
@@ -105,8 +105,8 @@ public class BinaryInspector {
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 					//"-vsearchinspect", // "-vsearchglobalonly", // "-vprefix=hh" // search index extended anlays 
-					"-vaddress",   
-					"-vcities", "-vstreetgroups", "-vcitynames",
+//					"-vaddress",   
+//					"-vcities", "-vstreetgroups", "-vcitynames",
 //					"-vstreets", //  "-vbuildings",// "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
@@ -117,7 +117,7 @@ public class BinaryInspector {
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
-//					System.getProperty("maps.dir") + "/Ukraine_zhytomyr_europe_2 2.obf",
+					System.getProperty("maps.dir") + "Ukraine_kyiv-city_europe_2.obf",
 //					System.getProperty("maps.dir") + "Germany_bayern_lower-franconia_europe_2.obf",
 //					System.getProperty("maps.dir") + "Germany_bayern_lower-bavaria_europe_2.obf",
 //					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_tubingen_europe_2.obf",
@@ -125,7 +125,7 @@ public class BinaryInspector {
 //					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_freiburg_europe_2.obf",
 //					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_stuttgart_europe_2.obf",
 //					System.getProperty("maps.dir") + "Liechtenstein_europe.obf",
-					System.getProperty("maps.dir") + "regions.ocbf",
+//					System.getProperty("maps.dir") + "regions.ocbf",
 //					System.getProperty("maps.dir") + "Spain_aragon_europe_2.obf"
 //					System.getProperty("maps.dir") + "../basemap/World_basemap_mini_2.obf"
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
@@ -1025,7 +1025,7 @@ public class BinaryInspector {
 	
 	private void printAdddrIndexStats(BinaryMapIndexReader index, AddressRegion region) throws IOException {
 		AddressStats as = vInfo.addressStats;
-		NameIndexInspector fullNameIndex = index.readFullNameIndex(region, null);
+		NameIndexReader fullNameIndex = index.readFullNameIndex(region, null);
 		fullNameIndex.setBoundariesStat(as.bndsStat);
 		for (CityBlocks type : CityBlocks.allTypes()) {
 			if (type.index >= 0) {
@@ -1853,7 +1853,7 @@ public class BinaryInspector {
 				ps.topMulti.put(main.value, main);
 			}
 		}
-		NameIndexInspector fullNameIndex = index.readFullNameIndex(p, null);
+		NameIndexReader fullNameIndex = index.readFullNameIndex(p, null);
 		ps.nameIndex = ValueFreq.mergeArray(new HashMap<>(), fullNameIndex.getPOIPrefixes(verbose.getPrefix()));
 		ps.suffixesStat = fullNameIndex.getSuffixesStat();
 		
