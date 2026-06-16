@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import net.osmand.server.api.operation.Operation;
@@ -57,7 +56,7 @@ public abstract class AbstractFileFixOperation implements Operation<AbstractFile
 
 	protected abstract byte[] processFile(UserFile file) throws IOException;
 
-	protected abstract ObjectNode fix(JsonNode node, String baseName);
+	protected abstract ObjectNode fix(UserFile file) throws IOException;
 
 	@Override
 	public Object run(Params params, OperationContext ctx) {

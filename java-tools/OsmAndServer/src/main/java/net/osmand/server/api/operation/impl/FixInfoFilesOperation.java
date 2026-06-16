@@ -19,7 +19,7 @@ import java.io.IOException;
  * Backfills required tags (type/file/subtype) into GPX *.info files that only contain "pointsGroups".
  */
 @Component
-@AdminOperation(name = "fix-info-files", title = "Fix info files")
+@AdminOperation(name = "fix-info-files")
 public class FixInfoFilesOperation extends AbstractFileFixOperation {
 
 	private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -43,13 +43,13 @@ public class FixInfoFilesOperation extends AbstractFileFixOperation {
 		if (file.name == null || !file.name.endsWith(GPX_INFO_EXT)) {
 			return null;
 		}
-		JsonNode root = MAPPER.readTree(read(file));
-		ObjectNode fixed = fix(root, baseName(file.name));
+		ObjectNode fixed = fix(file);
 		return fixed == null ? null : MAPPER.writeValueAsBytes(fixed);
 	}
 
 	@Override
-	protected ObjectNode fix(JsonNode node, String baseName) {
+	protected ObjectNode fix(UserFile file) throws IOException {
+		JsonNode node = MAPPER.readTree(read(file));
 		if (node == null || !node.isObject()) {
 			return null;
 		}
@@ -57,7 +57,7 @@ public class FixInfoFilesOperation extends AbstractFileFixOperation {
 		if (obj.size() == 1 && obj.has(POINTS_GROUPS)) {
 			ObjectNode out = MAPPER.createObjectNode();
 			out.put(KEY_TYPE, TYPE_GPX);
-			out.put(KEY_FILE, TRACKS_PREFIX + baseName);
+			out.put(KEY_FILE, TRACKS_PREFIX + baseName(file.name));
 			out.put(KEY_SUBTYPE, SUBTYPE_GPX);
 			out.setAll(obj);
 			return out;

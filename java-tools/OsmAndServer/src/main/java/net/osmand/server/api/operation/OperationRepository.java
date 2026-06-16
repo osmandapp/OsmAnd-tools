@@ -27,29 +27,29 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @Repository
 public class OperationRepository {
 
-	public record OperationItem(String className, String name, String title, String paramsJson, String resultType,
+	public record OperationItem(String className, String name, String paramsJson, String resultType,
 							 boolean valid, LocalDateTime updatedTime) {}
-	public record JobItem(Long id, String className, String operationName, String operationTitle, String name,
+	public record JobItem(Long id, String className, String operationName, String name,
 						 String description, String labels, String paramsJson, LocalDateTime createdTime,
 						 LocalDateTime updatedTime) {}
-	public record RunItem(Long id, Long jobId, String className, String operationName, String operationTitle, String jobName,
+	public record RunItem(Long id, Long jobId, String className, String operationName, String jobName,
 						 String status, String paramsJson, String resultJson, String errorText, Long elapsedMs,
 						 Integer processed, Integer total, String progressText,
 						 String summaryKey, Object summaryValue, LocalDateTime startedTime, LocalDateTime finishedTime,
 						 LocalDateTime createdTime, LocalDateTime updatedTime) {
 
 		public RunItem withProgress(int processed, int total, String progressText, long elapsedMs) {
-			return new RunItem(id, jobId, className, operationName, operationTitle, jobName, status, paramsJson,
+			return new RunItem(id, jobId, className, operationName, jobName, status, paramsJson,
 					resultJson, errorText, elapsedMs, processed, total, progressText, summaryKey, summaryValue,
 					startedTime, finishedTime, createdTime, updatedTime);
 		}
 	}
 
 	private static final String JOB_SELECT =
-			"SELECT j.*, a.name operation_name, a.title operation_title FROM job j " +
+			"SELECT j.*, a.name operation_name FROM job j " +
 			"LEFT JOIN operation a ON a.class_name = j.class_name";
 	private static final String RUN_SELECT =
-			"SELECT r.*, j.class_name, j.name job_name, a.name operation_name, a.title operation_title FROM run r " +
+			"SELECT r.*, j.class_name, j.name job_name, a.name operation_name FROM run r " +
 			"JOIN job j ON j.id = r.job_id LEFT JOIN operation a ON a.class_name = j.class_name";
 
 	private final JdbcTemplate jdbc;
@@ -68,13 +68,13 @@ public class OperationRepository {
 		jdbc.update("DELETE FROM operation WHERE valid = 0 AND class_name NOT IN (SELECT class_name FROM job)");
 	}
 
-	public void upsertOperation(String className, String name, String title, String paramsJson, String resultType) {
-		jdbc.update("INSERT INTO operation(class_name, name, title, params_json, result_type, valid, updated_time) " +
-				"VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP) " +
-				"ON CONFLICT(class_name) DO UPDATE SET name = excluded.name, title = excluded.title, " +
+	public void upsertOperation(String className, String name, String paramsJson, String resultType) {
+		jdbc.update("INSERT INTO operation(class_name, name, params_json, result_type, valid, updated_time) " +
+				"VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP) " +
+				"ON CONFLICT(class_name) DO UPDATE SET name = excluded.name, " +
 				"params_json = excluded.params_json, result_type = excluded.result_type, valid = 1, " +
 				"updated_time = CURRENT_TIMESTAMP",
-				className, name, title, paramsJson, resultType);
+				className, name, paramsJson, resultType);
 	}
 
 	public List<OperationItem> getOperations() {
@@ -165,11 +165,11 @@ public class OperationRepository {
 	}
 
 	private static final RowMapper<OperationItem> OPERATION_MAPPER = (rs, n) -> new OperationItem(
-			rs.getString("class_name"), rs.getString("name"), rs.getString("title"), rs.getString("params_json"),
+			rs.getString("class_name"), rs.getString("name"), rs.getString("params_json"),
 			rs.getString("result_type"), rs.getInt("valid") == 1, ts(rs, "updated_time"));
 
 	private static final RowMapper<JobItem> JOB_MAPPER = (rs, n) -> new JobItem(
-			rs.getLong("id"), rs.getString("class_name"), rs.getString("operation_name"), rs.getString("operation_title"),
+			rs.getLong("id"), rs.getString("class_name"), rs.getString("operation_name"),
 			rs.getString("name"), rs.getString("description"), rs.getString("labels"), rs.getString("params_json"),
 			ts(rs, "created_time"), ts(rs, "updated_time"));
 
@@ -177,7 +177,7 @@ public class OperationRepository {
 		String resultJson = decompress(rs.getString("result_json"));
 		Map.Entry<String, Object> summary = firstPrimitiveEntry(resultJson);
 		return new RunItem(rs.getLong("id"), rs.getLong("job_id"), rs.getString("class_name"),
-				rs.getString("operation_name"), rs.getString("operation_title"), rs.getString("job_name"),
+				rs.getString("operation_name"), rs.getString("job_name"),
 				rs.getString("status"), rs.getString("params_json"), resultJson, rs.getString("error_text"),
 				rs.getLong("elapsed_ms"), null, null, null, summary == null ? null : summary.getKey(),
 				summary == null ? null : summary.getValue(), ts(rs, "started_time"), ts(rs, "finished_time"),

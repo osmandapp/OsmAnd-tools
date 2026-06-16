@@ -58,7 +58,7 @@ public class OperationRegistry {
 			}
 			Class<?> paramsType = ResolvableType.forClass(targetClass).as(Operation.class).getGeneric(0).resolve();
 			List<ParamDescriptor> params = describeParams(paramsType);
-			repository.upsertOperation(targetClass.getName(), annotation.name(), annotation.title(),
+			repository.upsertOperation(targetClass.getName(), annotation.name(),
 					toJson(params), paramsType == null ? "" : paramsType.getName());
 			descriptors.put(targetClass.getName(), new OperationDescriptor(bean, paramsType, params));
 		}

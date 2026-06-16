@@ -12,6 +12,5 @@ import org.springframework.stereotype.Component;
 @Component
 public @interface AdminOperation {
 	String name();
-	String title() default "";
 }
 

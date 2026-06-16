@@ -50,7 +50,7 @@ public class OperationRepositoryConfiguration {
 				return;
 			}
 			jdbc.execute("CREATE TABLE IF NOT EXISTS operation (" +
-					"class_name TEXT PRIMARY KEY, name TEXT NOT NULL, title TEXT, params_json TEXT NOT NULL, " +
+					"class_name TEXT PRIMARY KEY, name TEXT NOT NULL, params_json TEXT NOT NULL, " +
 					"result_type TEXT NOT NULL, valid INTEGER NOT NULL DEFAULT 1, " +
 					"updated_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)");
 			jdbc.execute("CREATE TABLE IF NOT EXISTS job (" +
