@@ -1,5 +1,6 @@
 package net.osmand.server.api.services;
 
+import net.osmand.CollatorStringMatcher;
 import net.osmand.PlatformUtil;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.*;
@@ -12,6 +13,7 @@ import net.osmand.osm.*;
 import net.osmand.osm.edit.Entity;
 import net.osmand.search.SearchUICore;
 import net.osmand.search.core.*;
+import net.osmand.server.api.repo.CloudUserFilesRepository;
 import net.osmand.server.utils.MapPoiTypesTranslator;
 import net.osmand.util.Algorithms;
 import net.osmand.util.LocationParser;
@@ -41,6 +43,8 @@ import static net.osmand.data.Amenity.OPENING_HOURS;
 import static net.osmand.data.MapObject.unzipContent;
 import static net.osmand.gpx.GPXUtilities.AMENITY_PREFIX;
 import static net.osmand.search.SearchUICore.*;
+import static net.osmand.server.api.services.UserdataService.FILE_TYPE_GPX;
+import static net.osmand.server.api.services.UserdataService.INFO_EXT;
 import static net.osmand.server.controllers.pub.GeojsonClasses.*;
 import static net.osmand.shared.gpx.GpxUtilities.OSM_PREFIX;
 import static net.osmand.util.LocationParser.parseOpenLocationCode;
@@ -59,6 +63,9 @@ public class SearchService {
 
     @Autowired
     WikiService wikiService;
+
+	@Autowired
+	UserdataService userdataService;
     
     OsmandRegions osmandRegions;
     
@@ -215,9 +222,9 @@ public class SearchService {
         }
     }
 
-	public List<Feature> search(SearchContext ctx, String timeZone) throws IOException {
+	public List<Feature> search(SearchContext ctx, int userId, String timeZone) throws IOException {
 		long tm = System.currentTimeMillis();
-		SearchResults searchResults = getImmediateSearchResults(ctx, new SearchOption(false, null, null, true, (ObjectType[]) null), null);
+		SearchResults searchResults = getImmediateSearchResults(ctx, userId, new SearchOption(false, null, null, true, (ObjectType[]) null), null);
 		List<SearchResult> res = searchResults.results();
 		if (System.currentTimeMillis() - tm > 1000) {
             BinaryMapIndexReaderStats.SearchStat stat = searchResults.settings != null ? searchResults.settings.getStat() : null;
@@ -233,7 +240,12 @@ public class SearchService {
 		return !features.isEmpty() ? features : Collections.emptyList();
 	}
 
-    public SearchResults getImmediateSearchResults(SearchContext ctx, SearchOption option,
+	public SearchResults getImmediateSearchResults(SearchContext ctx, SearchOption option,
+	                                               Consumer<List<SearchResult>> consumerInContext) throws IOException {
+		return getImmediateSearchResults(ctx, 0, option, consumerInContext);
+	}
+
+	public SearchResults getImmediateSearchResults(SearchContext ctx, int userId, SearchOption option,
                                                    Consumer<List<SearchResult>> consumerInContext) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return new SearchResults(Collections.emptyList());
@@ -275,7 +287,9 @@ public class SearchService {
                             (option.queryIsCompleted ? DELIMITER : ""),
 		            new LatLon(ctx.lat, ctx.lon));
             resultCollection = addPoiCategoriesToSearchResult(resultCollection, ctx.text, ctx.locale, searchUICore);
-
+	        if (userId > 0) {
+		        resultCollection.addSearchResults(getTacksSearchResult(ctx.text, userId, searchUICore), true, true);
+	        }
 	        List<SearchResult> res = resultCollection != null ? resultCollection.getCurrentSearchResults() : Collections.emptyList();
 	        res = filterBrandsOutsideBBox(res, ctx.northWest, ctx.southEast, ctx.locale, ctx.lat, ctx.lon, ctx.baseSearch);
 	        res = res.size() > TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB ? res.subList(0, TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB) : res;
@@ -453,6 +467,25 @@ public class SearchService {
         }
         return resultCollection;
     }
+
+	private List<SearchResult> getTacksSearchResult(String text, int userId, SearchUICore searchUICore) {
+		List<CloudUserFilesRepository.UserFileNoData> userFileNoDataList = userdataService.generateFiles(userId,
+						null, false, false, Set.of(FILE_TYPE_GPX))
+				.uniqueFiles.stream().filter(uf -> !uf.name.endsWith(INFO_EXT)).toList();
+		SearchPhrase phrase = searchUICore.resetPhrase(text);
+		List<SearchResult> searchResults = new ArrayList<>();
+		for (CloudUserFilesRepository.UserFileNoData userFileNoData : userFileNoDataList) {
+			SearchResult searchResult = new SearchResult(phrase);
+			searchResult.objectType = ObjectType.GPX_TRACK;
+			searchResult.localeName = userFileNoData.name;
+			SearchPhrase.NameStringMatcher matcher = new SearchPhrase.NameStringMatcher(phrase.getFullSearchPhrase().trim(),
+					CollatorStringMatcher.StringMatcherMode.CHECK_CONTAINS);
+			if (matcher.matches(searchResult.localeName)) {
+				searchResults.add(searchResult);
+			}
+		}
+		return searchResults;
+	}
 
     private List<SearchResult> filterBrandsOutsideBBox(List<SearchResult> res, String northWest, String southEast, String locale, double lat, double lon, boolean baseSearch) throws IOException {
         if (northWest != null && southEast != null) {
@@ -1192,7 +1225,9 @@ public class SearchService {
 
 	public Feature getFeature(SearchResult result, String timeZone) {
 		Feature feature;
-		if (result.objectType == ObjectType.POI) {
+		if (result.objectType == ObjectType.GPX_TRACK) {
+			feature = getGpxFeature(result);
+		} else if (result.objectType == ObjectType.POI) {
 			feature = getPoiFeature(result, timeZone);
 		} else {
 			Geometry geometry = Geometry.point(result.location != null ? result.location : new LatLon(0, 0));
@@ -1215,6 +1250,13 @@ public class SearchService {
 				feature.prop(entry.getKey(), entry.getValue());
 			}
 		}
+		return feature;
+	}
+
+	private Feature getGpxFeature(SearchResult result) {
+		Feature feature = new Feature(Geometry.point(new LatLon(0, 0)));
+		feature.prop(PoiTypeField.NAME.getFieldName(), result.localeName);
+		feature.prop(PoiTypeField.TYPE.getFieldName(), result.objectType);
 		return feature;
 	}
 
