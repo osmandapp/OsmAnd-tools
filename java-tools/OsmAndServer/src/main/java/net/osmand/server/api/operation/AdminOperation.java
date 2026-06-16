@@ -1,4 +1,4 @@
-package net.osmand.server.api.action;
+package net.osmand.server.api.operation;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -10,8 +10,8 @@ import org.springframework.stereotype.Component;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 @Component
-public @interface UiAction {
-    String name();
-    String title() default "";
+public @interface AdminOperation {
+	String name();
+	String title() default "";
 }
 

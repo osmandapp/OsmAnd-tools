@@ -116,8 +116,8 @@ spring:
   searchtestdatasource:
     url:
     driverClassname:
-  actiondatasource:
-    url: 
+  operationdatasource:
+    url: jdbc:sqlite:${osmand.files.location}/operation.db
     driverClassname: org.sqlite.JDBC
   monitordatasource:
     url:
