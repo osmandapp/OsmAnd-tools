@@ -10,16 +10,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -75,6 +66,10 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	private RTree transportStopsTree;
 	private Map<Long, Relation> masterRoutes = new HashMap<Long, Relation>();
 	private Connection gtfsConnection;
+
+	private Map<Long, List<TransportStop>> mergedPlatformStopsByRouteId = new HashMap<Long, List<TransportStop>>();
+	private Map<Long, TLongArrayList> connectedStopIdsByPlatformId = new HashMap<Long, TLongArrayList>();
+	private Map<Long, TLongArrayList> connectedRouteIdsByPlatformId = new HashMap<Long, TLongArrayList>();
 
 	private static final long TEST_ROUTE_ID_MISSING_STOPS = 192037l;
 	
@@ -152,7 +147,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					String nameEn = rs.getString(5);
 					Map<String, String> names = gson.fromJson(rs.getString(6),t);
 					if (nameEn != null && nameEn.equals(Junidecode.unidecode(name))) {
-						nameEn = null;	
+						nameEn = null;
 					}
 					String deletedRoutesStr = rs.getString(7);
 					if (deletedRoutes == null) {
@@ -193,8 +188,17 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 						Long routeOffset = transportRoutes.get(routeId);
 						routesOffsets.add(routeOffset);
 					}
+					TLongArrayList connectedStopIds = connectedStopIdsByPlatformId.get(id);
+					if (connectedStopIds == null) {
+						connectedStopIds = new TLongArrayList();
+					}
+					TLongArrayList connectedRouteIds = connectedRouteIdsByPlatformId.get(id);
+					if (connectedRouteIds == null) {
+						connectedRouteIds = new TLongArrayList();
+					}
 					rset.close();
-					writer.writeTransportStop(id, x24, y24, name, nameEn, names, stringTable, routesOffsets, routesIds, deletedRoutes, exits);
+					writer.writeTransportStop(id, x24, y24, name, nameEn, names, stringTable, routesOffsets, routesIds,
+							deletedRoutes, connectedStopIds, connectedRouteIds, exits);
 				} else {
 					log.error("Something goes wrong with transport id = " + id); //$NON-NLS-1$
 				}
@@ -235,10 +239,22 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					if (stop.getDeletedRoutesIds() != null) {
 						deletedRoutes.addAll(stop.getDeletedRoutesIds());
 					}
+					TLongArrayList connectedStopIds = new TLongArrayList();
+					if (stop.getConnectedStopIds() != null) {
+						for (long stopId : stop.getConnectedStopIds()) {
+							connectedStopIds.add(stopId);
+						}
+					}
+					TLongArrayList connectedRouteIds = new TLongArrayList();
+					if (stop.getConnectedRouteIds() != null) {
+						for (long routeId : stop.getConnectedRouteIds()) {
+							connectedRouteIds.add(routeId);
+						}
+					}
 					Map<Entity.EntityId, List<TransportStopExit>> exits = new HashMap<>();
 					exits.put(new EntityId(Entity.EntityType.NODE, stop.getId()), stop.getExits());
-					writer.writeTransportStop(id, x24, y24, stop.getName(), stop.getEnName(false), stop.getNamesMap(false), 
-							stringTable, routesOffsets, routesIds, deletedRoutes, exits);
+					writer.writeTransportStop(id, x24, y24, stop.getName(), stop.getEnName(false), stop.getNamesMap(false),
+							stringTable, routesOffsets, routesIds, deletedRoutes, connectedStopIds, connectedRouteIds, exits);
 				} else {
 					log.error("Something goes wrong with transport id = " + id);
 				}
@@ -273,7 +289,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			for (RelationMember entry : e.getMembers()) {
 				String role = entry.getRole();
 				if ("platform".equals(role) || "stop".equals(role)) {
-					if (entry.getEntity() != null && 
+					if (entry.getEntity() != null &&
 							entry.getEntity().getTag(OSMTagKey.NAME) == null) {
 						stopAreas.put(entry.getEntityId(), e);
 					}
@@ -281,7 +297,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			}
 			List<TransportStopExit> stopExitList = new ArrayList<>();
 			for (RelationMember entryAlt : e.getMembers()) {
-				if (entryAlt.getEntity() != null && 
+				if (entryAlt.getEntity() != null &&
 						("subway_entrance".equals(entryAlt.getEntity().getTag(OSMTagKey.RAILWAY)))) {
 					TransportStopExit exit = new TransportStopExit();
 					exit.setId(entryAlt.getEntity().getId());
@@ -325,10 +341,10 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		stat.executeUpdate("create table transport_route_stop (stop bigint, route bigint, ord int, primary key (route, ord))");
 		stat.executeUpdate("create index transport_route_stop_stop on transport_route_stop (stop)");
 		stat.executeUpdate("create index transport_route_stop_route on transport_route_stop (route)");
-		
+
 		stat.executeUpdate("create table transport_route_geometry (geometry bytes, route bigint, ind int)");
 		stat.executeUpdate("create index transport_route_geometry_route on transport_route_geometry (route)");
-		
+
 
 		stat.executeUpdate("create table transport_stop (id bigint primary key, latitude double, longitude double, name varchar(1024), name_en varchar(1024), names varchar(8096), deleted_routes varchar(1024))");
 		stat.executeUpdate("create index transport_stop_id on transport_stop (id)");
@@ -356,7 +372,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		pStatements.put(transRouteStopsStat, 0);
 		pStatements.put(transStopsStat, 0);
 		pStatements.put(transRouteGeometryStat, 0);
-		
+
 		if(gtfsConnection != null) {
 			boolean hasTripMetadataLoc = false;
 			ResultSet columns = gtfsConnection.createStatement().executeQuery("PRAGMA table_info(trips)");
@@ -370,7 +386,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				indexBboxForGtfsTrips();
 			}
 		}
-		
+
 	}
 
 
@@ -386,11 +402,11 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			String[] colNames = s.substring(spl+1).split(",");
 			for(String colName : colNames) {
 				String indName = tableName + "_" + colName;
-				String ddl = "CREATE INDEX IF NOT EXISTS " + indName + " on " + tableName + " (" + colName + ")"; 
+				String ddl = "CREATE INDEX IF NOT EXISTS " + indName + " on " + tableName + " (" + colName + ")";
 				log.info(ddl);
 				gtfsConnection.createStatement().execute(ddl);
 			}
-			
+
 		}
 		log.info("Alter table and add columns");
 		for (String s : new String[] { "firstStopLat", "firstStopLon", "minLat", "maxLat", "minLon", "maxLon" }) {
@@ -403,10 +419,10 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 		PreparedStatement ins = gtfsConnection
 				.prepareStatement("UPDATE trips SET firstStopLat = ?, firstStopLon = ?, minLat = ?, maxLat = ?, minLon = ?, maxLon = ? where trip_id = ?");
-		
+
 		ResultSet selectTimes = gtfsConnection.createStatement().executeQuery(
 				"SELECT t.trip_id, t.stop_sequence, s.stop_lat, s.stop_lon from stop_times t "
-						+ "join stops s on s.stop_id = t.stop_id order by t.trip_id"); // 
+						+ "join stops s on s.stop_id = t.stop_id order by t.trip_id"); //
 		QuadRect bbox = null;
 		LatLon start = null;
 		String tripId = null;
@@ -468,7 +484,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		transRouteStat.setInt(7, route.getAvgBothDistance());
 		transRouteStat.setString(8, route.getColor());
 		addBatch(transRouteStat);
-		
+
 		ByteArrayOutputStream ous = new ByteArrayOutputStream();
 		if (route.getForwardWays() != null) {
 			int ind = 0;
@@ -509,32 +525,42 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	private void writeRouteStops(TransportRoute r, List<TransportStop> stops) throws SQLException {
 		int i = 0;
 		for (TransportStop s : stops) {
-			if (!visitedStops.contains(s.getId())) {
-				Gson gson = new Gson();
-				transStopsStat.setLong(1, s.getId());
-				transStopsStat.setDouble(2, s.getLocation().getLatitude());
-				transStopsStat.setDouble(3, s.getLocation().getLongitude());
-				transStopsStat.setString(4, s.getName());
-				transStopsStat.setString(5, s.getEnName(false));
-				Map<String, String> namesMap = s.getNamesMap(false);
-				transStopsStat.setString(6, namesMap.size() > 0 ? gson.toJson(namesMap) : "{}");
-				transStopsStat.setString(7, gson.toJson(s.getDeletedRoutesIds()));
-				int x = (int) MapUtils.getTileNumberX(24, s.getLocation().getLongitude());
-				int y = (int) MapUtils.getTileNumberY(24, s.getLocation().getLatitude());
-				addBatch(transStopsStat);
-				try {
-					transportStopsTree.insert(new LeafElement(new Rect(x, y, x, y), s.getId()));
-				} catch (RTreeInsertException e) {
-					throw new IllegalArgumentException(e);
-				} catch (IllegalValueException e) {
-					throw new IllegalArgumentException(e);
-				}
-				visitedStops.add(s.getId());
-			}
+			writeTransportStop(s);
 			transRouteStopsStat.setLong(1, r.getId());
 			transRouteStopsStat.setLong(2, s.getId());
 			transRouteStopsStat.setInt(3, i++);
 			addBatch(transRouteStopsStat);
+		}
+		List<TransportStop> platformStops = mergedPlatformStopsByRouteId.get(r.getId());
+		if (platformStops != null) {
+			for (TransportStop stop : platformStops) {
+				writeTransportStop(stop);
+			}
+		}
+	}
+
+	private void writeTransportStop(TransportStop s) throws SQLException {
+		if (!visitedStops.contains(s.getId())) {
+			Gson gson = new Gson();
+			transStopsStat.setLong(1, s.getId());
+			transStopsStat.setDouble(2, s.getLocation().getLatitude());
+			transStopsStat.setDouble(3, s.getLocation().getLongitude());
+			transStopsStat.setString(4, s.getName());
+			transStopsStat.setString(5, s.getEnName(false));
+			Map<String, String> namesMap = s.getNamesMap(false);
+			transStopsStat.setString(6, namesMap.size() > 0 ? gson.toJson(namesMap) : "{}");
+			transStopsStat.setString(7, gson.toJson(s.getDeletedRoutesIds()));
+			int x = (int) MapUtils.getTileNumberX(24, s.getLocation().getLongitude());
+			int y = (int) MapUtils.getTileNumberY(24, s.getLocation().getLatitude());
+			addBatch(transStopsStat);
+			try {
+				transportStopsTree.insert(new LeafElement(new Rect(x, y, x, y), s.getId()));
+			} catch (RTreeInsertException e) {
+				throw new IllegalArgumentException(e);
+			} catch (IllegalValueException e) {
+				throw new IllegalArgumentException(e);
+			}
+			visitedStops.add(s.getId());
 		}
 	}
 
@@ -553,7 +579,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			PreparedStatement selectTransportData = mapConnection.prepareStatement("SELECT S.stop, " + //$NON-NLS-1$
 					"  A.latitude,  A.longitude, A.name, A.name_en, A.names, A.deleted_routes " + //$NON-NLS-1$
 					"FROM transport_route_stop S INNER JOIN transport_stop A ON A.id = S.stop WHERE S.route = ? ORDER BY S.ord asc"); //$NON-NLS-1$
-			PreparedStatement selectTransportRouteGeometry = mapConnection.prepareStatement("SELECT S.geometry " + 
+			PreparedStatement selectTransportRouteGeometry = mapConnection.prepareStatement("SELECT S.geometry " +
 					"FROM transport_route_geometry S WHERE S.route = ? order by S.ind"); //$NON-NLS-1$
 
 			long transportIndexOffset = writer.startWriteTransportIndex(regionName);
@@ -574,7 +600,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				String routeName = rs.getString(3);
 				String routeEnName = rs.getString(4);
 				if (routeEnName != null && routeEnName.equals(Junidecode.unidecode(routeName))) {
-					routeEnName = null;	
+					routeEnName = null;
 				}
 				String ref = rs.getString(5);
 				String operator = rs.getString(6);
@@ -643,7 +669,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 			writer.writeIncompleteTransportRoutes(incompleteRoutesMap.valueCollection(), stringTable, transportIndexOffset);
 			writer.writeTransportStringTable(stringTable);
-			
+
 			writer.endWriteTransportIndex();
 			writer.flush();
 			log.info(gtfsStats);
@@ -740,7 +766,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					char[] newRef = new char[subnames.length];
 					for (int i = 0; i < subnames.length; i++) {
 						if (!Algorithms.isEmpty(subnames[i])) {
-							newRef[i] = subnames[i].charAt(0);	
+							newRef[i] = subnames[i].charAt(0);
 						}
 					}
 					ref = newRef.length <= 5 ? new String(newRef).toUpperCase() : new String(newRef).substring(0, 4).toUpperCase();
@@ -820,7 +846,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				insertNode = insertNodeNew;
 			}
 		}
-		if (insertNode != null && 
+		if (insertNode != null &&
 				MapUtils.getDistance(insertNode.getLatLon(), loc) > MISSING_STOP_DISTANCE_THRESHOLD) {
 			TransportStop stp = new TransportStop();
 			stp.setId(-wayId);
@@ -847,19 +873,19 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	
+
 	private void addIncompleteRoute(long routeId, TransportRoute t) {
 		incompleteRoutesMap.put(routeId, t);
 	}
-	
+
 	public boolean isRouteIncomplete(long routeId) {
 		return incompleteRoutesMap.contains(routeId);
 	}
 
-	
+
 
 	// returns array of stops (as node) after which and before there is a missing stop
-	// [<stop-next-missing>, <stop-before-missing>, <stop-next-missing-2>, <stop-before-missing-2>, ...] 
+	// [<stop-next-missing>, <stop-before-missing>, <stop-next-missing-2>, <stop-before-missing-2>, ...]
 	// null means missing is first stop or last stop and it should be inserted before 2nd element
 	private List<Entity> getIncompleteStops(Relation rel, TransportRoute directRoute) {
 		List<Entity> missingStopsAfterStop = new ArrayList<Entity>();
@@ -890,7 +916,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		}
 		return missingStopsAfterStop;
 	}
-	
+
 
 	private boolean hasRelationIncompleteWays(Relation rel) {
 		boolean relationHasIncompleteWays = false;
@@ -930,7 +956,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			ResultSet rs = gtfsSelectRoute.executeQuery();
 			String routeId = null, routeShortName = null, routeLongName = null;
 			TransportSchedule schedule = new TransportSchedule();
-			TIntArrayList timeDeparturesFirst = new TIntArrayList(); 
+			TIntArrayList timeDeparturesFirst = new TIntArrayList();
 			while (rs.next()) {
 				String nrouteId = rs.getString(1);
 				if (!Algorithms.objectEquals(routeId, nrouteId)) {
@@ -951,7 +977,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					TIntArrayList stopIntervals = new TIntArrayList(directStops.size());
 					TIntArrayList waitIntervals = new TIntArrayList(directStops.size());
 					int ftime = 0, ptime = 0;
-					
+
 					while (nrs.next()) {
 						int arrivalTime = parseTime(nrs.getString(1));
 						int depTime = parseTime(nrs.getString(2));
@@ -1100,7 +1126,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			Entity e = entry.getEntity();
 			icc.translitJapaneseNames(e);
 			icc.translitChineseNames(e);
-			if (role.startsWith("platform")) {
+			if (isPlatformRelationMember(e, role)) {
 				platformsAndStops.add(e);
 				platforms.add(e);
 			} else if (role.startsWith("stop")) {
@@ -1112,7 +1138,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				}
 			}
 		}
-		mergePlatformsStops(platformsAndStops, platforms, stops, platformNames);
+		mergePlatformsStops(route, platformsAndStops, platforms, stops, platformNames);
 		if (platformsAndStops.isEmpty()) {
 			return true; // nothing to get from this relation - there is no stop
 		}
@@ -1129,14 +1155,20 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			if(genericStopName != null) {
 				stop.copyNames(genericStopName.getTag(OSMTagKey.NAME), genericStopName.getTag(OSMTagKey.NAME_EN), genericStopName.getNameTags(), true);
 			}
-			
+
 			route.getForwardStops().add(stop);
 		}
 
 		return true;
 	}
 
-	private void mergePlatformsStops(List<Entity> platformsAndStopsToProcess, List<Entity> platforms, List<Entity> stops, 
+	private boolean isPlatformRelationMember(Entity entity, String role) {
+		boolean isTransportPlatform = "platform".equals(entity.getTag(OSMTagKey.PUBLIC_TRANSPORT))
+				|| "platform".equals(entity.getTag(OSMTagKey.RAILWAY));
+		return role.startsWith("platform") || role.isEmpty() && isTransportPlatform;
+	}
+
+	private void mergePlatformsStops(TransportRoute route, List<Entity> platformsAndStopsToProcess, List<Entity> platforms, List<Entity> stops,
 			Map<EntityId, Entity> nameReplacement) {
 		// walk through platforms  and verify names from the second:
 		for(Entity platform : platforms) {
@@ -1160,12 +1192,50 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					dist = MapUtils.getDistance(stop.getLatLon(), loc);
 				}
 			}
-			if(replaceStop != null) {
+			if (replaceStop != null) {
 				platformsAndStopsToProcess.remove(platform);
+				if (!EntityId.valueOf(platform).equals(EntityId.valueOf(replaceStop))) {
+					addMergedPlatformStop(route, platform, replaceStop);
+				}
 				if (!Algorithms.isEmpty(platform.getTag(OSMTagKey.NAME))) {
 					nameReplacement.put(EntityId.valueOf(replaceStop), platform);
 				}
 			}
+		}
+	}
+
+	private void addMergedPlatformStop(TransportRoute route, Entity platform, Entity stop) {
+		TransportStop platformStop = EntityParser.parseTransportStop(platform);
+		TransportStop routeStop = EntityParser.parseTransportStop(stop);
+		Long platformId = platformStop.getId();
+		Long routeStopId = routeStop.getId();
+		if (platformId == null || routeStopId == null) {
+			return;
+		}
+		long routeId = route.getId();
+		platformStop.addConnectedStopId(routeStopId);
+		platformStop.addConnectedRouteId(routeId);
+		List<TransportStop> platformStops = mergedPlatformStopsByRouteId.get(route.getId());
+		if (platformStops == null) {
+			platformStops = new ArrayList<TransportStop>();
+			mergedPlatformStopsByRouteId.put(route.getId(), platformStops);
+		}
+		platformStops.add(platformStop);
+		TLongArrayList connectedStopIds = connectedStopIdsByPlatformId.get(platformId);
+		if (connectedStopIds == null) {
+			connectedStopIds = new TLongArrayList();
+			connectedStopIdsByPlatformId.put(platformId, connectedStopIds);
+		}
+		if (!connectedStopIds.contains(routeStopId)) {
+			connectedStopIds.add(routeStopId);
+		}
+		TLongArrayList connectedRouteIds = connectedRouteIdsByPlatformId.get(platformId);
+		if (connectedRouteIds == null) {
+			connectedRouteIds = new TLongArrayList();
+			connectedRouteIdsByPlatformId.put(platformId, connectedRouteIds);
+		}
+		if (!connectedRouteIds.contains(routeId)) {
+			connectedRouteIds.add(routeId);
 		}
 	}
 
@@ -1259,7 +1329,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		return true;
 	}
 
-	
+
 	private static class GtfsInfoStats {
 		public int avgWaitDiff30Sec;
 		public int avgStopDiff30Sec;
@@ -1272,5 +1342,5 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					+ ", errorsTimeParsing=" + errorsTimeParsing + ", successTripsParsing=" + successTripsParsing
 					+ ", errorsTripsStopCounts=" + errorsTripsStopCounts + "]";
 		}
-	}	
+	}
 }

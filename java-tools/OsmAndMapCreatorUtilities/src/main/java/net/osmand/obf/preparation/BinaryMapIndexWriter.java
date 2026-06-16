@@ -30,6 +30,7 @@ import org.apache.commons.logging.LogFactory;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.Message;
+import com.google.protobuf.UnknownFieldSet;
 import com.google.protobuf.WireFormat;
 import com.google.protobuf.WireFormat.FieldType;
 
@@ -1583,7 +1584,8 @@ public class BinaryMapIndexWriter {
 	}
 
 	public void writeTransportStop(long id, int x24, int y24, String name, String nameEn, Map<String, String> names, Map<String, Integer> stringTable,
-			TLongArrayList routesOffsets, TLongArrayList routesIds, TLongArrayList deletedRoutes, Map<Entity.EntityId, List<TransportStopExit>> exits) throws IOException {
+			TLongArrayList routesOffsets, TLongArrayList routesIds, TLongArrayList deletedRoutes, TLongArrayList connectedStopIds,
+			TLongArrayList connectedRouteIds, Map<Entity.EntityId, List<TransportStopExit>> exits) throws IOException {
 		checkPeekState(TRANSPORT_STOPS_TREE);
 
 		Bounds bounds = stackBounds.peek();
@@ -1618,6 +1620,9 @@ public class BinaryMapIndexWriter {
 		for (long i : deletedRoutes.toArray()) {
 			ts.addDeletedRoutesIds(i);
 		}
+		UnknownFieldSet.Builder unknownFields = UnknownFieldSet.newBuilder();
+		boolean hasUnknownFields = addTransportStopIds(unknownFields, TransportStop.CONNECTED_STOP_IDS_FIELD_NUMBER, connectedStopIds);
+		hasUnknownFields |= addTransportStopIds(unknownFields, TransportStop.CONNECTED_ROUTE_IDS_FIELD_NUMBER, connectedRouteIds);
 		List<TransportStopExit> list = exits.get(new EntityId(EntityType.NODE, id));
 		if (list != null) {
 			for (TransportStopExit e : list) {
@@ -1631,11 +1636,26 @@ public class BinaryMapIndexWriter {
 				ts.addExits(exit);
 			}
 		}
+		if (hasUnknownFields) {
+			ts.setUnknownFields(unknownFields.build());
+		}
 
 
 		codedOutStream.writeMessageNoTag(ts.build());
 	}
-	
+
+	private boolean addTransportStopIds(UnknownFieldSet.Builder unknownFields, int fieldNumber, TLongArrayList ids) {
+		if (ids == null || ids.size() == 0) {
+			return false;
+		}
+		UnknownFieldSet.Field.Builder field = UnknownFieldSet.Field.newBuilder();
+		for (long id : ids.toArray()) {
+			field.addVarint(id);
+		}
+		unknownFields.addField(fieldNumber, field.build());
+		return true;
+	}
+
 	public void writeIncompleteTransportRoutes(Collection<net.osmand.data.TransportRoute> incompleteRoutes, Map<String, Integer> stringTable, long transportIndexOffset) throws IOException {
 		checkPeekState(TRANSPORT_INDEX_INIT);
 		OsmandOdb.IncompleteTransportRoutes.Builder irs = OsmandOdb.IncompleteTransportRoutes.newBuilder();
