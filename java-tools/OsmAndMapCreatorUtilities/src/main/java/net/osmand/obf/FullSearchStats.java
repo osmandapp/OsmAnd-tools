@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Map;
 
 import net.osmand.binary.CommonWords;
-import net.osmand.binary.NameIndexInspector.ValueFreq;
+import net.osmand.binary.NameIndexReader.ValueFreq;
 import net.osmand.data.Building;
 import net.osmand.data.City;
 import net.osmand.data.City.CityType;

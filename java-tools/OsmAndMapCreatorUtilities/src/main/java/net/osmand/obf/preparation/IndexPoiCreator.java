@@ -714,13 +714,14 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 			if (useInMemoryCreator) {
 				List<PoiData> poiData = entry.getKey().poiData;
-				Collections.sort(poiData, new Comparator<PoiData>() {
-
-					@Override
-					public int compare(PoiData o1, PoiData o2) {
-						return -Integer.compare(o1.getRating(), o2.getRating());
-					}
-				});
+				// don't change order as we reference from name index!
+//				Collections.sort(poiData, new Comparator<PoiData>() {
+//
+//					@Override
+//					public int compare(PoiData o1, PoiData o2) {
+//						return -Integer.compare(o1.getRating(), o2.getRating());
+//					}
+//				});
 
 				for (PoiData poi : poiData) {
 					int x31 = poi.x;
@@ -1070,6 +1071,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				if (prevTree.getNode().poiData == null) {
 					prevTree.getNode().poiData = new ArrayList<PoiData>();
 				}
+				int poiIndInBlock = prevTree.getNode().poiData.size() ;
 				PoiData poiData = new PoiData();
 				poiData.x = x;
 				poiData.y = y;
@@ -1079,7 +1081,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				poiData.additionalTags.putAll(additionalTags);
 				poiData.tagGroups.addAll(tagGroupIds);
 				prevTree.getNode().poiData.add(poiData);
-				int poiIndInBlock = prevTree.getNode().poiData.size();
 				putPoiObjectPrefix(namesIndex, prevTree.getNode(), poiIndInBlock, additionalTags.get(nameRuleType), 
 						additionalTags.get(nameEnRuleType), otherNames, idNames, settings);
 			} else {

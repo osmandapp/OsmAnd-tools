@@ -83,16 +83,23 @@ public class NameIndexCreator<T> {
 		public SuffixDictionary<T> suffixes = null;
 
 		
-		public void addToken(T object, String token, Collection<String> allNames) {
+		public boolean addToken(T object, String token, Collection<String> allNames) {
 			NamedObject<T> last = namedObjects.size() == 0  ? null : namedObjects.get(namedObjects.size() -1 );
-			if(last == null || last.object != object) {
+			Set<String> setNames = allNames.size() == 1 ? Collections.emptySet() : new TreeSet<String>(allNames);
+			if (last == null || last.object != object) {
 				// reuse last
 				last = new NamedObject<>();
 				last.object = object;
 				namedObjects.add(last);
+			} else {
+				for (NameObjectSingleNameIndex st : last.singleNames) {
+					if (st.token.equals(token) && st.allNames.equals(setNames)) {
+						return false;
+					}
+				}
 			}
-			last.singleNames.add(new NameObjectSingleNameIndex(token, allNames.size() == 1 ? Collections.emptySet() : 
-				new TreeSet<String>(allNames)));
+			last.singleNames.add(new NameObjectSingleNameIndex(token, setNames));
+			return true;
 		}
 		
 		// COMMON WORDS
@@ -274,12 +281,16 @@ public class NameIndexCreator<T> {
 				entry.prefix = prefix;
 				namesIndex.put(prefix, entry);
 			}
+			boolean added = entry.addToken(obj, token, splitName);
+			if (!added) {
+				continue;
+			}
 			tokenFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
 			boolean c = CommonWords.isCommon(token);
 			if (c && nonCommonName) {
 				commonNonIndexedFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
 			}
-			entry.addToken(obj, token, splitName);
+			
 		}		
 	}
 
