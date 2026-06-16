@@ -105,7 +105,7 @@ public class BinaryInspector {
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 					//"-vsearchinspect", // "-vsearchglobalonly", // "-vprefix=hh" // search index extended anlays 
-//					"-vaddress",   
+					"-vaddress",   
 //					"-vcities", "-vstreetgroups", "-vcitynames",
 //					"-vstreets", //  "-vbuildings",// "-vintersections",
 //					"-lang=ru",
@@ -117,7 +117,7 @@ public class BinaryInspector {
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
-					System.getProperty("maps.dir") + "Ukraine_kyiv-city_europe_2.obf",
+					System.getProperty("maps.dir") + "Map.obf",
 //					System.getProperty("maps.dir") + "Germany_bayern_lower-franconia_europe_2.obf",
 //					System.getProperty("maps.dir") + "Germany_bayern_lower-bavaria_europe_2.obf",
 //					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_tubingen_europe_2.obf",
@@ -1026,7 +1026,9 @@ public class BinaryInspector {
 	private void printAdddrIndexStats(BinaryMapIndexReader index, AddressRegion region) throws IOException {
 		AddressStats as = vInfo.addressStats;
 		NameIndexReader fullNameIndex = index.readFullNameIndex(region, null);
+		fullNameIndex.setSuffixesStat(as.suffixesStat);
 		fullNameIndex.setBoundariesStat(as.bndsStat);
+		fullNameIndex.setStreetsStat(as.streetsStat);
 		for (CityBlocks type : CityBlocks.allTypes()) {
 			if (type.index >= 0) {
 				List<ValueFreq> lst = fullNameIndex.getAddrPrefixes(type.index, vInfo.getPrefix());
@@ -1036,8 +1038,6 @@ public class BinaryInspector {
 			}
 		}
 		as.nameIndex = ValueFreq.mergeArray(new HashMap<>(), fullNameIndex.getAddrPrefixes(-1, vInfo.getPrefix()));
-		as.suffixesStat = fullNameIndex.getSuffixesStat();
-		as.streetsStat = fullNameIndex.getStreetsStat();
 		if (!vInfo.vsearchglobalonly) {
 			printAddressNameStats(as);
 		}
@@ -1854,8 +1854,8 @@ public class BinaryInspector {
 			}
 		}
 		NameIndexReader fullNameIndex = index.readFullNameIndex(p, null);
+		fullNameIndex.setSuffixesStat(ps.suffixesStat);
 		ps.nameIndex = ValueFreq.mergeArray(new HashMap<>(), fullNameIndex.getPOIPrefixes(verbose.getPrefix()));
-		ps.suffixesStat = fullNameIndex.getSuffixesStat();
 		
 		if (!verbose.vsearchglobalonly) {
 			printPoiTypeStats(ps);
