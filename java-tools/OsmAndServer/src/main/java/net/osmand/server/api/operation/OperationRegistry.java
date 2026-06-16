@@ -1,7 +1,10 @@
 package net.osmand.server.api.operation;
 
 import java.lang.reflect.RecordComponent;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -59,6 +62,7 @@ public class OperationRegistry {
 					toJson(params), paramsType == null ? "" : paramsType.getName());
 			descriptors.put(targetClass.getName(), new OperationDescriptor(bean, paramsType, params));
 		}
+		repository.deleteOrphanOperations();
 	}
 
 	public Optional<OperationDescriptor> resolve(String className) {
@@ -83,6 +87,9 @@ public class OperationRegistry {
 		}
 		if (type == char.class || type == Character.class || type == String.class) {
 			return "text";
+		}
+		if (type == LocalDate.class || type == LocalDateTime.class || type == Date.class) {
+			return "date";
 		}
 		if (type.isPrimitive() || Number.class.isAssignableFrom(type)) {
 			return "number";

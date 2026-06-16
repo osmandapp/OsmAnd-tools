@@ -19,6 +19,8 @@ import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.cfg.CoercionAction;
+import com.fasterxml.jackson.databind.cfg.CoercionInputShape;
 
 import net.osmand.server.api.operation.OperationRegistry.OperationDescriptor;
 import net.osmand.server.api.operation.OperationRepository.OperationItem;
@@ -32,11 +34,12 @@ public class OperationService {
 	public record JobRequest(String className, String name, String description, String labels, Map<String, Object> params) {}
 	public record RunRequest(Map<String, Object> params) {}
 
-	private record RunningOperation(Future<?> future, OperationContext context) {}
+	private record RunningOperation(Future<?> future, OperationContext context, long startedMs) {}
 
 	private final OperationRepository repository;
 	private final OperationRegistry registry;
 	private final ObjectMapper mapper;
+	private final ObjectMapper paramMapper;
 
 	private final ExecutorService executor = Executors.newFixedThreadPool(
 			Math.max(2, Runtime.getRuntime().availableProcessors()), runnable -> {
@@ -50,6 +53,8 @@ public class OperationService {
 		this.repository = repository;
 		this.registry = registry;
 		this.mapper = mapper;
+		this.paramMapper = mapper.copy();
+		this.paramMapper.coercionConfigDefaults().setCoercion(CoercionInputShape.EmptyString, CoercionAction.AsNull);
 	}
 
 	public List<OperationItem> getOperations() {
@@ -83,11 +88,21 @@ public class OperationService {
 	}
 
 	public List<RunItem> getRuns(Long jobId) {
-		return repository.getRuns(jobId);
+		return repository.getRuns(jobId).stream().map(this::overlayProgress).toList();
 	}
 
 	public Optional<RunItem> getRun(long id) {
-		return repository.getRun(id);
+		return repository.getRun(id).map(this::overlayProgress);
+	}
+
+	private RunItem overlayProgress(RunItem run) {
+		RunningOperation active = running.get(run.id());
+		if (active == null) {
+			return run;
+		}
+		OperationContext context = active.context();
+		long elapsed = System.currentTimeMillis() - active.startedMs();
+		return run.withProgress(context.getProcessed(), context.getTotal(), context.getProgressText(), elapsed);
 	}
 
 	public RunItem startRun(long jobId, RunRequest request) {
@@ -99,7 +114,7 @@ public class OperationService {
 		long runId = repository.insertRun(jobId, toJson(params));
 		OperationContext context = new OperationContext();
 		Future<?> future = executor.submit(() -> executeRun(runId, job.className(), params, context));
-		running.put(runId, new RunningOperation(future, context));
+		running.put(runId, new RunningOperation(future, context, System.currentTimeMillis()));
 		return repository.getRun(runId).orElseThrow();
 	}
 
@@ -114,15 +129,14 @@ public class OperationService {
 		repository.deleteRun(runId);
 	}
 
-	@SuppressWarnings({"rawtypes", "unchecked"})
 	private void executeRun(long runId, String className, Map<String, Object> params, OperationContext context) {
 		long started = System.currentTimeMillis();
 		repository.markRunning(runId);
 		try {
 			OperationDescriptor descriptor = registry.resolve(className)
 					.orElseThrow(() -> new IllegalStateException("Operation is not discovered or not valid: " + className));
-			Object args = descriptor.paramsType() == null ? params : mapper.convertValue(params, descriptor.paramsType());
-			Object result = ((Operation) descriptor.bean()).run(args, context);
+			Object args = descriptor.paramsType() == null ? params : paramMapper.convertValue(params, descriptor.paramsType());
+			Object result = invoke(descriptor.bean(), args, context);
 			repository.markSuccess(runId, toJson(result == null ? Collections.emptyMap() : result), elapsed(started));
 		} catch (Throwable e) {
 			if (isCancellation(e) || Thread.currentThread().isInterrupted()) {
@@ -133,6 +147,11 @@ public class OperationService {
 		} finally {
 			running.remove(runId);
 		}
+	}
+
+	@SuppressWarnings("unchecked")
+	private Object invoke(Operation<?> operation, Object args, OperationContext context) {
+		return ((Operation<Object>) operation).run(args, context);
 	}
 
 	private void markFailed(long runId, long started, Throwable e) {

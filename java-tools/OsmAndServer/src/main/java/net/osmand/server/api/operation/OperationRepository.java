@@ -1,13 +1,20 @@
 package net.osmand.server.api.operation;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.AbstractMap;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -27,8 +34,16 @@ public class OperationRepository {
 						 LocalDateTime updatedTime) {}
 	public record RunItem(Long id, Long jobId, String className, String operationName, String operationTitle, String jobName,
 						 String status, String paramsJson, String resultJson, String errorText, Long elapsedMs,
+						 Integer processed, Integer total, String progressText,
 						 String summaryKey, Object summaryValue, LocalDateTime startedTime, LocalDateTime finishedTime,
-						 LocalDateTime createdTime, LocalDateTime updatedTime) {}
+						 LocalDateTime createdTime, LocalDateTime updatedTime) {
+
+		public RunItem withProgress(int processed, int total, String progressText, long elapsedMs) {
+			return new RunItem(id, jobId, className, operationName, operationTitle, jobName, status, paramsJson,
+					resultJson, errorText, elapsedMs, processed, total, progressText, summaryKey, summaryValue,
+					startedTime, finishedTime, createdTime, updatedTime);
+		}
+	}
 
 	private static final String JOB_SELECT =
 			"SELECT j.*, a.name operation_name, a.title operation_title FROM job j " +
@@ -47,6 +62,10 @@ public class OperationRepository {
 
 	public void markAllOperationsInvalid() {
 		jdbc.update("UPDATE operation SET valid = 0, updated_time = CURRENT_TIMESTAMP");
+	}
+
+	public void deleteOrphanOperations() {
+		jdbc.update("DELETE FROM operation WHERE valid = 0 AND class_name NOT IN (SELECT class_name FROM job)");
 	}
 
 	public void upsertOperation(String className, String name, String title, String paramsJson, String resultType) {
@@ -118,13 +137,13 @@ public class OperationRepository {
 	public void markSuccess(long runId, String resultJson, long elapsedMs) {
 		jdbc.update("UPDATE run SET status = 'SUCCESS', result_json = ?, elapsed_ms = ?, " +
 				"finished_time = CURRENT_TIMESTAMP, updated_time = CURRENT_TIMESTAMP WHERE id = ?",
-				resultJson, elapsedMs, runId);
+				compress(resultJson), elapsedMs, runId);
 	}
 
 	public void markFailed(long runId, String resultJson, String errorText, long elapsedMs) {
 		jdbc.update("UPDATE run SET status = 'FAILED', result_json = ?, error_text = ?, elapsed_ms = ?, " +
 				"finished_time = CURRENT_TIMESTAMP, updated_time = CURRENT_TIMESTAMP WHERE id = ?",
-				resultJson, errorText, elapsedMs, runId);
+				compress(resultJson), errorText, elapsedMs, runId);
 	}
 
 	public void markCancelled(long runId, long elapsedMs) {
@@ -155,12 +174,12 @@ public class OperationRepository {
 			ts(rs, "created_time"), ts(rs, "updated_time"));
 
 	private final RowMapper<RunItem> runMapper = (rs, n) -> {
-		String resultJson = rs.getString("result_json");
+		String resultJson = decompress(rs.getString("result_json"));
 		Map.Entry<String, Object> summary = firstPrimitiveEntry(resultJson);
 		return new RunItem(rs.getLong("id"), rs.getLong("job_id"), rs.getString("class_name"),
 				rs.getString("operation_name"), rs.getString("operation_title"), rs.getString("job_name"),
 				rs.getString("status"), rs.getString("params_json"), resultJson, rs.getString("error_text"),
-				rs.getLong("elapsed_ms"), summary == null ? null : summary.getKey(),
+				rs.getLong("elapsed_ms"), null, null, null, summary == null ? null : summary.getKey(),
 				summary == null ? null : summary.getValue(), ts(rs, "started_time"), ts(rs, "finished_time"),
 				ts(rs, "created_time"), ts(rs, "updated_time"));
 	};
@@ -192,5 +211,35 @@ public class OperationRepository {
 			return null;
 		}
 		return null;
+	}
+
+	private static final String GZIP_PREFIX = "gzip:";
+	private static final int GZIP_THRESHOLD = 1024;
+
+	private static String compress(String json) {
+		if (json == null || json.length() < GZIP_THRESHOLD) {
+			return json;
+		}
+		try {
+			ByteArrayOutputStream out = new ByteArrayOutputStream();
+			try (GZIPOutputStream gzip = new GZIPOutputStream(out)) {
+				gzip.write(json.getBytes(StandardCharsets.UTF_8));
+			}
+			return GZIP_PREFIX + Base64.getEncoder().encodeToString(out.toByteArray());
+		} catch (IOException e) {
+			throw new IllegalStateException("Failed to gzip result", e);
+		}
+	}
+
+	private static String decompress(String value) {
+		if (value == null || !value.startsWith(GZIP_PREFIX)) {
+			return value;
+		}
+		try (GZIPInputStream gzip = new GZIPInputStream(
+				new ByteArrayInputStream(Base64.getDecoder().decode(value.substring(GZIP_PREFIX.length()))))) {
+			return new String(gzip.readAllBytes(), StandardCharsets.UTF_8);
+		} catch (IOException e) {
+			throw new IllegalStateException("Failed to gunzip result", e);
+		}
 	}
 }
