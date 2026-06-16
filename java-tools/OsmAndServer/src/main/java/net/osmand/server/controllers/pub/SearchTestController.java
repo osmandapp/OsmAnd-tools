@@ -467,17 +467,12 @@ public class SearchTestController {
 															  @RequestParam(defaultValue = "0") int pageToShow,
 															  @RequestParam(defaultValue = "100") int pageSizeLimit,
 															  @RequestParam(required = false) String sortBy,
-															  @RequestParam(required = false) String sortOrder,
-															  @RequestParam(required = false) String objectType) {
+															  @RequestParam(required = false) String sortOrder) {
 		List<String> selectedObfs = normalizeObfs(obf, obfs);
-		try {
-			if (selectedObfs.size() == 1) {
-				return ResponseEntity.ok(testSearchService.getIndex(selectedObfs.get(0), prefix, pageToShow, pageSizeLimit, sortBy, sortOrder, objectType));
-			}
-			return ResponseEntity.ok(testSearchService.getIndex(selectedObfs, prefix, pageToShow, pageSizeLimit, sortBy, sortOrder, objectType));
-		} catch (IllegalArgumentException e) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
+		if (selectedObfs.size() == 1) {
+			return ResponseEntity.ok(testSearchService.getIndex(selectedObfs.get(0), prefix, pageToShow, pageSizeLimit, sortBy, sortOrder));
 		}
+		return ResponseEntity.ok(testSearchService.getIndex(selectedObfs, prefix, pageToShow, pageSizeLimit, sortBy, sortOrder));
 	}
 
 	@PostMapping(value = "/objects", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -493,12 +488,11 @@ public class SearchTestController {
 																 @RequestParam(defaultValue = "true") boolean isFiltered,
 																 @RequestParam(defaultValue = "false") boolean invalidOnly,
 																 @RequestParam(required = false) String objectType,
-																 @RequestParam(required = false) String indexQuery,
 																 @RequestBody OBFService.IndexToken token) {
 		List<String> selectedObfs = normalizeObfs(obf, obfs);
 		OBFService.ObjectAddressPage objects = selectedObfs.size() == 1
-				? testSearchService.getObjects(selectedObfs.get(0), lang == null ? "en" : lang, token, regExp, pageToShow, pageSizeLimit, sortBy, sortOrder, isFiltered, invalidOnly, objectType, indexQuery)
-				: testSearchService.getObjects(selectedObfs, lang == null ? "en" : lang, token, regExp, pageToShow, pageSizeLimit, sortBy, sortOrder, isFiltered, invalidOnly, objectType, indexQuery);
+				? testSearchService.getObjects(selectedObfs.get(0), lang == null ? "en" : lang, token, regExp, pageToShow, pageSizeLimit, sortBy, sortOrder, isFiltered, invalidOnly, objectType)
+				: testSearchService.getObjects(selectedObfs, lang == null ? "en" : lang, token, regExp, pageToShow, pageSizeLimit, sortBy, sortOrder, isFiltered, invalidOnly, objectType);
 		return ResponseEntity.ok(objects);
 	}
 
