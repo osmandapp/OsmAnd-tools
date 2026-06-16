@@ -272,7 +272,7 @@ public class NameIndexCreator<T> {
 			if (Algorithms.isEmpty(prefix)) {
 				continue;
 			}
-			if (indexNumbers && CommonWords.isNumber2Letters(token)) {
+			if (!indexNumbers && CommonWords.isNumber2Letters(token)) {
 				continue;
 			}
 			NamedObjectsByPrefix<T> entry = namesIndex.get(prefix);
