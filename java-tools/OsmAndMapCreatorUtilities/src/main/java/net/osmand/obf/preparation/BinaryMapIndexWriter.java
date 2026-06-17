@@ -38,6 +38,7 @@ import gnu.trove.list.array.TByteArrayList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.TIntObjectMap;
+import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.IndexConstants;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.CityBlocks;
 import net.osmand.binary.BinaryMapIndexReader;
@@ -1178,7 +1179,7 @@ public class BinaryMapIndexWriter {
 	}
 
 	public void writeCityIndex(City cityOrPostcode, List<Street> streets, Map<Street, List<Node>> wayNodes,
-			BinaryFileReference ref, Map<String, Integer> tagRules) throws IOException {
+			BinaryFileReference ref, Map<String, Integer> tagRules, TLongObjectHashMap<Long> streetIds) throws IOException {
 		checkPeekState(CITY_INDEX_INIT);
 		codedOutStream.writeTag(CitiesIndex.BLOCKS_FIELD_NUMBER, FieldType.MESSAGE.getWireType());
 		codedOutStream.flush();
@@ -1204,7 +1205,7 @@ public class BinaryMapIndexWriter {
 		}
 		String postcodeFilter = cityOrPostcode.isPostcode() ? cityOrPostcode.getName() : null;
 		for (Street s : streets) {
-			StreetIndex streetInd = createStreetAndBuildings(s, cx, cy, postcodeFilter, mapNodeToStreet, wayNodes, tagRules);
+			StreetIndex streetInd = createStreetAndBuildings(s, cx, cy, postcodeFilter, mapNodeToStreet, wayNodes, tagRules, streetIds);
 			currentPointer += CodedOutputStream.computeTagSize(CityBlockIndex.STREETS_FIELD_NUMBER);
 			if (currentPointer > Integer.MAX_VALUE) {
 				throw new IllegalArgumentException("File offset > 2 GB.");
@@ -1237,11 +1238,8 @@ public class BinaryMapIndexWriter {
 
 	protected StreetIndex createStreetAndBuildings(Street street, int cx, int cy, String postcodeFilter,
 			Map<Long, Set<Street>> mapNodeToStreet, Map<Street, List<Node>> wayNodes,
-			Map<String, Integer> tagRules) throws IOException {
+			Map<String, Integer> tagRules, TLongObjectHashMap<Long> streetIds) throws IOException {
 		checkPeekState(CITY_INDEX_INIT);
-		if (street.getName().startsWith("Burnhamthorpe")) {
-			System.out.println("--- ");
-		}
 		StreetIndex.Builder streetBuilder = OsmandOdb.StreetIndex.newBuilder();
 		streetBuilder.setName(street.getName());
 		if (checkEnNameToWrite(street)) {
@@ -1256,8 +1254,13 @@ public class BinaryMapIndexWriter {
 				streetBuilder.addAttributeValues(next.getValue());
 			}
 		}
-		streetBuilder.setId(street.getId());
-
+		Long osmId = streetIds == null ? null : streetIds.get(street.getId());
+		if (osmId != null && osmId > 0) {
+			streetBuilder.setId(osmId);
+		} else {
+			streetBuilder.setId(-street.getId()); // negative ?
+			// streetBuilder.setId(street.getId()); // backward compatible...
+		}
 		int sx = MapUtils.get31TileNumberX(street.getLocation().getLongitude());
 		int sy = MapUtils.get31TileNumberY(street.getLocation().getLatitude());
 		streetBuilder.setX((sx >> 7) - (cx >> 7));

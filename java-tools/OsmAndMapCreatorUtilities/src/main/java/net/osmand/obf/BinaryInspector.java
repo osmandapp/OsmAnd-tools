@@ -106,8 +106,8 @@ public class BinaryInspector {
 //					"-vtransport", "-vtransportschedule",
 //					"-vsearchinspect", // "-vsearchglobalonly", // "-vprefix=hh" // search index extended anlays 
 					"-vaddress",   
-//					"-vcities", "-vstreetgroups", "-vcitynames",
-//					"-vstreets", //  "-vbuildings",// "-vintersections",
+					"-vcities", "-vstreetgroups", "-vcitynames",
+					"-vstreets", //  "-vbuildings",// "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
 					// road
@@ -117,12 +117,10 @@ public class BinaryInspector {
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
-//					System.getProperty("maps.dir") + "Map.obf",
-//					System.getProperty("maps.dir") + "Germany_bayern_lower-franconia_europe_2.obf",
-//					System.getProperty("maps.dir") + "Germany_bayern_lower-bavaria_europe_2.obf",
+					System.getProperty("maps.dir") + "Map.obf",
 //					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_tubingen_europe_2.obf",
 //					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_karlsruhe_europe_2.obf",
-					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_freiburg_europe_2.obf",
+//					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_freiburg_europe_2.obf",
 //					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_stuttgart_europe_2.obf",
 //					System.getProperty("maps.dir") + "Liechtenstein_europe.obf",
 //					System.getProperty("maps.dir") + "regions.ocbf",
@@ -992,7 +990,8 @@ public class BinaryInspector {
 					final List<Street> intersections = t.getIntersectedStreets();
 
 					String streetName = MessageFormat.format("\t\t\t''{0}'' [{1,number,#}], {2,number,#} building(s), {3,number,#} intersections(s)",
-							new Object[]{ t.getName(verbose.lang) + " " + t.getNamesMap(true).toString(), t.getId(), buildings.size(), intersections.size()});
+							new Object[]{ t.getName(verbose.lang) + " " + t.getNamesMap(true).toString(), ObfConstants.getOsmIdFromMapObjectId(t.getId()),
+									buildings.size(), intersections.size()});
 					if (verbose.vsearchinspect) {
 						verbose.searchStats.analyze(t.getName() + " " + c.getName(), t, c);
 						for (Building b : buildings) {

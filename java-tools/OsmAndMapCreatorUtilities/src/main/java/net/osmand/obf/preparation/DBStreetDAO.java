@@ -26,22 +26,28 @@ public class DBStreetDAO extends AbstractIndexPartCreator {
 		private final String name;
 		private final String cityPart;
 		private final String langs;
+		public long osmId; 
 		private LatLon location;
 		private String nameEn;
 
-		public SimpleStreet(long id, String name, long cityId, String cityPart, double latitude, double longitude,
+		public SimpleStreet(long id, long osmId, String name, long cityId, String cityPart, double latitude, double longitude,
 				String langs, String nameEn) {
-			this(id, name, cityId, cityPart, new LatLon(latitude, longitude), langs, nameEn);
+			this(id, osmId, name, cityId, cityPart, new LatLon(latitude, longitude), langs, nameEn);
 		}
 
-		public SimpleStreet(long id, String name, long cityId, String cityPart, LatLon location, String langs, String nameEn) {
+		public SimpleStreet(long id, long osmId, String name, long cityId, String cityPart, LatLon location, String langs, String nameEn) {
 			this.id = id;
+			this.osmId = osmId;
 			this.name = name;
 			this.cityId = cityId;
 			this.cityPart = cityPart;
 			this.location = location;
 			this.langs = langs;
 			this.nameEn = nameEn;
+		}
+		
+		public long getOsmId() {
+			return osmId;
 		}
 
 		public String getCityPart() {
@@ -74,6 +80,7 @@ public class DBStreetDAO extends AbstractIndexPartCreator {
 	}
 
 	protected PreparedStatement addressStreetStat;
+	private PreparedStatement addressStreetIdsUpdate;
 	private PreparedStatement addressStreetNodeStat;
 	private PreparedStatement addressBuildingStat;
 	private PreparedStatement addressSearchStreetStat;
@@ -89,7 +96,7 @@ public class DBStreetDAO extends AbstractIndexPartCreator {
 	public void createDatabaseStructure(Connection mapConnection, DBDialect dialect) throws SQLException {
 		this.mapConnection = mapConnection;
 		Statement stat = mapConnection.createStatement();
-        stat.executeUpdate("create table street (id bigint primary key, latitude double, longitude double, " +
+        stat.executeUpdate("create table street (id bigint primary key, osmid bigint, latitude double, longitude double, " +
 					"name varchar(1024), name_en varchar(1024), city bigint, citypart varchar(1024), langs varchar(1024))");
 	    
         // create index on name ?
@@ -103,13 +110,14 @@ public class DBStreetDAO extends AbstractIndexPartCreator {
         stat.close();
         createPrimaryIndexes(mapConnection);
 
-		addressStreetStat = createPrepareStatement(mapConnection,"insert into street (id, latitude, longitude, name, name_en, city, citypart, langs) values (?, ?, ?, ?, ?, ?, ?, ?)");
+		addressStreetStat = createPrepareStatement(mapConnection,"insert into street (id, osmid, latitude, longitude, name, name_en, city, citypart, langs) values (?, ?, ?, ?, ?, ?, ?, ?, ?)");
 		addressStreetNodeStat = createPrepareStatement(mapConnection,"insert into street_node (id, latitude, longitude, street, way) values (?, ?, ?, ?, ?)");
 		addressBuildingStat = createPrepareStatement(mapConnection,"insert into building (id, latitude, longitude, name, name_en, street, postcode, name2, name_en2, lat2, lon2, interval, interpolateType) values (?, ?, ?, ?, ?, ?, ?, ?, ? ,? ,? ,? ,?)");
-		addressSearchStreetStat = createPrepareStatement(mapConnection,"SELECT id,latitude,longitude,langs,name_en FROM street WHERE ? = city AND ? = citypart AND ? = name");
-		addressSearchStreetStatWithoutCityPart = createPrepareStatement(mapConnection,"SELECT id,name,citypart,latitude,longitude,langs,name_en FROM street WHERE ? = city AND ? = name");
+		addressSearchStreetStat = createPrepareStatement(mapConnection,"SELECT id,osmid,latitude,longitude,langs,name_en FROM street WHERE ? = city AND ? = citypart AND ? = name");
+		addressSearchStreetStatWithoutCityPart = createPrepareStatement(mapConnection,"SELECT id,osmid,name,citypart,latitude,longitude,langs,name_en FROM street WHERE ? = city AND ? = name");
 		addressStreetUpdateCityPart = createPrepareStatement(mapConnection,"UPDATE street SET citypart = ? WHERE id = ?");
 		addressStreetLangsUpdate = createPrepareStatement(mapConnection,"UPDATE street SET name_en = ? || name_en, langs = ? WHERE id = ?");
+		addressStreetIdsUpdate = createPrepareStatement(mapConnection,"UPDATE street SET osmid = ? WHERE id = ?");
 		addressSearchBuildingStat = createPrepareStatement(mapConnection,"SELECT id FROM building where ? = id");
 		addressRemoveBuildingStat = createPrepareStatement(mapConnection,"DELETE FROM building where ? = id");
 		addressSearchStreetNodeStat = createPrepareStatement(mapConnection,"SELECT way FROM street_node WHERE ? = way");
@@ -201,8 +209,8 @@ public class DBStreetDAO extends AbstractIndexPartCreator {
 		ResultSet rs = addressSearchStreetStatWithoutCityPart.executeQuery();
 		DBStreetDAO.SimpleStreet foundId = null;
 		if (rs.next()) {
-			foundId = new SimpleStreet(rs.getLong(1), rs.getString(2), city.getId(), rs.getString(3), rs.getDouble(4),
-					rs.getDouble(5), rs.getString(6), rs.getString(7));
+			foundId = new SimpleStreet(rs.getLong(1), rs.getLong(2), rs.getString(3), city.getId(), rs.getString(4), rs.getDouble(5),
+					rs.getDouble(6), rs.getString(7), rs.getString(8));
 		}
 		rs.close();
 		return foundId;
@@ -218,8 +226,8 @@ public class DBStreetDAO extends AbstractIndexPartCreator {
 		ResultSet rs = addressSearchStreetStat.executeQuery();
 		DBStreetDAO.SimpleStreet foundId = null;
 		if (rs.next()) {
-			foundId = new SimpleStreet(rs.getLong(1), name, city.getId(), cityPart, rs.getDouble(2), rs.getDouble(3),
-					rs.getString(4), rs.getString(5));
+			foundId = new SimpleStreet(rs.getLong(1), rs.getLong(2), name, city.getId(), cityPart, rs.getDouble(3), rs.getDouble(4),
+					rs.getString(5), rs.getString(6));
 		}
 		rs.close();
 		return foundId;
@@ -237,9 +245,9 @@ public class DBStreetDAO extends AbstractIndexPartCreator {
 		return langs;
 	}
 
-	public long insertStreet(String name, Map<String, String> names, LatLon location,
+	public long insertStreet(long osmid, String name, Map<String, String> names, LatLon location,
 			City city, String cityPart) throws SQLException {
-		long streetId = fillInsertStreetStatement(name, names, location, city, cityPart,
+		long streetId = fillInsertStreetStatement(osmid, name, names, location, city, cityPart,
 				constructLangs(names));
 		// execute the insert statement
 		addressStreetStat.execute();
@@ -250,18 +258,21 @@ public class DBStreetDAO extends AbstractIndexPartCreator {
 	}
 
 
-	protected long fillInsertStreetStatement(String name, Map<String, String> names,
+	protected long fillInsertStreetStatement(long osmid, String name, Map<String, String> names,
 			LatLon location, City city, String cityPart, String langs)
 			throws SQLException {
+//		long streetId = id > 0 ? id : -(streetIdSequence++);
 		long streetId = streetIdSequence++;
-		addressStreetStat.setLong(1, streetId);
-		addressStreetStat.setString(4, name);
-		addressStreetStat.setString(5, Algorithms.encodeMap(names));
-		addressStreetStat.setDouble(2, location.getLatitude());
-		addressStreetStat.setDouble(3, location.getLongitude());
-		addressStreetStat.setLong(6, city.getId());
-		addressStreetStat.setString(7, cityPart);
-		addressStreetStat.setString(8, langs);
+		int ind = 1;
+		addressStreetStat.setLong(ind++, streetId);
+		addressStreetStat.setLong(ind++, osmid);
+		addressStreetStat.setDouble(ind++, location.getLatitude());
+		addressStreetStat.setDouble(ind++, location.getLongitude());
+		addressStreetStat.setString(ind++, name);
+		addressStreetStat.setString(ind++, Algorithms.encodeMap(names));
+		addressStreetStat.setLong(ind++, city.getId());
+		addressStreetStat.setString(ind++, cityPart);
+		addressStreetStat.setString(ind++, langs);
 		return streetId;
 	}
 
@@ -305,9 +316,18 @@ public class DBStreetDAO extends AbstractIndexPartCreator {
 		addressStreetUpdateCityPart.setString(1, cityPart);
 		addressStreetUpdateCityPart.setLong(2, street.getId());
 		addressStreetUpdateCityPart.executeUpdate();
-		mapConnection.commit();
-		return new SimpleStreet(street.getId(), street.getName(), street.getCityId(), cityPart, street.getLocation(),
+		return new SimpleStreet(street.getId(), street.getOsmId(), street.getName(), street.getCityId(), cityPart, street.getLocation(),
 				street.getLangs(), street.getNameEn());
+	}
+	
+	public DBStreetDAO.SimpleStreet updateStreetID(DBStreetDAO.SimpleStreet street, long osmId) throws SQLException {
+		if (osmId > 0 && (street.getOsmId() == 0 || osmId < street.getOsmId())) {
+			addressStreetIdsUpdate.setLong(1, osmId);
+			addressStreetIdsUpdate.setLong(2, street.getId());
+			addressStreetIdsUpdate.executeUpdate();
+			street.osmId = osmId;
+		}
+		return street;
 	}
 
 	public DBStreetDAO.SimpleStreet updateStreetLangs(DBStreetDAO.SimpleStreet street, Map<String, String> newNames) throws SQLException {
@@ -318,8 +338,7 @@ public class DBStreetDAO extends AbstractIndexPartCreator {
 		addressStreetLangsUpdate.setString(2, langs);
 		addressStreetLangsUpdate.setLong(3, street.getId());
 		addressStreetLangsUpdate.executeUpdate();
-		mapConnection.commit();
-		return new SimpleStreet(street.getId(), street.getName(), street.getCityId(), street.getCityPart(),
+		return new SimpleStreet(street.getId(), street.getOsmId(), street.getName(), street.getCityId(), street.getCityPart(),
 				street.getLocation(), langs, nameEn);
 	}
 }

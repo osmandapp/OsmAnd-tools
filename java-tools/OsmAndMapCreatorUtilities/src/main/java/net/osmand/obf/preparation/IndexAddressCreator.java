@@ -493,7 +493,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 
 			if (streetName != null) {
-				Set<Long> idsOfStreet = getStreetInCity(isInNames, streetName, false, null, l, icc);
+				Set<Long> idsOfStreet = getStreetInCity(0, isInNames, streetName, false, null, l, icc);
 				if (!idsOfStreet.isEmpty()) {
 					Collection<Entity> houses = i.getMemberEntities("house"); // both house and address roles can have address
 					houses.addAll(i.getMemberEntities("address"));
@@ -618,7 +618,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		return newName.trim();
 	}
 
-	public Set<Long> getStreetInCity(Set<String> isInNames, String name, boolean place, Map<String, String> names, final LatLon location, IndexCreationContext icc) throws SQLException {
+	public Set<Long> getStreetInCity(long id, Set<String> isInNames, String name, boolean place, Map<String, String> names, final LatLon location, IndexCreationContext icc) throws SQLException {
 		if (location == null) {
 			return Collections.emptySet();
 
@@ -686,11 +686,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				}
 			}
         }
-		return registerStreetInCities(name, names, location, result);
+		return registerStreetInCities(id, name, names, location, result);
 	}
 
 
-	private Set<Long> registerStreetInCities(String name, Map<String, String> names, LatLon location, Collection<City> result) throws SQLException {
+	private Set<Long> registerStreetInCities(long id, String name, Map<String, String> names, LatLon location, Collection<City> result) throws SQLException {
 		if (result.isEmpty()) {
 			return Collections.emptySet();
 		}
@@ -707,14 +707,14 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				}
 				names.put(PLACE_ATTR, CityType.valueToString(city.getType()));
 			}
-			long streetId = getOrRegisterStreetIdForCity(nameInCity, names, location, city);
+			long streetId = getOrRegisterStreetIdForCity(id, nameInCity, names, location, city);
 			values.add(streetId);
 		}
 		return values;
 	}
 
 
-	private long getOrRegisterStreetIdForCity(String name, Map<String, String> names, LatLon location, City city)
+	private long getOrRegisterStreetIdForCity(long osmid, String name, Map<String, String> names, LatLon location, City city)
 			throws SQLException {
 		String cityPart;
 		boolean place = names != null && names.containsKey(PLACE_ATTR);
@@ -734,8 +734,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			if (names != null) {
 				langAttributes.addAll(names.keySet());
 			}
-			return streetDAO.insertStreet(name, names, location, city, cityPart);
+			return streetDAO.insertStreet(osmid, name, names, location, city, cityPart);
 		} else {
+			streetDAO.updateStreetID(foundStreet, osmid);
 			if (names != null) {
 				Map<String, String> addNames = null;
 				for (String s : names.keySet()) {
@@ -876,7 +877,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 							strt = first.getTag(OSMTagKey.ADDR_PLACE);
 							place = true;
 						}
-						Set<Long> idsOfStreet = getStreetInCity(first.getIsInNames(), strt, place, null, l, icc);
+						Set<Long> idsOfStreet = getStreetInCity(0, first.getIsInNames(), strt, place, null, l, icc);
 						if (!idsOfStreet.isEmpty()) {
 							if (Algorithms.extractFirstIntegerNumber(first.getTag(OSMTagKey.ADDR_HOUSE_NUMBER)) >
 								Algorithms.extractFirstIntegerNumber(second.getTag(OSMTagKey.ADDR_HOUSE_NUMBER))) {
@@ -929,7 +930,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			boolean exist = e instanceof Relation || streetDAO.findBuilding(e);
 			if (!exist) {
 				LatLon l = e.getLatLon();
-				Set<Long> idsOfStreet = getStreetInCity(e.getIsInNames(), streetOrPlace, place, null, l, icc);
+				Set<Long> idsOfStreet = getStreetInCity(0,
+						e.getIsInNames(), streetOrPlace, place, null, l, icc);
 				if (!idsOfStreet.isEmpty()) {
 					Building building = EntityParser.parseBuilding(e);
 					String hname = null;
@@ -979,7 +981,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 						if (secondHno != null) {
 							Building building2 = EntityParser.parseBuilding(e);
 							building2.setName(hname.substring(secondNumberInd + 1) + additionalHname);
-							Set<Long> ids2OfStreet = getStreetInCity(e.getIsInNames(), street2, false, null, l, icc);
+							Set<Long> ids2OfStreet = getStreetInCity(0, e.getIsInNames(), street2, false, null, l, icc);
 							ids2OfStreet.removeAll(idsOfStreet); // remove duplicated entries!
 							if (!ids2OfStreet.isEmpty()) {
 								streetDAO.writeBuilding(ids2OfStreet, building2);
@@ -1002,7 +1004,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			// check that street way is not registered already
 			if (!exist) {
 				LatLon l = e.getLatLon();
-				Set<Long> idsOfStreet = getStreetInCity(e.getIsInNames(), e.getTag(OSMTagKey.NAME), false, getOtherNames(e), l, icc);
+				Set<Long> idsOfStreet = getStreetInCity(ObfConstants.createMapObjectIdFromOsmAndEntity(e), e.getIsInNames(), e.getTag(OSMTagKey.NAME), false, getOtherNames(e), l, icc);
 				if (!idsOfStreet.isEmpty()) {
 					streetDAO.writeStreetWayNodes(idsOfStreet, (Way) e);
 				}
@@ -1183,7 +1185,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		PreparedStatement streetstat = mapConnection.prepareStatement(//
 				"SELECT A.id, A.name, A.name_en, A.latitude, A.longitude, "+ //$NON-NLS-1$
 				"B.id, B.name, B.name_en, B.latitude, B.longitude, B.postcode, A.cityPart, "+ //$NON-NLS-1$
-				" B.name2, B.name_en2, B.lat2, B.lon2, B.interval, B.interpolateType, A.cityPart == C.name as MainTown " +
+				" B.name2, B.name_en2, B.lat2, B.lon2, B.interval, B.interpolateType, A.cityPart == C.name as MainTown, A.osmid as osmid " +
 				"FROM street A LEFT JOIN building B ON B.street = A.id JOIN city C ON A.city = C.id " + //$NON-NLS-1$
 				"WHERE A.city = ? ORDER BY MainTown DESC, A.name ASC"); //$NON-NLS-1$
 		PreparedStatement waynodesStat =
@@ -1217,11 +1219,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		NameIndexCreator<MapObject> namesIndex = new NameIndexCreator<>();
 
 		progress.startTask(settings.getString("IndexCreator.SERIALIZING_ADDRESS"), cityTowns.size() + villages.size() / 100 + 1); //$NON-NLS-1$
-
+		TLongObjectHashMap<Long> streetIds = new TLongObjectHashMap<Long>();
 		writeCityBlockIndex(writer, CityBlocks.CITY_TOWN_TYPE.index, streetstat, waynodesStat, isInGroups, cityTowns,
-				postcodes, namesIndex, tagRules, progress);
+				postcodes, namesIndex, tagRules, progress, streetIds);
 		writeCityBlockIndex(writer, CityBlocks.VILLAGES_TYPE.index, streetstat, waynodesStat, isInGroups, villages, postcodes,
-				namesIndex, tagRules, progress);
+				namesIndex, tagRules, progress, streetIds);
 
 		// write postcodes
 		List<BinaryFileReference> refs = new ArrayList<BinaryFileReference>();
@@ -1246,7 +1248,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				}
 
 			});
-			writer.writeCityIndex(postCode, streets, null, ref, tagRules);
+			writer.writeCityIndex(postCode, streets, null, ref, tagRules, streetIds);
 		}
 		writer.endCityBlockIndex();
 
@@ -1300,7 +1302,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			City b = boundariesAsCities.get(i);
 			BinaryFileReference ref = refs.get(i);
 			NameIndexCreator.putAddrNamedMapObject(namesIndex, b, ref.getStartPointer(), settings);
-			writer.writeCityIndex(b, Collections.emptyList(), null, ref, tagRules);
+			writer.writeCityIndex(b, Collections.emptyList(), null, ref, tagRules, streetIds);
 		}
 		writer.endCityBlockIndex();
 
@@ -1372,7 +1374,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	private void writeCityBlockIndex(BinaryMapIndexWriter writer, int type, PreparedStatement streetstat, PreparedStatement waynodesStat,
 			Map<String, List<City>> isInGroups, List<City> cities, Map<String, City> postcodes, NameIndexCreator<MapObject> namesIndex,
-			Map<String, Integer> tagRules, IProgress progress)
+			Map<String, Integer> tagRules, IProgress progress, TLongObjectHashMap<Long> streetIds)
 			throws IOException, SQLException {
 		List<BinaryFileReference> refs = new ArrayList<BinaryFileReference>();
 		// 1. write cities
@@ -1404,21 +1406,21 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				for (City suburb : suburbs) {
 //					if (suburb.getType() != CityType.TOWN && suburb.getType() != CityType.CITY && suburb != city) {
 					// limit only to suburbs
-					if(suburb.getType() == CityType.SUBURB && city.getType() != CityType.SUBURB) {
+					if (suburb.getType() == CityType.SUBURB && city.getType() != CityType.SUBURB) {
 						listSuburbs.add(suburb);
 					}
 				}
 			}
 			long time = System.currentTimeMillis();
-			List<Street> streets = readStreetsBuildings(streetstat, city, waynodesStat, streetNodes, listSuburbs);
+			
+			List<Street> streets = readStreetsBuildings(streetstat, city, waynodesStat, streetNodes, listSuburbs, streetIds);
 			long f = System.currentTimeMillis() - time;
-			writer.writeCityIndex(city, streets, streetNodes, ref, tagRules);
+			writer.writeCityIndex(city, streets, streetNodes, ref, tagRules, streetIds);
 
 			int bCount = 0;
 			// register postcodes and name index
 			for (Street s : streets) {
 				NameIndexCreator.putAddrNamedMapObject(namesIndex, s, s.getFileOffset(), settings);
-
 				for (Building b : s.getBuildings()) {
 					bCount++;
 					if (city.getPostcode() != null && b.getPostcode() == null) {
@@ -1481,23 +1483,24 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	}
 
 	private List<Street> readStreetsBuildings(PreparedStatement streetBuildingsStat, City city, PreparedStatement waynodesStat,
-			Map<Street, List<Node>> streetNodes, List<City> attachedSuburbs) throws SQLException {
+			Map<Street, List<Node>> streetNodes, List<City> attachedSuburbs, TLongObjectHashMap<Long> streetIds) throws SQLException {
 		TLongObjectHashMap<Street> visitedStreets = new TLongObjectHashMap<>();
 		Map<String, List<Street>> uniqueNames = new TreeMap<>(OsmAndCollator.primaryCollator());
-
 		// read streets for city
-		readStreetsAndBuildingsForCity(streetBuildingsStat, city, city, waynodesStat, streetNodes, visitedStreets, uniqueNames);
+		readStreetsAndBuildingsForCity(streetBuildingsStat, city, city, waynodesStat, streetNodes, visitedStreets,
+				uniqueNames, streetIds);
 		// read streets for suburbs of the city
 		if (attachedSuburbs != null) {
 			for (City suburb : attachedSuburbs) {
-				readStreetsAndBuildingsForCity(streetBuildingsStat, city, suburb, waynodesStat, streetNodes, visitedStreets, uniqueNames);
+				readStreetsAndBuildingsForCity(streetBuildingsStat, city, suburb, waynodesStat, streetNodes,
+						visitedStreets, uniqueNames, streetIds);
 			}
 		}
-		uniqueNames.values().stream().forEach(streets -> mergeStreets(streets, streetNodes));
+		uniqueNames.values().stream().forEach(streets -> mergeStreets(streets, streetNodes, streetIds));
 		return new ArrayList<>(streetNodes.keySet());
 	}
 
-	private void mergeStreets(List<Street> streets, Map<Street, List<Node>> streetNodes) {
+	private void mergeStreets(List<Street> streets, Map<Street, List<Node>> streetNodes, TLongObjectHashMap<Long> streetIds) {
 		// Merge streets to streets with biggest amount of intersections.
 		// Streets, that were extracted from addr:street tag has no intersections at all.
 		streets.sort(Collections.reverseOrder((s0, s1) -> Algorithms.compare(s0.getIntersectedStreets().size(), s1.getIntersectedStreets().size())));
@@ -1512,6 +1515,15 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 					//logMapDataWarn.info("City : " + s.getCity() +
 					//	" combine 2 district streets '" + s.getName() + "' with '" + candidate.getName() + "'");
 					s.mergeWith(candidate);
+					Long l2 = streetIds.get(candidate.getId());
+					Long l1 = streetIds.get(s.getId());
+					if (l1 != null || l2 != null) {
+						if (l1 != null && l2 != null) {
+							streetIds.put(s.getId(), l1 <= 0 || l2 <= 0 ? Math.max(l1, l2) : Math.min(l1, l2));
+						} else {
+							streetIds.put(s.getId(), l1 != null ? l1 : l2);
+						}
+					}
 					candidate.getCity().unregisterStreet(candidate);
 					List<Node> old = streetNodes.remove(candidate);
 					streetNodes.get(s).addAll(old);
@@ -1576,7 +1588,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	private void readStreetsAndBuildingsForCity(PreparedStatement streetBuildingsStat, City mainCity,
 			City city, PreparedStatement waynodesStat, Map<Street, List<Node>> streetNodes, TLongObjectHashMap<Street> visitedStreets,
-			Map<String, List<Street>> uniqueNames) throws SQLException {
+			Map<String, List<Street>> uniqueNames, TLongObjectHashMap<Long> streetIds) throws SQLException {
 		streetBuildingsStat.setLong(1, city.getId());
 		ResultSet set = streetBuildingsStat.executeQuery();
 		while (set.next()) {
@@ -1589,6 +1601,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				// load the street nodes
 				List<Node> thisWayNodes = loadStreetNodes(streetId, waynodesStat);
 				Street street = addStreetToUniqueNamesMap(uniqueNames, streetName, names, city);
+				
+				streetIds.put(streetId, set.getLong("osmid"));
 				street.setLocation(lat, lon);
 				street.setId(streetId);
 				// If there are more streets with same name in different districts.
@@ -1611,7 +1625,6 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				}
 				streetNodes.put(street, thisWayNodes);
 				city.registerStreet(street);
-
 				visitedStreets.put(streetId, street); // mark the street as visited
 			}
 			if (set.getObject(6) != null) {
