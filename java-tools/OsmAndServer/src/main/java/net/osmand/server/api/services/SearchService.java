@@ -82,7 +82,7 @@ public class SearchService {
     private static final String WIKI_POI_TYPE = "osmwiki";
 
     private final ConcurrentHashMap<String, MapPoiTypes> poiTypesByLocale = new ConcurrentHashMap<>();
-	
+
     private final ThreadLocal<SpatialTextSearch> spatialTextSearch = ThreadLocal.withInitial(SpatialTextSearch::new);
 
     public static class PoiSearchResult {
@@ -273,8 +273,7 @@ public class SearchService {
 					if (!objs.isEmpty()) {
 						Feature f = getSpatialFeature(objs.get(0), ctx.locale, timeZone);
 						if (f != null) {
-							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(), objs.stream()
-									.map(o -> o.getName(ctx.locale)).collect(Collectors.joining("\n")));
+							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(), matchedObjects(objs, ctx.locale));
 							response.features.add(f);
 						}
 					}
@@ -291,6 +290,21 @@ public class SearchService {
 			osmAndMapsService.unlockReaders(usedMapList);
 		}
 		return response;
+	}
+
+	private List<Map<String, Object>> matchedObjects(List<MapObject> objs, String locale) {
+		List<Map<String, Object>> matched = new ArrayList<>();
+		for (MapObject o : objs) {
+			if (o.getLocation() == null) {
+				continue;
+			}
+			Map<String, Object> m = new LinkedHashMap<>();
+			m.put("name", o.getName(locale));
+			m.put("lat", o.getLocation().getLatitude());
+			m.put("lon", o.getLocation().getLongitude());
+			matched.add(m);
+		}
+		return matched;
 	}
 
 	private Feature getSpatialFeature(MapObject obj, String locale, String timeZone) {
