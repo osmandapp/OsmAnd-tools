@@ -12,6 +12,10 @@ import net.osmand.osm.*;
 import net.osmand.osm.edit.Entity;
 import net.osmand.search.SearchUICore;
 import net.osmand.search.core.*;
+import net.osmand.search.core.spatial.SpatialSearchContext;
+import net.osmand.search.core.spatial.SpatialSearchResult;
+import net.osmand.search.core.spatial.SpatialTextSearch;
+import net.osmand.search.core.spatial.SpatialTextSearch.SpatialSearchResults;
 import net.osmand.server.utils.MapPoiTypesTranslator;
 import net.osmand.util.Algorithms;
 import net.osmand.util.LocationParser;
@@ -78,6 +82,8 @@ public class SearchService {
     private static final String WIKI_POI_TYPE = "osmwiki";
 
     private final ConcurrentHashMap<String, MapPoiTypes> poiTypesByLocale = new ConcurrentHashMap<>();
+
+    private final SpatialTextSearch spatialTextSearch = new SpatialTextSearch();
 
     public static class PoiSearchResult {
         
@@ -231,6 +237,67 @@ public class SearchService {
 		}
 
 		return !features.isEmpty() ? features : Collections.emptyList();
+	}
+
+	// dev-only: new prototype search using SpatialTextSearch.
+	public List<Feature> searchSpatial(SearchContext ctx, String timeZone) throws IOException {
+		if (!osmAndMapsService.validateAndInitConfig()) {
+			return Collections.emptyList();
+		}
+		double radius = SearchOption.SEARCH_RADIUS_DEGREE;
+		QuadRect points = osmAndMapsService.points(null,
+				new LatLon(ctx.lat + radius, ctx.lon - radius),
+				new LatLon(ctx.lat - radius, ctx.lon + radius));
+		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
+		try {
+			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsForSearch(points, ctx.baseSearch);
+			if (list.isEmpty()) {
+				return Collections.emptyList();
+			}
+			usedMapList = osmAndMapsService.getReaders(list, null);
+			if (usedMapList.isEmpty()) {
+				return Collections.emptyList();
+			}
+			SpatialSearchResults res = spatialTextSearch.searchAPI(ctx.text, new SpatialSearchContext(usedMapList));
+			List<Feature> features = new ArrayList<>();
+			if (res.mainResult != null) {
+				for (SpatialSearchResult r : res.mainResult.getResult()) {
+					List<MapObject> objs = r.getObjects();
+					if (!objs.isEmpty()) {
+						Feature f = getSpatialFeature(objs.get(0), ctx.locale, timeZone);
+						if (f != null) {
+							features.add(f);
+						}
+					}
+				}
+			}
+			return features;
+		} catch (RuntimeException e) {
+			LOGGER.warn(String.format("Spatial search failed for '%s' (incompatible maps?): %s", ctx.text, e), e);
+			return Collections.emptyList();
+		} finally {
+			osmAndMapsService.unlockReaders(usedMapList);
+		}
+	}
+
+	private Feature getSpatialFeature(MapObject obj, String locale, String timeZone) {
+		if (obj == null || obj.getLocation() == null) {
+			return null;
+		}
+		SearchResult result = new SearchResult();
+		result.object = obj;
+		result.location = obj.getLocation();
+		result.localeName = obj.getName(locale);
+		if (obj instanceof Amenity) {
+			result.objectType = ObjectType.POI;
+		} else if (obj instanceof Street) {
+			result.objectType = ObjectType.STREET;
+		} else if (obj instanceof City) {
+			result.objectType = ObjectType.CITY;
+		} else {
+			result.objectType = ObjectType.LOCATION;
+		}
+		return getFeature(result, timeZone);
 	}
 
     public SearchResults getImmediateSearchResults(SearchContext ctx, SearchOption option,
