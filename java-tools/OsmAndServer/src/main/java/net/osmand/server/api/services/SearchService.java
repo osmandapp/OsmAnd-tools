@@ -82,8 +82,8 @@ public class SearchService {
     private static final String WIKI_POI_TYPE = "osmwiki";
 
     private final ConcurrentHashMap<String, MapPoiTypes> poiTypesByLocale = new ConcurrentHashMap<>();
-
-    private final SpatialTextSearch spatialTextSearch = new SpatialTextSearch();
+	
+    private final ThreadLocal<SpatialTextSearch> spatialTextSearch = ThreadLocal.withInitial(SpatialTextSearch::new);
 
     public static class PoiSearchResult {
         
@@ -265,7 +265,7 @@ public class SearchService {
 				return response;
 			}
 			long startTime = System.currentTimeMillis();
-			SpatialSearchResults res = spatialTextSearch.searchAPI(ctx.text, new SpatialSearchContext(usedMapList));
+			SpatialSearchResults res = spatialTextSearch.get().searchAPI(ctx.text, new SpatialSearchContext(usedMapList));
 			long searchTime = System.currentTimeMillis() - startTime;
 			if (res.mainResult != null) {
 				for (SpatialSearchResult r : res.mainResult.getResult()) {
