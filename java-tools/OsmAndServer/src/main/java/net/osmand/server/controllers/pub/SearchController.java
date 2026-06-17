@@ -21,6 +21,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 
 import net.osmand.data.LatLon;
 import net.osmand.server.api.services.OsmAndMapsService;
@@ -75,9 +76,13 @@ public class SearchController {
         }
         SearchService.SearchContext searchContext = new SearchService.SearchContext(lat, lon, text, locale,
                 baseSearch != null && baseSearch, northWest, southEast);
-        List<Feature> features = spatial != null && spatial
-                ? searchService.searchSpatial(searchContext, timeZone)
-                : searchService.search(searchContext, timeZone);
+        if (spatial != null && spatial) {
+            SearchService.SpatialResponse res = searchService.searchSpatial(searchContext, timeZone);
+            JsonObject json = gson.toJsonTree(new FeatureCollection(res.features.toArray(new Feature[0]))).getAsJsonObject();
+            json.add("info", gson.toJsonTree(res.info));
+            return ResponseEntity.ok(gson.toJson(json));
+        }
+        List<Feature> features = searchService.search(searchContext, timeZone);
         return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[0]))));
     }
     

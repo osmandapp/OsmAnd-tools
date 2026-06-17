@@ -239,10 +239,16 @@ public class SearchService {
 		return !features.isEmpty() ? features : Collections.emptyList();
 	}
 
+	public static class SpatialResponse {
+		public List<Feature> features = new ArrayList<>();
+		public Map<String, Object> info = new LinkedHashMap<>();
+	}
+
 	// dev-only: new prototype search using SpatialTextSearch.
-	public List<Feature> searchSpatial(SearchContext ctx, String timeZone) throws IOException {
+	public SpatialResponse searchSpatial(SearchContext ctx, String timeZone) throws IOException {
+		SpatialResponse response = new SpatialResponse();
 		if (!osmAndMapsService.validateAndInitConfig()) {
-			return Collections.emptyList();
+			return response;
 		}
 		double radius = SearchOption.SEARCH_RADIUS_DEGREE;
 		QuadRect points = osmAndMapsService.points(null,
@@ -252,14 +258,15 @@ public class SearchService {
 		try {
 			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsForSearch(points, ctx.baseSearch);
 			if (list.isEmpty()) {
-				return Collections.emptyList();
+				return response;
 			}
 			usedMapList = osmAndMapsService.getReaders(list, null);
 			if (usedMapList.isEmpty()) {
-				return Collections.emptyList();
+				return response;
 			}
+			long startTime = System.currentTimeMillis();
 			SpatialSearchResults res = spatialTextSearch.searchAPI(ctx.text, new SpatialSearchContext(usedMapList));
-			List<Feature> features = new ArrayList<>();
+			long searchTime = System.currentTimeMillis() - startTime;
 			if (res.mainResult != null) {
 				for (SpatialSearchResult r : res.mainResult.getResult()) {
 					List<MapObject> objs = r.getObjects();
@@ -268,18 +275,22 @@ public class SearchService {
 						if (f != null) {
 							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(), objs.stream()
 									.map(o -> o.getName(ctx.locale)).collect(Collectors.joining("\n")));
-							features.add(f);
+							response.features.add(f);
 						}
 					}
 				}
 			}
-			return features;
+			// extra info shown in the UI
+			response.info.put("timeMs", searchTime);
+			response.info.put("count", response.features.size());
+			response.info.put("tokens", res.tokens == null ? 0 : res.tokens.size());
+			response.info.put("combinations", res.combinations == null ? 0 : res.combinations.size());
 		} catch (RuntimeException e) {
 			LOGGER.warn(String.format("Spatial search failed for '%s' (incompatible maps?): %s", ctx.text, e), e);
-			return Collections.emptyList();
 		} finally {
 			osmAndMapsService.unlockReaders(usedMapList);
 		}
+		return response;
 	}
 
 	private Feature getSpatialFeature(MapObject obj, String locale, String timeZone) {
