@@ -1129,7 +1129,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				}
 			}
 		}
-		mergePlatformsStops(platformsAndStops, platforms, stops, platformNames);
+		mergePlatformsStops(platformsAndStops, platforms, stops, platformNames, route.getId());
 		if (platformsAndStops.isEmpty()) {
 			return true; // nothing to get from this relation - there is no stop
 		}
@@ -1153,8 +1153,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		return true;
 	}
 
-	private void mergePlatformsStops(List<Entity> platformsAndStopsToProcess, List<Entity> platforms, List<Entity> stops, 
-			Map<EntityId, Entity> nameReplacement) {
+	private void mergePlatformsStops(List<Entity> platformsAndStopsToProcess, List<Entity> platforms, List<Entity> stops,
+			Map<EntityId, Entity> nameReplacement, long routeId) {
 		// walk through platforms  and verify names from the second:
 		for(Entity platform : platforms) {
 			Entity replaceStop = null;
@@ -1188,6 +1188,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	}
 
 	private void addConnectedPlatformName(Entity stop, Entity platform) {
+	private void addConnectedPlatformData(Entity stop, Entity platform, long routeId) {
 		String platformName = platform.getTag(OSMTagKey.NAME);
 		if (Algorithms.isEmpty(platformName)) {
 			return;
@@ -1205,6 +1206,18 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			connectedPlatformNamesByStopId.put(stopId, platformNames);
 		}
 		platformNames.put(TransportStop.CONNECTED_PLATFORM_NAME_PREFIX + ":" + platformId, platformName);
+		addConnectedPlatformRouteId(platformNames, platformId, routeId);
+	}
+
+	private void addConnectedPlatformRouteId(Map<String, String> platformNames, Long platformId, long routeId) {
+		String key = TransportStop.CONNECTED_PLATFORM_ROUTES_PREFIX + ":" + platformId;
+		String routeIdString = String.valueOf(routeId);
+		String routeIds = platformNames.get(key);
+		if (Algorithms.isEmpty(routeIds)) {
+			platformNames.put(key, routeIdString);
+		} else if (!("," + routeIds + ",").contains("," + routeIdString + ",")) {
+			platformNames.put(key, routeIds + "," + routeIdString);
+		}
 	}
 
 
