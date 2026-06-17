@@ -71,10 +71,12 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	private PreparedStatement transRouteStat;
 	private PreparedStatement transRouteStopsStat;
 	private PreparedStatement transStopsStat;
+	private PreparedStatement transStopsUpdateStat;
 	private PreparedStatement transRouteGeometryStat;
 	private RTree transportStopsTree;
 	private Map<Long, Relation> masterRoutes = new HashMap<Long, Relation>();
 	private Connection gtfsConnection;
+	private Map<Long, Map<String, String>> connectedPlatformNamesByStopId = new HashMap<Long, Map<String, String>>();
 
 	private static final long TEST_ROUTE_ID_MISSING_STOPS = 192037l;
 	
@@ -351,10 +353,12 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		transRouteStat = conn.prepareStatement("insert into transport_route(id, type, operator, ref, name, name_en, dist, color) values(?, ?, ?, ?, ?, ?, ?, ?)");
 		transRouteStopsStat = conn.prepareStatement("insert into transport_route_stop(route, stop, ord) values(?, ?, ?)");
 		transStopsStat = conn.prepareStatement("insert into transport_stop(id, latitude, longitude, name, name_en, names, deleted_routes) values(?, ?, ?, ?, ?, ?, ?)");
+		transStopsUpdateStat = conn.prepareStatement("update transport_stop set names = ? where id = ?");
 		transRouteGeometryStat = conn.prepareStatement("insert into transport_route_geometry(route, geometry, ind) values(?, ?, ?)");
 		pStatements.put(transRouteStat, 0);
 		pStatements.put(transRouteStopsStat, 0);
 		pStatements.put(transStopsStat, 0);
+		pStatements.put(transStopsUpdateStat, 0);
 		pStatements.put(transRouteGeometryStat, 0);
 		
 		if(gtfsConnection != null) {
@@ -509,14 +513,14 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	private void writeRouteStops(TransportRoute r, List<TransportStop> stops) throws SQLException {
 		int i = 0;
 		for (TransportStop s : stops) {
+			Gson gson = new Gson();
+			Map<String, String> namesMap = getNamesMapWithConnectedPlatformNames(s);
 			if (!visitedStops.contains(s.getId())) {
-				Gson gson = new Gson();
 				transStopsStat.setLong(1, s.getId());
 				transStopsStat.setDouble(2, s.getLocation().getLatitude());
 				transStopsStat.setDouble(3, s.getLocation().getLongitude());
 				transStopsStat.setString(4, s.getName());
 				transStopsStat.setString(5, s.getEnName(false));
-				Map<String, String> namesMap = s.getNamesMap(false);
 				transStopsStat.setString(6, namesMap.size() > 0 ? gson.toJson(namesMap) : "{}");
 				transStopsStat.setString(7, gson.toJson(s.getDeletedRoutesIds()));
 				int x = (int) MapUtils.getTileNumberX(24, s.getLocation().getLongitude());
@@ -530,6 +534,10 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					throw new IllegalArgumentException(e);
 				}
 				visitedStops.add(s.getId());
+			} else if (connectedPlatformNamesByStopId.containsKey(s.getId())) {
+				transStopsUpdateStat.setString(1, namesMap.size() > 0 ? gson.toJson(namesMap) : "{}");
+				transStopsUpdateStat.setLong(2, s.getId());
+				addBatch(transStopsUpdateStat);
 			}
 			transRouteStopsStat.setLong(1, r.getId());
 			transRouteStopsStat.setLong(2, s.getId());
@@ -538,12 +546,21 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		}
 	}
 
+	private Map<String, String> getNamesMapWithConnectedPlatformNames(TransportStop stop) {
+		Map<String, String> namesMap = new LinkedHashMap<String, String>(stop.getNamesMap(false));
+		Map<String, String> platformNames = connectedPlatformNamesByStopId.get(stop.getId());
+		if (platformNames != null) {
+			namesMap.putAll(platformNames);
+		}
+		return namesMap;
+	}
+
 
 
 	public void writeBinaryTransportIndex(BinaryMapIndexWriter writer, String regionName,
 			Connection mapConnection) throws IOException, SQLException {
 		try {
-			closePreparedStatements(transRouteStat, transRouteStopsStat, transStopsStat, transRouteGeometryStat);
+			closePreparedStatements(transRouteStat, transRouteStopsStat, transStopsStat, transStopsUpdateStat, transRouteGeometryStat);
 			mapConnection.commit();
 			transportStopsTree.flush();
 
@@ -1163,10 +1180,31 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			if(replaceStop != null) {
 				platformsAndStopsToProcess.remove(platform);
 				if (!Algorithms.isEmpty(platform.getTag(OSMTagKey.NAME))) {
+					addConnectedPlatformName(replaceStop, platform);
 					nameReplacement.put(EntityId.valueOf(replaceStop), platform);
 				}
 			}
 		}
+	}
+
+	private void addConnectedPlatformName(Entity stop, Entity platform) {
+		String platformName = platform.getTag(OSMTagKey.NAME);
+		if (Algorithms.isEmpty(platformName)) {
+			return;
+		}
+		TransportStop routeStop = EntityParser.parseTransportStop(stop);
+		TransportStop platformStop = EntityParser.parseTransportStop(platform);
+		Long stopId = routeStop.getId();
+		Long platformId = platformStop.getId();
+		if (stopId == null || platformId == null) {
+			return;
+		}
+		Map<String, String> platformNames = connectedPlatformNamesByStopId.get(stopId);
+		if (platformNames == null) {
+			platformNames = new LinkedHashMap<String, String>();
+			connectedPlatformNamesByStopId.put(stopId, platformNames);
+		}
+		platformNames.put(TransportStop.CONNECTED_PLATFORM_NAME_PREFIX + ":" + platformId, platformName);
 	}
 
 
