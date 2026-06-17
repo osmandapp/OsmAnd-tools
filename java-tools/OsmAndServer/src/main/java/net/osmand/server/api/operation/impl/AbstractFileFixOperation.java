@@ -50,8 +50,8 @@ public abstract class AbstractFileFixOperation implements Operation<AbstractFile
 			Integer userId,         // null/empty = all users; a number = single user (for testing)
 			boolean testRun,         // true = only count what would be fixed, no write
 			LocalDate updatedAfter,  // null = no date filter; else only files updated on/after this date
-			int maxUsers,            // empty/0 = no limit
-			int maxFiles             // empty/0 = no limit
+			Integer usersPercent,    // null/100 = all users; otherwise that % of all users
+			Integer filesPercent     // null/100 = all files; otherwise that % of each user's files
 	) {}
 
 	protected abstract byte[] processFile(UserFile file) throws IOException;
@@ -61,21 +61,22 @@ public abstract class AbstractFileFixOperation implements Operation<AbstractFile
 	@Override
 	public Object run(Params params, OperationContext ctx) {
 		List<Integer> userIds = resolveUsers(params);
+		int fileCap = fileCap(userIds, params.filesPercent());
 		int total = userIds.size();
 		Stats stats = new Stats(params.testRun());
 		int doneUsers = 0;
 		for (Integer userId : userIds) {
-			if (ctx.isCancelled()) {
+			if (ctx.isCancelled() || stats.scanned >= fileCap) {
 				break;
 			}
-			processUser(userId, params, stats);
+			processUser(userId, params, stats, fileCap);
 			doneUsers++;
 			ctx.setProgress(doneUsers, total, String.format("%d/%d users · %d fixed", doneUsers, total, stats.fixed));
 		}
 		return stats.toResult();
 	}
 
-	private void processUser(int userId, Params params, Stats stats) {
+	private void processUser(int userId, Params params, Stats stats, int fileCap) {
 		stats.users++;
 		boolean userFixed = false;
 		Long afterMs = params.updatedAfter() == null ? null
@@ -85,7 +86,7 @@ public abstract class AbstractFileFixOperation implements Operation<AbstractFile
 			if (afterMs != null && fileNoData.updatetimems < afterMs) {
 				continue;
 			}
-			if (params.maxFiles() > 0 && stats.scanned >= params.maxFiles()) {
+			if (stats.scanned >= fileCap) {
 				break;
 			}
 			stats.scanned++;
@@ -150,11 +151,27 @@ public abstract class AbstractFileFixOperation implements Operation<AbstractFile
 		List<Integer> ids = new ArrayList<>();
 		for (CloudUser user : usersRepository.findAll()) {
 			ids.add(user.id);
-			if (params.maxUsers() > 0 && ids.size() >= params.maxUsers()) {
-				break;
-			}
 		}
-		return ids;
+		int max = limit(ids.size(), params.usersPercent());
+		return ids.subList(0, Math.min(max, ids.size()));
+	}
+
+	private static int limit(int total, Integer percent) {
+		if (percent == null || percent >= 100) {
+			return total;
+		}
+		return (int) Math.ceil(total * Math.max(0, percent) / 100.0);
+	}
+
+	private int fileCap(List<Integer> userIds, Integer filesPercent) {
+		if (filesPercent == null || filesPercent >= 100) {
+			return Integer.MAX_VALUE;
+		}
+		int total = 0;
+		for (int userId : userIds) {
+			total += userdataService.generateFiles(userId, null, false, false, Collections.emptySet()).uniqueFiles.size();
+		}
+		return limit(total, filesPercent);
 	}
 
 	protected static final class Stats {
