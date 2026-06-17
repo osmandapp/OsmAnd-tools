@@ -68,12 +68,16 @@ public class SearchController {
                                          @RequestParam (required = false) String northWest,
                                          @RequestParam (required = false) String southEast,
                                          @RequestParam(required = false) Boolean baseSearch,
+                                         @RequestParam(required = false) Boolean spatial,
                                          @RequestParam(required = false) String timeZone) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return osmAndMapsService.errorConfig();
         }
-        List<Feature> features = searchService.search(new SearchService.SearchContext(lat, lon, text, locale,
-                baseSearch != null && baseSearch, northWest, southEast), timeZone);
+        SearchService.SearchContext searchContext = new SearchService.SearchContext(lat, lon, text, locale,
+                baseSearch != null && baseSearch, northWest, southEast);
+        List<Feature> features = spatial != null && spatial
+                ? searchService.searchSpatial(searchContext, timeZone)
+                : searchService.search(searchContext, timeZone);
         return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[0]))));
     }
     
