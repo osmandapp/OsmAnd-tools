@@ -9,6 +9,7 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -1081,7 +1082,7 @@ public class BinaryMapIndexWriter {
 				if (bbox31 != null) {
 					int[] bytes = SearchAlgorithms.encodeBboxForNameAtoms(ZOOM_ENCODE_BBOX_NAME_ATOMS, bbox31);
 					// double bbox or bbox larger than 15th zoom tile 
-					if (bytes.length != 5 || (bytes[2] > 1 || bytes[4] > 1)) {
+					if (bytes.length != 5 || (bytes[2] >= 1 || bytes[4] >= 1)) {
 						mapDataBuf.clear();
 						writeRawVarint32(mapDataBuf, bytes[0]);
 						for (int k = 1; k < bytes.length; k += 4) {
