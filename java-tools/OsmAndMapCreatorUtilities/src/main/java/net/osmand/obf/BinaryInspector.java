@@ -104,7 +104,7 @@ public class BinaryInspector {
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
-					//"-vsearchinspect", // "-vsearchglobalonly", // "-vprefix=hh" // search index extended anlays 
+//					"-vsearchinspect", // "-vsearchglobalonly", // "-vprefix=hh" // search index extended anlays 
 					"-vaddress",   
 //					"-vcities", "-vstreetgroups", "-vcitynames",
 //					"-vstreets", //  "-vbuildings",// "-vintersections",
@@ -1036,6 +1036,7 @@ public class BinaryInspector {
 			}
 		}
 		as.nameIndex = ValueFreq.mergeArray(new HashMap<>(), fullNameIndex.getAddrPrefixes(-1, vInfo.getPrefix()));
+		as.commonWordsStat = fullNameIndex.getCommonWordsStats();
 		if (!vInfo.vsearchglobalonly) {
 			printAddressNameStats(as);
 		}
@@ -1080,6 +1081,7 @@ public class BinaryInspector {
 			
 		}
 		println(String.format("\t * Boundary stats (%,d): %s ", bndsLst.size(), bndsLstB));
+		printCommonStats(as.commonWordsStat, " * Address");
 	}
 
 	private void printNameStats(Map<String, ValueFreq> nameIndexMap, int alimit, String name, SuffixesStat suffixesStat) {
@@ -1691,6 +1693,7 @@ public class BinaryInspector {
 	public static class AddressStats {
 		int files = 0;
 		Map<String, ValueFreq> nameIndex = new HashMap<>();
+		Map<String, ValueFreq> commonWordsStat = new HashMap<>();
 		Map<CityBlocks, Map<String, ValueFreq>> nameByTypeIndex = new HashMap<>();
 		SuffixesStat suffixesStat = new SuffixesStat();
 		StreetsIndexStat streetsStat = new StreetsIndexStat();
@@ -1702,6 +1705,7 @@ public class BinaryInspector {
 			streetsStat.merge(s.streetsStat);
 			bndsStat.merge(s.bndsStat);
 			ValueFreq.mergeArray(nameIndex, s.nameIndex);
+			ValueFreq.mergeArray(commonWordsStat, s.commonWordsStat);
 			for (CityBlocks type : s.nameByTypeIndex.keySet()) {
 				if (!nameByTypeIndex.containsKey(type)) {
 					nameByTypeIndex.put(type, s.nameByTypeIndex.get(type));
@@ -1720,6 +1724,7 @@ public class BinaryInspector {
 		Map<String, ValueFreq> singleValues = new HashMap<>();
 		Map<String, ValueFreq> categories = new HashMap<>();
 		Map<String, ValueFreq> nameIndex = new HashMap<>();
+		Map<String, ValueFreq> commonWordsStat = new HashMap<>();
 		SuffixesStat suffixesStat = new SuffixesStat();
 		
 		public void merge(PoiStats s) {
@@ -1731,6 +1736,7 @@ public class BinaryInspector {
 			ValueFreq.mergeArray(singleValues, s.singleValues);
 			ValueFreq.mergeArray(categories, s.categories);
 			ValueFreq.mergeArray(nameIndex, s.nameIndex);
+			ValueFreq.mergeArray(commonWordsStat, s.commonWordsStat);
 		}
 
 
@@ -1854,6 +1860,7 @@ public class BinaryInspector {
 		NameIndexReader fullNameIndex = index.readFullNameIndex(new NameIndexReader(p), null);
 		fullNameIndex.setSuffixesStat(ps.suffixesStat);
 		ps.nameIndex = ValueFreq.mergeArray(new HashMap<>(), fullNameIndex.getPOIPrefixes(verbose.getPrefix()));
+		ps.commonWordsStat = fullNameIndex.getCommonWordsStats();
 		
 		if (!verbose.vsearchglobalonly) {
 			printPoiTypeStats(ps);
@@ -1863,8 +1870,7 @@ public class BinaryInspector {
 		if (verbose.isVpoiObjects() || verbose.vsearchinspect) {
 			index.searchPoi(req, p);
 			if (!verbose.vsearchinspect) {
-				println(String.format("Found %d pois (%d with addr, %d with name without addr)", count[0], count[1],
-						count[2]));
+				println(String.format("Found %d pois (%d with addr, %d with name without addr)", count[0], count[1], count[2]));
 			}
 		}
 	}
@@ -1914,7 +1920,25 @@ public class BinaryInspector {
 		println(String.format("\t\t\tText based (%d, %,d): %s",  ps.text.size(), sumFreq(text), text));
 		println(String.format("\t\t\tSingle value filters (%d, %,d): %s", sumSingleValue, sumFreq(singleValuesLst), singleValuesFmt));
 		
+		printCommonStats(ps.commonWordsStat, "\tPOI");
 		printNameStats(ps.nameIndex, 10_000, "\tPOI", ps.suffixesStat);
+	}
+
+	private void printCommonStats(Map<String, ValueFreq> commonWordsStat, String prefix) {
+		List<ValueFreq> clist = new ArrayList<>(commonWordsStat.values());
+		Collections.sort(clist);
+		StringBuilder cmn = new StringBuilder();
+		int cmnTotal = 0, cmnMatched = 0, cmnIndexed = 0;
+		for (ValueFreq vf : clist) {
+			cmnTotal++;
+			cmnMatched += vf.freq;
+			cmnIndexed += vf.extra;
+			if (cmn.length() < 10_000) {
+				cmn.append(String.format("%s (%,d, %,d), ", vf.value, vf.freq, vf.extra));
+			}
+		}
+		println(String.format("\t%s Common words (%,d words, %,d matched, %,d indexed): %s", 
+				prefix, cmnTotal, cmnMatched, cmnIndexed, cmn.toString()));
 	}
 
 	private static int sumFreq(List<ValueFreq> refs) {
