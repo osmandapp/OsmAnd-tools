@@ -266,6 +266,8 @@ public class SearchService {
 					if (!objs.isEmpty()) {
 						Feature f = getSpatialFeature(objs.get(0), ctx.locale, timeZone);
 						if (f != null) {
+							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(), objs.stream()
+									.map(o -> o.getName(ctx.locale)).collect(Collectors.joining("\n")));
 							features.add(f);
 						}
 					}
@@ -1199,7 +1201,9 @@ public class SearchService {
         POI_TYPE("web_poi_type"),
         POI_SUBTYPE("web_poi_subType"),
         POI_OSM_URL("web_poi_osmUrl"),
-        CITY("web_city");
+        CITY("web_city"),
+        // names of all objects matched in a spatial-search result (street, city, ...)
+        MATCHED_OBJECTS("web_matched_objects");
 
         private final String fieldName;
 
