@@ -9,6 +9,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -272,7 +273,7 @@ public class NameIndexCreator<T> {
 			if (Algorithms.isEmpty(prefix)) {
 				continue;
 			}
-			if (indexNumbers && CommonWords.isNumber2Letters(token)) {
+			if (!indexNumbers && CommonWords.isNumber2Letters(token)) {
 				continue;
 			}
 			NamedObjectsByPrefix<T> entry = namesIndex.get(prefix);

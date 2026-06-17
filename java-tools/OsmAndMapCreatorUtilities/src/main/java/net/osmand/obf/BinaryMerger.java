@@ -502,7 +502,7 @@ public class BinaryMerger {
 				}
 				BinaryFileReference ref = writer.writeCityHeader(city, city.getType().ordinal(), tagRules);
 				refs.add(ref);
-				writer.writeCityIndex(city, city.getStreets(), namesakesStreetNodes.get(city), ref, tagRules);
+				writer.writeCityIndex(city, city.getStreets(), namesakesStreetNodes.get(city), ref, tagRules, null);
 				NameIndexCreator.putAddrNamedMapObject(namesIndex, city, ref.getStartPointer(), settings);
 				if (!city.isPostcode()) {
 					for (Street s : city.getStreets()) {

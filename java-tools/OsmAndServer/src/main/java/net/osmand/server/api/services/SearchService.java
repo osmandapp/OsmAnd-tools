@@ -12,6 +12,10 @@ import net.osmand.osm.*;
 import net.osmand.osm.edit.Entity;
 import net.osmand.search.SearchUICore;
 import net.osmand.search.core.*;
+import net.osmand.search.core.spatial.SpatialSearchContext;
+import net.osmand.search.core.spatial.SpatialSearchResult;
+import net.osmand.search.core.spatial.SpatialTextSearch;
+import net.osmand.search.core.spatial.SpatialTextSearch.SpatialSearchResults;
 import net.osmand.server.utils.MapPoiTypesTranslator;
 import net.osmand.util.Algorithms;
 import net.osmand.util.LocationParser;
@@ -78,6 +82,8 @@ public class SearchService {
     private static final String WIKI_POI_TYPE = "osmwiki";
 
     private final ConcurrentHashMap<String, MapPoiTypes> poiTypesByLocale = new ConcurrentHashMap<>();
+
+    private final SpatialTextSearch spatialTextSearch = new SpatialTextSearch();
 
     public static class PoiSearchResult {
         
@@ -231,6 +237,76 @@ public class SearchService {
 		}
 
 		return !features.isEmpty() ? features : Collections.emptyList();
+	}
+
+	// dev-only: new prototype search using SpatialTextSearch.
+	public List<Feature> searchSpatial(SearchContext ctx, String timeZone) throws IOException {
+		if (!osmAndMapsService.validateAndInitConfig()) {
+			return Collections.emptyList();
+		}
+		double radius = SearchOption.SEARCH_RADIUS_DEGREE;
+		QuadRect points = osmAndMapsService.points(null,
+				new LatLon(ctx.lat + radius, ctx.lon - radius),
+				new LatLon(ctx.lat - radius, ctx.lon + radius));
+		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
+		try {
+			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsForSearch(points, ctx.baseSearch);
+			if (list.isEmpty()) {
+				return Collections.emptyList();
+			}
+			usedMapList = osmAndMapsService.getReaders(list, null);
+			if (usedMapList.isEmpty()) {
+				return Collections.emptyList();
+			}
+			SpatialSearchResults res = spatialTextSearch.searchAPI(ctx.text, new SpatialSearchContext(usedMapList));
+			List<Feature> features = new ArrayList<>();
+			if (res.mainResult != null) {
+				for (SpatialSearchResult r : res.mainResult.getResult()) {
+					List<MapObject> objs = r.getObjects();
+					if (!objs.isEmpty()) {
+						Feature f = getSpatialFeature(objs.get(0), ctx.locale, timeZone);
+						if (f != null) {
+							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(), objs.stream()
+									.map(o -> o.getName(ctx.locale)).collect(Collectors.joining("\n")));
+							features.add(f);
+						}
+					}
+				}
+			}
+			return features;
+		} catch (RuntimeException e) {
+			LOGGER.warn(String.format("Spatial search failed for '%s' (incompatible maps?): %s", ctx.text, e), e);
+			return Collections.emptyList();
+		} finally {
+			osmAndMapsService.unlockReaders(usedMapList);
+		}
+	}
+
+	private Feature getSpatialFeature(MapObject obj, String locale, String timeZone) {
+		if (obj == null || obj.getLocation() == null) {
+			return null;
+		}
+		if (obj instanceof Amenity amenity) {
+			SearchResult result = buildPoiSearchResult(amenity, locale, "");
+			result.localeName = amenity.getName(locale);
+			return getFeature(result, timeZone);
+		}
+		SearchResult result = new SearchResult();
+		result.object = obj;
+		result.location = obj.getLocation();
+		result.localeName = obj.getName(locale);
+		if (obj instanceof Street street) {
+			result.objectType = ObjectType.STREET;
+			City city = street.getCity();
+			if (city != null) {
+				result.localeRelatedObjectName = city.getName(locale);
+			}
+		} else if (obj instanceof City) {
+			result.objectType = ObjectType.CITY;
+		} else {
+			result.objectType = ObjectType.LOCATION;
+		}
+		return getFeature(result, timeZone);
 	}
 
     public SearchResults getImmediateSearchResults(SearchContext ctx, SearchOption option,
@@ -1125,7 +1201,9 @@ public class SearchService {
         POI_TYPE("web_poi_type"),
         POI_SUBTYPE("web_poi_subType"),
         POI_OSM_URL("web_poi_osmUrl"),
-        CITY("web_city");
+        CITY("web_city"),
+        // names of all objects matched in a spatial-search result (street, city, ...)
+        MATCHED_OBJECTS("web_matched_objects");
 
         private final String fieldName;
 
@@ -1165,18 +1243,21 @@ public class SearchService {
             }
             long osmId = amenity.getId();
             if (!foundFeatures.containsKey(osmId)) {
-                String cityName = amenity.getCityFromTagGroups(locale);
-                String city = cityName == null ? "" : cityName;
-                String mainCity = getMainCityName(city);
-                SearchResult result = new SearchResult();
-                result.object = amenity;
-                result.objectType = ObjectType.POI;
-                result.location = amenity.getLocation();
-                result.addressName = calculateAddressString(amenity, city, mainCity, dominatedCity);
-                foundFeatures.put(osmId, getPoiFeature(result, timeZone));
+                foundFeatures.put(osmId, getPoiFeature(buildPoiSearchResult(amenity, locale, dominatedCity), timeZone));
                 remainingLimit--;
             }
         }
+    }
+
+    private SearchResult buildPoiSearchResult(Amenity amenity, String locale, String dominatedCity) {
+        String cityName = amenity.getCityFromTagGroups(locale);
+        String city = cityName == null ? "" : cityName;
+        SearchResult result = new SearchResult();
+        result.object = amenity;
+        result.objectType = ObjectType.POI;
+        result.location = amenity.getLocation();
+        result.addressName = calculateAddressString(amenity, city, getMainCityName(city), dominatedCity);
+        return result;
     }
 
     private String calculateAddressString(Amenity amenity, String cityName, String mainCity, String dominatedCity) {
