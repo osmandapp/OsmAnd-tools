@@ -284,14 +284,21 @@ public class SearchService {
 		if (obj == null || obj.getLocation() == null) {
 			return null;
 		}
+		if (obj instanceof Amenity amenity) {
+			SearchResult result = buildPoiSearchResult(amenity, locale, "");
+			result.localeName = amenity.getName(locale);
+			return getFeature(result, timeZone);
+		}
 		SearchResult result = new SearchResult();
 		result.object = obj;
 		result.location = obj.getLocation();
 		result.localeName = obj.getName(locale);
-		if (obj instanceof Amenity) {
-			result.objectType = ObjectType.POI;
-		} else if (obj instanceof Street) {
+		if (obj instanceof Street street) {
 			result.objectType = ObjectType.STREET;
+			City city = street.getCity();
+			if (city != null) {
+				result.localeRelatedObjectName = city.getName(locale);
+			}
 		} else if (obj instanceof City) {
 			result.objectType = ObjectType.CITY;
 		} else {
@@ -1232,18 +1239,21 @@ public class SearchService {
             }
             long osmId = amenity.getId();
             if (!foundFeatures.containsKey(osmId)) {
-                String cityName = amenity.getCityFromTagGroups(locale);
-                String city = cityName == null ? "" : cityName;
-                String mainCity = getMainCityName(city);
-                SearchResult result = new SearchResult();
-                result.object = amenity;
-                result.objectType = ObjectType.POI;
-                result.location = amenity.getLocation();
-                result.addressName = calculateAddressString(amenity, city, mainCity, dominatedCity);
-                foundFeatures.put(osmId, getPoiFeature(result, timeZone));
+                foundFeatures.put(osmId, getPoiFeature(buildPoiSearchResult(amenity, locale, dominatedCity), timeZone));
                 remainingLimit--;
             }
         }
+    }
+
+    private SearchResult buildPoiSearchResult(Amenity amenity, String locale, String dominatedCity) {
+        String cityName = amenity.getCityFromTagGroups(locale);
+        String city = cityName == null ? "" : cityName;
+        SearchResult result = new SearchResult();
+        result.object = amenity;
+        result.objectType = ObjectType.POI;
+        result.location = amenity.getLocation();
+        result.addressName = calculateAddressString(amenity, city, getMainCityName(city), dominatedCity);
+        return result;
     }
 
     private String calculateAddressString(Amenity amenity, String cityName, String mainCity, String dominatedCity) {
