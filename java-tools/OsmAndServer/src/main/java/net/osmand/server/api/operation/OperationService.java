@@ -137,7 +137,12 @@ public class OperationService {
 					.orElseThrow(() -> new IllegalStateException("Operation is not discovered or not valid: " + className));
 			Object args = descriptor.paramsType() == null ? params : paramMapper.convertValue(params, descriptor.paramsType());
 			Object result = invoke(descriptor.bean(), args, context);
-			repository.markSuccess(runId, toJson(result == null ? Collections.emptyMap() : result), elapsed(started));
+			String resultJson = toJson(result == null ? Collections.emptyMap() : result);
+			if (context.isCancelled()) {
+				repository.markCancelled(runId, resultJson, elapsed(started)); // keep what was found before cancel
+			} else {
+				repository.markSuccess(runId, resultJson, elapsed(started));
+			}
 		} catch (Throwable e) {
 			if (isCancellation(e) || Thread.currentThread().isInterrupted()) {
 				repository.markCancelled(runId, elapsed(started));
@@ -166,8 +171,9 @@ public class OperationService {
 
 	private void interrupt(RunningOperation running) {
 		if (running != null) {
+			// cooperative cancel only: the operation loop checks isCancelled() each user/file and stops,
+			// returning its partial result. No hard interrupt, so in-flight DB calls finish and nothing is lost.
 			running.context().cancel();
-			running.future().cancel(true);
 		}
 	}
 

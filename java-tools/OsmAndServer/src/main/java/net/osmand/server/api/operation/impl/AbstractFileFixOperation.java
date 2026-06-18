@@ -53,7 +53,8 @@ public abstract class AbstractFileFixOperation implements Operation<AbstractFile
 			LocalDate updatedAfter,  // null = no date filter; else only files updated on/after this date
 			Set<String> fileTypes,   // null/empty = all types; otherwise only these (e.g. GPX, FAVOURITES)
 			Integer usersPercent,    // null/100 = all users; otherwise that % of all users
-			Integer filesPercent     // null/100 = all files; otherwise that % of each user's files
+			Integer filesPercent,    // null/100 = all files; otherwise that % of each user's files
+			List<Long> fileIds       // null/empty = normal scan; otherwise process only these file ids
 	) {}
 
 	protected abstract byte[] processFile(UserFile file, boolean testRun) throws IOException;
@@ -66,10 +67,19 @@ public abstract class AbstractFileFixOperation implements Operation<AbstractFile
 
 	@Override
 	public Object run(Params params, OperationContext ctx) {
+		Stats stats = new Stats(isTest(params));
+		if (params.fileIds() != null && !params.fileIds().isEmpty()) {
+			runForFiles(params, ctx, stats);
+		} else {
+			runForUsers(params, ctx, stats);
+		}
+		return stats.toResult();
+	}
+
+	private void runForUsers(Params params, OperationContext ctx, Stats stats) {
 		List<Integer> userIds = resolveUsers(params);
 		int fileCap = fileCap(userIds, params);
 		int total = userIds.size();
-		Stats stats = new Stats(isTest(params));
 		int doneUsers = 0;
 		for (Integer userId : userIds) {
 			if (ctx.isCancelled() || stats.scanned >= fileCap) {
@@ -79,12 +89,27 @@ public abstract class AbstractFileFixOperation implements Operation<AbstractFile
 			doneUsers++;
 			ctx.setProgress(doneUsers, total, String.format("%d/%d users · %d fixed", doneUsers, total, stats.fixed));
 		}
-		return stats.toResult();
+	}
+
+	// targeted run: process only the given file ids (e.g. the ones a previous test run found), no full scan
+	private void runForFiles(Params params, OperationContext ctx, Stats stats) {
+		List<Long> ids = params.fileIds();
+		int total = ids.size();
+		int done = 0;
+		for (Long id : ids) {
+			if (ctx.isCancelled()) {
+				break;
+			}
+			stats.scanned++;
+			processFileById(id, params, stats);
+			done++;
+			ctx.setProgress(done, total, String.format("%d/%d files · %d fixed", done, total, stats.fixed));
+		}
 	}
 
 	private void processUser(int userId, Params params, Stats stats, int fileCap) {
 		stats.users++;
-		boolean userFixed = false;
+		int fixedBefore = stats.fixed;
 		Long afterMs = params.updatedAfter() == null ? null
 				: params.updatedAfter().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
 		UserFilesResults res = userdataService.generateFiles(userId, null, false, false, typesOf(params));
@@ -96,30 +121,33 @@ public abstract class AbstractFileFixOperation implements Operation<AbstractFile
 				break;
 			}
 			stats.scanned++;
-			try {
-				UserFile file = filesRepository.findById(fileNoData.id).orElse(null);
-				if (file == null) {
-					stats.skipped++;
-					continue;
-				}
-				byte[] fixed = processFile(file, isTest(params));
-				if (fixed == null) {
-					stats.skipped++;
-				} else {
-					if (!isTest(params)) {
-						save(file, fixed);
-					}
-					stats.fixed++;
-					userFixed = true;
-					stats.fixedFiles.add(Map.of("userid", userId, "file", file.name));
-				}
-			} catch (Exception e) {
-				stats.failed++;
-				stats.failedFiles.add(Map.of("userid", userId, "file", fileNoData.name, "error", String.valueOf(e.getMessage())));
-			}
+			processFileById(fileNoData.id, params, stats);
 		}
-		if (userFixed) {
+		if (stats.fixed > fixedBefore) {
 			stats.usersFixed++;
+		}
+	}
+
+	private void processFileById(long id, Params params, Stats stats) {
+		UserFile file = filesRepository.findById(id).orElse(null);
+		if (file == null) {
+			stats.skipped++;
+			return;
+		}
+		try {
+			byte[] fixed = processFile(file, isTest(params));
+			if (fixed == null) {
+				stats.skipped++;
+				return;
+			}
+			if (!isTest(params)) {
+				save(file, fixed);
+			}
+			stats.fixed++;
+			stats.fixedFiles.add(Map.of("userid", file.userid, "id", file.id, "file", file.name));
+		} catch (Exception e) {
+			stats.failed++;
+			stats.failedFiles.add(Map.of("userid", file.userid, "id", file.id, "file", file.name, "error", String.valueOf(e.getMessage())));
 		}
 	}
 

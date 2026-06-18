@@ -151,6 +151,12 @@ public class OperationRepository {
 				"updated_time = CURRENT_TIMESTAMP WHERE id = ?", elapsedMs, runId);
 	}
 
+	public void markCancelled(long runId, String resultJson, long elapsedMs) {
+		jdbc.update("UPDATE run SET status = 'CANCELLED', result_json = ?, elapsed_ms = ?, " +
+				"finished_time = CURRENT_TIMESTAMP, updated_time = CURRENT_TIMESTAMP WHERE id = ?",
+				compress(resultJson), elapsedMs, runId);
+	}
+
 	public void requestCancel(long runId) {
 		jdbc.update("UPDATE run SET status = 'CANCELLED', finished_time = COALESCE(finished_time, CURRENT_TIMESTAMP), " +
 				"updated_time = CURRENT_TIMESTAMP WHERE id = ? AND status IN ('PENDING', 'RUNNING')", runId);
