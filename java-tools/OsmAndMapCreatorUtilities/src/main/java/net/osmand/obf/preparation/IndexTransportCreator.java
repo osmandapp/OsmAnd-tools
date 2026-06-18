@@ -1180,14 +1180,13 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			if(replaceStop != null) {
 				platformsAndStopsToProcess.remove(platform);
 				if (!Algorithms.isEmpty(platform.getTag(OSMTagKey.NAME))) {
-					addConnectedPlatformName(replaceStop, platform);
+					addConnectedPlatformData(replaceStop, platform, routeId);
 					nameReplacement.put(EntityId.valueOf(replaceStop), platform);
 				}
 			}
 		}
 	}
 
-	private void addConnectedPlatformName(Entity stop, Entity platform) {
 	private void addConnectedPlatformData(Entity stop, Entity platform, long routeId) {
 		String platformName = platform.getTag(OSMTagKey.NAME);
 		if (Algorithms.isEmpty(platformName)) {
