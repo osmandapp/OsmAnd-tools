@@ -13,8 +13,6 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 
 import net.osmand.server.api.operation.AdminOperation;
-import net.osmand.server.api.repo.CloudUserDevicesRepository;
-import net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
 import net.osmand.server.api.repo.CloudUserFilesRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFile;
 import net.osmand.server.api.repo.CloudUsersRepository;
@@ -32,13 +30,9 @@ public class DeleteBrokenInfoFilesOperation extends AbstractFileFixOperation {
 	private static final Gson GSON_WITH_NANS = new GsonBuilder().serializeSpecialFloatingPointValues().create();
 	private static final String INFO_EXT = ".info";
 
-	private final CloudUserDevicesRepository devicesRepository;
-
 	public DeleteBrokenInfoFilesOperation(CloudUsersRepository usersRepository, CloudUserFilesRepository filesRepository,
-										  UserdataService userdataService, StorageService storageService,
-										  CloudUserDevicesRepository devicesRepository) {
+										  UserdataService userdataService, StorageService storageService) {
 		super(usersRepository, filesRepository, userdataService, storageService);
-		this.devicesRepository = devicesRepository;
 	}
 
 	@Override
@@ -57,13 +51,9 @@ public class DeleteBrokenInfoFilesOperation extends AbstractFileFixOperation {
 			return false; // info file is valid json -> keep
 		}
 		if (!testRun) {
-			CloudUserDevice dev = devicesRepository.findById(file.deviceid);
-			if (dev == null) {
-				throw new IllegalStateException("no device for file");
-			}
 			LOG.info("Deleting broken info file: userid={}, name={}", file.userid, file.name);
 			try {
-				userdataService.deleteFile(file.name, file.type, null, null, dev);
+				userdataService.deleteFileVersion(null, file.userid, file.name, file.type, file);
 			} catch (Exception e) {
 				throw new IllegalStateException(
 						"Failed to delete broken info file userid=" + file.userid + " name=" + file.name, e);

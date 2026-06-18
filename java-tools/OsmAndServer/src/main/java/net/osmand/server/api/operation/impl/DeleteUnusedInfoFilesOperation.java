@@ -7,8 +7,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import net.osmand.server.api.operation.AdminOperation;
-import net.osmand.server.api.repo.CloudUserDevicesRepository;
-import net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
 import net.osmand.server.api.repo.CloudUserFilesRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFile;
 import net.osmand.server.api.repo.CloudUsersRepository;
@@ -26,13 +24,9 @@ public class DeleteUnusedInfoFilesOperation extends AbstractFileFixOperation {
 	private static final String INFO_EXT = ".info";
 	private static final String GPX_INFO_EXT = ".gpx.info";
 
-	private final CloudUserDevicesRepository devicesRepository;
-
 	public DeleteUnusedInfoFilesOperation(CloudUsersRepository usersRepository, CloudUserFilesRepository filesRepository,
-	                                      UserdataService userdataService, StorageService storageService,
-	                                      CloudUserDevicesRepository devicesRepository) {
+	                                      UserdataService userdataService, StorageService storageService) {
 		super(usersRepository, filesRepository, userdataService, storageService);
-		this.devicesRepository = devicesRepository;
 	}
 
 	@Override
@@ -53,13 +47,9 @@ public class DeleteUnusedInfoFilesOperation extends AbstractFileFixOperation {
 			return false; // paired gpx still exists
 		}
 		if (!testRun) {
-			CloudUserDevice dev = devicesRepository.findById(file.deviceid);
-			if (dev == null) {
-				throw new IllegalStateException("no device for file");
-			}
 			LOG.info("Deleting unused info file: userid={}, name={}, type={}", file.userid, file.name, file.type);
 			try {
-				userdataService.deleteFile(file.name, file.type, null, null, dev);
+				userdataService.deleteFileVersion(null, file.userid, file.name, file.type, file);
 			} catch (Exception e) {
 				throw new IllegalStateException(
 						"Failed to delete unused info file userid=" + file.userid + " name=" + file.name, e);
