@@ -585,7 +585,7 @@ public class NativeJavaRendering extends NativeLibrary {
 				File filesFolder = new File(obfFolder);
 				List<File> obfFiles = new ArrayList<>();
 				Map<String, FileIndex> map = defaultLoadedLibrary.initIndexesCache(filesFolder, obfFiles, true);
-				//defaultLoadedLibrary.initCacheMapFile(new File(filesFolder, INDEXES_CACHE).getAbsolutePath());
+				defaultLoadedLibrary.initCacheMapFile(new File(filesFolder, INDEXES_CACHE).getAbsolutePath());
 				defaultLoadedLibrary.initFilesInDir(obfFiles, map);
 			}
 			log.info(String.format("Init native library with maps: %d ms", System.currentTimeMillis() - now));

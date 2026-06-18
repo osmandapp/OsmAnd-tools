@@ -9,7 +9,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -28,8 +27,9 @@ import net.osmand.util.SearchAlgorithms;
 public class NameIndexCreator<T> {
 
 	private static final int NAMED_WORDS_SEPARATOR = 0;
-	private static final int MIN_LIMIT_FREQ_COMMON = 10; // minimum required
-	private static final int ADD_TOP_X_FREQ_WORDS = 10; // minimum required
+	private static final int MIN_LIMIT_FREQ_COMMON = 10; // minimum required for common to have at least
+	// Large ADD_TOP_X_FREQ_WORDS many will cause to add many common words to index !
+	private static final int ADD_TOP_X_FREQ_WORDS = 10; // minimum required  for frequent to be added and indexed 
 	public static boolean NOT_INDEX_COMMON_IF_THERE_ARE_RARE = true;
 	public static boolean INDEX_RARE_WORDS_FOR_COMMON = false;
 	public static boolean INDEX_RARE_WORDS_FOR_NON_COMMON = false;
@@ -147,6 +147,7 @@ public class NameIndexCreator<T> {
 					boolean isCommon = word != null && word.nonindexed != 0;
 					if (isCommon) {
 						boolean rare = false;
+						
 						for (String r : singleName.allNames) {
 							if (!commonWords.words.containsKey(r)) {
 								rare = true;
@@ -157,7 +158,6 @@ public class NameIndexCreator<T> {
 							continue;
 						}
 					}
-					
 					if (namedObject.bitsetIndex.size() != 0) {
 						namedObject.bitsetIndex.add(NAMED_WORDS_SEPARATOR); // separator
 					}
@@ -244,7 +244,7 @@ public class NameIndexCreator<T> {
 		Map<String, PrepareWordIndex> words = new HashMap<String, NameIndexCreator.PrepareWordIndex>();
 		List<PrepareWordIndex> wordsList = new ArrayList<>();
 		int ind = 0;
-		for(String c : commonStrings) {
+		for (String c : commonStrings) {
 			Integer matched = tokenFrequencies.get(c);
 			Integer nonIndexed = commonNonIndexedFrequencies.get(c);
 			PrepareWordIndex word = new PrepareWordIndex(ind++, c, matched, nonIndexed == null ? 0 : nonIndexed);
@@ -258,10 +258,10 @@ public class NameIndexCreator<T> {
 	
 	public void addToNameIndex(String name, T obj, int maxPrefixLength, boolean indexNumbers) {
 		List<String> splitName = SearchAlgorithms.splitAndNormalize(name);
-		boolean nonCommonName = false;
+		boolean hasRareName = false;
 		for (String token : splitName) {
-			if(!CommonWords.isCommon(token)) {
-				nonCommonName = true;
+			if (!CommonWords.isCommon(token) && CommonWords.getFrequentlyUsed(token) <= 0) {
+				hasRareName = true;
 				break;
 			}
 		}
@@ -288,7 +288,7 @@ public class NameIndexCreator<T> {
 			}
 			tokenFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
 			boolean c = CommonWords.isCommon(token);
-			if (c && nonCommonName) {
+			if (c && hasRareName) {
 				commonNonIndexedFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
 			}
 			

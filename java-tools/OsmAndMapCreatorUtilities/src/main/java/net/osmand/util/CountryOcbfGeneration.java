@@ -562,10 +562,17 @@ public class CountryOcbfGeneration {
 				TranslateEntity nt = set.iterator().next();
 				line += " translate-" + nt.tm.size() + "=" + nt.tm.get("name");
 				Iterator<Entry<String, String>> it = nt.tm.entrySet().iterator();
+                boolean hasBoundary = false;
 				while(it.hasNext()) {
 					Entry<String, String> e = it.next();
+                    if ("boundary".equals(e.getKey())) {
+                        hasBoundary = true;
+                    }
 					addTag(serializer, e.getKey(), e.getValue());
 				}
+                if (!hasBoundary) {
+                    addTag(serializer, "boundary", "administrative");
+                }
 			}
 		}
 
