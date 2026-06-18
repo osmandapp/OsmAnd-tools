@@ -44,7 +44,7 @@ public class TileMemoryCache<T extends TileCacheProvider> {
 		}
 	}
 
-	public void cleanupCache() {
+	private void cleanupCache() {
 		int version = cacheTouch.incrementAndGet();
 		// so with atomic only 1 thread will get % X == 0
 		if (version % MAX_RUNTIME_IMAGE_CACHE_SIZE == 0 && version > 0) {

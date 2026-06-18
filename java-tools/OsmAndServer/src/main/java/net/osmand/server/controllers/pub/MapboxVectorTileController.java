@@ -60,7 +60,7 @@ public class MapboxVectorTileController {
         MapboxVectorTile tile = tileMemoryCache.getTile(tileId, k -> new MapboxVectorTile(config, x, y, z));
         // for testing
         //MapboxVectorTile tile = new MapboxVectorTile(config, x, y, z);
-        tileMemoryCache.cleanupCache();
+        tileMemoryCache.conditionalCleanupCache();
 		byte[] data = tile.getCacheRuntimeTile();
         tile.touch();
 
