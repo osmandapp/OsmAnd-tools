@@ -91,17 +91,17 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 			return;
 		}
 		int total = users.total();
-		int userLimit = UserBatchReader.limit(total, params.usersPercent());
-		int fileCap = fileCap(params, total, ctx);
+		List<Integer> userIds = users.sample(total, UserBatchReader.limit(total, params.usersPercent()), ctx);
+		int fileCap = fileCap(params, userIds, ctx);
+		int totalUsers = userIds.size();
 		AtomicInteger done = new AtomicInteger();
-		users.forEachBatch(total, userLimit, ctx, batchIds ->
-				forEach(threads, batchIds, ctx, userId -> {
-					if (stats.scanned.get() < fileCap) {
-						processUser(userId, params, stats, fileCap);
-					}
-					int d = done.incrementAndGet();
-					ctx.setProgress(d, userLimit, String.format("%d/%d users · %d fixed", d, userLimit, stats.fixed.get()));
-				}));
+		forEach(threads, userIds, ctx, userId -> {
+			if (stats.scanned.get() < fileCap) {
+				processUser(userId, params, stats, fileCap);
+			}
+			int d = done.incrementAndGet();
+			ctx.setProgress(d, totalUsers, String.format("%d/%d users · %d fixed", d, totalUsers, stats.fixed.get()));
+		});
 	}
 
 	private void runForFiles(Params params, OperationContext ctx, Stats stats) {
@@ -194,17 +194,14 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 		}
 	}
 
-	private int fileCap(Params params, int total, OperationContext ctx) {
+	private int fileCap(Params params, List<Integer> userIds, OperationContext ctx) {
 		if (params.filesPercent() == null || params.filesPercent() >= 100) {
 			return Integer.MAX_VALUE;
 		}
-		int[] sum = {0};
-		users.forEachBatch(total, total, ctx, batchIds -> {
-			for (int userId : batchIds) {
-				sum[0] += userdataService.generateFiles(userId, null, false, false, typesOf(params)).uniqueFiles.size();
-			}
-		});
-		return UserBatchReader.limit(sum[0], params.filesPercent());
+		AtomicInteger sum = new AtomicInteger();
+		forEach(clampThreads(params.threads()), userIds, ctx, userId ->
+				sum.addAndGet(userdataService.generateFiles(userId, null, false, false, typesOf(params)).uniqueFiles.size()));
+		return UserBatchReader.limit(sum.get(), params.filesPercent());
 	}
 
 	public Set<String> supportedTypes() {

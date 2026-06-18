@@ -2,7 +2,6 @@ package net.osmand.server.api.operation.impl;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Consumer;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -38,36 +37,32 @@ class UserBatchReader {
 		return (int) Math.ceil(total * Math.max(0, percent) / 100.0);
 	}
 
-	void forEachBatch(int total, int userLimit, OperationContext ctx, Consumer<List<Integer>> batchConsumer) {
+	List<Integer> sample(int total, int userLimit, OperationContext ctx) {
 		boolean sample = userLimit > 0 && userLimit < total;
 		double step = sample ? (double) total / userLimit : 1.0;
 		double nextPick = 0.0;
 		long index = 0;
-		int selected = 0;
+		List<Integer> ids = new ArrayList<>(Math.max(0, Math.min(userLimit, total)));
 		int batch = 0;
-		while (selected < userLimit && !ctx.isCancelled()) {
+		while (ids.size() < userLimit && !ctx.isCancelled()) {
 			Page<CloudUser> users = usersRepository.findAll(PageRequest.of(batch++, BATCH_SIZE, Sort.by("id")));
 			if (users.isEmpty()) {
 				break;
 			}
-			List<Integer> ids = new ArrayList<>();
 			for (CloudUser user : users) {
-				if (selected >= userLimit) {
+				if (ids.size() >= userLimit) {
 					break;
 				}
 				if (!sample || index >= nextPick) {
 					ids.add(user.id);
-					selected++;
 					nextPick += step;
 				}
 				index++;
-			}
-			if (!ids.isEmpty()) {
-				batchConsumer.accept(ids);
 			}
 			if (!users.hasNext()) {
 				break;
 			}
 		}
+		return ids;
 	}
 }
