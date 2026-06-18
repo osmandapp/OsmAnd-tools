@@ -12,6 +12,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,6 +50,12 @@ public class OperationService {
 				return thread;
 			});
 	private final ConcurrentHashMap<Long, RunningOperation> running = new ConcurrentHashMap<>();
+	private static final long FLUSH_INTERVAL_MS = 5_000;
+	private final ScheduledExecutorService flusher = Executors.newSingleThreadScheduledExecutor(runnable -> {
+		Thread thread = new Thread(runnable, "operation-flush");
+		thread.setDaemon(true);
+		return thread;
+	});
 
 	public OperationService(OperationRepository repository, OperationRegistry registry, ObjectMapper mapper) {
 		this.repository = repository;
@@ -55,6 +63,20 @@ public class OperationService {
 		this.mapper = mapper;
 		this.paramMapper = mapper.copy();
 		this.paramMapper.coercionConfigDefaults().setCoercion(CoercionInputShape.EmptyString, CoercionAction.AsNull);
+		flusher.scheduleWithFixedDelay(this::flushRunning, FLUSH_INTERVAL_MS, FLUSH_INTERVAL_MS, TimeUnit.MILLISECONDS);
+	}
+
+	private void flushRunning() {
+		running.forEach((runId, op) -> {
+			try {
+				Object partial = op.context().snapshotResult();
+				if (partial != null) {
+					repository.saveProgressResult(runId, toJson(partial), System.currentTimeMillis() - op.startedMs());
+				}
+			} catch (Exception e) {
+				LOGGER.debug("Failed to flush partial result for run {}", runId, e);
+			}
+		});
 	}
 
 	public List<OperationItem> getOperations() {
@@ -144,8 +166,17 @@ public class OperationService {
 				repository.markSuccess(runId, resultJson, elapsed(started));
 			}
 		} catch (Throwable e) {
-			if (isCancellation(e) || Thread.currentThread().isInterrupted()) {
-				repository.markCancelled(runId, elapsed(started));
+			Object partial = context.snapshotResult();
+			String partialJson = partial == null ? null : toJson(partial);
+			if (isCancellation(e) || context.isCancelled() || Thread.currentThread().isInterrupted()) {
+				if (partialJson != null) {
+					repository.markCancelled(runId, partialJson, elapsed(started));
+				} else {
+					repository.markCancelled(runId, elapsed(started));
+				}
+			} else if (partialJson != null) {
+				repository.markFailed(runId, partialJson, stackTrace(e), elapsed(started));
+				LOGGER.warn("Operation run {} failed", runId, e);
 			} else {
 				markFailed(runId, started, e);
 			}

@@ -1,10 +1,13 @@
 package net.osmand.server.api.operation;
 
+import java.util.function.Supplier;
+
 public class OperationContext {
 	private volatile boolean cancelled;
 	private volatile String progressText;
 	private volatile int processed;
 	private volatile int total;
+	private volatile Supplier<Object> resultSupplier;
 
 	public boolean isCancelled() {
 		return cancelled || Thread.currentThread().isInterrupted();
@@ -12,6 +15,15 @@ public class OperationContext {
 
 	public void cancel() {
 		this.cancelled = true;
+	}
+
+	public void setResultSupplier(Supplier<Object> resultSupplier) {
+		this.resultSupplier = resultSupplier;
+	}
+
+	public Object snapshotResult() {
+		Supplier<Object> supplier = resultSupplier;
+		return supplier == null ? null : supplier.get();
 	}
 
 	public String getProgressText() {

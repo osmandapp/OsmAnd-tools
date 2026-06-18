@@ -69,6 +69,7 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 	@Override
 	public Object run(Params params, OperationContext ctx) {
 		Stats stats = new Stats(isTest(params));
+		ctx.setResultSupplier(stats::toResult);
 		if (params.fileIds() != null && !params.fileIds().isEmpty()) {
 			runForFiles(params, ctx, stats);
 		} else {
@@ -241,8 +242,8 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 			r.put("users", users.get());
 			r.put("usersFound", usersFound.get());
 			r.put("testRun", testRun);
-			r.put("foundFiles", foundFiles);
-			r.put("failedFiles", failedFiles);
+			r.put("foundFiles", new ArrayList<>(foundFiles));
+			r.put("failedFiles", new ArrayList<>(failedFiles));
 			return r;
 		}
 	}
