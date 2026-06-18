@@ -15,12 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
 import java.util.zip.GZIPInputStream;
-
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
@@ -29,7 +24,6 @@ import net.osmand.server.api.repo.CloudUserFilesRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFile;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFileNoData;
 import net.osmand.server.api.repo.CloudUsersRepository;
-import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
 import net.osmand.server.api.services.StorageService;
 import net.osmand.server.api.services.StorageService.InternalZipFile;
 import net.osmand.server.api.services.UserdataService;
@@ -39,16 +33,15 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 
 	private static final String TMP_PREFIX = "op-fix-";
 	private static final String TMP_SUFFIX = ".tmp";
-	private static final int USER_PAGE_SIZE = 1000;
 
-	protected final CloudUsersRepository usersRepository;
+	private final UserBatchReader users;
 	protected final CloudUserFilesRepository filesRepository;
 	protected final UserdataService userdataService;
 	protected final StorageService storageService;
 
 	protected AbstractFileFixOperation(CloudUsersRepository usersRepository, CloudUserFilesRepository filesRepository,
 									   UserdataService userdataService, StorageService storageService) {
-		this.usersRepository = usersRepository;
+		this.users = new UserBatchReader(usersRepository);
 		this.filesRepository = filesRepository;
 		this.userdataService = userdataService;
 		this.storageService = storageService;
@@ -93,11 +86,12 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 			});
 			return;
 		}
-		int userLimit = limit((int) Math.min(usersRepository.count(), Integer.MAX_VALUE), params.usersPercent());
-		int fileCap = fileCap(params, userLimit, ctx);
+		int total = users.total();
+		int userLimit = UserBatchReader.limit(total, params.usersPercent());
+		int fileCap = fileCap(params, total, ctx);
 		AtomicInteger done = new AtomicInteger();
-		forEachUserPage(userLimit, ctx, pageIds ->
-				forEach(threads, pageIds, ctx, userId -> {
+		users.forEachBatch(total, userLimit, ctx, batchIds ->
+				forEach(threads, batchIds, ctx, userId -> {
 					if (stats.scanned.get() < fileCap) {
 						processUser(userId, params, stats, fileCap);
 					}
@@ -193,47 +187,17 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 		}
 	}
 
-	private void forEachUserPage(int userLimit, OperationContext ctx, Consumer<List<Integer>> pageAction) {
-		int collected = 0;
-		int page = 0;
-		while (collected < userLimit && !ctx.isCancelled()) {
-			Page<CloudUser> users = usersRepository.findAll(PageRequest.of(page++, USER_PAGE_SIZE, Sort.by("id")));
-			if (users.isEmpty()) {
-				break;
-			}
-			List<Integer> ids = new ArrayList<>(users.getNumberOfElements());
-			for (CloudUser user : users) {
-				if (collected >= userLimit) {
-					break;
-				}
-				ids.add(user.id);
-				collected++;
-			}
-			pageAction.accept(ids);
-			if (!users.hasNext()) {
-				break;
-			}
-		}
-	}
-
-	private static int limit(int total, Integer percent) {
-		if (percent == null || percent >= 100) {
-			return total;
-		}
-		return (int) Math.ceil(total * Math.max(0, percent) / 100.0);
-	}
-
-	private int fileCap(Params params, int userLimit, OperationContext ctx) {
+	private int fileCap(Params params, int total, OperationContext ctx) {
 		if (params.filesPercent() == null || params.filesPercent() >= 100) {
 			return Integer.MAX_VALUE;
 		}
-		int[] total = {0};
-		forEachUserPage(userLimit, ctx, pageIds -> {
-			for (int userId : pageIds) {
-				total[0] += userdataService.generateFiles(userId, null, false, false, typesOf(params)).uniqueFiles.size();
+		int[] sum = {0};
+		users.forEachBatch(total, total, ctx, batchIds -> {
+			for (int userId : batchIds) {
+				sum[0] += userdataService.generateFiles(userId, null, false, false, typesOf(params)).uniqueFiles.size();
 			}
 		});
-		return limit(total[0], params.filesPercent());
+		return UserBatchReader.limit(sum[0], params.filesPercent());
 	}
 
 	public Set<String> supportedTypes() {
