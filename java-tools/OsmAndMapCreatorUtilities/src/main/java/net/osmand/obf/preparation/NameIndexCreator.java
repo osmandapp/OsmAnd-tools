@@ -147,9 +147,9 @@ public class NameIndexCreator<T> {
 					boolean isCommon = word != null && word.nonindexed != 0;
 					if (isCommon) {
 						boolean rare = false;
-						
 						for (String r : singleName.allNames) {
-							if (!commonWords.words.containsKey(r)) {
+							if (!commonWords.words.containsKey(r) &&
+									!SearchAlgorithms.isNumber2Letters(r)) {
 								rare = true;
 								break;
 							}
