@@ -43,6 +43,11 @@ public class DeleteUnusedInfoFilesOperation extends AbstractFileFixOperation {
 	}
 
 	@Override
+	protected boolean accepts(String name) {
+		return name != null && name.endsWith(GPX_INFO_EXT);
+	}
+
+	@Override
 	protected byte[] processFile(UserFile file, boolean testRun) {
 		fix(file, testRun);
 		return null;
@@ -50,9 +55,6 @@ public class DeleteUnusedInfoFilesOperation extends AbstractFileFixOperation {
 
 	@Override
 	protected ObjectNode fix(UserFile file, boolean testRun) {
-		if (file.name == null || !file.name.endsWith(GPX_INFO_EXT)) {
-			return null;
-		}
 		String gpxName = file.name.substring(0, file.name.length() - INFO_EXT.length());
 		UserFile gpx = userdataService.getLastFileVersion(file.userid, gpxName, file.type);
 		if (gpx != null && gpx.filesize >= 0) {

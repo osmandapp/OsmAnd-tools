@@ -62,6 +62,10 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 
 	protected abstract ObjectNode fix(UserFile file, boolean testRun) throws IOException;
 
+	protected boolean accepts(String name) {
+		return true;
+	}
+
 	private static boolean isTest(Params params) {
 		return params.testRun() == null || params.testRun();
 	}
@@ -122,6 +126,9 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 			if (afterMs != null && fileNoData.updatetimems < afterMs) {
 				continue;
 			}
+			if (!accepts(fileNoData.name)) {
+				continue;
+			}
 			if (stats.scanned.get() >= fileCap) {
 				break;
 			}
@@ -137,7 +144,7 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 
 	private boolean processFileById(long id, Params params, Stats stats) {
 		UserFile file = filesRepository.findById(id).orElse(null);
-		if (file == null) {
+		if (file == null || !accepts(file.name)) {
 			stats.skipped.incrementAndGet();
 			return false;
 		}

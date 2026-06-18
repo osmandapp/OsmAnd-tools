@@ -48,6 +48,11 @@ public class DeleteBrokenInfoFilesOperation extends AbstractFileFixOperation {
 	}
 
 	@Override
+	protected boolean accepts(String name) {
+		return name != null && name.endsWith(INFO_EXT);
+	}
+
+	@Override
 	protected byte[] processFile(UserFile file, boolean testRun) throws IOException {
 		fix(file, testRun);
 		return null;
@@ -55,9 +60,6 @@ public class DeleteBrokenInfoFilesOperation extends AbstractFileFixOperation {
 
 	@Override
 	protected ObjectNode fix(UserFile file, boolean testRun) throws IOException {
-		if (file.name == null || !file.name.endsWith(INFO_EXT)) {
-			return null;
-		}
 		if (isReadableJson(read(file))) {
 			return null; // info file is valid json -> keep
 		}

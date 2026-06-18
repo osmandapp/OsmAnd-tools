@@ -45,10 +45,12 @@ public class FixInfoFilesOperation extends AbstractFileFixOperation {
 	}
 
 	@Override
+	protected boolean accepts(String name) {
+		return name != null && name.endsWith(GPX_INFO_EXT);
+	}
+
+	@Override
 	protected byte[] processFile(UserFile file, boolean testRun) throws IOException {
-		if (file.name == null || !file.name.endsWith(GPX_INFO_EXT)) {
-			return null;
-		}
 		ObjectNode fixed = fix(file, testRun);
 		return fixed == null ? null : MAPPER.writeValueAsBytes(fixed);
 	}
