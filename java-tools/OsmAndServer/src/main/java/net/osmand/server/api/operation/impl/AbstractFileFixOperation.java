@@ -8,16 +8,22 @@ import java.nio.file.Files;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import java.util.zip.GZIPInputStream;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import net.osmand.server.api.operation.Operation;
 import net.osmand.server.api.operation.OperationContext;
 import net.osmand.server.api.repo.CloudUserFilesRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFile;
@@ -29,10 +35,11 @@ import net.osmand.server.api.services.StorageService.InternalZipFile;
 import net.osmand.server.api.services.UserdataService;
 import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
 
-public abstract class AbstractFileFixOperation implements Operation<AbstractFileFixOperation.Params> {
+public abstract class AbstractFileFixOperation extends AbstractParallelOperation<AbstractFileFixOperation.Params> {
 
 	private static final String TMP_PREFIX = "op-fix-";
 	private static final String TMP_SUFFIX = ".tmp";
+	private static final int USER_PAGE_SIZE = 1000;
 
 	protected final CloudUsersRepository usersRepository;
 	protected final CloudUserFilesRepository filesRepository;
@@ -54,7 +61,8 @@ public abstract class AbstractFileFixOperation implements Operation<AbstractFile
 			Set<String> fileTypes,   // null/empty = all types; otherwise only these (e.g. GPX, FAVOURITES)
 			Integer usersPercent,    // null/100 = all users; otherwise that % of all users
 			Integer filesPercent,    // null/100 = all files; otherwise that % of each user's files
-			List<Long> fileIds       // null/empty = normal scan; otherwise process only these file ids
+			List<Long> fileIds,      // null/empty = normal scan; otherwise process only these file ids
+			Integer threads          // null/1 = sequential; 2..10 = parallel processing
 	) {}
 
 	protected abstract byte[] processFile(UserFile file, boolean testRun) throws IOException;
@@ -77,39 +85,42 @@ public abstract class AbstractFileFixOperation implements Operation<AbstractFile
 	}
 
 	private void runForUsers(Params params, OperationContext ctx, Stats stats) {
-		List<Integer> userIds = resolveUsers(params);
-		int fileCap = fileCap(userIds, params);
-		int total = userIds.size();
-		int doneUsers = 0;
-		for (Integer userId : userIds) {
-			if (ctx.isCancelled() || stats.scanned >= fileCap) {
-				break;
-			}
-			processUser(userId, params, stats, fileCap);
-			doneUsers++;
-			ctx.setProgress(doneUsers, total, String.format("%d/%d users · %d fixed", doneUsers, total, stats.fixed));
+		int threads = clampThreads(params.threads());
+		if (params.userId() != null) {
+			forEach(threads, List.of(params.userId()), ctx, userId -> {
+				processUser(userId, params, stats, Integer.MAX_VALUE);
+				ctx.setProgress(1, 1, String.format("1/1 users · %d fixed", stats.fixed.get()));
+			});
+			return;
 		}
+		int userLimit = limit((int) Math.min(usersRepository.count(), Integer.MAX_VALUE), params.usersPercent());
+		int fileCap = fileCap(params, userLimit, ctx);
+		AtomicInteger done = new AtomicInteger();
+		forEachUserPage(userLimit, ctx, pageIds ->
+				forEach(threads, pageIds, ctx, userId -> {
+					if (stats.scanned.get() < fileCap) {
+						processUser(userId, params, stats, fileCap);
+					}
+					int d = done.incrementAndGet();
+					ctx.setProgress(d, userLimit, String.format("%d/%d users · %d fixed", d, userLimit, stats.fixed.get()));
+				}));
 	}
 
-	// targeted run: process only the given file ids (e.g. the ones a previous test run found), no full scan
 	private void runForFiles(Params params, OperationContext ctx, Stats stats) {
 		List<Long> ids = params.fileIds();
 		int total = ids.size();
-		int done = 0;
-		for (Long id : ids) {
-			if (ctx.isCancelled()) {
-				break;
-			}
-			stats.scanned++;
+		AtomicInteger done = new AtomicInteger();
+		forEach(clampThreads(params.threads()), ids, ctx, id -> {
+			stats.scanned.incrementAndGet();
 			processFileById(id, params, stats);
-			done++;
-			ctx.setProgress(done, total, String.format("%d/%d files · %d fixed", done, total, stats.fixed));
-		}
+			int d = done.incrementAndGet();
+			ctx.setProgress(d, total, String.format("%d/%d files · %d fixed", d, total, stats.fixed.get()));
+		});
 	}
 
 	private void processUser(int userId, Params params, Stats stats, int fileCap) {
-		stats.users++;
-		int fixedBefore = stats.fixed;
+		stats.users.incrementAndGet();
+		boolean userFixed = false;
 		Long afterMs = params.updatedAfter() == null ? null
 				: params.updatedAfter().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
 		UserFilesResults res = userdataService.generateFiles(userId, null, false, false, typesOf(params));
@@ -117,37 +128,41 @@ public abstract class AbstractFileFixOperation implements Operation<AbstractFile
 			if (afterMs != null && fileNoData.updatetimems < afterMs) {
 				continue;
 			}
-			if (stats.scanned >= fileCap) {
+			if (stats.scanned.get() >= fileCap) {
 				break;
 			}
-			stats.scanned++;
-			processFileById(fileNoData.id, params, stats);
+			stats.scanned.incrementAndGet();
+			if (processFileById(fileNoData.id, params, stats)) {
+				userFixed = true;
+			}
 		}
-		if (stats.fixed > fixedBefore) {
-			stats.usersFixed++;
+		if (userFixed) {
+			stats.usersFixed.incrementAndGet();
 		}
 	}
 
-	private void processFileById(long id, Params params, Stats stats) {
+	private boolean processFileById(long id, Params params, Stats stats) {
 		UserFile file = filesRepository.findById(id).orElse(null);
 		if (file == null) {
-			stats.skipped++;
-			return;
+			stats.skipped.incrementAndGet();
+			return false;
 		}
 		try {
 			byte[] fixed = processFile(file, isTest(params));
 			if (fixed == null) {
-				stats.skipped++;
-				return;
+				stats.skipped.incrementAndGet();
+				return false;
 			}
 			if (!isTest(params)) {
 				save(file, fixed);
 			}
-			stats.fixed++;
+			stats.fixed.incrementAndGet();
 			stats.fixedFiles.add(Map.of("userid", file.userid, "id", file.id, "file", file.name));
+			return true;
 		} catch (Exception e) {
-			stats.failed++;
+			stats.failed.incrementAndGet();
 			stats.failedFiles.add(Map.of("userid", file.userid, "id", file.id, "file", file.name, "error", String.valueOf(e.getMessage())));
+			return false;
 		}
 	}
 
@@ -178,16 +193,27 @@ public abstract class AbstractFileFixOperation implements Operation<AbstractFile
 		}
 	}
 
-	private List<Integer> resolveUsers(Params params) {
-		if (params.userId() != null) {
-			return List.of(params.userId());
+	private void forEachUserPage(int userLimit, OperationContext ctx, Consumer<List<Integer>> pageAction) {
+		int collected = 0;
+		int page = 0;
+		while (collected < userLimit && !ctx.isCancelled()) {
+			Page<CloudUser> users = usersRepository.findAll(PageRequest.of(page++, USER_PAGE_SIZE, Sort.by("id")));
+			if (users.isEmpty()) {
+				break;
+			}
+			List<Integer> ids = new ArrayList<>(users.getNumberOfElements());
+			for (CloudUser user : users) {
+				if (collected >= userLimit) {
+					break;
+				}
+				ids.add(user.id);
+				collected++;
+			}
+			pageAction.accept(ids);
+			if (!users.hasNext()) {
+				break;
+			}
 		}
-		List<Integer> ids = new ArrayList<>();
-		for (CloudUser user : usersRepository.findAll()) {
-			ids.add(user.id);
-		}
-		int max = limit(ids.size(), params.usersPercent());
-		return ids.subList(0, Math.min(max, ids.size()));
 	}
 
 	private static int limit(int total, Integer percent) {
@@ -197,15 +223,17 @@ public abstract class AbstractFileFixOperation implements Operation<AbstractFile
 		return (int) Math.ceil(total * Math.max(0, percent) / 100.0);
 	}
 
-	private int fileCap(List<Integer> userIds, Params params) {
+	private int fileCap(Params params, int userLimit, OperationContext ctx) {
 		if (params.filesPercent() == null || params.filesPercent() >= 100) {
 			return Integer.MAX_VALUE;
 		}
-		int total = 0;
-		for (int userId : userIds) {
-			total += userdataService.generateFiles(userId, null, false, false, typesOf(params)).uniqueFiles.size();
-		}
-		return limit(total, params.filesPercent());
+		int[] total = {0};
+		forEachUserPage(userLimit, ctx, pageIds -> {
+			for (int userId : pageIds) {
+				total[0] += userdataService.generateFiles(userId, null, false, false, typesOf(params)).uniqueFiles.size();
+			}
+		});
+		return limit(total[0], params.filesPercent());
 	}
 
 	public Set<String> supportedTypes() {
@@ -228,14 +256,14 @@ public abstract class AbstractFileFixOperation implements Operation<AbstractFile
 
 	protected static final class Stats {
 		final boolean testRun;
-		int fixed;
-		int scanned;
-		int skipped;
-		int failed;
-		int users;
-		int usersFixed;
-		final List<Map<String, Object>> fixedFiles = new ArrayList<>();
-		final List<Map<String, Object>> failedFiles = new ArrayList<>();
+		final AtomicInteger fixed = new AtomicInteger();
+		final AtomicInteger scanned = new AtomicInteger();
+		final AtomicInteger skipped = new AtomicInteger();
+		final AtomicInteger failed = new AtomicInteger();
+		final AtomicInteger users = new AtomicInteger();
+		final AtomicInteger usersFixed = new AtomicInteger();
+		final List<Map<String, Object>> fixedFiles = Collections.synchronizedList(new ArrayList<>());
+		final List<Map<String, Object>> failedFiles = Collections.synchronizedList(new ArrayList<>());
 
 		Stats(boolean testRun) {
 			this.testRun = testRun;
@@ -243,12 +271,12 @@ public abstract class AbstractFileFixOperation implements Operation<AbstractFile
 
 		Map<String, Object> toResult() {
 			Map<String, Object> r = new LinkedHashMap<>();
-			r.put("fixed", fixed);
-			r.put("scanned", scanned);
-			r.put("skipped", skipped);
-			r.put("failed", failed);
-			r.put("users", users);
-			r.put("usersFixed", usersFixed);
+			r.put("fixed", fixed.get());
+			r.put("scanned", scanned.get());
+			r.put("skipped", skipped.get());
+			r.put("failed", failed.get());
+			r.put("users", users.get());
+			r.put("usersFixed", usersFixed.get());
 			r.put("testRun", testRun);
 			r.put("fixedFiles", fixedFiles);
 			r.put("failedFiles", failedFiles);
