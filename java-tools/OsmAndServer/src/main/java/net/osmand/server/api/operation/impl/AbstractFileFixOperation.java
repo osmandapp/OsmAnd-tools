@@ -17,8 +17,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.GZIPInputStream;
 
-import com.fasterxml.jackson.databind.node.ObjectNode;
-
 import net.osmand.server.api.operation.OperationContext;
 import net.osmand.server.api.repo.CloudUserFilesRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFile;
@@ -58,9 +56,7 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 			Integer threads          // null/1 = sequential; 2..10 = parallel processing
 	) {}
 
-	protected abstract byte[] processFile(UserFile file, boolean testRun) throws IOException;
-
-	protected abstract ObjectNode fix(UserFile file, boolean testRun) throws IOException;
+	protected abstract boolean fix(UserFile file, boolean testRun) throws IOException;
 
 	protected boolean accepts(String name) {
 		return true;
@@ -86,7 +82,7 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 		if (params.userId() != null) {
 			forEach(threads, List.of(params.userId()), ctx, userId -> {
 				processUser(userId, params, stats, Integer.MAX_VALUE);
-				ctx.setProgress(1, 1, String.format("1/1 users · %d fixed", stats.fixed.get()));
+				ctx.setProgress(1, 1, String.format("1/1 users · %d found", stats.found.get()));
 			});
 			return;
 		}
@@ -100,7 +96,7 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 				processUser(userId, params, stats, fileCap);
 			}
 			int d = done.incrementAndGet();
-			ctx.setProgress(d, totalUsers, String.format("%d/%d users · %d fixed", d, totalUsers, stats.fixed.get()));
+			ctx.setProgress(d, totalUsers, String.format("%d/%d users · %d found", d, totalUsers, stats.found.get()));
 		});
 	}
 
@@ -112,13 +108,13 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 			stats.scanned.incrementAndGet();
 			processFileById(id, params, stats);
 			int d = done.incrementAndGet();
-			ctx.setProgress(d, total, String.format("%d/%d files · %d fixed", d, total, stats.fixed.get()));
+			ctx.setProgress(d, total, String.format("%d/%d files · %d found", d, total, stats.found.get()));
 		});
 	}
 
 	private void processUser(int userId, Params params, Stats stats, int fileCap) {
 		stats.users.incrementAndGet();
-		boolean userFixed = false;
+		boolean userFound = false;
 		Long afterMs = params.updatedAfter() == null ? null
 				: params.updatedAfter().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
 		UserFilesResults res = userdataService.generateFiles(userId, null, false, false, typesOf(params));
@@ -134,11 +130,11 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 			}
 			stats.scanned.incrementAndGet();
 			if (processFileById(fileNoData.id, params, stats)) {
-				userFixed = true;
+				userFound = true;
 			}
 		}
-		if (userFixed) {
-			stats.usersFixed.incrementAndGet();
+		if (userFound) {
+			stats.usersFound.incrementAndGet();
 		}
 	}
 
@@ -149,16 +145,15 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 			return false;
 		}
 		try {
-			byte[] fixed = processFile(file, isTest(params));
-			if (fixed == null) {
+			boolean test = isTest(params);
+			if (!fix(file, test)) {
 				stats.skipped.incrementAndGet();
 				return false;
 			}
-			if (!isTest(params)) {
-				save(file, fixed);
+			stats.found.incrementAndGet();
+			if (test) {
+				stats.foundFiles.add(Map.of("userid", file.userid, "id", file.id, "file", file.name));
 			}
-			stats.fixed.incrementAndGet();
-			stats.fixedFiles.add(Map.of("userid", file.userid, "id", file.id, "file", file.name));
 			return true;
 		} catch (Exception e) {
 			stats.failed.incrementAndGet();
@@ -224,13 +219,13 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 
 	protected static final class Stats {
 		final boolean testRun;
-		final AtomicInteger fixed = new AtomicInteger();
+		final AtomicInteger found = new AtomicInteger();
 		final AtomicInteger scanned = new AtomicInteger();
 		final AtomicInteger skipped = new AtomicInteger();
 		final AtomicInteger failed = new AtomicInteger();
 		final AtomicInteger users = new AtomicInteger();
-		final AtomicInteger usersFixed = new AtomicInteger();
-		final List<Map<String, Object>> fixedFiles = Collections.synchronizedList(new ArrayList<>());
+		final AtomicInteger usersFound = new AtomicInteger();
+		final List<Map<String, Object>> foundFiles = Collections.synchronizedList(new ArrayList<>());
 		final List<Map<String, Object>> failedFiles = Collections.synchronizedList(new ArrayList<>());
 
 		Stats(boolean testRun) {
@@ -239,14 +234,14 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 
 		Map<String, Object> toResult() {
 			Map<String, Object> r = new LinkedHashMap<>();
-			r.put("fixed", fixed.get());
+			r.put("found", found.get());
 			r.put("scanned", scanned.get());
 			r.put("skipped", skipped.get());
 			r.put("failed", failed.get());
 			r.put("users", users.get());
-			r.put("usersFixed", usersFixed.get());
+			r.put("usersFound", usersFound.get());
 			r.put("testRun", testRun);
-			r.put("fixedFiles", fixedFiles);
+			r.put("foundFiles", foundFiles);
 			r.put("failedFiles", failedFiles);
 			return r;
 		}

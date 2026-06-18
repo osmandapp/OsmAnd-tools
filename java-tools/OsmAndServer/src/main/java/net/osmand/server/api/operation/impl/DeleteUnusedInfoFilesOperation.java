@@ -6,8 +6,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import com.fasterxml.jackson.databind.node.ObjectNode;
-
 import net.osmand.server.api.operation.AdminOperation;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
@@ -48,17 +46,11 @@ public class DeleteUnusedInfoFilesOperation extends AbstractFileFixOperation {
 	}
 
 	@Override
-	protected byte[] processFile(UserFile file, boolean testRun) {
-		fix(file, testRun);
-		return null;
-	}
-
-	@Override
-	protected ObjectNode fix(UserFile file, boolean testRun) {
+	protected boolean fix(UserFile file, boolean testRun) {
 		String gpxName = file.name.substring(0, file.name.length() - INFO_EXT.length());
 		UserFile gpx = userdataService.getLastFileVersion(file.userid, gpxName, file.type);
 		if (gpx != null && gpx.filesize >= 0) {
-			return null; // paired gpx still exists
+			return false; // paired gpx still exists
 		}
 		if (!testRun) {
 			CloudUserDevice dev = devicesRepository.findById(file.deviceid);
@@ -73,6 +65,6 @@ public class DeleteUnusedInfoFilesOperation extends AbstractFileFixOperation {
 						"Failed to delete unused info file userid=" + file.userid + " name=" + file.name, e);
 			}
 		}
-		return null;
+		return true;
 	}
 }

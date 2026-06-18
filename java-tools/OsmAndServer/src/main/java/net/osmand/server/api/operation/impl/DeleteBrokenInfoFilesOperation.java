@@ -8,7 +8,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
@@ -53,15 +52,9 @@ public class DeleteBrokenInfoFilesOperation extends AbstractFileFixOperation {
 	}
 
 	@Override
-	protected byte[] processFile(UserFile file, boolean testRun) throws IOException {
-		fix(file, testRun);
-		return null;
-	}
-
-	@Override
-	protected ObjectNode fix(UserFile file, boolean testRun) throws IOException {
+	protected boolean fix(UserFile file, boolean testRun) throws IOException {
 		if (isReadableJson(read(file))) {
-			return null; // info file is valid json -> keep
+			return false; // info file is valid json -> keep
 		}
 		if (!testRun) {
 			CloudUserDevice dev = devicesRepository.findById(file.deviceid);
@@ -76,7 +69,7 @@ public class DeleteBrokenInfoFilesOperation extends AbstractFileFixOperation {
 						"Failed to delete broken info file userid=" + file.userid + " name=" + file.name, e);
 			}
 		}
-		return null;
+		return true;
 	}
 
 	private static boolean isReadableJson(byte[] content) {

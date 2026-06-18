@@ -50,27 +50,24 @@ public class FixInfoFilesOperation extends AbstractFileFixOperation {
 	}
 
 	@Override
-	protected byte[] processFile(UserFile file, boolean testRun) throws IOException {
-		ObjectNode fixed = fix(file, testRun);
-		return fixed == null ? null : MAPPER.writeValueAsBytes(fixed);
-	}
-
-	@Override
-	protected ObjectNode fix(UserFile file, boolean testRun) throws IOException {
+	protected boolean fix(UserFile file, boolean testRun) throws IOException {
 		JsonNode node = MAPPER.readTree(read(file));
 		if (node == null || !node.isObject()) {
-			return null;
+			return false;
 		}
 		ObjectNode obj = (ObjectNode) node;
-		if (obj.size() == 1 && obj.has(POINTS_GROUPS)) {
-			ObjectNode out = MAPPER.createObjectNode();
-			out.put(KEY_TYPE, TYPE_GPX);
-			out.put(KEY_FILE, TRACKS_PREFIX + baseName(file.name));
-			out.put(KEY_SUBTYPE, SUBTYPE_GPX);
-			out.setAll(obj);
-			return out;
+		if (!(obj.size() == 1 && obj.has(POINTS_GROUPS))) {
+			return false; // already has the tags or is not the broken shape
 		}
-		return null;
+		ObjectNode out = MAPPER.createObjectNode();
+		out.put(KEY_TYPE, TYPE_GPX);
+		out.put(KEY_FILE, TRACKS_PREFIX + baseName(file.name));
+		out.put(KEY_SUBTYPE, SUBTYPE_GPX);
+		out.setAll(obj);
+		if (!testRun) {
+			save(file, MAPPER.writeValueAsBytes(out));
+		}
+		return true;
 	}
 
 	static String baseName(String name) {
