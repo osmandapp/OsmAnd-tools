@@ -267,8 +267,8 @@ public class SearchService {
 			long startTime = System.currentTimeMillis();
 			SpatialSearchResults res = spatialTextSearch.get().searchAPI(ctx.text, new SpatialSearchContext(usedMapList));
 			long searchTime = System.currentTimeMillis() - startTime;
-			if (res.mainResult != null) {
-				for (SpatialSearchResult r : res.mainResult.getResult()) {
+			if (res.mainResults != null) {
+				for (SpatialSearchResult r : res.mainResults) {
 					List<MapObject> objs = r.getObjects();
 					if (!objs.isEmpty()) {
 						Feature f = getSpatialFeature(objs.get(0), ctx.locale, timeZone);
