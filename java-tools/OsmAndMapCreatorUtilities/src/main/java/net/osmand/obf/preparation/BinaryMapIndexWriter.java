@@ -1039,11 +1039,12 @@ public class BinaryMapIndexWriter {
 			NamedObjectsByPrefix<MapObject> indexEntry = entry.getValue();
 			SuffixDictionary<MapObject> suffixDictionary = indexEntry.build(commonWords);
 			if (suffixDictionary.dictionaryEntries.isEmpty()) {
-				builder.addSuffixesDictionary(EMPTY_SUFFIX_DICTIONARY_SENTINEL);
+//				builder.addSuffixesDictionary(EMPTY_SUFFIX_DICTIONARY_SENTINEL);
+				// not used any more
+				throw new UnsupportedOperationException();
 			} else {
 				for (SuffixEntry dictionaryEntry : suffixDictionary.dictionaryEntries) {
 					builder.addSuffixesDictionary(dictionaryEntry.encodedSuffix());
-					
 				}
 			}
 			for (Integer i : suffixDictionary.commonsRef) {
@@ -1846,7 +1847,9 @@ public class BinaryMapIndexWriter {
 			OsmAndPoiNameIndex.OsmAndPoiNameIndexData.Builder builder = OsmAndPoiNameIndex.OsmAndPoiNameIndexData.newBuilder();
 			SuffixDictionary<PoiNameObject> suffixDictionary = e.getValue().build(commonWords);
 			if (suffixDictionary.dictionaryEntries.isEmpty()) {
-				builder.addSuffixesDictionary(EMPTY_SUFFIX_DICTIONARY_SENTINEL);
+//				builder.addSuffixesDictionary(EMPTY_SUFFIX_DICTIONARY_SENTINEL);
+				// not used any more
+				throw new UnsupportedOperationException();
 			} else {
 				for (SuffixEntry dictionaryEntry : suffixDictionary.dictionaryEntries) {
 					builder.addSuffixesDictionary(dictionaryEntry.encodedSuffix());
