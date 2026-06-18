@@ -972,7 +972,7 @@ public interface InspectorService extends OBFService {
             }
         }
         for (String candidateName : candidateNames) {
-            List<String> tokens = SearchAlgorithms.splitAndNormalize(candidateName);
+            List<String> tokens = SearchAlgorithms.splitAndNormalize(candidateName, true);
             SearchAlgorithms.removeCommonWords(tokens);
             if (tokens.size() == 1 && tokens.contains(tokenName)) {
                 return true;

@@ -257,7 +257,7 @@ public class NameIndexCreator<T> {
 	
 	
 	public void addToNameIndex(String name, T obj, int maxPrefixLength, boolean indexNumbers) {
-		List<String> splitName = SearchAlgorithms.splitAndNormalize(name);
+		List<String> splitName = SearchAlgorithms.splitAndNormalize(name, true);
 		boolean hasRareName = false;
 		for (String token : splitName) {
 			if (!CommonWords.isCommon(token) && CommonWords.getFrequentlyUsed(token) <= 0) {
