@@ -1,11 +1,14 @@
 package net.osmand.server.api.operation.impl;
 
+import java.util.Set;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import net.osmand.server.api.operation.AdminOperation;
-import net.osmand.server.api.operation.OperationContext;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
 import net.osmand.server.api.repo.CloudUserFilesRepository;
@@ -21,11 +24,11 @@ import net.osmand.server.api.services.UserdataService;
 @AdminOperation(name = "delete-info-files")
 public class DeleteUnusedInfoFilesOperation extends AbstractFileFixOperation {
 
+	private static final Logger LOG = LoggerFactory.getLogger(DeleteUnusedInfoFilesOperation.class);
 	private static final String INFO_EXT = ".info";
 	private static final String GPX_INFO_EXT = ".gpx.info";
 
 	private final CloudUserDevicesRepository devicesRepository;
-	private volatile boolean testRun;
 
 	public DeleteUnusedInfoFilesOperation(CloudUsersRepository usersRepository, CloudUserFilesRepository filesRepository,
 	                                      UserdataService userdataService, StorageService storageService,
@@ -35,19 +38,18 @@ public class DeleteUnusedInfoFilesOperation extends AbstractFileFixOperation {
 	}
 
 	@Override
-	public Object run(Params params, OperationContext ctx) {
-		testRun = params.testRun();
-		return super.run(params, ctx);
+	public Set<String> supportedTypes() {
+		return Set.of(UserdataService.FILE_TYPE_GPX);
 	}
 
 	@Override
-	protected byte[] processFile(UserFile file) {
-		fix(file);
-		return null; // deletion happens in fix(); there is no content to write back
+	protected byte[] processFile(UserFile file, boolean testRun) {
+		fix(file, testRun);
+		return null;
 	}
 
 	@Override
-	protected ObjectNode fix(UserFile file) {
+	protected ObjectNode fix(UserFile file, boolean testRun) {
 		if (file.name == null || !file.name.endsWith(GPX_INFO_EXT)) {
 			return null;
 		}
@@ -61,7 +63,13 @@ public class DeleteUnusedInfoFilesOperation extends AbstractFileFixOperation {
 			if (dev == null) {
 				throw new IllegalStateException("no device for file");
 			}
-			userdataService.deleteFile(file.name, file.type, null, null, dev);
+			LOG.info("Deleting unused info file: userid={}, name={}, type={}", file.userid, file.name, file.type);
+			try {
+				userdataService.deleteFile(file.name, file.type, null, null, dev);
+			} catch (Exception e) {
+				throw new IllegalStateException(
+						"Failed to delete unused info file userid=" + file.userid + " name=" + file.name, e);
+			}
 		}
 		return null;
 	}

@@ -8,10 +8,11 @@ import java.nio.file.Files;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.zip.GZIPInputStream;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -48,22 +49,27 @@ public abstract class AbstractFileFixOperation implements Operation<AbstractFile
 
 	public record Params(
 			Integer userId,         // null/empty = all users; a number = single user (for testing)
-			boolean testRun,         // true = only count what would be fixed, no write
+			Boolean testRun,         // null/true = only count, no write (safe default); false = actually write
 			LocalDate updatedAfter,  // null = no date filter; else only files updated on/after this date
+			Set<String> fileTypes,   // null/empty = all types; otherwise only these (e.g. GPX, FAVOURITES)
 			Integer usersPercent,    // null/100 = all users; otherwise that % of all users
 			Integer filesPercent     // null/100 = all files; otherwise that % of each user's files
 	) {}
 
-	protected abstract byte[] processFile(UserFile file) throws IOException;
+	protected abstract byte[] processFile(UserFile file, boolean testRun) throws IOException;
 
-	protected abstract ObjectNode fix(UserFile file) throws IOException;
+	protected abstract ObjectNode fix(UserFile file, boolean testRun) throws IOException;
+
+	private static boolean isTest(Params params) {
+		return params.testRun() == null || params.testRun();
+	}
 
 	@Override
 	public Object run(Params params, OperationContext ctx) {
 		List<Integer> userIds = resolveUsers(params);
-		int fileCap = fileCap(userIds, params.filesPercent());
+		int fileCap = fileCap(userIds, params);
 		int total = userIds.size();
-		Stats stats = new Stats(params.testRun());
+		Stats stats = new Stats(isTest(params));
 		int doneUsers = 0;
 		for (Integer userId : userIds) {
 			if (ctx.isCancelled() || stats.scanned >= fileCap) {
@@ -81,7 +87,7 @@ public abstract class AbstractFileFixOperation implements Operation<AbstractFile
 		boolean userFixed = false;
 		Long afterMs = params.updatedAfter() == null ? null
 				: params.updatedAfter().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
-		UserFilesResults res = userdataService.generateFiles(userId, null, false, false, Collections.emptySet());
+		UserFilesResults res = userdataService.generateFiles(userId, null, false, false, typesOf(params));
 		for (UserFileNoData fileNoData : res.uniqueFiles) {
 			if (afterMs != null && fileNoData.updatetimems < afterMs) {
 				continue;
@@ -96,11 +102,11 @@ public abstract class AbstractFileFixOperation implements Operation<AbstractFile
 					stats.skipped++;
 					continue;
 				}
-				byte[] fixed = processFile(file);
+				byte[] fixed = processFile(file, isTest(params));
 				if (fixed == null) {
 					stats.skipped++;
 				} else {
-					if (!params.testRun()) {
+					if (!isTest(params)) {
 						save(file, fixed);
 					}
 					stats.fixed++;
@@ -163,15 +169,33 @@ public abstract class AbstractFileFixOperation implements Operation<AbstractFile
 		return (int) Math.ceil(total * Math.max(0, percent) / 100.0);
 	}
 
-	private int fileCap(List<Integer> userIds, Integer filesPercent) {
-		if (filesPercent == null || filesPercent >= 100) {
+	private int fileCap(List<Integer> userIds, Params params) {
+		if (params.filesPercent() == null || params.filesPercent() >= 100) {
 			return Integer.MAX_VALUE;
 		}
 		int total = 0;
 		for (int userId : userIds) {
-			total += userdataService.generateFiles(userId, null, false, false, Collections.emptySet()).uniqueFiles.size();
+			total += userdataService.generateFiles(userId, null, false, false, typesOf(params)).uniqueFiles.size();
 		}
-		return limit(total, filesPercent);
+		return limit(total, params.filesPercent());
+	}
+
+	public Set<String> supportedTypes() {
+		return null;
+	}
+
+	private Set<String> typesOf(Params params) {
+		Set<String> supported = supportedTypes();
+		Set<String> chosen = params.fileTypes() == null ? Set.of() : params.fileTypes();
+		if (supported == null) {
+			return chosen; // empty = all
+		}
+		if (chosen.isEmpty()) {
+			return supported;
+		}
+		Set<String> r = new HashSet<>(chosen);
+		r.retainAll(supported);
+		return r.isEmpty() ? supported : r;
 	}
 
 	protected static final class Stats {

@@ -4,10 +4,12 @@ import java.lang.reflect.RecordComponent;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.aop.support.AopUtils;
@@ -19,11 +21,13 @@ import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import net.osmand.server.api.operation.impl.AbstractFileFixOperation;
+
 @Component
 public class OperationRegistry {
 
 	public record ParamDescriptor(String name, String label, String type, boolean required, String defaultValue,
-								  String helpText) {}
+								  String helpText, List<String> options) {}
 	public record OperationDescriptor(Operation<?> bean, Class<?> paramsType, List<ParamDescriptor> params) {}
 
 	private final ApplicationContext applicationContext;
@@ -57,7 +61,8 @@ public class OperationRegistry {
 				continue;
 			}
 			Class<?> paramsType = ResolvableType.forClass(targetClass).as(Operation.class).getGeneric(0).resolve();
-			List<ParamDescriptor> params = describeParams(paramsType);
+			Set<String> supportedTypes = bean instanceof AbstractFileFixOperation op ? op.supportedTypes() : null;
+			List<ParamDescriptor> params = describeParams(paramsType, supportedTypes);
 			repository.upsertOperation(targetClass.getName(), annotation.name(),
 					toJson(params), paramsType == null ? "" : paramsType.getName());
 			descriptors.put(targetClass.getName(), new OperationDescriptor(bean, paramsType, params));
@@ -69,14 +74,16 @@ public class OperationRegistry {
 		return Optional.ofNullable(descriptors.get(className));
 	}
 
-	private List<ParamDescriptor> describeParams(Class<?> paramsType) {
+	private List<ParamDescriptor> describeParams(Class<?> paramsType, Set<String> supportedTypes) {
 		if (paramsType == null || !paramsType.isRecord()) {
 			return List.of();
 		}
 		List<ParamDescriptor> params = new ArrayList<>();
 		for (RecordComponent component : paramsType.getRecordComponents()) {
 			String name = component.getName();
-			params.add(new ParamDescriptor(name, name, inputType(component.getType()), false, "", ""));
+			List<String> options = supportedTypes != null && Collection.class.isAssignableFrom(component.getType())
+					? new ArrayList<>(supportedTypes) : null;
+			params.add(new ParamDescriptor(name, name, inputType(component.getType()), false, "", "", options));
 		}
 		return params;
 	}

@@ -14,6 +14,7 @@ import net.osmand.server.api.services.StorageService;
 import net.osmand.server.api.services.UserdataService;
 
 import java.io.IOException;
+import java.util.Set;
 
 /**
  * Backfills required tags (type/file/subtype) into GPX *.info files that only contain "pointsGroups".
@@ -39,16 +40,21 @@ public class FixInfoFilesOperation extends AbstractFileFixOperation {
 	}
 
 	@Override
-	protected byte[] processFile(UserFile file) throws IOException {
+	public Set<String> supportedTypes() {
+		return Set.of(UserdataService.FILE_TYPE_GPX);
+	}
+
+	@Override
+	protected byte[] processFile(UserFile file, boolean testRun) throws IOException {
 		if (file.name == null || !file.name.endsWith(GPX_INFO_EXT)) {
 			return null;
 		}
-		ObjectNode fixed = fix(file);
+		ObjectNode fixed = fix(file, testRun);
 		return fixed == null ? null : MAPPER.writeValueAsBytes(fixed);
 	}
 
 	@Override
-	protected ObjectNode fix(UserFile file) throws IOException {
+	protected ObjectNode fix(UserFile file, boolean testRun) throws IOException {
 		JsonNode node = MAPPER.readTree(read(file));
 		if (node == null || !node.isObject()) {
 			return null;
