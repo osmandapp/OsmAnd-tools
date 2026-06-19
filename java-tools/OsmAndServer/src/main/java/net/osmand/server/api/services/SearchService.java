@@ -36,6 +36,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -83,7 +84,8 @@ public class SearchService {
 
     private final ConcurrentHashMap<String, MapPoiTypes> poiTypesByLocale = new ConcurrentHashMap<>();
 
-    private final ThreadLocal<SpatialTextSearch> spatialTextSearch = ThreadLocal.withInitial(SpatialTextSearch::new);
+    private final SpatialTextSearch spatialTextSearch = new SpatialTextSearch();
+    private final ReentrantLock spatialSearchLock = new ReentrantLock();
 
     public static class PoiSearchResult {
         
@@ -265,7 +267,13 @@ public class SearchService {
 				return response;
 			}
 			long startTime = System.currentTimeMillis();
-			SpatialSearchResults res = spatialTextSearch.get().searchAPI(ctx.text, new SpatialSearchContext(usedMapList));
+			SpatialSearchResults res;
+			spatialSearchLock.lock();
+			try {
+				res = spatialTextSearch.searchAPI(ctx.text, new SpatialSearchContext(usedMapList));
+			} finally {
+				spatialSearchLock.unlock();
+			}
 			long searchTime = System.currentTimeMillis() - startTime;
 			if (res.mainResults != null) {
 				for (SpatialSearchResult r : res.mainResults) {
