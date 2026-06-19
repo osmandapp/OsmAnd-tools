@@ -21,8 +21,10 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Map.Entry;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
@@ -61,6 +63,7 @@ import com.google.gson.JsonObject;
 import net.osmand.IndexConstants;
 import net.osmand.LocationsHolder;
 import net.osmand.NativeJavaRendering;
+import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.CachedOsmandIndexes;
 import net.osmand.binary.GeocodingUtilities;
@@ -1395,6 +1398,63 @@ public class OsmAndMapsService {
 			}
 		}
 		return files;
+	}
+
+	private static final double SPATIAL_SEARCH_RADIUS_KM = 500;
+
+	// all maps within ~500 km of the point, no count limit.
+	// Union of region-based selection (regions.ocbf) and the regular bbox-intersection selection.
+	public List<BinaryMapIndexReaderReference> getObfReadersForSpatialSearch(double lat, double lon) throws IOException {
+		initObfReaders();
+		double dLat = SPATIAL_SEARCH_RADIUS_KM / 111.0;
+		double dLon = SPATIAL_SEARCH_RADIUS_KM / (111.0 * Math.max(0.1, Math.cos(Math.toRadians(lat))));
+		QuadRect bbox = points(null, new LatLon(lat + dLat, lon - dLon), new LatLon(lat - dLat, lon + dLon));
+
+		// 1. regions overlapping the area (queried from regions.ocbf by bbox) -> their combined bbox
+		List<String> regionNames = new ArrayList<>();
+		QuadRect regionBbox = null;
+		synchronized (osmandRegions) {
+			for (BinaryMapDataObject o : osmandRegions.query((int) bbox.left, (int) bbox.right, (int) bbox.top, (int) bbox.bottom)) {
+				regionNames.add(osmandRegions.getDownloadName(o));
+				for (int i = 0; i < o.getPointsLength(); i++) {
+					int x = o.getPoint31XTile(i), y = o.getPoint31YTile(i);
+					if (regionBbox == null) {
+						regionBbox = new QuadRect(x, y, x, y);
+					} else {
+						regionBbox.left = Math.min(regionBbox.left, x);
+						regionBbox.top = Math.min(regionBbox.top, y);
+						regionBbox.right = Math.max(regionBbox.right, x);
+						regionBbox.bottom = Math.max(regionBbox.bottom, y);
+					}
+				}
+			}
+		}
+		LOGGER.info("Spatial search regions: " + regionNames);
+
+		// 2. maps covering those regions, selected by bbox intersection
+		Set<File> files = new LinkedHashSet<>();
+		if (regionBbox != null) {
+			files.addAll(getMaps(regionBbox));
+		}
+		LOGGER.info("Spatial search region maps: " + fileNames(files));
+
+		// 3. + maps within the 500 km bbox (regular selection), then base map
+		files.addAll(getMaps(bbox));
+		files.add(getBaseMap().file);
+		LOGGER.info("Spatial search total maps: " + fileNames(files));
+
+		List<BinaryMapIndexReaderReference> res = new ArrayList<>();
+		for (File f : files) {
+			BinaryMapIndexReaderReference ref = obfFiles.get(f.getAbsolutePath());
+			if (ref != null) {
+				res.add(ref);
+			}
+		}
+		return res;
+	}
+
+	private static List<String> fileNames(Set<File> files) {
+		return files.stream().map(File::getName).toList();
 	}
 
 	public BinaryMapIndexReaderReference getBaseMap() throws IOException {

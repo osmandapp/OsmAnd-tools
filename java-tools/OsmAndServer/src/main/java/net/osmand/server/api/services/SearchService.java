@@ -36,7 +36,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -85,7 +84,6 @@ public class SearchService {
     private final ConcurrentHashMap<String, MapPoiTypes> poiTypesByLocale = new ConcurrentHashMap<>();
 
     private final SpatialTextSearch spatialTextSearch = new SpatialTextSearch();
-    private final ReentrantLock spatialSearchLock = new ReentrantLock();
 
     public static class PoiSearchResult {
         
@@ -252,13 +250,10 @@ public class SearchService {
 		if (!osmAndMapsService.validateAndInitConfig()) {
 			return response;
 		}
-		double radius = SearchOption.SEARCH_RADIUS_DEGREE;
-		QuadRect points = osmAndMapsService.points(null,
-				new LatLon(ctx.lat + radius, ctx.lon - radius),
-				new LatLon(ctx.lat - radius, ctx.lon + radius));
 		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
 		try {
-			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsForSearch(points, ctx.baseSearch);
+			List<OsmAndMapsService.BinaryMapIndexReaderReference> list =
+					osmAndMapsService.getObfReadersForSpatialSearch(ctx.lat, ctx.lon);
 			if (list.isEmpty()) {
 				return response;
 			}
@@ -268,11 +263,8 @@ public class SearchService {
 			}
 			long startTime = System.currentTimeMillis();
 			SpatialSearchResults res;
-			spatialSearchLock.lock();
-			try {
+			synchronized (spatialTextSearch) {
 				res = spatialTextSearch.searchAPI(ctx.text, new SpatialSearchContext(usedMapList));
-			} finally {
-				spatialSearchLock.unlock();
 			}
 			long searchTime = System.currentTimeMillis() - startTime;
 			if (res.mainResults != null) {
