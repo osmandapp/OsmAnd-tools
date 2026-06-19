@@ -1429,19 +1429,19 @@ public class OsmAndMapsService {
 				}
 			}
 		}
-		LOGGER.info("Spatial search regions: " + regionNames);
+		LOGGER.info("Spatial search regions (" + regionNames.size() + "): " + regionNames);
 
 		// 2. maps covering those regions, selected by bbox intersection
 		Set<File> files = new LinkedHashSet<>();
 		if (regionBbox != null) {
 			files.addAll(getMaps(regionBbox));
 		}
-		LOGGER.info("Spatial search region maps: " + fileNames(files));
+		LOGGER.info("Spatial search region maps " + mapsLog(files, lat, lon));
 
 		// 3. + maps within the 500 km bbox (regular selection), then base map
 		files.addAll(getMaps(bbox));
 		files.add(getBaseMap().file);
-		LOGGER.info("Spatial search total maps: " + fileNames(files));
+		LOGGER.info("Spatial search total maps " + mapsLog(files, lat, lon));
 
 		List<BinaryMapIndexReaderReference> res = new ArrayList<>();
 		for (File f : files) {
@@ -1453,8 +1453,25 @@ public class OsmAndMapsService {
 		return res;
 	}
 
-	private static List<String> fileNames(Set<File> files) {
-		return files.stream().map(File::getName).toList();
+	private String mapsLog(Set<File> files, double lat, double lon) {
+		List<String> names = files.stream()
+				.sorted(Comparator.comparingDouble(f -> regionDistance(f, lat, lon)))
+				.map(File::getName).toList();
+		int n = names.size();
+		if (n <= 8) {
+			return n + ": " + names;
+		}
+		return n + ": " + names.subList(0, 5) + " ... " + names.subList(n - 3, n);
+	}
+
+	private double regionDistance(File f, double lat, double lon) {
+		WorldRegion wr = osmandRegions.getRegionDataByDownloadName(getDownloadNameByFileName(f.getName()));
+		List<QuadRect> bounds = wr == null ? null : wr.getAllPolygonsBounds();
+		if (bounds == null || bounds.isEmpty()) {
+			return Double.MAX_VALUE;
+		}
+		QuadRect b = bounds.get(0);
+		return MapUtils.getDistance(lat, lon, (b.top + b.bottom) / 2, (b.left + b.right) / 2);
 	}
 
 	public BinaryMapIndexReaderReference getBaseMap() throws IOException {
