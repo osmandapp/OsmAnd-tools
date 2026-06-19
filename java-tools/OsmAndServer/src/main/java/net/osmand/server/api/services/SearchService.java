@@ -246,6 +246,7 @@ public class SearchService {
 
 	// dev-only: new prototype search using SpatialTextSearch.
 	public SpatialResponse searchSpatial(SearchContext ctx, String timeZone) throws IOException {
+		long sTime = System.currentTimeMillis();
 		SpatialResponse response = new SpatialResponse();
 		if (!osmAndMapsService.validateAndInitConfig()) {
 			return response;
@@ -264,7 +265,7 @@ public class SearchService {
 			long startTime = System.currentTimeMillis();
 			SpatialSearchResults res;
 			synchronized (spatialTextSearch) {
-				res = spatialTextSearch.searchAPI(ctx.text, new SpatialSearchContext(usedMapList));
+				res = spatialTextSearch.searchAPI(ctx.text, new SpatialSearchContext(usedMapList, new LatLon(ctx.lat, ctx.lon)));
 			}
 			long searchTime = System.currentTimeMillis() - startTime;
 			if (res.mainResults != null) {
@@ -280,10 +281,11 @@ public class SearchService {
 				}
 			}
 			// extra info shown in the UI
-			response.info.put("timeMs", searchTime);
+			response.info.put("timeAPI", String.format("%.2f", searchTime / 1e3));
+			response.info.put("timeOth", String.format("%.1f", (System.currentTimeMillis() - sTime - searchTime) / 1e3));
 			response.info.put("count", response.features.size());
-			response.info.put("tokens", res.tokens == null ? 0 : res.tokens.size());
-			response.info.put("combinations", res.combinations == null ? 0 : res.combinations.size());
+			response.info.put("tokens", res.combinations == null || res.combinations.size() == 0? 0 : res.combinations.get(0).getTokenCount());
+//			response.info.put("x", res.combinations == null ? 0 : res.combinations.size());
 		} catch (RuntimeException e) {
 			LOGGER.warn(String.format("Spatial search failed for '%s' (incompatible maps?): %s", ctx.text, e), e);
 		} finally {
