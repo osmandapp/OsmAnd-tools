@@ -21,7 +21,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Repository
@@ -113,10 +114,11 @@ public class OperationRepository {
 	}
 
 	public List<RunItem> getRuns(Long jobId) {
+		// list view uses the light mapper: no result_json shipped, summary read by streaming (see runListMapper)
 		if (jobId != null) {
-			return jdbc.query(RUN_SELECT + " WHERE r.job_id = ? ORDER BY r.created_time DESC", runMapper, jobId);
+			return jdbc.query(RUN_SELECT + " WHERE r.job_id = ? ORDER BY r.created_time DESC", runListMapper, jobId);
 		}
-		return jdbc.query(RUN_SELECT + " ORDER BY r.created_time DESC", runMapper);
+		return jdbc.query(RUN_SELECT + " ORDER BY r.created_time DESC", runListMapper);
 	}
 
 	public Optional<RunItem> getRun(long id) {
@@ -184,44 +186,66 @@ public class OperationRepository {
 			rs.getString("name"), rs.getString("description"), rs.getString("labels"), rs.getString("params_json"),
 			ts(rs, "created_time"), ts(rs, "updated_time"));
 
-	private final RowMapper<RunItem> runMapper = (rs, n) -> {
-		String resultJson = decompress(rs.getString("result_json"));
-		Map.Entry<String, Object> summary = firstPrimitiveEntry(resultJson);
+	private final RowMapper<RunItem> runMapper = (rs, n) -> toRunItem(rs, decompress(rs.getString("result_json")));
+	private final RowMapper<RunItem> runListMapper = (rs, n) -> toRunItem(rs, null);
+
+	private RunItem toRunItem(ResultSet rs, String resultJson) throws SQLException {
+		Map.Entry<String, Object> summary = summarize(rs.getString("result_json"));
 		return new RunItem(rs.getLong("id"), rs.getLong("job_id"), rs.getString("class_name"),
 				rs.getString("operation_name"), rs.getString("job_name"),
 				rs.getString("status"), rs.getString("params_json"), resultJson, rs.getString("error_text"),
 				rs.getLong("elapsed_ms"), null, null, null, summary == null ? null : summary.getKey(),
 				summary == null ? null : summary.getValue(), ts(rs, "started_time"), ts(rs, "finished_time"),
 				ts(rs, "created_time"), ts(rs, "updated_time"));
-	};
+	}
 
 	private static LocalDateTime ts(ResultSet rs, String column) throws SQLException {
 		Timestamp ts = rs.getTimestamp(column);
 		return ts == null ? null : ts.toLocalDateTime();
 	}
-
-	private Map.Entry<String, Object> firstPrimitiveEntry(String json) {
-		if (json == null || json.isBlank()) {
+	
+	private Map.Entry<String, Object> summarize(String stored) {
+		if (stored == null || stored.isBlank()) {
 			return null;
 		}
-		try {
-			JsonNode node = mapper.readTree(json);
-			if (!node.isObject()) {
+		try (JsonParser p = openParser(stored)) {
+			if (p.nextToken() != JsonToken.START_OBJECT) {
 				return null;
 			}
-			var fields = node.fields();
-			while (fields.hasNext()) {
-				Map.Entry<String, JsonNode> entry = fields.next();
-				JsonNode value = entry.getValue();
-				if (value == null || value.isNull() || value.isTextual() || value.isNumber() || value.isBoolean()) {
-					Object plain = value == null || value.isNull() ? null : mapper.convertValue(value, Object.class);
-					return new AbstractMap.SimpleImmutableEntry<>(entry.getKey(), plain);
+			while (p.nextToken() == JsonToken.FIELD_NAME) {
+				String name = p.getCurrentName();
+				JsonToken v = p.nextToken();
+				switch (v) {
+					case VALUE_STRING:
+						return new AbstractMap.SimpleImmutableEntry<>(name, p.getValueAsString());
+					case VALUE_NUMBER_INT:
+						return new AbstractMap.SimpleImmutableEntry<>(name, p.getLongValue());
+					case VALUE_NUMBER_FLOAT:
+						return new AbstractMap.SimpleImmutableEntry<>(name, p.getDoubleValue());
+					case VALUE_TRUE, VALUE_FALSE:
+						return new AbstractMap.SimpleImmutableEntry<>(name, p.getBooleanValue());
+					case VALUE_NULL:
+						return new AbstractMap.SimpleImmutableEntry<>(name, null);
+					case START_OBJECT, START_ARRAY:
+						p.skipChildren();
+						break;
+					default:
+						break;
 				}
 			}
 		} catch (Exception e) {
 			return null;
 		}
 		return null;
+	}
+
+	private JsonParser openParser(String stored) throws IOException {
+		if (stored.startsWith(GZIP_PREFIX)) {
+			ByteArrayInputStream b64 = new ByteArrayInputStream(
+					stored.substring(GZIP_PREFIX.length()).getBytes(StandardCharsets.US_ASCII));
+			return mapper.getFactory().createParser(new GZIPInputStream(Base64.getDecoder().wrap(b64)));
+		}
+		return mapper.getFactory().createParser(stored);
 	}
 
 	private static final String GZIP_PREFIX = "gzip:";
