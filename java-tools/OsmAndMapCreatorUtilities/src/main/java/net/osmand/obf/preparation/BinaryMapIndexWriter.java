@@ -1,7 +1,6 @@
 package net.osmand.obf.preparation;
 
 
-import static net.osmand.util.SearchAlgorithms.EMPTY_SUFFIX_DICTIONARY_SENTINEL;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -9,7 +8,6 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -1112,6 +1110,9 @@ public class BinaryMapIndexWriter {
 						atom.addOtherWordsCount(ct);
 					}
 				}
+				for (String s : no.extraSuffixes) {
+					atom.addExtraSuffix(s);
+				}
 				builder.addAtom(atom.build());
 			}
 			codedOutStream.writeMessageNoTag(builder.build());
@@ -1875,6 +1876,9 @@ public class BinaryMapIndexWriter {
 					for (int ct : no.otherWordsCount.toArray()) {
 						bs.addOtherWordsCount(ct);
 					}
+				}
+				for (String s : no.extraSuffixes) {
+					bs.addExtraSuffix(s);
 				}
 				bs.setShiftTo(0);
 				OsmAndPoiNameIndexDataAtom atom = bs.build();

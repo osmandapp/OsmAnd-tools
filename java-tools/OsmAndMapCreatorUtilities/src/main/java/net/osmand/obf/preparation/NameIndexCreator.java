@@ -16,6 +16,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 import gnu.trove.list.array.TIntArrayList;
+import net.osmand.CollatorStringMatcher;
 import net.osmand.binary.CommonWords;
 import net.osmand.data.City;
 import net.osmand.data.City.CityType;
@@ -66,6 +67,7 @@ public class NameIndexCreator<T> {
     	T object;
     	TIntArrayList bitsetIndex = new TIntArrayList();
     	TIntArrayList otherWordsCount = new TIntArrayList();
+    	List<String> extraSuffixes = new ArrayList<>();
     	List<NameObjectSingleNameIndex> singleNames = new ArrayList<>();
     	
 		public boolean isOtherWordsNonZeros() {
@@ -115,8 +117,9 @@ public class NameIndexCreator<T> {
 					allSortedSuffixes.add(suffix);
 					for (String otherName : singleName.allNames) {
 						if (!otherName.equals(singleName.token)) {
-							if (parsePureIntegerSuffix(otherName) != null) {
-								// skip encode as int
+							if (SearchAlgorithms.isNumber2Letters(otherName)) {
+//								if (parsePureIntegerSuffix(otherName) != null) {	
+								// skip encode as int and extra word
 							} else if(commonWords.words.containsKey(otherName)){
 								// skip indexed common words
 							} else {
@@ -142,6 +145,8 @@ public class NameIndexCreator<T> {
 			}
 			// 3. prepare for 1 object bitsets 
 			for (NamedObject<T> namedObject : namedObjects) {
+				
+				boolean allEmptyExtra = true;
 				for (NameObjectSingleNameIndex singleName : namedObject.singleNames) {
 					PrepareWordIndex word = commonWords.words.get(singleName.token);
 					boolean isCommon = word != null && word.nonindexed != 0;
@@ -165,14 +170,19 @@ public class NameIndexCreator<T> {
 					String suffix = calculateSuffix(singleName.token, prefix);
 					namedObject.bitsetIndex.add((suffixes.resolvedSuffixToIndex.get(suffix) + 1) << 1);
 					int otherWords = 0;
+					String extraToken = "";
 					for (String otherName : singleName.allNames) {
 						if (!otherName.equals(singleName.token)) {
-							Integer pInteger = parsePureIntegerSuffix(otherName);
-							if (pInteger != null) {
-								// partial number ends with 11 but separated number as 01
-								namedObject.bitsetIndex.add((pInteger << 2) + 1);
+							if (SearchAlgorithms.isNumber2Letters(otherName)) {
+								Integer pInteger = parsePureIntegerSuffix(otherName);
+								if (pInteger != null) {
+									// partial number ends with 11 but separated number as 01
+									namedObject.bitsetIndex.add((pInteger << 2) + 1);
+								} else {
+									extraToken += " " + otherName;
+								}
 							} else if (commonWords.words.containsKey(otherName)) {
-								if(!suffixes.usedCommons.containsKey(otherName)) {
+								if (!suffixes.usedCommons.containsKey(otherName)) {
 									int indx = commonWords.words.get(otherName).index;
 									suffixes.commonsRef.add(indx);
 									suffixes.usedCommons.put(otherName, suffixes.usedCommons.size());
@@ -181,7 +191,7 @@ public class NameIndexCreator<T> {
 								calcRef += suffixes.usedCommons.get(otherName);
 								namedObject.bitsetIndex.add((calcRef + 1) << 1);
 								// skip indexed common words
-							} else if(isCommonWord){
+							} else if (isCommonWord) {
 								if (INDEX_RARE_WORDS_FOR_COMMON) {
 									Integer ind = suffixes.resolvedSuffixToIndex.get(" " + otherName);
 									namedObject.bitsetIndex.add((ind + 1) << 1);
@@ -200,6 +210,13 @@ public class NameIndexCreator<T> {
 					}
 					// extraSuffixes are not used for now?
 					namedObject.otherWordsCount.add(otherWords);
+					namedObject.extraSuffixes.add(extraToken);
+					if (extraToken.length() > 0) {
+						allEmptyExtra = false;
+					}
+				}
+				if (allEmptyExtra) {
+					namedObject.extraSuffixes.clear();
 				}
 				
 			}
@@ -320,10 +337,6 @@ public class NameIndexCreator<T> {
     }
 	
 
-	
-
-	
-
 	private static String removeBraces(String localeName) {
 		int i = localeName.indexOf('(');
 		String retName = localeName;
@@ -340,7 +353,13 @@ public class NameIndexCreator<T> {
 	
 
 	private static Integer parsePureIntegerSuffix(String token) {
+		if (token == null || token.length() == 0) {
+			return null;
+		}
 		try {
+			if (token.charAt(token.length() - 1) == CollatorStringMatcher.INCOMPLETE_DOT) {
+				token = token.substring(0, token.length() - 1);
+			}
 			int int1 = Integer.parseInt(token);
 			if (!token.equals(int1 + "") || int1 > (Integer.MAX_VALUE >> 2)) {
 				return null;
