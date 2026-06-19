@@ -287,7 +287,7 @@ public class SearchService {
 			response.info.put("tokens", res.combinations == null || res.combinations.size() == 0? 0 : res.combinations.get(0).getTokenCount());
 //			response.info.put("x", res.combinations == null ? 0 : res.combinations.size());
 		} catch (RuntimeException e) {
-			LOGGER.warn(String.format("Spatial search failed for '%s' (incompatible maps?): %s", ctx.text, e), e);
+			LOGGER.error(String.format("Spatial search failed for '%s': %s", ctx.text, e), e);
 		} finally {
 			osmAndMapsService.unlockReaders(usedMapList);
 		}
