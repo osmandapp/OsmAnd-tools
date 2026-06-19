@@ -251,16 +251,16 @@ public class SearchService {
 		if (!osmAndMapsService.validateAndInitConfig()) {
 			return response;
 		}
-		double radius = SearchOption.SEARCH_RADIUS_DEGREE;
-		QuadRect points = osmAndMapsService.points(null,
-				new LatLon(ctx.lat + radius, ctx.lon - radius),
-				new LatLon(ctx.lat - radius, ctx.lon + radius));
+//		double radius = SearchOption.SEARCH_RADIUS_DEGREE;
+//		QuadRect points = osmAndMapsService.points(null,
+//				new LatLon(ctx.lat + radius, ctx.lon - radius),
+//				new LatLon(ctx.lat - radius, ctx.lon + radius));
 		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
 		try {
-			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsForSearch(points, ctx.baseSearch);
+//			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsForSearch(points, ctx.baseSearch);
 			// OPTION B
-//			List<OsmAndMapsService.BinaryMapIndexReaderReference> list =
-//					osmAndMapsService.getObfReadersForSpatialSearch(ctx.lat, ctx.lon);
+			List<OsmAndMapsService.BinaryMapIndexReaderReference> list =
+					osmAndMapsService.getObfReadersForSpatialSearch(ctx.lat, ctx.lon);
 			if (list.isEmpty()) {
 				return response;
 			}
