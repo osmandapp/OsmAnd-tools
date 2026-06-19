@@ -122,7 +122,7 @@ public class BinaryInspector {
 //					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_karlsruhe_europe_2.obf",
 //					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_freiburg_europe_2.obf",
 //					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_stuttgart_europe_2.obf",
-					System.getProperty("maps.dir") + "Ukraine_kyiv-city_europe_2_6.obf",
+					System.getProperty("maps.dir") + "Ukraine_kyiv-city_europe_2.obf",
 //					System.getProperty("maps.dir") + "regions.ocbf",
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
