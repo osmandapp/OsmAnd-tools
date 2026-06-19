@@ -123,6 +123,8 @@ public class OsmAndMapsService {
 	private static final int MAX_SAME_FILE_OPEN = 15;
 	private static final long CACHE_MAX_ROUTING_CONTEXT_SEC = Integer.MAX_VALUE; //12 * 60 * 60; // 12h
 
+	private static final double SPATIAL_SEARCH_RADIUS_KM = 300;
+	
 	private static final List<String> ALWAYS_IN_MEMORY = new ArrayList<String>();
 	static {
 		ALWAYS_IN_MEMORY.add("car:{}");
@@ -1400,43 +1402,43 @@ public class OsmAndMapsService {
 		return files;
 	}
 
-	private static final double SPATIAL_SEARCH_RADIUS_KM = 500;
 
-	// all maps within ~500 km of the point, no count limit.
+
+	// all maps within ~.00 km of the point, no count limit.
 	// Union of region-based selection (regions.ocbf) and the regular bbox-intersection selection.
 	public List<BinaryMapIndexReaderReference> getObfReadersForSpatialSearch(double lat, double lon) throws IOException {
 		initObfReaders();
 		double dLat = SPATIAL_SEARCH_RADIUS_KM / 111.0;
 		double dLon = SPATIAL_SEARCH_RADIUS_KM / (111.0 * Math.max(0.1, Math.cos(Math.toRadians(lat))));
 		QuadRect bbox = points(null, new LatLon(lat + dLat, lon - dLon), new LatLon(lat - dLat, lon + dLon));
+		Set<File> files = new LinkedHashSet<>();
 
 		// 1. regions overlapping the area (queried from regions.ocbf by bbox) -> their combined bbox
-		List<String> regionNames = new ArrayList<>();
-		QuadRect regionBbox = null;
-		synchronized (osmandRegions) {
-			for (BinaryMapDataObject o : osmandRegions.query((int) bbox.left, (int) bbox.right, (int) bbox.top, (int) bbox.bottom)) {
-				regionNames.add(osmandRegions.getDownloadName(o));
-				for (int i = 0; i < o.getPointsLength(); i++) {
-					int x = o.getPoint31XTile(i), y = o.getPoint31YTile(i);
-					if (regionBbox == null) {
-						regionBbox = new QuadRect(x, y, x, y);
-					} else {
-						regionBbox.left = Math.min(regionBbox.left, x);
-						regionBbox.top = Math.min(regionBbox.top, y);
-						regionBbox.right = Math.max(regionBbox.right, x);
-						regionBbox.bottom = Math.max(regionBbox.bottom, y);
-					}
-				}
-			}
-		}
-		LOGGER.info("Spatial search regions (" + regionNames.size() + "): " + regionNames);
+//		List<String> regionNames = new ArrayList<>();
+//		QuadRect regionBbox = null;
+//		synchronized (osmandRegions) {
+//			for (BinaryMapDataObject o : osmandRegions.query((int) bbox.left, (int) bbox.right, (int) bbox.top, (int) bbox.bottom)) {
+//				regionNames.add(osmandRegions.getDownloadName(o));
+//				for (int i = 0; i < o.getPointsLength(); i++) {
+//					int x = o.getPoint31XTile(i), y = o.getPoint31YTile(i);
+//					if (regionBbox == null) {
+//						regionBbox = new QuadRect(x, y, x, y);
+//					} else {
+//						regionBbox.left = Math.min(regionBbox.left, x);
+//						regionBbox.top = Math.min(regionBbox.top, y);
+//						regionBbox.right = Math.max(regionBbox.right, x);
+//						regionBbox.bottom = Math.max(regionBbox.bottom, y);
+//					}
+//				}
+//			}
+//		}
+//		LOGGER.info("Spatial search regions (" + regionNames.size() + "): " + regionNames);
 
 		// 2. maps covering those regions, selected by bbox intersection
-		Set<File> files = new LinkedHashSet<>();
-		if (regionBbox != null) {
-			files.addAll(getMaps(regionBbox));
-		}
-		LOGGER.info("Spatial search region maps " + mapsLog(files, lat, lon));
+//		if (regionBbox != null) {
+//			files.addAll(getMaps(bbox));
+//		}
+//		LOGGER.info("Spatial search region maps " + mapsLog(files, lat, lon));
 
 		// 3. + maps within the 500 km bbox (regular selection), then base map
 		files.addAll(getMaps(bbox));
