@@ -37,13 +37,19 @@ class UserBatchReader {
 		return (int) Math.ceil(total * Math.max(0, percent) / 100.0);
 	}
 
-	List<Integer> sample(int total, int userLimit, OperationContext ctx) {
+	List<Integer> sample(int total, int userLimit, int from, OperationContext ctx) {
 		boolean sample = userLimit > 0 && userLimit < total;
 		double step = sample ? (double) total / userLimit : 1.0;
 		double nextPick = 0.0;
 		long index = 0;
 		List<Integer> ids = new ArrayList<>(Math.max(0, Math.min(userLimit, total)));
 		int batch = 0;
+		// when not sampling we can jump straight to the page that contains the start offset
+		if (!sample && from > 0) {
+			batch = from / BATCH_SIZE;
+			index = (long) batch * BATCH_SIZE;
+			nextPick = index;
+		}
 		while (ids.size() < userLimit && !ctx.isCancelled()) {
 			Page<CloudUser> users = usersRepository.findAll(PageRequest.of(batch++, BATCH_SIZE, Sort.by("id")));
 			if (users.isEmpty()) {
@@ -54,7 +60,9 @@ class UserBatchReader {
 					break;
 				}
 				if (!sample || index >= nextPick) {
-					ids.add(user.id);
+					if (index >= from) {
+						ids.add(user.id);
+					}
 					nextPick += step;
 				}
 				index++;

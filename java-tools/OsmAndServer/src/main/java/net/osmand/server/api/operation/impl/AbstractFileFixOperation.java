@@ -48,8 +48,10 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 	public record Params(
 			Integer userId,         // null/empty = all users; a number = single user (for testing)
 			Boolean testRun,         // null/true = only count, no write (safe default); false = actually write
-			LocalDate updatedAfter,  // null = no date filter; else only files updated on/after this date
+			LocalDate updatedAfter,  // null = no lower bound; else only files updated on/after this date
+			LocalDate updatedBefore, // null = no upper bound; else only files updated on/before this date
 			Set<String> fileTypes,   // null/empty = all types; otherwise only these (e.g. GPX, FAVOURITES)
+			Integer usersFrom,       // null/0 = from the first user; else skip this many users (ordered by id) and start there
 			Integer usersPercent,    // null/100 = all users; otherwise that % of all users
 			Integer filesPercent,    // null/100 = all files; otherwise that % of each user's files
 			List<Long> fileIds,      // null/empty = normal scan; otherwise process only these file ids
@@ -88,7 +90,8 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 			return;
 		}
 		int total = users.total();
-		List<Integer> userIds = users.sample(total, UserBatchReader.limit(total, params.usersPercent()), ctx);
+		int from = params.usersFrom() == null ? 0 : Math.max(0, params.usersFrom());
+		List<Integer> userIds = users.sample(total, UserBatchReader.limit(total, params.usersPercent()), from, ctx);
 		int fileCap = fileCap(params, userIds, ctx);
 		int totalUsers = userIds.size();
 		AtomicInteger done = new AtomicInteger();
@@ -118,9 +121,14 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 		boolean userFound = false;
 		Long afterMs = params.updatedAfter() == null ? null
 				: params.updatedAfter().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
+		Long beforeMs = params.updatedBefore() == null ? null
+				: params.updatedBefore().plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
 		UserFilesResults res = userdataService.generateFiles(userId, null, false, false, typesOf(params));
 		for (UserFileNoData fileNoData : res.uniqueFiles) {
 			if (afterMs != null && fileNoData.updatetimems < afterMs) {
+				continue;
+			}
+			if (beforeMs != null && fileNoData.updatetimems >= beforeMs) {
 				continue;
 			}
 			if (!accepts(fileNoData.name)) {
