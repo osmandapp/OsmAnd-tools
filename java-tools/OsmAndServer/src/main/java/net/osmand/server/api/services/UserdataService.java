@@ -101,6 +101,9 @@ public class UserdataService {
     protected CloudUserDevicesRepository devicesRepository;
 
 	@Autowired
+	protected DeviceTokenCache deviceTokenCache;
+
+	@Autowired
 	protected DeviceSubscriptionsRepository subscriptionsRepo;
 
 	@Autowired
@@ -581,6 +584,7 @@ public class UserdataService {
 						"device-register: delete-same-device (%s) id (%d) brand (%s) model (%s) deviceId (%s)",
 						email, sameDevice.id, brand, model, deviceId));
 			    devicesRepository.delete(sameDevice);
+			    deviceTokenCache.invalidate(sameDevice.id);
 		    }
 	    }
         device.lang = lang;
@@ -1189,6 +1193,7 @@ public class UserdataService {
 						LOG.info("Deleted (/delete-account) users with email " + pu.email + " and id " + pu.id);
 						removeUserIdFromPurchases(pu.id);
                         int numOfUserDevicesDelete = devicesRepository.deleteByUserid(dev.userid);
+                        deviceTokenCache.invalidateByUserId(dev.userid);
                         if (numOfUserDevicesDelete != -1) {
 							LOG.info("Deleted (/delete-account) user devices for user " + pu.email + " and id " + pu.id);
                             request.logout();
