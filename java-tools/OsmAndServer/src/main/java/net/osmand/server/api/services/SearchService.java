@@ -270,7 +270,9 @@ public class SearchService {
 			}
 			long startTime = System.currentTimeMillis();
 			SpatialSearchResults res;
+			// In future multiple spatialTextSearch & multiple osmand regions
 			synchronized (spatialTextSearch) {
+				usedMapList.add(osmandRegions.getFile());
 				res = spatialTextSearch.searchAPI(ctx.text, new SpatialSearchContext(usedMapList, new LatLon(ctx.lat, ctx.lon)));
 			}
 			long searchTime = System.currentTimeMillis() - startTime;
