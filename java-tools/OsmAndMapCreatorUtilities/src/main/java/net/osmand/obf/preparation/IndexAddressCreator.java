@@ -1591,6 +1591,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			Map<String, List<Street>> uniqueNames, TLongObjectHashMap<Long> streetIds) throws SQLException {
 		streetBuildingsStat.setLong(1, city.getId());
 		ResultSet set = streetBuildingsStat.executeQuery();
+		long streetOsmId = 0;
 		while (set.next()) {
 			long streetId = set.getLong(1);
 			if (!visitedStreets.containsKey(streetId)) {
@@ -1602,6 +1603,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				List<Node> thisWayNodes = loadStreetNodes(streetId, waynodesStat);
 				Street street = addStreetToUniqueNamesMap(uniqueNames, streetName, names, city);
 
+				streetOsmId = set.getLong("osmid");
 				streetIds.put(streetId, set.getLong("osmid"));
 				street.setLocation(lat, lon);
 				street.setId(streetId);
@@ -1649,6 +1651,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				}
 
 				s.addBuildingCheckById(b);
+				if ((streetIds.get(streetId) == streetOsmId || b.getId() < streetIds.get(streetId)) && b.getId() > 0) {
+					// different set of buildings should have different id -
+					// example 2 different cities over same street Amstelveen / Almere Legmeerdijk
+					streetIds.put(streetId, b.getId());
+				}
 			}
 		}
 
