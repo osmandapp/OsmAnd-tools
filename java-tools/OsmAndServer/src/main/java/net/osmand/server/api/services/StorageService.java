@@ -239,7 +239,24 @@ public class StorageService {
 		}
 		return null;
 	}
-	
+
+	public boolean fileExists(String storage, String fld, String filename) {
+		if (!Algorithms.isEmpty(storage)) {
+			for (String id : storage.split(",")) {
+				StorageType st = getStorageProviderById(id);
+				if (!st.local) {
+					try {
+						return st.s3Conn.doesObjectExist(st.bucket, fld + FILE_SEPARATOR + filename);
+					} catch (com.amazonaws.SdkClientException e) {
+						handleException(st, "fileExists", st.bucket, filename, e);
+						throw e;
+					}
+				}
+			}
+		}
+		return true;
+	}
+
 	public void deleteFile(String storage, String fld, String filename) {
 		if (!Algorithms.isEmpty(storage)) {
 			for (String id : storage.split(",")) {
