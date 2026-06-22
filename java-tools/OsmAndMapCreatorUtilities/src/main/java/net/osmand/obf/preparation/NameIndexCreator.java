@@ -89,7 +89,7 @@ public class NameIndexCreator<T> {
 
 		
 		public boolean addToken(T object, String token, Collection<String> allNames) {
-			NamedObject<T> last = namedObjects.size() == 0  ? null : namedObjects.get(namedObjects.size() -1 );
+			NamedObject<T> last = namedObjects.size() == 0 ? null : namedObjects.get(namedObjects.size() - 1);
 			Set<String> setNames = allNames.size() == 1 ? Collections.emptySet() : new TreeSet<String>(allNames);
 			if (last == null || last.object != object) {
 				// reuse last
@@ -247,11 +247,15 @@ public class NameIndexCreator<T> {
 		
 		// Here we could also compute and add some top 5 frequent
 		for (Map.Entry<String, Integer> e : tokenFrequencies.entrySet()) {
+			String s = e.getKey();
+			if (s.equalsIgnoreCase(NameIndexReader.CITY_AS_STREET_COMMON)) {
+				commonStrings.add(s);
+				continue;
+			}
 			// don't add all common ! for some maps they could have different meaning
 			if (e.getValue() < MIN_LIMIT_FREQ_COMMON) {
 				continue;
 			}
-			String s = e.getKey();
 			boolean common = CommonWords.isCommon(s);
 			boolean freq = CommonWords.getFrequentlyUsed(s) >= 0;
 			if (common || freq || topXFrequent.contains(e.getKey())) {
@@ -283,7 +287,7 @@ public class NameIndexCreator<T> {
 		List<String> splitName = SearchAlgorithms.splitAndNormalize(name, true);
 		boolean hasRareName = false;
 		for (String token : splitName) {
-			if (!token.equals(NameIndexReader.CITY_AS_STREET_COMMON) &&
+			if (!token.equalsIgnoreCase(NameIndexReader.CITY_AS_STREET_COMMON) &&
 					!CommonWords.isCommon(token) && CommonWords.getFrequentlyUsed(token) <= 0) {
 				hasRareName = true;
 				break;
@@ -293,7 +297,7 @@ public class NameIndexCreator<T> {
 			if (Algorithms.isEmpty(token)) {
 				continue;
 			}
-			if (token.equals(NameIndexReader.CITY_AS_STREET_COMMON)) {
+			if (token.equalsIgnoreCase(NameIndexReader.CITY_AS_STREET_COMMON)) {
 				tokenFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
 				commonNonIndexedFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
 				continue;
