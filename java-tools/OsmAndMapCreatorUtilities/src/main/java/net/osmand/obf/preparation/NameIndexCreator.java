@@ -9,7 +9,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -17,6 +16,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 import gnu.trove.list.array.TIntArrayList;
+import net.osmand.CollatorStringMatcher;
 import net.osmand.binary.CommonWords;
 import net.osmand.data.City;
 import net.osmand.data.City.CityType;
@@ -28,8 +28,9 @@ import net.osmand.util.SearchAlgorithms;
 public class NameIndexCreator<T> {
 
 	private static final int NAMED_WORDS_SEPARATOR = 0;
-	private static final int MIN_LIMIT_FREQ_COMMON = 10; // minimum required
-	private static final int ADD_TOP_X_FREQ_WORDS = 10; // minimum required
+	private static final int MIN_LIMIT_FREQ_COMMON = 10; // minimum required for common to have at least
+	// Large ADD_TOP_X_FREQ_WORDS many will cause to add many common words to index !
+	private static final int ADD_TOP_X_FREQ_WORDS = 10; // minimum required  for frequent to be added and indexed 
 	public static boolean NOT_INDEX_COMMON_IF_THERE_ARE_RARE = true;
 	public static boolean INDEX_RARE_WORDS_FOR_COMMON = false;
 	public static boolean INDEX_RARE_WORDS_FOR_NON_COMMON = false;
@@ -66,6 +67,7 @@ public class NameIndexCreator<T> {
     	T object;
     	TIntArrayList bitsetIndex = new TIntArrayList();
     	TIntArrayList otherWordsCount = new TIntArrayList();
+    	List<String> extraSuffixes = new ArrayList<>();
     	List<NameObjectSingleNameIndex> singleNames = new ArrayList<>();
     	
 		public boolean isOtherWordsNonZeros() {
@@ -115,8 +117,9 @@ public class NameIndexCreator<T> {
 					allSortedSuffixes.add(suffix);
 					for (String otherName : singleName.allNames) {
 						if (!otherName.equals(singleName.token)) {
-							if (parsePureIntegerSuffix(otherName) != null) {
-								// skip encode as int
+							if (SearchAlgorithms.isNumber2Letters(otherName)) {
+//								if (parsePureIntegerSuffix(otherName) != null) {	
+								// skip encode as int and extra word
 							} else if(commonWords.words.containsKey(otherName)){
 								// skip indexed common words
 							} else {
@@ -142,13 +145,16 @@ public class NameIndexCreator<T> {
 			}
 			// 3. prepare for 1 object bitsets 
 			for (NamedObject<T> namedObject : namedObjects) {
+				
+				boolean allEmptyExtra = true;
 				for (NameObjectSingleNameIndex singleName : namedObject.singleNames) {
 					PrepareWordIndex word = commonWords.words.get(singleName.token);
 					boolean isCommon = word != null && word.nonindexed != 0;
 					if (isCommon) {
 						boolean rare = false;
 						for (String r : singleName.allNames) {
-							if (!commonWords.words.containsKey(r)) {
+							if (!commonWords.words.containsKey(r) &&
+									!SearchAlgorithms.isNumber2Letters(r)) {
 								rare = true;
 								break;
 							}
@@ -157,7 +163,6 @@ public class NameIndexCreator<T> {
 							continue;
 						}
 					}
-					
 					if (namedObject.bitsetIndex.size() != 0) {
 						namedObject.bitsetIndex.add(NAMED_WORDS_SEPARATOR); // separator
 					}
@@ -165,14 +170,19 @@ public class NameIndexCreator<T> {
 					String suffix = calculateSuffix(singleName.token, prefix);
 					namedObject.bitsetIndex.add((suffixes.resolvedSuffixToIndex.get(suffix) + 1) << 1);
 					int otherWords = 0;
+					String extraToken = "";
 					for (String otherName : singleName.allNames) {
 						if (!otherName.equals(singleName.token)) {
-							Integer pInteger = parsePureIntegerSuffix(otherName);
-							if (pInteger != null) {
-								// partial number ends with 11 but separated number as 01
-								namedObject.bitsetIndex.add((pInteger << 2) + 1);
+							if (SearchAlgorithms.isNumber2Letters(otherName)) {
+								Integer pInteger = parsePureIntegerSuffix(otherName);
+								if (pInteger != null) {
+									// partial number ends with 11 but separated number as 01
+									namedObject.bitsetIndex.add((pInteger << 2) + 1);
+								} else {
+									extraToken += " " + otherName;
+								}
 							} else if (commonWords.words.containsKey(otherName)) {
-								if(!suffixes.usedCommons.containsKey(otherName)) {
+								if (!suffixes.usedCommons.containsKey(otherName)) {
 									int indx = commonWords.words.get(otherName).index;
 									suffixes.commonsRef.add(indx);
 									suffixes.usedCommons.put(otherName, suffixes.usedCommons.size());
@@ -181,7 +191,7 @@ public class NameIndexCreator<T> {
 								calcRef += suffixes.usedCommons.get(otherName);
 								namedObject.bitsetIndex.add((calcRef + 1) << 1);
 								// skip indexed common words
-							} else if(isCommonWord){
+							} else if (isCommonWord) {
 								if (INDEX_RARE_WORDS_FOR_COMMON) {
 									Integer ind = suffixes.resolvedSuffixToIndex.get(" " + otherName);
 									namedObject.bitsetIndex.add((ind + 1) << 1);
@@ -200,6 +210,13 @@ public class NameIndexCreator<T> {
 					}
 					// extraSuffixes are not used for now?
 					namedObject.otherWordsCount.add(otherWords);
+					namedObject.extraSuffixes.add(extraToken);
+					if (extraToken.length() > 0) {
+						allEmptyExtra = false;
+					}
+				}
+				if (allEmptyExtra) {
+					namedObject.extraSuffixes.clear();
 				}
 				
 			}
@@ -244,7 +261,7 @@ public class NameIndexCreator<T> {
 		Map<String, PrepareWordIndex> words = new HashMap<String, NameIndexCreator.PrepareWordIndex>();
 		List<PrepareWordIndex> wordsList = new ArrayList<>();
 		int ind = 0;
-		for(String c : commonStrings) {
+		for (String c : commonStrings) {
 			Integer matched = tokenFrequencies.get(c);
 			Integer nonIndexed = commonNonIndexedFrequencies.get(c);
 			PrepareWordIndex word = new PrepareWordIndex(ind++, c, matched, nonIndexed == null ? 0 : nonIndexed);
@@ -257,11 +274,11 @@ public class NameIndexCreator<T> {
 	
 	
 	public void addToNameIndex(String name, T obj, int maxPrefixLength, boolean indexNumbers) {
-		List<String> splitName = SearchAlgorithms.splitAndNormalize(name);
-		boolean nonCommonName = false;
+		List<String> splitName = SearchAlgorithms.splitAndNormalize(name, true);
+		boolean hasRareName = false;
 		for (String token : splitName) {
-			if(!CommonWords.isCommon(token)) {
-				nonCommonName = true;
+			if (!CommonWords.isCommon(token) && CommonWords.getFrequentlyUsed(token) <= 0) {
+				hasRareName = true;
 				break;
 			}
 		}
@@ -288,7 +305,7 @@ public class NameIndexCreator<T> {
 			}
 			tokenFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
 			boolean c = CommonWords.isCommon(token);
-			if (c && nonCommonName) {
+			if (c && hasRareName) {
 				commonNonIndexedFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
 			}
 			
@@ -320,10 +337,6 @@ public class NameIndexCreator<T> {
     }
 	
 
-	
-
-	
-
 	private static String removeBraces(String localeName) {
 		int i = localeName.indexOf('(');
 		String retName = localeName;
@@ -340,7 +353,13 @@ public class NameIndexCreator<T> {
 	
 
 	private static Integer parsePureIntegerSuffix(String token) {
+		if (token == null || token.length() == 0) {
+			return null;
+		}
 		try {
+			if (token.charAt(token.length() - 1) == CollatorStringMatcher.INCOMPLETE_DOT) {
+				token = token.substring(0, token.length() - 1);
+			}
 			int int1 = Integer.parseInt(token);
 			if (!token.equals(int1 + "") || int1 > (Integer.MAX_VALUE >> 2)) {
 				return null;

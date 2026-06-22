@@ -53,7 +53,7 @@ public class FullSearchStats {
 		}
 	}
 	private void analyze(String name, String descr, MapObject obj, MapObject extra, boolean def) {
-		List<String> splitAndNormalize = SearchAlgorithms.splitAndNormalize(name);
+		List<String> splitAndNormalize = SearchAlgorithms.splitAndNormalize(name, true);
 		int cmn = 0;
 		int num = 0;
 		String objType = obj.getClass().getSimpleName();

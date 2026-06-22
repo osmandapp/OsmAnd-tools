@@ -239,47 +239,82 @@ public class SearchService {
 		return !features.isEmpty() ? features : Collections.emptyList();
 	}
 
+	public static class SpatialResponse {
+		public List<Feature> features = new ArrayList<>();
+		public Map<String, Object> info = new LinkedHashMap<>();
+	}
+
 	// dev-only: new prototype search using SpatialTextSearch.
-	public List<Feature> searchSpatial(SearchContext ctx, String timeZone) throws IOException {
+	public SpatialResponse searchSpatial(SearchContext ctx, String timeZone) throws IOException {
+		long sTime = System.currentTimeMillis();
+		SpatialResponse response = new SpatialResponse();
 		if (!osmAndMapsService.validateAndInitConfig()) {
-			return Collections.emptyList();
+			return response;
 		}
-		double radius = SearchOption.SEARCH_RADIUS_DEGREE;
-		QuadRect points = osmAndMapsService.points(null,
-				new LatLon(ctx.lat + radius, ctx.lon - radius),
-				new LatLon(ctx.lat - radius, ctx.lon + radius));
+//		double radius = SearchOption.SEARCH_RADIUS_DEGREE;
+//		QuadRect points = osmAndMapsService.points(null,
+//				new LatLon(ctx.lat + radius, ctx.lon - radius),
+//				new LatLon(ctx.lat - radius, ctx.lon + radius));
 		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
 		try {
-			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsForSearch(points, ctx.baseSearch);
+//			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsForSearch(points, ctx.baseSearch);
+			// OPTION B
+			List<OsmAndMapsService.BinaryMapIndexReaderReference> list =
+					osmAndMapsService.getObfReadersForSpatialSearch(ctx.lat, ctx.lon);
 			if (list.isEmpty()) {
-				return Collections.emptyList();
+				return response;
 			}
 			usedMapList = osmAndMapsService.getReaders(list, null);
 			if (usedMapList.isEmpty()) {
-				return Collections.emptyList();
+				return response;
 			}
-			SpatialSearchResults res = spatialTextSearch.searchAPI(ctx.text, new SpatialSearchContext(usedMapList));
-			List<Feature> features = new ArrayList<>();
-			if (res.mainResult != null) {
-				for (SpatialSearchResult r : res.mainResult.getResult()) {
+			long startTime = System.currentTimeMillis();
+			SpatialSearchResults res;
+			// In future multiple spatialTextSearch & multiple osmand regions
+			synchronized (spatialTextSearch) {
+				usedMapList.add(osmandRegions.getFile());
+				res = spatialTextSearch.searchAPI(ctx.text, new SpatialSearchContext(usedMapList, new LatLon(ctx.lat, ctx.lon)));
+			}
+			long searchTime = System.currentTimeMillis() - startTime;
+			if (res.mainResults != null) {
+				for (SpatialSearchResult r : res.mainResults) {
 					List<MapObject> objs = r.getObjects();
 					if (!objs.isEmpty()) {
 						Feature f = getSpatialFeature(objs.get(0), ctx.locale, timeZone);
 						if (f != null) {
-							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(), objs.stream()
-									.map(o -> o.getName(ctx.locale)).collect(Collectors.joining("\n")));
-							features.add(f);
+							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(), matchedObjects(objs, ctx.locale));
+							response.features.add(f);
 						}
 					}
 				}
 			}
-			return features;
+			// extra info shown in the UI
+			response.info.put("timeAPI", String.format("%.2f", searchTime / 1e3));
+			response.info.put("timeOth", String.format("%.1f", (System.currentTimeMillis() - sTime - searchTime) / 1e3));
+			response.info.put("count", response.features.size());
+			response.info.put("tokens", res.combinations == null || res.combinations.size() == 0? 0 : res.combinations.get(0).getTokenCount());
+//			response.info.put("x", res.combinations == null ? 0 : res.combinations.size());
 		} catch (RuntimeException e) {
-			LOGGER.warn(String.format("Spatial search failed for '%s' (incompatible maps?): %s", ctx.text, e), e);
-			return Collections.emptyList();
+			LOGGER.error(String.format("Spatial search failed for '%s': %s", ctx.text, e), e);
 		} finally {
 			osmAndMapsService.unlockReaders(usedMapList);
 		}
+		return response;
+	}
+
+	private List<Map<String, Object>> matchedObjects(List<MapObject> objs, String locale) {
+		List<Map<String, Object>> matched = new ArrayList<>();
+		for (MapObject o : objs) {
+			if (o.getLocation() == null) {
+				continue;
+			}
+			Map<String, Object> m = new LinkedHashMap<>();
+			m.put("name", o.getName(locale));
+			m.put("lat", o.getLocation().getLatitude());
+			m.put("lon", o.getLocation().getLongitude());
+			matched.add(m);
+		}
+		return matched;
 	}
 
 	private Feature getSpatialFeature(MapObject obj, String locale, String timeZone) {

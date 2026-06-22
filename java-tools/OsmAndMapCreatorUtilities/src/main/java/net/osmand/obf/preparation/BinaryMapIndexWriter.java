@@ -1,7 +1,6 @@
 package net.osmand.obf.preparation;
 
 
-import static net.osmand.util.SearchAlgorithms.EMPTY_SUFFIX_DICTIONARY_SENTINEL;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -1038,11 +1037,12 @@ public class BinaryMapIndexWriter {
 			NamedObjectsByPrefix<MapObject> indexEntry = entry.getValue();
 			SuffixDictionary<MapObject> suffixDictionary = indexEntry.build(commonWords);
 			if (suffixDictionary.dictionaryEntries.isEmpty()) {
-				builder.addSuffixesDictionary(EMPTY_SUFFIX_DICTIONARY_SENTINEL);
+//				builder.addSuffixesDictionary(EMPTY_SUFFIX_DICTIONARY_SENTINEL);
+				// not used any more
+				throw new UnsupportedOperationException();
 			} else {
 				for (SuffixEntry dictionaryEntry : suffixDictionary.dictionaryEntries) {
 					builder.addSuffixesDictionary(dictionaryEntry.encodedSuffix());
-					
 				}
 			}
 			for (Integer i : suffixDictionary.commonsRef) {
@@ -1081,7 +1081,7 @@ public class BinaryMapIndexWriter {
 				if (bbox31 != null) {
 					int[] bytes = SearchAlgorithms.encodeBboxForNameAtoms(ZOOM_ENCODE_BBOX_NAME_ATOMS, bbox31);
 					// double bbox or bbox larger than 15th zoom tile 
-					if (bytes.length != 5 || (bytes[2] > 1 || bytes[4] > 1)) {
+					if (bytes.length != 5 || (bytes[2] >= 1 || bytes[4] >= 1)) {
 						mapDataBuf.clear();
 						writeRawVarint32(mapDataBuf, bytes[0]);
 						for (int k = 1; k < bytes.length; k += 4) {
@@ -1109,6 +1109,9 @@ public class BinaryMapIndexWriter {
 					for (int ct : no.otherWordsCount.toArray()) {
 						atom.addOtherWordsCount(ct);
 					}
+				}
+				for (String s : no.extraSuffixes) {
+					atom.addExtraSuffix(s);
 				}
 				builder.addAtom(atom.build());
 			}
@@ -1845,7 +1848,9 @@ public class BinaryMapIndexWriter {
 			OsmAndPoiNameIndex.OsmAndPoiNameIndexData.Builder builder = OsmAndPoiNameIndex.OsmAndPoiNameIndexData.newBuilder();
 			SuffixDictionary<PoiNameObject> suffixDictionary = e.getValue().build(commonWords);
 			if (suffixDictionary.dictionaryEntries.isEmpty()) {
-				builder.addSuffixesDictionary(EMPTY_SUFFIX_DICTIONARY_SENTINEL);
+//				builder.addSuffixesDictionary(EMPTY_SUFFIX_DICTIONARY_SENTINEL);
+				// not used any more
+				throw new UnsupportedOperationException();
 			} else {
 				for (SuffixEntry dictionaryEntry : suffixDictionary.dictionaryEntries) {
 					builder.addSuffixesDictionary(dictionaryEntry.encodedSuffix());
@@ -1871,6 +1876,9 @@ public class BinaryMapIndexWriter {
 					for (int ct : no.otherWordsCount.toArray()) {
 						bs.addOtherWordsCount(ct);
 					}
+				}
+				for (String s : no.extraSuffixes) {
+					bs.addExtraSuffix(s);
 				}
 				bs.setShiftTo(0);
 				OsmAndPoiNameIndexDataAtom atom = bs.build();

@@ -1113,7 +1113,7 @@ public interface AnalystService extends InspectorService, GenDbService {
             return;
         }
         String preparedValue = isPoi ? value : removeGenerateDbAddressBraces(value);
-        List<String> splitValues = SearchAlgorithms.splitAndNormalize(preparedValue);
+        List<String> splitValues = SearchAlgorithms.splitAndNormalize(preparedValue, true);
         SearchAlgorithms.removeCommonWords(splitValues);
         for (String token : splitValues) {
             if (!Algorithms.isEmpty(token)) {

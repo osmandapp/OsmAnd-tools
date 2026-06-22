@@ -562,10 +562,17 @@ public class CountryOcbfGeneration {
 				TranslateEntity nt = set.iterator().next();
 				line += " translate-" + nt.tm.size() + "=" + nt.tm.get("name");
 				Iterator<Entry<String, String>> it = nt.tm.entrySet().iterator();
-				while(it.hasNext()) {
+                boolean hasBoundary = false;
+				while (it.hasNext()) {
 					Entry<String, String> e = it.next();
+					if ("boundary".equals(e.getKey())) {
+						hasBoundary = true;
+					}
 					addTag(serializer, e.getKey(), e.getValue());
 				}
+                if (!hasBoundary) {
+                    addTag(serializer, "boundary", "administrative");
+                }
 			}
 		}
 
@@ -729,18 +736,18 @@ public class CountryOcbfGeneration {
 	}
 
 	private void scanPolygons(File file, Map<String, File> polygonFiles) {
-		if(file.isDirectory()) {
-			for(File c : file.listFiles()) {
-				if(c.isDirectory()) {
+		if (file.isDirectory()) {
+			for (File c : file.listFiles()) {
+				if (c.isDirectory()) {
 					scanPolygons(c, polygonFiles);
-				} else if(c.getName().endsWith(".poly")) {
+				} else if (c.getName().endsWith(".poly")) {
 					String name = c.getName().substring(0, c.getName().length() - 5);
-					if(!polygonFiles.containsKey(name)) {
+					if (!polygonFiles.containsKey(name)) {
 						polygonFiles.put(name, c);
 					} else {
 						File rm = polygonFiles.remove(name);
-						System.out.println("Polygon duplicate -> " + rm.getParentFile().getName() + "/" + name + " and " +
-								c.getParentFile().getName() + "/" + name);
+						System.out.println("Polygon duplicate -> " + rm.getParentFile().getName() + "/" + name + " and "
+								+ c.getParentFile().getName() + "/" + name);
 					}
 					polygonFiles.put(c.getParentFile().getName() + "/" + name, c);
 				}

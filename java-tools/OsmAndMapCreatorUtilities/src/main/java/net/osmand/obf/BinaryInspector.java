@@ -99,31 +99,26 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-					"-vpoi", // "-vpoiobjects",
+//					"-vpoi", //"-vpoiobjects",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vsearchinspect", // "-vsearchglobalonly", // "-vprefix=hh" // search index extended anlays 
 					"-vaddress",   
-					"-vcities", "-vstreetgroups", "-vcitynames",
-					"-vstreets", //  "-vbuildings",// "-vintersections",
+					"-vcities", "-vstreetgroups", //"-vcitynames",
+					"-vstreets", "-vbuildings",  "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
 					// road
-//					"-latlon=40.755934,-73.986425,0.005",
+					"-latlon=50.49766,30.37458,0.01",
 //					"-latlon=48.804242,9.215574,0.005",
 
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
 					System.getProperty("maps.dir") + "Map.obf",
-//					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_tubingen_europe_2.obf",
-//					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_karlsruhe_europe_2.obf",
-//					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_freiburg_europe_2.obf",
-//					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_stuttgart_europe_2.obf",
-//					System.getProperty("maps.dir") + "Liechtenstein_europe.obf",
-//					System.getProperty("maps.dir") + "regions.ocbf",
+//					System.getProperty("maps.dir") + "Ukraine_kyiv-city_europe_2.obf",
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
@@ -1735,7 +1730,9 @@ public class BinaryInspector {
 			ValueFreq.mergeArray(singleValues, s.singleValues);
 			ValueFreq.mergeArray(categories, s.categories);
 			ValueFreq.mergeArray(nameIndex, s.nameIndex);
-			ValueFreq.mergeArray(commonWordsStat, s.commonWordsStat);
+			if (s.commonWordsStat != null) {
+				ValueFreq.mergeArray(commonWordsStat, s.commonWordsStat);
+			}
 		}
 
 
@@ -1756,6 +1753,9 @@ public class BinaryInspector {
 					@Override
 					public boolean publish(Amenity amenity) {
 						count[0]++;
+						if (!amenity.getName().toLowerCase().contains("shell")) {
+							return false;
+						}
 						String s = String.valueOf(amenity.printNamesAndAdditional());
 						if(verbose.vsearchinspect) {
 							verbose.searchStats.analyze(s, amenity, null);
@@ -1919,7 +1919,9 @@ public class BinaryInspector {
 		println(String.format("\t\t\tText based (%d, %,d): %s",  ps.text.size(), sumFreq(text), text));
 		println(String.format("\t\t\tSingle value filters (%d, %,d): %s", sumSingleValue, sumFreq(singleValuesLst), singleValuesFmt));
 		
-		printCommonStats(ps.commonWordsStat, "\tPOI");
+		if (ps.commonWordsStat != null) {
+			printCommonStats(ps.commonWordsStat, "\tPOI");
+		}
 		printNameStats(ps.nameIndex, 10_000, "\tPOI", ps.suffixesStat);
 	}
 

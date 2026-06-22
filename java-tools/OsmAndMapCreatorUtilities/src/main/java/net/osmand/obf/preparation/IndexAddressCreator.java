@@ -67,7 +67,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	private static final Log log = LogFactory.getLog(IndexAddressCreator.class);
 	private final Log logMapDataWarn;
 
-	
+
 	private PreparedStatement addressCityStat;
 
 	// MEMORY address : choose what to use ?
@@ -1069,7 +1069,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			String prefix =  null;
 			if (t.startsWith("name:")) {
 				String lang = t.substring(5);
-				if (MapRenderingTypes.langsSet.contains(lang) || "en".equals(lang)) {
+				if (MapRenderingTypes.langsSet.contains(lang) || "en".equals(lang) || "short".equals(lang)) {
 					prefix = "name:";
 				}
 			} else if(t.startsWith("old_name")){
@@ -1368,9 +1368,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	}
 
 
-	
 
-	
+
+
 
 	private void writeCityBlockIndex(BinaryMapIndexWriter writer, int type, PreparedStatement streetstat, PreparedStatement waynodesStat,
 			Map<String, List<City>> isInGroups, List<City> cities, Map<String, City> postcodes, NameIndexCreator<MapObject> namesIndex,
@@ -1412,7 +1412,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				}
 			}
 			long time = System.currentTimeMillis();
-			
+
 			List<Street> streets = readStreetsBuildings(streetstat, city, waynodesStat, streetNodes, listSuburbs, streetIds);
 			long f = System.currentTimeMillis() - time;
 			writer.writeCityIndex(city, streets, streetNodes, ref, tagRules, streetIds);
@@ -1591,6 +1591,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			Map<String, List<Street>> uniqueNames, TLongObjectHashMap<Long> streetIds) throws SQLException {
 		streetBuildingsStat.setLong(1, city.getId());
 		ResultSet set = streetBuildingsStat.executeQuery();
+		long streetOsmId = 0;
 		while (set.next()) {
 			long streetId = set.getLong(1);
 			if (!visitedStreets.containsKey(streetId)) {
@@ -1601,7 +1602,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				// load the street nodes
 				List<Node> thisWayNodes = loadStreetNodes(streetId, waynodesStat);
 				Street street = addStreetToUniqueNamesMap(uniqueNames, streetName, names, city);
-				
+
+				streetOsmId = set.getLong("osmid");
 				streetIds.put(streetId, set.getLong("osmid"));
 				street.setLocation(lat, lon);
 				street.setId(streetId);
@@ -1649,6 +1651,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				}
 
 				s.addBuildingCheckById(b);
+				if ((streetIds.get(streetId) == streetOsmId || b.getId() < streetIds.get(streetId)) && b.getId() > 0) {
+					// different set of buildings should have different id -
+					// example 2 different cities over same street Amstelveen / Almere Legmeerdijk
+					streetIds.put(streetId, b.getId());
+				}
 			}
 		}
 
