@@ -18,9 +18,11 @@ import java.util.TreeSet;
 import gnu.trove.list.array.TIntArrayList;
 import net.osmand.CollatorStringMatcher;
 import net.osmand.binary.CommonWords;
+import net.osmand.binary.NameIndexReader;
 import net.osmand.data.City;
 import net.osmand.data.City.CityType;
 import net.osmand.data.MapObject;
+import net.osmand.data.Street;
 import net.osmand.obf.preparation.IndexPoiCreator.PoiTileBox;
 import net.osmand.util.Algorithms;
 import net.osmand.util.SearchAlgorithms;
@@ -274,16 +276,26 @@ public class NameIndexCreator<T> {
 	
 	
 	public void addToNameIndex(String name, T obj, int maxPrefixLength, boolean indexNumbers) {
+		if (obj instanceof Street && name.startsWith("<") && name.trim().endsWith(">") && 
+				!name.startsWith("<<")) {
+			name += " " + NameIndexReader.CITY_AS_STREET_COMMON;
+		}
 		List<String> splitName = SearchAlgorithms.splitAndNormalize(name, true);
 		boolean hasRareName = false;
 		for (String token : splitName) {
-			if (!CommonWords.isCommon(token) && CommonWords.getFrequentlyUsed(token) <= 0) {
+			if (!token.equals(NameIndexReader.CITY_AS_STREET_COMMON) &&
+					!CommonWords.isCommon(token) && CommonWords.getFrequentlyUsed(token) <= 0) {
 				hasRareName = true;
 				break;
 			}
 		}
 		for (String token : splitName) {
 			if (Algorithms.isEmpty(token)) {
+				continue;
+			}
+			if (token.equals(NameIndexReader.CITY_AS_STREET_COMMON)) {
+				tokenFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
+				commonNonIndexedFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
 				continue;
 			}
 			String prefix = nameIndexPreparePrefix(token, maxPrefixLength);
