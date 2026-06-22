@@ -855,9 +855,9 @@ public class IndexCreator {
 		IndexCreatorSettings settings = new IndexCreatorSettings();
 		// settings.poiZipLongStrings = true;
 //		settings.indexMap = true;
-//		settings.indexAddress = true;
+		settings.indexAddress = true;
 		settings.indexPOI = true;
-		// settings.indexTransport = true;
+//		 settings.indexTransport = true;
 //		settings.indexRouting = true;
 		// settings.keepOnlySeaObjects = true;
 		// settings.srtmDataFolder = new File(rootFolder + "/maps/srtm/");
@@ -877,8 +877,7 @@ public class IndexCreator {
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
 		String file = rootFolder + "../temp/map.osm";
-//		String file = rootFolder + "../temp/stuttgart.osm";
-//		String file = rootFolder + "../temp/andorra_europe.pbf";
+//		String file = rootFolder + "../temp/ukraine_kyiv-city_europe.pbf";
 //		String file = rootFolder + "../temp/Routing_test_76.osm";
 //		String file = rootFolder + "../repos/resources/test-resources/alarm.osm";
 		// String file = rootFolder + "../repos/resources/test-resources/turn_lanes_test.osm";
@@ -913,7 +912,7 @@ public class IndexCreator {
 		log.info("- STRING_TABLE_SIZE " + BinaryMapIndexWriter.STRING_TABLE_SIZE); //$NON-NLS-1$
 		log.info("-- MAP_DATA_AND_STRINGS SIZE " //$NON-NLS-1$
 				+ (BinaryMapIndexWriter.MAP_DATA_SIZE + BinaryMapIndexWriter.STRING_TABLE_SIZE));
-
+		
 	}
 
 	public static void generateRegionsFile()

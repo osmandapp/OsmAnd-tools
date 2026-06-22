@@ -41,8 +41,8 @@ public class CountryOcbfGeneration {
 	private static final Log log = PlatformUtil.getLog(CountryOcbfGeneration.class);
 
 	public static void main(String[] args) throws XmlPullParserException, IOException, SAXException, SQLException, InterruptedException {
-		String repo =  "/Users/ivan/OsmAnd/";
-		if(args != null && args.length > 0) {
+		String repo = "../../../";
+		if (args != null && args.length > 0) {
 			repo = args[0];
 		}
 		new CountryOcbfGeneration().generate(repo);
@@ -357,7 +357,7 @@ public class CountryOcbfGeneration {
 	}
 
 	private void generate(String repo) throws XmlPullParserException, IOException, SAXException, SQLException, InterruptedException {
-		String targetObf = repo + "regions.ocbf";
+		String targetObf = repo + "regions.obf";
 		String targetOsmXml = repo + "regions.osm.xml";
 		Map<String, Set<TranslateEntity>> translates = getTranslates(repo);
 		Map<String, File> polygonFiles = getPolygons(repo);
@@ -396,10 +396,11 @@ public class CountryOcbfGeneration {
 
 		IndexCreatorSettings settings = new IndexCreatorSettings();
 		settings.indexMap = true;
-		settings.indexAddress = false;
+		settings.indexAddress = true;
 		settings.indexPOI = false;
 		settings.indexTransport = false;
 		settings.indexRouting = false;
+        settings.indexCountryRegions = true;
 
 		IndexCreator creator = new IndexCreator(new File(targetObf).getParentFile(), settings); //$NON-NLS-1$
 		creator.setMapFileName(new File(targetObf).getName());
@@ -529,22 +530,22 @@ public class CountryOcbfGeneration {
 		} else {
 			String[] tags = r.translate.split(";");
 			Set<TranslateEntity> set = null;
-			for(String t : tags) {
-				if(!t.contains("=")) {
-					if(translates.containsKey("name="+t)) {
-						t = "name=" +t;
-					} else if(translates.containsKey("name:en="+t)) {
+			for (String t : tags) {
+				if (!t.contains("=")) {
+					if (translates.containsKey("name=" + t)) {
+						t = "name=" + t;
+					} else if (translates.containsKey("name:en=" + t)) {
 						t = "name:en=" + t;
 					}
 				}
-				if(set == null) {
+				if (set == null) {
 					set = translates.get(t);
-					if(set == null) {
+					if (set == null) {
 						break;
 					}
 				} else {
 					Set<TranslateEntity> st2 = translates.get(t);
-					if(st2 != null) {
+					if (st2 != null) {
 						set = new HashSet<TranslateEntity>(set);
 						set.retainAll(st2);
 					} else {
@@ -561,25 +562,30 @@ public class CountryOcbfGeneration {
 				TranslateEntity nt = set.iterator().next();
 				line += " translate-" + nt.tm.size() + "=" + nt.tm.get("name");
 				Iterator<Entry<String, String>> it = nt.tm.entrySet().iterator();
-				while(it.hasNext()) {
+                boolean hasBoundary = false;
+				while (it.hasNext()) {
 					Entry<String, String> e = it.next();
+					if ("boundary".equals(e.getKey())) {
+						hasBoundary = true;
+					}
 					addTag(serializer, e.getKey(), e.getValue());
 				}
+                if (!hasBoundary) {
+                    addTag(serializer, "boundary", "administrative");
+                }
 			}
 		}
 
 		// COMMENT TO SEE ONLY WARNINGS
 		System.out.println(indent + line);
 
-
-		if(boundaryPoints.size() > 0) {
+		if (boundaryPoints.size() > 0) {
 			serializer.endTag(null, "way");
 		} else {
 			serializer.endTag(null, "node");
 		}
 
-
-		for(CountryRegion c : r.children) {
+		for (CountryRegion c : r.children) {
 			processRegion(c, translates, polygonFiles, targetObf, targetOsmXml, indent + "  ", serializer);
 		}
 	}
@@ -730,18 +736,18 @@ public class CountryOcbfGeneration {
 	}
 
 	private void scanPolygons(File file, Map<String, File> polygonFiles) {
-		if(file.isDirectory()) {
-			for(File c : file.listFiles()) {
-				if(c.isDirectory()) {
+		if (file.isDirectory()) {
+			for (File c : file.listFiles()) {
+				if (c.isDirectory()) {
 					scanPolygons(c, polygonFiles);
-				} else if(c.getName().endsWith(".poly")) {
+				} else if (c.getName().endsWith(".poly")) {
 					String name = c.getName().substring(0, c.getName().length() - 5);
-					if(!polygonFiles.containsKey(name)) {
+					if (!polygonFiles.containsKey(name)) {
 						polygonFiles.put(name, c);
 					} else {
 						File rm = polygonFiles.remove(name);
-						System.out.println("Polygon duplicate -> " + rm.getParentFile().getName() + "/" + name + " and " +
-								c.getParentFile().getName() + "/" + name);
+						System.out.println("Polygon duplicate -> " + rm.getParentFile().getName() + "/" + name + " and "
+								+ c.getParentFile().getName() + "/" + name);
 					}
 					polygonFiles.put(c.getParentFile().getName() + "/" + name, c);
 				}

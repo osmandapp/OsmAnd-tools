@@ -1,0 +1,80 @@
+package net.osmand.server.api.operation.impl;
+
+import java.io.IOException;
+import java.io.InputStream;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import com.amazonaws.services.s3.model.AmazonS3Exception;
+
+import net.osmand.server.api.operation.AdminOperation;
+import net.osmand.server.api.repo.CloudUserDevicesRepository;
+import net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
+import net.osmand.server.api.repo.CloudUserFilesRepository;
+import net.osmand.server.api.repo.CloudUserFilesRepository.UserFile;
+import net.osmand.server.api.repo.CloudUsersRepository;
+import net.osmand.server.api.services.StorageService;
+import net.osmand.server.api.services.UserdataService;
+
+/**
+ * Deletes (with a -1 version) DB files whose object is missing from S3
+ */
+@Component
+@AdminOperation(name = "delete-missing-in-cloud")
+public class DeleteFilesMissingInCloudOperation extends AbstractFileFixOperation {
+
+	private static final Logger LOG = LoggerFactory.getLogger(DeleteFilesMissingInCloudOperation.class);
+	private static final String LOCAL_STORAGE = "local";
+	private static final int HTTP_NOT_FOUND = 404;
+
+	private final CloudUserDevicesRepository devicesRepository;
+
+	public DeleteFilesMissingInCloudOperation(CloudUsersRepository usersRepository, CloudUserFilesRepository filesRepository,
+	                                           UserdataService userdataService, StorageService storageService,
+	                                           CloudUserDevicesRepository devicesRepository) {
+		super(usersRepository, filesRepository, userdataService, storageService);
+		this.devicesRepository = devicesRepository;
+	}
+
+	@Override
+	protected boolean fix(UserFile file, boolean testRun) throws IOException {
+		if (existsInCloud(file)) {
+			return false; // object present (or not an S3 file) -> keep
+		}
+		if (!testRun) {
+			CloudUserDevice dev = devicesRepository.findById(file.deviceid);
+			if (dev == null) {
+				throw new IllegalStateException("no device for file id=" + file.id);
+			}
+			LOG.info("Deleting (missing in cloud): userid={}, name={}, type={}", file.userid, file.name, file.type);
+			// normal delete flow: writes a new -1 version, does not touch S3 (object is already gone)
+			userdataService.deleteFile(file.name, file.type, null, null, dev);
+		}
+		return true; // missing in cloud -> counted/recorded (deleted only when !testRun)
+	}
+
+	private boolean existsInCloud(UserFile file) throws IOException {
+		if (file.data != null) {
+			return true; // stored in the DB blob, not in S3
+		}
+		if (file.storage == null || file.storage.isBlank() || LOCAL_STORAGE.equals(file.storage)) {
+			return true; // not an S3-backed file -> never delete on this rule
+		}
+		try {
+			InputStream in = userdataService.getInputStream(file);
+			if (in != null) {
+				in.close(); // opened the object -> present; close/abort right away, we don't read the body
+			}
+			// a null stream means the provider could not be resolved, not a confirmed miss -> keep.
+			return true;
+		} catch (AmazonS3Exception e) {
+			if (e.getStatusCode() == HTTP_NOT_FOUND) {
+				return false;
+			}
+			// any other S3 error (timeout, 5xx, access denied) -> do not treat as missing
+			throw new IllegalStateException("S3 existence check failed for id=" + file.id + " name=" + file.name, e);
+		}
+	}
+}

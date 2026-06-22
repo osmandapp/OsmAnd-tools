@@ -972,7 +972,7 @@ public interface InspectorService extends OBFService {
             }
         }
         for (String candidateName : candidateNames) {
-            List<String> tokens = SearchAlgorithms.splitAndNormalize(candidateName);
+            List<String> tokens = SearchAlgorithms.splitAndNormalize(candidateName, true);
             SearchAlgorithms.removeCommonWords(tokens);
             if (tokens.size() == 1 && tokens.contains(tokenName)) {
                 return true;
@@ -1261,17 +1261,6 @@ public interface InspectorService extends OBFService {
                 return;
             }
             switch (tag) {
-                case OsmandOdb.AddressNameIndexDataAtom.NAMEEN_FIELD_NUMBER:
-                case OsmandOdb.AddressNameIndexDataAtom.NAME_FIELD_NUMBER:
-                    index.getInputStream().readString();
-                    break;
-                case OsmandOdb.AddressNameIndexDataAtom.SUFFIXESBITSET_FIELD_NUMBER:
-                    int mask = index.getInputStream().readUInt32();
-                    if (isFiltered && !matched && matchesSuffixMask(maskIndex, mask, matchedSuffixIndexes)) {
-                        matched = true;
-                    }
-                    maskIndex++;
-                    break;
                 case OsmandOdb.AddressNameIndexDataAtom.SHIFTTOCITYINDEX_FIELD_NUMBER:
                     shiftToCityIndex = index.getInputStream().readInt32();
                     cityOffset = tokenOffset - shiftToCityIndex;
@@ -1722,13 +1711,6 @@ public interface InspectorService extends OBFService {
                      OsmandOdb.OsmAndPoiNameIndexDataAtom.Y_FIELD_NUMBER,
                      OsmandOdb.OsmAndPoiNameIndexDataAtom.ZOOM_FIELD_NUMBER:
                     index.getInputStream().readUInt32();
-                    break;
-                case OsmandOdb.OsmAndPoiNameIndexDataAtom.SUFFIXESBITSET_FIELD_NUMBER:
-                    int mask = index.getInputStream().readUInt32();
-                    if (isFiltered && !matched && matchesSuffixMask(maskIndex, mask, matchedSuffixIndexes)) {
-                        matched = true;
-                    }
-                    maskIndex++;
                     break;
                 case OsmandOdb.OsmAndPoiNameIndexDataAtom.SHIFTTO_FIELD_NUMBER:
                     long value = readInt(index.getInputStream());

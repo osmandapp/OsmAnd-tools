@@ -540,18 +540,6 @@ public interface OBFService extends BaseService {
 				case OsmandOdb.OsmAndPoiBoxDataAtom.ID_FIELD_NUMBER:
 					record.id = codedIS.readUInt64();
 					break;
-				case OsmandOdb.OsmAndPoiBoxDataAtom.OPENINGHOURS_FIELD_NUMBER:
-					record.openingHours = decodePoiString(codedIS.readString());
-					break;
-				case OsmandOdb.OsmAndPoiBoxDataAtom.SITE_FIELD_NUMBER:
-					record.site = decodePoiString(codedIS.readString());
-					break;
-				case OsmandOdb.OsmAndPoiBoxDataAtom.PHONE_FIELD_NUMBER:
-					record.phone = decodePoiString(codedIS.readString());
-					break;
-				case OsmandOdb.OsmAndPoiBoxDataAtom.NOTE_FIELD_NUMBER:
-					record.description = decodePoiString(codedIS.readString());
-					break;
 				case OsmandOdb.OsmAndPoiBoxDataAtom.TEXTCATEGORIES_FIELD_NUMBER: {
 					String tagName = getPoiSubtypeTagName(codedIS.readUInt32(), poiRegion);
 					if (!tagName.isEmpty()) {
