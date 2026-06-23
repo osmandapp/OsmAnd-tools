@@ -2,14 +2,12 @@ package net.osmand.server.api.searchtest;
 
 import com.google.protobuf.CodedInputStream;
 import com.google.protobuf.WireFormat;
-import net.osmand.CollatorStringMatcher;
 import net.osmand.binary.*;
 import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
 import net.osmand.data.*;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.osmand.util.SearchAlgorithms;
-import net.osmand.util.TransliterationHelper;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -404,8 +402,7 @@ public interface InspectorService extends OBFService {
                                        BinaryMapAddressReaderAdapter.AddressRegion region,
                                        AddressRef[] addressRefs,
                                        List<ObjectAddress> results,
-                                       String lang,
-                                       CollatorStringMatcher matcher) throws IOException {
+                                       String lang) throws IOException {
         List<AddressRef> refs = addressRefs == null ? List.of() : Arrays.asList(addressRefs);
         for (AddressRef ref : refs) {
             if (ref == null || ref.typeIndex() >= BinaryMapAddressReaderAdapter.CityBlocks.STREET_TYPE.index
@@ -413,7 +410,7 @@ public interface InspectorService extends OBFService {
                 continue;
             }
             int offset = ref.objectOffset();
-            ObjectAddress objectAddress = loadCityObjectAddress(index, region, offset, lang, matcher);
+            ObjectAddress objectAddress = loadCityObjectAddress(index, region, offset, lang);
             if (objectAddress != null) {
                 results.add(objectAddress);
             }
@@ -440,7 +437,7 @@ public interface InspectorService extends OBFService {
             int streetOffset = ref.objectOffset();
             int cityOffset = ref.cityOffset();
             City city = streetCities.get(cityOffset);
-            ObjectAddress objectAddress = loadStreetObjectAddress(index, region, streetOffset, city, lang, matcher);
+            ObjectAddress objectAddress = loadStreetObjectAddress(index, region, streetOffset, city, lang);
             if (objectAddress != null) {
                 results.add(objectAddress);
             }
@@ -1568,8 +1565,7 @@ public interface InspectorService extends OBFService {
     default ObjectAddress loadCityObjectAddress(BinaryMapIndexReaderExt index,
                                                 BinaryMapAddressReaderAdapter.AddressRegion region,
                                                 int offset,
-                                                String lang,
-                                                CollatorStringMatcher matcher) throws IOException {
+                                                String lang) throws IOException {
         index.getInputStream().seek(offset);
         long length = index.getInputStream().readRawVarint32();
         long oldLimit = index.getInputStream().pushLimitLong(length);
@@ -1594,8 +1590,7 @@ public interface InspectorService extends OBFService {
                                                   BinaryMapAddressReaderAdapter.AddressRegion region,
                                                   int offset,
                                                   City city,
-                                                  String lang,
-                                                  CollatorStringMatcher matcher) throws IOException {
+                                                  String lang) throws IOException {
         if (city == null || city.getLocation() == null) {
             return null;
         }
@@ -1814,67 +1809,12 @@ public interface InspectorService extends OBFService {
         }
     }
 
-    default boolean matchesLegacyCity(City city, CollatorStringMatcher matcher) {
-        if (city == null || matcher == null) {
-            return false;
-        }
-        boolean matches = matcher.matches(city.getName());
-        if (!matches) {
-            for (String name : city.getOtherNames()) {
-                matches = matcher.matches(name);
-                if (matches) {
-                    break;
-                }
-            }
-        }
-        return matches || matchesAddressAttributeValues(city, matcher);
-    }
-
-    default boolean matchesAddressAttributeValues(MapObject object, CollatorStringMatcher matcher) {
-        if (object == null || matcher == null) {
-            return false;
-        }
-        Map<String, String> values = object.getNamesMap(true);
-        if (values == null || values.isEmpty()) {
-            return false;
-        }
-        for (Map.Entry<String, String> entry : values.entrySet()) {
-            String key = entry.getKey();
-            if (Amenity.NAME.equals(key) || "en".equals(key) || (key != null && key.startsWith("name:"))) {
-                continue;
-            }
-            if ("place".equals(key) || isTagIndexedForSearchAsName(key) || isTagIndexedForSearchAsId(key)) {
-                if (matcher.matches(entry.getValue())) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    default boolean matchesLegacyStreet(Street street, CollatorStringMatcher matcher) {
-        if (street == null || matcher == null) {
-            return false;
-        }
-        boolean matches = matcher.matches(street.getName());
-        if (!matches) {
-            for (String name : street.getOtherNames()) {
-                matches = matcher.matches(name);
-                if (matches) {
-                    break;
-                }
-            }
-        }
-        return matches || matchesAddressAttributeValues(street, matcher);
-    }
-
     default void collectPoiObjectsByStoredOffsets(BinaryMapIndexReaderExt index,
                                                   Map<BinaryMapPoiReaderAdapter.PoiRegion, Set<Integer>> storedPoiOffsets,
                                                   Map<BinaryMapPoiReaderAdapter.PoiRegion, Map<Integer, Set<Integer>>> storedPoiIndexes,
                                                   List<BinaryMapPoiReaderAdapter.PoiRegion> poiRegions,
                                                   List<ObjectAddress> results,
-                                                  String lang,
-                                                  CollatorStringMatcher matcher) throws IOException {
+                                                  String lang) throws IOException {
         for (BinaryMapPoiReaderAdapter.PoiRegion poiRegion : poiRegions) {
             Set<Integer> relativeOffsets = storedPoiOffsets.get(poiRegion);
             if (relativeOffsets == null || relativeOffsets.isEmpty()) {
@@ -1887,7 +1827,7 @@ public interface InspectorService extends OBFService {
             for (Integer relativeOffset : sortedOffsets) {
                 Map<Integer, Set<Integer>> indexesByOffset = storedPoiIndexes == null ? null : storedPoiIndexes.get(poiRegion);
                 Set<Integer> objectIndexes = indexesByOffset == null ? null : indexesByOffset.get(relativeOffset);
-                readPoiObjectsAtShift(index, poiRegion, tagGroups, relativeOffset, objectIndexes, results, lang, matcher);
+                readPoiObjectsAtShift(index, poiRegion, tagGroups, relativeOffset, objectIndexes, results, lang);
             }
         }
     }
@@ -2051,8 +1991,10 @@ public interface InspectorService extends OBFService {
                                        int relativeOffset,
                                        Set<Integer> objectIndexes,
                                        List<ObjectAddress> results,
-                                       String lang,
-                                       CollatorStringMatcher matcher) throws IOException {
+                                       String lang) throws IOException {
+        if (objectIndexes == null || objectIndexes.isEmpty()) {
+            return;
+        }
         index.getInputStream().seek(region.getFilePointer() + relativeOffset);
         long length = readInt(index.getInputStream());
         long oldLimit = index.getInputStream().pushLimitLong(length);
@@ -2080,7 +2022,7 @@ public interface InspectorService extends OBFService {
                         int poiLength = index.getInputStream().readRawVarint32();
                         long poiOldLimit = index.getInputStream().pushLimitLong(poiLength);
                         try {
-                            boolean shouldRead = objectIndexes == null || objectIndexes.isEmpty() || objectIndexes.contains(poiIndex);
+                            boolean shouldRead = objectIndexes.contains(poiIndex);
                             RawPoiObject rawPoiObject = shouldRead
                                     ? readRawPoiObject(index.getInputStream(), x, y, zoom, region, tagGroups)
                                     : null;
@@ -2088,9 +2030,7 @@ public interface InspectorService extends OBFService {
                                 ObjectAddress objectAddress = toPoiObjectAddress(rawPoiObject, lang);
                                 int payloadSize = poiLength + computeVarint32Size(poiLength);
                                 int payloadOffset = (int) (index.getInputStream().getTotalBytesRead() - poiLength);
-                                boolean exactIndexHit = objectIndexes != null && !objectIndexes.isEmpty();
-                                boolean isMatched = exactIndexHit || matchesLegacyPoi(rawPoiObject, matcher);
-                                results.add(new ObjectAddress(0, objectAddress.name(), objectAddress.point(), objectAddress.commonTags(), objectAddress.isPoi(), isMatched, false, false, objectAddress.type(), objectAddress.osmId(), objectAddress.osmType(), payloadOffset, payloadSize, (int) (region.getFilePointer() + relativeOffset)));
+                                results.add(new ObjectAddress(0, objectAddress.name(), objectAddress.point(), objectAddress.commonTags(), objectAddress.isPoi(), true, false, false, objectAddress.type(), objectAddress.osmId(), objectAddress.osmType(), payloadOffset, payloadSize, (int) (region.getFilePointer() + relativeOffset)));
                             }
                         } finally {
                             consumeRemainingInLimit(index.getInputStream());
@@ -2160,13 +2100,6 @@ public interface InspectorService extends OBFService {
         }
     }
 
-    default ObjectAddress toGenerateDbPoiObjectAddress(GenerateDbRawPoiObject rawObject, String lang) {
-        ObjectAddress objectAddress = toPoiObjectAddress(rawObject.rawPoiObject(), lang);
-        return new ObjectAddress(0, objectAddress.name(), objectAddress.point(), objectAddress.commonTags(), objectAddress.isPoi(), true, false, false, objectAddress.type(),
-                objectAddress.osmId(), objectAddress.osmType(), rawObject.payloadOffset(), rawObject.payloadSize(),
-                rawObject.sourceOffset());
-    }
-
     default ObjectAddress toPoiObjectAddress(RawPoiObject rawPoiObject,
                                              String lang) {
         LatLon location = new LatLon(rawPoiObject.lat, rawPoiObject.lon);
@@ -2203,72 +2136,10 @@ public interface InspectorService extends OBFService {
                 true, false, false, false, "POI", osmId, osmType, 0, 0, 0);
     }
 
-    default boolean matchesLegacyPoi(RawPoiObject rawPoiObject, CollatorStringMatcher matcher) {
-        if (rawPoiObject == null || matcher == null) {
-            return false;
-        }
-        if (matcher.matches(safeLowerCase(rawPoiObject.name))
-                || matcher.matches(safeLowerCase(getLegacyPoiEnName(rawPoiObject, true)))) {
-            return true;
-        }
-        if (matchesLegacyPoiOtherNames(rawPoiObject, matcher)) {
-            return true;
-        }
-        for (Map.Entry<String, List<String>> entry : rawPoiObject.decodedTextTags.entrySet()) {
-            String key = entry.getKey();
-            if (isTagIndexedForSearchAsName(key) || isTagIndexedForSearchAsId(key)
-                    || isTagIndexedAsSearchRelated(key)) {
-                if (matchesAnyLegacyPoiValue(entry.getValue(), matcher, false)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
     default boolean isPoiSearchIndexedTextTag(String key) {
         return !Algorithms.isEmpty(key) && (isTagIndexedForSearchAsName(key)
                 || isTagIndexedForSearchAsId(key) || isTagIndexedAsSearchRelated(key)
                 || Amenity.ROUTE_MEMBERS_IDS.equals(key));
-    }
-
-    default boolean matchesLegacyPoiOtherNames(RawPoiObject rawPoiObject, CollatorStringMatcher matcher) {
-        for (Map.Entry<String, List<String>> entry : rawPoiObject.decodedTextTags.entrySet()) {
-            String key = entry.getKey();
-            if (key == null || (!key.startsWith("name:") && !key.startsWith("name_"))) {
-                continue;
-            }
-            if (matchesAnyLegacyPoiValue(entry.getValue(), matcher, true)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    default boolean matchesAnyLegacyPoiValue(List<String> values, CollatorStringMatcher matcher, boolean lowerCase) {
-        if (values == null || values.isEmpty()) {
-            return false;
-        }
-        for (String value : values) {
-            String candidate = lowerCase ? safeLowerCase(value) : value;
-            if (matcher.matches(candidate)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    default String getLegacyPoiEnName(RawPoiObject rawPoiObject, boolean transliterate) {
-        if (!Algorithms.isEmpty(rawPoiObject.nameEn)) {
-            return rawPoiObject.nameEn;
-        } else if (!Algorithms.isEmpty(rawPoiObject.name) && transliterate) {
-            return TransliterationHelper.transliterate(rawPoiObject.name);
-        }
-        return "";
-    }
-
-    default String safeLowerCase(String value) {
-        return value == null ? "" : value.toLowerCase(Locale.ROOT);
     }
 
     default Map<String, String> arrangeObjectAddressValues(Map<String, String> values) {
@@ -2540,15 +2411,13 @@ public interface InspectorService extends OBFService {
                 int allAtomsSize = safeMetricInt((long) allPoiAtomsSize + allAddressAtomsSize);
                 Map<BinaryMapPoiReaderAdapter.PoiRegion, Set<Integer>> storedPoiOffsets = mapPoiRefs(poiRefs, poiRegions);
                 Map<BinaryMapPoiReaderAdapter.PoiRegion, Map<Integer, Set<Integer>>> storedPoiIndexes = mapPoiIndexes(token.poiIndexes(), poiRegions);
-                CollatorStringMatcher matcher = new CollatorStringMatcher(token.name(),
-                        CollatorStringMatcher.StringMatcherMode.CHECK_EQUALS_FROM_SPACE);
                 if (hasAddressRefs) {
                     for (BinaryMapAddressReaderAdapter.AddressRegion addressRegion : addressRegions) {
-                        collectAddressObjects(index, addressRegion, addressRefs, results, lang, matcher);
+                        collectAddressObjects(index, addressRegion, addressRefs, results, lang);
                     }
                 }
                 if (hasPoiRefs) {
-                    collectPoiObjectsByStoredOffsets(index, storedPoiOffsets, storedPoiIndexes, poiRegions, results, lang, matcher);
+                    collectPoiObjectsByStoredOffsets(index, storedPoiOffsets, storedPoiIndexes, poiRegions, results, lang);
                 }
                 results = assignObjectSequenceIds(results);
                 results = markInvalidPoiAtoms(results);

@@ -578,15 +578,6 @@ public interface AnalystService extends InspectorService, GenDbService {
                     for (IndexToken token : entry.getValue()) {
                         matchers.put(token, new CollatorStringMatcher(token.name(), CollatorStringMatcher.StringMatcherMode.CHECK_EQUALS_FROM_SPACE));
                     }
-                    for (GenerateDbRawPoiObject rawObject : rawObjects) {
-                        for (Map.Entry<IndexToken, CollatorStringMatcher> tokenMatcher : matchers.entrySet()) {
-                            GenerateDbMetrics.current().poiCandidateChecks.incrementAndGet();
-                            if (matchesLegacyPoi(rawObject.rawPoiObject(), tokenMatcher.getValue())) {
-                                GenerateDbMetrics.current().poiMatches.incrementAndGet();
-                                tokenObjects.get(tokenMatcher.getKey()).add(toGenerateDbPoiObjectAddress(rawObject, "en"));
-                            }
-                        }
-                    }
                 }
             }
         } finally {
