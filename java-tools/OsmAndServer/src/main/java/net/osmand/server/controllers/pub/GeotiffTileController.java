@@ -74,7 +74,7 @@ public class GeotiffTileController {
 		GeotiffTile tile = tileMemoryCache.getTile(tileId, k -> new GeotiffTile(config, tileType, x, y, z));
 		// for testing
 		// GeotiffTile tile = new GeotiffTile(config, tileType, x, y, z);
-		tileMemoryCache.cleanupCache();
+		tileMemoryCache.conditionalCleanupCache();
 		BufferedImage img = tile.getCacheRuntimeImage();
 		tile.touch();
 
@@ -105,7 +105,7 @@ public class GeotiffTileController {
 		synchronized (lock) {
 			try {
 				GeotiffTile currentTile = tile != null ? tile : tileMemoryCache.getTile(tileId, k -> new GeotiffTile(config, tileType, x, y, z));
-				tileMemoryCache.cleanupCache();
+				tileMemoryCache.conditionalCleanupCache();
 				BufferedImage cachedImage = currentTile.getCacheRuntimeImage();
 				currentTile.touch();
 

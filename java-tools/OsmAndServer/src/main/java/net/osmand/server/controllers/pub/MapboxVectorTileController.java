@@ -60,7 +60,7 @@ public class MapboxVectorTileController {
         MapboxVectorTile tile = tileMemoryCache.getTile(tileId, k -> new MapboxVectorTile(config, x, y, z));
         // for testing
         //MapboxVectorTile tile = new MapboxVectorTile(config, x, y, z);
-        tileMemoryCache.cleanupCache();
+        tileMemoryCache.conditionalCleanupCache();
 		byte[] data = tile.getCacheRuntimeTile();
         tile.touch();
 
@@ -131,7 +131,7 @@ public class MapboxVectorTileController {
 		return name.endsWith(".mvt") && name.contains("mvts");
 	}
 
-	/* TODO */ synchronized /* TESTING */ private byte[] getTileFromService(MapboxVectorTile tile) throws IOException {
+	private byte[] getTileFromService(MapboxVectorTile tile) throws IOException {
 		long startTime = DEBUG ? System.currentTimeMillis() : 0;
 		ExecutorService executor = Executors.newSingleThreadExecutor();
 		if (DEBUG) {
