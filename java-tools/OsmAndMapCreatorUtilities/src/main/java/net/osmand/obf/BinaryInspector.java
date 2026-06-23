@@ -106,19 +106,19 @@ public class BinaryInspector {
 //					"-vtransport", "-vtransportschedule",
 //					"-vsearchinspect", // "-vsearchglobalonly", // "-vprefix=hh" // search index extended anlays 
 					"-vaddress",   
-					"-vcities", "-vstreetgroups", //"-vcitynames",
-					"-vstreets", "-vbuildings",  "-vintersections",
+//					"-vcities", "-vstreetgroups", //"-vcitynames",
+//					"-vstreets", "-vbuildings",  "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
 					// road
-					"-latlon=50.49766,30.37458,0.01",
+//					"-latlon=50.3816,30.4816,0.01",
 //					"-latlon=48.804242,9.215574,0.005",
 
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
-					System.getProperty("maps.dir") + "Map.obf",
-//					System.getProperty("maps.dir") + "Ukraine_kyiv-city_europe_2.obf",
+//					System.getProperty("maps.dir") + "Map.obf",
+					System.getProperty("maps.dir") + "Us_pennsylvania_northamerica_2.obf",
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {

@@ -829,6 +829,10 @@ public class UserdataService {
         return storageService.getFileInputStream(userFile.storage, userFolder(userFile.userid), storageFileName(userFile.type, userFile.name, userFile.updatetime));
     }
 
+    public boolean fileExists(CloudUserFilesRepository.UserFile userFile) {
+        return storageService.fileExists(userFile.storage, userFolder(userFile), storageFileName(userFile));
+    }
+
     public ResponseEntity<String> tokenNotValidError() {
         throw new OsmAndPublicApiException(ERROR_CODE_PROVIDED_TOKEN_IS_NOT_VALID, "provided deviceid or token is not valid");
     }

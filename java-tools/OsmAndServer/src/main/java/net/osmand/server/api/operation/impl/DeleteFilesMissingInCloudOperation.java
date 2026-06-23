@@ -1,7 +1,6 @@
 package net.osmand.server.api.operation.impl;
 
 import java.io.IOException;
-import java.io.InputStream;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,7 +54,7 @@ public class DeleteFilesMissingInCloudOperation extends AbstractFileFixOperation
 		return true; // missing in cloud -> counted/recorded (deleted only when !testRun)
 	}
 
-	private boolean existsInCloud(UserFile file) throws IOException {
+	private boolean existsInCloud(UserFile file) {
 		if (file.data != null) {
 			return true; // stored in the DB blob, not in S3
 		}
@@ -63,12 +62,7 @@ public class DeleteFilesMissingInCloudOperation extends AbstractFileFixOperation
 			return true; // not an S3-backed file -> never delete on this rule
 		}
 		try {
-			InputStream in = userdataService.getInputStream(file);
-			if (in != null) {
-				in.close(); // opened the object -> present; close/abort right away, we don't read the body
-			}
-			// a null stream means the provider could not be resolved, not a confirmed miss -> keep.
-			return true;
+			return userdataService.fileExists(file);
 		} catch (AmazonS3Exception e) {
 			if (e.getStatusCode() == HTTP_NOT_FOUND) {
 				return false;

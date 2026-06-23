@@ -123,7 +123,7 @@ public class OsmAndMapsService {
 	private static final int MAX_SAME_FILE_OPEN = 15;
 	private static final long CACHE_MAX_ROUTING_CONTEXT_SEC = Integer.MAX_VALUE; //12 * 60 * 60; // 12h
 
-	private static final double SPATIAL_SEARCH_RADIUS_KM = 300;
+	private static final double SPATIAL_SEARCH_RADIUS_KM = 400;
 	
 	private static final List<String> ALWAYS_IN_MEMORY = new ArrayList<String>();
 	static {

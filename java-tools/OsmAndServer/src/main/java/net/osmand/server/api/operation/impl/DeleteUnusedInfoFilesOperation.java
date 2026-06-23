@@ -17,7 +17,7 @@ import net.osmand.server.api.services.UserdataService;
  * Deletes *.info files whose paired *.gpx (same name and type) no longer exists (latest version missing or deleted).
  */
 @Component
-@AdminOperation(name = "delete-info-files")
+@AdminOperation(name = "delete-unused-info-files")
 public class DeleteUnusedInfoFilesOperation extends AbstractFileFixOperation {
 
 	private static final Logger LOG = LoggerFactory.getLogger(DeleteUnusedInfoFilesOperation.class);
