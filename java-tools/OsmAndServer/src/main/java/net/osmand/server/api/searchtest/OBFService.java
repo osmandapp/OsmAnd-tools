@@ -129,15 +129,34 @@ public interface OBFService extends BaseService {
 			"centralamerica",
 			"southamerica");
 
-	record IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes, boolean isCommon, boolean isFrequent, String obf) {
-		public IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes, boolean isCommon, boolean isFrequent) {
-			this(name, addressRefs, poiRefs, poiAtomRefs, poiAtomSizes, isCommon, isFrequent, null);
+	record IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes,
+	                  Map<Integer, int[]> poiIndexes,
+	                  Map<String, List<String>> suffixTexts, Map<String, List<String>> poiSuffixTexts,
+	                  Map<String, List<String>> addressSuffixTexts, boolean isCommon, boolean isFrequent, String obf) {
+		public IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes,
+		                  Map<String, List<String>> suffixTexts, Map<String, List<String>> poiSuffixTexts,
+		                  Map<String, List<String>> addressSuffixTexts, boolean isCommon, boolean isFrequent) {
+			this(name, addressRefs, poiRefs, poiAtomRefs, poiAtomSizes, Map.of(), suffixTexts, poiSuffixTexts, addressSuffixTexts,
+					isCommon, isFrequent, null);
+		}
+
+		public IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes,
+		                  Map<Integer, int[]> poiIndexes, Map<String, List<String>> suffixTexts,
+		                  Map<String, List<String>> poiSuffixTexts, Map<String, List<String>> addressSuffixTexts,
+		                  boolean isCommon, boolean isFrequent) {
+			this(name, addressRefs, poiRefs, poiAtomRefs, poiAtomSizes, poiIndexes, suffixTexts, poiSuffixTexts,
+					addressSuffixTexts, isCommon, isFrequent, null);
 		}
 	}
 	record ObfFileInfo(String path, String name, String continent, String country, String region, long lastModified, long size) {}
 	record IndexTokenPage(List<IndexToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, IndexTokenSummary summary) {}
-	record IndexTokenSummary(int poiSum, int addressSum, int commonSum, int frequentSum, int poiMax, int addressMax) {}
-	record IndexTokenBuilder(String name, int[] addressOffsets, int[] addressSuffixIndexes, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes) {}
+	record IndexTokenSummary(int poiSum, int addressSum, int commonSum, int frequentSum,
+	                         int dictSuffixSum, int partSuffixSum, int integerSuffixSum, int literalSuffixSum, int extraSuffixSum,
+	                         int poiMax, int addressMax,
+	                         int dictSuffixMax, int partSuffixMax, int integerSuffixMax, int literalSuffixMax, int extraSuffixMax) {}
+	record IndexTokenBuilder(String name, int[] addressOffsets, int[] addressSuffixIndexes, int[] poiRefs, int[] poiAtomRefs,
+	                         int[] poiAtomSizes, Map<Integer, int[]> poiIndexes, Map<String, List<String>> poiSuffixTexts,
+	                         Map<String, List<String>> addressSuffixTexts) {}
 	record AddressRef(int shiftToIndex, int shiftToCityIndex, int objectOffset, int cityOffset, int typeIndex, int atomSize) {}
 
 	record ObjectAddress(int sequenceId, String name, LatLon point, Map<String, String> commonTags,
@@ -154,7 +173,7 @@ public interface OBFService extends BaseService {
 	}
 	record ObjectAddressPage(List<ObjectAddress> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, int[] countMetrics, int[] sizeMetrics, int aloneCount, int aloneSize) {}
 	record ObjectAddressStats(int size, int count) {}
-	record PoiTokenRefs(Set<Integer> offsets, List<Integer> atomSizes) {}
+	record PoiTokenRefs(Set<Integer> offsets, List<Integer> atomRefs, List<Integer> atomSizes, Map<Integer, int[]> poiIndexes) {}
 	record PoiCategoryMeta(String type, String subtype) {}
 	record GenerateDbProgress(String status, String obfName, int obfIndex, int totalObfs, int processedTokens,
 	                          int totalTokens, long elapsedMs, long estimatedMs, String error,
@@ -431,14 +450,6 @@ public interface OBFService extends BaseService {
 					break;
 			}
 		}
-	}
-
-	default RawPoiObject readRawPoiObject(CodedInputStream codedIS,
-			int parentX,
-			int parentY,
-			int parentZoom,
-			BinaryMapPoiReaderAdapter.PoiRegion poiRegion) throws IOException {
-		return readRawPoiObject(codedIS, parentX, parentY, parentZoom, poiRegion, Collections.emptyMap());
 	}
 
 	default RawPoiObject readRawPoiObject(CodedInputStream codedIS,
@@ -759,7 +770,9 @@ public interface OBFService extends BaseService {
 		addObfSpec(schema, "OsmAndCategoryTable", 3, "subcategories", null, InspectorService.ObfLengthType.VAR_INT);
 
 		addObfSpec(schema, "OsmAndPoiNameIndex", 3, "table", "IndexedStringTable", InspectorService.ObfLengthType.FIXED32);
+		addObfSpec(schema, "OsmAndPoiNameIndex", 4, "commonStats", "CommonIndexedStats", InspectorService.ObfLengthType.VAR_INT);
 		addObfSpec(schema, "OsmAndPoiNameIndex", 5, "data", "OsmAndPoiNameIndexData", InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "OsmAndPoiNameIndexData", 1, "suffixesCommonDictionary", null, InspectorService.ObfLengthType.VAR_INT, false, true);
 		addObfSpec(schema, "OsmAndPoiNameIndexData", 3, "atoms", "OsmAndPoiNameIndexDataAtom", InspectorService.ObfLengthType.VAR_INT, false, true);
 		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 2, "zoom", null, InspectorService.ObfLengthType.VAR_INT);
 		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 3, "x", null, InspectorService.ObfLengthType.VAR_INT);
@@ -771,6 +784,9 @@ public interface OBFService extends BaseService {
 		addObfSpec(schema, "IndexedStringTable", 3, "key", null, InspectorService.ObfLengthType.VAR_INT);
 		addObfSpec(schema, "IndexedStringTable", 4, "val", null, InspectorService.ObfLengthType.VAR_INT);
 		addObfSpec(schema, "IndexedStringTable", 5, "subtables", "IndexedStringTable", InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "CommonIndexedStats", 4, "value", null, InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "CommonIndexedStats", 5, "matched", null, InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "CommonIndexedStats", 6, "nonindexed", null, InspectorService.ObfLengthType.VAR_INT, false, true);
 
 		addObfSpec(schema, "OsmAndPoiBox", 1, "zoom", null, InspectorService.ObfLengthType.VAR_INT);
 		addObfSpec(schema, "OsmAndPoiBox", 2, "left", null, InspectorService.ObfLengthType.VAR_INT);
@@ -824,7 +840,9 @@ public interface OBFService extends BaseService {
 		addObfSpec(schema, "StreetIndex", 12, "buildings", "BuildingIndex", InspectorService.ObfLengthType.VAR_INT, false, true);
 
 		addObfSpec(schema, "OsmAndAddressNameIndexData", 4, "table", "IndexedStringTable", InspectorService.ObfLengthType.FIXED32);
+		addObfSpec(schema, "OsmAndAddressNameIndexData", 6, "commonStats", "CommonIndexedStats", InspectorService.ObfLengthType.VAR_INT);
 		addObfSpec(schema, "OsmAndAddressNameIndexData", 7, "atom", "AddressNameIndexData", InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "AddressNameIndexData", 3, "suffixesCommonDictionary", null, InspectorService.ObfLengthType.VAR_INT, false, true);
 		addObfSpec(schema, "AddressNameIndexData", 4, "atom", "AddressNameIndexDataAtom", InspectorService.ObfLengthType.VAR_INT, false, true);
 
 		addObfSpec(schema, "OsmAndMapIndex", 4, "rules", "OsmAndMapIndex.MapEncodingRule", InspectorService.ObfLengthType.VAR_INT, false, true);
