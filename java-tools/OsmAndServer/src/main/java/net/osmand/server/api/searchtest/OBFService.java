@@ -132,29 +132,21 @@ public interface OBFService extends BaseService {
 	record IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes,
 	                  Map<Integer, int[]> poiIndexes,
 	                  Map<String, List<String>> suffixTexts, Map<String, List<String>> poiSuffixTexts,
-	                  Map<String, List<String>> addressSuffixTexts, boolean isCommon, boolean isFrequent, String obf) {
-		public IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes,
-		                  Map<String, List<String>> suffixTexts, Map<String, List<String>> poiSuffixTexts,
-		                  Map<String, List<String>> addressSuffixTexts, boolean isCommon, boolean isFrequent) {
-			this(name, addressRefs, poiRefs, poiAtomRefs, poiAtomSizes, Map.of(), suffixTexts, poiSuffixTexts, addressSuffixTexts,
-					isCommon, isFrequent, null);
-		}
-
-		public IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes,
-		                  Map<Integer, int[]> poiIndexes, Map<String, List<String>> suffixTexts,
-		                  Map<String, List<String>> poiSuffixTexts, Map<String, List<String>> addressSuffixTexts,
-		                  boolean isCommon, boolean isFrequent) {
-			this(name, addressRefs, poiRefs, poiAtomRefs, poiAtomSizes, poiIndexes, suffixTexts, poiSuffixTexts,
-					addressSuffixTexts, isCommon, isFrequent, null);
-		}
-	}
+	                  Map<String, List<String>> addressSuffixTexts, boolean isCommon, boolean isFrequent, String obf,
+	                  int poiCount, int addressCount) {}
 	record ObfFileInfo(String path, String name, String continent, String country, String region, long lastModified, long size) {}
 	record IndexTokenPage(List<IndexToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, IndexTokenSummary summary) {}
 	record IndexTokenSummary(int poiSum, int addressSum, int commonSum, int frequentSum,
-	                         int dictSuffixSum, int partSuffixSum, int integerSuffixSum, int literalSuffixSum, int extraSuffixSum,
+	                         int dictSuffixSum, int partSuffixSum, int integerSuffixSum, int literalSuffixSum,
+	                         int extraSuffixSum, int otherSuffixSum,
 	                         int poiMax, int addressMax,
-	                         int dictSuffixMax, int partSuffixMax, int integerSuffixMax, int literalSuffixMax, int extraSuffixMax) {}
-	record IndexTokenBuilder(String name, int[] addressOffsets, int[] addressSuffixIndexes, int[] poiRefs, int[] poiAtomRefs,
+	                         int dictSuffixMax, int partSuffixMax, int integerSuffixMax, int literalSuffixMax,
+	                         int extraSuffixMax, int otherSuffixMax) {}
+	record IndexSuffixRequest(List<String> tokens, String key, String objectType) {}
+	record IndexSuffixMetric(String name, String obf, int dict, int part, int literal, int integer, int extra, int other) {}
+	record IndexSuffixResponse(List<IndexSuffixMetric> metrics, List<String> values) {}
+	record IndexTokenBuilder(String name, int[] addressOffsets, int[] addressSuffixIndexes, AddressRef[] addressRefs,
+	                         int[] poiRefs, int[] poiAtomRefs,
 	                         int[] poiAtomSizes, Map<Integer, int[]> poiIndexes, Map<String, List<String>> poiSuffixTexts,
 	                         Map<String, List<String>> addressSuffixTexts) {}
 	record AddressRef(int shiftToIndex, int shiftToCityIndex, int objectOffset, int cityOffset, int typeIndex, int atomSize) {}
