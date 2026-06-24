@@ -271,9 +271,10 @@ public class SearchService {
 			long startTime = System.currentTimeMillis();
 			SpatialSearchResults res;
 			// In future multiple spatialTextSearch & multiple osmand regions
+			SpatialSearchContext sscontext = new SpatialSearchContext(usedMapList, new LatLon(ctx.lat, ctx.lon));
 			synchronized (spatialTextSearch) {
 				usedMapList.add(osmandRegions.getFile());
-				res = spatialTextSearch.searchAPI(ctx.text, new SpatialSearchContext(usedMapList, new LatLon(ctx.lat, ctx.lon)));
+				res = spatialTextSearch.searchAPI(ctx.text, sscontext);
 			}
 			long searchTime = System.currentTimeMillis() - startTime;
 			if (res.mainResults != null) {
@@ -290,10 +291,14 @@ public class SearchService {
 				}
 			}
 			// extra info shown in the UI
-			response.info.put("timeAPI", String.format("%.2f", searchTime / 1e3));
-			response.info.put("timeOth", String.format("%.1f", (System.currentTimeMillis() - sTime - searchTime) / 1e3));
-			response.info.put("count", response.features.size());
-			response.info.put("tokens", res.combinations == null || res.combinations.size() == 0? 0 : res.combinations.get(0).getTokenCount());
+			response.info.put("timeAll", String.format("%.1f", (System.currentTimeMillis() - sTime) / 1e3));
+			response.info.put("atoms", String.format("%.2f, %,d", sscontext.getStats().stepAtoms / 1e9,
+					sscontext.getStats().tokenObjs));
+			response.info.put("compute", String.format("%.2f, %,d", sscontext.getStats().stepCompute / 1e9,
+					sscontext.getStats().maxCombinations));
+			response.info.put("results", response.features.size());
+			response.info.put("words-matched", res.combinations == null || res.combinations.size() == 0 ? 0
+					: res.combinations.get(0).getTokenCount());
 //			response.info.put("x", res.combinations == null ? 0 : res.combinations.size());
 		} catch (RuntimeException e) {
 			LOGGER.error(String.format("Spatial search failed for '%s': %s", ctx.text, e), e);
