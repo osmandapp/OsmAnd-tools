@@ -30,6 +30,13 @@ public interface OBFService extends BaseService {
 					return size() > INDEX_TOKEN_CACHE_LIMIT;
 				}
 			});
+	Map<String, List<InspectorService.CommonSuffix>> INDEX_COMMON_SUFFIX_CACHE = Collections.synchronizedMap(
+			new LinkedHashMap<>(1024, 0.75f, true) {
+				@Override
+				protected boolean removeEldestEntry(Map.Entry<String, List<InspectorService.CommonSuffix>> eldest) {
+					return size() > 65536;
+				}
+			});
 
 	Map<String, Map<Integer, InspectorService.ObfFieldSpec>> OBF_MESSAGE_SCHEMA = buildObfMessageSchema();
 
@@ -131,8 +138,9 @@ public interface OBFService extends BaseService {
 
 	record IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes,
 	                  Map<Integer, int[]> poiIndexes,
-	                  Map<String, List<String>> suffixTexts, Map<String, List<String>> poiSuffixTexts,
-	                  Map<String, List<String>> addressSuffixTexts, boolean isCommon, boolean isFrequent, String obf,
+	                  List<IndexSuffixRef> poiSuffixRefs, List<IndexSuffixRef> addressSuffixRefs,
+	                  IndexSuffixCounts poiSuffixCounts, IndexSuffixCounts addressSuffixCounts,
+	                  boolean isCommon, boolean isFrequent, String obf,
 	                  int poiCount, int addressCount) {}
 	record ObfFileInfo(String path, String name, String continent, String country, String region, long lastModified, long size) {}
 	record IndexTokenPage(List<IndexToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, IndexTokenSummary summary) {}
@@ -143,12 +151,15 @@ public interface OBFService extends BaseService {
 	                         int dictSuffixMax, int partSuffixMax, int integerSuffixMax, int literalSuffixMax,
 	                         int extraSuffixMax, int otherSuffixMax) {}
 	record IndexSuffixRequest(List<String> tokens, String key, String objectType) {}
-	record IndexSuffixMetric(String name, String obf, int dict, int part, int literal, int integer, int extra, int other) {}
+	record IndexSuffixMetric(String name, String obf, int dict, int integer, int extra, int other) {}
 	record IndexSuffixResponse(List<IndexSuffixMetric> metrics, List<String> values) {}
+	record IndexSuffixRef(String obf, int offset, int suffixIndex, boolean poi, int[] metricSuffixIndexes) {}
+	record IndexSuffixCounts(int dict, int integer, int extra, int other) {}
 	record IndexTokenBuilder(String name, int[] addressOffsets, int[] addressSuffixIndexes, AddressRef[] addressRefs,
 	                         int[] poiRefs, int[] poiAtomRefs,
-	                         int[] poiAtomSizes, Map<Integer, int[]> poiIndexes, Map<String, List<String>> poiSuffixTexts,
-	                         Map<String, List<String>> addressSuffixTexts) {}
+	                         int[] poiAtomSizes, Map<Integer, int[]> poiIndexes,
+	                         List<IndexSuffixRef> poiSuffixRefs, List<IndexSuffixRef> addressSuffixRefs,
+	                         IndexSuffixCounts poiSuffixCounts, IndexSuffixCounts addressSuffixCounts) {}
 	record AddressRef(int shiftToIndex, int shiftToCityIndex, int objectOffset, int cityOffset, int typeIndex, int atomSize) {}
 
 	record ObjectAddress(int sequenceId, String name, LatLon point, Map<String, String> commonTags,
@@ -165,7 +176,8 @@ public interface OBFService extends BaseService {
 	}
 	record ObjectAddressPage(List<ObjectAddress> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, int[] countMetrics, int[] sizeMetrics, int aloneCount, int aloneSize) {}
 	record ObjectAddressStats(int size, int count) {}
-	record PoiTokenRefs(Set<Integer> offsets, List<Integer> atomRefs, List<Integer> atomSizes, Map<Integer, int[]> poiIndexes) {}
+	record PoiTokenRefs(Set<Integer> offsets, List<Integer> atomRefs, List<Integer> atomSizes,
+	                    Map<Integer, int[]> poiIndexes, Set<Integer> metricSuffixIndexes) {}
 	record PoiCategoryMeta(String type, String subtype) {}
 	record GenerateDbProgress(String status, String obfName, int obfIndex, int totalObfs, int processedTokens,
 	                          int totalTokens, long elapsedMs, long estimatedMs, String error,

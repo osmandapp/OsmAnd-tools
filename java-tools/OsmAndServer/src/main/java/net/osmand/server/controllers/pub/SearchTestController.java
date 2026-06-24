@@ -488,6 +488,23 @@ public class SearchTestController {
 		return ResponseEntity.ok(suffixes);
 	}
 
+	@GetMapping(value = "/index/suffix-sort", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<OBFService.IndexTokenPage> getIndexSuffixSort(@RequestParam(required = false) String obf,
+																		@RequestParam(required = false) List<String> obfs,
+																		@RequestParam(required = false) String prefix,
+																		@RequestParam(defaultValue = "0") int pageToShow,
+																		@RequestParam(defaultValue = "100") int pageSizeLimit,
+																		@RequestParam(required = false) String sortBy,
+																		@RequestParam(required = false) String sortOrder,
+																		@RequestParam(required = false) String objectType) {
+		List<String> selectedObfs = normalizeObfs(obf, obfs);
+		if (selectedObfs.size() == 1) {
+			return ResponseEntity.ok(testSearchService.getIndexSuffixSort(selectedObfs.get(0), prefix, pageToShow, pageSizeLimit, sortBy, sortOrder, objectType));
+		}
+		return ResponseEntity.ok(testSearchService.getIndexSuffixSort(selectedObfs, prefix, pageToShow, pageSizeLimit, sortBy, sortOrder, objectType));
+	}
+
 	@PostMapping(value = "/objects", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public ResponseEntity<OBFService.ObjectAddressPage> getObjects(@RequestParam(required = false) String obf,
