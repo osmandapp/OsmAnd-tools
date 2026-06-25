@@ -530,6 +530,19 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					throw new IllegalArgumentException(e);
 				}
 				visitedStops.add(s.getId());
+				Map<String, String> namesMap = s.getNamesMap(false);
+				if (namesMap.containsKey(CONNECTED_PLATFORM_ID)) {
+					if (pStatements.get(transStopsStat) > 0) {
+						transStopsStat.executeBatch();
+						pStatements.put(transStopsStat, 0);
+					}
+					try (PreparedStatement updateStop = transStopsStat.getConnection().prepareStatement(
+							"UPDATE transport_stop SET names = ? WHERE id = ?")) {
+						updateStop.setString(1, new Gson().toJson(namesMap));
+						updateStop.setLong(2, s.getId());
+						updateStop.executeUpdate();
+					}
+				}
 			}
 			transRouteStopsStat.setLong(1, r.getId());
 			transRouteStopsStat.setLong(2, s.getId());
@@ -1161,6 +1174,9 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				}
 			}
 			if(replaceStop != null) {
+                TransportStop platformStopParsed = EntityParser.parseTransportStop(platform);
+                replaceStop.putTag(CONNECTED_PLATFORM_ID, platformStopParsed.getId().toString());
+
 				platformsAndStopsToProcess.remove(platform);
 				if (!Algorithms.isEmpty(platform.getTag(OSMTagKey.NAME))) {
 					nameReplacement.put(EntityId.valueOf(replaceStop), platform);
