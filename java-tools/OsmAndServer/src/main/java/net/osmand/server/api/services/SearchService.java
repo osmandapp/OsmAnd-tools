@@ -55,6 +55,7 @@ import net.osmand.binary.BinaryMapPoiReaderAdapter;
 import net.osmand.binary.GeocodingUtilities;
 import net.osmand.binary.ObfConstants;
 import net.osmand.data.Amenity;
+import net.osmand.data.Building;
 import net.osmand.data.City;
 import net.osmand.data.City.CityType;
 import net.osmand.data.LatLon;
@@ -308,7 +309,6 @@ public class SearchService {
 			if (usedMapList.isEmpty()) {
 				return response;
 			}
-			long startTime = System.currentTimeMillis();
 			SpatialSearchResults res;
 			// In future multiple spatialTextSearch & multiple osmand regions
 			SpatialSearchContext sscontext = new SpatialSearchContext(new SpatialTextSearchSettings(),
@@ -317,12 +317,11 @@ public class SearchService {
 				usedMapList.add(osmandRegions.getFile());
 				res = spatialTextSearch.searchAPI(ctx.text, sscontext);
 			}
-			long searchTime = System.currentTimeMillis() - startTime;
 			if (res.mainResults != null) {
 				for (SpatialSearchResult r : res.mainResults) {
 					List<MapObject> objs = r.getObjects();
 					if (!objs.isEmpty()) {
-						Feature f = getSpatialFeature(objs.get(0), ctx.locale, timeZone);
+						Feature f = getSpatialFeature(r.getLatLon(), objs.get(0), ctx.locale, timeZone);
 						if (f != null) {
 							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(), matchedObjects(objs, ctx.locale));
 							f.prop(PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
@@ -357,6 +356,7 @@ public class SearchService {
 			}
 			Map<String, Object> m = new LinkedHashMap<>();
 			m.put("name", o.getName(locale));
+			m.put("type", o.getClass().getSimpleName());
 			m.put("lat", o.getLocation().getLatitude());
 			m.put("lon", o.getLocation().getLongitude());
 			matched.add(m);
@@ -364,8 +364,8 @@ public class SearchService {
 		return matched;
 	}
 
-	private Feature getSpatialFeature(MapObject obj, String locale, String timeZone) {
-		if (obj == null || obj.getLocation() == null) {
+	private Feature getSpatialFeature(LatLon loc, MapObject obj, String locale, String timeZone) {
+		if (obj == null || loc == null) {
 			return null;
 		}
 		if (obj instanceof Amenity amenity) {
@@ -375,7 +375,7 @@ public class SearchService {
 		}
 		SearchResult result = new SearchResult();
 		result.object = obj;
-		result.location = obj.getLocation();
+		result.location = loc;
 		result.localeName = obj.getName(locale);
 		if (obj instanceof Street street) {
 			result.objectType = ObjectType.STREET;
@@ -383,6 +383,8 @@ public class SearchService {
 			if (city != null) {
 				result.localeRelatedObjectName = city.getName(locale);
 			}
+		} else if (obj instanceof Building) {
+			result.objectType = ObjectType.HOUSE;
 		} else if (obj instanceof City) {
 			result.objectType = ObjectType.CITY;
 		} else {
