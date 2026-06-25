@@ -58,6 +58,8 @@ import rtree.RTreeException;
 import rtree.RTreeInsertException;
 import rtree.Rect;
 
+import static net.osmand.data.TransportStop.CONNECTED_PLATFORM_ID;
+
 
 public class IndexTransportCreator extends AbstractIndexPartCreator {
 
@@ -530,6 +532,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					throw new IllegalArgumentException(e);
 				}
 				visitedStops.add(s.getId());
+			} else {
 				Map<String, String> namesMap = s.getNamesMap(false);
 				if (namesMap.containsKey(CONNECTED_PLATFORM_ID)) {
 					if (pStatements.get(transStopsStat) > 0) {
