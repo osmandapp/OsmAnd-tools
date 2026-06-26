@@ -79,7 +79,7 @@ public interface ReportService {
 				WHEN query IS NULL OR trim(query) = '' THEN 'Empty' ELSE 'Processed' END AS type,
 			ds_id || '.' || tc_id AS row_id, id as gen_id, lat_lon, query, obj_id as id,
 			in_row, NULL, NULL, NULL, NULL, NULL, NULL, NULL as out_row FROM gen ORDER BY "group", gen_id""";
-	String[] IN_PROPS = new String[]{"group", "type", "row_id", "id", "lat_lon", "search_lat_lon", "query"};
+	String[] IN_PROPS = new String[]{"group", "type", "row_id", "id", "lat_lon", "search_lat_lon", "query", "src_map_found", "actual_name", "actual_lat_lon"};
 	String[] OUT_PROPS = new String[]{"res_name", "res_distance", "res_lat_lon", "res_place", "actual_place", "res_id", "actual_id",
 			"oid", "res_count", "search_bbox", "stat_bytes", "stat_time", "time"};
 
@@ -160,7 +160,7 @@ public interface ReportService {
 					JsonNode outRow = getObjectMapper().readTree(outRowJson);
 					// For consistency with CSV, serialize values as text, skipping excluded keys
 					outRow.fieldNames().forEachRemaining(fn -> {
-						if (exclude.contains(fn) || fn.startsWith("stat_") || fn.endsWith("_stats"))
+						if (exclude.contains(fn) || fn.startsWith("stat_") || fn.endsWith("_stats") || fn.startsWith("spatial_"))
 							return; // remove from the inner 'row' map
 						JsonNode v = outRow.get(fn);
 						if (outProps.contains(fn)) {

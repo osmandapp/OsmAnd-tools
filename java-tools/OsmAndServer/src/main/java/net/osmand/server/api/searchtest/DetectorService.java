@@ -274,7 +274,7 @@ public interface DetectorService extends OBFService {
                     baseCtx.baseSearch(), baseCtx.northWest(), baseCtx.southEast());
             SearchService.SearchResults queryResult = getSearchService().getImmediateSearchResults(
                     phraseCtx, new SearchService.SearchOption(true, exportSettings,
-                            null, true, (net.osmand.search.core.ObjectType[]) null), null);
+                            null, true, false, (net.osmand.search.core.ObjectType[]) null), null);
             if (settingsResult == null) {
                 settingsResult = queryResult;
             }
@@ -361,7 +361,7 @@ public interface DetectorService extends OBFService {
 					baseCtx.baseSearch(), baseCtx.northWest(), baseCtx.southEast());
 			SearchService.SearchResults searchResult = getSearchService().getImmediateSearchResults(
 					phraseCtx,
-					new SearchService.SearchOption(true, null, null, true, (net.osmand.search.core.ObjectType[]) null),
+					new SearchService.SearchOption(true, null, null, true, false, (net.osmand.search.core.ObjectType[]) null),
 					null);
 			SearchPhrase phrase = searchResult.phrase();
 			List<SearchResult> searchResults = searchResult.results();

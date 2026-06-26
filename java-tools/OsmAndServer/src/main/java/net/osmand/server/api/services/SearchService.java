@@ -247,7 +247,7 @@ public class SearchService {
 
     public record SearchContext(double lat, double lon, String text, String locale, boolean baseSearch, String northWest, String southEast) {
     }
-    public record SearchOption(boolean unlimited, SearchExportSettings exportedSettings, Double radiusToLoadMaps, boolean queryIsCompleted, ObjectType... searchTypes) {
+    public record SearchOption(boolean unlimited, SearchExportSettings exportedSettings, Double radiusToLoadMaps, boolean queryIsCompleted, boolean isBatch, ObjectType... searchTypes) {
         private static final double SEARCH_RADIUS_DEGREE = 1.5;
 
         public double getRadius() {
@@ -263,7 +263,8 @@ public class SearchService {
 
 	public List<Feature> search(SearchContext ctx, String timeZone) throws IOException {
 		long tm = System.currentTimeMillis();
-		SearchResults searchResults = getImmediateSearchResults(ctx, new SearchOption(false, null, null, true, (ObjectType[]) null), null);
+		SearchResults searchResults = getImmediateSearchResults(ctx, new SearchOption(false, null, 
+                null, true, false, (ObjectType[]) null), null);
 		List<SearchResult> res = searchResults.results();
 		if (System.currentTimeMillis() - tm > 1000) {
             BinaryMapIndexReaderStats.SearchStat stat = searchResults.settings != null ? searchResults.settings.getStat() : null;
@@ -452,7 +453,9 @@ public class SearchService {
                 return new SearchResults(Collections.emptyList());
             }
             SearchSettings settings = searchUICore.getPhrase().getSettings();
-	        settings.setStat(new BinaryMapIndexReaderStats.SearchStat());
+            BinaryMapIndexReaderStats.SearchStat stat = new BinaryMapIndexReaderStats.SearchStat();
+            stat.isBatch = option.isBatch;
+	        settings.setStat(stat);
 
 	        settings.setOfflineIndexes(usedMapList);
             settings.setRadiusLevel(SEARCH_RADIUS_LEVEL);
