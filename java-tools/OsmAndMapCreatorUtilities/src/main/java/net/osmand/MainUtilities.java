@@ -246,8 +246,8 @@ public class MainUtilities {
 				RouteRelationExtractor.main(subArgsArray);
 			} else if (utl.equals("process-commonswiki")) {
 				CommonsWikimediaPreparation.main(subArgsArray);
-			} else if (utl.equals("generate-web-icons")) {
-				IconGenerator.main(subArgsArray);
+			} else if (utl.equals("generate-mvt-icons")) {
+				GenerateMvtIcons.main(subArgsArray);
 			} else {
 				printSynopsys();
 			}
@@ -494,6 +494,6 @@ public class MainUtilities {
 		System.out.println("\t\t random-click-generator --help # generate random clicks for AutoRegressionTests");
 		System.out.println("\t\t route-relation-extractor --help # generate TravelObf from OSM relations");
 		System.out.println("\t\t process-commonswiki --help # download and parse commonswiki pages into meta_commonswiki.sqlite ");
-		System.out.println("\t\t generate-web-icons --help # generate SVG icons with shield for web vector map");
+		System.out.println("\t\t generate-mvt-icons --help # generate SVG icons with shield for web vector map");
 	}
 }

@@ -8,7 +8,7 @@ import java.io.FileWriter;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-public class IconGenerator {
+public class GenerateMvtIcons {
 
 	public static void main(String[] args) throws Exception {
 		MainUtilities.CommandLineOpts opts = new MainUtilities.CommandLineOpts(args);
@@ -31,7 +31,7 @@ public class IconGenerator {
 		}
 
 		RenderingRulesStorage storage = RenderingRulesStorage.getTestStorageForStyle(styleFilePath);
-		Set<IconInfo> icons = new IconGenerator().extractAllIcons(storage);
+		Set<IconInfo> icons = new GenerateMvtIcons().extractAllIcons(storage);
 		System.out.println("Total icons: " + icons.size());
 
 		File outDir = new File(outputFolder);
@@ -66,7 +66,7 @@ public class IconGenerator {
 	private static void printHelp() {
 		System.out.println("""
 			Set 'repo_dir' env variable pointing to the OsmAnd repository root
-			Usage: generate-web-icons <output-folder> [--style=path-to-render.xml] [--shield-size=40]
+			Usage: generate-mvt-icons <output-folder> [--style=path-to-render.xml] [--shield-size=40]
 			--style path-to-render.xml by default repoDir + "/resources/rendering_styles/default.render.xml"
 			""");
 	}
