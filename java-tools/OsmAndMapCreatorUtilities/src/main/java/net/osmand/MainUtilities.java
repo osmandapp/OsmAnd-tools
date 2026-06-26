@@ -11,10 +11,7 @@ import net.osmand.obf.preparation.*;
 import net.osmand.osm.FilterOsmByTags;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
-import net.osmand.render.OsmAndTestStyleRenderer;
-import net.osmand.render.RenderingRulesStorage;
-import net.osmand.render.RenderingRulesStoragePrinter;
-import net.osmand.render.SvgMapLegendGenerator;
+import net.osmand.render.*;
 import net.osmand.router.*;
 import net.osmand.router.tester.RandomRouteTester;
 import net.osmand.routes.RouteRelationExtractor;
@@ -249,6 +246,8 @@ public class MainUtilities {
 				RouteRelationExtractor.main(subArgsArray);
 			} else if (utl.equals("process-commonswiki")) {
 				CommonsWikimediaPreparation.main(subArgsArray);
+			} else if (utl.equals("generate-web-icons")) {
+				IconGenerator.main(subArgsArray);
 			} else {
 				printSynopsys();
 			}
@@ -495,5 +494,6 @@ public class MainUtilities {
 		System.out.println("\t\t random-click-generator --help # generate random clicks for AutoRegressionTests");
 		System.out.println("\t\t route-relation-extractor --help # generate TravelObf from OSM relations");
 		System.out.println("\t\t process-commonswiki --help # download and parse commonswiki pages into meta_commonswiki.sqlite ");
+		System.out.println("\t\t generate-web-icons --help # generate SVG icons with shield for web vector map");
 	}
 }

@@ -12,23 +12,21 @@ public class IconGenerator {
 
 	public static void main(String[] args) throws Exception {
 		MainUtilities.CommandLineOpts opts = new MainUtilities.CommandLineOpts(args);
+		if (opts.getBoolean("--help")) {
+			printHelp();
+			System.exit(0);
+		}
 
 		String outputFolder = opts.getStrings().isEmpty() ? null : opts.getStrings().get(0);
-		if (outputFolder == null) {
-			throw new IllegalArgumentException(
-					"Usage: IconGenerator <output-folder> [--style=path-to-render.xml] [--shield-size=40]\n" +
-					"Or set 'repo_dir' env variable so the render file can be resolved automatically.");
+		String repoDir = System.getenv("repo_dir");
+		if (outputFolder == null || Algorithms.isEmpty(repoDir)) {
+			printHelp();
+			return;
 		}
 
 		int shieldSize = opts.getIntOrDefault("--shield-size", SvgMapLegendGenerator.defaultShieldSize);
 		String styleFilePath = opts.getOpt("--style");
-
 		if (styleFilePath == null) {
-			String repoDir = System.getenv("repo_dir");
-			if (Algorithms.isEmpty(repoDir)) {
-				throw new IllegalArgumentException(
-						"Specify --style=path-to-render.xml or set 'repo_dir' env variable.");
-			}
 			styleFilePath = repoDir + "/resources/rendering_styles/default.render.xml";
 		}
 
@@ -63,6 +61,14 @@ public class IconGenerator {
 			}
 		}
 		System.out.println("Generated: " + generated + ", skipped: " + failed + " -> " + outputFolder);
+	}
+
+	private static void printHelp() {
+		System.out.println("""
+			Set 'repo_dir' env variable pointing to the OsmAnd repository root
+			Usage: generate-web-icons <output-folder> [--style=path-to-render.xml] [--shield-size=40]
+			--style path-to-render.xml by default repoDir + "/resources/rendering_styles/default.render.xml"
+			""");
 	}
 
 	private final Set<IconInfo> allIcons = new LinkedHashSet<>();
