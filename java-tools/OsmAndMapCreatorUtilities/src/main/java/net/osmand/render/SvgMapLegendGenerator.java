@@ -374,7 +374,7 @@ public class SvgMapLegendGenerator {
 		}
 	}
 
-	private static class SvgGenerator {
+	static class SvgGenerator {
 
 		public static String generate(String iconName, int iconSize, String shieldName, int shieldSize,
 		                              String backgroundColor, float backgroundOpacity) throws Exception {

@@ -1,34 +1,71 @@
 package net.osmand.render;
 
+import net.osmand.MainUtilities;
 import net.osmand.util.Algorithms;
 
-import java.util.HashSet;
+import java.io.File;
+import java.io.FileWriter;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 public class IconGenerator {
 
 	public static void main(String[] args) throws Exception {
-		String renderFilePath;
-		if (args.length > 0) {
-			renderFilePath = args[0];
-		} else {
+		MainUtilities.CommandLineOpts opts = new MainUtilities.CommandLineOpts(args);
+
+		String outputFolder = opts.getStrings().isEmpty() ? null : opts.getStrings().get(0);
+		if (outputFolder == null) {
+			throw new IllegalArgumentException(
+					"Usage: IconGenerator <output-folder> [--style=path-to-render.xml] [--shield-size=40]\n" +
+					"Or set 'repo_dir' env variable so the render file can be resolved automatically.");
+		}
+
+		int shieldSize = opts.getIntOrDefault("--shield-size", SvgMapLegendGenerator.defaultShieldSize);
+		String styleFilePath = opts.getOpt("--style");
+
+		if (styleFilePath == null) {
 			String repoDir = System.getenv("repo_dir");
 			if (Algorithms.isEmpty(repoDir)) {
-				throw new IllegalArgumentException("Usage: IconGenerator <path-to-render.xml>\n" +
-						"Or set 'repo_dir' env variable pointing to resources repository.");
+				throw new IllegalArgumentException(
+						"Specify --style=path-to-render.xml or set 'repo_dir' env variable.");
 			}
-			String style = args.length > 1 ? args[1] : "default";
-			renderFilePath = repoDir + "/resources/rendering_styles/" + style + ".render.xml";
+			styleFilePath = repoDir + "/resources/rendering_styles/default.render.xml";
 		}
-		RenderingRulesStorage storage = RenderingRulesStorage.getTestStorageForStyle(renderFilePath);
+
+		RenderingRulesStorage storage = RenderingRulesStorage.getTestStorageForStyle(styleFilePath);
 		Set<IconInfo> icons = new IconGenerator().extractAllIcons(storage);
 		System.out.println("Total icons: " + icons.size());
+
+		File outDir = new File(outputFolder);
+		outDir.mkdirs();
+
+		SvgMapLegendGenerator.canvasWidth = shieldSize;
+		SvgMapLegendGenerator.canvasHeight = shieldSize;
+
+		int generated = 0;
+		int failed = 0;
 		for (IconInfo iconInfo : icons) {
-			System.out.println(iconInfo);
+			try {
+				String svg = SvgMapLegendGenerator.SvgGenerator.generate(
+						iconInfo.icon,
+						SvgMapLegendGenerator.defaultIconSize,
+						iconInfo.shield,
+						shieldSize,
+						null, 0);
+				String fileName = iconInfo.icon + ".svg";
+				try (FileWriter writer = new FileWriter(new File(outDir, fileName))) {
+					writer.write(svg);
+				}
+				generated++;
+			} catch (Exception e) {
+				System.err.println("SKIP " + iconInfo.icon + ": " + e.getMessage());
+				failed++;
+			}
 		}
+		System.out.println("Generated: " + generated + ", skipped: " + failed + " -> " + outputFolder);
 	}
 
-	private Set<IconInfo> allIcons = new HashSet<>();
+	private final Set<IconInfo> allIcons = new LinkedHashSet<>();
 
 	public static class IconInfo {
 		public String tag;
@@ -49,9 +86,6 @@ public class IconGenerator {
 		allIcons.clear();
 
 		extractFromRuleType(storage, RenderingRulesStorage.POINT_RULES, "POINT_RULES");
-//		extractFromRuleType(storage, RenderingRulesStorage.LINE_RULES, "LINE_RULES");
-//		extractFromRuleType(storage, RenderingRulesStorage.POLYGON_RULES, "POLYGON_RULES");
-//		extractFromRuleType(storage, RenderingRulesStorage.TEXT_RULES, "TEXT_RULES");
 
 		return allIcons;
 	}
@@ -65,12 +99,15 @@ public class IconGenerator {
 			String value = storage.getValueString(key);
 
 			RenderingRule rule = rules[i];
-			extractIconsFromRule(rule, tag, value, source);
+			extractIconsFromRule(rule, tag, value, source, null);
 		}
 	}
 
-	private void extractIconsFromRule(RenderingRule rule, String tag, String value, String source) {
-		IconInfo iconInfo = extractIconInfo(rule);
+	private void extractIconsFromRule(RenderingRule rule, String tag, String value, String source, IconInfo parent) {
+		if (rule.getIntPropertyValue("nightMode") == 1 || rule.getIntPropertyValue("streetLighting") == 1) {
+			return;
+		}
+		IconInfo iconInfo = extractIconInfo(rule, parent);
 		if (iconInfo != null) {
 			iconInfo.tag = tag;
 			iconInfo.value = value;
@@ -78,27 +115,36 @@ public class IconGenerator {
 			allIcons.add(iconInfo);
 		}
 
+		IconInfo current = iconInfo != null ? iconInfo : parent;
+
 		extractAdditionalIcons(rule, tag, value, source);
 
+		// ifChildren (apply/apply_if) accumulate state sequentially — each sibling
+		// inherits from the previous one, mirroring how the renderer applies them.
+		IconInfo accumulated = current;
 		for (RenderingRule child : rule.getIfChildren()) {
-			extractIconsFromRule(child, tag, value, source + "/if");
+			extractIconsFromRule(child, tag, value, source + "/if", accumulated);
+			IconInfo contribution = extractIconInfo(child, accumulated);
+			if (contribution != null) {
+				accumulated = contribution;
+			}
 		}
 
 		for (RenderingRule child : rule.getIfElseChildren()) {
-			extractIconsFromRule(child, tag, value, source + "/ifElse");
+			extractIconsFromRule(child, tag, value, source + "/ifElse", current);
 		}
 	}
 
-	private IconInfo extractIconInfo(RenderingRule rule) {
+	private IconInfo extractIconInfo(RenderingRule rule, IconInfo parent) {
 		String icon = rule.getStringPropertyValue("icon");
 		String shield = rule.getStringPropertyValue("shield");
 		float iconVisibleSize = rule.getFloatPropertyValue("iconVisibleSize");
 
-		if (!Algorithms.isEmpty(icon)) {
+		if (!Algorithms.isEmpty(icon) || shield != null || iconVisibleSize != 0) {
 			IconInfo info = new IconInfo();
-			info.icon = icon;
-			info.shield = shield;
-			info.iconVisibleSize = iconVisibleSize > 0 ? iconVisibleSize : null;
+			info.icon = !Algorithms.isEmpty(icon) ? icon : (parent != null ? parent.icon : null);
+			info.shield = shield != null ? (shield.isEmpty() ? null : shield) : (parent != null ? parent.shield : null);
+			info.iconVisibleSize = iconVisibleSize > 0 ? (Float) iconVisibleSize : (parent != null ? parent.iconVisibleSize : null);
 			return info;
 		}
 		return null;
