@@ -20,6 +20,8 @@ import net.osmand.server.api.repo.CloudUserFilesRepository;
 @AdminOperation(name = "analyze-run")
 public class AnalyzeRunOperation extends AbstractParallelOperation<AnalyzeRunOperation.Params> {
 
+	private static final int BATCH = 1000; // 'id in (...)' is capped at 65535 bind params, so query in chunks
+
 	private final OperationRepository runs;
 	private final CloudUserFilesRepository files;
 	private final ObjectMapper mapper;
@@ -42,11 +44,21 @@ public class AnalyzeRunOperation extends AbstractParallelOperation<AnalyzeRunOpe
 		}
 		AtomicLong filesize = new AtomicLong();
 		AtomicLong zipfilesize = new AtomicLong();
-		forEach(clampThreads(params.threads()), files.findAllById(ids), ctx, f -> {
-			filesize.addAndGet(f.filesize == null ? 0 : f.filesize);
-			zipfilesize.addAndGet(f.zipfilesize == null ? 0 : f.zipfilesize);
+		forEach(clampThreads(params.threads()), batches(ids), ctx, batch -> {
+			for (var f : files.findAllById(batch)) {
+				filesize.addAndGet(f.filesize == null ? 0 : f.filesize);
+				zipfilesize.addAndGet(f.zipfilesize == null ? 0 : f.zipfilesize);
+			}
 		});
 		return Map.of("files", ids.size(), "filesize", size(filesize.get()), "zipfilesize", size(zipfilesize.get()));
+	}
+
+	private static List<List<Long>> batches(List<Long> ids) {
+		List<List<Long>> out = new ArrayList<>();
+		for (int i = 0; i < ids.size(); i += BATCH) {
+			out.add(ids.subList(i, Math.min(ids.size(), i + BATCH)));
+		}
+		return out;
 	}
 
 	private static String size(long bytes) {
