@@ -1,6 +1,7 @@
 package net.osmand.server.api.operation.impl;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -42,25 +43,36 @@ public class AnalyzeRunOperation extends AbstractParallelOperation<AnalyzeRunOpe
 		if (runIds.isEmpty()) {
 			throw new IllegalArgumentException("runIds is required (comma-separated, e.g. 142,143)");
 		}
-		Set<Long> unique = new LinkedHashSet<>();
+		Map<String, Set<Long>> groups = new LinkedHashMap<>();
 		for (Long runId : runIds) {
-			var run = runs.getRun(runId)
-					.orElseThrow(() -> new IllegalArgumentException("Run not found: " + runId));
-			unique.addAll(ids(run));
+			collect(runs.getRun(runId)
+					.orElseThrow(() -> new IllegalArgumentException("Run not found: " + runId)), groups);
 		}
-		List<Long> ids = new ArrayList<>(unique);
-		if (params.calcSize() != null && !params.calcSize()) {
-			return Map.of("files", ids.size());
+		boolean calcSize = params.calcSize() == null || params.calcSize();
+		int threads = clampThreads(params.threads());
+
+		Map<String, Object> result = new LinkedHashMap<>();
+		groups.forEach((group, ids) -> result.put(group, measure(new ArrayList<>(ids), calcSize, threads, ctx)));
+		return result;
+	}
+
+	// file count (+ total filesize/zipfilesize when calcSize) for one group of ids
+	private Map<String, Object> measure(List<Long> ids, boolean calcSize, int threads, OperationContext ctx) {
+		Map<String, Object> r = new LinkedHashMap<>();
+		r.put("files", ids.size());
+		if (calcSize) {
+			AtomicLong filesize = new AtomicLong();
+			AtomicLong zipfilesize = new AtomicLong();
+			forEach(threads, batches(ids), ctx, batch -> {
+				for (var f : files.findAllById(batch)) {
+					filesize.addAndGet(f.filesize == null ? 0 : f.filesize);
+					zipfilesize.addAndGet(f.zipfilesize == null ? 0 : f.zipfilesize);
+				}
+			});
+			r.put("filesize", size(filesize.get()));
+			r.put("zipfilesize", size(zipfilesize.get()));
 		}
-		AtomicLong filesize = new AtomicLong();
-		AtomicLong zipfilesize = new AtomicLong();
-		forEach(clampThreads(params.threads()), batches(ids), ctx, batch -> {
-			for (var f : files.findAllById(batch)) {
-				filesize.addAndGet(f.filesize == null ? 0 : f.filesize);
-				zipfilesize.addAndGet(f.zipfilesize == null ? 0 : f.zipfilesize);
-			}
-		});
-		return Map.of("files", ids.size(), "filesize", size(filesize.get()), "zipfilesize", size(zipfilesize.get()));
+		return r;
 	}
 
 	private static List<Long> parseRunIds(String raw) {
@@ -90,21 +102,23 @@ public class AnalyzeRunOperation extends AbstractParallelOperation<AnalyzeRunOpe
 				: String.format(Locale.US, "%.1f MB", bytes / (1024.0 * 1024));
 	}
 
-	private List<Long> ids(OperationRepository.RunItem run) {
-		List<Long> ids = new ArrayList<>();
+	private void collect(OperationRepository.RunItem run, Map<String, Set<Long>> groups) {
 		try {
 			JsonNode fileIds = mapper.readTree(run.paramsJson()).get("fileIds");
 			if (fileIds != null && fileIds.isArray()) {
-				fileIds.forEach(node -> ids.add(node.asLong()));
-			} else {
-				JsonNode found = mapper.readTree(run.resultJson()).get("foundFiles");
-				if (found != null) {
-					found.forEach(node -> ids.add(node.get("id").asLong()));
-				}
+				Set<Long> g = groups.computeIfAbsent("files", k -> new LinkedHashSet<>());
+				fileIds.forEach(node -> g.add(node.asLong()));
+				return;
+			}
+			JsonNode found = mapper.readTree(run.resultJson()).get("foundFiles");
+			if (found != null && found.isArray()) {
+				found.forEach(node -> {
+					String group = node.hasNonNull("tag") ? node.get("tag").asText() : "files";
+					groups.computeIfAbsent(group, k -> new LinkedHashSet<>()).add(node.get("id").asLong());
+				});
 			}
 		} catch (Exception e) {
 			throw new IllegalStateException("Bad run data: " + e.getMessage(), e);
 		}
-		return ids;
 	}
 }

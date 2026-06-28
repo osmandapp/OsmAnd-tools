@@ -14,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.GZIPInputStream;
 
@@ -160,8 +161,14 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 				return false;
 			}
 			stats.found.incrementAndGet();
+			String tag = tag(file);
+			if (tag != null) {
+				stats.byTag.computeIfAbsent(tag, k -> new AtomicInteger()).incrementAndGet();
+			}
 			if (test) {
-				stats.foundFiles.add(Map.of("userid", file.userid, "id", file.id, "file", file.name));
+				stats.foundFiles.add(tag == null
+						? Map.of("userid", file.userid, "id", file.id, "file", file.name)
+						: Map.of("userid", file.userid, "id", file.id, "file", file.name, "tag", tag));
 			}
 			return true;
 		} catch (Exception e) {
@@ -212,6 +219,11 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 		return null;
 	}
 
+	// optional tag added to each found file entry and counted in byTag; null = no tag (default)
+	protected String tag(UserFile file) {
+		return null;
+	}
+
 	private Set<String> typesOf(Params params) {
 		Set<String> supported = supportedTypes();
 		Set<String> chosen = params.fileTypes() == null ? Set.of() : params.fileTypes();
@@ -234,6 +246,7 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 		final AtomicInteger failed = new AtomicInteger();
 		final AtomicInteger users = new AtomicInteger();
 		final AtomicInteger usersFound = new AtomicInteger();
+		final Map<String, AtomicInteger> byTag = new ConcurrentHashMap<>();
 		final List<Map<String, Object>> foundFiles = Collections.synchronizedList(new ArrayList<>());
 		final List<Map<String, Object>> failedFiles = Collections.synchronizedList(new ArrayList<>());
 
@@ -249,6 +262,11 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 			r.put("failed", failed.get());
 			r.put("users", users.get());
 			r.put("usersFound", usersFound.get());
+			if (!byTag.isEmpty()) {
+				Map<String, Object> tags = new LinkedHashMap<>();
+				byTag.forEach((k, v) -> tags.put(k, v.get()));
+				r.put("byTag", tags);
+			}
 			r.put("testRun", testRun);
 			r.put("foundFiles", new ArrayList<>(foundFiles));
 			r.put("failedFiles", new ArrayList<>(failedFiles));
