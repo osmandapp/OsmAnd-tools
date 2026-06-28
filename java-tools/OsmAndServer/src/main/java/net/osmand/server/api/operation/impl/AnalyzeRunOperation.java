@@ -1,9 +1,11 @@
 package net.osmand.server.api.operation.impl;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.springframework.stereotype.Component;
@@ -20,7 +22,7 @@ import net.osmand.server.api.repo.CloudUserFilesRepository;
 @AdminOperation(name = "analyze-run")
 public class AnalyzeRunOperation extends AbstractParallelOperation<AnalyzeRunOperation.Params> {
 
-	private static final int BATCH = 1000; // 'id in (...)' is capped at 65535 bind params, so query in chunks
+	private static final int BATCH = 1000;
 
 	private final OperationRepository runs;
 	private final CloudUserFilesRepository files;
@@ -32,13 +34,21 @@ public class AnalyzeRunOperation extends AbstractParallelOperation<AnalyzeRunOpe
 		this.mapper = mapper;
 	}
 
-	public record Params(Long runId, Boolean calcSize, Integer threads) {}
+	public record Params(String runIds, Boolean calcSize, Integer threads) {}
 
 	@Override
 	public Object run(Params params, OperationContext ctx) {
-		var run = runs.getRun(params.runId())
-				.orElseThrow(() -> new IllegalArgumentException("Run not found: " + params.runId()));
-		List<Long> ids = ids(run);
+		List<Long> runIds = parseRunIds(params.runIds());
+		if (runIds.isEmpty()) {
+			throw new IllegalArgumentException("runIds is required (comma-separated, e.g. 142,143)");
+		}
+		Set<Long> unique = new LinkedHashSet<>();
+		for (Long runId : runIds) {
+			var run = runs.getRun(runId)
+					.orElseThrow(() -> new IllegalArgumentException("Run not found: " + runId));
+			unique.addAll(ids(run));
+		}
+		List<Long> ids = new ArrayList<>(unique);
 		if (params.calcSize() != null && !params.calcSize()) {
 			return Map.of("files", ids.size());
 		}
@@ -51,6 +61,19 @@ public class AnalyzeRunOperation extends AbstractParallelOperation<AnalyzeRunOpe
 			}
 		});
 		return Map.of("files", ids.size(), "filesize", size(filesize.get()), "zipfilesize", size(zipfilesize.get()));
+	}
+
+	private static List<Long> parseRunIds(String raw) {
+		List<Long> out = new ArrayList<>();
+		if (raw != null) {
+			for (String part : raw.split(",")) {
+				String s = part.trim();
+				if (!s.isEmpty()) {
+					out.add(Long.parseLong(s));
+				}
+			}
+		}
+		return out;
 	}
 
 	private static List<List<Long>> batches(List<Long> ids) {
