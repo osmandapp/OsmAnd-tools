@@ -154,19 +154,22 @@ def check(kind, url):
     try:
         is_ocean = coastline_fills_tile(download(actual_url))
     except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError):
-        print(kind, actual_url, "http_error")
-        return
+        print(kind, actual_url, "http-error")
+        return False
     expected_ocean = kind == "ocean"
     status = "ok" if is_ocean == expected_ocean else "false"
     suffix = f" {map_url(url)}" if status == "false" else ""
     print(kind, actual_url, status + suffix)
+    return status == "ok"
 
 
 def main():
+    ok = True
     for kind, path in (("ocean", "ocean.txt"), ("land", "land.txt")):
         for url in read_urls(path):
-            check(kind, url)
+            ok = check(kind, url) and ok
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
