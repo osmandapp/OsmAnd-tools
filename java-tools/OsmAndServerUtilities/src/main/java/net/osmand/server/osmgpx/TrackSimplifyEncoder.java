@@ -120,6 +120,9 @@ public class TrackSimplifyEncoder {
 	private static int readVarint(byte[] data, int[] pos) {
 		int result = 0, shift = 0, b;
 		do {
+			if (pos[0] >= data.length || shift > 28) {
+				throw new IllegalArgumentException("Corrupted varint geometry");
+			}
 			b = data[pos[0]++] & 0xFF;
 			result |= (b & 0x7F) << shift;
 			shift += 7;
