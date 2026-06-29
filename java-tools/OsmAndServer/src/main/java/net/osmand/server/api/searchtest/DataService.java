@@ -374,6 +374,20 @@ public interface DataService extends BaseService {
 						row.put("stat_calls_" + e.getKey().name(), e.getValue().calls);
 					}
 					row.put("sub_stats", stat.getSubStatsSummary());
+				} else {
+					int statAmenityCount = 0;
+					int statAddressCount = 0;
+					for (SearchResult sr : searchResults) {
+						if (sr.object instanceof Amenity || sr.objectType == POI_TYPE) {
+							statAmenityCount++;
+						} else {
+							statAddressCount++;
+						}
+					}
+					row.put("stat_results", resultsCount);
+					row.put("stat_amenity_count", statAmenityCount);
+					row.put("stat_address_count", statAddressCount);
+					row.put("stat_transport_count", 0);
 				}
 				row.put("time", duration);
 				row.put("web_type", firstResult.searchResult().objectType);
