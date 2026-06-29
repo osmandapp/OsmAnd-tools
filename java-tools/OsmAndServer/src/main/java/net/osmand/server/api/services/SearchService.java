@@ -332,9 +332,9 @@ public class SearchService {
 			}
 			// extra info shown in the UI
 			response.info.put("timeAll", String.format("%.1f", (System.currentTimeMillis() - sTime) / 1e3));
-			response.info.put("atoms", String.format("%.2f, %,d", sscontext.getStats().stepAtoms / 1e9,
+			response.info.put("atoms", String.format("%.2f, %,d", sscontext.getStats().step1Atoms.ms() * 1000,
 					sscontext.getStats().tokenObjs));
-			response.info.put("compute", String.format("%.2f, %,d", sscontext.getStats().step2Compute / 1e9,
+			response.info.put("compute", String.format("%.2f, %,d", sscontext.getStats().step2Compute.ms() * 1000,
 					sscontext.getStats().maxCombinations));
 			response.info.put("results", response.features.size());
 			response.info.put("words-matched", res.combinations == null || res.combinations.size() == 0 ? 0
