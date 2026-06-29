@@ -3,8 +3,6 @@ package net.osmand.server.api.searchtest;
 import net.osmand.binary.*;
 import net.osmand.data.*;
 import net.osmand.search.core.SearchResult;
-import net.osmand.server.api.searchtest.MapDataObjectFinder.Result;
-import net.osmand.server.api.searchtest.MapDataObjectFinder.ResultType;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
@@ -271,7 +269,7 @@ public interface DataService extends BaseService {
 	int SEARCH_DUPLICATE_NAME_RADIUS = 5000;
 	int FOUND_DEDUPLICATE_RADIUS = 100;
 
-	default Object[] collectRunResults(MapDataObjectFinder finder, long genId, int count, Run run, String query,
+	default Object[] collectRunResults(ResultActuator actuator, long genId, int count, Run run, String query,
 	                                   SearchService.SearchResults searchResult, LatLon targetPoint,
 	                                   LatLon searchPoint, long duration, String bbox, String error) throws IOException {
 		if (error != null || targetPoint == null) {
@@ -295,9 +293,9 @@ public interface DataService extends BaseService {
 			}
         }
 
-		Map<String, Object> row = finder.getRow();
-		Result firstResult = finder.getFirstResult();
-		Result actualResult = finder.getActualResult();
+		Map<String, Object> row = actuator.getRow();
+		ResultActuator.Result firstResult = actuator.getFirstResult();
+		ResultActuator.Result actualResult = actuator.getActualResult();
 		BinaryMapIndexReaderStats.SearchStat stat = searchResult != null && searchResult.settings() != null
 				? searchResult.settings().getStat()
 				: null;
@@ -396,7 +394,7 @@ public interface DataService extends BaseService {
 				row.put("res_name", firstResult.placeName());
 				if (actualResult == null && closestDuplicate < FOUND_DEDUPLICATE_RADIUS) {
 					SearchResult sr = searchResults.get(dupInd);
-					actualResult = new Result(ResultType.ByDist, null, dupInd + 1, sr);
+					actualResult = new ResultActuator.Result(ResultActuator.ResultType.ByDist, null, dupInd + 1, sr);
 				}
 				if (actualResult != null) {
 					row.put("actual_place", actualResult.toPlaceString());

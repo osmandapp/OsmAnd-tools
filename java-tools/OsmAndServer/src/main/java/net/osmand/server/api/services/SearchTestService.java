@@ -455,7 +455,7 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 					datasetId = -1;
 				}
 
-				final MapDataObjectFinder finder = new MapDataObjectFinder(targetPoint, newRow, datasetId);
+				ResultActuator actuator = new ResultActuator(targetPoint, newRow);
 				Object[] args = null;
 				try {
 					SearchService.SearchResults searchResult = null;
@@ -465,17 +465,18 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 						if (Boolean.TRUE.equals(run.spatial)) {
 							SearchService.SpatialResults spatialResult = searchService.searchSpatial(ctx);
 							searchResult = fromSpatialResults(spatialResult, newRow, run.locale);
-							finder.accept(searchResult.results());
+							actuator.accept(searchResult.results());
 						} else {
-							searchResult = searchService.getImmediateSearchResults(ctx, options, finder);
+							actuator = new MapDataObjectFinder(targetPoint, newRow, datasetId);
+							searchResult = searchService.getImmediateSearchResults(ctx, options, actuator);
 						}
 					}
 
-					args = collectRunResults(finder, genId, count, run, query, searchResult,
+					args = collectRunResults(actuator, genId, count, run, query, searchResult,
 							targetPoint, searchPoint, System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1], null);
 				} catch (Exception e) {
 					LOGGER.warn("Failed to process row for run {}.", run.id, e);
-					args = collectRunResults(finder, genId, count, run, query, null,
+					args = collectRunResults(actuator, genId, count, run, query, null,
 							targetPoint, searchPoint, System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1],
 							e.getMessage() == null ? e.toString() : e.getMessage());
 				} finally {
@@ -548,7 +549,7 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 		result.object = object;
 		result.location = location;
 		result.localeName = spatialName(object, locale);
-		result.objectType = spatialObjectType(spatial, object, objects);
+		result.objectType = spatialObjectType(object);
 		if (object instanceof Street street) {
 			City city = street.getCity();
 			if (city != null) {
@@ -559,7 +560,7 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 		return result;
 	}
 
-	private ObjectType spatialObjectType(SpatialSearchResult spatial, MapObject object, List<MapObject> objects) {
+	private ObjectType spatialObjectType(MapObject object) {
 		if (object instanceof Amenity) {
 			return ObjectType.POI;
 		}
