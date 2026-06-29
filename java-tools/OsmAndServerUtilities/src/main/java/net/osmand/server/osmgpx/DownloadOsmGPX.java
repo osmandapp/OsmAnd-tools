@@ -257,10 +257,19 @@ public class DownloadOsmGPX {
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS speed float");
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS distance float");
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS points integer");
+			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS max_speed float");
+			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS max_dist_between_points float");
+			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS time_minutes integer");
+			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS waypoints integer");
+			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS simplified_geometry bytea");
 
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_speed ON " + GPX_METADATA_TABLE_NAME + " (speed)");
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_distance ON " + GPX_METADATA_TABLE_NAME + " (distance)");
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_points ON " + GPX_METADATA_TABLE_NAME + " (points)");
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_max_speed ON " + GPX_METADATA_TABLE_NAME + " (max_speed)");
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_max_dist_between_points ON " + GPX_METADATA_TABLE_NAME + " (max_dist_between_points)");
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_time_minutes ON " + GPX_METADATA_TABLE_NAME + " (time_minutes)");
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_waypoints ON " + GPX_METADATA_TABLE_NAME + " (waypoints)");
 
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_activity ON " + GPX_METADATA_TABLE_NAME + " (activity)");
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_tags_gin ON " + GPX_METADATA_TABLE_NAME + " USING GIN (tags)");
@@ -303,7 +312,9 @@ public class DownloadOsmGPX {
 		LOG.info("Starting to populate the 'activity' column" + (update ? " (all records)" : " (only activity IS NULL)") + "...");
 		dbConn.setAutoCommit(false);
 		PreparedStatement updateStmtMetrics = dbConn.prepareStatement(
-				"UPDATE " + GPX_METADATA_TABLE_NAME + " SET activity = ?, speed = ?, distance = ?, points = ? WHERE id = ?"
+				"UPDATE " + GPX_METADATA_TABLE_NAME + " SET activity = ?, speed = ?, distance = ?, points = ?, " +
+						"max_speed = ?, max_dist_between_points = ?, time_minutes = ?, waypoints = ?, " +
+						"simplified_geometry = ? WHERE id = ?"
 		);
 		PreparedStatement updateStmtActivityOnly = dbConn.prepareStatement(
 				"UPDATE " + GPX_METADATA_TABLE_NAME + " SET activity = ? WHERE id = ?"
@@ -336,6 +347,11 @@ public class DownloadOsmGPX {
 						int pointsCount = 0;
 						float distanceMeters = 0f;
 						float avgSpeedKmh = 0f;
+						float maxSpeedKmh = 0f;
+						float maxDistBetweenPoints = 0f;
+						int timeMinutes = 0;
+						int waypointsCount = 0;
+						byte[] simplifiedGeometry = null;
 						try (Statement dataStmt = dbConn.createStatement();
 						     ResultSet rf = dataStmt.executeQuery(
 								     "SELECT data FROM " + GPX_FILES_TABLE_NAME + " WHERE id = " + id
@@ -381,6 +397,18 @@ public class DownloadOsmGPX {
 											avgSpeedKmh = (float) (speedMs * 3.6d);
 										}
 									}
+									double maxSpeedMs = analysis.getMaxSpeed();
+									if (maxSpeedMs > 0) {
+										maxSpeedKmh = (float) (maxSpeedMs * 3.6d);
+									}
+									maxDistBetweenPoints = analysis.getMaxDistanceBetweenPoints();
+									double timeSpanMs = analysis.getTimeSpan();
+									if (timeSpanMs > 0) {
+										timeMinutes = (int) (timeSpanMs / 60000d);
+									}
+									waypointsCount = gpxFile.getPointsList().size();
+									simplifiedGeometry = TrackSimplifyEncoder.encodeGeometry(
+											TrackSimplifyEncoder.simplifyGpx(gpxFile, TrackSimplifyEncoder.SIMPLIFY_ZOOM));
 								}
 							} else {
 								activity = ERROR_ACTIVITY_TYPE;
@@ -411,7 +439,12 @@ public class DownloadOsmGPX {
 							updateStmtMetrics.setFloat(2, round2(avgSpeedKmh));
 							updateStmtMetrics.setFloat(3, round2(distanceMeters));
 							updateStmtMetrics.setInt(4, pointsCount);
-							updateStmtMetrics.setLong(5, id);
+							updateStmtMetrics.setFloat(5, round2(maxSpeedKmh));
+							updateStmtMetrics.setFloat(6, round2(maxDistBetweenPoints));
+							updateStmtMetrics.setInt(7, timeMinutes);
+							updateStmtMetrics.setInt(8, waypointsCount);
+							updateStmtMetrics.setBytes(9, simplifiedGeometry);
+							updateStmtMetrics.setLong(10, id);
 							updateStmtMetrics.addBatch();
 						} else {
 							updateStmtActivityOnly.setString(1, activity);

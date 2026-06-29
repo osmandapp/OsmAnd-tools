@@ -83,7 +83,11 @@ public class OsmGpxController {
 			List<String> tags,
 			String tagMatchMode,
 			List<Integer> distanceRange,
-			List<Integer> speedRange
+			List<Integer> speedRange,
+			List<Integer> maxSpeedRange,
+			List<Integer> maxDistBetweenPointsRange,
+			List<Integer> timeMinutesRange,
+			List<Integer> waypointsRange
 	) {
 	}
 
@@ -131,6 +135,34 @@ public class OsmGpxController {
 
 		if (req.speedRange() != null && !req.speedRange().isEmpty()) {
 			error = filterByRange("m.speed", req.speedRange(), params, conditions, "speed");
+			if (error != null) {
+				return error;
+			}
+		}
+
+		if (req.maxSpeedRange() != null && !req.maxSpeedRange().isEmpty()) {
+			error = filterByRange("m.max_speed", req.maxSpeedRange(), params, conditions, "maxSpeed");
+			if (error != null) {
+				return error;
+			}
+		}
+
+		if (req.maxDistBetweenPointsRange() != null && !req.maxDistBetweenPointsRange().isEmpty()) {
+			error = filterByRange("m.max_dist_between_points", req.maxDistBetweenPointsRange(), params, conditions, "maxDistBetweenPoints");
+			if (error != null) {
+				return error;
+			}
+		}
+
+		if (req.timeMinutesRange() != null && !req.timeMinutesRange().isEmpty()) {
+			error = filterByRange("m.time_minutes", req.timeMinutesRange(), params, conditions, "time");
+			if (error != null) {
+				return error;
+			}
+		}
+
+		if (req.waypointsRange() != null && !req.waypointsRange().isEmpty()) {
+			error = filterByRange("m.waypoints", req.waypointsRange(), params, conditions, "waypoints");
 			if (error != null) {
 				return error;
 			}
@@ -195,7 +227,15 @@ public class OsmGpxController {
 				"MIN(CASE WHEN distance > 0 THEN distance END), " +
 				"MAX(CASE WHEN distance > 0 THEN distance END), " +
 				"MIN(CASE WHEN speed >= 0 THEN speed END), " +
-				"MAX(CASE WHEN speed >= 0 THEN speed END) " +
+				"MAX(CASE WHEN speed >= 0 THEN speed END), " +
+				"MIN(CASE WHEN max_speed >= 0 THEN max_speed END), " +
+				"MAX(CASE WHEN max_speed >= 0 THEN max_speed END), " +
+				"MIN(CASE WHEN max_dist_between_points >= 0 THEN max_dist_between_points END), " +
+				"MAX(CASE WHEN max_dist_between_points >= 0 THEN max_dist_between_points END), " +
+				"MIN(CASE WHEN time_minutes >= 0 THEN time_minutes END), " +
+				"MAX(CASE WHEN time_minutes >= 0 THEN time_minutes END), " +
+				"MIN(CASE WHEN waypoints >= 0 THEN waypoints END), " +
+				"MAX(CASE WHEN waypoints >= 0 THEN waypoints END) " +
 				"FROM " + GPX_METADATA_TABLE_NAME + " m WHERE 1 = 1 " + conditions;
 
 		Map<String, Integer> ranges = new LinkedHashMap<>();
@@ -212,6 +252,22 @@ public class OsmGpxController {
 			ranges.put("minSpeed", rs.wasNull() ? 0 : (int) minSpeed);
 			float maxSpeed = rs.getFloat(4);
 			ranges.put("maxSpeed", rs.wasNull() ? 0 : (int) maxSpeed);
+			float maxSpeedMin = rs.getFloat(5);
+			ranges.put("maxSpeedMin", rs.wasNull() ? 0 : (int) maxSpeedMin);
+			float maxSpeedMax = rs.getFloat(6);
+			ranges.put("maxSpeedMax", rs.wasNull() ? 0 : (int) maxSpeedMax);
+			float maxDistBetweenPointsMin = rs.getFloat(7);
+			ranges.put("maxDistBetweenPointsMin", rs.wasNull() ? 0 : (int) maxDistBetweenPointsMin);
+			float maxDistBetweenPointsMax = rs.getFloat(8);
+			ranges.put("maxDistBetweenPointsMax", rs.wasNull() ? 0 : (int) maxDistBetweenPointsMax);
+			int timeMinutesMin = rs.getInt(9);
+			ranges.put("timeMinutesMin", rs.wasNull() ? 0 : timeMinutesMin);
+			int timeMinutesMax = rs.getInt(10);
+			ranges.put("timeMinutesMax", rs.wasNull() ? 0 : timeMinutesMax);
+			int waypointsMin = rs.getInt(11);
+			ranges.put("waypointsMin", rs.wasNull() ? 0 : waypointsMin);
+			int waypointsMax = rs.getInt(12);
+			ranges.put("waypointsMax", rs.wasNull() ? 0 : waypointsMax);
 		});
 
 		return ResponseEntity.ok(gson.toJson(ranges));
