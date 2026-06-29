@@ -329,59 +329,57 @@ public class SearchService {
 //		QuadRect points = osmAndMapsService.points(null,
 //				new LatLon(ctx.lat + radius, ctx.lon - radius),
 //				new LatLon(ctx.lat - radius, ctx.lon + radius));
-        List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
-        try {
+		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
+		try {
 //			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsForSearch(points, ctx.baseSearch);
-            // OPTION B
-            List<OsmAndMapsService.BinaryMapIndexReaderReference> list =
-                    osmAndMapsService.getObfReadersForSpatialSearch(ctx.lat, ctx.lon);
-            if (list.isEmpty()) {
-                return response;
-            }
-            usedMapList = osmAndMapsService.getReaders(list, null);
-            if (usedMapList.isEmpty()) {
-                return response;
-            }
-            long startTime = System.currentTimeMillis();
-            SpatialSearchResults res;
-            // In future multiple spatialTextSearch & multiple osmand regions
-            SpatialSearchContext sscontext = new SpatialSearchContext(new SpatialTextSearchSettings(),
-                    usedMapList, new LatLon(ctx.lat, ctx.lon));
-            synchronized (spatialTextSearch) {
-                usedMapList.add(osmandRegions.getFile());
-                res = spatialTextSearch.searchAPI(ctx.text, sscontext);
-            }
-            long searchTime = System.currentTimeMillis() - startTime;
-            if (res.mainResults != null) {
-                for (SpatialSearchResult r : res.mainResults) {
-                    List<MapObject> objs = r.getObjects();
-                    if (!objs.isEmpty()) {
-                        Feature f = getSpatialFeature(objs.get(0), ctx.locale, timeZone);
-                        if (f != null) {
-                            f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(), matchedObjects(objs, ctx.locale));
-                            f.prop(PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
-                            response.features.add(f);
-                        }
-                    }
-                }
-            }
-            // extra info shown in the UI
-            response.info.put("timeAll", String.format("%.1f", (System.currentTimeMillis() - sTime) / 1e3));
-            response.info.put("atoms", String.format("%.2f, %,d", sscontext.getStats().stepAtoms / 1e9,
-                    sscontext.getStats().tokenObjs));
-            response.info.put("compute", String.format("%.2f, %,d", sscontext.getStats().stepCompute / 1e9,
-                    sscontext.getStats().maxCombinations));
-            response.info.put("results", response.features.size());
-            response.info.put("words-matched", res.combinations == null || res.combinations.size() == 0 ? 0
-                    : res.combinations.get(0).getTokenCount());
+			// OPTION B
+			List<OsmAndMapsService.BinaryMapIndexReaderReference> list =
+					osmAndMapsService.getObfReadersForSpatialSearch(ctx.lat, ctx.lon);
+			if (list.isEmpty()) {
+				return response;
+			}
+			usedMapList = osmAndMapsService.getReaders(list, null);
+			if (usedMapList.isEmpty()) {
+				return response;
+			}
+			SpatialSearchResults res;
+			// In future multiple spatialTextSearch & multiple osmand regions
+			SpatialSearchContext sscontext = new SpatialSearchContext(new SpatialTextSearchSettings(),
+					usedMapList, new LatLon(ctx.lat, ctx.lon));
+			synchronized (spatialTextSearch) {
+				usedMapList.add(osmandRegions.getFile());
+				res = spatialTextSearch.searchAPI(ctx.text, sscontext);
+			}
+			if (res.mainResults != null) {
+				for (SpatialSearchResult r : res.mainResults) {
+					List<MapObject> objs = r.getObjects();
+					if (!objs.isEmpty()) {
+						Feature f = getSpatialFeature(r.getLatLon(), objs.get(0), ctx.locale, timeZone);
+						if (f != null) {
+							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(), matchedObjects(objs, ctx.locale));
+							f.prop(PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
+							response.features.add(f);
+						}
+					}
+				}
+			}
+			// extra info shown in the UI
+			response.info.put("timeAll", String.format("%.1f", (System.currentTimeMillis() - sTime) / 1e3));
+			response.info.put("atoms", String.format("%.2f, %,d", sscontext.getStats().stepAtoms / 1e9,
+					sscontext.getStats().tokenObjs));
+			response.info.put("compute", String.format("%.2f, %,d", sscontext.getStats().stepCompute / 1e9,
+					sscontext.getStats().maxCombinations));
+			response.info.put("results", response.features.size());
+			response.info.put("words-matched", res.combinations == null || res.combinations.size() == 0 ? 0
+					: res.combinations.get(0).getTokenCount());
 //			response.info.put("x", res.combinations == null ? 0 : res.combinations.size());
-        } catch (RuntimeException e) {
-            LOGGER.error(String.format("Spatial search failed for '%s': %s", ctx.text, e), e);
-        } finally {
-            osmAndMapsService.unlockReaders(usedMapList);
-        }
-        return response;
-    }
+		} catch (RuntimeException e) {
+			LOGGER.error(String.format("Spatial search failed for '%s': %s", ctx.text, e), e);
+		} finally {
+			osmAndMapsService.unlockReaders(usedMapList);
+		}
+		return response;
+	}
 
 	private List<Map<String, Object>> matchedObjects(List<MapObject> objs, String locale) {
 		List<Map<String, Object>> matched = new ArrayList<>();
@@ -391,6 +389,7 @@ public class SearchService {
 			}
 			Map<String, Object> m = new LinkedHashMap<>();
 			m.put("name", o.getName(locale));
+			m.put("type", o.getClass().getSimpleName());
 			m.put("lat", o.getLocation().getLatitude());
 			m.put("lon", o.getLocation().getLongitude());
 			matched.add(m);
@@ -398,8 +397,8 @@ public class SearchService {
 		return matched;
 	}
 
-	private Feature getSpatialFeature(MapObject obj, String locale, String timeZone) {
-		if (obj == null || obj.getLocation() == null) {
+	private Feature getSpatialFeature(LatLon loc, MapObject obj, String locale, String timeZone) {
+		if (obj == null || loc == null) {
 			return null;
 		}
 		if (obj instanceof Amenity amenity) {
@@ -409,7 +408,7 @@ public class SearchService {
 		}
 		SearchResult result = new SearchResult();
 		result.object = obj;
-		result.location = obj.getLocation();
+		result.location = loc;
 		result.localeName = obj.getName(locale);
 		if (obj instanceof Street street) {
 			result.objectType = ObjectType.STREET;
@@ -417,6 +416,8 @@ public class SearchService {
 			if (city != null) {
 				result.localeRelatedObjectName = city.getName(locale);
 			}
+		} else if (obj instanceof Building) {
+			result.objectType = ObjectType.HOUSE;
 		} else if (obj instanceof City) {
 			result.objectType = ObjectType.CITY;
 		} else {
