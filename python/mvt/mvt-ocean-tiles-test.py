@@ -58,7 +58,7 @@ def tile_from_url(url):
 def vector_url(url, domain):
     z, x, y = tile_from_url(url)
     scheme, netloc = base_url(url, domain)
-    return urllib.parse.urlunparse((scheme, netloc, f"/vector/{z}/{x}/{y}.mvt", "", "", ""))
+    return urllib.parse.urlunparse((scheme, netloc, f"/vector/{z}/{x}/{y}.mvt", "", "cache=false", ""))
 
 
 def map_url(url, domain):

@@ -348,6 +348,16 @@ public class SearchService {
 			if (usedMapList.isEmpty()) {
 				return response;
 			}
+			LatLon coord = parseLocation(ctx.text, new LatLon(ctx.lat, ctx.lon));
+			if (coord != null) {
+				SearchResult sr = new SearchResult();
+				sr.object = coord;
+				sr.location = coord;
+				sr.objectType = ObjectType.LOCATION;
+				sr.localeName = ((float) coord.getLatitude()) + ", " + ((float) coord.getLongitude());
+				response.features.add(getFeature(sr, timeZone));
+				return response;
+			}
 			SpatialSearchResults res;
 			// In future multiple spatialTextSearch & multiple osmand regions
 			SpatialSearchContext sscontext = new SpatialSearchContext(new SpatialTextSearchSettings(),
@@ -371,9 +381,9 @@ public class SearchService {
 			}
 			// extra info shown in the UI
 			response.info.put("timeAll", String.format("%.1f", (System.currentTimeMillis() - sTime) / 1e3));
-			response.info.put("atoms", String.format("%.2f, %,d", sscontext.getStats().step1Atoms.ms(),
+			response.info.put("atoms", String.format("%.2f, %,d", sscontext.getStats().step1Atoms.ms() / 1000.0,
 					sscontext.getStats().tokenObjs));
-			response.info.put("compute", String.format("%.2f, %,d", sscontext.getStats().step2Compute.ms(),
+			response.info.put("compute", String.format("%.2f, %,d", sscontext.getStats().step2Compute.ms() / 1000.0,
 					sscontext.getStats().maxCombinations));
 			response.info.put("results", response.features.size());
 			response.info.put("words-matched", res.combinations == null || res.combinations.size() == 0 ? 0
@@ -460,9 +470,7 @@ public class SearchService {
                 return new SearchResults(Collections.emptyList());
             }
             SearchSettings settings = searchUICore.getPhrase().getSettings();
-            BinaryMapIndexReaderStats.SearchStat stat = new BinaryMapIndexReaderStats.SearchStat();
-            stat.isBatch = option.isBatch;
-	        settings.setStat(stat);
+	        settings.setStat(new BinaryMapIndexReaderStats.SearchStat());
 
 	        settings.setOfflineIndexes(usedMapList);
             settings.setRadiusLevel(SEARCH_RADIUS_LEVEL);

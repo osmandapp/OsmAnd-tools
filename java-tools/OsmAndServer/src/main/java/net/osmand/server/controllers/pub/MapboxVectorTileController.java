@@ -18,6 +18,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import net.osmand.server.api.services.OsmAndMapsService;
 
@@ -47,7 +48,8 @@ public class MapboxVectorTileController {
 	}
 
 	@RequestMapping(path = "/{z}/{x}/{y}.mvt", produces = MediaType.APPLICATION_PROTOBUF_VALUE)
-	public ResponseEntity<?> getTile(@PathVariable int z, @PathVariable int x, @PathVariable int y)
+	public ResponseEntity<?> getTile(@PathVariable int z, @PathVariable int x, @PathVariable int y,
+			@RequestParam(required = false, defaultValue = "true") boolean cache)
 			throws IOException {
 		if (!osmAndMapsService.validateAndInitConfig()) {
 			return errorConfig("Tile service is not initialized");
@@ -61,8 +63,10 @@ public class MapboxVectorTileController {
         // for testing
         //MapboxVectorTile tile = new MapboxVectorTile(config, x, y, z);
         tileMemoryCache.conditionalCleanupCache();
-		byte[] data = tile.getCacheRuntimeTile();
-        tile.touch();
+		byte[] data = cache ? tile.getCacheRuntimeTile() : null;
+		if (cache) {
+			tile.touch();
+		}
 
 		if (data == null) {
             data = getTileFromService(tile);
