@@ -69,7 +69,7 @@ public class GenerateMvtIcons {
 		System.out.println("""
 			Set 'repo_dir' env variable pointing to the OsmAnd repository root
 			Usage: generate-mvt-icons <output-folder> [--style=path-to-render.xml] [--shield-size=40]
-			--style path-to-render.xml by default repoDir + "/resources/rendering_styles/default.render.xml"
+			--style path-to-render.xml by default: $repo_dir + "/resources/rendering_styles/default.render.xml"
 			""");
 	}
 
