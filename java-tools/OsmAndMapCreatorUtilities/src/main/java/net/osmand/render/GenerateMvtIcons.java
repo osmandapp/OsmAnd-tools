@@ -6,9 +6,8 @@ import net.osmand.util.Algorithms;
 import java.io.File;
 import java.io.FileWriter;
 import java.nio.charset.StandardCharsets;
-import java.util.LinkedHashSet;
-import java.util.Objects;
-import java.util.Set;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 
 public class GenerateMvtIcons {
 
@@ -33,7 +32,7 @@ public class GenerateMvtIcons {
 		}
 
 		RenderingRulesStorage storage = RenderingRulesStorage.getTestStorageForStyle(styleFilePath);
-		Set<IconInfo> icons = new GenerateMvtIcons().extractAllIcons(storage);
+		Collection<IconInfo> icons = new GenerateMvtIcons().extractAllIcons(storage);
 		System.out.println("Total icons: " + icons.size());
 
 		File outDir = new File(outputFolder);
@@ -73,7 +72,7 @@ public class GenerateMvtIcons {
 			""");
 	}
 
-	private final Set<IconInfo> allIcons = new LinkedHashSet<>();
+	private final LinkedHashMap<String, IconInfo> allIcons = new LinkedHashMap<>();
 
 	public static class IconInfo {
 		public String tag;
@@ -83,35 +82,18 @@ public class GenerateMvtIcons {
 		public String source; // "POINT_RULES"
 
 		@Override
-		public boolean equals(Object o) {
-			if (this == o) {
-				return true;
-			}
-			if (!(o instanceof IconInfo)) {
-				return false;
-			}
-			IconInfo that = (IconInfo) o;
-			return Objects.equals(icon, that.icon);
-		}
-
-		@Override
-		public int hashCode() {
-			return Objects.hash(icon);
-		}
-
-		@Override
 		public String toString() {
 			return String.format("Tag: %s, Value: %s, Icon: %s, Shield: %s (Source: %s)",
 					tag, value, icon, shield, source);
 		}
 	}
 
-	public Set<IconInfo> extractAllIcons(RenderingRulesStorage storage) {
+	public Collection<IconInfo> extractAllIcons(RenderingRulesStorage storage) {
 		allIcons.clear();
 
 		extractFromRuleType(storage, RenderingRulesStorage.POINT_RULES, "POINT_RULES");
 
-		return allIcons;
+		return allIcons.values();
 	}
 
 	private void extractFromRuleType(RenderingRulesStorage storage, int ruleType, String source) {
@@ -136,8 +118,7 @@ public class GenerateMvtIcons {
 			iconInfo.tag = tag;
 			iconInfo.value = value;
 			iconInfo.source = source;
-			allIcons.remove(iconInfo);
-			allIcons.add(iconInfo);
+			allIcons.put(iconInfo.icon, iconInfo);
 		}
 
 		IconInfo current = iconInfo != null ? iconInfo : parent;
@@ -184,7 +165,7 @@ public class GenerateMvtIcons {
 				info.value = value;
 				info.icon = icon;
 				info.source = source + "/" + iconProp;
-				allIcons.add(info);
+				allIcons.put(icon, info);
 			}
 		}
 	}
