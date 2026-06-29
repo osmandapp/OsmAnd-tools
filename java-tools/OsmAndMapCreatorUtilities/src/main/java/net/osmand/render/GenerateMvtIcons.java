@@ -91,13 +91,12 @@ public class GenerateMvtIcons {
 				return false;
 			}
 			IconInfo that = (IconInfo) o;
-			return Objects.equals(icon, that.icon)
-					&& Objects.equals(shield, that.shield);
+			return Objects.equals(icon, that.icon);
 		}
 
 		@Override
 		public int hashCode() {
-			return Objects.hash(icon, shield);
+			return Objects.hash(icon);
 		}
 
 		@Override
@@ -137,6 +136,7 @@ public class GenerateMvtIcons {
 			iconInfo.tag = tag;
 			iconInfo.value = value;
 			iconInfo.source = source;
+			allIcons.remove(iconInfo);
 			allIcons.add(iconInfo);
 		}
 
