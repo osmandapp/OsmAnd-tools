@@ -80,7 +80,7 @@ public interface DetectorService extends OBFService {
 			}
 		}
 		return new ResultsWithStats(results, Collections.emptyList(), Collections.emptyMap(), totalTime,
-				spatialResponse.ctx() == null ? null : spatialResponse.ctx().getStats(), spatialCombinations(spatialResponse));
+				spatialResponse.stats(), spatialCombinations(spatialResponse));
 	}
 
 	private List<String> spatialCombinations(SearchService.SpatialResults spatialResponse) {

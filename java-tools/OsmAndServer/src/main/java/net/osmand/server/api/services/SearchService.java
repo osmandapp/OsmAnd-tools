@@ -286,7 +286,7 @@ public class SearchService {
 		public Map<String, Object> info = new LinkedHashMap<>();
 	}
 
-    public record SpatialResults(SpatialSearchResults results, SpatialSearchContext ctx) {}
+    public record SpatialResults(SpatialSearchResults results, SpatialSearchContext.SpatialSearchStats stats) {}
     
 	// dev-only: new prototype search using SpatialTextSearch.
 	public SpatialResults searchSpatial(SearchContext ctx) throws IOException {
@@ -309,7 +309,14 @@ public class SearchService {
 			SpatialTextSearch search = new SpatialTextSearch();
 			SpatialSearchContext sscontext = new SpatialSearchContext(new SpatialTextSearchSettings(),
 					usedMapList, new LatLon(ctx.lat, ctx.lon));
-			res = new SpatialResults(search.searchAPI(ctx.text, sscontext), sscontext);
+            SpatialSearchContext.SpatialSearchStats stats = sscontext.getStats();
+            stats.printLogs = false;
+
+            stats.requestTime.start();
+            SpatialSearchResults results = search.searchAPI(ctx.text, sscontext);
+            stats.requestTime.finish();
+            
+			res = new SpatialResults(results, stats);
 		} catch (RuntimeException e) {
 			LOGGER.error(String.format("Spatial search failed for '%s': %s", ctx.text, e), e);
 		} finally {
@@ -364,9 +371,9 @@ public class SearchService {
 			}
 			// extra info shown in the UI
 			response.info.put("timeAll", String.format("%.1f", (System.currentTimeMillis() - sTime) / 1e3));
-			response.info.put("atoms", String.format("%.2f, %,d", sscontext.getStats().stepAtoms / 1e9,
+			response.info.put("atoms", String.format("%.2f, %,d", sscontext.getStats().step1Atoms.ms(),
 					sscontext.getStats().tokenObjs));
-			response.info.put("compute", String.format("%.2f, %,d", sscontext.getStats().step2Compute / 1e9,
+			response.info.put("compute", String.format("%.2f, %,d", sscontext.getStats().step2Compute.ms(),
 					sscontext.getStats().maxCombinations));
 			response.info.put("results", response.features.size());
 			response.info.put("words-matched", res.combinations == null || res.combinations.size() == 0 ? 0

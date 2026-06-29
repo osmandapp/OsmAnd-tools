@@ -362,79 +362,66 @@ public interface ReportService {
 					}
 				} else {
 					String spatialStatsSql = """
-					SELECT 'total' AS sub_api,
+					SELECT 'Atoms' AS api, '' AS sub_api, 'all' AS map_name,
 						SUM(COALESCE(%s, 0)) AS time, 0 AS count
 					FROM run_result, run WHERE run.id = run_id AND run_id = ?
 					UNION ALL
-					SELECT 'stepAtomsTime' AS sub_api,
+					SELECT 'Atoms' AS api, 'FileAtoms' AS sub_api, 'all' AS map_name,
 						SUM(COALESCE(%s, 0)) AS time, 0 AS count
 					FROM run_result, run WHERE run.id = run_id AND run_id = ?
 					UNION ALL
-					SELECT 'fileAtomsTime' AS sub_api,
+					SELECT 'Atoms' AS api, 'Match' AS sub_api, 'all' AS map_name,
 						SUM(COALESCE(%s, 0)) AS time, 0 AS count
 					FROM run_result, run WHERE run.id = run_id AND run_id = ?
 					UNION ALL
-					SELECT 'matchTime' AS sub_api,
+					SELECT 'Compute' AS api, '' AS sub_api, 'all' AS map_name,
 						SUM(COALESCE(%s, 0)) AS time, 0 AS count
 					FROM run_result, run WHERE run.id = run_id AND run_id = ?
 					UNION ALL
-					SELECT 'stepComputeTime' AS sub_api,
+					SELECT 'Compute' AS api, 'LoadObjects' AS sub_api, 'all' AS map_name,
 						SUM(COALESCE(%s, 0)) AS time, 0 AS count
 					FROM run_result, run WHERE run.id = run_id AND run_id = ?
 					UNION ALL
-					SELECT 'loadObjectsBldTime' AS sub_api,
+					SELECT 'Compute' AS api, 'ReadObjects' AS sub_api, 'all' AS map_name,
 						SUM(COALESCE(%s, 0)) AS time, 0 AS count
 					FROM run_result, run WHERE run.id = run_id AND run_id = ?
 					UNION ALL
-					SELECT 'readObjTime' AS sub_api,
-						SUM(COALESCE(%s, 0)) AS time, 0 AS count
-					FROM run_result, run WHERE run.id = run_id AND run_id = ?
-					UNION ALL
-					SELECT 'stepSortTime' AS sub_api,
-						SUM(COALESCE(%s, 0)) AS time, 0 AS count
-					FROM run_result, run WHERE run.id = run_id AND run_id = ?
-					UNION ALL
-					SELECT 'maxCombinations' AS sub_api,
+					SELECT 'Compute' AS api, 'MaxCombinations' AS sub_api, 'all' AS map_name,
 						0 AS time, SUM(COALESCE(%s, 0)) AS count
 					FROM run_result, run WHERE run.id = run_id AND run_id = ?
 					UNION ALL
-					SELECT 'tokenObjs' AS sub_api,
+					SELECT 'Compute' AS api, 'TokenObjects' AS sub_api, 'all' AS map_name,
 						0 AS time, SUM(COALESCE(%s, 0)) AS count
 					FROM run_result, run WHERE run.id = run_id AND run_id = ?
 					UNION ALL
-					SELECT 'matchedTokens' AS sub_api,
-						0 AS time, SUM(COALESCE(%s, 0)) AS count
-					FROM run_result, run WHERE run.id = run_id AND run_id = ?
-					UNION ALL
-					SELECT 'visibleLevel' AS sub_api,
-						0 AS time, SUM(COALESCE(%s, 0)) AS count
+					SELECT 'Sort' AS api, '' AS sub_api, 'all' AS map_name,
+						SUM(COALESCE(%s, 0)) AS time, 0 AS count
 					FROM run_result, run WHERE run.id = run_id AND run_id = ?
 					ORDER BY time DESC, count DESC""".formatted(
-						jsonExtractSafe("$.spatial_total_time"),
-						jsonExtractSafe("$.spatial_step_atoms_time"),
+						jsonExtractSafe("$.spatial_step1_atoms_time"),
 						jsonExtractSafe("$.spatial_file_atoms_time"),
 						jsonExtractSafe("$.spatial_match_time"),
-						jsonExtractSafe("$.spatial_step_compute_time"),
+						jsonExtractSafe("$.spatial_step2_compute_time"),
 						jsonExtractSafe("$.spatial_load_objects_bld_time"),
 						jsonExtractSafe("$.spatial_read_obj_time"),
-						jsonExtractSafe("$.spatial_step_sort_time"),
 						jsonExtractSafe("$.spatial_max_combinations"),
 						jsonExtractSafe("$.spatial_tokens_obj"),
-						jsonExtractSafe("$.spatial_matched_tokens"),
-						jsonExtractSafe("$.spatial_visible_level"));
-					List<Object> spatialParams = Collections.nCopies(12, runId);
+						jsonExtractSafe("$.spatial_step3_sort_time"));
+					List<Object> spatialParams = Collections.nCopies(9, runId);
 					List<Map<String, Object>> spatialStatsRows = getJdbcTemplate().queryForList(spatialStatsSql, spatialParams.toArray());
-					String api = "SPATIAL";
 					for (Map<String, Object> row : spatialStatsRows) {
+						String api = row.get("api") == null ? "" : row.get("api").toString();
 						String subApi = row.get("sub_api") == null ? "" : row.get("sub_api").toString();
+						String mapName = row.get("map_name") == null ? "" : row.get("map_name").toString();
 						Number ssTime = (Number) row.get("time");
 						Number ssCount = (Number) row.get("count");
 						long time = ssTime == null ? 0 : ssTime.longValue();
 						long count = ssCount == null ? 0 : ssCount.longValue();
-						if (subApi.isEmpty() || (time == 0 && count == 0)) {
+						if (api.isEmpty() || mapName.isEmpty() || (time == 0 && count == 0)) {
 							continue;
 						}
-						subStats.put(api + '|' + subApi, new long[] { time, count, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 });
+						subStats.put(api + '|' + subApi + '|' + mapName,
+								new long[] { time, count, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 });
 					}
 				}
 			} else {

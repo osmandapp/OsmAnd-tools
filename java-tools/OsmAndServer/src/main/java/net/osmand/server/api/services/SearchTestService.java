@@ -496,20 +496,22 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 		if (spatialResult == null || spatialResult.results() == null) {
 			return new SearchService.SearchResults(results);
 		}
-		SpatialSearchContext ssContext = spatialResult.ctx();
-		if (ssContext != null && ssContext.getStats() != null) {
-			SpatialSearchContext.SpatialSearchStats stats = ssContext.getStats();
-			row.put("spatial_step_atoms_time", stats.stepAtoms);
-			row.put("spatial_step_compute_time", stats.stepCompute);
-			row.put("spatial_step_sort_time", stats.stepSort);
-			row.put("spatial_load_objects_bld_time", stats.loadObjectsBld);
-			row.put("spatial_read_obj_time", stats.readObjTime);
-			row.put("spatial_match_time", stats.matchTime);
-			row.put("spatial_file_atoms_time", stats.fileAtomsTime);
-			row.put("spatial_total_time", stats.time);
-			row.put("spatial_max_combinations", stats.maxCombinations);
-			row.put("spatial_tokens_obj", stats.tokenObjs);
-		}
+
+		SpatialSearchContext.SpatialSearchStats stats = spatialResult.stats();
+		row.put("stat_time", stats.requestTime.time);
+		
+		row.put("spatial_step1_atoms_time", stats.step1Atoms.time);
+		row.put("spatial_match_time", stats.sub1MatchTime.time);
+		row.put("spatial_file_atoms_time", stats.sub1FileAtomsTime.time);
+		
+		row.put("spatial_step2_compute_time", stats.step2Compute.time);
+		row.put("spatial_load_objects_bld_time", stats.sub2LoadObjectsBldTime.time);
+		row.put("spatial_read_obj_time", stats.sub2ReadObjTime.time);
+		row.put("spatial_max_combinations", stats.maxCombinations);
+		row.put("spatial_tokens_obj", stats.tokenObjs);
+
+		row.put("spatial_step3_sort_time", stats.step3Sort.time);
+
 		List<SpatialSearchResult> spatialResults = spatialResult.results().mainResults;
 		if (spatialResults == null) {
 			return new SearchService.SearchResults(results);
