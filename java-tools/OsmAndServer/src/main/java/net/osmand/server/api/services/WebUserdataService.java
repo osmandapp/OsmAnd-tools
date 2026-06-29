@@ -86,8 +86,20 @@ public class WebUserdataService {
 	public static final String INFO_FILE_EXT = ".info";
 	public static final String INFO_FILE_SUFFIX = GPX_FILE_EXT + INFO_FILE_EXT;
 
-	private static final String ERROR_DETAILS = "error";
+	public static final String ERROR_DETAILS = "error";
 	private static final long ERROR_LIFETIME = 31 * 86400000L; // 1 month
+
+	public enum FileError {
+		LOAD_GPX("load-gpx-error"),
+		CORRUPTED_GPX("corrupted-gpx-file"),
+		INPUT_STREAM("input-stream-error");
+
+		public final String id;
+
+		FileError(String id) {
+			this.id = id;
+		}
+	}
 
 	private static final long ANALYSIS_RERUN = 1776076777000L; // 13-04-2026
 
@@ -276,11 +288,11 @@ public class WebUserdataService {
 					     Source source = new Buffer().readFrom(gzipIn)) {
 						gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
 					} catch (IOException e) {
-						logAndSaveError("load-gpx-error " + e.getMessage(), uf, nd, result);
+						logAndSaveError(FileError.LOAD_GPX.id + " " + e.getMessage(), uf, nd, result);
 						continue;
 					}
 					if (gpxFile.getError() != null) {
-						logAndSaveError("corrupted-gpx-file " + gpxFile.getError().getMessage(), uf, nd, result);
+						logAndSaveError(FileError.CORRUPTED_GPX.id + " " + gpxFile.getError().getMessage(), uf, nd, result);
 						continue;
 					}
 					if (isTrack) {
@@ -293,7 +305,7 @@ public class WebUserdataService {
 					nd.details = detailsForResponse(uf.details);
 					result.add(nd);
 				} catch (IOException e) {
-					logAndSaveError("input-stream-error " + e.getMessage(), uf, nd, result);
+					logAndSaveError(FileError.INPUT_STREAM.id + " " + e.getMessage(), uf, nd, result);
 				}
 			}
 		}
@@ -330,7 +342,7 @@ public class WebUserdataService {
 	private void processInfoFile(InputStream in, CloudUserFilesRepository.UserFile uf,
 	                             CloudUserFilesRepository.UserFileNoData nd,
 	                             List<CloudUserFilesRepository.UserFileNoData> result) {
-		JsonElement infoDetails = getInfoDetails(in);
+		JsonElement infoDetails = getInfoDetails(in, uf);
 		if (infoDetails != null) {
 			if (uf.details == null) {
 				uf.details = new JsonObject();
@@ -368,12 +380,13 @@ public class WebUserdataService {
 		return response;
 	}
 
-	public JsonElement getInfoDetails(InputStream inputStream) {
+	public JsonElement getInfoDetails(InputStream inputStream, CloudUserFilesRepository.UserFile uf) {
 		try (InputStream is = new GZIPInputStream(inputStream);
 		     Reader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
-			return gson.fromJson(reader, JsonElement.class);
+			return gsonWithNans.fromJson(reader, JsonElement.class);
 		} catch (Exception e) {
-			LOG.warn("Failed to parse .info details JSON", e);
+			LOG.warn(String.format(
+					"Failed to parse .info details JSON userid=%d %s error (%s) ", uf.userid, uf.name, e.getMessage()));
 			return null;
 		}
 	}

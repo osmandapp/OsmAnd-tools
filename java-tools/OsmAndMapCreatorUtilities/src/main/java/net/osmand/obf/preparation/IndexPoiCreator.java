@@ -731,9 +731,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					int x24shift = (x31 >> 7) - (x << (24 - z));
 					int y24shift = (y31 >> 7) - (y << (24 - z));
 					int precisionXY = MapUtils.calculateFromBaseZoomPrecisionXY(24, 27, (x31 >> 4), (y31 >> 4));
-					if (poi.id > ObfConstants.PROPAGATE_NODE_BIT) {
-						continue;
-					}
 					writer.writePoiDataAtom(poi.id, x24shift, y24shift, type, subtype, poi.additionalTags,
 							globalCategories, settings.poiZipLongStrings ? settings.poiZipStringLimit : -1, precisionXY, poi.tagGroups);
 				}
@@ -758,8 +755,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					if (Algorithms.isEmpty(tagGroupIds)) {
 						tagGroupIds = parseTaggroups(rset.getString(6));
 					}
+					// ! Name index could reference
 					if (id > ObfConstants.PROPAGATE_NODE_BIT) {
-						continue;
+						throw new UnsupportedOperationException();
 					}
 					writer.writePoiDataAtom(id, x24shift, y24shift, type, subtype,
 							decodeAdditionalInfo(rset.getString(6), mp), globalCategories,
@@ -1078,6 +1076,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				poiData.type = type;
 				poiData.subtype = subtype;
 				poiData.id = rs.getLong(5);
+				if (poiData.id > ObfConstants.PROPAGATE_NODE_BIT) {
+					continue;
+				}
 				poiData.additionalTags.putAll(additionalTags);
 				poiData.tagGroups.addAll(tagGroupIds);
 				prevTree.getNode().poiData.add(poiData);

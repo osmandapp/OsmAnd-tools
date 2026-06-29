@@ -1,27 +1,39 @@
 package net.osmand.server.api.services;
 
-import net.osmand.PlatformUtil;
-import net.osmand.ResultMatcher;
-import net.osmand.binary.*;
-import net.osmand.binary.BinaryMapIndexReader.SearchPoiTypeFilter;
-import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
-import net.osmand.data.*;
-import net.osmand.data.City.CityType;
-import net.osmand.map.OsmandRegions;
-import net.osmand.osm.*;
-import net.osmand.osm.edit.Entity;
-import net.osmand.search.SearchUICore;
-import net.osmand.search.core.*;
-import net.osmand.search.core.spatial.SpatialSearchContext;
-import net.osmand.search.core.spatial.SpatialSearchResult;
-import net.osmand.search.core.spatial.SpatialTextSearch;
-import net.osmand.search.core.spatial.SpatialTextSearch.SpatialSearchResults;
-import net.osmand.server.utils.MapPoiTypesTranslator;
-import net.osmand.util.Algorithms;
-import net.osmand.util.LocationParser;
-import net.osmand.util.MapUtils;
+import static net.osmand.binary.BinaryMapIndexReader.SearchRequest.ZOOM_TO_SEARCH_POI;
+import static net.osmand.data.Amenity.OPENING_HOURS;
+import static net.osmand.data.MapObject.unzipContent;
+import static net.osmand.gpx.GPXUtilities.AMENITY_PREFIX;
+import static net.osmand.search.SearchUICore.createAddressString;
+import static net.osmand.search.SearchUICore.getDominatedCity;
+import static net.osmand.search.SearchUICore.getMainCityName;
+import static net.osmand.shared.gpx.GpxUtilities.OSM_PREFIX;
+import static net.osmand.util.LocationParser.parseOpenLocationCode;
+import static net.osmand.util.OpeningHoursParser.parseOpenedHours;
 
-import net.osmand.util.TextDirectionUtil;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.StringJoiner;
+import java.util.TimeZone;
+import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.jetbrains.annotations.Nullable;
@@ -32,24 +44,53 @@ import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlPullParserFactory;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import static net.osmand.binary.BinaryMapIndexReader.SearchRequest.ZOOM_TO_SEARCH_POI;
-import static net.osmand.data.Amenity.OPENING_HOURS;
-import static net.osmand.data.MapObject.unzipContent;
-import static net.osmand.gpx.GPXUtilities.AMENITY_PREFIX;
-import static net.osmand.search.SearchUICore.*;
-import static net.osmand.server.controllers.pub.GeojsonClasses.*;
-import static net.osmand.shared.gpx.GpxUtilities.OSM_PREFIX;
-import static net.osmand.util.LocationParser.parseOpenLocationCode;
-import static net.osmand.util.OpeningHoursParser.*;
-import static net.osmand.util.OpeningHoursParser.parseOpenedHours;
+import net.osmand.PlatformUtil;
+import net.osmand.ResultMatcher;
+import net.osmand.binary.BinaryIndexPart;
+import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.BinaryMapIndexReader.SearchPoiTypeFilter;
+import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
+import net.osmand.binary.BinaryMapIndexReaderStats;
+import net.osmand.binary.BinaryMapPoiReaderAdapter;
+import net.osmand.binary.GeocodingUtilities;
+import net.osmand.binary.ObfConstants;
+import net.osmand.data.Amenity;
+import net.osmand.data.Building;
+import net.osmand.data.City;
+import net.osmand.data.City.CityType;
+import net.osmand.data.LatLon;
+import net.osmand.data.MapObject;
+import net.osmand.data.QuadRect;
+import net.osmand.data.Street;
+import net.osmand.map.OsmandRegions;
+import net.osmand.osm.AbstractPoiType;
+import net.osmand.osm.MapPoiTypes;
+import net.osmand.osm.PoiCategory;
+import net.osmand.osm.PoiFilter;
+import net.osmand.osm.PoiType;
+import net.osmand.osm.edit.Entity;
+import net.osmand.search.SearchUICore;
+import net.osmand.search.core.ObjectType;
+import net.osmand.search.core.SearchCoreFactory;
+import net.osmand.search.core.SearchExportSettings;
+import net.osmand.search.core.SearchPhrase;
+import net.osmand.search.core.SearchResult;
+import net.osmand.search.core.SearchSettings;
+import net.osmand.search.core.TopIndexFilter;
+import net.osmand.search.core.spatial.SpatialSearchContext;
+import net.osmand.search.core.spatial.SpatialSearchResult;
+import net.osmand.search.core.spatial.SpatialTextSearch;
+import net.osmand.search.core.spatial.SpatialTextSearch.SpatialSearchResults;
+import net.osmand.search.core.spatial.SpatialTextSearch.SpatialTextSearchSettings;
+import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
+import net.osmand.server.controllers.pub.GeojsonClasses.FeatureCollection;
+import net.osmand.server.controllers.pub.GeojsonClasses.Geometry;
+import net.osmand.server.utils.MapPoiTypesTranslator;
+import net.osmand.util.Algorithms;
+import net.osmand.util.LocationParser;
+import net.osmand.util.MapUtils;
+import net.osmand.util.OpeningHoursParser.OpeningHours;
+import net.osmand.util.TextDirectionUtil;
 
 @Service
 public class SearchService {
@@ -239,49 +280,92 @@ public class SearchService {
 		return !features.isEmpty() ? features : Collections.emptyList();
 	}
 
+	public static class SpatialResponse {
+		public List<Feature> features = new ArrayList<>();
+		public Map<String, Object> info = new LinkedHashMap<>();
+	}
+
 	// dev-only: new prototype search using SpatialTextSearch.
-	public List<Feature> searchSpatial(SearchContext ctx, String timeZone) throws IOException {
+	public SpatialResponse searchSpatial(SearchContext ctx, String timeZone) throws IOException {
+		long sTime = System.currentTimeMillis();
+		SpatialResponse response = new SpatialResponse();
 		if (!osmAndMapsService.validateAndInitConfig()) {
-			return Collections.emptyList();
+			return response;
 		}
-		double radius = SearchOption.SEARCH_RADIUS_DEGREE;
-		QuadRect points = osmAndMapsService.points(null,
-				new LatLon(ctx.lat + radius, ctx.lon - radius),
-				new LatLon(ctx.lat - radius, ctx.lon + radius));
+//		double radius = SearchOption.SEARCH_RADIUS_DEGREE;
+//		QuadRect points = osmAndMapsService.points(null,
+//				new LatLon(ctx.lat + radius, ctx.lon - radius),
+//				new LatLon(ctx.lat - radius, ctx.lon + radius));
 		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
 		try {
-			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsForSearch(points, ctx.baseSearch);
+//			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsForSearch(points, ctx.baseSearch);
+			// OPTION B
+			List<OsmAndMapsService.BinaryMapIndexReaderReference> list =
+					osmAndMapsService.getObfReadersForSpatialSearch(ctx.lat, ctx.lon);
 			if (list.isEmpty()) {
-				return Collections.emptyList();
+				return response;
 			}
 			usedMapList = osmAndMapsService.getReaders(list, null);
 			if (usedMapList.isEmpty()) {
-				return Collections.emptyList();
+				return response;
 			}
-			SpatialSearchResults res = spatialTextSearch.searchAPI(ctx.text, new SpatialSearchContext(usedMapList));
-			List<Feature> features = new ArrayList<>();
-			if (res.mainResult != null) {
-				for (SpatialSearchResult r : res.mainResult.getResult()) {
+			SpatialSearchResults res;
+			// In future multiple spatialTextSearch & multiple osmand regions
+			SpatialSearchContext sscontext = new SpatialSearchContext(new SpatialTextSearchSettings(),
+					usedMapList, new LatLon(ctx.lat, ctx.lon));
+			synchronized (spatialTextSearch) {
+				usedMapList.add(osmandRegions.getFile());
+				res = spatialTextSearch.searchAPI(ctx.text, sscontext);
+			}
+			if (res.mainResults != null) {
+				for (SpatialSearchResult r : res.mainResults) {
 					List<MapObject> objs = r.getObjects();
 					if (!objs.isEmpty()) {
-						Feature f = getSpatialFeature(objs.get(0), ctx.locale, timeZone);
+						Feature f = getSpatialFeature(r.getLatLon(), objs.get(0), ctx.locale, timeZone);
 						if (f != null) {
-							features.add(f);
+							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(), matchedObjects(objs, ctx.locale));
+							f.prop(PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
+							response.features.add(f);
 						}
 					}
 				}
 			}
-			return features;
+			// extra info shown in the UI
+			response.info.put("timeAll", String.format("%.1f", (System.currentTimeMillis() - sTime) / 1e3));
+			response.info.put("atoms", String.format("%.2f, %,d", sscontext.getStats().stepAtoms / 1e9,
+					sscontext.getStats().tokenObjs));
+			response.info.put("compute", String.format("%.2f, %,d", sscontext.getStats().stepCompute / 1e9,
+					sscontext.getStats().maxCombinations));
+			response.info.put("results", response.features.size());
+			response.info.put("words-matched", res.combinations == null || res.combinations.size() == 0 ? 0
+					: res.combinations.get(0).getTokenCount());
+//			response.info.put("x", res.combinations == null ? 0 : res.combinations.size());
 		} catch (RuntimeException e) {
-			LOGGER.warn(String.format("Spatial search failed for '%s' (incompatible maps?): %s", ctx.text, e), e);
-			return Collections.emptyList();
+			LOGGER.error(String.format("Spatial search failed for '%s': %s", ctx.text, e), e);
 		} finally {
 			osmAndMapsService.unlockReaders(usedMapList);
 		}
+		return response;
 	}
 
-	private Feature getSpatialFeature(MapObject obj, String locale, String timeZone) {
-		if (obj == null || obj.getLocation() == null) {
+	private List<Map<String, Object>> matchedObjects(List<MapObject> objs, String locale) {
+		List<Map<String, Object>> matched = new ArrayList<>();
+		for (MapObject o : objs) {
+			if (o.getLocation() == null) {
+				continue;
+			}
+			Map<String, Object> m = new LinkedHashMap<>();
+			m.put("name", o.getName(locale));
+			m.put("type", o.getClass().getSimpleName());
+			m.put("lat", o.getLocation().getLatitude());
+			m.put("lon", o.getLocation().getLongitude());
+			matched.add(m);
+		}
+		return matched;
+	}
+
+	private Feature getSpatialFeature(LatLon loc, MapObject obj, String locale, String timeZone) {
+		if (obj == null || loc == null) {
 			return null;
 		}
 		if (obj instanceof Amenity amenity) {
@@ -291,7 +375,7 @@ public class SearchService {
 		}
 		SearchResult result = new SearchResult();
 		result.object = obj;
-		result.location = obj.getLocation();
+		result.location = loc;
 		result.localeName = obj.getName(locale);
 		if (obj instanceof Street street) {
 			result.objectType = ObjectType.STREET;
@@ -299,6 +383,8 @@ public class SearchService {
 			if (city != null) {
 				result.localeRelatedObjectName = city.getName(locale);
 			}
+		} else if (obj instanceof Building) {
+			result.objectType = ObjectType.HOUSE;
 		} else if (obj instanceof City) {
 			result.objectType = ObjectType.CITY;
 		} else {
@@ -1199,7 +1285,10 @@ public class SearchService {
         POI_TYPE("web_poi_type"),
         POI_SUBTYPE("web_poi_subType"),
         POI_OSM_URL("web_poi_osmUrl"),
-        CITY("web_city");
+        CITY("web_city"),
+        // names of all objects matched in a spatial-search result (street, city, ...)
+        MATCHED_OBJECTS("web_matched_objects"), 
+        VISIBLE_LEVEL("web_visible_level");
 
         private final String fieldName;
 

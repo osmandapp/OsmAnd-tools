@@ -27,12 +27,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -635,88 +631,5 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 		double roundedLon = BigDecimal.valueOf(sumLon /
 				rows.size()).setScale(7, RoundingMode.HALF_UP).doubleValue();
 		return new LatLon(roundedLat, roundedLon);
-	}
-
-	public static void main(String[] args) {
-		InspectorService svc = new SearchTestService(null);
-		
-		String mapDir = System.getenv("MAP_DIR");
-		if (mapDir == null || mapDir.trim().isEmpty()) {
-			System.err.println("MAP_DIR env is required");
-			return;
-		}
-		String fieldPathEnv = System.getenv("FIELD_PATH");
-		String fieldName = System.getenv("FIELD_NAME");
-		String filter = System.getenv("MAP_FILTER");
-        if (filter != null)
-            filter = filter.toLowerCase(Locale.ROOT);
-		String fieldPath = fieldPathEnv == null || fieldPathEnv.trim().isEmpty() ? null : fieldPathEnv.trim();
-		String statsFieldPath;
-		if (fieldPath == null) {
-			statsFieldPath = fieldName == null || fieldName.trim().isEmpty() ? null : fieldName.trim();
-		} else if (fieldName == null || fieldName.trim().isEmpty()) {
-			statsFieldPath = fieldPath;
-		} else {
-			statsFieldPath = fieldPath + "." + fieldName.trim();
-		}
-		String jsonFieldPath;
-		if (fieldPath == null) {
-			jsonFieldPath = (fieldName == null || fieldName.trim().isEmpty()) ? null : fieldName.trim();
-		} else if (fieldName == null || fieldName.trim().isEmpty()) {
-			jsonFieldPath = fieldPath;
-		} else {
-			jsonFieldPath = fieldPath + "." + fieldName.trim();
-		}
-		
-		Path root = Path.of(mapDir);
-		if (!Files.exists(root)) {
-			System.err.println("MAP_DIR doesn't exist: " + root);
-			return;
-		}
-
-		List<Path> obfFiles = new ArrayList<>();
-		try {
-			try (java.util.stream.Stream<Path> s = Files.walk(root)) {
-				s.filter(p -> Files.isRegularFile(p) && p.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".obf"))
-						.forEach(obfFiles::add);
-			}
-		} catch (IOException e) {
-			System.err.println("Failed to list OBF files in MAP_DIR: " + e.getMessage());
-			return;
-		}
-
-		obfFiles.sort(Comparator.comparing(p -> p.toString().toLowerCase(Locale.ROOT)));
-		System.out.println("MAP_DIR=" + root.toAbsolutePath());
-		System.out.println("MAP_FILTER=" + (filter == null ? "" : filter));
-		System.out.println("FIELD_PATH=" + (statsFieldPath == null ? "" : statsFieldPath));
-        System.out.println("OBFs count:" + obfFiles.size());
-
-		long totalSize = 0;
-		for (Path p : obfFiles) {
-			String obfName = p.getFileName().toString().toLowerCase(Locale.ROOT);
-			if (filter != null && !obfName.startsWith(filter))
-				continue;
-
-			try {
-				String obf = p.toAbsolutePath().toString();
-				Map<String, long[]> m = svc.getSectionSizes(obf, statsFieldPath);
-				long[] s = m == null || statsFieldPath == null ? null : m.get(statsFieldPath);
-				long sum = s == null ? 0 : s[0];
-				totalSize += sum;
-				System.out.println(obf + ", " + sum);
-
-				String json = svc.getSectionJson(obf, jsonFieldPath);
-				String obfBaseName = obfName.endsWith(".obf")
-						? obfName.substring(0, obfName.length() - 4)
-						: obfName;
-
-				Path jsonOutPath = root.resolve(obfBaseName + ".json");
-				Files.writeString(jsonOutPath, json, StandardCharsets.UTF_8);
-				System.out.println("JSON file: " + jsonOutPath);
-			} catch (Exception e) {
-				System.err.println(obfName + "\tERROR\t" + (e.getMessage() == null ? e.toString() : e.getMessage()));
-			}
-		}
-		System.out.println("TOTAL: " + totalSize);
 	}
 }

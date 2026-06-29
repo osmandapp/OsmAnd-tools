@@ -99,33 +99,25 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-					"-vpoi", // "-vpoiobjects",
+//					"-vpoi", //"-vpoiobjects",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vsearchinspect", // "-vsearchglobalonly", // "-vprefix=hh" // search index extended anlays 
 					"-vaddress",   
-//					"-vcities", "-vstreetgroups", "-vcitynames",
-//					"-vstreets", //  "-vbuildings",// "-vintersections",
+					"-vcities", "-vstreetgroups", //"-vcitynames",
+					"-vstreets", //"-vbuildings",  "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
 					// road
-//					"-latlon=40.755934,-73.986425,0.005",
+					"-latlon=40.775,-111.9194,0.1",
 //					"-latlon=48.804242,9.215574,0.005",
-
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
 //					System.getProperty("maps.dir") + "Map.obf",
-//					System.getProperty("maps.dir") + "Germany_bayern_lower-franconia_europe_2.obf",
-//					System.getProperty("maps.dir") + "Germany_bayern_lower-bavaria_europe_2.obf",
-//					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_tubingen_europe_2.obf",
-//					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_karlsruhe_europe_2.obf",
-					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_freiburg_europe_2.obf",
-//					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_stuttgart_europe_2.obf",
-//					System.getProperty("maps.dir") + "Liechtenstein_europe.obf",
-//					System.getProperty("maps.dir") + "regions.ocbf",
+					System.getProperty("maps.dir") + "Us_utah_northamerica_2.obf",
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
@@ -992,7 +984,8 @@ public class BinaryInspector {
 					final List<Street> intersections = t.getIntersectedStreets();
 
 					String streetName = MessageFormat.format("\t\t\t''{0}'' [{1,number,#}], {2,number,#} building(s), {3,number,#} intersections(s)",
-							new Object[]{ t.getName(verbose.lang) + " " + t.getNamesMap(true).toString(), t.getId(), buildings.size(), intersections.size()});
+							new Object[]{ t.getName(verbose.lang) + " " + t.getNamesMap(true).toString(), ObfConstants.getOsmIdFromMapObjectId(t.getId()),
+									buildings.size(), intersections.size()});
 					if (verbose.vsearchinspect) {
 						verbose.searchStats.analyze(t.getName() + " " + c.getName(), t, c);
 						for (Building b : buildings) {
@@ -1023,7 +1016,8 @@ public class BinaryInspector {
 	
 	private void printAdddrIndexStats(BinaryMapIndexReader index, AddressRegion region) throws IOException {
 		AddressStats as = vInfo.addressStats;
-		NameIndexReader fullNameIndex = index.readFullNameIndex(new NameIndexReader(region), null);
+		NameIndexReader fullNameIndex = new NameIndexReader(region);
+		index.readFullNameIndex(fullNameIndex);
 		fullNameIndex.setSuffixesStat(as.suffixesStat);
 		fullNameIndex.setBoundariesStat(as.bndsStat);
 		fullNameIndex.setStreetsStat(as.streetsStat);
@@ -1736,7 +1730,9 @@ public class BinaryInspector {
 			ValueFreq.mergeArray(singleValues, s.singleValues);
 			ValueFreq.mergeArray(categories, s.categories);
 			ValueFreq.mergeArray(nameIndex, s.nameIndex);
-			ValueFreq.mergeArray(commonWordsStat, s.commonWordsStat);
+			if (s.commonWordsStat != null) {
+				ValueFreq.mergeArray(commonWordsStat, s.commonWordsStat);
+			}
 		}
 
 
@@ -1757,6 +1753,9 @@ public class BinaryInspector {
 					@Override
 					public boolean publish(Amenity amenity) {
 						count[0]++;
+						if (!amenity.getName().toLowerCase().contains("shell")) {
+							return false;
+						}
 						String s = String.valueOf(amenity.printNamesAndAdditional());
 						if(verbose.vsearchinspect) {
 							verbose.searchStats.analyze(s, amenity, null);
@@ -1857,7 +1856,8 @@ public class BinaryInspector {
 				ps.topMulti.put(main.value, main);
 			}
 		}
-		NameIndexReader fullNameIndex = index.readFullNameIndex(new NameIndexReader(p), null);
+		NameIndexReader fullNameIndex = new NameIndexReader(p);
+		index.readFullNameIndex(fullNameIndex);
 		fullNameIndex.setSuffixesStat(ps.suffixesStat);
 		ps.nameIndex = ValueFreq.mergeArray(new HashMap<>(), fullNameIndex.getPOIPrefixes(verbose.getPrefix()));
 		ps.commonWordsStat = fullNameIndex.getCommonWordsStats();
@@ -1920,7 +1920,9 @@ public class BinaryInspector {
 		println(String.format("\t\t\tText based (%d, %,d): %s",  ps.text.size(), sumFreq(text), text));
 		println(String.format("\t\t\tSingle value filters (%d, %,d): %s", sumSingleValue, sumFreq(singleValuesLst), singleValuesFmt));
 		
-		printCommonStats(ps.commonWordsStat, "\tPOI");
+		if (ps.commonWordsStat != null) {
+			printCommonStats(ps.commonWordsStat, "\tPOI");
+		}
 		printNameStats(ps.nameIndex, 10_000, "\tPOI", ps.suffixesStat);
 	}
 

@@ -467,12 +467,42 @@ public class SearchTestController {
 															  @RequestParam(defaultValue = "0") int pageToShow,
 															  @RequestParam(defaultValue = "100") int pageSizeLimit,
 															  @RequestParam(required = false) String sortBy,
-															  @RequestParam(required = false) String sortOrder) {
+															  @RequestParam(required = false) String sortOrder,
+															  @RequestParam(required = false) String objectType) {
 		List<String> selectedObfs = normalizeObfs(obf, obfs);
 		if (selectedObfs.size() == 1) {
-			return ResponseEntity.ok(testSearchService.getIndex(selectedObfs.get(0), prefix, pageToShow, pageSizeLimit, sortBy, sortOrder));
+			return ResponseEntity.ok(testSearchService.getIndex(selectedObfs.get(0), prefix, pageToShow, pageSizeLimit, sortBy, sortOrder, objectType));
 		}
-		return ResponseEntity.ok(testSearchService.getIndex(selectedObfs, prefix, pageToShow, pageSizeLimit, sortBy, sortOrder));
+		return ResponseEntity.ok(testSearchService.getIndex(selectedObfs, prefix, pageToShow, pageSizeLimit, sortBy, sortOrder, objectType));
+	}
+
+	@PostMapping(value = "/index/suffix", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<OBFService.IndexSuffixResponse> getIndexSuffix(@RequestParam(required = false) String obf,
+																	 @RequestParam(required = false) List<String> obfs,
+																	 @RequestBody OBFService.IndexSuffixRequest request) {
+		List<String> selectedObfs = normalizeObfs(obf, obfs);
+		OBFService.IndexSuffixResponse suffixes = selectedObfs.size() == 1
+				? testSearchService.getIndexSuffix(selectedObfs.get(0), request)
+				: testSearchService.getIndexSuffix(selectedObfs, request);
+		return ResponseEntity.ok(suffixes);
+	}
+
+	@GetMapping(value = "/index/suffix-sort", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<OBFService.IndexTokenPage> getIndexSuffixSort(@RequestParam(required = false) String obf,
+																		@RequestParam(required = false) List<String> obfs,
+																		@RequestParam(required = false) String prefix,
+																		@RequestParam(defaultValue = "0") int pageToShow,
+																		@RequestParam(defaultValue = "100") int pageSizeLimit,
+																		@RequestParam(required = false) String sortBy,
+																		@RequestParam(required = false) String sortOrder,
+																		@RequestParam(required = false) String objectType) {
+		List<String> selectedObfs = normalizeObfs(obf, obfs);
+		if (selectedObfs.size() == 1) {
+			return ResponseEntity.ok(testSearchService.getIndexSuffixSort(selectedObfs.get(0), prefix, pageToShow, pageSizeLimit, sortBy, sortOrder, objectType));
+		}
+		return ResponseEntity.ok(testSearchService.getIndexSuffixSort(selectedObfs, prefix, pageToShow, pageSizeLimit, sortBy, sortOrder, objectType));
 	}
 
 	@PostMapping(value = "/objects", produces = MediaType.APPLICATION_JSON_VALUE)

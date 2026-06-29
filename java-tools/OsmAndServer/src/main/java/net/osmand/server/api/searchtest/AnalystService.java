@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.io.UncheckedIOException;
@@ -26,6 +27,9 @@ import java.util.zip.ZipOutputStream;
 import static net.osmand.binary.ObfConstants.*;
 
 public interface AnalystService extends InspectorService, GenDbService {
+
+    String GENERATE_DB_SCHEMA_DDL = "/analyst-db/schema.ddl";
+    String GENERATE_DB_INDEX_DDL = "/analyst-db/index.ddl";
     
     default void generateDb(List<String> obfs, OutputStream out) throws IOException, SQLException {
         generateDb(obfs, out, null);
@@ -122,131 +126,33 @@ public interface AnalystService extends InspectorService, GenDbService {
         }
     }
 
-    private void createDbSchema(Connection conn) throws SQLException {
-        try (Statement stmt = conn.createStatement()) {
-            stmt.execute("""
-                    CREATE TABLE obf (
-                    	id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    	name TEXT NOT NULL
-                    )
-                    """);
-            stmt.execute("""
-                    CREATE TABLE token (
-                    	id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    	name TEXT NOT NULL UNIQUE,
-                    	isCommon INTEGER NOT NULL,
-                        isFrequent INTEGER NOT NULL,
-                        isGenerated INTEGER NOT NULL -- is token added during generation (true) or became from index (false)
-                    )
-                    """);
-            stmt.execute("""
-                    CREATE TABLE "object" (
-                    	id INTEGER PRIMARY KEY,
-                    	name TEXT,
-                    	lat REAL,
-                    	lon REAL,
-                    	commonTags TEXT,
-                    	type TEXT,
-                    	osmType TEXT
-                    )
-                    """);
-            stmt.execute("""
-                    CREATE TABLE tag (
-                    	id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    	name TEXT NOT NULL,
-                    	type TEXT,
-                        isSkipped INTEGER NOT NULL, -- is tag skipped (true) in matchesLegacy for POI/Address or not (false)
-                    	UNIQUE(name, type)
-                    )
-                    """);
-            stmt.execute("""
-                    CREATE TABLE token_stats (
-                    	token_id INTEGER PRIMARY KEY,
-                    	matched_count INTEGER NOT NULL,
-                    	alone_count INTEGER NOT NULL,
-                    	poi_matched_count INTEGER NOT NULL,
-                    	poi_alone_count INTEGER NOT NULL,
-                    	address_matched_count INTEGER NOT NULL,
-                    	address_alone_count INTEGER NOT NULL
-                    )
-                    """);
-            stmt.execute("""
-                    CREATE TABLE tag_stats (
-                    	tag_id INTEGER PRIMARY KEY,
-                    	objects_count INTEGER NOT NULL
-                    )
-                    """);
-            stmt.execute("""
-                    CREATE TABLE value (
-                    	id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    	tag_id INTEGER NOT NULL,
-                    	value TEXT NOT NULL,
-                    	UNIQUE(tag_id, value)
-                    )
-                    """);
-            stmt.execute("""
-                    CREATE TABLE object_tag_value (
-                        object_id INTEGER NOT NULL, -- what kind of object related to tag
-                        tag_id INTEGER NOT NULL, -- what kind of tag related to object
-                        token_id INTEGER NOT NULL, -- what kind of token related to object in corresponding tag value, -1 if tag isSkipped = true
-                        value_id INTEGER NOT NULL, -- what kind of value related to object in corresponding tag and token
-                    	value TEXT NOT NULL,
-                        PRIMARY KEY (tag_id, value_id, object_id, token_id)
-                    )
-                    """);
-            stmt.execute("""
-                    CREATE TABLE posting (
-                    	obf_id INTEGER NOT NULL,
-                    	token_id INTEGER NOT NULL,
-                    	object_id INTEGER NOT NULL,
-                    	sequenceId INTEGER NOT NULL,
-                    	isAlone INTEGER NOT NULL DEFAULT 0,
-                    	PRIMARY KEY (token_id, object_id, obf_id)
-                    )
-                    """);
+    private void createDbSchema(Connection conn) throws SQLException, IOException {
+        executeGenerateDbSqlResource(conn, GENERATE_DB_SCHEMA_DDL);
+    }
+
+    private void buildGenerateDbPostLoadIndexes(Connection conn) throws SQLException, IOException {
+        long start = System.currentTimeMillis();
+        executeGenerateDbSqlResource(conn, GENERATE_DB_INDEX_DDL);
+        getLogger().info("generateDb: post-load posting indexes completed in {} ms", System.currentTimeMillis() - start);
+    }
+
+    private void executeGenerateDbSqlResource(Connection conn, String resourcePath) throws SQLException, IOException {
+        try (InputStream inputStream = AnalystService.class.getResourceAsStream(resourcePath)) {
+            if (inputStream == null) {
+                throw new IOException("Missing SQL resource: " + resourcePath);
+            }
+            executeGenerateDbSqlScript(conn, Algorithms.readFromInputStream(inputStream).toString());
         }
     }
 
-    private void buildGenerateDbPostLoadIndexes(Connection conn) throws SQLException {
+    private void executeGenerateDbSqlScript(Connection conn, String sqlScript) throws SQLException {
         try (Statement stmt = conn.createStatement()) {
-            long start = System.currentTimeMillis();
-            stmt.execute("CREATE INDEX idx_object_tag_value_tag_value_object ON object_tag_value(tag_id, value_id, object_id)");
-            stmt.execute("CREATE INDEX idx_object_tag_value_object_tag ON object_tag_value(object_id, tag_id)");
-            stmt.execute("CREATE INDEX idx_posting_token_object_obf ON posting(token_id, object_id, obf_id)");
-            stmt.execute("CREATE INDEX idx_posting_object_token ON posting(object_id, token_id)");
-            stmt.execute("CREATE INDEX idx_token_name_nocase ON token(name COLLATE NOCASE)");
-            stmt.execute("CREATE INDEX idx_object_type_id ON \"object\"(type, id)");
-            stmt.execute("""
-                    INSERT INTO token_stats(token_id, matched_count, alone_count, poi_matched_count, poi_alone_count, address_matched_count, address_alone_count)
-                    SELECT t.id,
-                           COALESCE(s.matched, 0),
-                           COALESCE(s.alone, 0),
-                           COALESCE(s.poi_matched, 0),
-                           COALESCE(s.poi_alone, 0),
-                           COALESCE(s.address_matched, 0),
-                           COALESCE(s.address_alone, 0)
-                    FROM token t
-                    LEFT JOIN (
-                        SELECT p.token_id,
-                               COUNT(p.object_id) matched,
-                               COALESCE(SUM(CASE WHEN p.isAlone = 1 THEN 1 ELSE 0 END), 0) alone,
-                               COALESCE(SUM(CASE WHEN o.type = 'POI' THEN 1 ELSE 0 END), 0) poi_matched,
-                               COALESCE(SUM(CASE WHEN o.type = 'POI' AND p.isAlone = 1 THEN 1 ELSE 0 END), 0) poi_alone,
-                               COALESCE(SUM(CASE WHEN o.type <> 'POI' THEN 1 ELSE 0 END), 0) address_matched,
-                               COALESCE(SUM(CASE WHEN o.type <> 'POI' AND p.isAlone = 1 THEN 1 ELSE 0 END), 0) address_alone
-                        FROM posting p
-                        JOIN "object" o ON o.id = p.object_id
-                        GROUP BY p.token_id
-                    ) s ON s.token_id = t.id
-                    """);
-            stmt.execute("""
-                    INSERT INTO tag_stats(tag_id, objects_count)
-                    SELECT t.id, COUNT(DISTINCT otv.object_id)
-                    FROM tag t
-                    LEFT JOIN object_tag_value otv ON otv.tag_id = t.id
-                    GROUP BY t.id
-                    """);
-            getLogger().info("generateDb: post-load posting indexes completed in {} ms", System.currentTimeMillis() - start);
+            for (String statement : sqlScript.split(";")) {
+                String sql = statement.trim();
+                if (!sql.isEmpty()) {
+                    stmt.execute(sql);
+                }
+            }
         }
     }
 
@@ -671,15 +577,6 @@ public interface AnalystService extends InspectorService, GenDbService {
                     Map<IndexToken, CollatorStringMatcher> matchers = new HashMap<>();
                     for (IndexToken token : entry.getValue()) {
                         matchers.put(token, new CollatorStringMatcher(token.name(), CollatorStringMatcher.StringMatcherMode.CHECK_EQUALS_FROM_SPACE));
-                    }
-                    for (GenerateDbRawPoiObject rawObject : rawObjects) {
-                        for (Map.Entry<IndexToken, CollatorStringMatcher> tokenMatcher : matchers.entrySet()) {
-                            GenerateDbMetrics.current().poiCandidateChecks.incrementAndGet();
-                            if (matchesLegacyPoi(rawObject.rawPoiObject(), tokenMatcher.getValue())) {
-                                GenerateDbMetrics.current().poiMatches.incrementAndGet();
-                                tokenObjects.get(tokenMatcher.getKey()).add(toGenerateDbPoiObjectAddress(rawObject, "en"));
-                            }
-                        }
                     }
                 }
             }
@@ -1113,7 +1010,7 @@ public interface AnalystService extends InspectorService, GenDbService {
             return;
         }
         String preparedValue = isPoi ? value : removeGenerateDbAddressBraces(value);
-        List<String> splitValues = SearchAlgorithms.splitAndNormalize(preparedValue);
+        List<String> splitValues = SearchAlgorithms.splitAndNormalize(preparedValue, true);
         SearchAlgorithms.removeCommonWords(splitValues);
         for (String token : splitValues) {
             if (!Algorithms.isEmpty(token)) {
