@@ -306,12 +306,10 @@ public class SearchService {
 				return null;
 			}
 			// In future multiple spatialTextSearch & multiple osmand regions
+			SpatialTextSearch search = new SpatialTextSearch();
 			SpatialSearchContext sscontext = new SpatialSearchContext(new SpatialTextSearchSettings(),
 					usedMapList, new LatLon(ctx.lat, ctx.lon));
-			synchronized (spatialTextSearch) {
-				usedMapList.add(osmandRegions.getFile());
-				res = new SpatialResults(spatialTextSearch.searchAPI(ctx.text, sscontext), sscontext);
-			}
+			res = new SpatialResults(search.searchAPI(ctx.text, sscontext), sscontext);
 		} catch (RuntimeException e) {
 			LOGGER.error(String.format("Spatial search failed for '%s': %s", ctx.text, e), e);
 		} finally {
