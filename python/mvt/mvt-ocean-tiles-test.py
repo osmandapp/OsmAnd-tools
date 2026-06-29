@@ -71,7 +71,7 @@ def map_url(url, domain):
 
 
 def download(url):
-    req = urllib.request.Request(vector_url(url), headers={"Accept": "application/x-protobuf"})
+    req = urllib.request.Request(url, headers={"Accept": "application/x-protobuf"})
     with urllib.request.urlopen(req, timeout=20) as r:
         data = r.read()
     return gzip.decompress(data) if data.startswith(b"\x1f\x8b") else data
