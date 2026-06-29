@@ -5,7 +5,9 @@ import net.osmand.util.Algorithms;
 
 import java.io.File;
 import java.io.FileWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashSet;
+import java.util.Objects;
 import java.util.Set;
 
 public class GenerateMvtIcons {
@@ -51,7 +53,7 @@ public class GenerateMvtIcons {
 						shieldSize,
 						null, 0);
 				String fileName = iconInfo.icon + ".svg";
-				try (FileWriter writer = new FileWriter(new File(outDir, fileName))) {
+				try (FileWriter writer = new FileWriter(new File(outDir, fileName), StandardCharsets.UTF_8)) {
 					writer.write(svg);
 				}
 				generated++;
@@ -78,13 +80,30 @@ public class GenerateMvtIcons {
 		public String value;
 		public String icon;
 		public String shield;
-		public Float iconVisibleSize;
 		public String source; // "POINT_RULES"
 
 		@Override
+		public boolean equals(Object o) {
+			if (this == o) {
+				return true;
+			}
+			if (!(o instanceof IconInfo)) {
+				return false;
+			}
+			IconInfo that = (IconInfo) o;
+			return Objects.equals(icon, that.icon)
+					&& Objects.equals(shield, that.shield);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(icon, shield);
+		}
+
+		@Override
 		public String toString() {
-			return String.format("Tag: %s, Value: %s, Icon: %s, Shield: %s, Size: %s (Source: %s)",
-					tag, value, icon, shield, iconVisibleSize, source);
+			return String.format("Tag: %s, Value: %s, Icon: %s, Shield: %s (Source: %s)",
+					tag, value, icon, shield, source);
 		}
 	}
 
@@ -109,12 +128,12 @@ public class GenerateMvtIcons {
 		}
 	}
 
-	private void extractIconsFromRule(RenderingRule rule, String tag, String value, String source, IconInfo parent) {
+	private IconInfo extractIconsFromRule(RenderingRule rule, String tag, String value, String source, IconInfo parent) {
 		if (rule.getIntPropertyValue("nightMode") == 1 || rule.getIntPropertyValue("streetLighting") == 1) {
-			return;
+			return null;
 		}
 		IconInfo iconInfo = extractIconInfo(rule, parent);
-		if (iconInfo != null) {
+		if (iconInfo != null && !Algorithms.isEmpty(iconInfo.icon)) {
 			iconInfo.tag = tag;
 			iconInfo.value = value;
 			iconInfo.source = source;
@@ -129,8 +148,7 @@ public class GenerateMvtIcons {
 		// inherits from the previous one, mirroring how the renderer applies them.
 		IconInfo accumulated = current;
 		for (RenderingRule child : rule.getIfChildren()) {
-			extractIconsFromRule(child, tag, value, source + "/if", accumulated);
-			IconInfo contribution = extractIconInfo(child, accumulated);
+			IconInfo contribution = extractIconsFromRule(child, tag, value, source + "/if", accumulated);
 			if (contribution != null) {
 				accumulated = contribution;
 			}
@@ -139,18 +157,17 @@ public class GenerateMvtIcons {
 		for (RenderingRule child : rule.getIfElseChildren()) {
 			extractIconsFromRule(child, tag, value, source + "/ifElse", current);
 		}
+		return iconInfo;
 	}
 
 	private IconInfo extractIconInfo(RenderingRule rule, IconInfo parent) {
 		String icon = rule.getStringPropertyValue("icon");
 		String shield = rule.getStringPropertyValue("shield");
-		float iconVisibleSize = rule.getFloatPropertyValue("iconVisibleSize");
 
-		if (!Algorithms.isEmpty(icon) || shield != null || iconVisibleSize != 0) {
+		if (!Algorithms.isEmpty(icon) || shield != null) {
 			IconInfo info = new IconInfo();
 			info.icon = !Algorithms.isEmpty(icon) ? icon : (parent != null ? parent.icon : null);
 			info.shield = shield != null ? (shield.isEmpty() ? null : shield) : (parent != null ? parent.shield : null);
-			info.iconVisibleSize = iconVisibleSize > 0 ? (Float) iconVisibleSize : (parent != null ? parent.iconVisibleSize : null);
 			return info;
 		}
 		return null;
