@@ -309,6 +309,16 @@ public class SearchService {
 			if (usedMapList.isEmpty()) {
 				return response;
 			}
+			LatLon coord = parseLocation(ctx.text, new LatLon(ctx.lat, ctx.lon));
+			if (coord != null) {
+				SearchResult sr = new SearchResult();
+				sr.object = coord;
+				sr.location = coord;
+				sr.objectType = ObjectType.LOCATION;
+				sr.localeName = ((float) coord.getLatitude()) + ", " + ((float) coord.getLongitude());
+				response.features.add(getFeature(sr, timeZone));
+				return response;
+			}
 			SpatialSearchResults res;
 			// In future multiple spatialTextSearch & multiple osmand regions
 			SpatialSearchContext sscontext = new SpatialSearchContext(new SpatialTextSearchSettings(),
