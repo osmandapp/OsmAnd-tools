@@ -12,21 +12,21 @@ import mapbox_vector_tile
 
 EXTENT = 4096
 EPS = 4
-DOMAIN = sys.argv[1] if len(sys.argv) > 1 else None
+DOMAINS = sys.argv[1:] or [None]
 
 
-def base_url(url):
-    if DOMAIN is None:
+def base_url(url, domain):
+    if domain is None:
         p = urllib.parse.urlparse(url)
         return p.scheme, p.netloc
-    scheme = "http" if DOMAIN.startswith("127.0.0.1") or DOMAIN.startswith("localhost") else "https"
-    return scheme, DOMAIN
+    scheme = "http" if domain.startswith("127.0.0.1") or domain.startswith("localhost") else "https"
+    return scheme, domain
 
 
-def map_base_url(url):
-    if DOMAIN == "maptile.osmand.net":
+def map_base_url(url, domain):
+    if domain == "maptile.osmand.net":
         return "https", "osmand.net"
-    return base_url(url)
+    return base_url(url, domain)
 
 
 def read_urls(path):
@@ -55,18 +55,18 @@ def tile_from_url(url):
     raise ValueError("unsupported tile url")
 
 
-def vector_url(url):
+def vector_url(url, domain):
     z, x, y = tile_from_url(url)
-    scheme, netloc = base_url(url)
+    scheme, netloc = base_url(url, domain)
     return urllib.parse.urlunparse((scheme, netloc, f"/vector/{z}/{x}/{y}.mvt", "", "", ""))
 
 
-def map_url(url):
+def map_url(url, domain):
     z, x, y = tile_from_url(url)
     n = 1 << z
     lon = (x + 0.5) / n * 360.0 - 180.0
     lat = math.degrees(math.atan(math.sinh(math.pi * (1.0 - 2.0 * (y + 0.5) / n))))
-    scheme, netloc = map_base_url(url)
+    scheme, netloc = map_base_url(url, domain)
     return urllib.parse.urlunparse((scheme, netloc, "/map/", "", "", f"{z + 1}/{lat:.6f}/{lon:.6f}"))
 
 
@@ -149,25 +149,26 @@ def coastline_fills_tile(data):
     return False
 
 
-def check(kind, url):
-    actual_url = vector_url(url)
+def check(kind, url, domain):
+    actual_url = vector_url(url, domain)
     try:
         is_ocean = coastline_fills_tile(download(actual_url))
     except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError):
         print(kind, actual_url, "http-error")
         return False
     expected_ocean = kind == "ocean"
-    status = "ok" if is_ocean == expected_ocean else "false"
-    suffix = f" {map_url(url)}" if status == "false" else ""
+    status = "ok" if is_ocean == expected_ocean else "failed"
+    suffix = f" {map_url(url, domain)}" if status == "failed" else ""
     print(kind, actual_url, status + suffix)
     return status == "ok"
 
 
 def main():
     ok = True
-    for kind, path in (("ocean", "ocean.txt"), ("land", "land.txt")):
-        for url in read_urls(path):
-            ok = check(kind, url) and ok
+    for domain in DOMAINS:
+        for kind, path in (("ocean", "ocean.txt"), ("land", "land.txt")):
+            for url in read_urls(path):
+                ok = check(kind, url, domain) and ok
     return 0 if ok else 1
 
 
