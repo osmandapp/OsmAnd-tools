@@ -3,6 +3,7 @@ package net.osmand.server.api.services;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import net.osmand.data.Amenity;
+import net.osmand.data.Building;
 import net.osmand.data.City;
 import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
@@ -545,21 +546,36 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 		result.object = object;
 		result.location = location;
 		result.localeName = spatialName(object, locale);
-		if (object instanceof Amenity) {
-			result.objectType = ObjectType.POI;
-		} else if (object instanceof Street street) {
-			result.objectType = ObjectType.STREET;
+		result.objectType = spatialObjectType(spatial, object, objects);
+		if (object instanceof Street street) {
 			City city = street.getCity();
 			if (city != null) {
 				result.localeRelatedObjectName = city.getName(locale);
 				result.addressName = result.localeRelatedObjectName;
 			}
-		} else if (object instanceof City) {
-			result.objectType = ObjectType.CITY;
-		} else {
-			result.objectType = ObjectType.LOCATION;
 		}
 		return result;
+	}
+
+	private ObjectType spatialObjectType(SpatialSearchResult spatial, MapObject object, List<MapObject> objects) {
+		if (object instanceof Amenity) {
+			return ObjectType.POI;
+		}
+		if (object instanceof Building) {
+			return ObjectType.HOUSE;
+		}
+		if (object instanceof Street) {
+			return ObjectType.STREET;
+		}
+		if (object instanceof City city) {
+			return switch (city.getType()) {
+				case VILLAGE, HAMLET, SUBURB -> ObjectType.VILLAGE;
+				case BOUNDARY -> ObjectType.BOUNDARY;
+				case POSTCODE -> ObjectType.POSTCODE;
+				default -> ObjectType.CITY;
+			};
+		}
+		return ObjectType.LOCATION;
 	}
 
 	private String spatialName(MapObject object, String locale) {

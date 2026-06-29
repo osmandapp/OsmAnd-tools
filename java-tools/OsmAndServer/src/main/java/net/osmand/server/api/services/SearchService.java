@@ -55,6 +55,7 @@ import net.osmand.binary.BinaryMapPoiReaderAdapter;
 import net.osmand.binary.GeocodingUtilities;
 import net.osmand.binary.ObfConstants;
 import net.osmand.data.Amenity;
+import net.osmand.data.Building;
 import net.osmand.data.City;
 import net.osmand.data.City.CityType;
 import net.osmand.data.LatLon;
