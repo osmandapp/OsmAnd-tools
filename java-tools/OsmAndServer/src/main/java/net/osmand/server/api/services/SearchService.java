@@ -366,7 +366,7 @@ public class SearchService {
 			response.info.put("timeAll", String.format("%.1f", (System.currentTimeMillis() - sTime) / 1e3));
 			response.info.put("atoms", String.format("%.2f, %,d", sscontext.getStats().stepAtoms / 1e9,
 					sscontext.getStats().tokenObjs));
-			response.info.put("compute", String.format("%.2f, %,d", sscontext.getStats().stepCompute / 1e9,
+			response.info.put("compute", String.format("%.2f, %,d", sscontext.getStats().step2Compute / 1e9,
 					sscontext.getStats().maxCombinations));
 			response.info.put("results", response.features.size());
 			response.info.put("words-matched", res.combinations == null || res.combinations.size() == 0 ? 0
