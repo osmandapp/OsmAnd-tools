@@ -73,9 +73,11 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	private PreparedStatement transRouteStat;
 	private PreparedStatement transRouteStopsStat;
 	private PreparedStatement transStopsStat;
+	private PreparedStatement updateStopStat;
 	private PreparedStatement transRouteGeometryStat;
 	private RTree transportStopsTree;
 	private Map<Long, Relation> masterRoutes = new HashMap<Long, Relation>();
+	private Map<Long, TransportStop> updatedPlatformStops = new LinkedHashMap<Long, TransportStop>();
 	private Connection gtfsConnection;
 
 	private static final long TEST_ROUTE_ID_MISSING_STOPS = 192037l;
@@ -353,10 +355,12 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		transRouteStat = conn.prepareStatement("insert into transport_route(id, type, operator, ref, name, name_en, dist, color) values(?, ?, ?, ?, ?, ?, ?, ?)");
 		transRouteStopsStat = conn.prepareStatement("insert into transport_route_stop(route, stop, ord) values(?, ?, ?)");
 		transStopsStat = conn.prepareStatement("insert into transport_stop(id, latitude, longitude, name, name_en, names, deleted_routes) values(?, ?, ?, ?, ?, ?, ?)");
+		updateStopStat = conn.prepareStatement("update transport_stop set names = ? where id = ?");
 		transRouteGeometryStat = conn.prepareStatement("insert into transport_route_geometry(route, geometry, ind) values(?, ?, ?)");
 		pStatements.put(transRouteStat, 0);
 		pStatements.put(transRouteStopsStat, 0);
 		pStatements.put(transStopsStat, 0);
+		pStatements.put(updateStopStat, 0);
 		pStatements.put(transRouteGeometryStat, 0);
 		
 		if(gtfsConnection != null) {
@@ -535,16 +539,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			} else {
 				Map<String, String> namesMap = s.getNamesMap(false);
 				if (namesMap.containsKey(CONNECTED_PLATFORM_ID)) {
-					if (pStatements.get(transStopsStat) > 0) {
-						transStopsStat.executeBatch();
-						pStatements.put(transStopsStat, 0);
-					}
-					try (PreparedStatement updateStop = transStopsStat.getConnection().prepareStatement(
-							"UPDATE transport_stop SET names = ? WHERE id = ?")) {
-						updateStop.setString(1, new Gson().toJson(namesMap));
-						updateStop.setLong(2, s.getId());
-						updateStop.executeUpdate();
-					}
+					updatedPlatformStops.put(s.getId(), s);
 				}
 			}
 			transRouteStopsStat.setLong(1, r.getId());
@@ -554,12 +549,21 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-
+	private void updatePlatformStops() throws SQLException {
+		Gson gson = new Gson();
+		for (TransportStop s : updatedPlatformStops.values()) {
+			updateStopStat.setString(1, gson.toJson(s.getNamesMap(false)));
+			updateStopStat.setLong(2, s.getId());
+			addBatch(updateStopStat);
+		}
+	}
 
 	public void writeBinaryTransportIndex(BinaryMapIndexWriter writer, String regionName,
 			Connection mapConnection) throws IOException, SQLException {
 		try {
 			closePreparedStatements(transRouteStat, transRouteStopsStat, transStopsStat, transRouteGeometryStat);
+			updatePlatformStops();
+			closePreparedStatements(updateStopStat);
 			mapConnection.commit();
 			transportStopsTree.flush();
 
