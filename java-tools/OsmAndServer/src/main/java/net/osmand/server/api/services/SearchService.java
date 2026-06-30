@@ -13,6 +13,8 @@ import static net.osmand.util.OpeningHoursParser.parseOpenedHours;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -248,7 +250,7 @@ public class SearchService {
 
     public record SearchContext(double lat, double lon, String text, String locale, boolean baseSearch, String northWest, String southEast) {
     }
-    public record SearchOption(boolean unlimited, SearchExportSettings exportedSettings, Double radiusToLoadMaps, boolean queryIsCompleted, ObjectType... searchTypes) {
+    public record SearchOption(boolean unlimited, SearchExportSettings exportedSettings, Double radiusToLoadMaps, boolean queryIsCompleted, boolean isBatch, ObjectType... searchTypes) {
         private static final double SEARCH_RADIUS_DEGREE = 1.5;
 
         public double getRadius() {
@@ -264,7 +266,8 @@ public class SearchService {
 
 	public List<Feature> search(SearchContext ctx, String timeZone) throws IOException {
 		long tm = System.currentTimeMillis();
-		SearchResults searchResults = getImmediateSearchResults(ctx, new SearchOption(false, null, null, true, (ObjectType[]) null), null);
+		SearchResults searchResults = getImmediateSearchResults(ctx, new SearchOption(false, null, 
+                null, true, false, (ObjectType[]) null), null);
 		List<SearchResult> res = searchResults.results();
 		if (System.currentTimeMillis() - tm > 1000) {
             BinaryMapIndexReaderStats.SearchStat stat = searchResults.settings != null ? searchResults.settings.getStat() : null;
@@ -285,13 +288,57 @@ public class SearchService {
 		public Map<String, Object> info = new LinkedHashMap<>();
 	}
 
+    public record SpatialResults(SpatialSearchResults results, SpatialSearchContext.SpatialSearchStats stats) {}
+    
 	// dev-only: new prototype search using SpatialTextSearch.
-	public SpatialResponse searchSpatial(SearchContext ctx, String timeZone) throws IOException {
-		long sTime = System.currentTimeMillis();
-		SpatialResponse response = new SpatialResponse();
+	public SpatialResults searchTestSpatial(SearchContext ctx, SearchService.SearchOption options, boolean printLogs) throws IOException {
 		if (!osmAndMapsService.validateAndInitConfig()) {
-			return response;
+			return null;
 		}
+        SpatialResults res = null;
+		List<BinaryMapIndexReader> mapList = new ArrayList<>();
+		try {
+            QuadRect points = osmAndMapsService.points(null,
+                    new LatLon(ctx.lat + options.getRadius(), ctx.lon - options.getRadius()),
+                    new LatLon(ctx.lat - options.getRadius(), ctx.lon + options.getRadius()));
+            List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsForSearch(points, false);
+			if (list.isEmpty()) {
+				return null;
+			}
+			mapList = osmAndMapsService.getReaders(list, null, true);
+            
+			if (mapList.isEmpty()) {
+				return null;
+			}
+
+			SpatialTextSearch search = new SpatialTextSearch();
+			SpatialSearchContext sscontext = new SpatialSearchContext(new SpatialTextSearchSettings(),
+					mapList, new LatLon(ctx.lat, ctx.lon));
+            SpatialSearchContext.SpatialSearchStats stats = sscontext.getStats();
+            stats.printLogs = printLogs;
+
+            stats.requestTime.start();
+            SpatialSearchResults results = search.searchAPI(ctx.text, sscontext);
+            stats.requestTime.finish();
+            
+			res = new SpatialResults(results, stats);
+		} catch (RuntimeException e) {
+			LOGGER.error(String.format("Spatial search failed for '%s': %s", ctx.text, e), e);
+			StringWriter stackTrace = new StringWriter();
+			e.printStackTrace(new PrintWriter(stackTrace));
+			LOGGER.error("RuntimeException stacktrace:\n" + stackTrace);
+		} finally {
+			osmAndMapsService.unlockReaders(mapList);
+		}
+		return res;
+	}
+
+    public SpatialResponse searchSpatial(SearchContext ctx, String timeZone) throws IOException {
+        long sTime = System.currentTimeMillis();
+        SpatialResponse response = new SpatialResponse();
+        if (!osmAndMapsService.validateAndInitConfig()) {
+            return response;
+        }
 //		double radius = SearchOption.SEARCH_RADIUS_DEGREE;
 //		QuadRect points = osmAndMapsService.points(null,
 //				new LatLon(ctx.lat + radius, ctx.lon - radius),
@@ -430,7 +477,9 @@ public class SearchService {
                 return new SearchResults(Collections.emptyList());
             }
             SearchSettings settings = searchUICore.getPhrase().getSettings();
-	        settings.setStat(new BinaryMapIndexReaderStats.SearchStat());
+            BinaryMapIndexReaderStats.SearchStat stat = new BinaryMapIndexReaderStats.SearchStat();
+            stat.isBatch = option.isBatch;
+	        settings.setStat(stat);
 
 	        settings.setOfflineIndexes(usedMapList);
             settings.setRadiusLevel(SEARCH_RADIUS_LEVEL);

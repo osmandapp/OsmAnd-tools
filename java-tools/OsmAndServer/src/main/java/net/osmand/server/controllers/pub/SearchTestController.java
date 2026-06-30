@@ -157,7 +157,7 @@ public class SearchTestController {
 															  @RequestBody RunTestCaseRequest request) {
 		RunParam payload = request == null || request.payload == null ? new RunParam() : request.payload;
 		SearchService.SearchOption options = request == null || request.options == null
-				? new SearchService.SearchOption(false, null, null, false,(net.osmand.search.core.ObjectType[]) null)
+				? new SearchService.SearchOption(false, null, null, false, true, (net.osmand.search.core.ObjectType[]) null)
 				: request.options;
 		return testSearchService.runTestCase(caseId, payload, options).thenApply(ResponseEntity::ok);
 	}
@@ -432,13 +432,14 @@ public class SearchTestController {
 			@RequestParam(required = false) String lang,
 			@RequestParam() Double lat,
 			@RequestParam() Double lon,
+			@RequestParam(required = false, defaultValue = "false") Boolean spatial,
 			@RequestBody SearchService.SearchOption options) throws IOException {
 		if (query == null || lat == null || lon == null) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'query', 'lat' and 'lon' are required");
-		}
+        }
 
         SearchService.SearchContext ctx = new SearchService.SearchContext(lat, lon, query, lang, false, null, null);
-		return ResponseEntity.ok(testSearchService.getResults(ctx, options));
+		return ResponseEntity.ok(testSearchService.getResults(ctx, options, spatial));
 	}
 
 	@PostMapping(value = "/unit-test", produces = "application/zip")
