@@ -317,7 +317,6 @@ public class SearchService {
 				sr.objectType = ObjectType.LOCATION;
 				sr.localeName = ((float) coord.getLatitude()) + ", " + ((float) coord.getLongitude());
 				response.features.add(getFeature(sr, timeZone));
-				return response;
 			}
 			SpatialSearchResults res;
 			// In future multiple spatialTextSearch & multiple osmand regions
