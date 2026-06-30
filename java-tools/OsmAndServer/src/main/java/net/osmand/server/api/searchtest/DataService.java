@@ -413,6 +413,7 @@ public interface DataService extends BaseService {
 		}
 		String rowJson = getObjectMapper().writeValueAsString(row);
 		Object statTimeValue = row.get("stat_time");
+		Object statBytesValue = row.get("stat_bytes");
 
 		return new Object[] {genId, count, run.datasetId, run.id, run.caseId, query, rowJson, error, duration,
 				resultsCount, distance, resultPoint, resPlace,
@@ -420,7 +421,7 @@ public interface DataService extends BaseService {
 				searchPoint == null ? null : searchPoint.getLongitude(),
 				bbox,
 				new Timestamp(System.currentTimeMillis()), found,
-				stat != null ? stat.totalBytes : null,
+				stat != null ? stat.totalBytes : statBytesValue instanceof Number n ? n.longValue() : null,
 				stat != null ? stat.totalTime : statTimeValue instanceof Number n ? n.longValue() : null
 		};
 	}
