@@ -289,7 +289,7 @@ public class SearchService {
     public record SpatialResults(SpatialSearchResults results, SpatialSearchContext.SpatialSearchStats stats) {}
     
 	// dev-only: new prototype search using SpatialTextSearch.
-	public SpatialResults searchSpatial(SearchContext ctx) throws IOException {
+	public SpatialResults searchSpatial(SearchContext ctx, boolean printLogs) throws IOException {
 		if (!osmAndMapsService.validateAndInitConfig()) {
 			return null;
 		}
@@ -310,7 +310,7 @@ public class SearchService {
 			SpatialSearchContext sscontext = new SpatialSearchContext(new SpatialTextSearchSettings(),
 					usedMapList, new LatLon(ctx.lat, ctx.lon));
             SpatialSearchContext.SpatialSearchStats stats = sscontext.getStats();
-            stats.printLogs = false;
+            stats.printLogs = printLogs;
 
             stats.requestTime.start();
             SpatialSearchResults results = search.searchAPI(ctx.text, sscontext);

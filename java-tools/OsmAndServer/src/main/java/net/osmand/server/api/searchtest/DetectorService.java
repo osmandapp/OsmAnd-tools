@@ -51,7 +51,7 @@ public interface DetectorService extends OBFService {
 	default ResultsWithStats getResults(SearchService.SearchContext ctx, SearchService.SearchOption options, Boolean spatial) throws IOException {
 		long startTime = System.currentTimeMillis();
 		if (spatial != null && spatial) {
-			SearchService.SpatialResults results = getSearchService().searchSpatial(ctx);
+			SearchService.SpatialResults results = getSearchService().searchSpatial(ctx, true);
 			String timeAll = String.format(Locale.US, "%.1f", (System.currentTimeMillis() - startTime) / 1e3);
 			return toResults(ctx, results, timeAll);
 		}

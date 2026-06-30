@@ -463,7 +463,7 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 						SearchService.SearchContext ctx = new SearchService.SearchContext(searchPoint.getLatitude(), searchPoint.getLongitude(),
 								query, run.locale, false, bbox[0], bbox[1]);
 						if (Boolean.TRUE.equals(run.spatial)) {
-							SearchService.SpatialResults spatialResult = searchService.searchSpatial(ctx);
+							SearchService.SpatialResults spatialResult = searchService.searchSpatial(ctx, false);
 							searchResult = fromSpatialResults(spatialResult, newRow, run.locale);
 							actuator.accept(searchResult.results());
 						} else {

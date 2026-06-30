@@ -14,7 +14,6 @@ import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
 import net.osmand.data.QuadRect;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
-import net.osmand.search.core.ObjectType;
 import net.osmand.search.core.SearchResult;
 import static net.osmand.util.MapUtils.*;
 
