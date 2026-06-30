@@ -308,7 +308,7 @@ public class SearchService {
                     continue;
                 }
                 RandomAccessFile raf = new RandomAccessFile(ref.file, "r");
-                BinaryMapIndexReader reader = new BinaryMapIndexReader(raf, ref.file, false);
+                BinaryMapIndexReader reader = new BinaryMapIndexReader(raf, ref.file, true);
                 if (reader.containsAddressData() && reader.containsRouteData()) {
                     mapList.add(reader);
                 }
