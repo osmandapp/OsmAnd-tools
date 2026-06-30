@@ -53,7 +53,7 @@ public class DeleteBrokenInfoFilesOperation extends AbstractFileFixOperation {
 		if (!isTest(params)) {
 			LOG.info("Deleting broken info file: userid={}, name={}", file.userid, file.name);
 			try {
-				userdataService.deleteFileVersion(null, file.userid, file.name, file.type, file);
+				deleteCompletely(file);
 			} catch (Exception e) {
 				throw new IllegalStateException(
 						"Failed to delete broken info file userid=" + file.userid + " name=" + file.name, e);
