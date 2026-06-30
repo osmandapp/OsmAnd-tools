@@ -1402,8 +1402,6 @@ public class OsmAndMapsService {
 		return files;
 	}
 
-
-
 	// all maps within ~.00 km of the point, no count limit.
 	// Union of region-based selection (regions.ocbf) and the regular bbox-intersection selection.
 	public List<BinaryMapIndexReaderReference> getObfReadersForSpatialSearch(double lat, double lon) throws IOException {

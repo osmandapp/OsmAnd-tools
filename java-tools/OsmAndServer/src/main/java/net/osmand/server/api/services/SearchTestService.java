@@ -500,6 +500,8 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 
 		SpatialSearchContext.SpatialSearchStats stats = spatialResult.stats();
 		row.put("stat_time", stats.requestTime.time);
+		row.put("stat_bytes", stats.readTableBytes + stats.readAtomsBytes);
+		row.put("stat_table_bytes", stats.readTableBytes);
 		
 		row.put("spatial_step1_atoms_time", stats.step1Atoms.time);
 		row.put("spatial_match_time", stats.sub1MatchTime.time);
