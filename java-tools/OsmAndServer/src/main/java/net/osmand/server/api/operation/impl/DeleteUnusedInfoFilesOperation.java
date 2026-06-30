@@ -49,7 +49,7 @@ public class DeleteUnusedInfoFilesOperation extends AbstractFileFixOperation {
 		if (!isTest(params)) {
 			LOG.info("Deleting unused info file: userid={}, name={}, type={}", file.userid, file.name, file.type);
 			try {
-				userdataService.deleteFileVersion(null, file.userid, file.name, file.type, file);
+				deleteCompletely(file);
 			} catch (Exception e) {
 				throw new IllegalStateException(
 						"Failed to delete unused info file userid=" + file.userid + " name=" + file.name, e);
