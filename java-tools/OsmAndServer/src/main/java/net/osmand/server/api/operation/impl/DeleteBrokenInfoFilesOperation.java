@@ -46,11 +46,11 @@ public class DeleteBrokenInfoFilesOperation extends AbstractFileFixOperation {
 	}
 
 	@Override
-	protected boolean fix(UserFile file, boolean testRun) throws IOException {
+	protected boolean fix(UserFile file, Params params) throws IOException {
 		if (isReadableJson(read(file))) {
 			return false; // info file is valid json -> keep
 		}
-		if (!testRun) {
+		if (!isTest(params)) {
 			LOG.info("Deleting broken info file: userid={}, name={}", file.userid, file.name);
 			try {
 				userdataService.deleteFileVersion(null, file.userid, file.name, file.type, file);

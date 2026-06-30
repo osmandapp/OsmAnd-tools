@@ -38,11 +38,11 @@ public class DeleteFilesMissingInCloudOperation extends AbstractFileFixOperation
 	}
 
 	@Override
-	protected boolean fix(UserFile file, boolean testRun) throws IOException {
+	protected boolean fix(UserFile file, Params params) throws IOException {
 		if (existsInCloud(file)) {
 			return false; // object present (or not an S3 file) -> keep
 		}
-		if (!testRun) {
+		if (!isTest(params)) {
 			CloudUserDevice dev = devicesRepository.findById(file.deviceid);
 			if (dev == null) {
 				throw new IllegalStateException("no device for file id=" + file.id);
