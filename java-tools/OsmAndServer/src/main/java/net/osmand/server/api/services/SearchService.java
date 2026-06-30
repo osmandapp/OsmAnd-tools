@@ -13,6 +13,7 @@ import static net.osmand.util.OpeningHoursParser.parseOpenedHours;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -289,26 +290,37 @@ public class SearchService {
     public record SpatialResults(SpatialSearchResults results, SpatialSearchContext.SpatialSearchStats stats) {}
     
 	// dev-only: new prototype search using SpatialTextSearch.
-	public SpatialResults searchSpatial(SearchContext ctx, boolean printLogs) throws IOException {
+	public SpatialResults searchTestSpatial(SearchContext ctx, boolean printLogs) throws IOException {
 		if (!osmAndMapsService.validateAndInitConfig()) {
 			return null;
 		}
         SpatialResults res = null;
-		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
+		List<BinaryMapIndexReader> mapList = new ArrayList<>();
 		try {
 			List<OsmAndMapsService.BinaryMapIndexReaderReference> list =
 					osmAndMapsService.getObfReadersForSpatialSearch(ctx.lat, ctx.lon);
 			if (list.isEmpty()) {
 				return null;
 			}
-			usedMapList = osmAndMapsService.getReaders(list, null);
-			if (usedMapList.isEmpty()) {
+            
+            for (OsmAndMapsService.BinaryMapIndexReaderReference ref : list) {
+                if (ref.file.getName().startsWith("World_")) {
+                    continue;
+                }
+                RandomAccessFile raf = new RandomAccessFile(ref.file, "r");
+                BinaryMapIndexReader reader = new BinaryMapIndexReader(raf, ref.file, false);
+                if (reader.containsAddressData() && reader.containsRouteData()) {
+                    mapList.add(reader);
+                }
+            }
+            
+			if (mapList.isEmpty()) {
 				return null;
 			}
-			// In future multiple spatialTextSearch & multiple osmand regions
+
 			SpatialTextSearch search = new SpatialTextSearch();
 			SpatialSearchContext sscontext = new SpatialSearchContext(new SpatialTextSearchSettings(),
-					usedMapList, new LatLon(ctx.lat, ctx.lon));
+					mapList, new LatLon(ctx.lat, ctx.lon));
             SpatialSearchContext.SpatialSearchStats stats = sscontext.getStats();
             stats.printLogs = printLogs;
 
@@ -320,7 +332,7 @@ public class SearchService {
 		} catch (RuntimeException e) {
 			LOGGER.error(String.format("Spatial search failed for '%s': %s", ctx.text, e), e);
 		} finally {
-			osmAndMapsService.unlockReaders(usedMapList);
+			osmAndMapsService.unlockReaders(mapList);
 		}
 		return res;
 	}
