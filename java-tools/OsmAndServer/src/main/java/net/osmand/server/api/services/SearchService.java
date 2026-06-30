@@ -13,7 +13,9 @@ import static net.osmand.util.OpeningHoursParser.parseOpenedHours;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintWriter;
 import java.io.RandomAccessFile;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -331,6 +333,9 @@ public class SearchService {
 			res = new SpatialResults(results, stats);
 		} catch (RuntimeException e) {
 			LOGGER.error(String.format("Spatial search failed for '%s': %s", ctx.text, e), e);
+			StringWriter stackTrace = new StringWriter();
+			e.printStackTrace(new PrintWriter(stackTrace));
+			LOGGER.error("RuntimeException stacktrace:\n" + stackTrace);
 		} finally {
 			osmAndMapsService.unlockReaders(mapList);
 		}
