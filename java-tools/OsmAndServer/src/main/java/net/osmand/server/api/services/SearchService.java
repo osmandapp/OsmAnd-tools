@@ -478,7 +478,9 @@ public class SearchService {
                 return new SearchResults(Collections.emptyList());
             }
             SearchSettings settings = searchUICore.getPhrase().getSettings();
-	        settings.setStat(new BinaryMapIndexReaderStats.SearchStat());
+            BinaryMapIndexReaderStats.SearchStat stat = new BinaryMapIndexReaderStats.SearchStat();
+            stat.isBatch = option.isBatch;
+	        settings.setStat(stat);
 
 	        settings.setOfflineIndexes(usedMapList);
             settings.setRadiusLevel(SEARCH_RADIUS_LEVEL);
