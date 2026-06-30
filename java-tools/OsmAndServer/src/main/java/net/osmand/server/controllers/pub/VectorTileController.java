@@ -3,6 +3,8 @@ package net.osmand.server.controllers.pub;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 
 import javax.imageio.ImageIO;
@@ -20,6 +22,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.xml.sax.SAXException;
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -97,7 +100,8 @@ public class VectorTileController {
 	}
 
 	@RequestMapping(path = "/{style}/{z}/{x}/{y}.png", produces = MediaType.IMAGE_PNG_VALUE)
-	public ResponseEntity<?> getTile(@PathVariable String style, @PathVariable int z, @PathVariable int x, @PathVariable int y)
+	public ResponseEntity<?> getTile(@PathVariable String style, @PathVariable int z, @PathVariable int x, @PathVariable int y,
+	                                 @RequestParam(required = false) Map<String, String> renderingParams)
 			throws IOException, XmlPullParserException, SAXException {
 		if (!osmAndMapsService.validateAndInitConfig()) {
 			return errorConfig("Tile service is not initialized: " + (config == null ? "" : config.initErrorMessage));
@@ -115,7 +119,8 @@ public class VectorTileController {
 		}
 
 		tileMemoryCache.conditionalCleanupCache();
-		VectorMetatile tile = getMetaTile(vectorStyle, z, x, y, interactiveKey);
+		String renderingProps = getRenderingProps(vectorStyle, renderingParams);
+		VectorMetatile tile = getMetaTile(vectorStyle, z, x, y, interactiveKey, renderingProps);
 		// for local debug :
 		//BufferedImage img = null;
 		BufferedImage img = tile.getCacheRuntimeImage();
@@ -138,7 +143,8 @@ public class VectorTileController {
 	}
 
 	@GetMapping(path = "/info/{style}/{z}/{x}/{y}.json", produces = MediaType.APPLICATION_JSON_VALUE)
-	public ResponseEntity<String> getTileInfo(@PathVariable String style, @PathVariable int z, @PathVariable int x, @PathVariable int y) throws IOException {
+	public ResponseEntity<String> getTileInfo(@PathVariable String style, @PathVariable int z, @PathVariable int x, @PathVariable int y,
+	                                          @RequestParam(required = false) Map<String, String> renderingParams) throws IOException {
 
 		String interactiveKey = osmAndMapsService.getInteractiveKeyMap(style);
 		String currentStyle = osmAndMapsService.getMapStyle(style, interactiveKey);
@@ -147,7 +153,8 @@ public class VectorTileController {
 		if (vectorStyle == null) {
 			return ResponseEntity.badRequest().body("Rendering style is undefined: " + currentStyle);
 		}
-		VectorMetatile tile = getMetaTile(vectorStyle, z, x, y, interactiveKey);
+		String renderingProps = getRenderingProps(vectorStyle, renderingParams);
+		VectorMetatile tile = getMetaTile(vectorStyle, z, x, y, interactiveKey, renderingProps);
 		JsonObject tileInfo = osmAndMapsService.getTileInfo(tile.getCacheRuntimeInfo(), x, y, z);
 		tile.touch();
 		if (tileInfo == null) {
@@ -160,13 +167,47 @@ public class VectorTileController {
 				.body(String.valueOf(tileInfo));
 	}
 
-	public VectorMetatile getMetaTile(VectorStyle vectorStyle, int z, int x, int y, String interactiveKey) {
+	private String getRenderingProps(VectorStyle vectorStyle, Map<String, String> renderingParams) {
+		if (renderingParams == null || renderingParams.isEmpty()) {
+			return "";
+		}
+		Map<String, String> props = new TreeMap<>();
+		for (RenderingRuleProperty property : vectorStyle.storage.PROPS.getPoperties()) {
+			String value = renderingParams.get(property.getAttrName());
+			if (!Algorithms.isEmpty(value)) {
+				props.put(property.getAttrName(), value);
+			}
+		}
+		if (props.isEmpty()) {
+			return "";
+		}
+		StringBuilder renderingProps = new StringBuilder();
+		props.forEach((key, value) -> {
+			if (renderingProps.length() > 0) {
+				renderingProps.append(",");
+			}
+			renderingProps.append(key).append("=").append(value);
+		});
+		return renderingProps.toString();
+	}
+
+	private String getRenderingCacheKey(String renderingProps) {
+		if (Algorithms.isEmpty(renderingProps)) {
+			return "";
+		}
+		return "rp-" + Integer.toUnsignedString(renderingProps.hashCode(), 36);
+	}
+
+	public VectorMetatile getMetaTile(VectorStyle vectorStyle, int z, int x, int y, String interactiveKey, String renderingProps) {
 		int metaSizeLog = Math.min(vectorStyle.metaTileSizeLog, z - 1);
 		String key = interactiveKey != null ? interactiveKey : vectorStyle.key;
-		String tileId = config.createTileId(key, x, y, z, metaSizeLog, vectorStyle.tileSizeLog);
+		String renderingCacheKey = getRenderingCacheKey(renderingProps);
+		String cacheKey = Algorithms.isEmpty(renderingCacheKey) ? key : key + "-" + renderingCacheKey;
+		String tileId = config.createTileId(cacheKey, x, y, z, metaSizeLog, vectorStyle.tileSizeLog);
 		VectorMetatile tile = tileMemoryCache.get(tileId);
 		if (tile == null) {
-			tile = new VectorMetatile(config, tileId, vectorStyle, z, x, y, metaSizeLog, vectorStyle.tileSizeLog, interactiveKey);
+			tile = new VectorMetatile(config, tileId, vectorStyle, z, x, y, metaSizeLog, vectorStyle.tileSizeLog,
+					interactiveKey, renderingProps, cacheKey);
 			tileMemoryCache.put(tile.key, tile);
 		}
 		return tile;
