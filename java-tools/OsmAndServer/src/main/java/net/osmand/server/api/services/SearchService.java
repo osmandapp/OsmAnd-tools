@@ -127,6 +127,8 @@ public class SearchService {
     private final ConcurrentHashMap<String, MapPoiTypes> poiTypesByLocale = new ConcurrentHashMap<>();
 
     private final SpatialTextSearch spatialTextSearch = new SpatialTextSearch();
+    private final ThreadLocal<SpatialTextSearch> spatialTextSearchLocal = 
+    	    ThreadLocal.withInitial(() -> new SpatialTextSearch());
 
     public static class PoiSearchResult {
         
@@ -311,14 +313,18 @@ public class SearchService {
 				return null;
 			}
 
-			SpatialTextSearch search = new SpatialTextSearch();
-			SpatialSearchContext sscontext = new SpatialSearchContext(new SpatialTextSearchSettings(),
+			SpatialTextSearchSettings settings = new SpatialTextSearchSettings();
+			settings.AUTO_CLEAR_PREFIX_CACHE_LIMIT = 100_000;
+			SpatialSearchContext sscontext = new SpatialSearchContext(settings,
 					mapList, new LatLon(ctx.lat, ctx.lon));
             SpatialSearchContext.SpatialSearchStats stats = sscontext.getStats();
             stats.printLogs = printLogs;
 
             stats.requestTime.start();
-            SpatialSearchResults results = search.searchAPI(ctx.text, sscontext);
+            SpatialTextSearch spatialTextSearch = spatialTextSearchLocal.get();
+            // TODO usedMapList.add(osmandRegions.getFile()); add local thread file reference
+            SpatialSearchResults results = spatialTextSearch.searchAPI(ctx.text, sscontext);
+            spatialTextSearch.searchAPI(ctx.text, sscontext);
             stats.requestTime.finish();
             
 			res = new SpatialResults(results, stats);
