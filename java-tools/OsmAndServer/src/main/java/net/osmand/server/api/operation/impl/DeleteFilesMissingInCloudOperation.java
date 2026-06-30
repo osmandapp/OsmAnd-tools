@@ -9,8 +9,6 @@ import org.springframework.stereotype.Component;
 import com.amazonaws.services.s3.model.AmazonS3Exception;
 
 import net.osmand.server.api.operation.AdminOperation;
-import net.osmand.server.api.repo.CloudUserDevicesRepository;
-import net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
 import net.osmand.server.api.repo.CloudUserFilesRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFile;
 import net.osmand.server.api.repo.CloudUsersRepository;
@@ -18,7 +16,7 @@ import net.osmand.server.api.services.StorageService;
 import net.osmand.server.api.services.UserdataService;
 
 /**
- * Deletes (with a -1 version) DB files whose object is missing from S3
+ * Deletes DB files whose object is missing from S3
  */
 @Component
 @AdminOperation(name = "delete-missing-in-cloud")
@@ -28,13 +26,9 @@ public class DeleteFilesMissingInCloudOperation extends AbstractFileFixOperation
 	private static final String LOCAL_STORAGE = "local";
 	private static final int HTTP_NOT_FOUND = 404;
 
-	private final CloudUserDevicesRepository devicesRepository;
-
 	public DeleteFilesMissingInCloudOperation(CloudUsersRepository usersRepository, CloudUserFilesRepository filesRepository,
-	                                           UserdataService userdataService, StorageService storageService,
-	                                           CloudUserDevicesRepository devicesRepository) {
+	                                           UserdataService userdataService, StorageService storageService) {
 		super(usersRepository, filesRepository, userdataService, storageService);
-		this.devicesRepository = devicesRepository;
 	}
 
 	@Override
@@ -43,13 +37,8 @@ public class DeleteFilesMissingInCloudOperation extends AbstractFileFixOperation
 			return false; // object present (or not an S3 file) -> keep
 		}
 		if (!isTest(params)) {
-			CloudUserDevice dev = devicesRepository.findById(file.deviceid);
-			if (dev == null) {
-				throw new IllegalStateException("no device for file id=" + file.id);
-			}
 			LOG.info("Deleting (missing in cloud): userid={}, name={}, type={}", file.userid, file.name, file.type);
-			// normal delete flow: writes a new -1 version, does not touch S3 (object is already gone)
-			userdataService.deleteFile(file.name, file.type, null, null, dev);
+			deleteCompletely(file);
 		}
 		return true; // missing in cloud -> counted/recorded (deleted only when !testRun)
 	}
