@@ -74,10 +74,16 @@ public class MapboxVectorTileController {
 		if (data == null) {
 			return ResponseEntity.badRequest().body("Failed to get tile");
 		}
-		return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_ENCODING, "gzip")
-				.header(HttpHeaders.CACHE_CONTROL, "public, max-age=2592000")
-				.body(new ByteArrayResource(data));
+		HttpHeaders headers = new HttpHeaders();
+		headers.set(HttpHeaders.CONTENT_ENCODING, "gzip");
+		if (cache) {
+			headers.setCacheControl("public, max-age=2592000"); // 30 days
+		} else {
+			headers.setCacheControl("no-cache, no-store, max-age=0, must-revalidate");
+			headers.setPragma("no-cache");
+			headers.setExpires(0);
+		}
+		return new ResponseEntity<>(new ByteArrayResource(data), headers, HttpStatus.OK);
 	}
 
 	@Scheduled(fixedRate = CLEANUP_INTERVAL_MILLIS)
