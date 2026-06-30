@@ -128,6 +128,22 @@ public class SearchService {
     private final ConcurrentHashMap<String, MapPoiTypes> poiTypesByLocale = new ConcurrentHashMap<>();
 
     private final SpatialTextSearch spatialTextSearch = new SpatialTextSearch();
+    private final ThreadLocal<SpatialSearchThreadCache> searchTestSpatialCache =
+            ThreadLocal.withInitial(SpatialSearchThreadCache::new);
+
+    private static class SpatialSearchThreadCache {
+        final SpatialTextSearch search = new SpatialTextSearch();
+        final Map<String, CachedSpatialReader> readers = new HashMap<>();
+        final Map<String, FileStamp> rejectedReaders = new HashMap<>();
+    }
+
+    private record FileStamp(long length, long lastModified) {
+        static FileStamp of(java.io.File file) {
+            return new FileStamp(file.length(), file.lastModified());
+        }
+    }
+
+	private record CachedSpatialReader(FileStamp stamp, BinaryMapIndexReader reader) {}
 
     public static class PoiSearchResult {
         
@@ -304,28 +320,25 @@ public class SearchService {
 			if (list.isEmpty()) {
 				return null;
 			}
-            
-            for (OsmAndMapsService.BinaryMapIndexReaderReference ref : list) {
-                if (ref.file.getName().startsWith("World_")) {
-                    continue;
-                }
-                RandomAccessFile raf = new RandomAccessFile(ref.file, "r");
-                BinaryMapIndexReader reader = new BinaryMapIndexReader(raf, ref.file, false);
-                mapList.add(reader);
-            }
+			SpatialSearchThreadCache cache = searchTestSpatialCache.get();
+			for (OsmAndMapsService.BinaryMapIndexReaderReference ref : list) {
+				BinaryMapIndexReader reader = getSearchTestSpatialReader(cache, ref);
+				if (reader != null) {
+					mapList.add(reader);
+				}
+			}
             
 			if (mapList.isEmpty()) {
 				return null;
 			}
 
-			SpatialTextSearch search = new SpatialTextSearch();
 			SpatialSearchContext sscontext = new SpatialSearchContext(new SpatialTextSearchSettings(),
 					mapList, new LatLon(ctx.lat, ctx.lon));
             SpatialSearchContext.SpatialSearchStats stats = sscontext.getStats();
             stats.printLogs = printLogs;
 
             stats.requestTime.start();
-            SpatialSearchResults results = search.searchAPI(ctx.text, sscontext);
+            SpatialSearchResults results = cache.search.searchAPI(ctx.text, sscontext);
             stats.requestTime.finish();
             
 			res = new SpatialResults(results, stats);
@@ -334,10 +347,45 @@ public class SearchService {
 			StringWriter stackTrace = new StringWriter();
 			e.printStackTrace(new PrintWriter(stackTrace));
 			LOGGER.error("RuntimeException stacktrace:\n" + stackTrace);
-		} finally {
-			osmAndMapsService.unlockReaders(mapList);
 		}
 		return res;
+	}
+
+	private BinaryMapIndexReader getSearchTestSpatialReader(SpatialSearchThreadCache cache,
+			OsmAndMapsService.BinaryMapIndexReaderReference ref) throws IOException {
+		if (ref.file.getName().startsWith("World_")) {
+			return null;
+		}
+		String path = ref.file.getAbsolutePath();
+		FileStamp stamp = FileStamp.of(ref.file);
+		CachedSpatialReader cached = cache.readers.get(path);
+		if (cached != null) {
+			if (cached.stamp.equals(stamp)) {
+				return cached.reader;
+			}
+			closeReader(cached.reader);
+			cache.readers.remove(path);
+		}
+		FileStamp rejectedStamp = cache.rejectedReaders.get(path);
+		if (stamp.equals(rejectedStamp)) {
+			return null;
+		}
+		BinaryMapIndexReader reader = new BinaryMapIndexReader(new RandomAccessFile(ref.file, "r"), ref.file, true);
+		if (reader.containsAddressData() && reader.containsRouteData()) {
+			cache.readers.put(path, new CachedSpatialReader(stamp, reader));
+			return reader;
+		}
+		closeReader(reader);
+		cache.rejectedReaders.put(path, stamp);
+		return null;
+	}
+
+	private void closeReader(BinaryMapIndexReader reader) {
+		try {
+			reader.close();
+		} catch (IOException e) {
+			LOGGER.warn("Failed to close stale spatial reader.", e);
+		}
 	}
 
     public SpatialResponse searchSpatial(SearchContext ctx, String timeZone) throws IOException {
