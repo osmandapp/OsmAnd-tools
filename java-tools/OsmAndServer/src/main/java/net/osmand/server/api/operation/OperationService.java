@@ -129,7 +129,10 @@ public class OperationService {
 		return run.withProgress(context.getProcessed(), context.getTotal(), context.getProgressText(), elapsed);
 	}
 
-	public RunItem startRun(long jobId, RunRequest request) {
+	public synchronized RunItem startRun(long jobId, RunRequest request) {
+		if (!running.isEmpty()) {
+			throw new IllegalStateException("Another operation is already running; only one run at a time is allowed");
+		}
 		JobItem job = repository.getJob(jobId).orElseThrow(() -> new IllegalArgumentException("Job not found: " + jobId));
 		Map<String, Object> params = readMap(job.paramsJson());
 		if (request != null && request.params() != null) {
