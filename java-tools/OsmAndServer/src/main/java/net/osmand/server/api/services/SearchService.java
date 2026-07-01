@@ -123,7 +123,7 @@ public class SearchService {
 	private static final String DELIMITER = " ";
 	private static final String WIKI_POI_TYPE = "osmwiki";
 	// For test increase default limit to cache more
-	private static final int TEST_CACHE_PREFIX_LIMIT = 100_000;
+	private static final int TEST_CACHE_PREFIX_LIMIT = 8_000;
 
 	private final ConcurrentHashMap<String, MapPoiTypes> poiTypesByLocale = new ConcurrentHashMap<>();
 
