@@ -174,7 +174,7 @@ public class VectorTileController {
 		Map<String, String> props = new TreeMap<>();
 		for (RenderingRuleProperty property : vectorStyle.storage.PROPS.getPoperties()) {
 			String value = renderingParams.get(property.getAttrName());
-			if (!Algorithms.isEmpty(value)) {
+			if (!Algorithms.isEmpty(value) && isSafeRenderingPropValue(value)) {
 				props.put(property.getAttrName(), value);
 			}
 		}
@@ -189,6 +189,10 @@ public class VectorTileController {
 			renderingProps.append(key).append("=").append(value);
 		});
 		return renderingProps.toString();
+	}
+
+	private boolean isSafeRenderingPropValue(String value) {
+		return !value.contains(",") && !value.contains("=") && !value.contains(";");
 	}
 
 	private String getRenderingCacheKey(String renderingProps) {
