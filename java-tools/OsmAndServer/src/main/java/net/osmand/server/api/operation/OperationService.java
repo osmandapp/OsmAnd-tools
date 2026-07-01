@@ -20,6 +20,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.cfg.CoercionAction;
 import com.fasterxml.jackson.databind.cfg.CoercionInputShape;
@@ -63,6 +64,7 @@ public class OperationService {
 		this.mapper = mapper;
 		this.paramMapper = mapper.copy();
 		this.paramMapper.coercionConfigDefaults().setCoercion(CoercionInputShape.EmptyString, CoercionAction.AsNull);
+		this.paramMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false); // base/extra params share one map
 		flusher.scheduleWithFixedDelay(this::flushRunning, FLUSH_INTERVAL_MS, FLUSH_INTERVAL_MS, TimeUnit.MILLISECONDS);
 	}
 
@@ -158,6 +160,9 @@ public class OperationService {
 			OperationDescriptor descriptor = registry.resolve(className)
 					.orElseThrow(() -> new IllegalStateException("Operation is not discovered or not valid: " + className));
 			Object args = descriptor.paramsType() == null ? params : paramMapper.convertValue(params, descriptor.paramsType());
+			if (descriptor.extraParamsType() != null) {
+				context.setExtraParams(paramMapper.convertValue(params, descriptor.extraParamsType()));
+			}
 			Object result = invoke(descriptor.bean(), args, context);
 			String resultJson = toJson(result == null ? Collections.emptyMap() : result);
 			if (context.isCancelled()) {
