@@ -56,8 +56,7 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 			Integer usersPercent,    // null/100 = all users; otherwise that % of all users
 			Integer filesPercent,    // null/100 = all files; otherwise that % of each user's files
 			List<Long> fileIds,      // null/empty = normal scan; otherwise process only these file ids
-			Integer threads,         // null/1 = sequential; 2..10 = parallel processing
-			Boolean reanalyze        // FileErrors only: true = re-run list-files analysis instead of deleting
+			Integer threads          // null/1 = sequential; 2..10 = parallel processing
 	) {}
 
 	protected abstract boolean fix(UserFile file, Params params) throws IOException;
@@ -68,6 +67,10 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 
 	static boolean isTest(Params params) {
 		return params.testRun() == null || params.testRun();
+	}
+
+	protected boolean recordFound(Params params) {
+		return isTest(params);
 	}
 
 	@Override
@@ -165,7 +168,7 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 			if (tag != null) {
 				stats.byTag.computeIfAbsent(tag, k -> new AtomicInteger()).incrementAndGet();
 			}
-			if (isTest(params) || Boolean.TRUE.equals(params.reanalyze())) {
+			if (recordFound(params)) {
 				stats.foundFiles.add(tag == null
 						? Map.of("userid", file.userid, "id", file.id, "file", file.name)
 						: Map.of("userid", file.userid, "id", file.id, "file", file.name, "tag", tag));
