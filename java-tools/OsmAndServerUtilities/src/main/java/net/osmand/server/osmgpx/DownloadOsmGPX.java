@@ -133,6 +133,7 @@ public class DownloadOsmGPX {
 	
 	public DownloadOsmGPX() throws SQLException {
 		net.osmand.shared.util.PlatformUtil.INSTANCE.initialize(new ToolsOsmAndContextImpl());
+		java.util.logging.Logger.getLogger("GpxUtilities").setLevel(java.util.logging.Level.OFF);
 		initDBConnection();
 	}
 	
@@ -324,7 +325,6 @@ public class DownloadOsmGPX {
 				"UPDATE " + GPX_METADATA_TABLE_NAME + " SET activity = ? WHERE id = ?"
 		);
 
-		// process each track in a worker thread with a timeout, so no single (corrupt/huge) track can hang the run
 		final int TRACK_TIMEOUT_SEC = 120;
 		final ExecutorService trackExec = Executors.newCachedThreadPool();
 
