@@ -156,11 +156,11 @@ public class VectorTileController {
 		String renderingProps = getRenderingProps(vectorStyle, renderingParams);
 		VectorMetatile tile = getMetaTile(vectorStyle, z, x, y, interactiveKey, renderingProps);
 		JsonObject tileInfo = osmAndMapsService.getTileInfo(tile.getCacheRuntimeInfo(), x, y, z);
-		tile.touch();
 		if (tileInfo == null) {
 			return ResponseEntity.badRequest().body("Unexpected error during rendering");
 		}
 		tileMemoryCache.conditionalCleanupCache();
+		tile.touch();
 
 		return ResponseEntity.ok()
 				.header("Cache-Control", "public, max-age=2592000")
