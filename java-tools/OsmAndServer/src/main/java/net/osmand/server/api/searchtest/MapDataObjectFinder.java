@@ -4,8 +4,6 @@ import java.io.IOException;
 import java.util.*;
 import java.util.function.Consumer;
 
-import org.jetbrains.annotations.NotNull;
-
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader;
@@ -15,87 +13,20 @@ import net.osmand.data.Building;
 import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
 import net.osmand.data.QuadRect;
-import net.osmand.data.Street;
-import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
-import net.osmand.search.core.ObjectType;
 import net.osmand.search.core.SearchResult;
 import static net.osmand.util.MapUtils.*;
 
-public class MapDataObjectFinder implements Consumer<List<SearchResult>> {
-	public enum ResultType {
-		Best,
-		ById,
-		ByTag,
-		ByDist,
-		Error
-	}
-
-	private final LatLon targetPoint;
-	private final Map<String, Object> row;
+public class MapDataObjectFinder extends ResultActuator implements Consumer<List<SearchResult>> {
 	private final long datasetId;
-
-	private Result firstResult = null, actualResult = null;
-
+	
 	public MapDataObjectFinder(LatLon targetPoint, Map<String, Object> row, long datasetId) {
-		this.targetPoint = targetPoint;
-		this.row = row;
+		super(targetPoint, row);
 		this.datasetId = datasetId;
 	}
 
-	public record Result(ResultType type, Object exact, int place, SearchResult searchResult) {
-		
-		@NotNull
-		public String toIdString() {
-			String idStr = "U";
-			Object obj = exact == null ? searchResult.object : exact; 
-			if (obj instanceof BinaryMapDataObject) {
-				EntityType et = ObfConstants.getOsmEntityType((BinaryMapDataObject) obj);
-				if (et == EntityType.RELATION) {
-					idStr = "R";
-				} else if (et == EntityType.NODE) {
-					idStr = "N";
-				} else {
-					idStr = "W";
-				}
-				idStr += ObfConstants.getOsmObjectId((BinaryMapDataObject) obj);
-			} else if (obj instanceof Street s) {
-				idStr = "S" + ObfConstants.getOsmObjectId(s);
-			} else if (obj instanceof MapObject mo && mo.getId() != null) {
-				EntityType et = ObfConstants.getOsmEntityType(mo);
-				if (et == EntityType.NODE) {
-					idStr = "N";
-				} else if (et == EntityType.WAY) {
-					idStr = "W";
-				} else {
-					idStr = "R";
-				}
-				idStr += ObfConstants.getOsmObjectId(mo);
-			} else if (searchResult.object != null) {
-				idStr += searchResult.object.getClass().getSimpleName();
-			}
-			return idStr;
-		}
-		
-		public String toPlaceString() {
-			return place + " - " + type();
-		}
-		
-		public String placeName() {
-			return searchResult != null ? searchResult.toString() : "";
-		}
-	}
-
-	private Result findFirstResult(List<SearchResult> searchResults) throws IOException {
-		Result firstResult = null;
-		int resPlace = 1;
-		for (SearchResult sr : searchResults) {
-			if (sr.objectType != null && ObjectType.LOCATION != sr.objectType) {
-				firstResult = new Result(ResultType.Best, null, resPlace, sr);
-				break;
-			}
-			resPlace++;
-		}
+	protected Result findFirstResult(List<SearchResult> searchResults) throws IOException {
+		Result firstResult = super.findFirstResult(searchResults);
 		if (firstResult != null) {
 			if (firstResult.searchResult().object instanceof Building b) {
 				if (b.getInterpolationInterval() != 0 || b.getInterpolationType() != null) {
@@ -104,7 +35,7 @@ public class MapDataObjectFinder implements Consumer<List<SearchResult>> {
 				// try to calculate precise id for first result 
 				// building name doesn't have unit probably it's a bug to fix, so we check with startsWith
 				if (firstResult.searchResult().file != null) {
-					List<Amenity> poi = getPoiObjects(firstResult.searchResult().file, firstResult.searchResult.location, null);
+					List<Amenity> poi = getPoiObjects(firstResult.searchResult().file, firstResult.searchResult().location, null);
 					Amenity am = null;
 					BinaryMapDataObject obj = null;
 					for (Amenity o : poi) {
@@ -114,7 +45,7 @@ public class MapDataObjectFinder implements Consumer<List<SearchResult>> {
 							break;
 						}
 					}
-					List<BinaryMapDataObject> objects = getMapObjects(firstResult.searchResult().file, firstResult.searchResult.location, null);
+					List<BinaryMapDataObject> objects = getMapObjects(firstResult.searchResult().file, firstResult.searchResult().location, null);
 					for (BinaryMapDataObject o : objects) {
 						String hno = o.getTagValue(OSMTagKey.ADDR_HOUSE_NUMBER.getValue());
 						if (hno != null && (hno.equals(b.getName()) || hno.startsWith(b.getName() + " "))) {
@@ -124,8 +55,8 @@ public class MapDataObjectFinder implements Consumer<List<SearchResult>> {
 					}
 					
 					if (obj != null && am != null) {
-						double dObj = getDistance(firstResult.searchResult.location, obj.getLabelLatLon());
-						double dAm = getDistance(firstResult.searchResult.location, am.getLocation());
+						double dObj = getDistance(firstResult.searchResult().location, obj.getLabelLatLon());
+						double dAm = getDistance(firstResult.searchResult().location, am.getLocation());
 						if (dObj < dAm) {
 							am = null;
 						} else {
@@ -133,9 +64,9 @@ public class MapDataObjectFinder implements Consumer<List<SearchResult>> {
 						}
 					}
 					if (obj != null) {
-						return new Result(ResultType.Best, obj, firstResult.place, firstResult.searchResult);
+						return new Result(ResultType.Best, obj, firstResult.place(), firstResult.searchResult());
 					} else if (am != null) {
-						return new Result(ResultType.Best, am, firstResult.place, firstResult.searchResult);
+						return new Result(ResultType.Best, am, firstResult.place(), firstResult.searchResult());
 					}
 					
 				}
@@ -200,7 +131,7 @@ public class MapDataObjectFinder implements Consumer<List<SearchResult>> {
 
 	private static final int DIST_PRECISE_THRESHOLD_M = 20;
 
-	private Result findActualResult(List<SearchResult> searchResults) throws IOException {
+	protected Result findActualResult(List<SearchResult> searchResults) throws IOException {
 		Result actualResult = null;
 		int resPlace;
 		Set<BinaryMapIndexReader> files = new HashSet<>();
@@ -265,26 +196,5 @@ public class MapDataObjectFinder implements Consumer<List<SearchResult>> {
 			resPlace++;
 		}
 		return actualResult;
-	}
-
-	public void accept(List<SearchResult> searchResults) {
-		try {
-			firstResult = findFirstResult(searchResults);
-			actualResult = findActualResult(searchResults);
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
-	}
-
-	public Result getFirstResult() {
-		return firstResult;
-	}
-
-	public Result getActualResult() {
-		return actualResult;
-	}
-
-	public Map<String, Object> getRow() {
-		return row;
 	}
 }

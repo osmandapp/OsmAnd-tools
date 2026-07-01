@@ -145,16 +145,17 @@ public interface OBFService extends BaseService {
 	record ObfFileInfo(String path, String name, String continent, String country, String region, long lastModified, long size) {}
 	record IndexTokenPage(List<IndexToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, IndexTokenSummary summary) {}
 	record IndexTokenSummary(int poiSum, int addressSum, int commonSum, int frequentSum,
-	                         int dictSuffixSum, int partSuffixSum, int integerSuffixSum, int literalSuffixSum,
+	                         int dictSuffixSum, int commonSuffixSum, int integerSuffixSum, int partSuffixSum,
 	                         int extraSuffixSum, int otherSuffixSum,
 	                         int poiMax, int addressMax,
-	                         int dictSuffixMax, int partSuffixMax, int integerSuffixMax, int literalSuffixMax,
+	                         int dictSuffixMax, int commonSuffixMax, int integerSuffixMax, int partSuffixMax,
 	                         int extraSuffixMax, int otherSuffixMax) {}
 	record IndexSuffixRequest(List<String> tokens, String key, String objectType) {}
-	record IndexSuffixMetric(String name, String obf, int dict, int integer, int extra, int other) {}
+	record IndexSuffixMetric(String name, String obf, int dict, int common, int part, int integer, int extra, int other) {}
 	record IndexSuffixResponse(List<IndexSuffixMetric> metrics, List<String> values) {}
-	record IndexSuffixRef(String obf, int offset, int suffixIndex, boolean poi, int[] metricSuffixIndexes) {}
-	record IndexSuffixCounts(int dict, int integer, int extra, int other) {}
+	record IndexSuffixRef(String obf, int offset, int suffixIndex, boolean poi, int[] metricSuffixIndexes,
+	                      String[] metricIntegerSuffixes, String[] metricExtraSuffixes) {}
+	record IndexSuffixCounts(int dict, int common, int part, int integer, int extra, int other) {}
 	record IndexTokenBuilder(String name, int[] addressOffsets, int[] addressSuffixIndexes, AddressRef[] addressRefs,
 	                         int[] poiRefs, int[] poiAtomRefs,
 	                         int[] poiAtomSizes, Map<Integer, int[]> poiIndexes,
@@ -177,7 +178,8 @@ public interface OBFService extends BaseService {
 	record ObjectAddressPage(List<ObjectAddress> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, int[] countMetrics, int[] sizeMetrics, int aloneCount, int aloneSize) {}
 	record ObjectAddressStats(int size, int count) {}
 	record PoiTokenRefs(Set<Integer> offsets, List<Integer> atomRefs, List<Integer> atomSizes,
-	                    Map<Integer, int[]> poiIndexes, Set<Integer> metricSuffixIndexes) {}
+	                    Map<Integer, int[]> poiIndexes, Set<Integer> metricSuffixIndexes,
+	                    Set<String> metricIntegerSuffixes, Set<String> metricExtraSuffixes) {}
 	record PoiCategoryMeta(String type, String subtype) {}
 	record GenerateDbProgress(String status, String obfName, int obfIndex, int totalObfs, int processedTokens,
 	                          int totalTokens, long elapsedMs, long estimatedMs, String error,

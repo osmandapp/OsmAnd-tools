@@ -11,6 +11,9 @@ import net.osmand.search.core.SearchExportSettings;
 import net.osmand.search.core.SearchPhrase;
 import net.osmand.search.core.SearchResult;
 import net.osmand.search.core.SearchSettings;
+import net.osmand.search.core.spatial.SpatialSearchContext;
+import net.osmand.search.core.spatial.SpatialSearchResult;
+import net.osmand.search.core.spatial.SpatialSearchResultsList;
 import net.osmand.server.api.services.SearchService;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -23,7 +26,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.*;
-import java.util.concurrent.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -38,12 +40,20 @@ public interface DetectorService extends OBFService {
 	}
 
 	record ResultsWithStats(List<AddressResult> results, Collection<BinaryMapIndexReaderStats.WordSearchStat> wordStats,
-	                        Map<BinaryMapIndexReaderStats.BinaryMapIndexReaderApiName, BinaryMapIndexReaderStats.StatByAPI> statsByApi) {}
+	                        Map<BinaryMapIndexReaderStats.BinaryMapIndexReaderApiName, BinaryMapIndexReaderStats.StatByAPI> statsByApi,
+	                        String timeAll, SpatialSearchContext.SpatialSearchStats spatialStats, List<String> spatialCombinations) {}
 	record ResultMetric(String obf, int depth, double foundWordCount, double unknownPhraseMatchWeight,
 	                    Collection<String> otherWordsMatch, Double distance, boolean isEqual, boolean inResult) {}
-	record AddressResult(String name, String type, String address, AddressResult parent, ResultMetric metric, LatLon location, String mainWord) {}
+	record AddressResult(String name, String type, String address, AddressResult parent, ResultMetric metric,
+	                     LatLon location, String mainWord) {}
 
-	default ResultsWithStats getResults(SearchService.SearchContext ctx, SearchService.SearchOption options) throws IOException {
+	default ResultsWithStats getResults(SearchService.SearchContext ctx, SearchService.SearchOption options, Boolean spatial) throws IOException {
+		long startTime = System.currentTimeMillis();
+		if (spatial != null && spatial) {
+			SearchService.SpatialResults results = getSearchService().searchTestSpatial(ctx, options, true);
+			String timeAll = String.format(Locale.US, "%.1f", (System.currentTimeMillis() - startTime) / 1e3);
+			return toResults(ctx, results, timeAll);
+		}
 		SearchService.SearchResults result = getSearchService().getImmediateSearchResults(ctx, options, null);
 		String mainWord = result.phrase() == null ? "" : result.phrase().getUnknownWordToSearch();
 
@@ -52,8 +62,94 @@ public interface DetectorService extends OBFService {
 			AddressResult rec = toResult(r, mainWord, Collections.newSetFromMap(new IdentityHashMap<>()));
 			results.add(rec);
 		}
+		String totalTime = String.format(Locale.US, "%.1f", (System.currentTimeMillis() - startTime) / 1e3);
+		return new ResultsWithStats(results, result.settings().getStat().getWordStats().values(),
+				result.settings().getStat().getByApis(), totalTime, null, null);
+	}
 
-		return new ResultsWithStats(results, result.settings().getStat().getWordStats().values(), result.settings().getStat().getByApis());
+	private ResultsWithStats toResults(SearchService.SearchContext ctx, SearchService.SpatialResults spatialResponse, String totalTime) {
+		List<AddressResult> results = new ArrayList<>();
+		if (spatialResponse == null || spatialResponse.results() == null || spatialResponse.results().mainResults == null) {
+			return new ResultsWithStats(results, Collections.emptyList(), Collections.emptyMap(), totalTime, null, null);
+		}
+		for (SpatialSearchResult res : spatialResponse.results().mainResults) {
+			AddressResult result = toResult(ctx, res);
+			if (result != null) {
+				results.add(result);
+			}
+		}
+		return new ResultsWithStats(results, Collections.emptyList(), Collections.emptyMap(), totalTime,
+				spatialResponse.stats(), spatialCombinations(spatialResponse));
+	}
+
+	private List<String> spatialCombinations(SearchService.SpatialResults spatialResponse) {
+		if (spatialResponse == null || spatialResponse.results() == null || spatialResponse.results().combinations == null) {
+			return Collections.emptyList();
+		}
+		List<String> combinations = new ArrayList<>();
+		for (SpatialSearchResultsList combination : spatialResponse.results().combinations) {
+			if (combination != null) {
+				combinations.add(combination.toString(false));
+			}
+		}
+		return combinations;
+	}
+
+	private AddressResult toResult(SearchService.SearchContext ctx, SpatialSearchResult res) {
+		if (res == null) {
+			return null;
+		}
+		LatLon location = res.getLatLon();
+		List<MapObject> objects = res.getObjects();
+		MapObject object = objects == null || objects.isEmpty() ? null : objects.get(0);
+		Double distance = location == null ? null : MapUtils.getDistance(new LatLon(ctx.lat(), ctx.lon()), location) / 1000.0;
+		ResultMetric metric = new ResultMetric("", res.visibleLevel(), res.matchedTokens(), res.sumOther(),
+				Collections.emptyList(), distance, true, true);
+		AddressResult parent = toParent(ctx, objects, 1, res.matchedTokens());
+		return new AddressResult(spatialName(object, ctx.locale()), spatialType(object), spatialAddress(object, ctx.locale()),
+				parent, metric, location, null);
+	}
+
+	private AddressResult toParent(SearchService.SearchContext ctx, List<MapObject> objects, int index, double foundWordCount) {
+		if (objects == null || index >= objects.size()) {
+			return null;
+		}
+		MapObject object = objects.get(index);
+		LatLon location = object == null ? null : object.getLocation();
+		Double distance = location == null ? null : MapUtils.getDistance(new LatLon(ctx.lat(), ctx.lon()), location) / 1000.0;
+		ResultMetric metric = new ResultMetric("", index, foundWordCount, 0, Collections.emptyList(), distance, true, true);
+		return new AddressResult(spatialName(object, ctx.locale()), spatialType(object), spatialAddress(object, ctx.locale()),
+				toParent(ctx, objects, index + 1, foundWordCount), metric, location, null);
+	}
+
+	private String spatialName(MapObject object, String locale) {
+		if (object == null) {
+			return "";
+		}
+		String name = object.getName(locale);
+		return Algorithms.isEmpty(name) ? object.getName() : name;
+	}
+
+	private String spatialType(MapObject object) {
+		if (object instanceof Amenity) {
+			return "poi";
+		} else if (object instanceof Street) {
+			return "street";
+		} else if (object instanceof City city) {
+			return city.getType() == null ? "city" : city.getType().name().toLowerCase(Locale.ROOT);
+		} else if (object == null) {
+			return "";
+		}
+		return object.getClass().getSimpleName().toLowerCase(Locale.ROOT);
+	}
+
+	private String spatialAddress(MapObject object, String locale) {
+		if (object instanceof Amenity amenity) {
+			return amenity.getCityFromTagGroups(locale);
+		} else if (object instanceof Street street && street.getCity() != null) {
+			return street.getCity().getName(locale);
+		}
+		return "";
 	}
 
 	private AddressResult toResult(SearchResult r, String mainWord, Set<SearchResult> seen) {
@@ -177,7 +273,7 @@ public interface DetectorService extends OBFService {
                     baseCtx.baseSearch(), baseCtx.northWest(), baseCtx.southEast());
             SearchService.SearchResults queryResult = getSearchService().getImmediateSearchResults(
                     phraseCtx, new SearchService.SearchOption(true, exportSettings,
-                            null, true, (net.osmand.search.core.ObjectType[]) null), null);
+                            null, true, false, (net.osmand.search.core.ObjectType[]) null), null);
             if (settingsResult == null) {
                 settingsResult = queryResult;
             }
@@ -264,7 +360,7 @@ public interface DetectorService extends OBFService {
 					baseCtx.baseSearch(), baseCtx.northWest(), baseCtx.southEast());
 			SearchService.SearchResults searchResult = getSearchService().getImmediateSearchResults(
 					phraseCtx,
-					new SearchService.SearchOption(true, null, null, true, (net.osmand.search.core.ObjectType[]) null),
+					new SearchService.SearchOption(true, null, null, true, false, (net.osmand.search.core.ObjectType[]) null),
 					null);
 			SearchPhrase phrase = searchResult.phrase();
 			List<SearchResult> searchResults = searchResult.results();

@@ -50,6 +50,9 @@ public interface SearchTestCaseRepository extends JpaRepository<TestCase, Long> 
 		@Column(name = "skip_found")
 		public Boolean skipFound;
 
+		@Column()
+		public Boolean spatial;
+		
 		// branch
 		@Column()
 		public String name;

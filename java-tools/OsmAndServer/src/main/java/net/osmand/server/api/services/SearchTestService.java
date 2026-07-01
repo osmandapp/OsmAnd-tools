@@ -2,7 +2,12 @@ package net.osmand.server.api.services;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
+import net.osmand.data.Amenity;
+import net.osmand.data.Building;
+import net.osmand.data.City;
 import net.osmand.data.LatLon;
+import net.osmand.data.MapObject;
+import net.osmand.data.Street;
 import net.osmand.server.api.searchtest.*;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.RunParam;
@@ -11,6 +16,10 @@ import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository.Dataset;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
+import net.osmand.search.core.ObjectType;
+import net.osmand.search.core.SearchResult;
+import net.osmand.search.core.spatial.SpatialSearchContext;
+import net.osmand.search.core.spatial.SpatialSearchResult;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import org.slf4j.Logger;
@@ -275,6 +284,8 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 		test.average = payload.average;
 		run.skipFound = payload.skipFound;
 		test.skipFound = payload.skipFound;
+		run.spatial = payload.spatial;
+		test.spatial = payload.spatial;
 		run.shift = payload.shift;
 		test.shift = payload.shift;
 		run.setNorthWest(payload.getNorthWest());
@@ -444,22 +455,28 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 					datasetId = -1;
 				}
 
-				final MapDataObjectFinder finder = new MapDataObjectFinder(targetPoint, newRow, datasetId);
+				ResultActuator actuator = new ResultActuator(targetPoint, newRow);
 				Object[] args = null;
 				try {
 					SearchService.SearchResults searchResult = null;
 					if (query != null && !query.trim().isEmpty()) {
-						searchResult = searchService.getImmediateSearchResults(
-								new SearchService.SearchContext(searchPoint.getLatitude(), searchPoint.getLongitude(),
-								query, run.locale, false, bbox[0], bbox[1]),
-								options, finder);
+						SearchService.SearchContext ctx = new SearchService.SearchContext(searchPoint.getLatitude(), searchPoint.getLongitude(),
+								query, run.locale, false, bbox[0], bbox[1]);
+						if (Boolean.TRUE.equals(run.spatial)) {
+							SearchService.SpatialResults spatialResult = searchService.searchTestSpatial(ctx, options, false);
+							searchResult = fromSpatialResults(spatialResult, newRow, run.locale);
+							actuator.accept(searchResult.results());
+						} else {
+							actuator = new MapDataObjectFinder(targetPoint, newRow, datasetId);
+							searchResult = searchService.getImmediateSearchResults(ctx, options, actuator);
+						}
 					}
 
-					args = collectRunResults(finder, genId, count, run, query, searchResult,
+					args = collectRunResults(actuator, genId, count, run, query, searchResult,
 							targetPoint, searchPoint, System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1], null);
 				} catch (Exception e) {
 					LOGGER.warn("Failed to process row for run {}.", run.id, e);
-					args = collectRunResults(finder, genId, count, run, query, null,
+					args = collectRunResults(actuator, genId, count, run, query, null,
 							targetPoint, searchPoint, System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1],
 							e.getMessage() == null ? e.toString() : e.getMessage());
 				} finally {
@@ -472,6 +489,107 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 			run.setError(e.getMessage());
 			run.status = Run.Status.FAILED;
 		}
+	}
+
+	private SearchService.SearchResults fromSpatialResults(SearchService.SpatialResults spatialResult,
+	                                                       Map<String, Object> row, String locale) {
+		List<SearchResult> results = new ArrayList<>();
+		if (spatialResult == null || spatialResult.results() == null) {
+			return new SearchService.SearchResults(results);
+		}
+
+		SpatialSearchContext.SpatialSearchStats stats = spatialResult.stats();
+		row.put("stat_time", stats.requestTime.time);
+		row.put("stat_bytes", stats.readTableBytes + stats.readAtomsBytes + stats.readObjsBytes);
+		row.put("stat_table_bytes", stats.readTableBytes);
+		row.put("stat_atoms_bytes", stats.readAtomsBytes);
+		
+		row.put("spatial_step1_atoms_time", stats.step1Atoms.time);
+		row.put("spatial_match_time", stats.sub1MatchTime.time);
+		row.put("spatial_file_atoms_time", stats.sub1FileAtomsTime.time);
+		
+		row.put("spatial_step2_compute_time", stats.step2Compute.time);
+		row.put("spatial_load_objects_bld_time", stats.sub2LoadObjectsBldTime.time);
+		row.put("spatial_read_obj_time", stats.sub2ReadObjTime.time);
+		row.put("spatial_max_combinations", stats.maxCombinations);
+		row.put("spatial_tokens_obj", stats.tokenObjs);
+
+		row.put("spatial_step3_sort_time", stats.step3Sort.time);
+
+		List<SpatialSearchResult> spatialResults = spatialResult.results().mainResults;
+		if (spatialResults == null) {
+			return new SearchService.SearchResults(results);
+		}
+		int place = 1;
+		for (SpatialSearchResult spatial : spatialResults) {
+			SearchResult result = fromSpatialResult(spatial, locale);
+			if (result != null) {
+				if (place == 1) {
+					row.put("spatial_matched_tokens", spatial.matchedTokens());
+					row.put("spatial_visible_level", spatial.visibleLevel());
+				}
+				results.add(result);
+				place++;
+			}
+		}
+		return new SearchService.SearchResults(results);
+	}
+
+	private SearchResult fromSpatialResult(SpatialSearchResult spatial, String locale) {
+		if (spatial == null) {
+			return null;
+		}
+		List<MapObject> objects = spatial.getObjects();
+		MapObject object = objects == null || objects.isEmpty() ? null : objects.get(0);
+		LatLon location = spatial.getLatLon();
+		if (location == null && object != null) {
+			location = object.getLocation();
+		}
+		if (location == null) {
+			return null;
+		}
+		SearchResult result = new SearchResult();
+		result.object = object;
+		result.location = location;
+		result.localeName = spatialName(object, locale);
+		result.objectType = spatialObjectType(object);
+		if (object instanceof Street street) {
+			City city = street.getCity();
+			if (city != null) {
+				result.localeRelatedObjectName = city.getName(locale);
+				result.addressName = result.localeRelatedObjectName;
+			}
+		}
+		return result;
+	}
+
+	private ObjectType spatialObjectType(MapObject object) {
+		if (object instanceof Amenity) {
+			return ObjectType.POI;
+		}
+		if (object instanceof Building) {
+			return ObjectType.HOUSE;
+		}
+		if (object instanceof Street) {
+			return ObjectType.STREET;
+		}
+		if (object instanceof City city) {
+			return switch (city.getType()) {
+				case VILLAGE, HAMLET, SUBURB -> ObjectType.VILLAGE;
+				case BOUNDARY -> ObjectType.BOUNDARY;
+				case POSTCODE -> ObjectType.POSTCODE;
+				default -> ObjectType.CITY;
+			};
+		}
+		return ObjectType.LOCATION;
+	}
+
+	private String spatialName(MapObject object, String locale) {
+		if (object == null) {
+			return "";
+		}
+		String name = object.getName(locale);
+		return Algorithms.isEmpty(name) ? object.getName() : name;
 	}
 
  	private void enqueueRunResult(Run run, Object[] args) {
