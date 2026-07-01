@@ -1571,6 +1571,10 @@ public class OsmAndMapsService {
 	}
 
 	public JsonObject getTileInfo(JsonObject tileInfo, int x, int y, int z) {
+		if (tileInfo == null) {
+			return null;
+		}
+
 		JsonObject subInfo = new JsonObject();
 		JsonArray featuresArray = tileInfo.getAsJsonArray("features");
 		JsonArray newFeaturesArray = new JsonArray();
