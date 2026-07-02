@@ -301,9 +301,6 @@ public class SearchService {
 	// dev-only: new prototype search using SpatialTextSearch.
 	public SpatialResults searchTestSpatial(SearchContext ctx, SearchService.SearchOption options, List<BinaryMapIndexReader> readers, boolean printLogs)
 			throws IOException {
-		if (!osmAndMapsService.validateAndInitConfig()) {
-			return null;
-		}
 		SpatialResults res = null;
 		try {
 			if (readers == null) {
@@ -378,11 +375,23 @@ public class SearchService {
 					reader.close();
 				}
 			}
+			BinaryMapIndexReader regionsReader = openRegionsReader();
+			if (regionsReader != null) {
+				readers.add(regionsReader);
+			}
 		} catch (IOException | RuntimeException e) {
 			closeReaders(readers);
 			throw e;
 		}
 		return readers;
+	}
+
+	private BinaryMapIndexReader openRegionsReader() throws IOException {
+		BinaryMapIndexReader regionsReader = osmandRegions.getFile();
+		if (regionsReader == null || regionsReader.getFile() == null) {
+			return null;
+		}
+		return new BinaryMapIndexReader(new RandomAccessFile(regionsReader.getFile(), "r"), regionsReader);
 	}
 
 	public void closeReaders(List<BinaryMapIndexReader> readers) {

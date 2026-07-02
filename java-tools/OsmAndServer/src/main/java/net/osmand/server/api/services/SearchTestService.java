@@ -347,6 +347,10 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 			}
 			return readerPool.get(workerIndex % readerPool.size());
 		}
+
+		int openMapsCount() {
+			return readerPool == null || readerPool.isEmpty() ? 0 : readerPool.get(0).size();
+		}
 	}
 
 	private void doMainRun(TestCase test, Run run, int threadsCount, SearchService.SearchOption options) {
@@ -358,6 +362,7 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 
 		try {
 			spatialContext = createContext(test, maxParallel, options);
+			run.mapsCount = spatialContext == null ? 0 : spatialContext.openMapsCount();
 			if (maxParallel > 1) {
 				String sql = "SELECT count(*) FROM gen_result WHERE case_id = ? ORDER BY id";
 				final long count;
@@ -538,7 +543,7 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 
 	private RunReaderContext createContext(TestCase test, int maxParallel, SearchService.SearchOption options) throws IOException {
 		if (test.getNorthWest() == null || test.getSouthEast() == null) {
-			LOGGER.info("Test-case {} has no test bbox; falling back to per-query map readers.", test.id);
+			LOGGER.info("Test-case {} has no bbox; falling back to per-query map readers.", test.id);
 			return null;
 		}
 		List<OsmAndMapsService.BinaryMapIndexReaderReference> maps =
@@ -620,13 +625,13 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 		return new SearchService.SearchResults(results);
 	}
 
-	private SearchResult fromSpatialResult(SpatialSearchResult spatial, String locale) {
-		if (spatial == null) {
+	private SearchResult fromSpatialResult(SpatialSearchResult res, String locale) {
+		if (res == null) {
 			return null;
 		}
-		List<MapObject> objects = spatial.getObjects();
+		List<MapObject> objects = res.getObjects();
 		MapObject object = objects == null || objects.isEmpty() ? null : objects.get(0);
-		LatLon location = spatial.getLatLon();
+		LatLon location = res.getLatLon();
 		if (location == null && object != null) {
 			location = object.getLocation();
 		}
