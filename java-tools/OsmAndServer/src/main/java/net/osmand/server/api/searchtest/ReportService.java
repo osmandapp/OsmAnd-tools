@@ -43,6 +43,7 @@ public interface ReportService {
 			long failed,
 			long duration,
 			int threadsCount,
+			Integer mapsCount,
 			long found,
 			long partial,
 			long totalBytes,
@@ -224,7 +225,7 @@ public interface ReportService {
 	default Optional<RunStatus> getRunStatus(Long runId, boolean isFull) {
 		String runResultActualPlaceSql = jsonExtractSafe("$.actual_place");
 		String prefixSQL =
-				"SELECT run.status, run.spatial, run.threads_count, COALESCE(finish - start, max(run_result.timestamp) - start) AS time_duration," +
+				"SELECT run.status, run.spatial, run.threads_count, run.maps_count, COALESCE(finish - start, max(run_result.timestamp) - start) AS time_duration," +
 						" count(*) AS total," +
 						" count(*) FILTER (WHERE gen_count > 0 and trim(query) <> '') AS processed," +
 						" count(*) FILTER (WHERE run_result.error IS NOT NULL) AS failed," +
@@ -266,6 +267,8 @@ public interface ReportService {
 			long timeDuration = number == null ? 0 : number.longValue();
 			number = ((Number) result.get("threads_count"));
 			int threadsCount = number == null ? 0 : number.intValue();
+			number = ((Number) result.get("maps_count"));
+			Integer mapsCount = number == null ? null : number.intValue();
 
 			number = ((Number) result.get("found_count"));
 			long found = number == null ? 0 : number.longValue();
@@ -428,7 +431,7 @@ public interface ReportService {
 				totalStats = null;
 			}
 			RunStatus report = new RunStatus(Run.Status.valueOf(status), total, processed, failed,
-					timeDuration, threadsCount, found, partial, totalBytes, totalTime, totalStats, mainStats, subStats, null, null);
+					timeDuration, threadsCount, mapsCount, found, partial, totalBytes, totalTime, totalStats, mainStats, subStats, null, null);
 			return Optional.of(report);
 		} catch (EmptyResultDataAccessException ee) {
 			LOGGER.error("Failed to process RunStatus for {}.", runId, ee);
@@ -469,10 +472,10 @@ public interface ReportService {
 			TestCaseStatus caseStatus = optCase.get();
 			finalStatus = new RunStatus(Run.Status.NEW, caseStatus.processed(), caseStatus.processed(),
 					caseStatus.failed(), caseStatus.duration(), 0, 0, 0,
-					0, 0, null, null, null,  distanceHistogram, caseStatus);
+					0, 0, 0, null, null, null,  distanceHistogram, caseStatus);
 		} else {
 			finalStatus = new RunStatus(status.status(), status.total(), status.processed(), status.failed(),
-					status.duration(), status.threadsCount, status.found(), status.partial(),
+					status.duration(), status.threadsCount, status.mapsCount, status.found(), status.partial(),
 					status.totalBytes, status.totalTime, status.statsCounts, status.mainStats, status.subStats, distanceHistogram, optCase.get());
 		}
 		return Optional.of(finalStatus);
