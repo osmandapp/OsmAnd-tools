@@ -40,16 +40,16 @@ public class DeleteUnusedInfoFilesOperation extends AbstractFileFixOperation {
 	}
 
 	@Override
-	protected boolean fix(UserFile file, boolean testRun) {
+	protected boolean fix(UserFile file, Params params) {
 		String gpxName = file.name.substring(0, file.name.length() - INFO_EXT.length());
 		UserFile gpx = userdataService.getLastFileVersion(file.userid, gpxName, file.type);
 		if (gpx != null && gpx.filesize >= 0) {
 			return false; // paired gpx still exists
 		}
-		if (!testRun) {
+		if (!isTest(params)) {
 			LOG.info("Deleting unused info file: userid={}, name={}, type={}", file.userid, file.name, file.type);
 			try {
-				userdataService.deleteFileVersion(null, file.userid, file.name, file.type, file);
+				deleteCompletely(file);
 			} catch (Exception e) {
 				throw new IllegalStateException(
 						"Failed to delete unused info file userid=" + file.userid + " name=" + file.name, e);

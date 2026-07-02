@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.springframework.stereotype.Component;
@@ -56,23 +57,38 @@ public class AnalyzeRunOperation extends AbstractParallelOperation<AnalyzeRunOpe
 		return result;
 	}
 
-	// file count (+ total filesize/zipfilesize when calcSize) for one group of ids
+	// file count + size of the found id versions and, separately, of all versions of those files (what deleteCompletely removes)
 	private Map<String, Object> measure(List<Long> ids, boolean calcSize, int threads, OperationContext ctx) {
 		Map<String, Object> r = new LinkedHashMap<>();
 		r.put("files", ids.size());
 		if (calcSize) {
-			AtomicLong filesize = new AtomicLong();
-			AtomicLong zipfilesize = new AtomicLong();
+			AtomicLong filesize = new AtomicLong(), zipfilesize = new AtomicLong();
+			AtomicLong allFilesize = new AtomicLong(), allZipfilesize = new AtomicLong();
+			Set<String> countedFiles = ConcurrentHashMap.newKeySet();
 			forEach(threads, batches(ids), ctx, batch -> {
 				for (var f : files.findAllById(batch)) {
-					filesize.addAndGet(f.filesize == null ? 0 : f.filesize);
-					zipfilesize.addAndGet(f.zipfilesize == null ? 0 : f.zipfilesize);
+					filesize.addAndGet(orZero(f.filesize));
+					zipfilesize.addAndGet(orZero(f.zipfilesize));
+					if (countedFiles.add(f.userid + "\n" + f.type + "\n" + f.name)) {
+						for (var v : files.findAllByUseridAndNameAndTypeOrderByUpdatetimeDesc(f.userid, f.name, f.type)) {
+							if (orZero(v.filesize) >= 0) { // skip -1 tombstones
+								allFilesize.addAndGet(orZero(v.filesize));
+								allZipfilesize.addAndGet(orZero(v.zipfilesize));
+							}
+						}
+					}
 				}
 			});
 			r.put("filesize", size(filesize.get()));
 			r.put("zipfilesize", size(zipfilesize.get()));
+			r.put("allVersionsFilesize", size(allFilesize.get()));
+			r.put("allVersionsZipfilesize", size(allZipfilesize.get()));
 		}
 		return r;
+	}
+
+	private static long orZero(Long value) {
+		return value == null ? 0 : value;
 	}
 
 	private static List<Long> parseRunIds(String raw) {

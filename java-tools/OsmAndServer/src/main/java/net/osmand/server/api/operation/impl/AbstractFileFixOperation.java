@@ -59,14 +59,18 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 			Integer threads          // null/1 = sequential; 2..10 = parallel processing
 	) {}
 
-	protected abstract boolean fix(UserFile file, boolean testRun) throws IOException;
+	protected abstract boolean fix(UserFile file, Params params) throws IOException;
 
 	protected boolean accepts(String name) {
 		return true;
 	}
 
-	private static boolean isTest(Params params) {
+	static boolean isTest(Params params) {
 		return params.testRun() == null || params.testRun();
+	}
+
+	protected boolean recordFound(Params params) {
+		return isTest(params);
 	}
 
 	@Override
@@ -155,8 +159,7 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 			return false;
 		}
 		try {
-			boolean test = isTest(params);
-			if (!fix(file, test)) {
+			if (!fix(file, params)) {
 				stats.skipped.incrementAndGet();
 				return false;
 			}
@@ -165,7 +168,7 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 			if (tag != null) {
 				stats.byTag.computeIfAbsent(tag, k -> new AtomicInteger()).incrementAndGet();
 			}
-			if (test) {
+			if (recordFound(params)) {
 				stats.foundFiles.add(tag == null
 						? Map.of("userid", file.userid, "id", file.id, "file", file.name)
 						: Map.of("userid", file.userid, "id", file.id, "file", file.name, "tag", tag));
@@ -202,6 +205,19 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 			}
 		} finally {
 			Files.deleteIfExists(tmp.toPath());
+		}
+	}
+
+	protected void deleteCompletely(UserFile file) {
+		deleteAllVersions(file.userid, file.name, file.type);
+		if (UserdataService.FILE_TYPE_GPX.equals(file.type) && !file.name.endsWith(UserdataService.INFO_EXT)) {
+			deleteAllVersions(file.userid, file.name + UserdataService.INFO_EXT, file.type);
+		}
+	}
+
+	private void deleteAllVersions(int userid, String name, String type) {
+		for (UserFile v : filesRepository.findAllByUseridAndNameAndTypeOrderByUpdatetimeDesc(userid, name, type)) {
+			userdataService.deleteFileVersion(null, userid, name, type, v); // deletes S3 object + DB row
 		}
 	}
 
