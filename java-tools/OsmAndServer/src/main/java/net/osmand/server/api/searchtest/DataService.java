@@ -182,11 +182,27 @@ public interface DataService extends BaseService {
 			assert rows != null;
 
 			List<PolyglotEngine.GenRow> examples = getEngine().execute(getWebServerConfigDir(), test, rows);
+			double north = -Double.MAX_VALUE;
+			double south = Double.MAX_VALUE;
+			double west = Double.MAX_VALUE;
+			double east = -Double.MAX_VALUE;
+			boolean bboxInitialized = false;
 			for (PolyglotEngine.GenRow example : examples) {
-				if (example.point() != null)
+				if (example.point() != null) {
+					LatLon point = example.point();
+					north = Math.max(north, point.getLatitude());
+					south = Math.min(south, point.getLatitude());
+					west = Math.min(west, point.getLongitude());
+					east = Math.max(east, point.getLongitude());
+					bboxInitialized = true;
 					saveCaseResults(test, example);
-				else
+				} else {
 					getLogger().warn("Dataset row: {} has no point.", rows.get(example.dsResultId()));
+				}
+			}
+			if (bboxInitialized) {
+				test.setNorthWest(String.format(Locale.US, "%.5f, %.5f", north, west));
+				test.setSouthEast(String.format(Locale.US, "%.5f, %.5f", south, east));
 			}
 			test.status = TestCase.Status.GENERATED;
 		} catch (Exception e) {

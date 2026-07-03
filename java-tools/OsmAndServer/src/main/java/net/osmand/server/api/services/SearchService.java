@@ -14,6 +14,7 @@ import static net.osmand.util.OpeningHoursParser.parseOpenedHours;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
+import java.io.RandomAccessFile;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -123,7 +124,7 @@ public class SearchService {
 	private static final String DELIMITER = " ";
 	private static final String WIKI_POI_TYPE = "osmwiki";
 	// For test increase default limit to cache more
-	private static final int TEST_CACHE_PREFIX_LIMIT = 100_000;
+	private static final int TEST_CACHE_PREFIX_LIMIT = 1_000; // 8_000 too much
 
 	private final ConcurrentHashMap<String, MapPoiTypes> poiTypesByLocale = new ConcurrentHashMap<>();
 
@@ -298,53 +299,112 @@ public class SearchService {
 	}
 
 	// dev-only: new prototype search using SpatialTextSearch.
-	public SpatialResults searchTestSpatial(SearchContext ctx, SearchService.SearchOption options, boolean printLogs)
+	public SpatialResults searchTestSpatial(SearchContext ctx, SearchService.SearchOption options, List<BinaryMapIndexReader> readers, boolean printLogs)
 			throws IOException {
-		if (!osmAndMapsService.validateAndInitConfig()) {
-			return null;
-		}
 		SpatialResults res = null;
-		List<BinaryMapIndexReader> mapList = new ArrayList<>();
 		try {
-			QuadRect points = osmAndMapsService.points(null,
-					new LatLon(ctx.lat + options.getRadius(), ctx.lon - options.getRadius()),
-					new LatLon(ctx.lat - options.getRadius(), ctx.lon + options.getRadius()));
-			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsForSearch(points, false);
-			if (list.isEmpty()) {
-				return null;
+			if (readers == null) {
+				QuadRect points = osmAndMapsService.points(null,
+						new LatLon(ctx.lat + options.getRadius(), ctx.lon - options.getRadius()),
+						new LatLon(ctx.lat - options.getRadius(), ctx.lon + options.getRadius()));
+				List<OsmAndMapsService.BinaryMapIndexReaderReference> maps = getMapsForSearch(points, false);
+				if (maps.isEmpty()) {
+					return null;
+				}
+				readers = osmAndMapsService.getReaders(maps, null, true);
 			}
-			// TODO use more maps for spatial search
-//			List<OsmAndMapsService.BinaryMapIndexReaderReference> list =
-//					osmAndMapsService.getObfReadersForSpatialSearch(ctx.lat, ctx.lon);
-			mapList = osmAndMapsService.getReaders(list, null, true);
-
-			if (mapList.isEmpty()) {
-				return null;
-			}
-
-			SpatialTextSearchSettings settings = new SpatialTextSearchSettings();
-			settings.AUTO_CLEAR_PREFIX_CACHE_LIMIT = TEST_CACHE_PREFIX_LIMIT;
-			// TODO usedMapList.add(osmandRegions.getFile()); add local thread file
-			// reference
-			SpatialSearchContext sscontext = new SpatialSearchContext(settings, mapList, new LatLon(ctx.lat, ctx.lon));
-			SpatialSearchContext.SpatialSearchStats stats = sscontext.getStats();
-			stats.printLogs = printLogs;
-			stats.requestTime.start();
-			SpatialTextSearch spatialTextSearch = spatialTextSearchLocal.get();
-			SpatialSearchResults results = spatialTextSearch.searchAPI(ctx.text, sscontext);
-			spatialTextSearch.searchAPI(ctx.text, sscontext);
-			stats.requestTime.finish();
-
-			res = new SpatialResults(results, stats);
+			
+			res = searchTestSpatial(ctx, readers, printLogs);
 		} catch (RuntimeException e) {
 			LOGGER.error(String.format("Spatial search failed for '%s': %s", ctx.text, e), e);
 			StringWriter stackTrace = new StringWriter();
 			e.printStackTrace(new PrintWriter(stackTrace));
 			LOGGER.error("RuntimeException stacktrace:\n" + stackTrace);
 		} finally {
-			osmAndMapsService.unlockReaders(mapList);
+			osmAndMapsService.unlockReaders(readers);
 		}
 		return res;
+	}
+
+	private SpatialResults searchTestSpatial(SearchContext ctx, List<BinaryMapIndexReader> readers, boolean printLogs)
+			throws IOException {
+		if (readers == null || readers.isEmpty()) {
+			return null;
+		}
+		SpatialTextSearchSettings settings = new SpatialTextSearchSettings();
+		settings.AUTO_CLEAR_PREFIX_CACHE_LIMIT = TEST_CACHE_PREFIX_LIMIT;
+		SpatialSearchContext sscontext = new SpatialSearchContext(settings, readers, new LatLon(ctx.lat, ctx.lon));
+		SpatialSearchContext.SpatialSearchStats stats = sscontext.getStats();
+		stats.printLogs = printLogs;
+		
+		stats.requestTime.start();
+		SpatialTextSearch spatialTextSearch = spatialTextSearchLocal.get();
+		SpatialSearchResults results = spatialTextSearch.searchAPI(ctx.text, sscontext);
+		stats.requestTime.finish();
+		return new SpatialResults(results, stats);
+	}
+
+	public List<OsmAndMapsService.BinaryMapIndexReaderReference> getMapRefs(String northWest,
+	                                                                        String southEast, double radius,
+	                                                                        boolean baseSearch) throws IOException {
+		if (!osmAndMapsService.validateAndInitConfig()) {
+			return Collections.emptyList();
+		}
+		if (northWest == null || southEast == null) {
+			return Collections.emptyList();
+		}
+		QuadRect points = getSearchBbox(getBboxCoords(Arrays.asList(northWest, southEast)), radius);
+		return getMapsForSearch(points, baseSearch);
+	}
+
+	public List<BinaryMapIndexReader> openReaders(
+			List<OsmAndMapsService.BinaryMapIndexReaderReference> maps) throws IOException {
+		List<BinaryMapIndexReader> readers = new ArrayList<>();
+		if (maps == null) {
+			return readers;
+		}
+		try {
+			for (OsmAndMapsService.BinaryMapIndexReaderReference ref : maps) {
+				if (ref.file.getName().startsWith("World_")) {
+					continue;
+				}
+				BinaryMapIndexReader reader = new BinaryMapIndexReader(new RandomAccessFile(ref.file, "r"), ref.file, true);
+				if (reader.containsAddressData() && reader.containsRouteData()) {
+					readers.add(reader);
+				} else {
+					reader.close();
+				}
+			}
+			BinaryMapIndexReader regionsReader = openRegionsReader();
+			if (regionsReader != null) {
+				readers.add(regionsReader);
+			}
+		} catch (IOException | RuntimeException e) {
+			closeReaders(readers);
+			throw e;
+		}
+		return readers;
+	}
+
+	private BinaryMapIndexReader openRegionsReader() throws IOException {
+		BinaryMapIndexReader regionsReader = osmandRegions.getFile();
+		if (regionsReader == null || regionsReader.getFile() == null) {
+			return null;
+		}
+		return new BinaryMapIndexReader(new RandomAccessFile(regionsReader.getFile(), "r"), regionsReader);
+	}
+
+	public void closeReaders(List<BinaryMapIndexReader> readers) {
+		if (readers == null) {
+			return;
+		}
+		for (BinaryMapIndexReader reader : readers) {
+			try {
+				reader.close();
+			} catch (IOException e) {
+				LOGGER.warn("Failed to close spatial test reader.", e);
+			}
+		}
 	}
 
 	public SpatialResponse searchSpatial(SearchContext ctx, String timeZone) throws IOException {
@@ -1145,6 +1205,17 @@ public class SearchService {
 	public QuadRect getSearchBbox(List<LatLon> bbox) {
 		if (bbox.size() == 2) {
 			return osmAndMapsService.points(null, bbox.get(0), bbox.get(1));
+		}
+		return null;
+	}
+
+	public QuadRect getSearchBbox(List<LatLon> bbox, double radius) {
+		if (bbox.size() == 2) {
+			LatLon northWest = bbox.get(0);
+			LatLon southEast = bbox.get(1);
+			return osmAndMapsService.points(null,
+					new LatLon(northWest.getLatitude() + radius, northWest.getLongitude() - radius),
+					new LatLon(southEast.getLatitude() - radius, southEast.getLongitude() + radius));
 		}
 		return null;
 	}

@@ -73,6 +73,9 @@ public interface SearchTestRunRepository extends JpaRepository<Run, Long> {
 			}
 			this.error = error == null ? null : error.substring(0, 256);
 		}
+
+		@Column(name = "maps_count")
+		public Integer mapsCount;
 	}
 
 	@MappedSuperclass
