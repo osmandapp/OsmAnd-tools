@@ -326,7 +326,7 @@ public class DownloadOsmGPX {
 		);
 
 		final int TRACK_TIMEOUT_SEC = 120;
-		final ExecutorService trackExec = Executors.newCachedThreadPool();
+		ExecutorService trackExec = null;
 
 		int batchSize = 0;
 		final int BATCH_LIMIT = 1000;
@@ -335,6 +335,11 @@ public class DownloadOsmGPX {
 		long lastUpdatedId = -1; // so id=0 is included when present
 		boolean hasMoreRecords = true;
 		try {
+			trackExec = Executors.newCachedThreadPool(r -> {
+				Thread t = new Thread(r);
+				t.setDaemon(true);
+				return t;
+			});
 			while (hasMoreRecords) {
 				hasMoreRecords = false;
 
@@ -466,7 +471,9 @@ public class DownloadOsmGPX {
 			dbConn.rollback();
 			throw e;
 		} finally {
-			trackExec.shutdownNow();
+			if (trackExec != null) {
+				trackExec.shutdownNow();
+			}
 			dbConn.setAutoCommit(true);
 			updateStmtMetrics.close();
 			updateStmtActivityOnly.close();
