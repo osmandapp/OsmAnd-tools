@@ -416,7 +416,7 @@ public interface DataService extends BaseService {
 					row.put("actual_place", actualResult.toPlaceString());
 					row.put("actual_id", actualResult.toIdString());
 					row.put("actual_name", actualResult.placeName());
-					row.put("actual_distance",  ((int) MapUtils.getDistance(targetPoint, actualResult.searchResult().location) / 10) * 10);
+					row.put("actual_dist",  ((int) MapUtils.getDistance(targetPoint, actualResult.searchResult().location) / 10) * 10);
 					LatLon pnt = actualResult.searchResult().location;
 					row.put("actual_lat_lon", String.format(Locale.US, "%f, %f", pnt.getLatitude(), pnt.getLongitude()));
 					found = actualResult.place() <= dupCount + firstResult.place();

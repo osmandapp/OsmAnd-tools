@@ -103,10 +103,9 @@ public class ResultActuator implements Consumer<List<SearchResult>> {
 			} else if (sr.object instanceof BinaryMapDataObject bo && ObfConstants.getOsmObjectId(bo) == datasetId) {
 				actualResult = new Result(ResultType.ById, bo, resPlace, sr);
 				break;
-			}
-			if (sr.location != null) {
-				double dist = MapUtils.getDistance(targetPoint, sr.location);
-				if (dist < minDistance) {
+			} else if(sr.location != null) {
+				double dist = MapUtils.getDistance(sr.location, targetPoint);
+				if (dist < DIST_PRECISE_THRESHOLD_M && dist < minDistance) {
 					minDistance = dist;
 					actualResult = new Result(ResultType.ByDist, sr.object, resPlace, sr);
 				}
