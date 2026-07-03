@@ -709,6 +709,10 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			}
 			long streetId = getOrRegisterStreetIdForCity(id, nameInCity, names, location, city);
 			values.add(streetId);
+			boolean upd = city.updateBbox31WithLoc(location);
+			if (upd) {
+				cityDataStorage.extendBbox(city);
+			}
 		}
 		return values;
 	}

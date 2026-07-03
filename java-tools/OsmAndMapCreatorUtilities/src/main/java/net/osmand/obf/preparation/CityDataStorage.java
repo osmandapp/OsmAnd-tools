@@ -5,7 +5,6 @@ import net.osmand.data.City;
 import net.osmand.data.DataTileManager;
 import net.osmand.data.QuadRect;
 import net.osmand.osm.edit.Entity;
-import net.osmand.util.MapUtils;
 
 import java.util.*;
 
@@ -19,7 +18,8 @@ import java.util.*;
  */
 public class CityDataStorage {
 
-	public Map<City, Boundary> cityBoundaries = new HashMap<City, Boundary>();
+	public Map<City, Boundary> cityBoundaries = new HashMap<>();
+	public Map<City, int[]> cityExtBoundaries = new HashMap<>();
 	public Map<Boundary, List<City>> boundaryToContainingCities = new HashMap<Boundary, List<City>>();
 	private static final double CITY_VILLAGE_DIST = 30000;
 	private DataTileManager<City> cityVillageManager = new DataTileManager<City>(13);
@@ -102,6 +102,11 @@ public class CityDataStorage {
 	}
 
 	public void assignBbox(City c) {
+		int[] bbox31 = cityExtBoundaries.get(c);
+		if (bbox31 != null && c.getBbox31() == null) {
+			c.setBbox31(bbox31);
+			return;
+		}
 		Boundary b = cityBoundaries.get(c);
 		if (c.getBbox31() == null && b != null) {
 			assignBbox(c, b);
@@ -110,7 +115,10 @@ public class CityDataStorage {
 
 	public void assignBbox(City c, Boundary b) {
 		QuadRect bbox = b.getMultipolygon().getLatLonBbox();
-		c.setBbox31(new int[] { MapUtils.get31TileNumberX(bbox.left), MapUtils.get31TileNumberY(bbox.top),
-				MapUtils.get31TileNumberX(bbox.right), MapUtils.get31TileNumberY(bbox.bottom) });
+		c.setBbox31(bbox);
+	}
+
+	public void extendBbox(City city) {
+		cityExtBoundaries.put(city, city.getBbox31());
 	}
 }
