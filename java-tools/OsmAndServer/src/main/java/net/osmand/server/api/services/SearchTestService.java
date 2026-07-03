@@ -3,12 +3,9 @@ package net.osmand.server.api.services;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.data.Amenity;
-import net.osmand.data.Building;
-import net.osmand.data.City;
-import net.osmand.data.LatLon;
-import net.osmand.data.MapObject;
-import net.osmand.data.Street;
+import net.osmand.data.*;
+import net.osmand.obf.OBFDataCreator;
+import net.osmand.search.core.*;
 import net.osmand.server.api.searchtest.*;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.RunParam;
@@ -17,8 +14,6 @@ import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository.Dataset;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
-import net.osmand.search.core.ObjectType;
-import net.osmand.search.core.SearchResult;
 import net.osmand.search.core.spatial.SpatialSearchContext;
 import net.osmand.search.core.spatial.SpatialSearchResult;
 import net.osmand.util.Algorithms;
@@ -37,15 +32,20 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.zip.GZIPInputStream;
 
 @Service
 public class SearchTestService implements ReportService, DataService, DetectorService, InspectorService, AnalystService, TokenAnalystService, AddressPOIAnalystService {
@@ -839,5 +839,39 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 		double roundedLon = BigDecimal.valueOf(sumLon /
 				rows.size()).setScale(7, RoundingMode.HALF_UP).doubleValue();
 		return new LatLon(roundedLat, roundedLon);
+	}
+	
+	public static void main(String[] args) throws IOException, SQLException {
+		String unitTestDir = args.length > 0 ? args[0] : System.getenv("UNIT_TEST_DIR");
+		if (Algorithms.isEmpty(unitTestDir)) {
+			throw new IllegalArgumentException("Unit-test directory is required. Pass it as the first argument or set UNIT_TEST_DIR.");
+		}
+		File dir = new File(unitTestDir);
+		if (!dir.isDirectory()) {
+			throw new IllegalArgumentException("Unit-test directory does not exist: " + dir.getAbsolutePath());
+		}
+		File[] jsonFiles = dir.listFiles((file, name) -> name.toLowerCase(Locale.ROOT).endsWith(".json"));
+		if (jsonFiles == null || jsonFiles.length == 0) {
+			throw new IllegalArgumentException("No JSON unit-tests found in: " + dir.getAbsolutePath());
+		}
+
+		SearchTestService service = new SearchTestService(new SearchService());
+		int failed = 0;
+		for (File jsonFile : jsonFiles) {
+			String fileName = jsonFile.getName();
+			String unitTestName = fileName.substring(0, fileName.length() - ".json".length());
+			try {
+				UnitTestSourceData data = service.executeUnitTest(dir, unitTestName);
+				if (data == null)
+					continue;
+				System.out.println("Generated JSON file: " + data.jsonFilePath());
+			} catch (Exception e) {
+				failed++;
+				System.err.println("Failed unit-test '" + unitTestName + "': " + e.getMessage());
+			}
+		}
+		if (failed > 0) {
+			throw new IllegalStateException("Failed " + failed + " of " + jsonFiles.length + " unit-tests.");
+		}
 	}
 }
