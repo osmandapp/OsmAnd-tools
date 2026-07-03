@@ -523,6 +523,20 @@ public class RandomRouteTester {
 		router.setImpassableRoads(impassableRoads);
 	}
 
+	private RoutingConfiguration buildRoutingConfiguration(RoutingConfiguration.Builder builder,
+			RandomRouteEntry entry, RoutingConfiguration.RoutingMemoryLimits memoryLimits) {
+		GeneralRouter router = builder.getRouter(entry.profile);
+		Map<String, String> routeParameters = getDefaultParameters(router);
+		for (Map.Entry<String, String> e : entry.mapParams().entrySet()) {
+			if ("false".equalsIgnoreCase(e.getValue())) {
+				routeParameters.remove(e.getKey());
+			} else {
+				routeParameters.put(e.getKey(), e.getValue());
+			}
+		}
+		return builder.build(entry.profile, memoryLimits, routeParameters);
+	}
+
 	private RandomRouteResult runBinaryRoutePlanner(RandomRouteEntry entry, boolean useNative) throws IOException, InterruptedException {
 		long started = System.currentTimeMillis();
 
@@ -535,7 +549,7 @@ public class RandomRouteTester {
 		RoutingConfiguration.RoutingMemoryLimits memoryLimits =
 				new RoutingConfiguration.RoutingMemoryLimits(MEM_LIMIT, MEM_LIMIT);
 
-		RoutingConfiguration config = builder.build(entry.profile, memoryLimits, entry.mapParams());
+		RoutingConfiguration config = buildRoutingConfiguration(builder, entry, memoryLimits);
 
 		RoutePlannerFrontEnd.RouteCalculationMode mode =
 				(this.config.CAR_2PHASE_MODE && "car".equals(entry.profile)) ?
@@ -599,7 +613,7 @@ public class RandomRouteTester {
 		RoutingConfiguration.RoutingMemoryLimits memoryLimits =
 				new RoutingConfiguration.RoutingMemoryLimits(MEM_LIMIT, MEM_LIMIT);
 
-		RoutingConfiguration config = builder.build(entry.profile, memoryLimits, entry.mapParams());
+		RoutingConfiguration config = buildRoutingConfiguration(builder, entry, memoryLimits);
 
 		if (this.config.USE_TIME_CONDITIONAL_ROUTING == 1) {
 			config.routeCalculationTime = System.currentTimeMillis();
