@@ -187,7 +187,7 @@ public class UserSubscriptionService {
 		}
 	}
 
-	public long lastProExpiry(int userId) {
+	public long latestProExpiry(int userId) {
 		long last = 0;
 		Map<String, PurchasesDataLoader.Subscription> subMap = purchasesDataLoader.getSubscriptions();
 		for (SupporterDeviceSubscription s : subscriptionsRepo.findAllByUserId(userId)) {
@@ -235,7 +235,7 @@ public class UserSubscriptionService {
 	}
 
 	private SupporterDeviceSubscription revalidateGoogleSubscription(SupporterDeviceSubscription s) {
-		if (!Algorithms.isEmpty(clientSecretFile) ) {
+		if (!Algorithms.isEmpty(clientSecretFile)) {
 			if (androidPublisher == null) {
 				try {
 					// watch first time you need to open special url on web server
@@ -351,7 +351,7 @@ public class UserSubscriptionService {
 		if (s.timestamp != null && FastSpringHelper.isTooEarlyToValidate(s.timestamp.getTime())) {
 			long timeSincePurchase = System.currentTimeMillis() - s.timestamp.getTime();
 			LOG.info(String.format("FastSpring subscription %s - %s is too recent (%d minutes old), skipping validation",
-				s.sku, s.orderId, timeSincePurchase / (60 * 1000)));
+					s.sku, s.orderId, timeSincePurchase / (60 * 1000)));
 			return s;
 		}
 

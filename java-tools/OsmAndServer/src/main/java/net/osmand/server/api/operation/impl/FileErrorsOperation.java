@@ -27,7 +27,8 @@ import net.osmand.server.api.services.WebUserdataService.UserFileUpdate;
 @AdminOperation(name = "file-errors")
 public class FileErrorsOperation extends AbstractFileFixOperation implements ExtraParamsOperation {
 
-	public record Extra(Boolean reanalyze) {}
+	public record Extra(Boolean reanalyze) {
+	}
 
 	private final WebUserdataService webUserdataService;
 	private final CloudUserDevicesRepository devicesRepository;
@@ -35,8 +36,8 @@ public class FileErrorsOperation extends AbstractFileFixOperation implements Ext
 	private volatile boolean reanalyze;
 
 	public FileErrorsOperation(CloudUsersRepository usersRepository, CloudUserFilesRepository filesRepository,
-							   UserdataService userdataService, StorageService storageService,
-							   WebUserdataService webUserdataService, CloudUserDevicesRepository devicesRepository) {
+	                           UserdataService userdataService, StorageService storageService,
+	                           WebUserdataService webUserdataService, CloudUserDevicesRepository devicesRepository) {
 		super(usersRepository, filesRepository, userdataService, storageService);
 		this.webUserdataService = webUserdataService;
 		this.devicesRepository = devicesRepository;
@@ -54,7 +55,7 @@ public class FileErrorsOperation extends AbstractFileFixOperation implements Ext
 	}
 
 	@Override
-	protected boolean recordFound(Params params) {
+	protected boolean shouldListFoundFiles(Params params) {
 		return isTest(params) || reanalyze;
 	}
 
