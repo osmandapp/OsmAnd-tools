@@ -178,7 +178,11 @@ public interface DetectorService extends OBFService {
 			@JsonProperty("geocodingLimit") Integer geocodingLimit) {}
 
 	record UnitTestResultsData(List<List<String>> results, JSONArray routing) {}
-	record UnitTestSourceData(String jsonFilePath, SearchService.SearchResults results) {}
+	record UnitTestSourceData(String jsonFilePath, List<String> jsonFilePaths, SearchService.SearchResults results) {
+		UnitTestSourceData(String jsonFilePath, SearchService.SearchResults results) {
+			this(jsonFilePath, Collections.singletonList(jsonFilePath), results);
+		}
+	}
 
 	default void createUnitTest(UnitTestPayload unitTest, SearchService.SearchContext ctx, OutputStream out) throws IOException, SQLException {
 		Path rootTmp = Path.of(System.getProperty("java.io.tmpdir"));
@@ -292,7 +296,11 @@ public interface DetectorService extends OBFService {
 	}
 
 	private UnitTestSourceData createUnitTestJson(Path dirPath, String name, SearchService.SearchResults results, JSONArray routing, Map<String, Amenity> amenities, Map<Long, City> cities) throws IOException {
-		File sourceJsonFile = dirPath.resolve(name + ".source.json").toFile();
+		return createUnitTestJsonFile(dirPath.resolve(name + ".source.json").toFile(), results, routing, amenities, cities);
+	}
+
+	private UnitTestSourceData createUnitTestJsonFile(File sourceJsonFile, SearchService.SearchResults results, JSONArray routing,
+			Map<String, Amenity> amenities, Map<Long, City> cities) throws IOException {
 		JSONObject sourceJson = new JSONObject();
 		if (!amenities.isEmpty()) {
 			JSONArray amenitiesJson = new JSONArray();
@@ -551,6 +559,8 @@ public interface DetectorService extends OBFService {
 			SearchPhrase emptyPhrase = SearchPhrase.emptyPhrase(settings);
 			LinkedHashMap<String, Amenity> amenities = new LinkedHashMap<>();
 			LinkedHashMap<Long, City> cities = new LinkedHashMap<>();
+			Map<String, LinkedHashMap<String, Amenity>> amenitiesByReader = new LinkedHashMap<>();
+			Map<String, LinkedHashMap<Long, City>> citiesByReader = new LinkedHashMap<>();
 			SearchService.SearchResults results = null;
 			for (String q : queries) {
 				SearchPhrase phrase = emptyPhrase.generateNewPhrase(q, settings);
@@ -564,7 +574,22 @@ public interface DetectorService extends OBFService {
 				String unitTestJson = json == null ? null : json.toString(4);
 
 				collectUnitTestSourceData(unitTestJson, amenities, cities);
+				if (readers.size() > 1) {
+					collectUnitTestSourceDataByReader(collection, matcher, amenitiesByReader, citiesByReader);
+				}
 				results = new SearchService.SearchResults(collection.getCurrentSearchResults(), settings, unitTestJson, collection.getPhrase());
+			}
+			if (readers.size() > 1) {
+				List<String> jsonFilePaths = new ArrayList<>();
+				for (BinaryMapIndexReader reader : readers) {
+					String readerFileName = reader.getFile().getName();
+					File sourceJsonFile = obfDir.toPath().resolve(unitTestJsonFileName(readerFileName)).toFile();
+					UnitTestSourceData data = createUnitTestJsonFile(sourceJsonFile, results, new JSONArray(),
+							amenitiesByReader.getOrDefault(readerFileName, new LinkedHashMap<>()),
+							citiesByReader.getOrDefault(readerFileName, new LinkedHashMap<>()));
+					jsonFilePaths.add(data.jsonFilePath());
+				}
+				return new UnitTestSourceData(jsonFilePaths.get(0), jsonFilePaths, results);
 			}
 			return createUnitTestJson(obfDir.toPath(), name, results, new JSONArray(), amenities, cities);
 		} finally {
@@ -573,5 +598,102 @@ public interface DetectorService extends OBFService {
 				reader.getFile().deleteOnExit();
 			}
 		}
+	}
+
+	private void collectUnitTestSourceDataByReader(SearchUICore.SearchResultCollection collection,
+			SearchUICore.SearchResultMatcher matcher,
+			Map<String, LinkedHashMap<String, Amenity>> amenitiesByReader,
+			Map<String, LinkedHashMap<Long, City>> citiesByReader) {
+		Map<String, List<SearchResult>> resultsByReader = new LinkedHashMap<>();
+		for (SearchResult result : collection.getCurrentSearchResults()) {
+			String readerFileName = unitTestReaderFileName(result);
+			if (readerFileName != null) {
+				resultsByReader.computeIfAbsent(readerFileName, k -> new ArrayList<>()).add(result);
+			}
+		}
+		for (Map.Entry<String, List<SearchResult>> entry : resultsByReader.entrySet()) {
+			SearchUICore.SearchResultCollection readerCollection = new SearchUICore.SearchResultCollection(collection.getPhrase());
+			readerCollection.addSearchResults(entry.getValue(), false, false);
+			JSONObject json = SearchUICore.createTestJSON(readerCollection,
+					filterExportedObjects(entry.getValue(), matcher.getExportedObjects()),
+					filterExportedCities(entry.getValue(), matcher.getExportedCities()));
+			if (json != null) {
+				collectUnitTestSourceData(json.toString(4),
+						amenitiesByReader.computeIfAbsent(entry.getKey(), k -> new LinkedHashMap<>()),
+						citiesByReader.computeIfAbsent(entry.getKey(), k -> new LinkedHashMap<>()));
+			}
+		}
+	}
+
+	private List<MapObject> filterExportedObjects(List<SearchResult> results, List<MapObject> exportedObjects) {
+		if (exportedObjects == null || exportedObjects.isEmpty()) {
+			return exportedObjects;
+		}
+		Set<MapObject> usedObjects = Collections.newSetFromMap(new IdentityHashMap<>());
+		Set<City> usedCities = Collections.newSetFromMap(new IdentityHashMap<>());
+		collectUnitTestResultObjects(results, usedObjects, usedCities);
+		List<MapObject> filtered = new ArrayList<>();
+		for (MapObject object : exportedObjects) {
+			if (usedObjects.contains(object) || object instanceof City city && usedCities.contains(city)) {
+				filtered.add(object);
+			}
+		}
+		return filtered;
+	}
+
+	private List<City> filterExportedCities(List<SearchResult> results, List<City> exportedCities) {
+		if (exportedCities == null || exportedCities.isEmpty()) {
+			return exportedCities;
+		}
+		Set<MapObject> usedObjects = Collections.newSetFromMap(new IdentityHashMap<>());
+		Set<City> usedCities = Collections.newSetFromMap(new IdentityHashMap<>());
+		collectUnitTestResultObjects(results, usedObjects, usedCities);
+		List<City> filtered = new ArrayList<>();
+		for (City city : exportedCities) {
+			if (usedCities.contains(city)) {
+				filtered.add(city);
+			}
+		}
+		return filtered;
+	}
+
+	private void collectUnitTestResultObjects(List<SearchResult> results, Set<MapObject> usedObjects, Set<City> usedCities) {
+		for (SearchResult result : results) {
+			collectUnitTestResultObjects(result, usedObjects, usedCities);
+		}
+	}
+
+	private void collectUnitTestResultObjects(SearchResult result, Set<MapObject> usedObjects, Set<City> usedCities) {
+		if (result == null) {
+			return;
+		}
+		collectUnitTestResultObject(result.object, usedObjects, usedCities);
+		collectUnitTestResultObject(result.relatedObject, usedObjects, usedCities);
+		if (result.parentSearchResult != result) {
+			collectUnitTestResultObjects(result.parentSearchResult, usedObjects, usedCities);
+		}
+	}
+
+	private void collectUnitTestResultObject(Object object, Set<MapObject> usedObjects, Set<City> usedCities) {
+		if (object instanceof MapObject mapObject) {
+			usedObjects.add(mapObject);
+			if (mapObject instanceof City city) {
+				usedCities.add(city);
+			} else if (mapObject instanceof Street street && street.getCity() != null) {
+				usedCities.add(street.getCity());
+			}
+		}
+	}
+
+	private String unitTestReaderFileName(SearchResult result) {
+		if (result == null || result.file == null || result.file.getFile() == null) {
+			return null;
+		}
+		return result.file.getFile().getName();
+	}
+
+	private String unitTestJsonFileName(String fileName) {
+		int dot = fileName.lastIndexOf('.');
+		return (dot > 0 ? fileName.substring(0, dot) : fileName) + ".json";
 	}
 }

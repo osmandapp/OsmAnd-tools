@@ -864,7 +864,9 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 				UnitTestSourceData data = service.executeUnitTest(dir, unitTestName);
 				if (data == null)
 					continue;
-				System.out.println("Generated JSON file: " + data.jsonFilePath());
+				for (String jsonFilePath : data.jsonFilePaths()) {
+					System.out.println("Generated JSON file: " + jsonFilePath);
+				}
 			} catch (Exception e) {
 				failed++;
 				System.err.println("Failed unit-test '" + unitTestName + "': " + e.getMessage());
