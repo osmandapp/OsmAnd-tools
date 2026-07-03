@@ -13,6 +13,8 @@ import java.io.IOException;
 import java.util.*;
 import java.util.function.Consumer;
 
+import static net.osmand.util.MapUtils.getDistance;
+
 public class ResultActuator implements Consumer<List<SearchResult>> {
 	public enum ResultType {
 		Best,
@@ -25,10 +27,12 @@ public class ResultActuator implements Consumer<List<SearchResult>> {
 	protected final LatLon targetPoint;
 	protected final Map<String, Object> row;
 	protected Result firstResult = null, actualResult = null;
+	protected final long datasetId;
 
-	public ResultActuator(LatLon targetPoint, Map<String, Object> row) {
+	public ResultActuator(LatLon targetPoint, Map<String, Object> row, long datasetId) {
 		this.targetPoint = targetPoint;
 		this.row = row;
+		this.datasetId = datasetId;
 	}
 
 	public record Result(ResultType type, Object exact, int place, SearchResult searchResult) {
@@ -85,17 +89,26 @@ public class ResultActuator implements Consumer<List<SearchResult>> {
 		}
 		return firstResult;
 	}
-
+	
+	protected static final int DIST_PRECISE_THRESHOLD_M = 20;
+	
 	protected Result findActualResult(List<SearchResult> searchResults) throws IOException {
-		Result actualResult = null;
-		double minDistance = Double.MAX_VALUE;
+		// Find closest by distance by id & by tags 
 		int resPlace = 1;
+		double minDistance = Double.MAX_VALUE;
 		for (SearchResult sr : searchResults) {
+			if (sr.object instanceof MapObject mo && ObfConstants.getOsmObjectId(mo) == datasetId) {
+				actualResult = new Result(ResultType.ById, mo, resPlace, sr);
+				break;
+			} else if (sr.object instanceof BinaryMapDataObject bo && ObfConstants.getOsmObjectId(bo) == datasetId) {
+				actualResult = new Result(ResultType.ById, bo, resPlace, sr);
+				break;
+			}
 			if (sr.location != null) {
 				double dist = MapUtils.getDistance(targetPoint, sr.location);
 				if (dist < minDistance) {
 					minDistance = dist;
-					actualResult = new Result(ResultType.ByDist, null, resPlace, sr);
+					actualResult = new Result(ResultType.ByDist, sr.object, resPlace, sr);
 				}
 			}
 			resPlace++;
