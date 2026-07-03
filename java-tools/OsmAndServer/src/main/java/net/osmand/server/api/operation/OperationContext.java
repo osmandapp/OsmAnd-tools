@@ -8,6 +8,15 @@ public class OperationContext {
 	private volatile int processed;
 	private volatile int total;
 	private volatile Supplier<Object> resultSupplier;
+	private volatile Object extraParams;
+
+	public Object getExtraParams() {
+		return extraParams;
+	}
+
+	public void setExtraParams(Object extraParams) {
+		this.extraParams = extraParams;
+	}
 
 	public boolean isCancelled() {
 		return cancelled || Thread.currentThread().isInterrupted();
