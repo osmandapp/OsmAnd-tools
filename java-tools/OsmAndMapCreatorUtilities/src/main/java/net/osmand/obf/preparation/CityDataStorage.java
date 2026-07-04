@@ -5,6 +5,7 @@ import net.osmand.data.City;
 import net.osmand.data.DataTileManager;
 import net.osmand.data.QuadRect;
 import net.osmand.osm.edit.Entity;
+import net.osmand.util.MapUtils;
 
 import java.util.*;
 
@@ -104,8 +105,13 @@ public class CityDataStorage {
 	public void assignBbox(City c) {
 		int[] bbox31 = cityExtBoundaries.get(c);
 		if (bbox31 != null && c.getBbox31() == null) {
+//			double d = MapUtils.getDistance(MapUtils.get31LatitudeY(bbox31[1]), MapUtils.get31LongitudeX(bbox31[0]),
+//					MapUtils.get31LatitudeY(bbox31[3]),MapUtils.get31LongitudeX(bbox31[2]));
+//			if(d < 10000 || cityBoundaries.containsKey(c)) {
+			// assign to all bbox for now
 			c.setBbox31(bbox31);
 			return;
+//			}
 		}
 		Boundary b = cityBoundaries.get(c);
 		if (c.getBbox31() == null && b != null) {
