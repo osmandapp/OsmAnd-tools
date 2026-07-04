@@ -285,9 +285,14 @@ public class NameIndexCreator<T> {
 	
 	
 	public void addToNameIndex(String name, T obj, int maxPrefixLength, boolean indexNumbers) {
-		if (obj instanceof Street && name.startsWith("<") && name.trim().endsWith(">") && 
-				!name.startsWith("<<")) {
-			name += " " + NameIndexReader.CITY_AS_STREET_COMMON;
+		if (obj instanceof Street s) {
+//			if(name.startsWith("<") && name.trim().endsWith(">") && 
+//				!name.startsWith("<<")) {
+//				name += " " + NameIndexReader.CITY_AS_STREET_COMMON;
+//			} else 
+			if (s.getName(IndexAddressCreator.PLACE_ATTR) != null) {
+				name += " " + NameIndexReader.CITY_AS_STREET_COMMON;
+			}
 		}
 		List<String> uniqueNames = SearchAlgorithms.splitAndNormalize(name, true);
 		List<String> allNames = SearchAlgorithms.splitAndNormalize(name, false);

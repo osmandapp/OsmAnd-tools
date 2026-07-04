@@ -86,7 +86,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	private boolean DEBUG_FULL_NAMES = false; //true to see attached cityPart and boundaries to the street names
 
-	private static final String PLACE_ATTR = "place";
+	public static final String PLACE_ATTR = "place";
+	
 	private static final String ADMIN_LEVEL_ATTR = "admin_level";
 	private TreeSet<String> langAttributes = new TreeSet<String>();
 	{
