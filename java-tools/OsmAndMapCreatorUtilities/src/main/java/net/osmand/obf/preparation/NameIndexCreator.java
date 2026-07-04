@@ -290,7 +290,7 @@ public class NameIndexCreator<T> {
 //				!name.startsWith("<<")) {
 //				name += " " + NameIndexReader.CITY_AS_STREET_COMMON;
 //			} else 
-			if (s.getName(IndexAddressCreator.PLACE_ATTR) != null) {
+			if (s.getNamesMap(false).containsKey(MapObject.NAME_PLACE_ATTR)) {
 				name += " " + NameIndexReader.CITY_AS_STREET_COMMON;
 			}
 		}
