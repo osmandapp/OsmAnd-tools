@@ -170,11 +170,11 @@ public class NotifyInactiveUsersOperation extends AbstractFileFixOperation imple
 		result.deleted.add(entry);
 		if (!isTest(params)) {
 			try {
-				synchronized (dbLock) {
-					noticeRepository.markDeleted(userId);
-				}
 				for (UserFileNoData f : res.uniqueFiles) {
 					filesRepository.findById(f.id).ifPresent(this::deleteCompletely);
+				}
+				synchronized (dbLock) {
+					noticeRepository.markDeleted(userId);
 				}
 			} catch (Exception e) {
 				result.failed.incrementAndGet();
