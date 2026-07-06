@@ -456,9 +456,8 @@ public class DownloadIndexesService  {
 	    SLOPE("slope", "slope") ,
 	    SRTM_MAP("srtm-countries", "srtmcountry"),
 	    WEATHER("weather/regions", "weather"),
-
-	    DELETED_MAP("indexes", ""),
-	    DELETED_ROAD_MAP("road-indexes", "");
+	    
+	    DELETED_MAP("indexes", "");
 
 
 		private final String path;
