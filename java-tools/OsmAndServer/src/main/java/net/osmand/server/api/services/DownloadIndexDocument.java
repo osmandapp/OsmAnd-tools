@@ -72,9 +72,12 @@ public class DownloadIndexDocument {
 	private List<DownloadIndex> weather = new ArrayList<>();
 	
 	@XmlElement(name = "deleted_map")
-	private List<DownloadIndex> deletedMaps = new ArrayList<>(); 
-	
-	
+	private List<DownloadIndex> deletedMaps = new ArrayList<>();
+
+	@XmlElement(name = "deleted_road_map")
+	private List<DownloadIndex> deletedRoadMaps = new ArrayList<>();
+
+
 	public void setOutdatedMaps() {
 		addDeletedMap("Argentina_southamerica_2.obf.zip", DownloadType.MAP, "06.07.2026");
 		addDeletedMap("Austria_europe_2.obf.zip", DownloadType.MAP, "06.07.2026");
@@ -145,9 +148,13 @@ public class DownloadIndexDocument {
 		try {
 			DownloadIndex di = new DownloadIndex();
 			di.setName(name);
+			di.setType(oldType);
 			di.setDateByString(date);
-			di.setType(DownloadType.DELETED_MAP);
-			deletedMaps.add(di);
+			if (oldType == DownloadType.MAP) {
+				deletedMaps.add(di);
+			} else if (oldType == DownloadType.ROAD_MAP) {
+				deletedRoadMaps.add(di);
+			}
 		} catch (ParseException e) {
 			e.printStackTrace();
 		}

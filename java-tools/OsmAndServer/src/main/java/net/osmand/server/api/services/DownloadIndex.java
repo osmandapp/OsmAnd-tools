@@ -232,6 +232,8 @@ public class DownloadIndex {
 				dt = DownloadIndexesService.DownloadType.ROAD_MAP;
 			} else if (v.equals("deleted_map")) {
 				dt = DownloadIndexesService.DownloadType.DELETED_MAP;
+			} else if (v.equals("deleted_road_map")) {
+				dt = DownloadIndexesService.DownloadType.DELETED_ROAD_MAP;
 			}
 			return dt;
 		}
