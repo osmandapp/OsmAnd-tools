@@ -132,7 +132,7 @@ public class UserdataService {
     private static final String USER_FOLDER_PREFIX = "user-";
     private static final String FILE_NAME_SUFFIX = ".gz";
     private static final int MAX_FILENAME = 220; // max basename bytes
-    private static final int SHORT_FILENAME = 100; // chars a too-long basename is shortened to
+    private static final int SHORT_FILENAME = 100; // bytes a too-long basename is shortened to
     private static final String CR_SANITIZE = "$0D"; // \r
     private static final String LF_SANITIZE = "$0A"; // \n
 
@@ -461,16 +461,28 @@ public class UserdataService {
         return fldName + "/" + updatetime.getTime() + "-" + name + FILE_NAME_SUFFIX;
     }
 
-    // bounded key for a too-long basename (100 chars + name hash); null when the basename already fits
-    public String computeStorageName(String type, String name, Date updatetime) {
-        int nt = name.lastIndexOf('/') + 1;
-        String base = name.substring(nt);
-        if (base.getBytes(StandardCharsets.UTF_8).length <= MAX_FILENAME) {
-            return null;
-        }
-        String shortName = name.substring(0, nt) + base.substring(0, Math.min(SHORT_FILENAME, base.length())) + "-" + Integer.toHexString(name.hashCode());
-        return storageFileName(type, shortName, updatetime);
-    }
+	// bounded key for a too-long basename (100 bytes + name hash); null when the basename already fits
+	public String computeStorageName(String type, String name, Date updatetime) {
+		int nt = name.lastIndexOf('/') + 1;
+		String base = name.substring(nt);
+		if (base.getBytes(StandardCharsets.UTF_8).length <= MAX_FILENAME) {
+			return null;
+		}
+		String shortName = name.substring(0, nt) + shortBasename(base) + "-" + Integer.toHexString(name.hashCode());
+		return storageFileName(type, shortName, updatetime);
+	}
+
+	private static String shortBasename(String base) {
+		byte[] b = base.getBytes(StandardCharsets.UTF_8);
+		if (b.length <= SHORT_FILENAME) {
+			return base;
+		}
+		int end = SHORT_FILENAME;
+		while (end > 0 && (b[end] & 0xC0) == 0x80) {
+			end--;
+		}
+		return new String(b, 0, end, StandardCharsets.UTF_8);
+	}
 
     // remap an existing file's S3 object to the bounded key and persist storagename; no-op if not needed
     public void migrateStorageName(UserFile fl) {
