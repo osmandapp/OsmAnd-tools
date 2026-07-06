@@ -32,7 +32,7 @@ import net.osmand.util.Algorithms;
 /**
  * Two mailing lists of free-inactive users (had-pro / never-pro) for a support warning mail. State is kept across
  * runs: a user still inactive after the grace period (default 30 days) gets their files deleted instead of re-mailed;
- * a user active again before that is dropped. Free-inactive = same rule as delete-old-files.
+ * a user active again before that is dropped. Free-inactive = free 2+ years, no device sync 2+ years, no file activity 1+ year.
  */
 @Component
 @AdminOperation(name = "notify-inactive-users")
