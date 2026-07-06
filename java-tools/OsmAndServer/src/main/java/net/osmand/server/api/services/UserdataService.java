@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -130,6 +131,8 @@ public class UserdataService {
     public static final long MAXIMUM_ACCOUNT_SIZE = 3000 * MB; // 3 (5 GB - std, 50 GB - ext, 1000 GB - pro)
     private static final String USER_FOLDER_PREFIX = "user-";
     private static final String FILE_NAME_SUFFIX = ".gz";
+    private static final int MAX_FILENAME = 220; // max basename bytes
+    private static final int SHORT_FILENAME = 100; // chars a too-long basename is shortened to
     private static final String CR_SANITIZE = "$0D"; // \r
     private static final String LF_SANITIZE = "$0A"; // \n
 
@@ -422,6 +425,7 @@ public class UserdataService {
 		usf.deviceid = dev.id;
 		usf.filesize = zipfile.getContentSize();
 		usf.zipfilesize = zipfile.getSize();
+		usf.storagename = computeStorageName(usf.type, usf.name, usf.updatetime);
 		usf.storage = storageService.save(userFolder(usf), storageFileName(usf), zipfile);
 		if (storageService.storeLocally()) {
 			usf.data = zipfile.getBytes();
@@ -440,7 +444,11 @@ public class UserdataService {
     }
 
     public String storageFileName(UserFile uf) {
-        return storageFileName(uf.type, uf.name, uf.updatetime);
+        return Algorithms.isEmpty(uf.storagename) ? storageFileName(uf.type, uf.name, uf.updatetime) : uf.storagename;
+    }
+
+    public String storageFileName(CloudUserFilesRepository.UserFileNoData nd) {
+        return Algorithms.isEmpty(nd.storagename) ? storageFileName(nd.type, nd.name, nd.updatetime) : nd.storagename;
     }
 
     public String storageFileName(String type, String name, Date updatetime) {
@@ -451,6 +459,28 @@ public class UserdataService {
             name = name.substring(nt + 1);
         }
         return fldName + "/" + updatetime.getTime() + "-" + name + FILE_NAME_SUFFIX;
+    }
+
+    // bounded key for a too-long basename (100 chars + name hash); null when the basename already fits
+    public String computeStorageName(String type, String name, Date updatetime) {
+        int nt = name.lastIndexOf('/') + 1;
+        String base = name.substring(nt);
+        if (base.getBytes(StandardCharsets.UTF_8).length <= MAX_FILENAME) {
+            return null;
+        }
+        String shortName = name.substring(0, nt) + base.substring(0, Math.min(SHORT_FILENAME, base.length())) + "-" + Integer.toHexString(name.hashCode());
+        return storageFileName(type, shortName, updatetime);
+    }
+
+    // remap an existing file's S3 object to the bounded key and persist storagename; no-op if not needed
+    public void migrateStorageName(UserFile fl) {
+        String bounded = Algorithms.isEmpty(fl.storagename) ? computeStorageName(fl.type, fl.name, fl.updatetime) : null;
+        if (bounded == null) {
+            return;
+        }
+        storageService.remapFileNames(fl.storage, userFolder(fl), storageFileName(fl.type, fl.name, fl.updatetime), bounded);
+        fl.storagename = bounded;
+        filesRepository.save(fl);
     }
 
     public ResponseEntity<String> webUserActivate(String email, String token, String password, String lang) {
@@ -739,6 +769,7 @@ public class UserdataService {
         usf.deviceid = dev.id;
         usf.filesize = zipFile.getContentSize();
         usf.zipfilesize = zipFile.getSize();
+        usf.storagename = computeStorageName(usf.type, usf.name, usf.updatetime);
         usf.storage = storageService.save(userFolder(usf), storageFileName(usf), zipFile);
         if (storageService.storeLocally()) {
             usf.data = zipFile.getBytes();
@@ -826,7 +857,7 @@ public class UserdataService {
     }
 
     public InputStream getInputStream(CloudUserFilesRepository.UserFileNoData userFile) {
-        return storageService.getFileInputStream(userFile.storage, userFolder(userFile.userid), storageFileName(userFile.type, userFile.name, userFile.updatetime));
+        return storageService.getFileInputStream(userFile.storage, userFolder(userFile.userid), storageFileName(userFile));
     }
 
     public boolean fileExists(CloudUserFilesRepository.UserFile userFile) {
@@ -1378,7 +1409,7 @@ public class UserdataService {
 	}
 
 	public UserdataController.UserFilesResults generateGpxFilesByQuadTiles(int userId, boolean allVersions, String[] tiles) {
-		String query = "SELECT u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize, u.storage " +
+		String query = "SELECT u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize, u.storage, u.storagename " +
 				"FROM user_files u " +
 				"WHERE u.userid = ? " +
 				"AND u.type = 'GPX' " +
@@ -1400,8 +1431,9 @@ public class UserdataService {
 			Long fileSize = (Long) row.get("filesize");
 			Long zipFileSize = (Long) row.get("zipfilesize");
 			String storage = (String) row.get("storage");
+			String storagename = (String) row.get("storagename");
 
-			userFileNoDataList.add(new UserFileNoData(id, uId, deviceId, type, name, updateTime, clientTime, fileSize, zipFileSize, storage, null));
+			userFileNoDataList.add(new UserFileNoData(id, uId, deviceId, type, name, updateTime, clientTime, fileSize, zipFileSize, storage, null, storagename));
 		}
 
 		sanitizeFileNames(userFileNoDataList);
