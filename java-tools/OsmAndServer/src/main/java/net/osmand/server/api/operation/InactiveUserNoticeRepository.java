@@ -39,16 +39,14 @@ public class InactiveUserNoticeRepository {
 
 	public void insertNotified(int userId, String email, String category) {
 		jdbc.update("INSERT INTO inactive_user_notice(userid, email, category, status, notified_time, updated_time) " +
-						"VALUES (?, ?, ?, '" + STATUS_NOTIFIED + "', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) " +
-						"ON CONFLICT(userid) DO UPDATE SET email = excluded.email, category = excluded.category, " +
-						"status = '" + STATUS_NOTIFIED + "', notified_time = CURRENT_TIMESTAMP, deleted_time = NULL, " +
-						"updated_time = CURRENT_TIMESTAMP",
-				userId, email, category);
+						"VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+				userId, email, category, STATUS_NOTIFIED);
 	}
 
 	public void markDeleted(int userId) {
-		jdbc.update("UPDATE inactive_user_notice SET status = '" + STATUS_DELETED + "', " +
-				"deleted_time = CURRENT_TIMESTAMP, updated_time = CURRENT_TIMESTAMP WHERE userid = ?", userId);
+		jdbc.update("UPDATE inactive_user_notice SET status = ?, " +
+						"deleted_time = CURRENT_TIMESTAMP, updated_time = CURRENT_TIMESTAMP WHERE userid = ?",
+				STATUS_DELETED, userId);
 	}
 
 	public void delete(int userId) {

@@ -143,11 +143,7 @@ public class NotifyInactiveUsersOperation extends AbstractFileFixOperation imple
 		}
 
 		Notice notice = existing.get();
-		if (InactiveUserNoticeRepository.STATUS_DELETED.equals(notice.status())) {
-			return;
-		}
 		if (!inactive) {
-			// active again before deletion: drop the notice
 			result.reactivated.incrementAndGet();
 			if (!isTest(params)) {
 				synchronized (dbLock) {
@@ -155,6 +151,9 @@ public class NotifyInactiveUsersOperation extends AbstractFileFixOperation imple
 				}
 			}
 			return;
+		}
+		if (InactiveUserNoticeRepository.STATUS_DELETED.equals(notice.status())) {
+			return; // files already deleted, nothing more to do
 		}
 		long notifiedMs = notice.notifiedTime() == null ? 0
 				: notice.notifiedTime().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
