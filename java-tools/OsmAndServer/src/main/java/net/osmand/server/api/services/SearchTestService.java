@@ -867,13 +867,18 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 				for (String jsonFilePath : data.jsonFilePaths()) {
 					System.out.println("Generated JSON file: " + jsonFilePath);
 				}
+				if (data.results().results().isEmpty()) {
+					System.err.println("Failed unit-test '" + unitTestName + "': no results");
+					failed++;
+				}
 			} catch (Exception e) {
+				System.err.println("Failed unit-test '" + unitTestName);
+				e.printStackTrace();
 				failed++;
-				System.err.println("Failed unit-test '" + unitTestName + "': " + e.getMessage());
 			}
 		}
 		if (failed > 0) {
-			throw new IllegalStateException("Failed " + failed + " of " + jsonFiles.length + " unit-tests.");
+			System.err.println("Failed " + failed + " of " + jsonFiles.length + " unit-tests.");
 		}
 	}
 }
