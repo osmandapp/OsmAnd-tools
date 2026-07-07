@@ -187,8 +187,7 @@ public class NotifyInactiveUsersOperation extends AbstractFileFixOperation imple
 
 	private boolean isFreeAndInactive(int userId, CloudUser user, UserFilesResults res, long proExpiry) {
 		long now = System.currentTimeMillis();
-		return Algorithms.isEmpty(user.orderid)
-				&& freeOver2Years(user, now, proExpiry)
+		return freeOver2Years(user, now, proExpiry)
 				&& now - lastDeviceSync(userId) > TWO_YEARS_MS
 				&& now - lastFileActivity(res) > YEAR_MS;
 	}
