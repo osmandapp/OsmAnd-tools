@@ -47,8 +47,6 @@ create table inactive_user_notice
     updated_time  TIMESTAMP not null default CURRENT_TIMESTAMP
 );
 
-create index inactive_user_notice_status_idx on inactive_user_notice (status);
-
 create index job_class_name_idx on job (class_name);
 create index job_updated_time_idx on job (updated_time);
 create index run_job_id_idx on run (job_id);
