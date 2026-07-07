@@ -86,11 +86,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	private boolean DEBUG_FULL_NAMES = false; //true to see attached cityPart and boundaries to the street names
 
-	
 	private TreeSet<String> langAttributes = new TreeSet<String>();
 	{
 		langAttributes.add(MapObject.NAME_ADMIN_LEVEL_ATTR);
 		langAttributes.add(MapObject.NAME_PLACE_ATTR);
+        langAttributes.add(MapObject.NAME_WIKIDATA_ATTR);
 	}
 	public static final String ENTRANCE_BUILDING_DELIMITER = ", ";
 	private static final int NO_BOUNDARY = 100;
@@ -443,6 +443,10 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			boundary.setAltName(e.getTag("short_name")); // Goteborg, Esslingen
 			boundary.setAdminLevel(extractBoundaryAdminLevel(e));
 			boundary.setNames(getOtherNames(e));
+            String wikidata = e.getTag(MapObject.NAME_WIKIDATA_ATTR);
+            if (wikidata != null) {
+                boundary.addName(MapObject.NAME_WIKIDATA_ATTR, wikidata);
+            }
 			boundary.setBoundaryId(ObfConstants.createMapObjectIdFromOsmAndEntity(e));
 			if (ct == null && census) {
 				boundary.setCityType(CityType.CENSUS);
@@ -1619,8 +1623,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				}
 				street.setName(streetName + cityPart);
 				for (String lang : names.keySet()) {
-					if (//!PLACE_ATTR.equals(lang) && 
-							!MapObject.NAME_ADMIN_LEVEL_ATTR.equals(lang)) {
+					if (!MapObject.NAME_ADMIN_LEVEL_ATTR.equals(lang) && !MapObject.NAME_WIKIDATA_ATTR.equals(lang)) {
 						String cityLangPart = cityPart;
 						String cityLangName = city.getName(lang, true);
 						if (!Algorithms.isEmpty(cityLangName)) {

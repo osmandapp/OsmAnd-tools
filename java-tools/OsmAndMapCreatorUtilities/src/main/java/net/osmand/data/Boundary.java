@@ -1,5 +1,6 @@
 package net.osmand.data;
 
+import java.util.HashMap;
 import java.util.Map;
 
 import net.osmand.data.City.CityType;
@@ -10,23 +11,29 @@ public class Boundary {
 	private String name;
 	private String altName;
 	private int adminLevel;
-	
+
 
 	private long labelId;
 	private long adminCenterId;
 	private CityType cityType;
 	private Multipolygon multipolygon;
 	private Map<String, String> nameTags;
-	
+
 
 	public Boundary(MultipolygonBuilder m) {
 		multipolygon = m.build();
 	}
-	
+
 	public void setNames(Map<String, String> nameTags) {
 		this.nameTags = nameTags;
 	}
-	
+
+    public void addName(String key, String val) {
+        if (this.nameTags == null)
+            this.nameTags = new HashMap<>();
+        this.nameTags.put(key, val);
+    }
+
 	public Map<String, String> getNameTags() {
 		return nameTags;
 	}
@@ -97,7 +104,7 @@ public class Boundary {
 	public long getAdminCenterId() {
 		return adminCenterId != 0 ? adminCenterId : labelId;
 	}
-	
+
 	public void setLabelId(long l) {
 		this.labelId = l;
 	}
@@ -121,7 +128,7 @@ public class Boundary {
 	public LatLon getCenterPoint() {
 		return multipolygon.getCenterPoint();
 	}
-	
+
 	public LatLon getPolyCenterPoint() {
 		return multipolygon.getPolyCenter();
 	}
