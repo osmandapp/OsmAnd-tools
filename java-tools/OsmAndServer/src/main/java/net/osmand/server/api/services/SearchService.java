@@ -454,7 +454,8 @@ public class SearchService {
 				for (SpatialSearchResult r : res.mainResults) {
 					List<MapObject> objs = r.getObjects();
 					if (!objs.isEmpty()) {
-						Feature f = getSpatialFeature(r.getLatLon(), objs.get(0), ctx.locale, timeZone);
+						LatLon l = r.getLatLon() == null ? new LatLon(ctx.lat, ctx.lon) : r.getLatLon();
+						Feature f = getSpatialFeature(l, objs.get(0), ctx.locale, timeZone);
 						if (f != null) {
 							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(), matchedObjects(objs, ctx.locale));
 							f.prop(PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
