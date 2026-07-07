@@ -490,7 +490,7 @@ public class UserdataService {
         if (bounded == null) {
             return;
         }
-        storageService.remapFileNames(fl.storage, userFolder(fl), storageFileName(fl.type, fl.name, fl.updatetime), bounded);
+        storageService.remapFileNames(fl.id, fl.storage, userFolder(fl), storageFileName(fl.type, fl.name, fl.updatetime), bounded);
         fl.storagename = bounded;
         filesRepository.save(fl);
     }

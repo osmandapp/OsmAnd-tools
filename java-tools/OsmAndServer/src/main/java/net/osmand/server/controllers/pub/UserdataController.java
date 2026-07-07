@@ -370,8 +370,8 @@ public class UserdataController {
 	}
 
 	@PostMapping(value = "/remap-filenames")
-	public ResponseEntity<String> remapFilenames(@RequestParam(name = "deviceid", required = true) int deviceId,
-			@RequestParam(name = "accessToken", required = true) String accessToken) throws IOException, SQLException {
+	public ResponseEntity<String> remapFilenames(@RequestParam(name = "deviceid") int deviceId,
+	                                             @RequestParam(name = "accessToken") String accessToken) {
 		CloudUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
 			return userdataService.tokenNotValidError();
@@ -380,7 +380,7 @@ public class UserdataController {
 		Iterable<UserFile> lst = filesRepository.findAllByUserid(dev.userid);
 		for (UserFile fl : lst) {
 			if (fl != null && fl.filesize > 0) {
-				storageService.remapFileNames(fl.storage, userdataService.userFolder(fl), userdataService.oldStorageFileName(fl), userdataService.storageFileName(fl));
+				storageService.remapFileNames(fl.id, fl.storage, userdataService.userFolder(fl), userdataService.oldStorageFileName(fl), userdataService.storageFileName(fl));
 			}
 		}
 		return userdataService.ok();

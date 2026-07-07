@@ -138,8 +138,8 @@ public class StorageService {
 		}
 		return false;
 	}
-	
-	public void remapFileNames(String storage, String userFolder, String oldStorageFileName, String newStorageFileName) {
+
+	public void remapFileNames(long trackId, String storage, String userFolder, String oldStorageFileName, String newStorageFileName) {
 		if (!Algorithms.isEmpty(storage) && !newStorageFileName.trim().equals(oldStorageFileName.trim())) {
 			String oldKey = userFolder + FILE_SEPARATOR + oldStorageFileName;
 			String newKey = userFolder + FILE_SEPARATOR + newStorageFileName;
@@ -152,6 +152,8 @@ public class StorageService {
 						if (res.getLastModifiedDate() != null) {
 							toStore.s3Conn.deleteObject(toStore.bucket, oldKey);
 						}
+					} else if (!toStore.local) {
+						LOGGER.warn("remap: object not copied, track id=" + trackId + " key=" + oldKey);
 					}
 				} catch (com.amazonaws.SdkClientException e) {
 					handleException(toStore, "remap", userFolder, oldStorageFileName, e);
