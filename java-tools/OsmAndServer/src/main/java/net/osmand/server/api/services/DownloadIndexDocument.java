@@ -76,16 +76,68 @@ public class DownloadIndexDocument {
 	
 	
 	public void setOutdatedMaps() {
+		addDeletedMap("Argentina_southamerica_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Austria_europe_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Belarus_europe_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Belgium_europe_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Canada_british-columbia_northamerica_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Canada_ontario_northamerica_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Canada_quebec_northamerica_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Chile_southamerica_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Congo-democratic-republic_africa_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Czech-republic_europe_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Denmark_europe_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Finland_europe_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("France_auvergne-rhone-alpes_europe_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("France_great-east_europe_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("France_new-aquitaine_europe_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("France_occitania_europe_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("France_provence-alpes-cote-d-azur_europe_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Germany_baden-wuerttemberg_europe_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Germany_bayern_europe_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Germany_hessen_europe_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Germany_niedersachsen_europe_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Iran_asia_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Japan_chubu_asia_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Japan_kanto_asia_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Mexico_northamerica_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Philippines_asia_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Russia_far-eastern-federal-district_asia_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Russia_north-caucasus-federal-district_asia_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Russia_northwestern-federal-district_asia_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Russia_siberian-federal-district_asia_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Russia_south-federal-district_asia_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Russia_ural-federal-district_asia_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Russia_volga-federal-district_asia_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("South-africa_africa_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Sweden_europe_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Switzerland_europe_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Tanzania_africa_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Us_florida_northamerica_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		addDeletedMap("Us_new-york_northamerica_2.obf.zip", DownloadType.MAP, "06.07.2026");
+
+		addDeletedMap("Congo-democratic-republic_africa_2.road.obf.zip", DownloadType.ROAD_MAP, "06.07.2026");
+		addDeletedMap("Philippines_asia_2.road.obf.zip", DownloadType.ROAD_MAP, "06.07.2026");
+		addDeletedMap("South-africa_africa_2.road.obf.zip", DownloadType.ROAD_MAP, "06.07.2026");
+		addDeletedMap("Us_florida_northamerica_2.road.obf.zip", DownloadType.ROAD_MAP, "06.07.2026");
+		addDeletedMap("Us_new-york_northamerica_2.road.obf.zip", DownloadType.ROAD_MAP, "06.07.2026");
+
+		addDeletedMap("Norway_europe_2.road.obf.zip", DownloadType.ROAD_MAP, "06.07.2026");
+		addDeletedMap("Ukraine_europe_2.road.obf.zip", DownloadType.ROAD_MAP, "06.07.2026");
+		addDeletedMap("Gb_england_europe_2.road.obf.zip", DownloadType.ROAD_MAP, "06.07.2026");
+		addDeletedMap("Netherlands_europe_2.road.obf.zip", DownloadType.ROAD_MAP, "06.07.2026");
+		addDeletedMap("Us_texas_northamerica_2.road.obf.zip", DownloadType.ROAD_MAP, "06.07.2026");
+		addDeletedMap("Australia-oceania_2.road.obf.zip", DownloadType.ROAD_MAP, "06.07.2026");
+		addDeletedMap("Indonesia_asia_2.road.obf.zip", DownloadType.ROAD_MAP, "06.07.2026");
+
 		addDeletedMap("Turkey_europe_2.obf.zip", DownloadType.MAP, "03.04.2026");
 		addDeletedMap("Us_california_northamerica_2.road.obf.zip", DownloadType.ROAD_MAP, "03.04.2026");
 
-		addDeletedMap("Us_texas_northamerica_2.obf.zip", DownloadType.ROAD_MAP, "03.11.2025");
 		addDeletedMap("Germany_nordrhein-westfalen_europe_2.road.obf.zip", DownloadType.ROAD_MAP, "03.10.2025");
 		addDeletedMap("Germany_nordrhein-westfalen_europe_2.obf.zip", DownloadType.MAP, "03.10.2025");
 
 		addDeletedMap("India_asia_2.road.obf.zip", DownloadType.ROAD_MAP, "03.09.2025");
 		addDeletedMap("Spain_europe_2.road.obf.zip", DownloadType.ROAD_MAP, "03.09.2025");
-		/// ..
 	}
 	
 	

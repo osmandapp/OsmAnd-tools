@@ -3,8 +3,6 @@ package net.osmand.server.api.searchtest;
 import net.osmand.binary.*;
 import net.osmand.data.*;
 import net.osmand.search.core.SearchResult;
-import net.osmand.server.api.searchtest.MapDataObjectFinder.Result;
-import net.osmand.server.api.searchtest.MapDataObjectFinder.ResultType;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
@@ -184,11 +182,27 @@ public interface DataService extends BaseService {
 			assert rows != null;
 
 			List<PolyglotEngine.GenRow> examples = getEngine().execute(getWebServerConfigDir(), test, rows);
+			double north = -Double.MAX_VALUE;
+			double south = Double.MAX_VALUE;
+			double west = Double.MAX_VALUE;
+			double east = -Double.MAX_VALUE;
+			boolean bboxInitialized = false;
 			for (PolyglotEngine.GenRow example : examples) {
-				if (example.point() != null)
+				if (example.point() != null) {
+					LatLon point = example.point();
+					north = Math.max(north, point.getLatitude());
+					south = Math.min(south, point.getLatitude());
+					west = Math.min(west, point.getLongitude());
+					east = Math.max(east, point.getLongitude());
+					bboxInitialized = true;
 					saveCaseResults(test, example);
-				else
+				} else {
 					getLogger().warn("Dataset row: {} has no point.", rows.get(example.dsResultId()));
+				}
+			}
+			if (bboxInitialized) {
+				test.setNorthWest(String.format(Locale.US, "%.5f, %.5f", north, west));
+				test.setSouthEast(String.format(Locale.US, "%.5f, %.5f", south, east));
 			}
 			test.status = TestCase.Status.GENERATED;
 		} catch (Exception e) {
@@ -271,7 +285,7 @@ public interface DataService extends BaseService {
 	int SEARCH_DUPLICATE_NAME_RADIUS = 5000;
 	int FOUND_DEDUPLICATE_RADIUS = 100;
 
-	default Object[] collectRunResults(MapDataObjectFinder finder, long genId, int count, Run run, String query,
+	default Object[] collectRunResults(ResultActuator actuator, long genId, int count, Run run, String query,
 	                                   SearchService.SearchResults searchResult, LatLon targetPoint,
 	                                   LatLon searchPoint, long duration, String bbox, String error) throws IOException {
 		if (error != null || targetPoint == null) {
@@ -295,9 +309,9 @@ public interface DataService extends BaseService {
 			}
         }
 
-		Map<String, Object> row = finder.getRow();
-		Result firstResult = finder.getFirstResult();
-		Result actualResult = finder.getActualResult();
+		Map<String, Object> row = actuator.getRow();
+		ResultActuator.Result firstResult = actuator.getFirstResult();
+		ResultActuator.Result actualResult = actuator.getActualResult();
 		BinaryMapIndexReaderStats.SearchStat stat = searchResult != null && searchResult.settings() != null
 				? searchResult.settings().getStat()
 				: null;
@@ -374,6 +388,20 @@ public interface DataService extends BaseService {
 						row.put("stat_calls_" + e.getKey().name(), e.getValue().calls);
 					}
 					row.put("sub_stats", stat.getSubStatsSummary());
+				} else {
+					int statAmenityCount = 0;
+					int statAddressCount = 0;
+					for (SearchResult sr : searchResults) {
+						if (sr.object instanceof Amenity || sr.objectType == POI_TYPE) {
+							statAmenityCount++;
+						} else {
+							statAddressCount++;
+						}
+					}
+					row.put("stat_results", resultsCount);
+					row.put("stat_amenity_count", statAmenityCount);
+					row.put("stat_address_count", statAddressCount);
+					row.put("stat_transport_count", 0);
 				}
 				row.put("time", duration);
 				row.put("web_type", firstResult.searchResult().objectType);
@@ -382,12 +410,13 @@ public interface DataService extends BaseService {
 				row.put("res_name", firstResult.placeName());
 				if (actualResult == null && closestDuplicate < FOUND_DEDUPLICATE_RADIUS) {
 					SearchResult sr = searchResults.get(dupInd);
-					actualResult = new Result(ResultType.ByDist, null, dupInd + 1, sr);
+					actualResult = new ResultActuator.Result(ResultActuator.ResultType.ByDist, null, dupInd + 1, sr);
 				}
 				if (actualResult != null) {
 					row.put("actual_place", actualResult.toPlaceString());
 					row.put("actual_id", actualResult.toIdString());
 					row.put("actual_name", actualResult.placeName());
+					row.put("actual_dist",  ((int) MapUtils.getDistance(targetPoint, actualResult.searchResult().location) / 10) * 10);
 					LatLon pnt = actualResult.searchResult().location;
 					row.put("actual_lat_lon", String.format(Locale.US, "%f, %f", pnt.getLatitude(), pnt.getLongitude()));
 					found = actualResult.place() <= dupCount + firstResult.place();
@@ -400,6 +429,8 @@ public interface DataService extends BaseService {
 			error = searchResults.isEmpty() ? "Search result is empty" : "First search result is missing";
 		}
 		String rowJson = getObjectMapper().writeValueAsString(row);
+		Object statTimeValue = row.get("stat_time");
+		Object statBytesValue = row.get("stat_bytes");
 
 		return new Object[] {genId, count, run.datasetId, run.id, run.caseId, query, rowJson, error, duration,
 				resultsCount, distance, resultPoint, resPlace,
@@ -407,7 +438,8 @@ public interface DataService extends BaseService {
 				searchPoint == null ? null : searchPoint.getLongitude(),
 				bbox,
 				new Timestamp(System.currentTimeMillis()), found,
-                stat != null ? stat.totalBytes : null, stat != null ? stat.totalTime : null
+				stat != null ? stat.totalBytes : statBytesValue instanceof Number n ? n.longValue() : null,
+				stat != null ? stat.totalTime : statTimeValue instanceof Number n ? n.longValue() : null
 		};
 	}
 

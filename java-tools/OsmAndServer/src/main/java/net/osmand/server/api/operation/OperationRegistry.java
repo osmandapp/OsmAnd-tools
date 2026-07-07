@@ -28,7 +28,8 @@ public class OperationRegistry {
 
 	public record ParamDescriptor(String name, String label, String type, boolean required, String defaultValue,
 								  String helpText, List<String> options) {}
-	public record OperationDescriptor(Operation<?> bean, Class<?> paramsType, List<ParamDescriptor> params) {}
+	public record OperationDescriptor(Operation<?> bean, Class<?> paramsType, Class<?> extraParamsType,
+									 List<ParamDescriptor> params) {}
 
 	private final ApplicationContext applicationContext;
 	private final OperationRepositoryConfiguration dbConfig;
@@ -62,10 +63,12 @@ public class OperationRegistry {
 			}
 			Class<?> paramsType = ResolvableType.forClass(targetClass).as(Operation.class).getGeneric(0).resolve();
 			Set<String> supportedTypes = bean instanceof AbstractFileFixOperation op ? op.supportedTypes() : null;
+			Class<?> extraParamsType = bean instanceof ExtraParamsOperation op ? op.extraParamsType() : null;
 			List<ParamDescriptor> params = describeParams(paramsType, supportedTypes);
+			params.addAll(describeParams(extraParamsType, null));
 			repository.upsertOperation(targetClass.getName(), annotation.name(),
 					toJson(params), paramsType == null ? "" : paramsType.getName());
-			descriptors.put(targetClass.getName(), new OperationDescriptor(bean, paramsType, params));
+			descriptors.put(targetClass.getName(), new OperationDescriptor(bean, paramsType, extraParamsType, params));
 		}
 		repository.deleteOrphanOperations();
 	}

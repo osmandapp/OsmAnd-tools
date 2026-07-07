@@ -23,6 +23,11 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -42,7 +47,6 @@ import net.osmand.obf.ToolsOsmAndContextImpl;
 import net.osmand.shared.data.KQuadRect;
 import net.osmand.shared.gpx.RouteActivityHelper;
 import net.osmand.shared.gpx.primitives.RouteActivity;
-import net.osmand.shared.gpx.primitives.WptPt;
 import okio.Source;
 import okio.Buffer;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
@@ -129,6 +133,7 @@ public class DownloadOsmGPX {
 	
 	public DownloadOsmGPX() throws SQLException {
 		net.osmand.shared.util.PlatformUtil.INSTANCE.initialize(new ToolsOsmAndContextImpl());
+		java.util.logging.Logger.getLogger("GpxUtilities").setLevel(java.util.logging.Level.OFF);
 		initDBConnection();
 	}
 	
@@ -257,10 +262,19 @@ public class DownloadOsmGPX {
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS speed float");
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS distance float");
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS points integer");
+			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS max_speed float");
+			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS max_dist_between_points float");
+			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS time_minutes integer");
+			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS waypoints integer");
+			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS simplified_geometry bytea");
 
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_speed ON " + GPX_METADATA_TABLE_NAME + " (speed)");
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_distance ON " + GPX_METADATA_TABLE_NAME + " (distance)");
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_points ON " + GPX_METADATA_TABLE_NAME + " (points)");
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_max_speed ON " + GPX_METADATA_TABLE_NAME + " (max_speed)");
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_max_dist_between_points ON " + GPX_METADATA_TABLE_NAME + " (max_dist_between_points)");
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_time_minutes ON " + GPX_METADATA_TABLE_NAME + " (time_minutes)");
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_waypoints ON " + GPX_METADATA_TABLE_NAME + " (waypoints)");
 
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_activity ON " + GPX_METADATA_TABLE_NAME + " (activity)");
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_tags_gin ON " + GPX_METADATA_TABLE_NAME + " USING GIN (tags)");
@@ -303,11 +317,16 @@ public class DownloadOsmGPX {
 		LOG.info("Starting to populate the 'activity' column" + (update ? " (all records)" : " (only activity IS NULL)") + "...");
 		dbConn.setAutoCommit(false);
 		PreparedStatement updateStmtMetrics = dbConn.prepareStatement(
-				"UPDATE " + GPX_METADATA_TABLE_NAME + " SET activity = ?, speed = ?, distance = ?, points = ? WHERE id = ?"
+				"UPDATE " + GPX_METADATA_TABLE_NAME + " SET activity = ?, speed = ?, distance = ?, points = ?, " +
+						"max_speed = ?, max_dist_between_points = ?, time_minutes = ?, waypoints = ?, " +
+						"simplified_geometry = ? WHERE id = ?"
 		);
 		PreparedStatement updateStmtActivityOnly = dbConn.prepareStatement(
 				"UPDATE " + GPX_METADATA_TABLE_NAME + " SET activity = ? WHERE id = ?"
 		);
+
+		final int TRACK_TIMEOUT_SEC = 120;
+		ExecutorService trackExec = null;
 
 		int batchSize = 0;
 		final int BATCH_LIMIT = 1000;
@@ -316,6 +335,11 @@ public class DownloadOsmGPX {
 		long lastUpdatedId = -1; // so id=0 is included when present
 		boolean hasMoreRecords = true;
 		try {
+			trackExec = Executors.newCachedThreadPool(r -> {
+				Thread t = new Thread(r);
+				t.setDaemon(true);
+				return t;
+			});
 			while (hasMoreRecords) {
 				hasMoreRecords = false;
 
@@ -336,53 +360,50 @@ public class DownloadOsmGPX {
 						int pointsCount = 0;
 						float distanceMeters = 0f;
 						float avgSpeedKmh = 0f;
+						float maxSpeedKmh = 0f;
+						float maxDistBetweenPoints = 0f;
+						int timeMinutes = 0;
+						int waypointsCount = 0;
+						byte[] simplifiedGeometry = null;
+						byte[] bytes = null;
 						try (Statement dataStmt = dbConn.createStatement();
 						     ResultSet rf = dataStmt.executeQuery(
 								     "SELECT data FROM " + GPX_FILES_TABLE_NAME + " WHERE id = " + id
 						     )) {
 							if (rf.next()) {
-								byte[] bytes = rf.getBytes("data");
-								if (bytes != null) {
-									try (Source src = new Buffer().write(Objects.requireNonNull(Algorithms.gzipToString(bytes)).getBytes())) {
-										gpxFile = GpxUtilities.INSTANCE.loadGpxFile(src);
-									} catch (IOException e) {
-										LOG.error("Error loading GPX file", e);
-										activity = ERROR_ACTIVITY_TYPE;
-									}
-								}
+								bytes = rf.getBytes("data");
 							}
 						}
 
-						if (activity == null) {
-							if (gpxFile != null && gpxFile.getError() == null) {
-								analysis = gpxFile.getAnalysis(System.currentTimeMillis());
-								List<WptPt> points = gpxFile.getAllSegmentsPoints();
-								int pointsSize = points.size();
-								float totalDistance = analysis.getTotalDistance();
-								if (pointsSize < MIN_POINTS_SIZE
-										|| totalDistance < MIN_DISTANCE
-										|| analysis.getMaxDistanceBetweenPoints() >= MAX_DISTANCE_BETWEEN_POINTS) {
+						if (bytes == null) {
+							activity = ERROR_ACTIVITY_TYPE;
+						} else {
+							final byte[] trackBytes = bytes;
+							Future<TrackData> future = trackExec.submit(() -> computeTrackData(trackBytes));
+							try {
+								TrackData d = future.get(TRACK_TIMEOUT_SEC, TimeUnit.SECONDS);
+								gpxFile = d.gpxFile;
+								analysis = d.analysis;
+								if (d.error) {
+									activity = ERROR_ACTIVITY_TYPE;
+								} else if (d.garbage) {
 									activity = GARBAGE_ACTIVITY_TYPE;
-								} else {
-									// only for non-garbage & non-error tracks
-									pointsCount = pointsSize;
-									distanceMeters = totalDistance;
-									double avgSpeedMs = analysis.getAvgSpeed();
-									if (avgSpeedMs > 0) {
-										avgSpeedKmh = (float) (avgSpeedMs * 3.6d);
-									} else if (distanceMeters > 0) {
-										// Fallback: calculate speed manually when not available in track
-										double timeMs = analysis.getTimeMoving();
-										if (timeMs <= 0) {
-											timeMs = analysis.getTimeSpan();
-										}
-										if (timeMs > 0) {
-											double speedMs = distanceMeters / (timeMs / 1000d);
-											avgSpeedKmh = (float) (speedMs * 3.6d);
-										}
-									}
+								} else if (d.metrics) {
+									pointsCount = d.pointsCount;
+									distanceMeters = d.distanceMeters;
+									avgSpeedKmh = d.avgSpeedKmh;
+									maxSpeedKmh = d.maxSpeedKmh;
+									maxDistBetweenPoints = d.maxDistBetweenPoints;
+									timeMinutes = d.timeMinutes;
+									waypointsCount = d.waypointsCount;
+									simplifiedGeometry = d.simplifiedGeometry;
 								}
-							} else {
+							} catch (TimeoutException te) {
+								future.cancel(true);
+								LOG.error("Timeout (>" + TRACK_TIMEOUT_SEC + "s) processing id=" + id + ", marking as error");
+								activity = ERROR_ACTIVITY_TYPE;
+							} catch (Exception e) {
+								LOG.error("Error processing id=" + id, e);
 								activity = ERROR_ACTIVITY_TYPE;
 							}
 						}
@@ -411,7 +432,12 @@ public class DownloadOsmGPX {
 							updateStmtMetrics.setFloat(2, round2(avgSpeedKmh));
 							updateStmtMetrics.setFloat(3, round2(distanceMeters));
 							updateStmtMetrics.setInt(4, pointsCount);
-							updateStmtMetrics.setLong(5, id);
+							updateStmtMetrics.setFloat(5, round2(maxSpeedKmh));
+							updateStmtMetrics.setFloat(6, round2(maxDistBetweenPoints));
+							updateStmtMetrics.setInt(7, timeMinutes);
+							updateStmtMetrics.setInt(8, waypointsCount);
+							updateStmtMetrics.setBytes(9, simplifiedGeometry);
+							updateStmtMetrics.setLong(10, id);
 							updateStmtMetrics.addBatch();
 						} else {
 							updateStmtActivityOnly.setString(1, activity);
@@ -445,11 +471,88 @@ public class DownloadOsmGPX {
 			dbConn.rollback();
 			throw e;
 		} finally {
+			if (trackExec != null) {
+				trackExec.shutdownNow();
+			}
 			dbConn.setAutoCommit(true);
 			updateStmtMetrics.close();
 			updateStmtActivityOnly.close();
 		}
 		LOG.info("Finished populating the 'activity' column. Total records processed: " + processedCount);
+	}
+
+	// Parse GPX + analysis + build simplified geometry. Runs in a worker thread guarded by a timeout,
+	// touches no DB state so it is safe off the main thread.
+	private TrackData computeTrackData(byte[] bytes) {
+		TrackData d = new TrackData();
+		GpxFile gpxFile;
+		try (Source src = new Buffer().write(Objects.requireNonNull(Algorithms.gzipToString(bytes)).getBytes())) {
+			gpxFile = GpxUtilities.INSTANCE.loadGpxFile(src);
+		} catch (IOException e) {
+			LOG.error("Error loading GPX file", e);
+			d.error = true;
+			return d;
+		}
+		d.gpxFile = gpxFile;
+		if (gpxFile.getError() != null) {
+			d.error = true;
+			return d;
+		}
+		GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
+		d.analysis = analysis;
+		int pointsSize = gpxFile.getAllSegmentsPoints().size();
+		float totalDistance = analysis.getTotalDistance();
+		if (pointsSize < MIN_POINTS_SIZE
+				|| totalDistance < MIN_DISTANCE
+				|| analysis.getMaxDistanceBetweenPoints() >= MAX_DISTANCE_BETWEEN_POINTS) {
+			d.garbage = true;
+			return d;
+		}
+		d.metrics = true;
+		d.pointsCount = pointsSize;
+		d.distanceMeters = totalDistance;
+		double avgSpeedMs = analysis.getAvgSpeed();
+		if (avgSpeedMs > 0) {
+			d.avgSpeedKmh = (float) (avgSpeedMs * 3.6d);
+		} else if (totalDistance > 0) {
+			// Fallback: calculate speed manually when not available in track
+			double timeMs = analysis.getTimeMoving();
+			if (timeMs <= 0) {
+				timeMs = analysis.getTimeSpan();
+			}
+			if (timeMs > 0) {
+				d.avgSpeedKmh = (float) ((totalDistance / (timeMs / 1000d)) * 3.6d);
+			}
+		}
+		double maxSpeedMs = analysis.getMaxSpeed();
+		if (maxSpeedMs > 0) {
+			d.maxSpeedKmh = (float) (maxSpeedMs * 3.6d);
+		}
+		d.maxDistBetweenPoints = analysis.getMaxDistanceBetweenPoints();
+		double timeSpanMs = analysis.getTimeSpan();
+		if (timeSpanMs > 0) {
+			d.timeMinutes = (int) (timeSpanMs / 60000d);
+		}
+		d.waypointsCount = gpxFile.getPointsList().size();
+		d.simplifiedGeometry = TrackSimplifyEncoder.encodeGeometry(
+				TrackSimplifyEncoder.simplifyGpx(gpxFile, TrackSimplifyEncoder.SIMPLIFY_ZOOM));
+		return d;
+	}
+
+	private static class TrackData {
+		GpxFile gpxFile;
+		GpxTrackAnalysis analysis;
+		boolean error;
+		boolean garbage;
+		boolean metrics;
+		int pointsCount;
+		int timeMinutes;
+		int waypointsCount;
+		float distanceMeters;
+		float avgSpeedKmh;
+		float maxSpeedKmh;
+		float maxDistBetweenPoints;
+		byte[] simplifiedGeometry;
 	}
 
 	private String getActivityByRouteActivity(GpxFile gpxFile, Map<String, List<String>> activitiesMap) {

@@ -99,7 +99,7 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-//					"-vpoi", //"-vpoiobjects",
+//					"-vpoi", "-vpoiobjects",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
@@ -110,14 +110,13 @@ public class BinaryInspector {
 					"-vstreets", //"-vbuildings",  "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
-					// road
-					"-latlon=40.775,-111.9194,0.1",
+					"-latlon=45.4447,12.32724,0.01",
 //					"-latlon=48.804242,9.215574,0.005",
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
 //					System.getProperty("maps.dir") + "Map.obf",
-					System.getProperty("maps.dir") + "Us_utah_northamerica_2.obf",
+					System.getProperty("maps.dir") + "Map.obf",
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
@@ -1753,9 +1752,6 @@ public class BinaryInspector {
 					@Override
 					public boolean publish(Amenity amenity) {
 						count[0]++;
-						if (!amenity.getName().toLowerCase().contains("shell")) {
-							return false;
-						}
 						String s = String.valueOf(amenity.printNamesAndAdditional());
 						if(verbose.vsearchinspect) {
 							verbose.searchStats.analyze(s, amenity, null);

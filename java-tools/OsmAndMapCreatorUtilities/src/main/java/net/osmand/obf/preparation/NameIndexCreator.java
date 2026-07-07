@@ -4,7 +4,6 @@ package net.osmand.obf.preparation;
 import java.text.Collator;
 import java.text.Normalizer;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -63,7 +62,7 @@ public class NameIndexCreator<T> {
     }
 
     // single objects
-	public record NameObjectSingleNameIndex(String token, Set<String> allNames) {}
+	public record NameObjectSingleNameIndex(String token, Set<String> setNames, List<String> listNames) {}
 	
     public static class NamedObject<T> {
     	T object;
@@ -88,7 +87,7 @@ public class NameIndexCreator<T> {
 		public SuffixDictionary<T> suffixes = null;
 
 		
-		public boolean addToken(T object, String token, Collection<String> allNames) {
+		public boolean addToken(T object, String token, List<String> allNames) {
 			NamedObject<T> last = namedObjects.size() == 0 ? null : namedObjects.get(namedObjects.size() - 1);
 			Set<String> setNames = allNames.size() == 1 ? Collections.emptySet() : new TreeSet<String>(allNames);
 			if (last == null || last.object != object) {
@@ -98,12 +97,12 @@ public class NameIndexCreator<T> {
 				namedObjects.add(last);
 			} else {
 				for (NameObjectSingleNameIndex st : last.singleNames) {
-					if (st.token.equals(token) && st.allNames.equals(setNames)) {
+					if (st.token.equals(token) && st.setNames.equals(setNames)) {
 						return false;
 					}
 				}
 			}
-			last.singleNames.add(new NameObjectSingleNameIndex(token, setNames));
+			last.singleNames.add(new NameObjectSingleNameIndex(token, setNames, allNames));
 			return true;
 		}
 		
@@ -117,7 +116,7 @@ public class NameIndexCreator<T> {
 					boolean isCommonWord = commonWords.words.containsKey(singleName.token);
 					String suffix = calculateSuffix(singleName.token, prefix);
 					allSortedSuffixes.add(suffix);
-					for (String otherName : singleName.allNames) {
+					for (String otherName : singleName.setNames) {
 						if (!otherName.equals(singleName.token)) {
 							if (SearchAlgorithms.isNumber2Letters(otherName)) {
 //								if (parsePureIntegerSuffix(otherName) != null) {	
@@ -147,14 +146,13 @@ public class NameIndexCreator<T> {
 			}
 			// 3. prepare for 1 object bitsets 
 			for (NamedObject<T> namedObject : namedObjects) {
-				
 				boolean allEmptyExtra = true;
 				for (NameObjectSingleNameIndex singleName : namedObject.singleNames) {
 					PrepareWordIndex word = commonWords.words.get(singleName.token);
 					boolean isCommon = word != null && word.nonindexed != 0;
 					if (isCommon) {
 						boolean rare = false;
-						for (String r : singleName.allNames) {
+						for (String r : singleName.setNames) {
 							if (!commonWords.words.containsKey(r) &&
 									!SearchAlgorithms.isNumber2Letters(r)) {
 								rare = true;
@@ -173,7 +171,7 @@ public class NameIndexCreator<T> {
 					namedObject.bitsetIndex.add((suffixes.resolvedSuffixToIndex.get(suffix) + 1) << 1);
 					int otherWords = 0;
 					String extraToken = "";
-					for (String otherName : singleName.allNames) {
+					for (String otherName : singleName.setNames) {
 						if (!otherName.equals(singleName.token)) {
 							if (SearchAlgorithms.isNumber2Letters(otherName)) {
 								Integer pInteger = parsePureIntegerSuffix(otherName);
@@ -207,6 +205,13 @@ public class NameIndexCreator<T> {
 								} else {
 									otherWords++;
 								}
+							}
+						} else if (singleName.setNames.size() < singleName.listNames.size()) {
+							int i1 = singleName.listNames.indexOf(otherName);
+							int i2 = singleName.listNames.lastIndexOf(otherName);
+							// duplicate word store as separate name
+							if (i1 != i2) {
+								extraToken += " " + otherName;
 							}
 						}
 					}
@@ -280,20 +285,26 @@ public class NameIndexCreator<T> {
 	
 	
 	public void addToNameIndex(String name, T obj, int maxPrefixLength, boolean indexNumbers) {
-		if (obj instanceof Street && name.startsWith("<") && name.trim().endsWith(">") && 
-				!name.startsWith("<<")) {
-			name += " " + NameIndexReader.CITY_AS_STREET_COMMON;
+		if (obj instanceof Street s) {
+//			if(name.startsWith("<") && name.trim().endsWith(">") && 
+//				!name.startsWith("<<")) {
+//				name += " " + NameIndexReader.CITY_AS_STREET_COMMON;
+//			} else 
+			if (s.getNamesMap(false).containsKey(MapObject.NAME_PLACE_ATTR)) {
+				name += " " + NameIndexReader.CITY_AS_STREET_COMMON;
+			}
 		}
-		List<String> splitName = SearchAlgorithms.splitAndNormalize(name, true);
+		List<String> uniqueNames = SearchAlgorithms.splitAndNormalize(name, true);
+		List<String> allNames = SearchAlgorithms.splitAndNormalize(name, false);
 		boolean hasRareName = false;
-		for (String token : splitName) {
+		for (String token : uniqueNames) {
 			if (!token.equalsIgnoreCase(NameIndexReader.CITY_AS_STREET_COMMON) &&
 					!CommonWords.isCommon(token) && CommonWords.getFrequentlyUsed(token) <= 0) {
 				hasRareName = true;
 				break;
 			}
 		}
-		for (String token : splitName) {
+		for (String token : uniqueNames) {
 			if (Algorithms.isEmpty(token)) {
 				continue;
 			}
@@ -315,7 +326,7 @@ public class NameIndexCreator<T> {
 				entry.prefix = prefix;
 				namesIndex.put(prefix, entry);
 			}
-			boolean added = entry.addToken(obj, token, splitName);
+			boolean added = entry.addToken(obj, token, allNames);
 			if (!added) {
 				continue;
 			}

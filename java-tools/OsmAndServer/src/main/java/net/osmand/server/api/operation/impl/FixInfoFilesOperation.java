@@ -50,7 +50,7 @@ public class FixInfoFilesOperation extends AbstractFileFixOperation {
 	}
 
 	@Override
-	protected boolean fix(UserFile file, boolean testRun) throws IOException {
+	protected boolean fix(UserFile file, Params params) throws IOException {
 		JsonNode node = MAPPER.readTree(read(file));
 		if (node == null || !node.isObject()) {
 			return false;
@@ -64,7 +64,7 @@ public class FixInfoFilesOperation extends AbstractFileFixOperation {
 		out.put(KEY_FILE, TRACKS_PREFIX + baseName(file.name));
 		out.put(KEY_SUBTYPE, SUBTYPE_GPX);
 		out.setAll(obj);
-		if (!testRun) {
+		if (!isTest(params)) {
 			save(file, MAPPER.writeValueAsBytes(out));
 		}
 		return true;

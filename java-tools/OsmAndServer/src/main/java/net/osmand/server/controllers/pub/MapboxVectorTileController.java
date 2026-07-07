@@ -18,6 +18,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import net.osmand.server.api.services.OsmAndMapsService;
 
@@ -47,7 +48,8 @@ public class MapboxVectorTileController {
 	}
 
 	@RequestMapping(path = "/{z}/{x}/{y}.mvt", produces = MediaType.APPLICATION_PROTOBUF_VALUE)
-	public ResponseEntity<?> getTile(@PathVariable int z, @PathVariable int x, @PathVariable int y)
+	public ResponseEntity<?> getTile(@PathVariable int z, @PathVariable int x, @PathVariable int y,
+			@RequestParam(required = false, defaultValue = "true") boolean cache)
 			throws IOException {
 		if (!osmAndMapsService.validateAndInitConfig()) {
 			return errorConfig("Tile service is not initialized");
@@ -61,8 +63,10 @@ public class MapboxVectorTileController {
         // for testing
         //MapboxVectorTile tile = new MapboxVectorTile(config, x, y, z);
         tileMemoryCache.conditionalCleanupCache();
-		byte[] data = tile.getCacheRuntimeTile();
-        tile.touch();
+		byte[] data = cache ? tile.getCacheRuntimeTile() : null;
+		if (cache) {
+			tile.touch();
+		}
 
 		if (data == null) {
             data = getTileFromService(tile);
@@ -70,10 +74,16 @@ public class MapboxVectorTileController {
 		if (data == null) {
 			return ResponseEntity.badRequest().body("Failed to get tile");
 		}
-		return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_ENCODING, "gzip")
-				.header(HttpHeaders.CACHE_CONTROL, "public, max-age=2592000")
-				.body(new ByteArrayResource(data));
+		HttpHeaders headers = new HttpHeaders();
+		headers.set(HttpHeaders.CONTENT_ENCODING, "gzip");
+		if (cache) {
+			headers.setCacheControl("public, max-age=2592000"); // 30 days
+		} else {
+			headers.setCacheControl("no-cache, no-store, max-age=0, must-revalidate");
+			headers.setPragma("no-cache");
+			headers.setExpires(0);
+		}
+		return new ResponseEntity<>(new ByteArrayResource(data), headers, HttpStatus.OK);
 	}
 
 	@Scheduled(fixedRate = CLEANUP_INTERVAL_MILLIS)

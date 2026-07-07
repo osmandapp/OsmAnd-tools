@@ -14,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.GZIPInputStream;
 
@@ -38,7 +39,7 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 	protected final StorageService storageService;
 
 	protected AbstractFileFixOperation(CloudUsersRepository usersRepository, CloudUserFilesRepository filesRepository,
-									   UserdataService userdataService, StorageService storageService) {
+	                                   UserdataService userdataService, StorageService storageService) {
 		this.users = new UserBatchReader(usersRepository);
 		this.filesRepository = filesRepository;
 		this.userdataService = userdataService;
@@ -51,21 +52,26 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 			LocalDate updatedAfter,  // null = no lower bound; else only files updated on/after this date
 			LocalDate updatedBefore, // null = no upper bound; else only files updated on/before this date
 			Set<String> fileTypes,   // null/empty = all types; otherwise only these (e.g. GPX, FAVOURITES)
-			Integer usersFrom,       // null/0 = from the first user; else skip this many users (ordered by id) and start there
+			Integer usersFrom,       // null/0 = from the first user; else skip and start there
 			Integer usersPercent,    // null/100 = all users; otherwise that % of all users
 			Integer filesPercent,    // null/100 = all files; otherwise that % of each user's files
 			List<Long> fileIds,      // null/empty = normal scan; otherwise process only these file ids
 			Integer threads          // null/1 = sequential; 2..10 = parallel processing
-	) {}
+	) {
+	}
 
-	protected abstract boolean fix(UserFile file, boolean testRun) throws IOException;
+	protected abstract boolean fix(UserFile file, Params params) throws IOException;
 
 	protected boolean accepts(String name) {
 		return true;
 	}
 
-	private static boolean isTest(Params params) {
+	static boolean isTest(Params params) {
 		return params.testRun() == null || params.testRun();
+	}
+
+	protected boolean shouldListFoundFiles(Params params) {
+		return isTest(params);
 	}
 
 	@Override
@@ -154,14 +160,19 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 			return false;
 		}
 		try {
-			boolean test = isTest(params);
-			if (!fix(file, test)) {
+			if (!fix(file, params)) {
 				stats.skipped.incrementAndGet();
 				return false;
 			}
 			stats.found.incrementAndGet();
-			if (test) {
-				stats.foundFiles.add(Map.of("userid", file.userid, "id", file.id, "file", file.name));
+			String tag = tag(file);
+			if (tag != null) {
+				stats.byTag.computeIfAbsent(tag, k -> new AtomicInteger()).incrementAndGet();
+			}
+			if (shouldListFoundFiles(params)) {
+				stats.foundFiles.add(tag == null
+						? Map.of("userid", file.userid, "id", file.id, "file", file.name)
+						: Map.of("userid", file.userid, "id", file.id, "file", file.name, "tag", tag));
 			}
 			return true;
 		} catch (Exception e) {
@@ -198,6 +209,19 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 		}
 	}
 
+	protected void deleteCompletely(UserFile file) {
+		deleteAllVersions(file.userid, file.name, file.type);
+		if (UserdataService.FILE_TYPE_GPX.equals(file.type) && !file.name.endsWith(UserdataService.INFO_EXT)) {
+			deleteAllVersions(file.userid, file.name + UserdataService.INFO_EXT, file.type);
+		}
+	}
+
+	private void deleteAllVersions(int userid, String name, String type) {
+		for (UserFile v : filesRepository.findAllByUseridAndNameAndTypeOrderByUpdatetimeDesc(userid, name, type)) {
+			userdataService.deleteFileVersion(null, userid, name, type, v); // deletes S3 object + DB row
+		}
+	}
+
 	private int fileCap(Params params, List<Integer> userIds, OperationContext ctx) {
 		if (params.filesPercent() == null || params.filesPercent() >= 100) {
 			return Integer.MAX_VALUE;
@@ -209,6 +233,11 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 	}
 
 	public Set<String> supportedTypes() {
+		return null;
+	}
+
+	// optional tag added to each found file entry and counted in byTag; null = no tag (default)
+	protected String tag(UserFile file) {
 		return null;
 	}
 
@@ -234,6 +263,7 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 		final AtomicInteger failed = new AtomicInteger();
 		final AtomicInteger users = new AtomicInteger();
 		final AtomicInteger usersFound = new AtomicInteger();
+		final Map<String, AtomicInteger> byTag = new ConcurrentHashMap<>();
 		final List<Map<String, Object>> foundFiles = Collections.synchronizedList(new ArrayList<>());
 		final List<Map<String, Object>> failedFiles = Collections.synchronizedList(new ArrayList<>());
 
@@ -249,6 +279,11 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 			r.put("failed", failed.get());
 			r.put("users", users.get());
 			r.put("usersFound", usersFound.get());
+			if (!byTag.isEmpty()) {
+				Map<String, Object> tags = new LinkedHashMap<>();
+				byTag.forEach((k, v) -> tags.put(k, v.get()));
+				r.put("byTag", tags);
+			}
 			r.put("testRun", testRun);
 			r.put("foundFiles", new ArrayList<>(foundFiles));
 			r.put("failedFiles", new ArrayList<>(failedFiles));
