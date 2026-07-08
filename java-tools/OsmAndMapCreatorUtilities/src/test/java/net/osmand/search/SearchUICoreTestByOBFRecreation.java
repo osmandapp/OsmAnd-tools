@@ -43,7 +43,7 @@ public class SearchUICoreTestByOBFRecreation {
 
 	private static final String ROOT_RESOURCES_PATH = "../../../resources/test-resources/";
 	private static final String SEARCH_RESOURCES_PATH = ROOT_RESOURCES_PATH + "search";
-	private static final String SEARCH_BY_JSON_RESOURCES_PATH = ROOT_RESOURCES_PATH + "search-by-json";
+	private static final String SEARCH_BY_JSON_RESOURCES_PATH = ROOT_RESOURCES_PATH + "search-by-recreation";
 	private static final String GENERATED_OBF_DIR_NAME = "search-by-json-generated-obf";
 	private static final File TMP_DIR = new File(System.getProperty("java.io.tmpdir"), GENERATED_OBF_DIR_NAME);
 	private static final Set<String> GENERATED_OBFS = Collections.synchronizedSet(new HashSet<>());
