@@ -451,11 +451,12 @@ public class SearchService {
 				res = spatialTextSearch.searchAPI(ctx.text, sscontext);
 			}
 			if (res.mainResults != null) {
+				String dominatedCity = calculateSpatialDominatedCity(res.mainResults, ctx.locale);
 				for (SpatialSearchResult r : res.mainResults) {
 					List<MapObject> objs = r.getObjects();
 					if (!objs.isEmpty()) {
 						LatLon l = r.getLatLon() == null ? new LatLon(ctx.lat, ctx.lon) : r.getLatLon();
-						Feature f = getSpatialFeature(l, objs.get(0), ctx.locale, timeZone);
+						Feature f = getSpatialFeature(l, objs.get(0), ctx.locale, timeZone, dominatedCity);
 						if (f != null) {
 							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(), matchedObjects(objs, ctx.locale));
 							f.prop(PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
@@ -498,12 +499,12 @@ public class SearchService {
 		return matched;
 	}
 
-	private Feature getSpatialFeature(LatLon loc, MapObject obj, String locale, String timeZone) {
+	private Feature getSpatialFeature(LatLon loc, MapObject obj, String locale, String timeZone, String dominatedCity) {
 		if (obj == null || loc == null) {
 			return null;
 		}
 		if (obj instanceof Amenity amenity) {
-			SearchResult result = buildPoiSearchResult(amenity, locale, "");
+			SearchResult result = buildPoiSearchResult(amenity, locale, dominatedCity);
 			result.localeName = amenity.getName(locale);
 			return getFeature(result, timeZone);
 		}
@@ -1493,6 +1494,24 @@ public class SearchService {
 		String addr = streetName + (Algorithms.isEmpty(houseNumber) ? "" : " " + houseNumber);
 
 		return createAddressString(cityName, mainCity, dominatedCity, addr);
+	}
+
+	private String calculateSpatialDominatedCity(List<SpatialSearchResult> results, String locale) {
+		Map<String, Integer> cityCounter = new TreeMap<>();
+		for (SpatialSearchResult r : results) {
+			for (MapObject obj : r.getObjects()) {
+				if (obj instanceof Amenity amenity) {
+					String cityName = amenity.getCityFromTagGroups(locale);
+					if (!Algorithms.isEmpty(cityName)) {
+						String domCity = getDominatedCity(cityCounter, getMainCityName(cityName));
+						if (domCity != null) {
+							return domCity;
+						}
+					}
+				}
+			}
+		}
+		return "";
 	}
 
 	public Feature getFeature(SearchResult result, String timeZone) {
