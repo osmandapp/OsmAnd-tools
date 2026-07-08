@@ -503,6 +503,17 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		int maxX = 0;
 		int minY = Integer.MAX_VALUE;
 		int maxY = 0;
+
+		boolean isEmpty() {
+			return minX == Integer.MAX_VALUE && maxX == 0 && minY == Integer.MAX_VALUE && maxY == 0;
+		}
+
+		void setWorld() {
+			minX = 0;
+			maxX = Integer.MAX_VALUE;
+			minY = 0;
+			maxY = Integer.MAX_VALUE;
+		}
 	}
 
 	public static class PoiCreatorTagGroup {
@@ -667,6 +678,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		collectTagGroups();
 		// 0. process all entities
 		processPOIIntoTree(poiGeocoding, namesIndex, zoomToStart, bbox, rootZoomsTree);
+		if (bbox.isEmpty()) {
+			bbox.setWorld();
+		}
 
 		// 1. write header
 		long startFpPoiIndex = writer.startWritePoiIndex(regionName, bbox.minX, bbox.maxX, bbox.maxY, bbox.minY);
