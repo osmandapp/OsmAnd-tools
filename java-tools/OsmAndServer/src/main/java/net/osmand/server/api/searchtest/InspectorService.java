@@ -2,14 +2,19 @@ package net.osmand.server.api.searchtest;
 
 import com.google.protobuf.CodedInputStream;
 import com.google.protobuf.WireFormat;
+import net.osmand.ResultMatcher;
 import net.osmand.binary.*;
 import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
 import net.osmand.data.*;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.osmand.util.SearchAlgorithms;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.regex.Pattern;
@@ -1269,10 +1274,6 @@ public interface InspectorService extends OBFService {
                         countMetricSuffixes(suffixInfo, allMetricSuffixIndexes(), enabledSuffixIndexes));
             }
         }
-    }
-
-    default IndexSuffixCounts countMetricSuffixes(NameIndexSuffixInfo suffixInfo, int[] suffixIndexes) {
-        return countMetricSuffixes(suffixInfo, suffixIndexes, suffixIndexes);
     }
 
     default IndexSuffixCounts countMetricSuffixes(NameIndexSuffixInfo suffixInfo, int[] suffixIndexes, int[] enabledSuffixIndexes) {
@@ -3527,4 +3528,219 @@ public interface InspectorService extends OBFService {
 		return record;
 	}
 
+	default List<Amenity> getAmenities(String obf, String lang) {
+		List<Amenity> results = new ArrayList<>();
+		File file = new File(obf);
+		try (RandomAccessFile r = new RandomAccessFile(file.getAbsolutePath(), "r")) {
+			BinaryMapIndexReader index = new BinaryMapIndexReader(r, file);
+			try {
+				for (BinaryMapPoiReaderAdapter.PoiRegion poiIndex : index.getPoiIndexes()) {
+					BinaryMapIndexReader.SearchRequest<Amenity> request = BinaryMapIndexReader.buildSearchPoiRequest(
+							0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE,
+							-1, BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER, null);
+					results.addAll(index.searchPoi(request, poiIndex));
+				}
+				results.sort(Comparator.comparing(a -> {
+					String name = a == null ? null : a.getName(lang);
+					return name == null ? "" : name;
+				}, String.CASE_INSENSITIVE_ORDER));
+				return results;
+			} finally {
+				index.close();
+			}
+		} catch (Exception e) {
+			getLogger().error("Failed to read OBF amenities {}", file, e);
+			throw new RuntimeException("Failed to read OBF amenities: " + e.getMessage(), e);
+		}
+	}
+
+	default List<City> getCities(String obf, String lang) {
+		Map<String, City> mergedCities = new LinkedHashMap<>();
+		File file = new File(obf);
+		try (RandomAccessFile r = new RandomAccessFile(file.getAbsolutePath(), "r")) {
+			BinaryMapIndexReader index = new BinaryMapIndexReader(r, file);
+			try {
+				for (BinaryMapAddressReaderAdapter.AddressRegion region : index.getAddressIndexes()) {
+					for (BinaryMapAddressReaderAdapter.CityBlocks type : BinaryMapAddressReaderAdapter.CityBlocks.values()) {
+						if (type == BinaryMapAddressReaderAdapter.CityBlocks.UNKNOWN_TYPE) {
+							continue;
+						}
+						for (City city : index.getCities(null, type, region, null)) {
+							index.preloadStreets(city, null, true, null);
+							for (Street street : new ArrayList<>(city.getStreets())) {
+								index.preloadBuildings(street, null, null);
+							}
+							mergeCity(mergedCities, city, lang);
+						}
+					}
+				}
+				List<City> results = new ArrayList<>(mergedCities.values());
+				results.sort(Comparator.comparing(c -> {
+					String name = c == null ? null : c.getName(lang);
+					return name == null ? "" : name;
+				}, String.CASE_INSENSITIVE_ORDER));
+				return results;
+			} finally {
+				index.close();
+			}
+		} catch (Exception e) {
+			getLogger().error("Failed to read OBF cities {}", file, e);
+			throw new RuntimeException("Failed to read OBF cities: " + e.getMessage(), e);
+		}
+	}
+
+	default List<RouteDataObject> getRoutes(String obf, String lang) {
+		List<RouteDataObject> results = new ArrayList<>();
+		File file = new File(obf);
+		try (RandomAccessFile r = new RandomAccessFile(file.getAbsolutePath(), "r")) {
+			BinaryMapIndexReader index = new BinaryMapIndexReader(r, file);
+			try {
+				for (BinaryMapRouteReaderAdapter.RouteRegion region : index.getRoutingIndexes()) {
+					BinaryMapIndexReader.SearchRequest<RouteDataObject> request = BinaryMapIndexReader.buildSearchRouteRequest(
+							0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, null);
+					List<BinaryMapRouteReaderAdapter.RouteSubregion> subregions =
+							index.searchRouteIndexTree(request, region.getSubregions());
+					index.loadRouteIndexData(subregions, new ResultMatcher<>() {
+						@Override
+						public boolean publish(RouteDataObject object) {
+							results.add(object);
+							return true;
+						}
+
+						@Override
+						public boolean isCancelled() {
+							return false;
+						}
+					});
+				}
+				results.sort(Comparator.comparingLong(rdo -> rdo == null ? Long.MAX_VALUE : rdo.id));
+				return results;
+			} finally {
+				index.close();
+			}
+		} catch (Exception e) {
+			getLogger().error("Failed to read OBF routes {}", file, e);
+			throw new RuntimeException("Failed to read OBF routes: " + e.getMessage(), e);
+		}
+	}
+
+	default void createJsonFile(File sourceJsonFile, List<Amenity> amenities, List<City> cities, List<RouteDataObject> routings) throws IOException {
+		JSONObject sourceJson = new JSONObject();
+		if (amenities != null && !amenities.isEmpty()) {
+			JSONArray amenitiesJson = new JSONArray();
+			for (Amenity amenity : amenities) {
+				if (amenity != null) {
+					amenitiesJson.put(amenity.toJSON());
+				}
+			}
+			if (!amenitiesJson.isEmpty()) {
+				sourceJson.put("amenities", amenitiesJson);
+			}
+		}
+		List<City> mergedCities = mergeCities(cities, "");
+		if (!mergedCities.isEmpty()) {
+			JSONArray citiesJson = new JSONArray();
+			for (City city : mergedCities) {
+				citiesJson.put(city.toJSON(true));
+			}
+			sourceJson.put("cities", citiesJson);
+		}
+		if (routings != null && !routings.isEmpty()) {
+			JSONArray routingJson = new JSONArray();
+			long routeId = 1;
+			for (RouteDataObject route : routings) {
+				if (route != null) {
+					routingJson.put(routeDataObjectToJson(route, routeId++));
+				}
+			}
+			if (!routingJson.isEmpty()) {
+				sourceJson.put("routing", routingJson);
+			}
+		}
+		File parent = sourceJsonFile.getParentFile();
+		if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
+			throw new IOException("Cannot create directory " + parent);
+		}
+		Files.writeString(sourceJsonFile.toPath(), sourceJson.toString(4), StandardCharsets.UTF_8);
+	}
+
+	private List<City> mergeCities(List<City> cities, String lang) {
+		Map<String, City> merged = new LinkedHashMap<>();
+		if (cities != null) {
+			for (City city : cities) {
+				mergeCity(merged, city, lang);
+			}
+		}
+		return new ArrayList<>(merged.values());
+	}
+
+	private void mergeCity(Map<String, City> mergedCities, City city, String lang) {
+		if (city == null) {
+			return;
+		}
+		String key = cityMergeKey(city, lang);
+		City existing = mergedCities.get(key);
+		if (existing == null) {
+			mergedCities.put(key, city);
+		} else {
+			existing.mergeWith(city);
+		}
+	}
+
+	private String cityMergeKey(City city, String lang) {
+		Long id = city.getId();
+		if (id != null) {
+			return id.toString();
+		}
+		String name = city.getName(lang);
+		LatLon location = city.getLocation();
+		return city.getType() + "|" + (name == null ? "" : name.toLowerCase(Locale.ROOT)) + "|"
+				+ (location == null ? "" : String.format(Locale.US, "%.6f,%.6f", location.getLatitude(), location.getLongitude()));
+	}
+
+	private JSONObject routeDataObjectToJson(RouteDataObject road, long routeId) {
+		JSONObject routeJson = new JSONObject();
+		routeJson.put("id", routeId);
+		routeJson.put("pointsX", toJsonArray(road.pointsX));
+		routeJson.put("pointsY", toJsonArray(road.pointsY));
+		JSONArray types = new JSONArray();
+		if (road.types != null) {
+			for (int type : road.types) {
+				BinaryMapRouteReaderAdapter.RouteTypeRule rule = road.region.quickGetEncodingRule(type);
+				if (rule != null) {
+					JSONObject typeJson = new JSONObject();
+					typeJson.put("tag", rule.getTag());
+					typeJson.put("value", rule.getValue());
+					types.put(typeJson);
+				}
+			}
+		}
+		routeJson.put("types", types);
+		JSONArray names = new JSONArray();
+		if (road.nameIds != null && road.names != null) {
+			for (int nameId : road.nameIds) {
+				BinaryMapRouteReaderAdapter.RouteTypeRule rule = road.region.quickGetEncodingRule(nameId);
+				if (rule == null) {
+					continue;
+				}
+				JSONObject nameJson = new JSONObject();
+				nameJson.put("tag", rule.getTag());
+				nameJson.put("value", road.names.get(nameId));
+				names.put(nameJson);
+			}
+		}
+		routeJson.put("names", names);
+		return routeJson;
+	}
+
+	private JSONArray toJsonArray(int[] values) {
+		JSONArray arr = new JSONArray();
+		if (values == null) {
+			return arr;
+		}
+		for (int value : values) {
+			arr.put(value);
+		}
+		return arr;
+	}
 }

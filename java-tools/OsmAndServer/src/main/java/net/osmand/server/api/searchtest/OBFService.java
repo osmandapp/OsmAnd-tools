@@ -15,6 +15,8 @@ import java.io.*;
 import java.text.Normalizer;
 import java.util.*;
 import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 public interface OBFService extends BaseService {
 	int BASE_POI_SHIFT = BinaryMapPoiReaderAdapter.SHIFT_BITS_CATEGORY;
@@ -877,5 +879,23 @@ public interface OBFService extends BaseService {
 	                       boolean packedVarInt, boolean repeated) {
 		Map<Integer, InspectorService.ObfFieldSpec> byField = schema.computeIfAbsent(messageType, k -> new HashMap<>());
 		byField.put(fieldNumber, new InspectorService.ObfFieldSpec(fieldName, childMessageType, lengthType, packedVarInt, repeated));
+	}
+
+	default File gzip(File sourceFile) throws IOException {
+		File gzFile = new File(sourceFile.getParentFile(), sourceFile.getName() + ".gz");
+		try (FileInputStream inputStream = new FileInputStream(sourceFile);
+		     FileOutputStream fileOutputStream = new FileOutputStream(gzFile);
+		     GZIPOutputStream gzipOutputStream = new GZIPOutputStream(fileOutputStream)) {
+			Algorithms.streamCopy(inputStream, gzipOutputStream);
+		}
+		return gzFile;
+	}
+
+	default void unzip(File gzFile, File file) throws IOException {
+		GZIPInputStream gzin = new GZIPInputStream(new FileInputStream(gzFile));
+		FileOutputStream fous = new FileOutputStream(file);
+		Algorithms.streamCopy(gzin, fous);
+		fous.close();
+		gzin.close();
 	}
 }

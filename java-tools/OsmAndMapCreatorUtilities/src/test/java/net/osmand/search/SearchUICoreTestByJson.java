@@ -35,7 +35,7 @@ public class SearchUICoreTestByJson {
 	private static final String SEARCH_RESOURCES_PATH = "../../../resources/test-resources/search-by-json";
 	private static final String GENERATED_OBF_DIR_NAME = "search-by-json-generated-obf";
 	private static final File TMP_DIR = new File(System.getProperty("java.io.tmpdir"), GENERATED_OBF_DIR_NAME);
-	private static final Set<String> GENERATED_OBFS = Collections.synchronizedSet(new HashSet<String>());
+	private static final Set<String> GENERATED_OBFS = Collections.synchronizedSet(new HashSet<>());
 	private static boolean TEST_EXTRA_RESULTS = true;
 
 	private RoutingContext geoCtx = null;
@@ -67,13 +67,13 @@ public class SearchUICoreTestByJson {
 		try {
 			JSONObject sourceJson = new JSONObject(Algorithms.getFileAsString(testFile));
 			JSONArray filesJson = sourceJson.optJSONArray("files");
-			File directory = new File(testFile.getParentFile(), "source");
+			File sourceDir = new File(testFile.getParentFile(), "source");
 			if (filesJson != null) {
 				for (int i = 0; i < filesJson.length(); i++) {
 					String file = filesJson.optString(i);
 					if (file != null && file.replace(".gz", "").endsWith(".obf")) {
 						String sourceFileName = file.replace(".gz", "").replace(".obf", ".json");
-						if (!new File(directory, sourceFileName).isFile()) {
+						if (!new File(sourceDir, sourceFileName).isFile()) {
 							return false;
 						}
 					}
@@ -82,7 +82,7 @@ public class SearchUICoreTestByJson {
 			}
 			String fileName = testFile.getName();
 			String sourceFileName = fileName.substring(0, fileName.length() - ".json".length()) + ".json";
-			return new File(directory, sourceFileName).isFile();
+			return new File(sourceDir, sourceFileName).isFile();
 		} catch (JSONException e) {
 			System.out.println(testFile);
 			return false;

@@ -3,8 +3,8 @@ package net.osmand.server.api.services;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.RouteDataObject;
 import net.osmand.data.*;
-import net.osmand.obf.OBFDataCreator;
 import net.osmand.search.core.*;
 import net.osmand.server.api.searchtest.*;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
@@ -33,8 +33,6 @@ import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -45,7 +43,6 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.zip.GZIPInputStream;
 
 @Service
 public class SearchTestService implements ReportService, DataService, DetectorService, InspectorService, AnalystService, TokenAnalystService, AddressPOIAnalystService {
@@ -850,35 +847,38 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 		if (!dir.isDirectory()) {
 			throw new IllegalArgumentException("Unit-test directory does not exist: " + dir.getAbsolutePath());
 		}
-		File[] jsonFiles = dir.listFiles((file, name) -> name.toLowerCase(Locale.ROOT).endsWith(".json"));
-		if (jsonFiles == null || jsonFiles.length == 0) {
-			throw new IllegalArgumentException("No JSON unit-tests found in: " + dir.getAbsolutePath());
+		File[] obfFiles = dir.listFiles((file, name) -> name.toLowerCase(Locale.ROOT).endsWith(".obf.gz"));
+		if (obfFiles == null || obfFiles.length == 0) {
+			throw new IllegalArgumentException("No OBF found in: " + dir.getAbsolutePath());
 		}
 
+		File sourceDir = new File(dir, "source");
 		SearchTestService service = new SearchTestService(new SearchService());
 		int failed = 0;
-		for (File jsonFile : jsonFiles) {
-			String fileName = jsonFile.getName();
-			String unitTestName = fileName.substring(0, fileName.length() - ".json".length());
+		for (File gzFile : obfFiles) {
+			String fileName = gzFile.getName().substring(0, gzFile.getName().length() - 7);
+			File obfFile = new File(dir, fileName + ".obf");
 			try {
-				UnitTestSourceData data = service.executeUnitTest(dir, unitTestName);
-				if (data == null)
-					continue;
-				for (String jsonFilePath : data.jsonFilePaths()) {
-					System.out.println("Generated JSON file: " + jsonFilePath);
-				}
-				if (data.results().results().isEmpty()) {
-					System.err.println("Failed unit-test '" + unitTestName + "': no results");
-					failed++;
-				}
+				service.unzip(gzFile, obfFile);
+				List<Amenity> amenities = service.getAmenities(obfFile.getAbsolutePath(), "en");
+				List<City> cities = service.getCities(obfFile.getAbsolutePath(), "en");
+				List<RouteDataObject> routes = service.getRoutes(obfFile.getAbsolutePath(), "en");
+				
+				File jsonFile = new File(sourceDir, fileName + ".json");
+				service.createJsonFile(jsonFile, amenities, cities, routes);
+				File jsonGzFile = service.gzip(jsonFile);
+				jsonFile.deleteOnExit();
+				
+				System.out.println("Read OBF '" + fileName + "': amenities=" + amenities.size() + ", cities=" + cities.size()
+						+ ", routes=" + routes.size() + ", json=" + jsonGzFile.getAbsolutePath());
 			} catch (Exception e) {
-				System.err.println("Failed unit-test '" + unitTestName);
+				System.err.println("Failed OBF '" + fileName);
 				e.printStackTrace();
 				failed++;
 			}
 		}
 		if (failed > 0) {
-			System.err.println("Failed " + failed + " of " + jsonFiles.length + " unit-tests.");
+			System.err.println("Failed " + failed + " of " + obfFiles.length + " OBFs.");
 		}
 	}
 }
