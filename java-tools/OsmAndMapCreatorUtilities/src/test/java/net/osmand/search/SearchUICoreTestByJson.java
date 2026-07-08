@@ -1,9 +1,16 @@
 package net.osmand.search;
 
 import net.osmand.ResultMatcher;
+import net.osmand.binary.BinaryMapAddressReaderAdapter;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.BinaryMapPoiReaderAdapter;
+import net.osmand.binary.BinaryMapRouteReaderAdapter;
 import net.osmand.binary.GeocodingUtilities;
+import net.osmand.binary.RouteDataObject;
+import net.osmand.data.Amenity;
 import net.osmand.data.Building;
+import net.osmand.data.City;
+import net.osmand.data.LatLon;
 import net.osmand.data.Street;
 import net.osmand.obf.OBFDataCreator;
 import net.osmand.osm.AbstractPoiType;
@@ -25,6 +32,7 @@ import org.junit.runners.Parameterized;
 import org.xmlpull.v1.XmlPullParserException;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -33,7 +41,9 @@ import java.util.zip.GZIPInputStream;
 @RunWith(Parameterized.class)
 public class SearchUICoreTestByJson {
 
-	private static final String SEARCH_RESOURCES_PATH = "../../../resources/test-resources/search-by-json";
+	private static final String ROOT_RESOURCES_PATH = "../../../resources/test-resources/";
+	private static final String SEARCH_RESOURCES_PATH = ROOT_RESOURCES_PATH + "search";
+	private static final String SEARCH_BY_JSON_RESOURCES_PATH = ROOT_RESOURCES_PATH + "search-by-json";
 	private static final String GENERATED_OBF_DIR_NAME = "search-by-json-generated-obf";
 	private static final File TMP_DIR = new File(System.getProperty("java.io.tmpdir"), GENERATED_OBF_DIR_NAME);
 	private static final Set<String> GENERATED_OBFS = Collections.synchronizedSet(new HashSet<>());
@@ -50,48 +60,18 @@ public class SearchUICoreTestByJson {
 
 	@Parameterized.Parameters(name = "{index}: {0}")
 	public static Iterable<Object[]> data() throws IOException {
-		File[] files = new File(SEARCH_RESOURCES_PATH).listFiles();
+		File[] files = new File(SEARCH_BY_JSON_RESOURCES_PATH).listFiles();
 		ArrayList<Object[]> arrayList = new ArrayList<>();
 		if (files != null) {
 			for (File file : files) {
 				String fileName = file.getName();
-				if (fileName.endsWith(".json") && hasSourceData(file)) {
+				if (fileName.endsWith(".json")) {
 					String name = fileName.substring(0, fileName.length() - ".json".length());
 					arrayList.add(new Object[] { name, file });
 				}
 			}
 		}
 		return arrayList;
-	}
-
-	private static boolean hasSourceData(File testFile) {
-		try {
-			JSONObject sourceJson = new JSONObject(Algorithms.getFileAsString(testFile));
-			JSONArray filesJson = sourceJson.optJSONArray("files");
-			File sourceDir = new File(testFile.getParentFile(), "source");
-			if (filesJson != null) {
-				for (int i = 0; i < filesJson.length(); i++) {
-					String file = filesJson.optString(i);
-					if (file != null && file.replace(".gz", "").endsWith(".obf")) {
-						String sourceFileName = file.replace(".gz", "").replace(".obf", ".json");
-						if (!hasSourceJson(new File(sourceDir, sourceFileName))) {
-							return false;
-						}
-					}
-				}
-				return true;
-			}
-			String fileName = testFile.getName();
-			String sourceFileName = fileName.substring(0, fileName.length() - ".json".length()) + ".json";
-			return hasSourceJson(new File(sourceDir, sourceFileName));
-		} catch (JSONException e) {
-			System.out.println(testFile);
-			return false;
-		}
-	}
-
-	private static boolean hasSourceJson(File sourceJson) {
-		return sourceJson.isFile() || new File(sourceJson.getParentFile(), sourceJson.getName() + ".gz").isFile();
 	}
 
 	@BeforeClass
@@ -123,38 +103,49 @@ public class SearchUICoreTestByJson {
 		poiTypes.setPoiTranslator(new TestSearchTranslator(phrases, enPhrases));
 	}
 	
-	private File createOBFIfNeeded(File obfFile, File sourceJson) throws IOException, SQLException {
-		String obfPath = obfFile.getAbsolutePath();
+	private File createOBFIfNeeded(File originalGzFile) throws IOException, SQLException {
+		if (!originalGzFile.isFile()) {
+			throw new FileNotFoundException("Original OBF does not exist: " + originalGzFile.getAbsolutePath());
+		}
+		String generatedObfName = originalGzFile.getName().endsWith(".obf.gz")
+				? originalGzFile.getName().substring(0, originalGzFile.getName().length() - ".gz".length())
+				: originalGzFile.getName();
+		File generatedObfFile = new File(TMP_DIR, generatedObfName);
+		String obfPath = generatedObfFile.getAbsolutePath();
 		synchronized (GENERATED_OBFS) {
-			if (!GENERATED_OBFS.contains(obfPath) || !obfFile.isFile()) {
-				File parent = obfFile.getParentFile();
+			if (!GENERATED_OBFS.contains(obfPath) || !generatedObfFile.isFile()) {
+				File parent = generatedObfFile.getParentFile();
 				if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
 					throw new IOException("Cannot create generated OBF directory " + parent);
 				}
-				sourceJson = resolveSourceJson(sourceJson);
+				File originalObfFile = new File(TMP_DIR, generatedObfName + ".original");
+				unzip(originalGzFile, originalObfFile);
+				File sourceFile = exportSourceJson(originalObfFile, generatedObfName);
 				OBFDataCreator creator = new OBFDataCreator();
-				creator.create(obfFile.getAbsolutePath(), new String[] { sourceJson.getAbsolutePath() });
+				creator.create(generatedObfFile.getAbsolutePath(), new String[] { sourceFile.getAbsolutePath() });
 				GENERATED_OBFS.add(obfPath);
 			}
 		}
-		return obfFile;
+		return generatedObfFile;
 	}
 
-	private File resolveSourceJson(File sourceJson) throws IOException {
-		if (sourceJson.isFile()) {
-			return sourceJson;
-		}
-		File gzSourceJson = new File(sourceJson.getParentFile(), sourceJson.getName() + ".gz");
-		if (!gzSourceJson.isFile()) {
-			throw new FileNotFoundException("Source JSON does not exist: " + sourceJson.getAbsolutePath()
-					+ " or " + gzSourceJson.getAbsolutePath());
-		}
-		try (GZIPInputStream inputStream = new GZIPInputStream(new FileInputStream(gzSourceJson));
-		     FileOutputStream outputStream = new FileOutputStream(sourceJson)) {
+	private void unzip(File gzFile, File file) throws IOException {
+		try (GZIPInputStream inputStream = new GZIPInputStream(new FileInputStream(gzFile));
+		     FileOutputStream outputStream = new FileOutputStream(file)) {
 			Algorithms.streamCopy(inputStream, outputStream);
 		}
-		sourceJson.deleteOnExit();
-		return sourceJson;
+	}
+
+	private File exportSourceJson(File originalObfFile, String generatedObfName) throws IOException {
+		List<Amenity> amenities = getAmenities(originalObfFile.getAbsolutePath());
+		List<City> cities = getCities(originalObfFile.getAbsolutePath());
+		List<RouteDataObject> routes = getRoutes(originalObfFile.getAbsolutePath());
+		String jsonName = generatedObfName.endsWith(".obf")
+				? generatedObfName.substring(0, generatedObfName.length() - ".obf".length()) + ".json"
+				: generatedObfName + ".json";
+		File jsonFile = new File(TMP_DIR, jsonName);
+		createJsonFile(jsonFile, amenities, cities, routes);
+		return jsonFile;
 	}
 
 	@Test
@@ -187,22 +178,19 @@ public class SearchUICoreTestByJson {
 				if (!TMP_DIR.isDirectory() && !TMP_DIR.mkdirs()) {
 					throw new IOException("Cannot create generated OBF directory " + TMP_DIR);
 				}
-				File directory = new File(testFile.getParentFile(), "source");
 				if (filesJson != null) {
 					for (int i = 0; i < filesJson.length(); i++) {
 						if (filesJson.optString(i) == null) {
 							continue;
 						}
-						String file = filesJson.optString(i).replace(".gz", "");
-						if (file.endsWith(".obf")) {
-							File obfFile = createOBFIfNeeded(new File(TMP_DIR, file),
-									new File(directory, file.replace(".obf", ".json")));
+						String file = filesJson.optString(i);
+						if (file.endsWith(".obf.gz")) {
+							File obfFile = createOBFIfNeeded(new File(SEARCH_RESOURCES_PATH, file));
 							readers.add(new BinaryMapIndexReader(new RandomAccessFile(obfFile.getPath(), "r"), obfFile));
 						}
 					}
 				} else {
-					File obfFile = createOBFIfNeeded(new File(TMP_DIR, testFile.getName().replace(".json", ".obf")),
-							new File(directory, testFile.getName()));
+					File obfFile = createOBFIfNeeded(new File(SEARCH_RESOURCES_PATH, testFile.getName().replace(".json", ".obf.gz")));
 					readers.add(new BinaryMapIndexReader(new RandomAccessFile(obfFile.getPath(), "r"), obfFile));
 				}
 			}
@@ -379,6 +367,234 @@ public class SearchUICoreTestByJson {
 		}
 
 		return collection.getCurrentSearchResults();
+	}
+
+	private List<Amenity> getAmenities(String obf) throws IOException {
+		List<Amenity> results = new ArrayList<>();
+		File file = new File(obf);
+		try (RandomAccessFile r = new RandomAccessFile(file.getAbsolutePath(), "r")) {
+			BinaryMapIndexReader index = new BinaryMapIndexReader(r, file);
+			try {
+				for (BinaryMapPoiReaderAdapter.PoiRegion poiIndex : index.getPoiIndexes()) {
+					BinaryMapIndexReader.SearchRequest<Amenity> request = BinaryMapIndexReader.buildSearchPoiRequest(
+							0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE,
+							-1, BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER, null);
+					results.addAll(index.searchPoi(request, poiIndex));
+				}
+			} finally {
+				index.close();
+			}
+		}
+		results.sort(Comparator.comparing(a -> {
+			String name = a == null ? null : a.getName("en");
+			return name == null ? "" : name;
+		}, String.CASE_INSENSITIVE_ORDER));
+		return results;
+	}
+
+	private List<City> getCities(String obf) throws IOException {
+		Map<String, City> mergedCities = new LinkedHashMap<>();
+		File file = new File(obf);
+		try (RandomAccessFile r = new RandomAccessFile(file.getAbsolutePath(), "r")) {
+			BinaryMapIndexReader index = new BinaryMapIndexReader(r, file);
+			try {
+				for (BinaryMapAddressReaderAdapter.AddressRegion region : index.getAddressIndexes()) {
+					for (BinaryMapAddressReaderAdapter.CityBlocks type : BinaryMapAddressReaderAdapter.CityBlocks.values()) {
+						if (type == BinaryMapAddressReaderAdapter.CityBlocks.UNKNOWN_TYPE) {
+							continue;
+						}
+						for (City city : index.getCities(null, type, region, null)) {
+							index.preloadStreets(city, null, true, null);
+							for (Street street : new ArrayList<>(city.getStreets())) {
+								index.preloadBuildings(street, null, null);
+							}
+							mergeCity(mergedCities, city, "en");
+						}
+					}
+				}
+			} finally {
+				index.close();
+			}
+		}
+		List<City> results = new ArrayList<>(mergedCities.values());
+		results.sort(Comparator.comparing(c -> {
+			String name = c == null ? null : c.getName("en");
+			return name == null ? "" : name;
+		}, String.CASE_INSENSITIVE_ORDER));
+		return results;
+	}
+
+	private List<RouteDataObject> getRoutes(String obf) throws IOException {
+		List<RouteDataObject> results = new ArrayList<>();
+		File file = new File(obf);
+		try (RandomAccessFile r = new RandomAccessFile(file.getAbsolutePath(), "r")) {
+			BinaryMapIndexReader index = new BinaryMapIndexReader(r, file);
+			try {
+				for (BinaryMapRouteReaderAdapter.RouteRegion region : index.getRoutingIndexes()) {
+					BinaryMapIndexReader.SearchRequest<RouteDataObject> request = BinaryMapIndexReader.buildSearchRouteRequest(
+							0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, null);
+					List<BinaryMapRouteReaderAdapter.RouteSubregion> subregions =
+							index.searchRouteIndexTree(request, region.getSubregions());
+					index.loadRouteIndexData(subregions, new ResultMatcher<>() {
+						@Override
+						public boolean publish(RouteDataObject object) {
+							results.add(object);
+							return true;
+						}
+
+						@Override
+						public boolean isCancelled() {
+							return false;
+						}
+					});
+				}
+			} finally {
+				index.close();
+			}
+		}
+		results.sort(Comparator.comparingLong(rdo -> rdo == null ? Long.MAX_VALUE : rdo.id));
+		return results;
+	}
+
+	private void createJsonFile(File sourceJsonFile, List<Amenity> amenities, List<City> cities, List<RouteDataObject> routes) throws IOException {
+		File parent = sourceJsonFile.getParentFile();
+		if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
+			throw new IOException("Cannot create directory " + parent);
+		}
+		try (Writer writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(sourceJsonFile), StandardCharsets.UTF_8))) {
+			writer.write("{\n");
+			boolean hasPreviousSection = false;
+			if (amenities != null && !amenities.isEmpty()) {
+				hasPreviousSection = writeJsonSection(writer, "amenities", amenities, hasPreviousSection,
+						amenity -> amenity == null ? null : amenity.toJSON());
+			}
+			List<City> mergedCities = mergeCities(cities);
+			if (!mergedCities.isEmpty()) {
+				hasPreviousSection = writeJsonSection(writer, "cities", mergedCities, hasPreviousSection,
+						city -> city == null ? null : city.toJSON(true));
+			}
+			if (routes != null && !routes.isEmpty()) {
+				long[] routeId = {1};
+				writeJsonSection(writer, "routing", routes, hasPreviousSection,
+						route -> route == null ? null : routeDataObjectToJson(route, routeId[0]++));
+			}
+			writer.write("\n}");
+		}
+	}
+
+	private <T> boolean writeJsonSection(Writer writer, String name, List<T> values, boolean hasPreviousSection,
+			JsonObjectWriter<T> objectWriter) throws IOException {
+		boolean hasAnyObject = false;
+		boolean firstObject = true;
+		for (T value : values) {
+			JSONObject object = objectWriter.toJson(value);
+			if (object == null) {
+				continue;
+			}
+			if (!hasAnyObject) {
+				writer.write(hasPreviousSection ? ",\n" : "");
+				writer.write("  \"");
+				writer.write(name);
+				writer.write("\": [");
+				hasAnyObject = true;
+			}
+			if (!firstObject) {
+				writer.write(",");
+			}
+			writer.write("\n    ");
+			writer.write(object.toString());
+			firstObject = false;
+		}
+		if (hasAnyObject) {
+			writer.write("\n  ]");
+			return true;
+		}
+		return hasPreviousSection;
+	}
+
+	private interface JsonObjectWriter<T> {
+		JSONObject toJson(T value);
+	}
+
+	private List<City> mergeCities(List<City> cities) {
+		Map<String, City> merged = new LinkedHashMap<>();
+		if (cities != null) {
+			for (City city : cities) {
+				mergeCity(merged, city, "");
+			}
+		}
+		return new ArrayList<>(merged.values());
+	}
+
+	private void mergeCity(Map<String, City> mergedCities, City city, String lang) {
+		if (city == null) {
+			return;
+		}
+		String key = cityMergeKey(city, lang);
+		City existing = mergedCities.get(key);
+		if (existing == null) {
+			mergedCities.put(key, city);
+		} else {
+			existing.mergeWith(city);
+		}
+	}
+
+	private String cityMergeKey(City city, String lang) {
+		Long id = city.getId();
+		if (id != null) {
+			return id.toString();
+		}
+		String name = city.getName(lang);
+		LatLon location = city.getLocation();
+		return city.getType() + "|" + (name == null ? "" : name.toLowerCase(Locale.ROOT)) + "|"
+				+ (location == null ? "" : String.format(Locale.US, "%.6f,%.6f",
+				location.getLatitude(), location.getLongitude()));
+	}
+
+	private JSONObject routeDataObjectToJson(RouteDataObject road, long routeId) {
+		JSONObject routeJson = new JSONObject();
+		routeJson.put("id", routeId);
+		routeJson.put("pointsX", toJsonArray(road.pointsX));
+		routeJson.put("pointsY", toJsonArray(road.pointsY));
+		JSONArray types = new JSONArray();
+		if (road.types != null) {
+			for (int type : road.types) {
+				BinaryMapRouteReaderAdapter.RouteTypeRule rule = road.region.quickGetEncodingRule(type);
+				if (rule != null) {
+					JSONObject typeJson = new JSONObject();
+					typeJson.put("tag", rule.getTag());
+					typeJson.put("value", rule.getValue());
+					types.put(typeJson);
+				}
+			}
+		}
+		routeJson.put("types", types);
+		JSONArray names = new JSONArray();
+		if (road.nameIds != null && road.names != null) {
+			for (int nameId : road.nameIds) {
+				BinaryMapRouteReaderAdapter.RouteTypeRule rule = road.region.quickGetEncodingRule(nameId);
+				if (rule == null) {
+					continue;
+				}
+				JSONObject nameJson = new JSONObject();
+				nameJson.put("tag", rule.getTag());
+				nameJson.put("value", road.names.get(nameId));
+				names.put(nameJson);
+			}
+		}
+		routeJson.put("names", names);
+		return routeJson;
+	}
+
+	private JSONArray toJsonArray(int[] values) {
+		JSONArray arr = new JSONArray();
+		if (values == null) {
+			return arr;
+		}
+		for (int value : values) {
+			arr.put(value);
+		}
+		return arr;
 	}
 
 	private void parseResults(JSONObject sourceJson, String tag, List<List<String>> results) {
