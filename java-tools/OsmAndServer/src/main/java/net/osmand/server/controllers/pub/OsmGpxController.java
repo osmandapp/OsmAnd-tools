@@ -2,14 +2,12 @@ package net.osmand.server.controllers.pub;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import net.osmand.data.LatLon;
 import net.osmand.server.DatasourceConfiguration;
 import net.osmand.server.api.services.GpxService;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import net.osmand.shared.gpx.GpxUtilities;
-import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.util.Algorithms;
 import okio.Buffer;
 import okio.Source;
@@ -25,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -65,9 +64,6 @@ public class OsmGpxController {
 	private static final int MAX_RUNTIME_CACHE_SIZE = 5000;
 	private static final int MAX_ROUTES_SUMMARY = 100000;
 	private static final int MAX_TAGS_PER_BBOX = 1000;
-	private static final int MAX_ROUTES_FULL_MODE_THRESHOLD = 100;
-	private static final int MIN_POINTS_SIZE = 100;
-	private static final int MAX_DISTANCE_BETWEEN_POINTS = 1000;
 	private final AtomicInteger cacheTouch = new AtomicInteger(0);
 
 	private static final String GPX_METADATA_TABLE_NAME = "osm_gpx_data";
@@ -173,13 +169,7 @@ public class OsmGpxController {
 
 		List<Feature> summaryFeatures = querySummaryFeatures(conditions, params);
 
-		if (summaryFeatures.size() > MAX_ROUTES_FULL_MODE_THRESHOLD) {
-			FeatureCollection featureCollection = new FeatureCollection();
-			featureCollection.setFeatures(summaryFeatures);
-			return ResponseEntity.ok(gson.toJson(featureCollection));
-		} else {
-			return buildFullRoutesResponse(summaryFeatures);
-		}
+		return buildFullRoutesResponse(summaryFeatures);
 	}
 
 	@GetMapping(path = {"/ranges"}, produces = "application/json")
@@ -313,15 +303,15 @@ public class OsmGpxController {
 
 		String query =
 				"SELECT tag, count(*) AS cnt " +
-				"FROM (" +
-				"  SELECT unnest(m.tags) AS tag " +
-				"  FROM " + GPX_METADATA_TABLE_NAME + " m " +
-				"  WHERE 1 = 1 " + conditions +
-				") t " +
-				"WHERE tag IS NOT NULL AND tag <> '' " +
-				"GROUP BY tag " +
-				"ORDER BY cnt DESC " +
-				"LIMIT " + MAX_TAGS_PER_BBOX;
+						"FROM (" +
+						"  SELECT unnest(m.tags) AS tag " +
+						"  FROM " + GPX_METADATA_TABLE_NAME + " m " +
+						"  WHERE 1 = 1 " + conditions +
+						") t " +
+						"WHERE tag IS NOT NULL AND tag <> '' " +
+						"GROUP BY tag " +
+						"ORDER BY cnt DESC " +
+						"LIMIT " + MAX_TAGS_PER_BBOX;
 
 		List<Map<String, Object>> rows = jdbcTemplate.queryForList(query, params.toArray());
 		return ResponseEntity.ok(gson.toJson(rows));
@@ -359,10 +349,10 @@ public class OsmGpxController {
 
 		String query =
 				"SELECT m.activity AS id, COUNT(*) AS count " +
-				"FROM " + GPX_METADATA_TABLE_NAME + " m " +
-				"WHERE 1 = 1 " + conditions +
-				" GROUP BY m.activity " +
-				"ORDER BY count DESC";
+						"FROM " + GPX_METADATA_TABLE_NAME + " m " +
+						"WHERE 1 = 1 " + conditions +
+						" GROUP BY m.activity " +
+						"ORDER BY count DESC";
 
 		List<Map<String, Object>> rows = jdbcTemplate.queryForList(query, params.toArray());
 		return ResponseEntity.ok(gson.toJson(rows));
@@ -433,7 +423,8 @@ public class OsmGpxController {
 			return ResponseEntity.ok(gson.toJson(empty));
 		}
 
-		String query = "SELECT id, data FROM " + GPX_FILES_TABLE_NAME + " WHERE id IN (" + String.join(",", Collections.nCopies(ids.size(), "?")) +
+		String query = "SELECT id, simplified_geometry FROM " + GPX_METADATA_TABLE_NAME +
+				" WHERE simplified_geometry IS NOT NULL AND id IN (" + String.join(",", Collections.nCopies(ids.size(), "?")) +
 				") ORDER BY id DESC";
 
 		List<Feature> features = new ArrayList<>();
@@ -447,27 +438,12 @@ public class OsmGpxController {
 			if (feature == null) {
 				return;
 			}
-			String idKey = String.valueOf(id);
-			byte[] bytes = rs.getBytes("data");
-			RouteFile file = routesCache.computeIfAbsent(idKey, key -> {
-				GpxFile gpxFile = null;
-				try (Source src = new Buffer().write(Objects.requireNonNull(Algorithms.gzipToString(bytes)).getBytes())) {
-					gpxFile = GpxUtilities.INSTANCE.loadGpxFile(src);
-				} catch (IOException e) {
-					LOGGER.error("Error loading GPX file", e);
-				}
-				if (gpxFile != null && gpxFile.getError() == null) {
-					GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
-					return new RouteFile(bytes, gpxFile, analysis);
-				}
-				return null;
-			});
-			if (file != null) {
-				addGeoDataToFeature(file, feature);
-				if (feature.getProperty("geo") != null) {
-					features.add(feature);
-				}
+			byte[] simplifiedGeometry = rs.getBytes("simplified_geometry");
+			if (simplifiedGeometry == null || simplifiedGeometry.length == 0) {
+				return;
 			}
+			feature.getProperties().put("geo_b64", Base64.getEncoder().encodeToString(simplifiedGeometry));
+			features.add(feature);
 		});
 
 		FeatureCollection featureCollection = new FeatureCollection();
@@ -646,31 +622,6 @@ public class OsmGpxController {
 			params.add(max);
 		}
 		return null;
-	}
-
-	private void addGeoDataToFeature(RouteFile file, Feature feature) {
-		GpxFile gpxFile = file.gpxFile;
-		List<WptPt> points = gpxFile.getAllSegmentsPoints();
-		GpxTrackAnalysis analysis = file.analysis;
-		if (!points.isEmpty() && points.size() > MIN_POINTS_SIZE && analysis.getMaxDistanceBetweenPoints() < MAX_DISTANCE_BETWEEN_POINTS) {
-			List<List<LatLon>> result = new ArrayList<>();
-			gpxFile.getTracks().forEach(track -> {
-				if (!track.getGeneralTrack()) {
-					track.getSegments().forEach(segment -> {
-						List<LatLon> segmentPoints = new ArrayList<>();
-						segment.getPoints().forEach(point -> {
-							if (point.hasLocation()) {
-								segmentPoints.add(new LatLon(point.getLatitude(), point.getLongitude()));
-							}
-						});
-						if (!segmentPoints.isEmpty()) {
-							result.add(segmentPoints);
-						}
-					});
-				}
-			});
-			feature.getProperties().put("geo", result);
-		}
 	}
 
 	private ResponseEntity<String> addCoords(List<Object> params, StringBuilder conditions, String minLat, String maxLat, String minLon, String maxLon) {
