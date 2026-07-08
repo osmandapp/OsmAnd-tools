@@ -167,9 +167,11 @@ public class OsmGpxController {
 		String tagMatchMode = Algorithms.isEmpty(req.tagMatchMode()) ? "OR" : req.tagMatchMode();
 		applyTagsFilter(req.tags(), tagMatchMode, conditions, params);
 
-		List<Feature> summaryFeatures = querySummaryFeatures(conditions, params);
+		List<Feature> features = queryRouteFeatures(conditions, params);
+		FeatureCollection featureCollection = new FeatureCollection();
+		featureCollection.setFeatures(features);
 
-		return buildFullRoutesResponse(summaryFeatures);
+		return ResponseEntity.ok(gson.toJson(featureCollection));
 	}
 
 	@GetMapping(path = {"/ranges"}, produces = "application/json")
@@ -381,11 +383,12 @@ public class OsmGpxController {
 		params.addAll(normalized);
 	}
 
-	private List<Feature> querySummaryFeatures(StringBuilder conditions, List<Object> params) {
+	private List<Feature> queryRouteFeatures(StringBuilder conditions, List<Object> params) {
 		String query = "SELECT m.id, m.name, m.description, m.user, m.date, m.activity, m.lat, m.lon, " +
-				"m.speed, m.distance, m.points " +
+				"m.speed, m.distance, m.points, m.simplified_geometry " +
 				"FROM " + GPX_METADATA_TABLE_NAME + " m " +
 				"WHERE 1 = 1 " + conditions +
+				" AND m.simplified_geometry IS NOT NULL" +
 				" ORDER BY m.date DESC LIMIT " + MAX_ROUTES_SUMMARY;
 
 		List<Feature> features = new ArrayList<>();
@@ -394,61 +397,15 @@ public class OsmGpxController {
 				ps.setObject(i + 1, params.get(i));
 			}
 		}, rs -> {
-			features.add(createBaseFeature(rs));
-		});
-		return features;
-	}
-
-	private ResponseEntity<String> buildFullRoutesResponse(List<Feature> summaryFeatures) {
-		if (summaryFeatures.isEmpty()) {
-			FeatureCollection empty = new FeatureCollection();
-			empty.setFeatures(Collections.emptyList());
-			return ResponseEntity.ok(gson.toJson(empty));
-		}
-
-		Map<Long, Feature> featureById = new LinkedHashMap<>();
-		List<Long> ids = new ArrayList<>();
-		for (Feature f : summaryFeatures) {
-			Long id = f.getProperty("id");
-			if (id != null) {
-				featureById.computeIfAbsent(id, k -> {
-					ids.add(k);
-					return f;
-				});
-			}
-		}
-		if (ids.isEmpty()) {
-			FeatureCollection empty = new FeatureCollection();
-			empty.setFeatures(Collections.emptyList());
-			return ResponseEntity.ok(gson.toJson(empty));
-		}
-
-		String query = "SELECT id, simplified_geometry FROM " + GPX_METADATA_TABLE_NAME +
-				" WHERE simplified_geometry IS NOT NULL AND id IN (" + String.join(",", Collections.nCopies(ids.size(), "?")) +
-				") ORDER BY id DESC";
-
-		List<Feature> features = new ArrayList<>();
-		jdbcTemplate.query(query, ps -> {
-			for (int i = 0; i < ids.size(); i++) {
-				ps.setLong(i + 1, ids.get(i));
-			}
-		}, rs -> {
-			Long id = rs.getLong("id");
-			Feature feature = featureById.get(id);
-			if (feature == null) {
-				return;
-			}
 			byte[] simplifiedGeometry = rs.getBytes("simplified_geometry");
 			if (simplifiedGeometry == null || simplifiedGeometry.length == 0) {
 				return;
 			}
+			Feature feature = createBaseFeature(rs);
 			feature.getProperties().put("geo_b64", Base64.getEncoder().encodeToString(simplifiedGeometry));
 			features.add(feature);
 		});
-
-		FeatureCollection featureCollection = new FeatureCollection();
-		featureCollection.setFeatures(features);
-		return ResponseEntity.ok(gson.toJson(featureCollection));
+		return features;
 	}
 
 	private Feature createBaseFeature(ResultSet rs) throws SQLException {
