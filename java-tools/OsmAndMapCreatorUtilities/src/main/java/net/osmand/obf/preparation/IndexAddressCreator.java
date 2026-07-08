@@ -1011,7 +1011,15 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			// check that street way is not registered already
 			if (!exist) {
 				LatLon l = e.getLatLon();
-				Set<Long> idsOfStreet = getStreetInCity(ObfConstants.createMapObjectIdFromOsmAndEntity(e), e.getIsInNames(), e.getTag(OSMTagKey.NAME), false, getOtherNames(e), l, icc);
+                Map<String, String> names = getOtherNames(e);
+                String wikidata = e.getTag(MapObject.NAME_WIKIDATA_ATTR);
+                if (wikidata != null) {
+                    if (names == null) {
+                        names = new HashMap<>();
+                    }
+                    names.put(MapObject.NAME_WIKIDATA_ATTR, wikidata);
+                }
+				Set<Long> idsOfStreet = getStreetInCity(ObfConstants.createMapObjectIdFromOsmAndEntity(e), e.getIsInNames(), e.getTag(OSMTagKey.NAME), false, names, l, icc);
 				if (!idsOfStreet.isEmpty()) {
 					streetDAO.writeStreetWayNodes(idsOfStreet, (Way) e);
 				}
@@ -1623,7 +1631,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				}
 				street.setName(streetName + cityPart);
 				for (String lang : names.keySet()) {
-					if (!MapObject.NAME_ADMIN_LEVEL_ATTR.equals(lang) && !MapObject.NAME_WIKIDATA_ATTR.equals(lang)) {
+					if (!MapObject.NAME_ADMIN_LEVEL_ATTR.equals(lang)) {
 						String cityLangPart = cityPart;
 						String cityLangName = city.getName(lang, true);
 						if (!Algorithms.isEmpty(cityLangName)) {
