@@ -389,7 +389,7 @@ public class OsmGpxController {
 				"FROM " + GPX_METADATA_TABLE_NAME + " m " +
 				"WHERE 1 = 1 " + conditions +
 				" AND m.simplified_geometry IS NOT NULL" +
-				" ORDER BY m.date DESC LIMIT " + MAX_ROUTES_SUMMARY;
+				" LIMIT " + MAX_ROUTES_SUMMARY;
 
 		List<Feature> features = new ArrayList<>();
 		jdbcTemplate.query(query, ps -> {
