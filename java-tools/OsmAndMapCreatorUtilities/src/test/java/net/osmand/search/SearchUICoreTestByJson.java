@@ -28,6 +28,7 @@ import java.io.*;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.zip.GZIPInputStream;
 
 @RunWith(Parameterized.class)
 public class SearchUICoreTestByJson {
@@ -73,7 +74,7 @@ public class SearchUICoreTestByJson {
 					String file = filesJson.optString(i);
 					if (file != null && file.replace(".gz", "").endsWith(".obf")) {
 						String sourceFileName = file.replace(".gz", "").replace(".obf", ".json");
-						if (!new File(sourceDir, sourceFileName).isFile()) {
+						if (!hasSourceJson(new File(sourceDir, sourceFileName))) {
 							return false;
 						}
 					}
@@ -82,11 +83,15 @@ public class SearchUICoreTestByJson {
 			}
 			String fileName = testFile.getName();
 			String sourceFileName = fileName.substring(0, fileName.length() - ".json".length()) + ".json";
-			return new File(sourceDir, sourceFileName).isFile();
+			return hasSourceJson(new File(sourceDir, sourceFileName));
 		} catch (JSONException e) {
 			System.out.println(testFile);
 			return false;
 		}
+	}
+
+	private static boolean hasSourceJson(File sourceJson) {
+		return sourceJson.isFile() || new File(sourceJson.getParentFile(), sourceJson.getName() + ".gz").isFile();
 	}
 
 	@BeforeClass
@@ -126,12 +131,30 @@ public class SearchUICoreTestByJson {
 				if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
 					throw new IOException("Cannot create generated OBF directory " + parent);
 				}
+				sourceJson = resolveSourceJson(sourceJson);
 				OBFDataCreator creator = new OBFDataCreator();
 				creator.create(obfFile.getAbsolutePath(), new String[] { sourceJson.getAbsolutePath() });
 				GENERATED_OBFS.add(obfPath);
 			}
 		}
 		return obfFile;
+	}
+
+	private File resolveSourceJson(File sourceJson) throws IOException {
+		if (sourceJson.isFile()) {
+			return sourceJson;
+		}
+		File gzSourceJson = new File(sourceJson.getParentFile(), sourceJson.getName() + ".gz");
+		if (!gzSourceJson.isFile()) {
+			throw new FileNotFoundException("Source JSON does not exist: " + sourceJson.getAbsolutePath()
+					+ " or " + gzSourceJson.getAbsolutePath());
+		}
+		try (GZIPInputStream inputStream = new GZIPInputStream(new FileInputStream(gzSourceJson));
+		     FileOutputStream outputStream = new FileOutputStream(sourceJson)) {
+			Algorithms.streamCopy(inputStream, outputStream);
+		}
+		sourceJson.deleteOnExit();
+		return sourceJson;
 	}
 
 	@Test
