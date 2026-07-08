@@ -286,6 +286,21 @@ public class DownloadOsmGPX {
 							" USING GIST (ST_MakeEnvelope(minlon, minlat, maxlon, maxlat, 4326))"
 			);
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_year ON " + GPX_METADATA_TABLE_NAME + " ((extract(year from date)))");
+
+			// BBox range index used by the plain minlon/maxlon/minlat/maxlat comparisons.
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_bbox_btree ON " + GPX_METADATA_TABLE_NAME
+					+ " (minlat, maxlat, minlon, maxlon)");
+
+			// Partial covering indexes for the /ranges endpoint (bbox + activity, carrying distance/speed),
+			// limited to non-garbage tracks with a valid distance or speed.
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_ranges_optimized ON " + GPX_METADATA_TABLE_NAME
+					+ " (minlat, maxlat, minlon, maxlon, activity) INCLUDE (distance, speed)"
+					+ " WHERE (distance > 0::double precision OR speed > 0::double precision)"
+					+ " AND (activity <> ALL (ARRAY['garbage'::text, 'error'::text]))");
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_ranges_composite ON " + GPX_METADATA_TABLE_NAME
+					+ " (activity, minlat, minlon, maxlat, maxlon) INCLUDE (distance, speed)"
+					+ " WHERE (distance > 0::double precision OR speed > 0::double precision)"
+					+ " AND (activity <> ALL (ARRAY['garbage'::text, 'error'::text]))");
 		}
 		LOG.info("Activity schema (columns and indexes) ensured.");
 	}
