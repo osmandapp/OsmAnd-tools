@@ -39,7 +39,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.GZIPInputStream;
 
 @RunWith(Parameterized.class)
-public class SearchUICoreTestByJson {
+public class SearchUICoreTestByOBFRecreation {
 
 	private static final String ROOT_RESOURCES_PATH = "../../../resources/test-resources/";
 	private static final String SEARCH_RESOURCES_PATH = ROOT_RESOURCES_PATH + "search";
@@ -54,7 +54,7 @@ public class SearchUICoreTestByJson {
 
 	private final File testFile;
 
-	public SearchUICoreTestByJson(String name, File file) {
+	public SearchUICoreTestByOBFRecreation(String name, File file) {
 		this.testFile = file;
 	}
 
@@ -136,6 +136,19 @@ public class SearchUICoreTestByJson {
 		}
 	}
 
+	private BinaryMapIndexReader openReader(File obfFile) throws IOException {
+		RandomAccessFile raf = new RandomAccessFile(obfFile.getPath(), "r");
+		try {
+			return new BinaryMapIndexReader(raf, obfFile);
+		} catch (IOException | RuntimeException e) {
+			try {
+				raf.close();
+			} catch (IOException ignored) {
+			}
+			throw e;
+		}
+	}
+
 	private File exportSourceJson(File originalObfFile, String generatedObfName) throws IOException {
 		List<Amenity> amenities = getAmenities(originalObfFile.getAbsolutePath());
 		List<City> cities = getCities(originalObfFile.getAbsolutePath());
@@ -163,8 +176,8 @@ public class SearchUICoreTestByJson {
 		}
 		if (phrasesJson != null) {
 			for (int i = 0; i < phrasesJson.length(); i++) {
-				String phrase = phrasesJson.optString(i);
-				if (phrase != null) {
+				String phrase = phrasesJson.optString(i, null);
+				if (!Algorithms.isEmpty(phrase)) {
 					phrases.add(phrase);
 				}
 			}
@@ -173,6 +186,7 @@ public class SearchUICoreTestByJson {
 		boolean useData = settingsJson.optBoolean("useData", true);
 		JSONArray filesJson = sourceJson.optJSONArray("files");
 		List<BinaryMapIndexReader> readers = new ArrayList<>();
+		boolean prevDisplayDefaultPoiTypes = SearchCoreFactory.DISPLAY_DEFAULT_POI_TYPES;
 		try {
 			if (useData) {
 				if (!TMP_DIR.isDirectory() && !TMP_DIR.mkdirs()) {
@@ -180,18 +194,21 @@ public class SearchUICoreTestByJson {
 				}
 				if (filesJson != null) {
 					for (int i = 0; i < filesJson.length(); i++) {
-						if (filesJson.optString(i) == null) {
+						String file = filesJson.optString(i, null);
+						if (Algorithms.isEmpty(file)) {
 							continue;
 						}
-						String file = filesJson.optString(i);
 						if (file.endsWith(".obf.gz")) {
 							File obfFile = createOBFIfNeeded(new File(SEARCH_RESOURCES_PATH, file));
-							readers.add(new BinaryMapIndexReader(new RandomAccessFile(obfFile.getPath(), "r"), obfFile));
+							readers.add(openReader(obfFile));
 						}
 					}
 				} else {
 					File obfFile = createOBFIfNeeded(new File(SEARCH_RESOURCES_PATH, testFile.getName().replace(".json", ".obf.gz")));
-					readers.add(new BinaryMapIndexReader(new RandomAccessFile(obfFile.getPath(), "r"), obfFile));
+					readers.add(openReader(obfFile));
+				}
+				if (readers.isEmpty()) {
+					throw new IllegalStateException("useData=true but no OBF indexes were loaded for " + testFile.getName());
 				}
 			}
 		boolean disabled = settingsJson.optBoolean("disabled", false);
@@ -292,11 +309,13 @@ public class SearchUICoreTestByJson {
 				}
 				Assert.assertEquals(expected, present);
 				if (testGeocoding) {
+					Assert.assertFalse("Reverse geocoding requested but no OBF readers are available", readers.isEmpty());
 					testReverseGeocoding(res, readers.get(0));
 				}
 			}
 		}
 		} finally {
+			SearchCoreFactory.DISPLAY_DEFAULT_POI_TYPES = prevDisplayDefaultPoiTypes;
 			if (geoCtx != null) {
 				for (BinaryMapIndexReader reader : geoCtx.getMaps()) {
 					reader.close();
@@ -323,7 +342,6 @@ public class SearchUICoreTestByJson {
 		}
 		if (!file.delete()) {
 			for (int i = 0; i < 5 && file.exists(); i++) {
-				System.gc();
 				if (file.delete()) {
 					return;
 				}
@@ -468,9 +486,8 @@ public class SearchUICoreTestByJson {
 				hasPreviousSection = writeJsonSection(writer, "amenities", amenities, hasPreviousSection,
 						amenity -> amenity == null ? null : amenity.toJSON());
 			}
-			List<City> mergedCities = mergeCities(cities);
-			if (!mergedCities.isEmpty()) {
-				hasPreviousSection = writeJsonSection(writer, "cities", mergedCities, hasPreviousSection,
+			if (cities != null && !cities.isEmpty()) {
+				hasPreviousSection = writeJsonSection(writer, "cities", cities, hasPreviousSection,
 						city -> city == null ? null : city.toJSON(true));
 			}
 			if (routes != null && !routes.isEmpty()) {
@@ -514,16 +531,6 @@ public class SearchUICoreTestByJson {
 
 	private interface JsonObjectWriter<T> {
 		JSONObject toJson(T value);
-	}
-
-	private List<City> mergeCities(List<City> cities) {
-		Map<String, City> merged = new LinkedHashMap<>();
-		if (cities != null) {
-			for (City city : cities) {
-				mergeCity(merged, city, "");
-			}
-		}
-		return new ArrayList<>(merged.values());
 	}
 
 	private void mergeCity(Map<String, City> mergedCities, City city, String lang) {
@@ -578,7 +585,8 @@ public class SearchUICoreTestByJson {
 				}
 				JSONObject nameJson = new JSONObject();
 				nameJson.put("tag", rule.getTag());
-				nameJson.put("value", road.names.get(nameId));
+				String nameValue = road.names.get(nameId);
+				nameJson.put("value", nameValue == null ? "" : nameValue);
 				names.put(nameJson);
 			}
 		}
@@ -598,6 +606,9 @@ public class SearchUICoreTestByJson {
 	}
 
 	private void parseResults(JSONObject sourceJson, String tag, List<List<String>> results) {
+		if (results.isEmpty()) {
+			return;
+		}
 		List<String> result = results.get(0);
 		JSONArray resultsArr = sourceJson.getJSONArray(tag);
 		boolean hasInnerArray = resultsArr.length() > 0 && resultsArr.optJSONArray(0) != null;
