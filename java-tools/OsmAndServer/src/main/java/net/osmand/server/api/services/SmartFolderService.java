@@ -244,7 +244,10 @@ public class SmartFolderService {
 			return null;
 		}
 		return smartFolder.getTrackItems().stream()
-				.map(trackItem -> userDataService.getUserFile(trackItem.getName(), FILE_TYPE_GPX, null, dev))
+				.map(trackItem -> {
+					if (trackItem.getFile() == null) return null;
+					return userDataService.getUserFile(trackItem.getFile().path(), FILE_TYPE_GPX, null, dev);
+				})
 				.filter(Objects::nonNull)
 				.toList();
 	}
