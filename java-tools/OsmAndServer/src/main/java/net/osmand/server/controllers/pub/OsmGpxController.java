@@ -634,11 +634,13 @@ public class OsmGpxController {
 			return ResponseEntity.badRequest().body("Invalid latitude or longitude values.");
 		}
 
-		conditions.append(" AND m.minlon <= ? AND m.maxlon >= ? AND m.minlat <= ? AND m.maxlat >= ?");
-		params.add(validatedMaxLon);
-		params.add(validatedMinLon);
-		params.add(validatedMaxLat);
-		params.add(validatedMinLat);
+		// Use the GiST spatial index (idx_osm_gpx_bbox_gist) via the bbox-overlap operator.
+		conditions.append(" AND ST_MakeEnvelope(m.minlon, m.minlat, m.maxlon, m.maxlat, 4326)"
+				+ " && ST_MakeEnvelope(?, ?, ?, ?, 4326)");
+		params.add(validatedMinLon.doubleValue());
+		params.add(validatedMinLat.doubleValue());
+		params.add(validatedMaxLon.doubleValue());
+		params.add(validatedMaxLat.doubleValue());
 
 		return null;
 	}
