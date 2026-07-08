@@ -170,6 +170,11 @@ def process_tile(tiff_path, args_dict):
 
             if nf:
                 neighbors.append(nf)
+                is_highres_tile = '_highres' in nf.lower()
+
+                if dlat == 0 and dlon == 0:
+                    center_path = nf
+                    center_is_highres = is_highres_tile
 
                 # Mark boundary neighbors for expansion
                 if dlat == 0 and dlon == -1:

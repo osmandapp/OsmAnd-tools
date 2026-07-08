@@ -80,6 +80,7 @@ import net.osmand.search.core.SearchPhrase;
 import net.osmand.search.core.SearchResult;
 import net.osmand.search.core.SearchSettings;
 import net.osmand.search.core.TopIndexFilter;
+import net.osmand.search.core.spatial.SpatialPoiSearch;
 import net.osmand.search.core.spatial.SpatialSearchContext;
 import net.osmand.search.core.spatial.SpatialSearchResult;
 import net.osmand.search.core.spatial.SpatialTextSearch;
@@ -131,6 +132,8 @@ public class SearchService {
 	private final SpatialTextSearch spatialTextSearch = new SpatialTextSearch();
 	private final ThreadLocal<SpatialTextSearch> spatialTextSearchLocal = ThreadLocal
 			.withInitial(() -> new SpatialTextSearch());
+	// reused for cache
+	private final SpatialPoiSearch poiSearch = new SpatialPoiSearch(MapPoiTypes.getDefault());
 
 	public static class PoiSearchResult {
 
@@ -333,7 +336,7 @@ public class SearchService {
 		}
 		SpatialTextSearchSettings settings = new SpatialTextSearchSettings();
 		settings.AUTO_CLEAR_PREFIX_CACHE_LIMIT = TEST_CACHE_PREFIX_LIMIT;
-		SpatialSearchContext sscontext = new SpatialSearchContext(settings, readers, new LatLon(ctx.lat, ctx.lon));
+		SpatialSearchContext sscontext = new SpatialSearchContext(settings, readers, poiSearch, new LatLon(ctx.lat, ctx.lon));
 		SpatialSearchContext.SpatialSearchStats stats = sscontext.getStats();
 		stats.printLogs = printLogs;
 		
@@ -442,7 +445,7 @@ public class SearchService {
 			SpatialSearchResults res;
 			// In future multiple spatialTextSearch & multiple osmand regions
 			SpatialSearchContext sscontext = new SpatialSearchContext(new SpatialTextSearchSettings(), usedMapList,
-					new LatLon(ctx.lat, ctx.lon));
+					poiSearch, new LatLon(ctx.lat, ctx.lon));
 			synchronized (spatialTextSearch) {
 				usedMapList.add(osmandRegions.getFile());
 				res = spatialTextSearch.searchAPI(ctx.text, sscontext);
@@ -451,7 +454,8 @@ public class SearchService {
 				for (SpatialSearchResult r : res.mainResults) {
 					List<MapObject> objs = r.getObjects();
 					if (!objs.isEmpty()) {
-						Feature f = getSpatialFeature(r.getLatLon(), objs.get(0), ctx.locale, timeZone);
+						LatLon l = r.getLatLon() == null ? new LatLon(ctx.lat, ctx.lon) : r.getLatLon();
+						Feature f = getSpatialFeature(l, objs.get(0), ctx.locale, timeZone);
 						if (f != null) {
 							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(), matchedObjects(objs, ctx.locale));
 							f.prop(PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());

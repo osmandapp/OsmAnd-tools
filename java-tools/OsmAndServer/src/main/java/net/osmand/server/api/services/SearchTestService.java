@@ -502,7 +502,7 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 					datasetId = -1;
 				}
 
-				ResultActuator actuator = new ResultActuator(targetPoint, newRow);
+				ResultActuator actuator = new ResultActuator(targetPoint, newRow, datasetId);
 				Object[] args = null;
 				try {
 					SearchService.SearchResults searchResult = null;

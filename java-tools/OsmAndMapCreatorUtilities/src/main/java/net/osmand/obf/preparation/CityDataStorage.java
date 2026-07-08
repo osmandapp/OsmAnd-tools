@@ -19,7 +19,8 @@ import java.util.*;
  */
 public class CityDataStorage {
 
-	public Map<City, Boundary> cityBoundaries = new HashMap<City, Boundary>();
+	public Map<City, Boundary> cityBoundaries = new HashMap<>();
+	public Map<City, int[]> cityExtBoundaries = new HashMap<>();
 	public Map<Boundary, List<City>> boundaryToContainingCities = new HashMap<Boundary, List<City>>();
 	private static final double CITY_VILLAGE_DIST = 30000;
 	private DataTileManager<City> cityVillageManager = new DataTileManager<City>(13);
@@ -102,6 +103,16 @@ public class CityDataStorage {
 	}
 
 	public void assignBbox(City c) {
+		int[] bbox31 = cityExtBoundaries.get(c);
+		if (bbox31 != null && c.getBbox31() == null) {
+//			double d = MapUtils.getDistance(MapUtils.get31LatitudeY(bbox31[1]), MapUtils.get31LongitudeX(bbox31[0]),
+//					MapUtils.get31LatitudeY(bbox31[3]),MapUtils.get31LongitudeX(bbox31[2]));
+//			if(d < 10000 || cityBoundaries.containsKey(c)) {
+			// assign to all bbox for now
+			c.setBbox31(bbox31);
+			return;
+//			}
+		}
 		Boundary b = cityBoundaries.get(c);
 		if (c.getBbox31() == null && b != null) {
 			assignBbox(c, b);
@@ -110,7 +121,10 @@ public class CityDataStorage {
 
 	public void assignBbox(City c, Boundary b) {
 		QuadRect bbox = b.getMultipolygon().getLatLonBbox();
-		c.setBbox31(new int[] { MapUtils.get31TileNumberX(bbox.left), MapUtils.get31TileNumberY(bbox.top),
-				MapUtils.get31TileNumberX(bbox.right), MapUtils.get31TileNumberY(bbox.bottom) });
+		c.setBbox31(bbox);
+	}
+
+	public void extendBbox(City city) {
+		cityExtBoundaries.put(city, city.getBbox31());
 	}
 }

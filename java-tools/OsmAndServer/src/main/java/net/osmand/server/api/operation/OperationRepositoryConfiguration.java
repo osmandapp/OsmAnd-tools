@@ -64,6 +64,10 @@ public class OperationRepositoryConfiguration {
 					"started_time TIMESTAMP, finished_time TIMESTAMP, created_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, " +
 					"updated_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, " +
 					"FOREIGN KEY (job_id) REFERENCES job(id) ON DELETE CASCADE)");
+			jdbc.execute("CREATE TABLE IF NOT EXISTS inactive_user_notice (" +
+					"userid INTEGER PRIMARY KEY, email TEXT, category TEXT NOT NULL, status TEXT NOT NULL, " +
+					"notified_time TIMESTAMP NOT NULL, deleted_time TIMESTAMP, " +
+					"updated_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)");
 			jdbc.execute("CREATE INDEX IF NOT EXISTS job_class_name_idx ON job(class_name)");
 			jdbc.execute("CREATE INDEX IF NOT EXISTS job_updated_time_idx ON job(updated_time)");
 			jdbc.execute("CREATE INDEX IF NOT EXISTS run_job_id_idx ON run(job_id)");

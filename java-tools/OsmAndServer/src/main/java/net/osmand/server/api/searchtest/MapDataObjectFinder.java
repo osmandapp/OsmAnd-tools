@@ -18,11 +18,8 @@ import net.osmand.search.core.SearchResult;
 import static net.osmand.util.MapUtils.*;
 
 public class MapDataObjectFinder extends ResultActuator implements Consumer<List<SearchResult>> {
-	private final long datasetId;
-	
 	public MapDataObjectFinder(LatLon targetPoint, Map<String, Object> row, long datasetId) {
-		super(targetPoint, row);
-		this.datasetId = datasetId;
+		super(targetPoint, row, datasetId);
 	}
 
 	protected Result findFirstResult(List<SearchResult> searchResults) throws IOException {
@@ -128,8 +125,6 @@ public class MapDataObjectFinder extends ResultActuator implements Consumer<List
 	private void sortPoints(LatLon targetPoint, List<BinaryMapDataObject> res) {
 		res.sort(Comparator.comparingDouble(o -> getDistance(targetPoint, o.getLabelLatLon())));
 	}
-
-	private static final int DIST_PRECISE_THRESHOLD_M = 20;
 
 	protected Result findActualResult(List<SearchResult> searchResults) throws IOException {
 		Result actualResult = null;
