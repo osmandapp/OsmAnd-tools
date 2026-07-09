@@ -476,7 +476,7 @@ public class OsmGpxController {
 					if (gpxFile.getError() == null) {
 						GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
 						routesCache.put(id.toString(), new RouteFile(resultData.byteArray, gpxFile, analysis));
-						WebGpxParser.TrackData gpxData = gpxService.buildTrackDataFromGpxFile(gpxFile, analysis);
+						WebGpxParser.TrackData gpxData = gpxService.buildTrackDataFromGpxFile(gpxFile.clone(), analysis);
 						if (gpxData != null) {
 							return ResponseEntity.ok(gsonWithNans.toJson(Map.of("gpx_data", gpxData)));
 						}
@@ -484,6 +484,22 @@ public class OsmGpxController {
 				} catch (IOException e) {
 					return ResponseEntity.badRequest().body("Error loading GPX file");
 				}
+			}
+		} catch (DataAccessException e) {
+			return ResponseEntity.badRequest().body("No records found");
+		}
+		return ResponseEntity.badRequest().body("No records found");
+	}
+
+	@GetMapping(path = {"/get-route-info"}, produces = "application/json")
+	public ResponseEntity<String> getRouteInfo(@RequestParam Long id) {
+		String columns = "m.id, m.name, m.description, m.user, m.date, m.activity, m.lat, m.lon, m.speed, m.distance, m.points";
+		String query = "SELECT " + columns + " FROM " + GPX_METADATA_TABLE_NAME + " m WHERE m.id = ? LIMIT 1";
+		try {
+			Feature feature = jdbcTemplate.queryForObject(query, (rs, rowNum) -> createBaseFeature(rs), id);
+			if (feature != null) {
+				feature.getProperties().remove("id");
+				return ResponseEntity.ok(gsonWithNans.toJson(feature.getProperties()));
 			}
 		} catch (DataAccessException e) {
 			return ResponseEntity.badRequest().body("No records found");
