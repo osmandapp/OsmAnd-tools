@@ -61,6 +61,7 @@ public class SearchUICoreGenOBFTest {
 	private static final String SEARCH_RESOURCES_PATH = getSearchResourcesPath();
 	private static final File GEN_DIR = new File(SEARCH_RESOURCES_PATH, "gen-source");
 	private static final Set<String> GENERATED_OBFS = Collections.synchronizedSet(new HashSet<>());
+	private static final boolean REGENERATE_OBF = true;
 	private static boolean TEST_EXTRA_RESULTS = true;
 
 	private RoutingContext geoCtx = null;
@@ -144,12 +145,19 @@ public class SearchUICoreGenOBFTest {
 	 * <li>otherwise cached {@code *.json.gz} is used as source when newer than the original OBF or when no original exists. </li>
 	 * <li>If no source cache is valid, the original OBF from {@link #SEARCH_RESOURCES_PATH} is exported to source JSON. 
 	 * <li>New plain {@code *.json} and {@code *.obf} files are compressed back to {@code *.json.gz} and {@code *.obf.gz} for later runs.
+	 * <li>When {@link #REGENERATE_OBF} is {@code false}, the transformation/cache chain is skipped and only the original OBF is used.
 	 */
 	private File createOBFIfNeeded(String fileName) throws IOException, SQLException {
 		String baseName = getBaseName(fileName);
 		File originalObf = getNewestExistingFile(
 				new File(SEARCH_RESOURCES_PATH, baseName + ".obf"),
 				new File(SEARCH_RESOURCES_PATH, baseName + ".obf.gz"));
+		if (!REGENERATE_OBF) {
+			if (originalObf == null) {
+				throw new FileNotFoundException("Original OBF does not exist for " + fileName);
+			}
+			return prepareOriginalObfFile(originalObf, new File(GEN_DIR, baseName + ".orig.obf"));
+		}
 		File sourceJson = getNewestExistingFile(
 				new File(GEN_DIR, baseName + ".json"),
 				new File(GEN_DIR, baseName + ".json.gz"));
@@ -170,17 +178,17 @@ public class SearchUICoreGenOBFTest {
 			}
 			if (preparedObf != null && sourceJson == null && originalObf == null) {
 				File obfFile = prepareObfFile(preparedObf, generatedObfFile);
-				cacheGzipIfNeeded(obfFile, new File(GEN_DIR, baseName + ".obf.gz"));
+				cacheObfIfNeeded(preparedObf, obfFile, baseName);
+				GENERATED_OBFS.add(obfPath);
+				return obfFile;
+			}
+			if (isPreparedObfActual(preparedObf, sourceJson, originalObf)) {
+				File obfFile = prepareObfFile(preparedObf, generatedObfFile);
+				cacheObfIfNeeded(preparedObf, obfFile, baseName);
 				GENERATED_OBFS.add(obfPath);
 				return obfFile;
 			}
 			File sourceFile = getSourceFile(baseName, originalObf, sourceJson);
-			if (isPreparedObfActual(preparedObf, sourceFile)) {
-				File obfFile = prepareObfFile(preparedObf, generatedObfFile);
-				cacheGzipIfNeeded(obfFile, new File(GEN_DIR, baseName + ".obf.gz"));
-				GENERATED_OBFS.add(obfPath);
-				return obfFile;
-			}
 			if (!GENERATED_OBFS.contains(obfPath) || !generatedObfFile.isFile()
 					|| generatedObfFile.lastModified() < sourceFile.lastModified()) {
 				OBFDataCreator creator = new OBFDataCreator();
@@ -190,6 +198,13 @@ public class SearchUICoreGenOBFTest {
 			GENERATED_OBFS.add(obfPath);
 		}
 		return generatedObfFile;
+	}
+
+	private void cacheObfIfNeeded(File preparedObf, File obfFile, String baseName) throws IOException {
+		if (preparedObf != null && preparedObf.getName().endsWith(".obf.gz")) {
+			return;
+		}
+		cacheGzipIfNeeded(obfFile, new File(GEN_DIR, baseName + ".obf.gz"));
 	}
 
 	private File getSourceFile(String baseName, File originalObf, File sourceJson) throws IOException {
@@ -230,8 +245,14 @@ public class SearchUICoreGenOBFTest {
 		return obfFile;
 	}
 
-	private boolean isPreparedObfActual(File preparedObf, File sourceJson) {
-		return preparedObf != null && sourceJson != null && preparedObf.lastModified() > sourceJson.lastModified();
+	private boolean isPreparedObfActual(File preparedObf, File sourceJson, File originalObf) {
+		if (preparedObf == null) {
+			return false;
+		}
+		File source = sourceJson != null && (originalObf == null || sourceJson.lastModified() > originalObf.lastModified())
+				? sourceJson
+				: originalObf;
+		return source != null && preparedObf.lastModified() > source.lastModified();
 	}
 
 	private File getNewestExistingFile(File... files) {
@@ -275,7 +296,7 @@ public class SearchUICoreGenOBFTest {
 		if (sourceFile == null || !sourceFile.isFile() || sourceFile.equals(gzFile)) {
 			return;
 		}
-		if (gzFile.isFile() && gzFile.lastModified() > sourceFile.lastModified()) {
+		if (gzFile.isFile() && gzFile.lastModified() >= sourceFile.lastModified()) {
 			return;
 		}
 		try (FileInputStream inputStream = new FileInputStream(sourceFile);
