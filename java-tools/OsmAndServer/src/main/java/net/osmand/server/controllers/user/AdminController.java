@@ -951,19 +951,8 @@ public class AdminController {
 		report.columns.add(new AdminGenericSubReportColumn("Market<br>GPlay").app(SubAppType.OSMAND, SubAppType.OSMAND_PLUS));
 		report.columns.add(new AdminGenericSubReportColumn("Market<br>IOS").app(SubAppType.IOS));
 		report.columns.add(new AdminGenericSubReportColumn("Market<br>Other" ).app(SubAppType.HUAWEI, SubAppType.AMAZON, SubAppType.FASTSPRING));
+		report.columns.add(new AdminGenericSubReportColumn("Market<br>Other A" ).app(SubAppType.HUAWEI, SubAppType.AMAZON, SubAppType.FASTSPRING).duration(12));
 
-        report.columns.add(new AdminGenericSubReportColumn("Market<br>Other<br>PRO A")
-				.app(SubAppType.HUAWEI, SubAppType.AMAZON, SubAppType.FASTSPRING)
-				.pro(true)
-				.duration(12));
-        report.columns.add(new AdminGenericSubReportColumn("Market<br>Other<br>PRO M")
-				.app(SubAppType.HUAWEI, SubAppType.AMAZON, SubAppType.FASTSPRING)
-				.pro(true)
-				.duration(1));
-        report.columns.add(new AdminGenericSubReportColumn("Market<br>Other<br>Maps")
-				.app(SubAppType.HUAWEI, SubAppType.AMAZON, SubAppType.FASTSPRING)
-				.maps(true));
-        
 		report.columns.add(new AdminGenericSubReportColumn("Type<br>Maps A").maps(true));
 		report.columns.add(new AdminGenericSubReportColumn("Type<br>PRO A").pro(true).duration(12));
 		report.columns.add(new AdminGenericSubReportColumn("Type<br>PRO M").pro(true).duration(1));
