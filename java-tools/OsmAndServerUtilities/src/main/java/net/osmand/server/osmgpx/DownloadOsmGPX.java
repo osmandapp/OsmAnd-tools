@@ -280,16 +280,11 @@ public class DownloadOsmGPX {
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_tags_gin ON " + GPX_METADATA_TABLE_NAME + " USING GIN (tags)");
 
 			statement.executeUpdate("CREATE EXTENSION IF NOT EXISTS postgis");
-			statement.executeUpdate(
-					"CREATE INDEX IF NOT EXISTS idx_osm_gpx_bbox_gist " +
-							"ON " + GPX_METADATA_TABLE_NAME +
-							" USING GIST (ST_MakeEnvelope(minlon, minlat, maxlon, maxlat, 4326))"
-			);
+			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS bbox geometry"
+					+ " GENERATED ALWAYS AS (ST_MakeEnvelope(minlon, minlat, maxlon, maxlat, 4326)) STORED");
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_bbox_geom ON " + GPX_METADATA_TABLE_NAME
+					+ " USING GIST (bbox)");
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_year ON " + GPX_METADATA_TABLE_NAME + " ((extract(year from date)))");
-
-			// BBox range index used by the plain minlon/maxlon/minlat/maxlat comparisons.
-			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_bbox_btree ON " + GPX_METADATA_TABLE_NAME
-					+ " (minlat, maxlat, minlon, maxlon)");
 
 			// Partial covering indexes for the /ranges endpoint (bbox + activity, carrying distance/speed),
 			// limited to non-garbage tracks with a valid distance or speed.

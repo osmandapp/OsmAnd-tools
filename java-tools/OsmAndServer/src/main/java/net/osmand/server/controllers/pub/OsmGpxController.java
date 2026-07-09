@@ -63,6 +63,7 @@ public class OsmGpxController {
 
 	private static final int MAX_RUNTIME_CACHE_SIZE = 5000;
 	private static final int MAX_ROUTES_SUMMARY = 100000;
+	private static final int MAX_ROUTES_FULL_MODE_THRESHOLD = 5000;
 	private static final int MAX_TAGS_PER_BBOX = 1000;
 	private final AtomicInteger cacheTouch = new AtomicInteger(0);
 
@@ -167,7 +168,11 @@ public class OsmGpxController {
 		String tagMatchMode = Algorithms.isEmpty(req.tagMatchMode()) ? "OR" : req.tagMatchMode();
 		applyTagsFilter(req.tags(), tagMatchMode, conditions, params);
 
-		List<Feature> features = queryRouteFeatures(conditions, params);
+		List<Feature> features = queryRouteFeatures(conditions, params, true, MAX_ROUTES_FULL_MODE_THRESHOLD + 1);
+		if (features.size() > MAX_ROUTES_FULL_MODE_THRESHOLD) {
+			features = queryRouteFeatures(conditions, params, false, MAX_ROUTES_SUMMARY);
+		}
+
 		FeatureCollection featureCollection = new FeatureCollection();
 		featureCollection.setFeatures(features);
 
@@ -383,13 +388,17 @@ public class OsmGpxController {
 		params.addAll(normalized);
 	}
 
-	private List<Feature> queryRouteFeatures(StringBuilder conditions, List<Object> params) {
-		String query = "SELECT m.id, m.name, m.description, m.user, m.date, m.activity, m.lat, m.lon, " +
-				"m.speed, m.distance, m.points, m.simplified_geometry " +
-				"FROM " + GPX_METADATA_TABLE_NAME + " m " +
+	private List<Feature> queryRouteFeatures(StringBuilder conditions, List<Object> params, boolean withGeometry, int limit) {
+		String columns = "m.id, m.name, m.description, m.user, m.date, m.activity, m.lat, m.lon, " +
+				"m.speed, m.distance, m.points";
+		if (withGeometry) {
+			columns += ", m.simplified_geometry";
+		}
+		String query = "SELECT " + columns +
+				" FROM " + GPX_METADATA_TABLE_NAME + " m " +
 				"WHERE 1 = 1 " + conditions +
 				" AND m.simplified_geometry IS NOT NULL" +
-				" LIMIT " + MAX_ROUTES_SUMMARY;
+				" LIMIT " + limit;
 
 		List<Feature> features = new ArrayList<>();
 		jdbcTemplate.query(query, ps -> {
@@ -397,12 +406,13 @@ public class OsmGpxController {
 				ps.setObject(i + 1, params.get(i));
 			}
 		}, rs -> {
-			byte[] simplifiedGeometry = rs.getBytes("simplified_geometry");
-			if (simplifiedGeometry == null || simplifiedGeometry.length == 0) {
-				return;
-			}
 			Feature feature = createBaseFeature(rs);
-			feature.getProperties().put("geo_b64", Base64.getEncoder().encodeToString(simplifiedGeometry));
+			if (withGeometry) {
+				byte[] simplifiedGeometry = rs.getBytes("simplified_geometry");
+				if (simplifiedGeometry != null && simplifiedGeometry.length > 0) {
+					feature.getProperties().put("geo_b64", Base64.getEncoder().encodeToString(simplifiedGeometry));
+				}
+			}
 			features.add(feature);
 		});
 		return features;
@@ -465,6 +475,7 @@ public class OsmGpxController {
 					GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(src);
 					if (gpxFile.getError() == null) {
 						GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
+						routesCache.put(id.toString(), new RouteFile(resultData.byteArray, gpxFile, analysis));
 						WebGpxParser.TrackData gpxData = gpxService.buildTrackDataFromGpxFile(gpxFile, analysis);
 						if (gpxData != null) {
 							return ResponseEntity.ok(gsonWithNans.toJson(Map.of("gpx_data", gpxData)));
@@ -591,9 +602,7 @@ public class OsmGpxController {
 			return ResponseEntity.badRequest().body("Invalid latitude or longitude values.");
 		}
 
-		// Use the GiST spatial index (idx_osm_gpx_bbox_gist) via the bbox-overlap operator.
-		conditions.append(" AND ST_MakeEnvelope(m.minlon, m.minlat, m.maxlon, m.maxlat, 4326)"
-				+ " && ST_MakeEnvelope(?, ?, ?, ?, 4326)");
+		conditions.append(" AND m.bbox && ST_MakeEnvelope(?, ?, ?, ?, 4326)");
 		params.add(validatedMinLon.doubleValue());
 		params.add(validatedMinLat.doubleValue());
 		params.add(validatedMaxLon.doubleValue());
@@ -614,6 +623,9 @@ public class OsmGpxController {
 	private record RouteFile(byte[] bytes, GpxFile gpxFile, GpxTrackAnalysis analysis) {
 	}
 
+	private record GpxData(Long id, byte[] byteArray) {
+	}
+
 	private void cleanupCache() {
 		if (lock.tryLock()) {
 			try {
@@ -624,7 +636,6 @@ public class OsmGpxController {
 
 					List<String> keysToRemove = new ArrayList<>(routesCache.keySet());
 
-					// remove half of the cache
 					if (routesCache.size() >= MAX_RUNTIME_CACHE_SIZE) {
 						for (int i = 0; i < MAX_RUNTIME_CACHE_SIZE / 2; i++) {
 							String key = keysToRemove.get(i);
@@ -636,9 +647,6 @@ public class OsmGpxController {
 				lock.unlock();
 			}
 		}
-	}
-
-	private record GpxData(Long id, byte[] byteArray) {
 	}
 
 	// for testing purposes
