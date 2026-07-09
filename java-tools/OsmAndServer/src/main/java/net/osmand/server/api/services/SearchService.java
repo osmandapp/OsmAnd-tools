@@ -103,6 +103,13 @@ public class SearchService {
 	public static final String IS_OPENED_PREFIX = "open:";
 	public static final String OPENING_HOURS_INFO_SUFFIX = "_info";
 
+	private static final ObjectType[] CLASSIC_SEARCH_TYPES = {
+			// Exclude PARTIAL_LOCATION and app-only types (fav, tracks, markers, etc.)
+			ObjectType.CITY, ObjectType.VILLAGE, ObjectType.BOUNDARY, ObjectType.POSTCODE,
+			ObjectType.STREET, ObjectType.HOUSE, ObjectType.STREET_INTERSECTION,
+			ObjectType.POI_TYPE, ObjectType.POI, ObjectType.LOCATION, ObjectType.REGION
+	};
+
 	@Autowired
 	OsmAndMapsService osmAndMapsService;
 
@@ -275,7 +282,7 @@ public class SearchService {
 	public List<Feature> search(SearchContext ctx, String timeZone) throws IOException {
 		long tm = System.currentTimeMillis();
 		SearchResults searchResults = getImmediateSearchResults(ctx,
-				new SearchOption(false, null, null, true, false, (ObjectType[]) null), null);
+				new SearchOption(false, null, null, true, false, CLASSIC_SEARCH_TYPES), null);
 		List<SearchResult> res = searchResults.results();
 		if (System.currentTimeMillis() - tm > 1000) {
 			BinaryMapIndexReaderStats.SearchStat stat = searchResults.settings != null
