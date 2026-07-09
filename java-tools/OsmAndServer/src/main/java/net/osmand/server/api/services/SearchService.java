@@ -463,7 +463,7 @@ public class SearchService {
 					List<MapObject> objs = r.getObjects();
 					if (!objs.isEmpty()) {
 						LatLon l = r.getLatLon() == null ? new LatLon(ctx.lat, ctx.lon) : r.getLatLon();
-						Feature f = getSpatialFeature(l, objs.get(0), ctx.locale, timeZone, dominatedCity);
+						Feature f = getSpatialFeature(l, objs, ctx.locale, timeZone, dominatedCity);
 						if (f != null) {
 							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(), matchedObjects(objs, ctx.locale));
 							f.prop(PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
@@ -506,7 +506,8 @@ public class SearchService {
 		return matched;
 	}
 
-	private Feature getSpatialFeature(LatLon loc, MapObject obj, String locale, String timeZone, String dominatedCity) {
+	private Feature getSpatialFeature(LatLon loc, List<MapObject> objs, String locale, String timeZone, String dominatedCity) {
+		MapObject obj = objs.isEmpty() ? null : objs.get(0);
 		if (obj == null || loc == null) {
 			return null;
 		}
@@ -519,20 +520,51 @@ public class SearchService {
 		result.object = obj;
 		result.location = loc;
 		result.localeName = obj.getName(locale);
-		if (obj instanceof Street street) {
+		if (obj instanceof Street) {
 			result.objectType = ObjectType.STREET;
-			City city = street.getCity();
+			City city = getSpatialCity(objs);
 			if (city != null) {
 				result.localeRelatedObjectName = city.getName(locale);
 			}
 		} else if (obj instanceof Building) {
 			result.objectType = ObjectType.HOUSE;
+			Street street = getSpatialStreet(objs);
+			if (street != null) {
+				result.localeRelatedObjectName = street.getName(locale);
+			}
+			City city = getSpatialCity(objs);
+			if (city != null) {
+				SearchResult parent = new SearchResult();
+				parent.localeRelatedObjectName = city.getName(locale);
+				result.parentSearchResult = parent;
+			}
 		} else if (obj instanceof City) {
 			result.objectType = ObjectType.CITY;
 		} else {
 			result.objectType = ObjectType.LOCATION;
 		}
 		return getFeature(result, timeZone);
+	}
+
+	private Street getSpatialStreet(List<MapObject> objs) {
+		for (MapObject obj : objs) {
+			if (obj instanceof Street street) {
+				return street;
+			}
+		}
+		return null;
+	}
+
+	private City getSpatialCity(List<MapObject> objs) {
+		for (MapObject obj : objs) {
+			if (obj instanceof City city) {
+				return city;
+			}
+			if (obj instanceof Street street && street.getCity() != null) {
+				return street.getCity();
+			}
+		}
+		return null;
 	}
 
 	public SearchResults getImmediateSearchResults(SearchContext ctx, SearchOption option,
