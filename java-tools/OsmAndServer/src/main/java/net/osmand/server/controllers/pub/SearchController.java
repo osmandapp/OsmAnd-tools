@@ -139,6 +139,13 @@ public class SearchController {
             return ResponseEntity.badRequest().body("Error get poi categories!");
         }
     }
+
+    @PostMapping(path = {"/get-tags-visibility"}, produces = "application/json")
+    @ResponseBody
+    public ResponseEntity<String> getTagsVisibility(@RequestBody Map<String, String> tags) {
+        Map<String, String> visibleTags = searchService.checkTagsVisibility(tags);
+        return ResponseEntity.ok(gson.toJson(visibleTags));
+    }
     
     @GetMapping(path = {"/get-top-filters"}, produces = "application/json")
     @ResponseBody

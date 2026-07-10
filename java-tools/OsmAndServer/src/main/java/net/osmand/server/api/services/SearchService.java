@@ -58,6 +58,7 @@ import net.osmand.binary.BinaryMapPoiReaderAdapter;
 import net.osmand.binary.GeocodingUtilities;
 import net.osmand.binary.ObfConstants;
 import net.osmand.data.Amenity;
+import net.osmand.data.AmenityInfoDisplayFilter;
 import net.osmand.data.Building;
 import net.osmand.data.City;
 import net.osmand.data.City.CityType;
@@ -1273,6 +1274,21 @@ public class SearchService {
 
 		});
 		return res;
+	}
+
+	public Map<String, String> checkTagsVisibility(Map<String, String> tags) {
+		if (tags == null || tags.isEmpty()) {
+			return Collections.emptyMap();
+		}
+		String subtype = tags.get(Amenity.SUBTYPE);
+		MapPoiTypes mapPoiTypes = MapPoiTypes.getDefault();
+		Map<String, String> visible = new HashMap<>();
+		tags.forEach((key, value) -> {
+			if (AmenityInfoDisplayFilter.shouldDisplayKey(key, subtype, mapPoiTypes)) {
+				visible.put(key, value);
+			}
+		});
+		return visible;
 	}
 
 	private Map<String, String> getTranslations(String locale) {
