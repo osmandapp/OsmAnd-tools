@@ -10,16 +10,13 @@ import net.osmand.util.MapUtils;
 import org.json.JSONObject;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
 
 public class SpatialSearch implements SearchEngine {
     private final SpatialTextSearch spatialSearch;
     private final SpatialSearchContext searchContext;
     private final LatLon location;
-    
+
     public SpatialSearch(JSONObject settingsJson, List<BinaryMapIndexReader> readers) {
         spatialSearch = new SpatialTextSearch();
         SpatialPoiSearch poiSearch = new SpatialPoiSearch(MapPoiTypes.getDefault());
@@ -27,41 +24,60 @@ public class SpatialSearch implements SearchEngine {
         location = parseLocation(settingsJson);
         searchContext = new SpatialSearchContext(spatialSettings, readers, poiSearch, location);
     }
-    
+
     @Override
     public List<String> apply(String phrase, List<String> expectedResults) throws IOException {
         SpatialTextSearch.SpatialSearchResults searchResults = spatialSearch.searchAPI(phrase, searchContext);
         List<SpatialSearchResult> mainResults = searchResults.mainResults == null ? Collections.emptyList()
                 : searchResults.mainResults;
-        
+
         List<String> result = new ArrayList<>();
         for(SpatialSearchResult res : mainResults) {
-            SpatialSearchResultRef firstRef = res.getFirstRef();
-            result.add(firstRef == null ? "" : formatResult(firstRef, location));
+            result.add(formatResult(res));
         }
         return result;
     }
 
-
-    public String formatResult(SpatialSearchResultRef ref, LatLon searchLocation) {
+    public String formatResult(SpatialSearchResult r) {
+        int tCount = r.getParent().getTokenCount();
+        //int objSize = r.getObjectsSize();
+        int surplusWords = r.getSurplusWords();
+        int sumOther = r.sumOther();
+        int rating = r.getRating();
+        if (rating == SpatialTextSearch.SpatialTextSearchSettings.MIN_ELO_RATING) {
+            rating = 0;
+        }
+        double dist = 0.0;
+        if (location != null && r.getLatLon() != null) {
+            dist = MapUtils.getDistance(location, r.getLatLon());
+        }
         StringBuilder b = new StringBuilder();
-        SpatialSearchToken.NameIndexAtom atom = ref.atom;
-        MapObject mainObject = atom.bldObject != null ? atom.bldObject : atom.object;
-        appendName(b, mainObject);
-        if (atom.bldObject != null && atom.object != null) {
-            appendName(b, atom.object);
+        SpatialSearchToken.NameIndexAtom atom = r.getFirstRef().atom;
+        appendName(b, atom.bldObject);
+        appendName(b, atom.object);
+        if (atom.bldObject == null && atom.object == null) {
+            b.append(atom.getName());
         }
-        MapObject cityObject = atom.object;
-        if (cityObject instanceof Street street) {
-            appendName(b, street.getCity());
+        List<MapObject> allObjs = r.getAllObjects();
+        for (MapObject o : allObjs) {
+            if (o instanceof Street street) {
+                appendName(b, street.getCity());
+                break;
+            }
+            if (o instanceof City city) {
+                appendName(b, city);
+                break;
+            }
         }
-        double distance = 0;
-        LatLon resultLocation = atom.getResultLocation();
-        if (searchLocation != null && resultLocation != null) {
-            distance = MapUtils.getDistance(resultLocation, searchLocation);
+        return String.format(Locale.US, "%s [[%d, %s,%s%s%s, %.2f km]]", b,
+                tCount, testTypeStr(atom), rs("sw", surplusWords), rs("os", sumOther), rs("r", rating), dist / 1000);
+    }
+
+    private String rs(String p, int i) {
+        if (i == 0) {
+            return "";
         }
-        return String.format(Locale.US, "%s [[%d, %s, %.3f, %.2f km]]", b,
-                ref.tokens.size(), testTypeStr(atom), atom.otherFoundCnt / 1000.0, distance / 1000);
+        return " " + p+":" + i;
     }
 
     private void appendName(StringBuilder b, MapObject object) {
@@ -92,7 +108,7 @@ public class SpatialSearch implements SearchEngine {
         }
         return atom.typeStr().toUpperCase(Locale.US);
     }
-    
+
     @Override
     public void close() {}
 

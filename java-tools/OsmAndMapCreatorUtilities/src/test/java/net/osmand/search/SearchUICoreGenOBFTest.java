@@ -44,15 +44,15 @@ import java.util.zip.GZIPOutputStream;
  * Unit-test is converting original OBF files into universal JSON, generating source OBFs from that JSON,
  * and running unit tests against the generated OBFs. Config JSON files from {@link #SEARCH_RESOURCES_PATH}
  * provide mandatory settings, phrases, and expected results; same-basename OBFs in that directory are original
- * transformation inputs unless files are listed explicitly. 
+ * transformation inputs unless files are listed explicitly.
  * <p>
- * Generated source JSON and OBF artifacts are cached as {@code *.json.gz} and {@code *.obf.gz} in {@link #GEN_DIR}, 
- * while plain {@code *.orig.obf}, {@code *.json}, and {@code *.obf} files are temporary. 
+ * Generated source JSON and OBF artifacts are cached as {@code *.json.gz} and {@code *.obf.gz} in {@link #GEN_DIR},
+ * while plain {@code *.orig.obf}, {@code *.json}, and {@code *.obf} files are temporary.
  */
 @RunWith(Parameterized.class)
 public class SearchUICoreGenOBFTest {
 	private static final String ANDROID_PATH_ENV = "ANDROID_PATH",
-			RESOURCES_PATH_ENV = "RESOURCES_PATH", 
+			RESOURCES_PATH_ENV = "RESOURCES_PATH",
 			SEARCH_RESOURCES_PATH_ENV = "SEARCH_RESOURCES_PATH",
 			SPATIAL_SEARCH_ENV = "SPATIAL_SEARCH";
 	private static final String RESOURCES_PATH = getResourcesPath();
@@ -88,7 +88,7 @@ public class SearchUICoreGenOBFTest {
 	private static String getSearchResourcesPath() {
 		String searchResourcesPath = System.getenv(SEARCH_RESOURCES_PATH_ENV);
 		if (Algorithms.isEmpty(searchResourcesPath)) {
-			searchResourcesPath = RESOURCES_PATH + "test-resources/search";
+			searchResourcesPath = RESOURCES_PATH + "test-resources/spatial_search";
 		} else {
 			searchResourcesPath = RESOURCES_PATH + searchResourcesPath;
 		}
@@ -145,12 +145,12 @@ public class SearchUICoreGenOBFTest {
 
 		poiTypes.setPoiTranslator(new TestSearchTranslator(phrases, enPhrases));
 	}
-	
+
 	/**
-	 * Resolves a same-basename test data chain and returns a readable generated OBF: 
+	 * Resolves a same-basename test data chain and returns a readable generated OBF:
 	 * <li>Cached {@code *.obf.gz} in {@link #GEN_DIR} is reused when newer than the resolved source JSON; </li>
 	 * <li>otherwise cached {@code *.json.gz} is used as source when newer than the original OBF or when no original exists. </li>
-	 * <li>If no source cache is valid, the original OBF from {@link #SEARCH_RESOURCES_PATH} is exported to source JSON. 
+	 * <li>If no source cache is valid, the original OBF from {@link #SEARCH_RESOURCES_PATH} is exported to source JSON.
 	 * <li>New plain {@code *.json} and {@code *.obf} files are compressed back to {@code *.json.gz} and {@code *.obf.gz} for later runs.
 	 * <li>When {@link #REGENERATE_OBF} is {@code false}, the transformation/cache chain is skipped and only the original OBF is used.
 	 */
@@ -425,7 +425,7 @@ public class SearchUICoreGenOBFTest {
 		for (int k = 0; k < phrases.size(); k++) {
 			String text = phrases.get(k);
 			List<String> expectedResults = results.get(k);
-			
+
 			List<String> actualResults = engine.apply(text, expectedResults);
 			for (int i = 0; i < expectedResults.size(); i++) {
 				String expected = expectedResults.get(i);
@@ -443,14 +443,12 @@ public class SearchUICoreGenOBFTest {
 					System.out.printf("Phrase: %s%n", text);
 					System.out.printf("Mismatch #%s for '%s' != '%s'. %n", i + 1, expected, present);
 					System.out.println("CURRENT RESULTS: ");
-					int j = 1;
 					for (String r : actualResults) {
-						System.out.printf("\t%s. \"%s\",%n", j++, r);
+						System.out.printf("\t\t\"%s\",%n", r);
 					}
 					System.out.println("EXPECTED : ");
-					j = 1;
 					for (String r : expectedResults) {
-						System.out.printf("\t%s. \"%s\",%n", j++, r);
+						System.out.printf("\t\t\"%s\",%n", r);
 					}
 				}
 				Assert.assertEquals(expected, present);
