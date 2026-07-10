@@ -390,7 +390,7 @@ public class OsmGpxController {
 
 	private List<Feature> queryRouteFeatures(StringBuilder conditions, List<Object> params, boolean withGeometry, int limit) {
 		String columns = "m.id, m.name, m.description, m.user, m.date, m.activity, m.lat, m.lon, " +
-				"m.speed, m.distance, m.points";
+				"m.speed, m.distance, m.points, m.tags";
 		if (withGeometry) {
 			columns += ", m.simplified_geometry";
 		}
@@ -445,6 +445,10 @@ public class OsmGpxController {
 		if (points != 0) {
 			feature.getProperties().put("points", points);
 		}
+		java.sql.Array tagsArray = rs.getArray("tags");
+		if (tagsArray != null) {
+			feature.getProperties().put("tags", Arrays.asList((String[]) tagsArray.getArray()));
+		}
 
 		return feature;
 	}
@@ -493,7 +497,7 @@ public class OsmGpxController {
 
 	@GetMapping(path = {"/get-route-info"}, produces = "application/json")
 	public ResponseEntity<String> getRouteInfo(@RequestParam Long id) {
-		String columns = "m.id, m.name, m.description, m.user, m.date, m.activity, m.lat, m.lon, m.speed, m.distance, m.points";
+		String columns = "m.id, m.name, m.description, m.user, m.date, m.activity, m.lat, m.lon, m.speed, m.distance, m.points, m.tags";
 		String query = "SELECT " + columns + " FROM " + GPX_METADATA_TABLE_NAME + " m WHERE m.id = ? LIMIT 1";
 		try {
 			Feature feature = jdbcTemplate.queryForObject(query, (rs, rowNum) -> createBaseFeature(rs), id);
