@@ -1,30 +1,30 @@
 package net.osmand.search;
 
 import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.data.LatLon;
+import net.osmand.data.*;
 import net.osmand.osm.MapPoiTypes;
-import net.osmand.search.core.SearchResult;
-import net.osmand.search.core.spatial.SpatialPoiSearch;
-import net.osmand.search.core.spatial.SpatialSearchContext;
-import net.osmand.search.core.spatial.SpatialSearchResult;
-import net.osmand.search.core.spatial.SpatialTextSearch;
+import net.osmand.search.core.spatial.*;
+import net.osmand.search.core.spatial.SpatialSearchResult.SpatialSearchResultRef;
+import net.osmand.util.Algorithms;
+import net.osmand.util.MapUtils;
 import org.json.JSONObject;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.function.Function;
+import java.util.Locale;
 
 public class SpatialSearch implements SearchEngine {
     private final SpatialTextSearch spatialSearch;
     private final SpatialSearchContext searchContext;
+    private final LatLon location;
     
     public SpatialSearch(JSONObject settingsJson, List<BinaryMapIndexReader> readers) {
         spatialSearch = new SpatialTextSearch();
         SpatialPoiSearch poiSearch = new SpatialPoiSearch(MapPoiTypes.getDefault());
         SpatialTextSearch.SpatialTextSearchSettings spatialSettings = parseSpatialSettings(settingsJson);
-        LatLon location = parseLocation(settingsJson);
+        location = parseLocation(settingsJson);
         searchContext = new SpatialSearchContext(spatialSettings, readers, poiSearch, location);
     }
     
@@ -36,19 +36,65 @@ public class SpatialSearch implements SearchEngine {
         
         List<String> result = new ArrayList<>();
         for(SpatialSearchResult res : mainResults) {
-            if (res.getObjects().isEmpty()) {
-                result.add("");
-            } else {
-                result.add(res.getObjects().get(0).toString());
-            }
+            SpatialSearchResultRef firstRef = res.getFirstRef();
+            result.add(firstRef == null ? "" : formatResult(firstRef, location));
         }
         return result;
     }
 
-    @Override
-    public void close() {
-        
+
+    public String formatResult(SpatialSearchResultRef ref, LatLon searchLocation) {
+        StringBuilder b = new StringBuilder();
+        SpatialSearchToken.NameIndexAtom atom = ref.atom;
+        MapObject mainObject = atom.bldObject != null ? atom.bldObject : atom.object;
+        appendName(b, mainObject);
+        if (atom.bldObject != null && atom.object != null) {
+            appendName(b, atom.object);
+        }
+        MapObject cityObject = atom.object;
+        if (cityObject instanceof Street street) {
+            appendName(b, street.getCity());
+        }
+        double distance = 0;
+        LatLon resultLocation = atom.getResultLocation();
+        if (searchLocation != null && resultLocation != null) {
+            distance = MapUtils.getDistance(resultLocation, searchLocation);
+        }
+        return String.format(Locale.US, "%s [[%d, %s, %.3f, %.2f km]]", b,
+                ref.tokens.size(), testTypeStr(atom), atom.otherFoundCnt / 1000.0, distance / 1000);
     }
+
+    private void appendName(StringBuilder b, MapObject object) {
+        if (object == null) {
+            return;
+        }
+        String name = object instanceof Building building ? building.getName() : object.getName();
+        if (Algorithms.isEmpty(name)) {
+            return;
+        }
+        if (!b.isEmpty()) {
+            b.append(", ");
+        }
+        b.append(name);
+    }
+
+    private String testTypeStr(SpatialSearchToken.NameIndexAtom atom) {
+        if (atom.isBuilding()) {
+            return "HOUSE";
+        } else if (atom.isPOI()) {
+            return "POI";
+        } else if (atom.isStreet()) {
+            return "STREET";
+        } else if (atom.isPoiCategory()) {
+            return "POI_TYPE";
+        } else if (atom.object instanceof City) {
+            return "CITY";
+        }
+        return atom.typeStr().toUpperCase(Locale.US);
+    }
+    
+    @Override
+    public void close() {}
 
     private LatLon parseLocation(JSONObject settingsJson) {
         JSONObject locationJson = settingsJson.optJSONObject("location");
