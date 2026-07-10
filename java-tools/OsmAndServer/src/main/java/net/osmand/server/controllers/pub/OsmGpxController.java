@@ -69,6 +69,7 @@ public class OsmGpxController {
 
 	private static final String GPX_METADATA_TABLE_NAME = "osm_gpx_data";
 	private static final String GPX_FILES_TABLE_NAME = "osm_gpx_files";
+	private static final Set<String> INVALID_ACTIVITIES = Set.of("garbage", "error");
 
 	public record RoutesListRequest(
 			List<String> activityArr,
@@ -104,10 +105,10 @@ public class OsmGpxController {
 			return error;
 		}
 
-		// skip garbage and error activities
-		conditions.append(" AND (m.activity IS NULL OR (m.activity <> ? AND m.activity <> ?))");
-		params.add("garbage");
-		params.add("error");
+		boolean invalidActivities = isInvalidActivityRequest(req.activityArr());
+		if (!invalidActivities) {
+			appendSkipInvalidActivities(conditions, params);
+		}
 
 		if (req.year() != null) {
 			error = filterByYear(String.valueOf(req.year()), params, conditions);
@@ -168,9 +169,15 @@ public class OsmGpxController {
 		String tagMatchMode = Algorithms.isEmpty(req.tagMatchMode()) ? "OR" : req.tagMatchMode();
 		applyTagsFilter(req.tags(), tagMatchMode, conditions, params);
 
-		List<Feature> features = queryRouteFeatures(conditions, params, true, MAX_ROUTES_FULL_MODE_THRESHOLD + 1);
-		if (features.size() > MAX_ROUTES_FULL_MODE_THRESHOLD) {
-			features = queryRouteFeatures(conditions, params, false, MAX_ROUTES_SUMMARY);
+		List<Feature> features;
+		if (invalidActivities) {
+			// garbage/error tracks have no geometry — return them as points only
+			features = queryRouteFeatures(conditions, params, false, MAX_ROUTES_SUMMARY, false);
+		} else {
+			features = queryRouteFeatures(conditions, params, true, MAX_ROUTES_FULL_MODE_THRESHOLD + 1, true);
+			if (features.size() > MAX_ROUTES_FULL_MODE_THRESHOLD) {
+				features = queryRouteFeatures(conditions, params, false, MAX_ROUTES_SUMMARY, true);
+			}
 		}
 
 		FeatureCollection featureCollection = new FeatureCollection();
@@ -198,10 +205,7 @@ public class OsmGpxController {
 			return error;
 		}
 
-		// skip garbage and error activities
-		conditions.append(" AND (m.activity IS NULL OR (m.activity <> ? AND m.activity <> ?))");
-		params.add("garbage");
-		params.add("error");
+		appendSkipInvalidActivities(conditions, params);
 
 		if (year != null) {
 			error = filterByYear(String.valueOf(year), params, conditions);
@@ -289,10 +293,7 @@ public class OsmGpxController {
 			return error;
 		}
 
-		// skip garbage and error activities
-		conditions.append(" AND (m.activity IS NULL OR (m.activity <> ? AND m.activity <> ?))");
-		params.add("garbage");
-		params.add("error");
+		appendSkipInvalidActivities(conditions, params);
 
 		if (year != null) {
 			error = filterByYear(String.valueOf(year), params, conditions);
@@ -342,10 +343,8 @@ public class OsmGpxController {
 			return error;
 		}
 
-		// only non-null, non-empty activities; exclude garbage and error
-		conditions.append(" AND m.activity IS NOT NULL AND m.activity <> '' AND m.activity <> ? AND m.activity <> ?");
-		params.add("garbage");
-		params.add("error");
+		conditions.append(" AND m.activity IS NOT NULL AND m.activity <> '' AND m.activity NOT IN ")
+				.append(placeholders(INVALID_ACTIVITIES, params));
 
 		if (year != null) {
 			error = filterByYear(String.valueOf(year), params, conditions);
@@ -388,7 +387,7 @@ public class OsmGpxController {
 		params.addAll(normalized);
 	}
 
-	private List<Feature> queryRouteFeatures(StringBuilder conditions, List<Object> params, boolean withGeometry, int limit) {
+	private List<Feature> queryRouteFeatures(StringBuilder conditions, List<Object> params, boolean withGeometry, int limit, boolean requireGeometry) {
 		String columns = "m.id, m.name, m.description, m.user, m.date, m.activity, m.lat, m.lon, " +
 				"m.speed, m.distance, m.points, m.tags";
 		if (withGeometry) {
@@ -397,7 +396,7 @@ public class OsmGpxController {
 		String query = "SELECT " + columns +
 				" FROM " + GPX_METADATA_TABLE_NAME + " m " +
 				"WHERE 1 = 1 " + conditions +
-				" AND m.simplified_geometry IS NOT NULL" +
+				(requireGeometry ? " AND m.simplified_geometry IS NOT NULL" : "") +
 				" LIMIT " + limit;
 
 		List<Feature> features = new ArrayList<>();
@@ -564,16 +563,25 @@ public class OsmGpxController {
 		}
 	}
 
+	private boolean isInvalidActivityRequest(List<String> activityArr) {
+		return activityArr != null && !activityArr.isEmpty() && INVALID_ACTIVITIES.containsAll(activityArr);
+	}
+
+	private String placeholders(Collection<?> values, List<Object> params) {
+		params.addAll(values);
+		return "(" + String.join(",", Collections.nCopies(values.size(), "?")) + ")";
+	}
+
+	private void appendSkipInvalidActivities(StringBuilder conditions, List<Object> params) {
+		conditions.append(" AND (m.activity IS NULL OR m.activity NOT IN ").append(placeholders(INVALID_ACTIVITIES, params)).append(")");
+	}
+
 	private ResponseEntity<String> filterByActivity(List<String> activityArr, List<Object> params, StringBuilder conditions) {
-		if (activityArr != null && !activityArr.isEmpty()) {
-			conditions.append(" AND m.activity IN (");
-			conditions.append(String.join(",", Collections.nCopies(activityArr.size(), "?")));
-			conditions.append(")");
-			params.addAll(activityArr);
-			return null;
-		} else {
+		if (activityArr == null || activityArr.isEmpty()) {
 			return ResponseEntity.badRequest().body("Activity parameter is required.");
 		}
+		conditions.append(" AND m.activity IN ").append(placeholders(activityArr, params));
+		return null;
 	}
 
 	private ResponseEntity<String> filterByYear(String year, List<Object> params, StringBuilder conditions) {
