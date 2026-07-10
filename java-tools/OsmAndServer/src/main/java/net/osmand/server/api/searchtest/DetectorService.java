@@ -174,7 +174,11 @@ public interface DetectorService extends OBFService {
 			@JsonProperty("geocodingLimit") Integer geocodingLimit) {}
 
 	record UnitTestResultsData(List<List<String>> results, JSONArray routing) {}
-	record UnitTestSourceData(String jsonFilePath, SearchService.SearchResults settingsResult) {}
+	record UnitTestSourceData(String jsonFilePath, List<String> jsonFilePaths, SearchService.SearchResults results) {
+		UnitTestSourceData(String jsonFilePath, SearchService.SearchResults results) {
+			this(jsonFilePath, Collections.singletonList(jsonFilePath), results);
+		}
+	}
 
 	default void createUnitTest(UnitTestPayload unitTest, SearchService.SearchContext ctx, OutputStream out) throws IOException, SQLException {
 		Path rootTmp = Path.of(System.getProperty("java.io.tmpdir"));
@@ -184,7 +188,7 @@ public interface DetectorService extends OBFService {
 			int geocodingLimit = unitTest.geocodingLimit();
 			UnitTestResultsData unitTestData = buildUnitTestResults(unitTest.queries(), ctx, limit, geocodingLimit);
 			UnitTestSourceData sourceData = createUnitTestSourceData(unitTest, ctx, dirPath, unitTestData.routing());
-			SearchService.SearchResults result = sourceData.settingsResult();
+			SearchService.SearchResults result = sourceData.results();
 			if (result == null) {
 				return;
 			}
@@ -263,27 +267,36 @@ public interface DetectorService extends OBFService {
 	private UnitTestSourceData createUnitTestSourceData(UnitTestPayload unitTest, SearchService.SearchContext baseCtx,
 			Path dirPath, JSONArray routing) throws IOException {
 		SearchExportSettings exportSettings = new SearchExportSettings(true, true, -1);
-		SearchService.SearchResults settingsResult = null;
-		String[] sourceQueries = normalizedUnitTestQueries(unitTest.queries(), baseCtx.text());
+		SearchService.SearchResults results = null;
+		String[] queries = normalizedUnitTestQueries(unitTest.queries(), baseCtx.text());
 		LinkedHashMap<String, Amenity> amenities = new LinkedHashMap<>();
 		LinkedHashMap<Long, City> cities = new LinkedHashMap<>();
-        for (String sourceQuery : sourceQueries) {
+        for (String q : queries) {
             SearchService.SearchContext phraseCtx = new SearchService.SearchContext(
-                    baseCtx.lat(), baseCtx.lon(), sourceQuery, baseCtx.locale(),
+                    baseCtx.lat(), baseCtx.lon(), q, baseCtx.locale(),
                     baseCtx.baseSearch(), baseCtx.northWest(), baseCtx.southEast());
             SearchService.SearchResults queryResult = getSearchService().getImmediateSearchResults(
                     phraseCtx, new SearchService.SearchOption(true, exportSettings,
                             null, true, false, (net.osmand.search.core.ObjectType[]) null), null);
-            if (settingsResult == null) {
-                settingsResult = queryResult;
+            if (results == null) {
+                results = queryResult;
             }
-            String queryUnitTestJson = queryResult == null ? null : queryResult.unitTestJson();
-            if (queryUnitTestJson == null) {
+            String unitTestJson = queryResult == null ? null : queryResult.unitTestJson();
+            if (unitTestJson == null) {
                 continue;
             }
-            collectUnitTestSourceData(queryUnitTestJson, amenities, cities);
+            collectUnitTestSourceData(unitTestJson, amenities, cities);
         }
-		File sourceJsonFile = dirPath.resolve(unitTest.name + ".source.json").toFile();
+		
+		return createUnitTestJson(dirPath, unitTest.name, results, routing, amenities, cities);
+	}
+
+	private UnitTestSourceData createUnitTestJson(Path dirPath, String name, SearchService.SearchResults results, JSONArray routing, Map<String, Amenity> amenities, Map<Long, City> cities) throws IOException {
+		return createUnitTestJsonFile(dirPath.resolve(name + ".json").toFile(), results, routing, amenities, cities);
+	}
+
+	private UnitTestSourceData createUnitTestJsonFile(File sourceJsonFile, SearchService.SearchResults results, JSONArray routing,
+			Map<String, Amenity> amenities, Map<Long, City> cities) throws IOException {
 		JSONObject sourceJson = new JSONObject();
 		if (!amenities.isEmpty()) {
 			JSONArray amenitiesJson = new JSONArray();
@@ -302,8 +315,8 @@ public interface DetectorService extends OBFService {
 		if (!routing.isEmpty()) {
 			sourceJson.put("routing", routing);
 		}
-		Files.writeString(sourceJsonFile.toPath(), sourceJson.toString(), StandardCharsets.UTF_8);
-		return new UnitTestSourceData(sourceJsonFile.getAbsolutePath(), settingsResult);
+		Files.writeString(sourceJsonFile.toPath(), sourceJson.toString(4), StandardCharsets.UTF_8);
+		return new UnitTestSourceData(sourceJsonFile.getAbsolutePath(), results);
 	}
 
 	private String[] normalizedUnitTestQueries(String[] queries, String fallbackQuery) {

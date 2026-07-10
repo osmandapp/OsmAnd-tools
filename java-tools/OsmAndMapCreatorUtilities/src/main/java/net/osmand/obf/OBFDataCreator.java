@@ -38,46 +38,52 @@ public class OBFDataCreator extends BinaryMerger {
 		File outputFile = new File(obfFilePath);
 		List<BinaryMapIndexReader> readers = new ArrayList<>();
 		List<BinaryMapIndexTestReader> testReaders = new ArrayList<>();
-		for (String jsonFilePath : jsonFilePaths) {
-			File jsonFile = new File(jsonFilePath);
-			if (jsonFile.exists() && jsonFile.getName().endsWith(".json")) {
-				BinaryMapIndexReader reader = BinaryMapIndexTestReader.buildTestReader(jsonFile);
-				readers.add(reader);
-				if (reader instanceof BinaryMapIndexTestReader testReader) {
-					testReaders.add(testReader);
+		try {
+			for (String jsonFilePath : jsonFilePaths) {
+				File jsonFile = new File(jsonFilePath);
+				if (jsonFile.exists() && jsonFile.getName().endsWith(".json")) {
+					BinaryMapIndexReader reader = BinaryMapIndexTestReader.buildTestReader(jsonFile);
+					readers.add(reader);
+					if (reader instanceof BinaryMapIndexTestReader testReader) {
+						testReaders.add(testReader);
+					}
 				}
 			}
-		}
 
-		if (readers.isEmpty()) {
-			throw new IOException("No data for merge");
-		}
-		if (outputFile.exists()) {
-			if (!outputFile.delete()) {
-				throw new IOException("Cannot delete file " + outputFile);
+			if (readers.isEmpty()) {
+				throw new IOException("No data for merge");
+			}
+			if (outputFile.exists()) {
+				if (!outputFile.delete()) {
+					throw new IOException("Cannot delete file " + outputFile);
+				}
+			}
+			Set<Integer> cp = combineParts == null || combineParts.isEmpty()
+					? new HashSet<>(COMBINE_ARGS.values())
+					: new HashSet<>(combineParts);
+			boolean includeRouting = cp.contains(OsmandOdb.OsmAndStructure.ROUTINGINDEX_FIELD_NUMBER);
+			boolean hasRoutingData = includeRouting && hasRoutingData(testReaders);
+			if (hasRoutingData) {
+				createWithRouting(outputFile, readers, testReaders, cp);
+			} else {
+				Set<Integer> cpWithoutRouting = new HashSet<>(cp);
+				cpWithoutRouting.remove(OsmandOdb.OsmAndStructure.ROUTINGINDEX_FIELD_NUMBER);
+				combineParts(outputFile, null, readers, cpWithoutRouting);
+			}
+
+			File outFile = new File(obfFilePath + ".gz");
+			try (FileInputStream inputStream = new FileInputStream(outputFile);
+			     FileOutputStream fileOutputStream = new FileOutputStream(outFile);
+			     GZIPOutputStream gzipOutputStream = new GZIPOutputStream(fileOutputStream)) {
+				Algorithms.streamCopy(inputStream, gzipOutputStream);
+			}
+
+			return outFile;
+		} finally {
+			for (BinaryMapIndexReader reader : readers) {
+				reader.close();
 			}
 		}
-		Set<Integer> cp = combineParts == null || combineParts.isEmpty()
-				? new HashSet<>(COMBINE_ARGS.values())
-				: new HashSet<>(combineParts);
-		boolean includeRouting = cp.contains(OsmandOdb.OsmAndStructure.ROUTINGINDEX_FIELD_NUMBER);
-		boolean hasRoutingData = includeRouting && hasRoutingData(testReaders);
-		if (hasRoutingData) {
-			createWithRouting(outputFile, readers, testReaders, cp);
-		} else {
-			Set<Integer> cpWithoutRouting = new HashSet<>(cp);
-			cpWithoutRouting.remove(OsmandOdb.OsmAndStructure.ROUTINGINDEX_FIELD_NUMBER);
-			combineParts(outputFile, null, readers, cpWithoutRouting);
-		}
-
-		File outFile = new File(obfFilePath + ".gz");
-		try (FileInputStream inputStream = new FileInputStream(outputFile);
-		     FileOutputStream fileOutputStream = new FileOutputStream(outFile);
-		     GZIPOutputStream gzipOutputStream = new GZIPOutputStream(fileOutputStream)) {
-			Algorithms.streamCopy(inputStream, gzipOutputStream);
-		}
-
-		return outFile;
 	}
 
 	private boolean hasRoutingData(List<BinaryMapIndexTestReader> readers) {
