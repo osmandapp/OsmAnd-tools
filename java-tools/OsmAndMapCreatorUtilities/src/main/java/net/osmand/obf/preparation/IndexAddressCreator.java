@@ -36,6 +36,7 @@ import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.IProgress;
 import net.osmand.OsmAndCollator;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.CityBlocks;
+import net.osmand.binary.CommonWords;
 import net.osmand.binary.ObfConstants;
 import net.osmand.data.Boundary;
 import net.osmand.data.Building;
@@ -1231,7 +1232,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 
 
-		NameIndexCreator<MapObject> namesIndex = new NameIndexCreator<>();
+		NameIndexCreator<MapObject> namesIndex = new NameIndexCreator<>(CommonWords.getInstance());
 
 		progress.startTask(settings.getString("IndexCreator.SERIALIZING_ADDRESS"), cityTowns.size() + villages.size() / 100 + 1); //$NON-NLS-1$
 		TLongObjectHashMap<Long> streetIds = new TLongObjectHashMap<Long>();

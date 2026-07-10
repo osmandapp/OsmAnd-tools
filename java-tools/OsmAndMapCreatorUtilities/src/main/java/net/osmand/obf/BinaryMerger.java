@@ -11,6 +11,7 @@ import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.CityBlocks;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.CommonWords;
 import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.OsmandOdb;
 import net.osmand.data.*;
@@ -445,7 +446,7 @@ public class BinaryMerger {
 		List<String> attributeTagsTable = new ArrayList<String>();
 		attributeTagsTable.addAll(attributeTagsTableSet);
 		Map<String, Integer> tagRules = new HashMap<String, Integer>();
-		NameIndexCreator<MapObject> namesIndex = new NameIndexCreator<MapObject>();
+		NameIndexCreator<MapObject> namesIndex = new NameIndexCreator<>(CommonWords.getInstance());
 		ListIterator<String> it = attributeTagsTable.listIterator();
 		while (it.hasNext()) {
 			tagRules.put(it.next(), it.previousIndex());

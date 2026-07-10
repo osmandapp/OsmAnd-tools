@@ -39,10 +39,15 @@ public class NameIndexCreator<T> {
 	Map<String, NamedObjectsByPrefix<T>> namesIndex = new TreeMap<>(Collator.getInstance());
 	
 	PrepareWordsIndex commonWords;
+	CommonWords predefinedWords;
 	
 	Map<String, Integer> tokenFrequencies = new HashMap<String, Integer>();
 	Map<String, Integer> commonNonIndexedFrequencies = new HashMap<String, Integer>();
 	
+	
+	public NameIndexCreator(CommonWords c) {
+		this.predefinedWords = c;
+	}
 	
 	public record PoiNameObject(PoiTileBox tileBox, int ind) {  }
 	
@@ -261,8 +266,8 @@ public class NameIndexCreator<T> {
 			if (e.getValue() < MIN_LIMIT_FREQ_COMMON) {
 				continue;
 			}
-			boolean common = CommonWords.isCommon(s);
-			boolean freq = CommonWords.getFrequentlyUsed(s) >= 0;
+			boolean common = predefinedWords.isCommon(s);
+			boolean freq = predefinedWords.getFrequentlyUsed(s) >= 0;
 			if (common || freq || topXFrequent.contains(e.getKey())) {
 				commonStrings.add(s);
 			}
@@ -299,7 +304,7 @@ public class NameIndexCreator<T> {
 		boolean hasRareName = false;
 		for (String token : uniqueNames) {
 			if (!token.equalsIgnoreCase(NameIndexReader.CITY_AS_STREET_COMMON) &&
-					!CommonWords.isCommon(token) && CommonWords.getFrequentlyUsed(token) <= 0) {
+					!predefinedWords.isCommon(token) && predefinedWords.getFrequentlyUsed(token) <= 0) {
 				hasRareName = true;
 				break;
 			}
@@ -317,7 +322,7 @@ public class NameIndexCreator<T> {
 			if (Algorithms.isEmpty(prefix)) {
 				continue;
 			}
-			if (!indexNumbers && CommonWords.isNumber2Letters(token)) {
+			if (!indexNumbers && SearchAlgorithms.isNumber2Letters(token)) {
 				continue;
 			}
 			NamedObjectsByPrefix<T> entry = namesIndex.get(prefix);
@@ -331,7 +336,7 @@ public class NameIndexCreator<T> {
 				continue;
 			}
 			tokenFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
-			boolean c = CommonWords.isCommon(token);
+			boolean c = predefinedWords.isCommon(token);
 			if (c && hasRareName) {
 				commonNonIndexedFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
 			}
