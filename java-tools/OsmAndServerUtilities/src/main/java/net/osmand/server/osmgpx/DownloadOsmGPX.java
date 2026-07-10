@@ -116,6 +116,9 @@ public class DownloadOsmGPX {
 	private static final String ERROR_ACTIVITY_TYPE = "error";
 	private static final String NOSPEED_ACTIVITY_TYPE = "nospeed";
 
+	// Garmin exports named "COURSE_<id>.gpx" would otherwise match "road_running"
+	private static final Set<String> ACTIVITY_KEYWORD_EXCLUSIONS = Set.of("course");
+
 	private static final int MIN_POINTS_SIZE = 100;
 	private static final int MIN_DISTANCE = 1000;
 	private static final int MAX_DISTANCE_BETWEEN_POINTS = 1000;
@@ -623,6 +626,9 @@ public class DownloadOsmGPX {
 			String tag = entry.getKey();
 			String activityId = entry.getValue();
 			if (name != null && name.toLowerCase().contains(tag)) {
+				if (ACTIVITY_KEYWORD_EXCLUSIONS.contains(tag)) {
+					continue;
+				}
 				return activityId;
 			}
 			if (desc != null && desc.toLowerCase().contains(tag)) {
