@@ -670,7 +670,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 		poiConnection.commit();
 
-		NameIndexCreator<PoiNameObject> namesIndex = new NameIndexCreator<>(CommonWords.getInstance());
+		NameIndexCreator<PoiNameObject> namesIndex = new NameIndexCreator<>(CommonWords.getPoiInstance());
 
 		int zoomToStart = ZOOM_TO_SAVE_START;
 		IntBbox bbox = new IntBbox();

@@ -446,7 +446,7 @@ public class BinaryMerger {
 		List<String> attributeTagsTable = new ArrayList<String>();
 		attributeTagsTable.addAll(attributeTagsTableSet);
 		Map<String, Integer> tagRules = new HashMap<String, Integer>();
-		NameIndexCreator<MapObject> namesIndex = new NameIndexCreator<>(CommonWords.getInstance());
+		NameIndexCreator<MapObject> namesIndex = new NameIndexCreator<>(CommonWords.getAddrInstance());
 		ListIterator<String> it = attributeTagsTable.listIterator();
 		while (it.hasNext()) {
 			tagRules.put(it.next(), it.previousIndex());
