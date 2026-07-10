@@ -242,21 +242,21 @@ public class OsmGpxController {
 			}
 		}, rs -> {
 			float minDist = rs.getFloat(1);
-			ranges.put("minDist", rs.wasNull() ? 0 : (int) minDist);
+			ranges.put("minDist", rs.wasNull() ? 0 : (int) Math.floor(minDist));
 			float maxDist = rs.getFloat(2);
-			ranges.put("maxDist", rs.wasNull() ? 0 : (int) maxDist);
+			ranges.put("maxDist", rs.wasNull() ? 0 : (int) Math.ceil(maxDist));
 			float minSpeed = rs.getFloat(3);
-			ranges.put("minSpeed", rs.wasNull() ? 0 : (int) minSpeed);
+			ranges.put("minSpeed", rs.wasNull() ? 0 : (int) Math.floor(minSpeed));
 			float maxSpeed = rs.getFloat(4);
-			ranges.put("maxSpeed", rs.wasNull() ? 0 : (int) maxSpeed);
+			ranges.put("maxSpeed", rs.wasNull() ? 0 : (int) Math.ceil(maxSpeed));
 			float maxSpeedMin = rs.getFloat(5);
-			ranges.put("maxSpeedMin", rs.wasNull() ? 0 : (int) maxSpeedMin);
+			ranges.put("maxSpeedMin", rs.wasNull() ? 0 : (int) Math.floor(maxSpeedMin));
 			float maxSpeedMax = rs.getFloat(6);
-			ranges.put("maxSpeedMax", rs.wasNull() ? 0 : (int) maxSpeedMax);
+			ranges.put("maxSpeedMax", rs.wasNull() ? 0 : (int) Math.ceil(maxSpeedMax));
 			float maxDistBetweenPointsMin = rs.getFloat(7);
-			ranges.put("maxDistBetweenPointsMin", rs.wasNull() ? 0 : (int) maxDistBetweenPointsMin);
+			ranges.put("maxDistBetweenPointsMin", rs.wasNull() ? 0 : (int) Math.floor(maxDistBetweenPointsMin));
 			float maxDistBetweenPointsMax = rs.getFloat(8);
-			ranges.put("maxDistBetweenPointsMax", rs.wasNull() ? 0 : (int) maxDistBetweenPointsMax);
+			ranges.put("maxDistBetweenPointsMax", rs.wasNull() ? 0 : (int) Math.ceil(maxDistBetweenPointsMax));
 			int timeMinutesMin = rs.getInt(9);
 			ranges.put("timeMinutesMin", rs.wasNull() ? 0 : timeMinutesMin);
 			int timeMinutesMax = rs.getInt(10);
