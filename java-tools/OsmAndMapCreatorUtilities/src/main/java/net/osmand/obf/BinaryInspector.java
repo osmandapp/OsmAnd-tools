@@ -55,7 +55,6 @@ import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
 import net.osmand.binary.BinaryMapTransportReaderAdapter.TransportIndex;
 import net.osmand.binary.NameIndexReader;
 import net.osmand.binary.NameIndexReader.BoundariesIndexStat;
-import net.osmand.binary.NameIndexReader.StreetsIndexStat;
 import net.osmand.binary.NameIndexReader.SuffixesStat;
 import net.osmand.binary.NameIndexReader.ValueFreq;
 import net.osmand.binary.ObfConstants;
@@ -99,13 +98,13 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-					"-vpoi", //"-vpoiobjects",
+//					"-vpoi", //"-vpoiobjects",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vsearchinspect", // "-vsearchglobalonly", // "-vprefix=hh" // search index extended anlays 
-//					"-vaddress",   
+					"-vaddress",   
 //					"-vcities", "-vstreetgroups", //"-vcitynames",
 //					"-vstreets", //"-vbuildings",  "-vintersections",
 //					"-lang=ru",
@@ -114,8 +113,10 @@ public class BinaryInspector {
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
-//					System.getProperty("maps.dir") + "Map.obf",
 					System.getProperty("maps.dir") + "Map.obf",
+//					System.getProperty("maps.dir") + "Us_pennsylvania_northamerica_2.obf",
+//					System.getProperty("maps.dir") + "Ukraine_kyiv-city_europe_2.obf",
+					
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
@@ -180,12 +181,12 @@ public class BinaryInspector {
 		int zoom = 15;
 		
 		// stats for search
-		PoiStats poiStats = new PoiStats();
-		PoiStats globalPoiStats = new PoiStats();
-		AddressStats addressStats = new AddressStats();
-		AddressStats globalAddressStats = new AddressStats();
-		FullSearchStats searchStats = new FullSearchStats();
-		FullSearchStats globalSearchStats = new FullSearchStats();
+		PoiStats poiStats;
+		PoiStats globalPoiStats;
+		AddressStats addressStats;
+		AddressStats globalAddressStats;
+		FullSearchStats searchStats;
+		FullSearchStats globalSearchStats;
 		
 
 		public boolean isVaddress() {
@@ -310,6 +311,12 @@ public class BinaryInspector {
 					latbottom = Double.parseDouble(values[3]);
 				}
 			}
+			poiStats = new PoiStats();
+			globalPoiStats = new PoiStats();
+			addressStats = new AddressStats();
+			globalAddressStats = new AddressStats();
+			searchStats = new FullSearchStats();
+			globalSearchStats = new FullSearchStats();
 		}
 
 		public boolean contains(MapObject o) {
@@ -1018,7 +1025,6 @@ public class BinaryInspector {
 		index.readFullNameIndex(fullNameIndex);
 		fullNameIndex.setSuffixesStat(as.suffixesStat);
 		fullNameIndex.setBoundariesStat(as.bndsStat);
-		fullNameIndex.setStreetsStat(as.streetsStat);
 		for (CityBlocks type : CityBlocks.allTypes()) {
 			if (type.index >= 0) {
 				List<ValueFreq> lst = fullNameIndex.getAddrPrefixes(type.index, vInfo.getPrefix());
@@ -1039,17 +1045,7 @@ public class BinaryInspector {
 			printNameStats(as.nameByTypeIndex.get(type), 1000, " * Address " + type, null);
 		}
 		printNameStats(as.nameIndex, 10_000, " * All address", as.suffixesStat);
-		List<ValueFreq> lst = new ArrayList<>(as.streetsStat.getValues().values());
-		Collections.sort(lst);
 		
-		List<ValueFreq> streetsLst = lst.subList(0, Math.min(lst.size(), 1000));
-		StringBuilder nameValuesFmt = new StringBuilder();
-		for (ValueFreq v : streetsLst) {
-			nameValuesFmt.append(String.format("%s (%d, str %,d, enc %,d / max %,d) %s, ", v.value, v.freq, v.extra, 
-					v.enclosing, v.maxSingleAtomEnc,
-					v.getSubvalues(0.06, 1)));
-		}
-		println(String.format("\t * Streets stats: %s ", nameValuesFmt.toString()));
 		List<ValueFreq> bndsLst = new ArrayList<>(as.bndsStat.getBoundaries().values());
 		for (ValueFreq v : bndsLst) {
 			v.freq = as.bndsStat.calculateNumberOfDistinctBBox(v.subValues);
@@ -1101,7 +1097,7 @@ public class BinaryInspector {
 			String streetsNum = key.enclosing == 0 ? "" : 
 				String.format(", enc %,d/%,d/%,d", key.enclosing, key.maxSingleSubValueEnc, key.maxSingleAtomEnc);
 			nameValuesFmt.append(String.format("%s (%d, %,d%s) %s, ", key.value, key.subValues.size(), key.freq,
-					streetsNum, key.getSubvalues(0.06, 1))); // 6%
+					streetsNum, key.getSubvalues(0.00, 1))); // 6%
 		}
 		println(String.format("\t%s Name index stats (%,d prefixes, %,d tokens, %,d refs/atoms,"
 				+ " enclosed: %,d total / max token %,d / max atom %,d): %s ", name, nameIndex.size(),
@@ -1686,15 +1682,13 @@ public class BinaryInspector {
 		int files = 0;
 		Map<String, ValueFreq> nameIndex = new HashMap<>();
 		Map<String, ValueFreq> commonWordsStat = new HashMap<>();
-		Map<CityBlocks, Map<String, ValueFreq>> nameByTypeIndex = new HashMap<>();
-		SuffixesStat suffixesStat = new SuffixesStat();
-		StreetsIndexStat streetsStat = new StreetsIndexStat();
-		BoundariesIndexStat bndsStat = new BoundariesIndexStat();
+		final Map<CityBlocks, Map<String, ValueFreq>> nameByTypeIndex = new HashMap<>();
+		final SuffixesStat suffixesStat = new SuffixesStat();
+		final BoundariesIndexStat bndsStat = new BoundariesIndexStat();
 		
 		public void merge(AddressStats s) {
 			files += s.files;
 			suffixesStat.merge(s.suffixesStat);
-			streetsStat.merge(s.streetsStat);
 			bndsStat.merge(s.bndsStat);
 			ValueFreq.mergeArray(nameIndex, s.nameIndex);
 			ValueFreq.mergeArray(commonWordsStat, s.commonWordsStat);
@@ -1710,14 +1704,14 @@ public class BinaryInspector {
 
 	public static class PoiStats {
 		int files = 0;
-		Map<String, ValueFreq> text = new HashMap<>();
-		Map<String, ValueFreq> refs = new HashMap<>();
-		Map<String, ValueFreq> topMulti = new HashMap<>();
-		Map<String, ValueFreq> singleValues = new HashMap<>();
-		Map<String, ValueFreq> categories = new HashMap<>();
+		final Map<String, ValueFreq> text = new HashMap<>();
+		final Map<String, ValueFreq> refs = new HashMap<>();
+		final Map<String, ValueFreq> topMulti = new HashMap<>();
+		final Map<String, ValueFreq> singleValues = new HashMap<>();
+		final Map<String, ValueFreq> categories = new HashMap<>();
+		final SuffixesStat suffixesStat = new SuffixesStat();
 		Map<String, ValueFreq> nameIndex = new HashMap<>();
 		Map<String, ValueFreq> commonWordsStat = new HashMap<>();
-		SuffixesStat suffixesStat = new SuffixesStat();
 		
 		public void merge(PoiStats s) {
 			files += s.files;
