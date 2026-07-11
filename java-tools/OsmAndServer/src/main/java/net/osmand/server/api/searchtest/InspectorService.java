@@ -1604,6 +1604,7 @@ public interface InspectorService extends OBFService {
 
     default List<IndexToken> buildIndexTokensWithRefs(Map<String, IndexTokenBuilder> tokens, String obf) {
         List<IndexToken> tokensWithRefs = new ArrayList<>(tokens.size());
+        CommonWords cw = CommonWords.getInstance();
         for (IndexTokenBuilder token : tokens.values()) {
             AddressRef[] addressRefs = distinctAddressRefs(token.addressRefs());
             int poiCount = countPoiIndexes(token.poiIndexes());
@@ -1613,8 +1614,8 @@ public interface InspectorService extends OBFService {
             tokensWithRefs.add(new IndexToken(token.name(), addressRefs, token.poiRefs(), token.poiAtomRefs(),
                     token.poiAtomSizes(), token.poiIndexes(), withObf(token.poiSuffixRefs(), obf), withObf(token.addressSuffixRefs(), obf),
                     token.poiSuffixCounts(), token.addressSuffixCounts(),
-                    CommonWords.getCommon(token.name()) != -1,
-                    CommonWords.getFrequentlyUsed(token.name()) != -1, null, poiCount, addressRefs.length));
+                    cw.getCommon(token.name()) != -1,
+                    cw.getFrequentlyUsed(token.name()) != -1, null, poiCount, addressRefs.length));
         }
         return tokensWithRefs;
     }
@@ -2064,9 +2065,10 @@ public interface InspectorService extends OBFService {
                 }
             }
         }
+        CommonWords defaultInstance = CommonWords.getInstance();
         for (String candidateName : candidateNames) {
             List<String> tokens = SearchAlgorithms.splitAndNormalize(candidateName, true);
-            SearchAlgorithms.removeCommonWords(tokens);
+            SearchAlgorithms.removeCommonWords(defaultInstance, tokens);
             if (tokens.size() == 1 && tokens.contains(tokenName)) {
                 return true;
             }
