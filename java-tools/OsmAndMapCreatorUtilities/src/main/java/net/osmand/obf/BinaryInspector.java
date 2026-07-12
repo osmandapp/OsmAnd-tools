@@ -1079,6 +1079,9 @@ public class BinaryInspector {
 
 	private void printNameStats(Map<String, ValueFreq> nameIndexMap, int alimit, String name, SuffixesStat suffixesStat) {
 		int tokens = 0; 
+		if (!vInfo.groupByPrefix) {
+			ValueFreq.SORT_BY_TOP_FREQ = false;
+		}
 		List<ValueFreq> nameIndex = new ArrayList<ValueFreq>(nameIndexMap.values());
 		Collections.sort(nameIndex);
 		int enclosing = 0, maxSingleAtomEnc = 0, maxSingleTokenEnc = 0;
