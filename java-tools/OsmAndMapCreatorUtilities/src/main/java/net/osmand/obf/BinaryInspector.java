@@ -113,8 +113,8 @@ public class BinaryInspector {
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
-					System.getProperty("maps.dir") + "Map.obf",
-//					System.getProperty("maps.dir") + "Us_pennsylvania_northamerica_2.obf",
+//					System.getProperty("maps.dir") + "Map.obf",
+					System.getProperty("maps.dir") + "Us_pennsylvania_northamerica_2.obf",
 //					System.getProperty("maps.dir") + "Ukraine_kyiv-city_europe_2.obf",
 					
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
@@ -1087,7 +1087,7 @@ public class BinaryInspector {
 		}
 		int limit = Math.min(100, nameIndex.size());
 		for (; limit < nameIndex.size() && limit < alimit; limit++) {
-			if (nameIndex.get(limit).freq < 80) {
+			if (nameIndex.get(limit).freq < 80) { 
 				break;
 			}
 		}
@@ -1096,8 +1096,9 @@ public class BinaryInspector {
 		for (ValueFreq key : sublist) {
 			String streetsNum = key.enclosing == 0 ? "" : 
 				String.format(", enc %,d/%,d/%,d", key.enclosing, key.maxSingleSubValueEnc, key.maxSingleAtomEnc);
+			List<ValueFreq> subvalues = key.getSubvalues(0.05, 1); // 6%
 			nameValuesFmt.append(String.format("%s (%d, %,d%s) %s, ", key.value, key.subValues.size(), key.freq,
-					streetsNum, key.getSubvalues(0.00, 1))); // 6%
+					streetsNum, subvalues)); 
 		}
 		println(String.format("\t%s Name index stats (%,d prefixes, %,d tokens, %,d refs/atoms,"
 				+ " enclosed: %,d total / max token %,d / max atom %,d): %s ", name, nameIndex.size(),
