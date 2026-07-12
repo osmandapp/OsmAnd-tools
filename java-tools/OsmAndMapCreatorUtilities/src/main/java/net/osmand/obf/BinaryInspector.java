@@ -114,8 +114,8 @@ public class BinaryInspector {
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
 //					System.getProperty("maps.dir") + "Map.obf",
-					System.getProperty("maps.dir") + "Us_pennsylvania_northamerica_2.obf",
-//					System.getProperty("maps.dir") + "Ukraine_kyiv-city_europe_2.obf",
+//					System.getProperty("maps.dir") + "Us_pennsylvania_northamerica_2.obf",
+					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_freiburg_europe_2.obf",
 					
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
@@ -181,6 +181,7 @@ public class BinaryInspector {
 		int zoom = 15;
 		
 		// stats for search
+		boolean groupByPrefix;
 		PoiStats poiStats;
 		PoiStats globalPoiStats;
 		AddressStats addressStats;
@@ -1027,13 +1028,14 @@ public class BinaryInspector {
 		fullNameIndex.setBoundariesStat(as.bndsStat);
 		for (CityBlocks type : CityBlocks.allTypes()) {
 			if (type.index >= 0) {
-				List<ValueFreq> lst = fullNameIndex.getAddrPrefixes(type.index, vInfo.getPrefix());
+				List<ValueFreq> lst = fullNameIndex.getAddrPrefixes(type.index, vInfo.getPrefix(), vInfo.groupByPrefix);
 				if (lst.size() > 0) {
 					as.nameByTypeIndex.put(type, ValueFreq.mergeArray(new HashMap<>(), lst));
 				}
 			}
 		}
-		as.nameIndex = ValueFreq.mergeArray(new HashMap<>(), fullNameIndex.getAddrPrefixes(-1, vInfo.getPrefix()));
+		as.nameIndex = ValueFreq.mergeArray(new HashMap<>(),
+				fullNameIndex.getAddrPrefixes(-1, vInfo.getPrefix(), vInfo.groupByPrefix));
 		as.commonWordsStat = fullNameIndex.getCommonWordsStats();
 		if (!vInfo.vsearchglobalonly) {
 			printAddressNameStats(as);
