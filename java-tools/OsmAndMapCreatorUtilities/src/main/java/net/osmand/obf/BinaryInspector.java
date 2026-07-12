@@ -98,7 +98,7 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-//					"-vpoi", //"-vpoiobjects",
+					"-vpoi", //"-vpoiobjects",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
@@ -1047,7 +1047,11 @@ public class BinaryInspector {
 			printNameStats(as.nameByTypeIndex.get(type), 1000, " * Address " + type, null);
 		}
 		printNameStats(as.nameIndex, 10_000, " * All address", as.suffixesStat);
-		
+		printBoundariesStats(as);
+		printCommonStats(as.commonWordsStat, " * Address");
+	}
+
+	private void printBoundariesStats(AddressStats as) {
 		List<ValueFreq> bndsLst = new ArrayList<>(as.bndsStat.getBoundaries().values());
 		for (ValueFreq v : bndsLst) {
 			v.freq = as.bndsStat.calculateNumberOfDistinctBBox(v.subValues);
@@ -1071,7 +1075,6 @@ public class BinaryInspector {
 			
 		}
 		println(String.format("\t * Boundary stats (%,d): %s ", bndsLst.size(), bndsLstB));
-		printCommonStats(as.commonWordsStat, " * Address");
 	}
 
 	private void printNameStats(Map<String, ValueFreq> nameIndexMap, int alimit, String name, SuffixesStat suffixesStat) {
@@ -1692,7 +1695,7 @@ public class BinaryInspector {
 		public void merge(AddressStats s) {
 			files += s.files;
 			suffixesStat.merge(s.suffixesStat);
-			bndsStat.merge(s.bndsStat);
+			bndsStat.mergeBoundaries(s.bndsStat);
 			ValueFreq.mergeArray(nameIndex, s.nameIndex);
 			ValueFreq.mergeArray(commonWordsStat, s.commonWordsStat);
 			for (CityBlocks type : s.nameByTypeIndex.keySet()) {
@@ -1851,7 +1854,7 @@ public class BinaryInspector {
 		NameIndexReader fullNameIndex = new NameIndexReader(p);
 		index.readFullNameIndex(fullNameIndex);
 		fullNameIndex.setSuffixesStat(ps.suffixesStat);
-		ps.nameIndex = ValueFreq.mergeArray(new HashMap<>(), fullNameIndex.getPOIPrefixes(verbose.getPrefix()));
+		ps.nameIndex = ValueFreq.mergeArray(new HashMap<>(), fullNameIndex.getPOIPrefixes(verbose.getPrefix(), verbose.groupByPrefix));
 		ps.commonWordsStat = fullNameIndex.getCommonWordsStats();
 		
 		if (!verbose.vsearchglobalonly) {
