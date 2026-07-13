@@ -37,6 +37,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import net.osmand.data.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.jetbrains.annotations.Nullable;
@@ -57,15 +58,7 @@ import net.osmand.binary.BinaryMapIndexReaderStats;
 import net.osmand.binary.BinaryMapPoiReaderAdapter;
 import net.osmand.binary.GeocodingUtilities;
 import net.osmand.binary.ObfConstants;
-import net.osmand.data.Amenity;
-import net.osmand.data.AmenityInfoDisplayFilter;
-import net.osmand.data.Building;
-import net.osmand.data.City;
 import net.osmand.data.City.CityType;
-import net.osmand.data.LatLon;
-import net.osmand.data.MapObject;
-import net.osmand.data.QuadRect;
-import net.osmand.data.Street;
 import net.osmand.map.OsmandRegions;
 import net.osmand.osm.AbstractPoiType;
 import net.osmand.osm.MapPoiTypes;
@@ -1276,15 +1269,16 @@ public class SearchService {
 		return res;
 	}
 
-	public Map<String, String> checkTagsVisibility(Map<String, String> tags) {
+	public Map<String, Object> checkTagsVisibility(Map<String, String> tags) {
 		if (tags == null || tags.isEmpty()) {
 			return Collections.emptyMap();
 		}
+		AdditionalInfoBundle infoFilter = new AdditionalInfoBundle(MapPoiTypes.getDefault(), tags);
 		String subtype = tags.get(Amenity.SUBTYPE);
 		MapPoiTypes mapPoiTypes = MapPoiTypes.getDefault();
-		Map<String, String> visible = new HashMap<>();
-		tags.forEach((key, value) -> {
-			if (AmenityInfoDisplayFilter.shouldDisplayKey(key, subtype, mapPoiTypes)) {
+		Map<String, Object> visible = new HashMap<>();
+		infoFilter.getFilteredLocalizedInfo().forEach((key, value) -> {
+			if (infoFilter.shouldDisplayKey(key)) {
 				visible.put(key, value);
 			}
 		});

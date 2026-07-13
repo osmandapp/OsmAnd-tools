@@ -143,7 +143,7 @@ public class SearchController {
     @PostMapping(path = {"/get-tags-visibility"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> getTagsVisibility(@RequestBody Map<String, String> tags) {
-        Map<String, String> visibleTags = searchService.checkTagsVisibility(tags);
+        Map<String, Object> visibleTags = searchService.checkTagsVisibility(tags);
         return ResponseEntity.ok(gson.toJson(visibleTags));
     }
     
