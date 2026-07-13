@@ -114,9 +114,7 @@ public class BinaryInspector {
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
 //					System.getProperty("maps.dir") + "Map.obf",
-//					System.getProperty("maps.dir") + "Us_pennsylvania_northamerica_2.obf",
-					System.getProperty("maps.dir") + "Germany_baden-wuerttemberg_freiburg_europe_2.obf",
-					
+//					System.getProperty("maps.dir") + "Us_pennsylvania_northamerica_2.obf",				
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
@@ -1708,10 +1706,30 @@ public class BinaryInspector {
 					ValueFreq.mergeArray(nameByTypeIndex.get(type), s.nameByTypeIndex.get(type));
 				}
 			}
+			checkLimit(nameIndex);
+			checkLimit(commonWordsStat);
+			for (Map<String, ValueFreq> m : nameByTypeIndex.values()) {
+				checkLimit(m);
+			}
 		}
+	}
+	public static int LIMIT_NAME_INDEX = 100_000;
+	
+	public static Map<String, ValueFreq> checkLimit(Map<String, ValueFreq> nameIndex) {
+		if (nameIndex.size() > LIMIT_NAME_INDEX) {
+			List<ValueFreq> arrayList = new ArrayList<>(nameIndex.values());
+			Collections.sort(arrayList);
+			List<ValueFreq> ls = arrayList.subList(0, LIMIT_NAME_INDEX / 2);
+			nameIndex.clear();
+			for (ValueFreq s : ls) {
+				nameIndex.put(s.value, s);
+			}
+		}
+		return nameIndex;
 	}
 
 	public static class PoiStats {
+		
 		int files = 0;
 		final Map<String, ValueFreq> text = new HashMap<>();
 		final Map<String, ValueFreq> refs = new HashMap<>();
@@ -1734,8 +1752,11 @@ public class BinaryInspector {
 			if (s.commonWordsStat != null) {
 				ValueFreq.mergeArray(commonWordsStat, s.commonWordsStat);
 			}
+			checkLimit(nameIndex);
+			checkLimit(commonWordsStat);
 		}
-
+		
+		
 
 	}
 	
