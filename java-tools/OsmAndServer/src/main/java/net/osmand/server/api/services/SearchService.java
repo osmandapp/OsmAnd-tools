@@ -37,6 +37,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import net.osmand.search.core.spatial.SpatialPoiSearch.SpatialPoiType;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.jetbrains.annotations.Nullable;
@@ -461,12 +462,21 @@ public class SearchService {
 				String dominatedCity = calculateSpatialDominatedCity(res.mainResults, ctx.locale);
 				for (SpatialSearchResult r : res.mainResults) {
 					List<MapObject> objs = r.getObjects();
+					if (r.hasPoiTypes()) {
+						for (SpatialPoiType type : r.getPoiTypes(poiSearch)) {
+							Feature f = getSpatialPoiTypeFeature(type);
+							f.prop(PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
+							f.prop(PoiTypeField.COMPARE_KEY.getFieldName(), SpatialSearchResult.compareKeyString(r));
+							response.features.add(f);
+						}
+					}
 					if (!objs.isEmpty()) {
 						LatLon l = r.getLatLon() == null ? new LatLon(ctx.lat, ctx.lon) : r.getLatLon();
 						Feature f = getSpatialFeature(l, objs, ctx.locale, timeZone, dominatedCity);
 						if (f != null) {
 							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(), matchedObjects(objs, ctx.locale));
 							f.prop(PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
+							f.prop(PoiTypeField.COMPARE_KEY.getFieldName(), SpatialSearchResult.compareKeyString(r));
 							response.features.add(f);
 						}
 					}
@@ -488,6 +498,47 @@ public class SearchService {
 			osmAndMapsService.unlockReaders(usedMapList);
 		}
 		return response;
+	}
+
+	private Feature getSpatialPoiTypeFeature(SpatialPoiType type) {
+		Feature feature = new Feature(Geometry.point(new LatLon(0, 0)))
+				.prop(PoiTypeField.TYPE.getFieldName(), ObjectType.POI_TYPE);
+		Map<String, String> tags = getSpatialPoiTypeFields(type);
+		for (Map.Entry<String, String> entry : tags.entrySet()) {
+			feature.prop(entry.getKey(), entry.getValue());
+		}
+		return feature;
+	}
+
+	private Map<String, String> getSpatialPoiTypeFields(SpatialPoiType type) {
+		if (type.singleType != null) {
+			if (type.singleType instanceof PoiType poiType && poiType.isAdditional()
+					&& type.getParentTypes() != null && type.getParentTypes().size() > 1) {
+				SearchCoreFactory.PoiAdditionalCustomFilter filter =
+						new SearchCoreFactory.PoiAdditionalCustomFilter(MapPoiTypes.getDefault(), poiType);
+				Map<String, String> tags = getPoiTypeFields(filter);
+				tags.put(PoiTypeField.NAME.getFieldName(), filter.getTranslation());
+				return tags;
+			}
+			Map<String, String> tags = getPoiTypeFields(type.singleType);
+			tags.put(PoiTypeField.NAME.getFieldName(), type.singleType.getTranslation());
+			return tags;
+		}
+		Map<String, String> tags = new HashMap<>();
+		if (type.poiAdditional != null) {
+			String valueKey = TopIndexFilter.getValueKey(type.poiAdditional);
+			String tag = type.getKey();
+			if (tag.endsWith("_" + valueKey)) {
+				tag = tag.substring(0, tag.length() - valueKey.length() - 1);
+			}
+			if (tag.startsWith(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX)) {
+				tag = tag.substring(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX.length());
+			}
+			tags.put(PoiTypeField.CATEGORY_KEY_NAME.getFieldName(), tag);
+			tags.put(PoiTypeField.CATEGORY_ICON.getFieldName(), tag);
+			tags.put(PoiTypeField.NAME.getFieldName(), type.poiAdditional);
+		}
+		return tags;
 	}
 
 	private List<Map<String, Object>> matchedObjects(List<MapObject> objs, String locale) {
@@ -1454,7 +1505,10 @@ public class SearchService {
 			tags.put(PoiTypeField.KEY_NAME.getFieldName(), type.getKeyName());
 			tags.put(PoiTypeField.ICON_NAME.getFieldName(), type.getIconKeyName());
 		} else if (obj instanceof MapObject type) {
-			tags.put(PoiTypeField.EN_NAME.getFieldName(), type.getEnName(false));
+			String enName = type.getEnName(false);
+			if (Algorithms.isNotEmpty(enName)) {
+				tags.put(PoiTypeField.EN_NAME.getFieldName(), enName);
+			}
 		}
 		return tags;
 	}
@@ -1467,7 +1521,8 @@ public class SearchService {
 		POI_NAME("web_poi_name"), POI_COLOR("web_poi_color"), POI_ICON_NAME("web_poi_iconName"),
 		POI_TYPE("web_poi_type"), POI_SUBTYPE("web_poi_subType"), POI_OSM_URL("web_poi_osmUrl"), CITY("web_city"),
 		// names of all objects matched in a spatial-search result (street, city, ...)
-		MATCHED_OBJECTS("web_matched_objects"), VISIBLE_LEVEL("web_visible_level");
+		MATCHED_OBJECTS("web_matched_objects"), VISIBLE_LEVEL("web_visible_level"),
+		COMPARE_KEY("web_compare_key");
 
 		private final String fieldName;
 
