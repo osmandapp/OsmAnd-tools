@@ -60,11 +60,12 @@ public class FullSearchStats {
 //		if (obj instanceof City c) {
 //			objType = c.getType().toString();
 //		}
+		CommonWords cw = CommonWords.getInstance();
 		boolean bld = obj instanceof Building;
 		for (String word : splitAndNormalize) {
-			int commonIndex = CommonWords.getCommon(word);
+			int commonIndex = cw.getCommon(word);
 			if (commonIndex >= 0 || bld) {
-				boolean number = CommonWords.isNumber2Letters(word);
+				boolean number = SearchAlgorithms.isNumber2Letters(word);
 				String n = word;
 				if (number) {
 					if (Algorithms.parseIntSilently(n, -1) < 0) {

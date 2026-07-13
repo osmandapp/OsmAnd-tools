@@ -1049,6 +1049,10 @@ public class BinaryMapIndexWriter {
 				builder.addSuffixesCommonDictionary(i);
 			}
 			for (NamedObject<MapObject> no : indexEntry.namedObjects) {
+				if (no.bitsetIndex.size() == 0) {
+					// skip common words
+					continue;
+				}
 				AddressNameIndexDataAtom.Builder atom = AddressNameIndexDataAtom.newBuilder();
 				CityBlocks type = CityBlocks.CITY_TOWN_TYPE;
 				LatLon ll = no.object.getLocation();
@@ -1862,6 +1866,10 @@ public class BinaryMapIndexWriter {
 			}
 			List<PoiTileBox> tileBoxes = new ArrayList<>();
 			for (NamedObject<PoiNameObject> no : e.getValue().namedObjects) {
+				if (no.bitsetIndex.size() == 0) {
+					// skip common words
+					continue;
+				}
 				PoiTileBox box = no.object.tileBox();
 				tileBoxes.add(box);
 				OsmandOdb.OsmAndPoiNameIndexDataAtom.Builder bs = OsmandOdb.OsmAndPoiNameIndexDataAtom.newBuilder();

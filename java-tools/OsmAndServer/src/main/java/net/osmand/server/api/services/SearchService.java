@@ -103,6 +103,13 @@ public class SearchService {
 	public static final String IS_OPENED_PREFIX = "open:";
 	public static final String OPENING_HOURS_INFO_SUFFIX = "_info";
 
+	private static final ObjectType[] CLASSIC_SEARCH_TYPES = {
+			// Exclude PARTIAL_LOCATION and app-only types (fav, tracks, markers, etc.)
+			ObjectType.CITY, ObjectType.VILLAGE, ObjectType.BOUNDARY, ObjectType.POSTCODE,
+			ObjectType.STREET, ObjectType.HOUSE, ObjectType.STREET_INTERSECTION,
+			ObjectType.POI_TYPE, ObjectType.POI, ObjectType.LOCATION, ObjectType.REGION
+	};
+
 	@Autowired
 	OsmAndMapsService osmAndMapsService;
 
@@ -275,7 +282,7 @@ public class SearchService {
 	public List<Feature> search(SearchContext ctx, String timeZone) throws IOException {
 		long tm = System.currentTimeMillis();
 		SearchResults searchResults = getImmediateSearchResults(ctx,
-				new SearchOption(false, null, null, true, false, (ObjectType[]) null), null);
+				new SearchOption(false, null, null, true, false, CLASSIC_SEARCH_TYPES), null);
 		List<SearchResult> res = searchResults.results();
 		if (System.currentTimeMillis() - tm > 1000) {
 			BinaryMapIndexReaderStats.SearchStat stat = searchResults.settings != null
@@ -456,7 +463,7 @@ public class SearchService {
 					List<MapObject> objs = r.getObjects();
 					if (!objs.isEmpty()) {
 						LatLon l = r.getLatLon() == null ? new LatLon(ctx.lat, ctx.lon) : r.getLatLon();
-						Feature f = getSpatialFeature(l, objs.get(0), ctx.locale, timeZone, dominatedCity);
+						Feature f = getSpatialFeature(l, objs, ctx.locale, timeZone, dominatedCity);
 						if (f != null) {
 							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(), matchedObjects(objs, ctx.locale));
 							f.prop(PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
@@ -499,7 +506,8 @@ public class SearchService {
 		return matched;
 	}
 
-	private Feature getSpatialFeature(LatLon loc, MapObject obj, String locale, String timeZone, String dominatedCity) {
+	private Feature getSpatialFeature(LatLon loc, List<MapObject> objs, String locale, String timeZone, String dominatedCity) {
+		MapObject obj = objs.isEmpty() ? null : objs.get(0);
 		if (obj == null || loc == null) {
 			return null;
 		}
@@ -512,20 +520,51 @@ public class SearchService {
 		result.object = obj;
 		result.location = loc;
 		result.localeName = obj.getName(locale);
-		if (obj instanceof Street street) {
+		if (obj instanceof Street) {
 			result.objectType = ObjectType.STREET;
-			City city = street.getCity();
+			City city = getSpatialCity(objs);
 			if (city != null) {
 				result.localeRelatedObjectName = city.getName(locale);
 			}
 		} else if (obj instanceof Building) {
 			result.objectType = ObjectType.HOUSE;
+			Street street = getSpatialStreet(objs);
+			if (street != null) {
+				result.localeRelatedObjectName = street.getName(locale);
+			}
+			City city = getSpatialCity(objs);
+			if (city != null) {
+				SearchResult parent = new SearchResult();
+				parent.localeRelatedObjectName = city.getName(locale);
+				result.parentSearchResult = parent;
+			}
 		} else if (obj instanceof City) {
 			result.objectType = ObjectType.CITY;
 		} else {
 			result.objectType = ObjectType.LOCATION;
 		}
 		return getFeature(result, timeZone);
+	}
+
+	private Street getSpatialStreet(List<MapObject> objs) {
+		for (MapObject obj : objs) {
+			if (obj instanceof Street street) {
+				return street;
+			}
+		}
+		return null;
+	}
+
+	private City getSpatialCity(List<MapObject> objs) {
+		for (MapObject obj : objs) {
+			if (obj instanceof City city) {
+				return city;
+			}
+			if (obj instanceof Street street && street.getCity() != null) {
+				return street.getCity();
+			}
+		}
+		return null;
 	}
 
 	public SearchResults getImmediateSearchResults(SearchContext ctx, SearchOption option,
