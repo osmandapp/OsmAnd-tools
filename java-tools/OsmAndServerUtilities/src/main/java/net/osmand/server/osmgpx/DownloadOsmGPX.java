@@ -642,8 +642,8 @@ public class DownloadOsmGPX {
 		if (text == null) {
 			return false;
 		}
-		for (String part : text.toLowerCase().split("[\\s_]+")) {
-			if (part.equals(word)) {
+		for (String part : text.split("[\\s_]+")) {
+			if (part.equalsIgnoreCase(word)) {
 				return true;
 			}
 		}
