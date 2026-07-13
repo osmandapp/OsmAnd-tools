@@ -122,6 +122,7 @@ public class DownloadOsmGPX {
 	private static final int MIN_POINTS_SIZE = 100;
 	private static final int MIN_DISTANCE = 1000;
 	private static final int MAX_DISTANCE_BETWEEN_POINTS = 1000;
+	private static final int SRID_WGS84 = 4326;
 
 	private static final String GPX_FILE_PREIX = "OG";
 	private final RouteActivityHelper routeActivityHelper = RouteActivityHelper.INSTANCE;
@@ -284,7 +285,7 @@ public class DownloadOsmGPX {
 
 			statement.executeUpdate("CREATE EXTENSION IF NOT EXISTS postgis");
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS bbox geometry"
-					+ " GENERATED ALWAYS AS (ST_MakeEnvelope(minlon, minlat, maxlon, maxlat, 4326)) STORED");
+					+ " GENERATED ALWAYS AS (ST_MakeEnvelope(minlon, minlat, maxlon, maxlat, " + SRID_WGS84 + ")) STORED");
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_bbox_geom ON " + GPX_METADATA_TABLE_NAME
 					+ " USING GIST (bbox)");
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_year ON " + GPX_METADATA_TABLE_NAME + " ((extract(year from date)))");

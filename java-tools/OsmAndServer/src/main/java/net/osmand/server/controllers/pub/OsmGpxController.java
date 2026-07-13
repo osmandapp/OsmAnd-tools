@@ -69,6 +69,7 @@ public class OsmGpxController {
 
 	private static final String GPX_METADATA_TABLE_NAME = "osm_gpx_data";
 	private static final String GPX_FILES_TABLE_NAME = "osm_gpx_files";
+	private static final int SRID_WGS84 = 4326;
 	private static final Set<String> INVALID_ACTIVITIES = Set.of("garbage", "error");
 
 	public record RoutesListRequest(
@@ -630,7 +631,7 @@ public class OsmGpxController {
 			return ResponseEntity.badRequest().body("Invalid latitude or longitude values.");
 		}
 
-		conditions.append(" AND m.bbox && ST_MakeEnvelope(?, ?, ?, ?, 4326)");
+		conditions.append(" AND m.bbox && ST_MakeEnvelope(?, ?, ?, ?, " + SRID_WGS84 + ")");
 		params.add(validatedMinLon.doubleValue());
 		params.add(validatedMinLat.doubleValue());
 		params.add(validatedMaxLon.doubleValue());
