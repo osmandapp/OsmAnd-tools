@@ -141,7 +141,7 @@ public class DownloadOsmGPX {
 
 	private static final int MIN_POINTS_SIZE = 10;
 	private static final int MIN_DISTANCE = 200;
-	private static final int MAX_DISTANCE_BETWEEN_POINTS = 5000;
+	private static final double GAP_MAX_SPEED_KMH = 1200; // above any airliner: crossing a gap faster = teleport = garbage
 	private static final long MIN_SPEED_INTERVAL_MS = 500; // min elapsed time to trust a speed sample
 	private static final double MIN_MOVING_SPEED_MPS = 0.1; // below this the interval counts as standing still
 	private static final int SRID_WGS84 = 4326;
@@ -541,9 +541,7 @@ public class DownloadOsmGPX {
 		d.analysis = analysis;
 		int pointsSize = gpxFile.getAllSegmentsPoints().size();
 		float totalDistance = analysis.getTotalDistance();
-		if (pointsSize < MIN_POINTS_SIZE
-				|| totalDistance < MIN_DISTANCE
-				|| analysis.getMaxDistanceBetweenPoints() >= MAX_DISTANCE_BETWEEN_POINTS) {
+		if (pointsSize < MIN_POINTS_SIZE || totalDistance < MIN_DISTANCE || hasTeleportGap(gpxFile)) {
 			d.garbage = true;
 			return d;
 		}
@@ -562,6 +560,28 @@ public class DownloadOsmGPX {
 		d.simplifiedGeometry = TrackSimplifyEncoder.encodeGeometry(
 				TrackSimplifyEncoder.simplifyGpx(gpxFile, TrackSimplifyEncoder.SIMPLIFY_ZOOM));
 		return d;
+	}
+
+	// A gap crossed faster than any real vehicle (incl. aircraft) is a teleport, not a tunnel/flight.
+	static boolean hasTeleportGap(GpxFile gpxFile) {
+		for (Track track : gpxFile.getTracks(false)) {
+			for (TrkSegment seg : track.getSegments()) {
+				WptPt prev = null;
+				for (WptPt p : seg.getPoints()) {
+					if (prev != null) {
+						long dtMs = p.getTime() - prev.getTime();
+						if (dtMs >= MIN_SPEED_INTERVAL_MS) {
+							double dist = MapUtils.getDistance(prev.getLat(), prev.getLon(), p.getLat(), p.getLon());
+							if (dist * 3600d / dtMs > GAP_MAX_SPEED_KMH) { // m/ms -> km/h
+								return true;
+							}
+						}
+					}
+					prev = p;
+				}
+			}
+		}
+		return false;
 	}
 
 	// Measures each move from the last distinct position (skipping frozen duplicate coordinates),
