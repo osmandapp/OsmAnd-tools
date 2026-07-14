@@ -102,7 +102,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	public static final int DEFAULT_TOP_INDEX_LIMIT_PER_MAP = 1000;
 
 	// some multipolygons have > 38K islands (tongass)
-	private static final int MAX_POI_OUTER_MULTIPOLYGON_SIZE = 1024;
+	private static final int MAX_POI_OUTER_MULTIPOLYGON_SIZE = 256;
 
     private final List<String> WORLD_BRANDS = Arrays.asList("McDonald's", "Starbucks", "Subway", "KFC", "Burger King", "Domino's Pizza",
             "Pizza Hut", "Dunkin'", "Costa Coffee", "Tim Hortons", "7-Eleven", "Żabka", "Shell", "BP", "Chevron",
