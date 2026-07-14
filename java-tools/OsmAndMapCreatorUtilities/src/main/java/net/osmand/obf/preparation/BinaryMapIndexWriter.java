@@ -1119,7 +1119,25 @@ public class BinaryMapIndexWriter {
 				}
 				builder.addAtom(atom.build());
 			}
-			codedOutStream.writeMessageNoTag(builder.build());
+			builder.setAtomsLength(builder.getAtomCount());
+			// order has changed
+//			codedOutStream.writeMessageNoTag(builder.build());
+			AddressNameIndexData msg = builder.build();
+			codedOutStream.writeRawVarint32(msg.getSerializedSize());
+			codedOutStream.writeUInt32(OsmandOdb.OsmAndAddressNameIndexData.AddressNameIndexData.ATOMSLENGTH_FIELD_NUMBER,
+					msg.getAtomsLength());
+			for (int i = 0; i < msg.getSuffixesCommonDictionaryCount(); i++) {
+				codedOutStream.writeUInt32(OsmandOdb.OsmAndAddressNameIndexData.AddressNameIndexData.SUFFIXESCOMMONDICTIONARY_FIELD_NUMBER,
+						msg.getSuffixesCommonDictionary(i));
+			}
+			for (int i = 0; i < msg.getSuffixesDictionaryCount(); i++) {
+				codedOutStream.writeBytes(OsmandOdb.OsmAndAddressNameIndexData.AddressNameIndexData.SUFFIXESDICTIONARY_FIELD_NUMBER, 
+						msg.getSuffixesDictionaryBytes(i));
+			}
+			for (int i = 0; i < msg.getAtomCount(); i++) {
+				codedOutStream.writeMessage(OsmandOdb.OsmAndAddressNameIndexData.AddressNameIndexData.ATOM_FIELD_NUMBER,
+						msg.getAtom(i));
+			}
 		}
 
 		long len = writeInt32Size();
@@ -1820,6 +1838,7 @@ public class BinaryMapIndexWriter {
 		}
 		codedOutStream.writeMessageNoTag(groupsBuilder.build());
 	}
+	
 
 	public Map<PoiTileBox, List<BinaryFileReference>> writePoiNameIndex(
 			NameIndexCreator<PoiNameObject> namesIndex, long startPoiIndex) throws IOException {
@@ -1892,9 +1911,26 @@ public class BinaryMapIndexWriter {
 				OsmAndPoiNameIndexDataAtom atom = bs.build();
 				builder.addAtoms(atom);
 			}
+			builder.setAtomsLength(builder.getAtomsCount());
 			OsmAndPoiNameIndex.OsmAndPoiNameIndexData msg = builder.build();
-			// simple version doesnt' work because it's changed 4->2
-			codedOutStream.writeMessageNoTag(msg);
+//			codedOutStream.writeMessageNoTag(msg);
+			// order changed
+			codedOutStream.writeRawVarint32(msg.getSerializedSize());
+			codedOutStream.writeUInt32(OsmandOdb.OsmAndPoiNameIndex.OsmAndPoiNameIndexData.ATOMSLENGTH_FIELD_NUMBER,
+					msg.getAtomsLength());
+			for (int i = 0; i < msg.getSuffixesCommonDictionaryCount(); i++) {
+				codedOutStream.writeUInt32(OsmandOdb.OsmAndPoiNameIndex.OsmAndPoiNameIndexData.SUFFIXESCOMMONDICTIONARY_FIELD_NUMBER,
+						msg.getSuffixesCommonDictionary(i));
+			}
+			for (int i = 0; i < msg.getSuffixesDictionaryCount(); i++) {
+				codedOutStream.writeBytes(OsmandOdb.OsmAndPoiNameIndex.OsmAndPoiNameIndexData.SUFFIXESDICTIONARY_FIELD_NUMBER, 
+						msg.getSuffixesDictionaryBytes(i));
+			}
+			for (int i = 0; i < msg.getAtomsCount(); i++) {
+				codedOutStream.writeMessage(OsmandOdb.OsmAndPoiNameIndex.OsmAndPoiNameIndexData.ATOMS_FIELD_NUMBER,
+						msg.getAtoms(i));
+			}
+			
 			long endPointer = getFilePointer();
 			// first message
 			int accumulateSize = 4;
