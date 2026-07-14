@@ -140,43 +140,20 @@ public interface OBFService extends BaseService {
 	
 	record ObfFileInfo(String path, String name, String continent, String country, String region, long lastModified, long size) {}
 	
-	record IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes,
-	                  Map<Integer, int[]> poiIndexes,
-	                  List<IndexSuffixRef> poiSuffixRefs, List<IndexSuffixRef> addressSuffixRefs,
-	                  IndexSuffixCounts poiSuffixCounts, IndexSuffixCounts addressSuffixCounts,
-	                  boolean isCommon, boolean isFrequent, String obf,
-	                  int poiCount, int addressCount) {}
-	record IndexTokenPage(List<IndexToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, IndexTokenSummary summary) {}
+	abstract class Atom {
+		public IndexSuffixRef suffixRefs;
+	}
+	class POIAtom extends Atom {
+	}
+	class AddressAtom extends Atom {
+
+	}
 	
-	record IndexTokenSummary(int poiSum, int addressSum, int commonSum, int frequentSum,
-	                         int dictSuffixSum, int commonSuffixSum, int integerSuffixSum, int partSuffixSum,
-	                         int extraSuffixSum, int otherSuffixSum,
-	                         int poiMax, int addressMax,
-	                         int dictSuffixMax, int commonSuffixMax, int integerSuffixMax, int partSuffixMax,
-	                         int extraSuffixMax, int otherSuffixMax) {}
-	
-	record IndexSuffixRequest(List<String> tokens, String key, String objectType) {}
-	
-	record IndexSuffixMetric(String name, String obf, int dict, int common, int part, int integer, int extra, int other) {}
-	
-	record IndexSuffixResponse(List<IndexSuffixMetric> metrics, List<String> values) {}
+	record IndexToken(String name, boolean isPOI, Atom[] atoms, boolean isCommon, boolean isFrequent, String obf, int count) {}
+	record IndexTokenPage(List<IndexToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages) {}
 	
 	record IndexSuffixRef(String obf, int offset, int suffixIndex, boolean poi, int[] metricSuffixIndexes,
 	                      String[] metricIntegerSuffixes, String[] metricExtraSuffixes) {}
-	
-	record IndexSuffixCounts(int dict, int common, int part, int integer, int extra, int other) {}
-	
-	record IndexTokenBuilder(String name, int[] addressOffsets, int[] addressSuffixIndexes, AddressRef[] addressRefs,
-	                         int[] poiRefs, int[] poiAtomRefs,
-	                         int[] poiAtomSizes, Map<Integer, int[]> poiIndexes,
-	                         List<IndexSuffixRef> poiSuffixRefs, List<IndexSuffixRef> addressSuffixRefs,
-	                         IndexSuffixCounts poiSuffixCounts, IndexSuffixCounts addressSuffixCounts) {}
-	
-	record AddressRef(int shiftToIndex, int shiftToCityIndex, int objectOffset, int cityOffset, int typeIndex, int atomSize) {}
-
-	record AddressTokenRef(IndexToken token, AddressRef ref) {}
-
-	record GenerateDbRawPoiObject(RawPoiObject rawPoiObject, int payloadOffset, int payloadSize, int sourceOffset) {}
 
 	record CommonSuffix(String value, int matched, int nonindexed) {}
 
@@ -186,16 +163,8 @@ public interface OBFService extends BaseService {
 	                           Set<String> integerSuffixes, Set<String> extraSuffixes, int otherWordsCount) {}
 
 	record ObjectAddress(int sequenceId, String name, LatLon point, Map<String, String> commonTags,
-	                     boolean isPoi, boolean isMatched,
-	                     boolean isInvalidAtom, boolean isAlone, String type, Long osmId,
+	                     boolean isPoi, boolean isAlone, String type, Long osmId,
 	                     String osmType, int payloadOffset, int payloadSize, int sourceOffset, String obf) {
-		public ObjectAddress(int sequenceId, String name, LatLon point, Map<String, String> commonTags,
-		                     boolean isPoi, boolean isMatched,
-		                     boolean isInvalidAtom, boolean isAlone, String type, Long osmId,
-		                     String osmType, int payloadOffset, int payloadSize, int sourceOffset) {
-			this(sequenceId, name, point, commonTags, isPoi, isMatched, isInvalidAtom, isAlone, type, osmId,
-					osmType, payloadOffset, payloadSize, sourceOffset, null);
-		}
 	}
 	
 	record ObjectAddressPage(List<ObjectAddress> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, int[] countMetrics, int[] sizeMetrics, int aloneCount, int aloneSize) {}
@@ -394,14 +363,14 @@ public interface OBFService extends BaseService {
 					case 0:
 						return results;
 					case OsmandOdb.OsmAndPoiIndex.POIDATA_FIELD_NUMBER: {
-						long length = InspectorService.readFixed32Length(codedIS);
+						long length = readFixed32Length(codedIS);
 						long innerOldLimit = codedIS.pushLimitLong(length);
 						findPoiAddressesInBoxData(codedIS, poiRegion, tagGroups, poiPattern, normalizedPoiPattern, results);
 						codedIS.popLimit(innerOldLimit);
 						break;
 					}
 					default:
-						InspectorService.skipUnknownField(codedIS, tagValue);
+						skipUnknownField(codedIS, tagValue);
 						break;
 				}
 			}
@@ -472,7 +441,7 @@ public interface OBFService extends BaseService {
 			int tagValue = codedIS.readTag();
 			int tag = WireFormat.getTagFieldNumber(tagValue);
 			if (amenityType == null && (tag > OsmandOdb.OsmAndPoiBoxDataAtom.CATEGORIES_FIELD_NUMBER || tag == 0)) {
-				InspectorService.consumeRemainingInLimit(codedIS);
+				consumeRemainingInLimit(codedIS);
 				return null;
 			}
 			switch (tag) {
@@ -606,14 +575,14 @@ public interface OBFService extends BaseService {
 					case 0:
 						return tagGroups;
 					case OsmandOdb.OsmAndPoiIndex.BOXES_FIELD_NUMBER: {
-						long length = InspectorService.readFixed32Length(codedIS);
+						long length = readFixed32Length(codedIS);
 						long boxOldLimit = codedIS.pushLimitLong(length);
 						readPoiBoxTagGroups(codedIS, tagGroups);
 						codedIS.popLimit(boxOldLimit);
 						break;
 					}
 					default:
-						InspectorService.skipUnknownField(codedIS, tagValue);
+						skipUnknownField(codedIS, tagValue);
 						break;
 				}
 			}
@@ -638,14 +607,14 @@ public interface OBFService extends BaseService {
 					break;
 				}
 				case OsmandOdb.OsmAndPoiBox.SUBBOXES_FIELD_NUMBER: {
-					long length = InspectorService.readFixed32Length(codedIS);
+					long length = readFixed32Length(codedIS);
 					long oldLimit = codedIS.pushLimitLong(length);
 					readPoiBoxTagGroups(codedIS, tagGroups);
 					codedIS.popLimit(oldLimit);
 					break;
 				}
 				default:
-					InspectorService.skipUnknownField(codedIS, tagValue);
+					skipUnknownField(codedIS, tagValue);
 					break;
 			}
 		}
@@ -667,7 +636,7 @@ public interface OBFService extends BaseService {
 					break;
 				}
 				default:
-					InspectorService.skipUnknownField(codedIS, tagValue);
+					skipUnknownField(codedIS, tagValue);
 					break;
 			}
 		}
@@ -697,7 +666,7 @@ public interface OBFService extends BaseService {
 					tagValues.add(decodePoiString(codedIS.readString()).intern());
 					break;
 				default:
-					InspectorService.skipUnknownField(codedIS, tagValue);
+					skipUnknownField(codedIS, tagValue);
 					break;
 			}
 		}
@@ -891,5 +860,581 @@ public interface OBFService extends BaseService {
 		Algorithms.streamCopy(gzin, fous);
 		fous.close();
 		gzin.close();
+	}
+
+	enum ObfLengthType {
+		VAR_INT,
+		FIXED32
+	}
+
+	static long[] getOrCreateSectionStats(Map<String, long[]> out, String key) {
+		return out.computeIfAbsent(key, k -> new long[]{0L, 0L, 0L});
+	}
+
+	static boolean messageHasNestedElements(CodedInputStream codedIS, String messageType) throws IOException {
+		Map<Integer, ObfFieldSpec> specByFieldNumber = OBF_MESSAGE_SCHEMA.get(messageType);
+		try {
+			while (true) {
+				int tag = codedIS.readTag();
+				int fieldNumber = WireFormat.getTagFieldNumber(tag);
+				if (fieldNumber == 0) {
+					return false;
+				}
+				ObfFieldSpec spec = specByFieldNumber == null ? null : specByFieldNumber.get(fieldNumber);
+				if (spec == null) {
+					skipUnknownField(codedIS, tag);
+					continue;
+				}
+				if (spec.childMessageType() == null) {
+					skipUnknownField(codedIS, tag);
+					continue;
+				}
+				long payloadLength = readPayloadLength(codedIS, tag, spec);
+				if (payloadLength < 0) {
+					skipUnknownField(codedIS, tag);
+					continue;
+				}
+				if (payloadLength > 0) {
+					return true;
+				}
+			}
+		} catch (com.google.protobuf.InvalidProtocolBufferException e) {
+			return false;
+		}
+	}
+
+	static void collectImmediateChildStats(CodedInputStream codedIS, String messageType, Map<String, long[]> sizes) throws IOException {
+		Map<Integer, ObfFieldSpec> specByFieldNumber = OBF_MESSAGE_SCHEMA.get(messageType);
+		if (specByFieldNumber != null) {
+			for (ObfFieldSpec spec : specByFieldNumber.values()) {
+				if (spec == null || spec.childMessageType() == null || spec.fieldName() == null) {
+					continue;
+				}
+				getOrCreateSectionStats(sizes, spec.fieldName());
+			}
+		}
+		try {
+			while (true) {
+				int tag = codedIS.readTag();
+				int fieldNumber = WireFormat.getTagFieldNumber(tag);
+				if (fieldNumber == 0) {
+					return;
+				}
+				ObfFieldSpec spec = specByFieldNumber == null ? null : specByFieldNumber.get(fieldNumber);
+				if (spec == null || spec.childMessageType() == null) {
+					skipUnknownField(codedIS, tag);
+					continue;
+				}
+				long payloadLength = readPayloadLength(codedIS, tag, spec);
+				if (payloadLength < 0) {
+					skipUnknownField(codedIS, tag);
+					continue;
+				}
+				long[] stats = getOrCreateSectionStats(sizes, spec.fieldName());
+				if (payloadLength > 0) {
+					stats[0] += payloadLength;
+				}
+				if (spec.repeated()) {
+					stats[2]++;
+				}
+				long oldLimit = codedIS.pushLimitLong(payloadLength);
+				try {
+					if (messageHasNestedElements(codedIS, spec.childMessageType())) {
+						stats[1] = 1;
+					}
+				} catch (com.google.protobuf.InvalidProtocolBufferException e) {
+					long remainingInLimit = codedIS.getBytesUntilLimit();
+					if (remainingInLimit > 0) {
+						skipRawBytesLong(codedIS, remainingInLimit);
+					}
+				} finally {
+					consumeRemainingInLimit(codedIS);
+					codedIS.popLimit(oldLimit);
+				}
+			}
+		} catch (com.google.protobuf.InvalidProtocolBufferException ignored) {
+		}
+	}
+
+	static boolean collectChildStatsAtPath(CodedInputStream codedIS, String messageType, String[] path,
+	                                       int pathIndex, Map<String, long[]> sizes) throws IOException {
+		Map<Integer, ObfFieldSpec> specByFieldNumber = OBF_MESSAGE_SCHEMA.get(messageType);
+		String expectedFieldName = path[pathIndex];
+		boolean found = false;
+		try {
+			while (true) {
+				int tag = codedIS.readTag();
+				int fieldNumber = WireFormat.getTagFieldNumber(tag);
+				if (fieldNumber == 0) {
+					return found;
+				}
+				ObfFieldSpec spec = specByFieldNumber == null ? null : specByFieldNumber.get(fieldNumber);
+				if (spec == null || spec.childMessageType() == null || !expectedFieldName.equalsIgnoreCase(spec.fieldName())) {
+					skipUnknownField(codedIS, tag);
+					continue;
+				}
+				long payloadLength = readPayloadLength(codedIS, tag, spec);
+				if (payloadLength < 0) {
+					skipUnknownField(codedIS, tag);
+					continue;
+				}
+				found = true;
+				long oldLimit = codedIS.pushLimitLong(payloadLength);
+				try {
+					if (pathIndex == path.length - 1) {
+						collectImmediateChildStats(codedIS, spec.childMessageType(), sizes);
+					} else {
+						collectChildStatsAtPath(codedIS, spec.childMessageType(), path, pathIndex + 1, sizes);
+					}
+				} finally {
+					consumeRemainingInLimit(codedIS);
+					codedIS.popLimit(oldLimit);
+				}
+			}
+		} catch (com.google.protobuf.InvalidProtocolBufferException e) {
+			return found;
+		}
+	}
+
+	static long readFixed32Length(CodedInputStream codedIS) throws IOException {
+		long l = readUnsignedByte(codedIS);
+		boolean eightBytes = l > 0x7f;
+		if (eightBytes) {
+			l = l & 0x7f;
+		}
+		l = (l << 8) + readUnsignedByte(codedIS);
+		l = (l << 8) + readUnsignedByte(codedIS);
+		l = (l << 8) + readUnsignedByte(codedIS);
+		if (eightBytes) {
+			l = (l << 8) + readUnsignedByte(codedIS);
+			l = (l << 8) + readUnsignedByte(codedIS);
+			l = (l << 8) + readUnsignedByte(codedIS);
+			l = (l << 8) + readUnsignedByte(codedIS);
+		}
+		return l;
+	}
+
+	static int readUnsignedByte(CodedInputStream codedIS) throws IOException {
+		byte b = codedIS.readRawByte();
+		return b < 0 ? b + 256 : b;
+	}
+
+	static void skipRawBytesLong(CodedInputStream codedIS, long length) throws IOException {
+		if (length <= 0) {
+			return;
+		}
+		while (length > 0) {
+			int chunk = (int) Math.min(length, Integer.MAX_VALUE);
+			codedIS.skipRawBytes(chunk);
+			length -= chunk;
+		}
+	}
+
+	static void consumeRemainingInLimit(CodedInputStream codedIS) throws IOException {
+		long remainingInLimit = codedIS.getBytesUntilLimit();
+		if (remainingInLimit > 0) {
+			skipRawBytesLong(codedIS, remainingInLimit);
+		}
+	}
+
+	record RootSpec(int rootFieldNumber, String rootMessageType) {}
+
+	static RootSpec resolveRootSpec(String rootSegment) {
+		if (rootSegment == null || rootSegment.trim().isEmpty()) {
+			throw new IllegalArgumentException("fieldPath root is empty");
+		}
+		Map<Integer, ObfFieldSpec> rootSpecs = OBF_MESSAGE_SCHEMA.get("OsmAndStructure");
+		if (rootSpecs == null) {
+			throw new IllegalStateException("Missing schema for OsmAndStructure");
+		}
+		for (Map.Entry<Integer, ObfFieldSpec> e : rootSpecs.entrySet()) {
+			ObfFieldSpec spec = e.getValue();
+			if (spec == null || spec.childMessageType() == null || spec.fieldName() == null) {
+				continue;
+			}
+			if (rootSegment.equalsIgnoreCase(spec.fieldName())) {
+				return new RootSpec(e.getKey(), spec.childMessageType());
+			}
+		}
+		throw new IllegalArgumentException("Unsupported fieldPath root: '" + rootSegment + "'");
+	}
+
+	static void skipUnknownField(CodedInputStream codedIS, int tag) throws IOException {
+		try {
+			int wireType = WireFormat.getTagWireType(tag);
+			if (wireType == WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED) {
+				long length = readFixed32Length(codedIS);
+				long remainingInLimit = codedIS.getBytesUntilLimit();
+				if (remainingInLimit >= 0 && length > remainingInLimit) {
+					length = remainingInLimit;
+				}
+				skipRawBytesLong(codedIS, length);
+			} else if (wireType == WireFormat.WIRETYPE_LENGTH_DELIMITED) {
+				long length = codedIS.readRawVarint32();
+				long remainingInLimit = codedIS.getBytesUntilLimit();
+				if (remainingInLimit >= 0 && length > remainingInLimit) {
+					length = remainingInLimit;
+				}
+				skipRawBytesLong(codedIS, length);
+			} else {
+				codedIS.skipField(tag);
+			}
+		} catch (com.google.protobuf.InvalidProtocolBufferException e) {
+			long remainingInLimit = codedIS.getBytesUntilLimit();
+			if (remainingInLimit > 0) {
+				skipRawBytesLong(codedIS, remainingInLimit);
+			}
+		}
+	}
+
+	static long readPayloadLengthByWireType(CodedInputStream codedIS, int tag) throws IOException {
+		int wireType = WireFormat.getTagWireType(tag);
+		if (wireType == WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED) {
+			return readFixed32Length(codedIS);
+		} else if (wireType == WireFormat.WIRETYPE_LENGTH_DELIMITED) {
+			return codedIS.readRawVarint32();
+		}
+		return -1;
+	}
+
+	static long readPayloadLength(CodedInputStream codedIS, int tag, ObfFieldSpec spec) throws IOException {
+		if (spec != null && spec.lengthType() != null) {
+			if (spec.lengthType() == ObfLengthType.FIXED32) {
+				return readFixed32Length(codedIS);
+			}
+			if (spec.lengthType() == ObfLengthType.VAR_INT) {
+				return codedIS.readRawVarint32();
+			}
+		}
+		return readPayloadLengthByWireType(codedIS, tag);
+	}
+
+	static boolean isRepeatedMessageField(String messageType, int fieldNumber) {
+		Map<Integer, InspectorService.ObfFieldSpec> specByFieldNumber = OBF_MESSAGE_SCHEMA.get(messageType);
+		InspectorService.ObfFieldSpec fieldSpec = specByFieldNumber == null ? null : specByFieldNumber.get(fieldNumber);
+		return fieldSpec != null && fieldSpec.repeated();
+	}
+	
+	// fieldPath is null or empty string for root, otherwise dot separated path like 'poiIndex.nameIndex' or 'addressIndex.cities'
+	default Map<String, long[]> getSectionSizes(String obf, String fieldPath) {
+		String normalizedFieldPath = fieldPath == null ? "" : fieldPath.trim();
+		String[] path = normalizedFieldPath.isEmpty() ? new String[0] : normalizedFieldPath.split("\\.");
+		File file = new File(obf);
+		try (RandomAccessFile indexFile = new RandomAccessFile(file.getAbsolutePath(), "r");
+		     RandomAccessFile dataFile = new RandomAccessFile(file.getAbsolutePath(), "r")) {
+			BinaryMapIndexReader indexReader = new BinaryMapIndexReader(indexFile, file);
+			if (path.length == 0) {
+				Map<String, long[]> sizes = new HashMap<>();
+				Map<Integer, ObfFieldSpec> rootSpecs = OBF_MESSAGE_SCHEMA.get("OsmAndStructure");
+				if (rootSpecs != null) {
+					for (ObfFieldSpec rootSpec : rootSpecs.values()) {
+						if (rootSpec == null || rootSpec.childMessageType() == null || rootSpec.fieldName() == null) {
+							continue;
+						}
+						getOrCreateSectionStats(sizes, rootSpec.fieldName());
+					}
+				}
+				for (BinaryIndexPart indexPart : indexReader.getIndexes()) {
+					if (indexPart == null) {
+						continue;
+					}
+					int fieldNumber = indexPart.getFieldNumber();
+					ObfFieldSpec rootFieldSpec = rootSpecs == null ? null : rootSpecs.get(fieldNumber);
+					if (rootFieldSpec == null || rootFieldSpec.childMessageType() == null) {
+						continue;
+					}
+					String fieldName = rootFieldSpec.fieldName() != null ? rootFieldSpec.fieldName() : OBF_STRUCTURE_FIELD_NAMES.get(fieldNumber);
+					if (fieldName == null) {
+						fieldName = "field_" + fieldNumber;
+					}
+					long[] stats = getOrCreateSectionStats(sizes, fieldName);
+					long payloadLength = indexPart.getLength();
+					if (payloadLength > 0) {
+						stats[0] += payloadLength;
+					}
+					stats[1] = 1;
+					if (isRepeatedMessageField("OsmAndStructure", fieldNumber)) {
+						stats[2]++;
+					}
+				}
+				return sizes;
+			}
+
+			RootSpec rootSpec = resolveRootSpec(path[0]);
+			int rootFieldNumber = rootSpec.rootFieldNumber;
+			String rootMessageType = rootSpec.rootMessageType;
+			Map<String, long[]> sizes = new HashMap<>();
+			boolean foundPath = false;
+
+			for (BinaryIndexPart indexPart : indexReader.getIndexes()) {
+				if (indexPart == null || indexPart.getFieldNumber() != rootFieldNumber) {
+					continue;
+				}
+				long payloadLength = indexPart.getLength();
+				if (payloadLength <= 0) {
+					continue;
+				}
+				CodedInputStream partInput = CodedInputStream.newInstance(dataFile);
+				partInput.setSizeLimit(CodedInputStream.MAX_DEFAULT_SIZE_LIMIT);
+				partInput.seek(indexPart.getFilePointer());
+				long oldLimit = partInput.pushLimitLong(payloadLength);
+				try {
+					if (path.length == 1) {
+						foundPath = true;
+						collectImmediateChildStats(partInput, rootMessageType, sizes);
+					} else {
+						foundPath = collectChildStatsAtPath(partInput, rootMessageType, path, 1, sizes) || foundPath;
+					}
+				} finally {
+					consumeRemainingInLimit(partInput);
+					partInput.popLimit(oldLimit);
+				}
+			}
+			if (!foundPath) {
+				return null;
+			}
+			return sizes;
+		} catch (IOException e) {
+			getLogger().error("Failed to read OBF file: {}", file, e);
+			throw new RuntimeException("Failed to read OBF file: " + e.getMessage(), e);
+		}
+	}
+
+	default Map<String, long[]> getSectionSizes(List<String> obfs, String fieldPath) {
+		Map<String, long[]> merged = new HashMap<>();
+		if (obfs == null) {
+			return merged;
+		}
+		for (String obf : obfs) {
+			if (obf == null || obf.isBlank()) {
+				continue;
+			}
+			Map<String, long[]> sizes = getSectionSizes(obf, fieldPath);
+			if (sizes == null) {
+				continue;
+			}
+			for (Map.Entry<String, long[]> entry : sizes.entrySet()) {
+				long[] source = entry.getValue();
+				long[] target = merged.computeIfAbsent(entry.getKey(), key -> new long[3]);
+				if (source == null) {
+					continue;
+				}
+				for (int i = 0; i < Math.min(target.length, source.length); i++) {
+					target[i] += source[i];
+				}
+			}
+		}
+		return merged;
+	}
+
+	default void readIndexedStringTableOffsets(BinaryMapIndexReaderExt index, String prefix,
+	                                           Map<String, Integer> prefixOffsets) throws IOException {
+		String currentKey = null;
+		while (true) {
+			int tagWithType = index.getInputStream().readTag();
+			int tag = WireFormat.getTagFieldNumber(tagWithType);
+			switch (tag) {
+				case 0:
+					return;
+				case OsmandOdb.IndexedStringTable.KEY_FIELD_NUMBER:
+					currentKey = prefix + index.getInputStream().readString();
+					break;
+				case OsmandOdb.IndexedStringTable.VAL_FIELD_NUMBER:
+					int offset = (int) index.readInt();
+					if (currentKey != null) {
+						prefixOffsets.put(currentKey, offset);
+					}
+					break;
+				case OsmandOdb.IndexedStringTable.SUBTABLES_FIELD_NUMBER:
+					long length = index.getInputStream().readRawVarint32();
+					long oldLimit = index.getInputStream().pushLimitLong(length);
+					try {
+						readIndexedStringTableOffsets(index, currentKey == null ? prefix : currentKey, prefixOffsets);
+					} finally {
+						index.getInputStream().popLimit(oldLimit);
+					}
+					break;
+				default:
+					skipUnknownField(index.getInputStream(), tagWithType);
+					break;
+			}
+		}
+	}
+
+	default int computeVarint32Size(long value) {
+		int size = 1;
+		long normalizedValue = value;
+		while ((normalizedValue & ~0x7FL) != 0L) {
+			size++;
+			normalizedValue >>>= 7;
+		}
+		return size;
+	}
+	
+	default long readInt(CodedInputStream codedIS) throws IOException {
+		long value = readUnsignedByte(codedIS);
+		boolean eightBytes = value > 0x7f;
+		if (eightBytes) {
+			value = value & 0x7f;
+		}
+		value = (value << 8) + readUnsignedByte(codedIS);
+		value = (value << 8) + readUnsignedByte(codedIS);
+		value = (value << 8) + readUnsignedByte(codedIS);
+		if (eightBytes) {
+			value = (value << 8) + readUnsignedByte(codedIS);
+			value = (value << 8) + readUnsignedByte(codedIS);
+			value = (value << 8) + readUnsignedByte(codedIS);
+			value = (value << 8) + readUnsignedByte(codedIS);
+		}
+		return value;
+	}
+	
+	default City readCityAtOffset(CodedInputStream codedIS,
+	                              long filePointer,
+	                              List<String> additionalTagsTable) throws IOException {
+		int x = 0;
+		int y = 0;
+		City city = null;
+		LinkedList<String> additionalTags = null;
+		while (true) {
+			int tagWithType = codedIS.readTag();
+			int tag = WireFormat.getTagFieldNumber(tagWithType);
+			switch (tag) {
+				case 0:
+					if (city != null) {
+						city.setLocation(MapUtils.get31LatitudeY(y), MapUtils.get31LongitudeX(x));
+					}
+					return city;
+				case OsmandOdb.CityIndex.CITY_TYPE_FIELD_NUMBER:
+					int type = codedIS.readUInt32();
+					City.CityType[] values = City.CityType.values();
+					if (type >= 0 && type < values.length) {
+						city = new City(values[type]);
+					}
+					break;
+				case OsmandOdb.CityIndex.ID_FIELD_NUMBER:
+					long id = codedIS.readUInt64();
+					if (city != null) {
+						city.setId(id);
+					}
+					break;
+				case OsmandOdb.CityIndex.ATTRIBUTETAGIDS_FIELD_NUMBER:
+					int tagId = codedIS.readUInt32();
+					if (additionalTags == null) {
+						additionalTags = new LinkedList<>();
+					}
+					if (additionalTagsTable != null && tagId < additionalTagsTable.size()) {
+						additionalTags.add(additionalTagsTable.get(tagId));
+					}
+					break;
+				case OsmandOdb.CityIndex.ATTRIBUTEVALUES_FIELD_NUMBER:
+					String attributeValue = codedIS.readString();
+					if (city != null && additionalTags != null && !additionalTags.isEmpty()) {
+						String attributeTag = additionalTags.pollFirst();
+						if (attributeTag.startsWith("name:")) {
+							city.setName(attributeTag.substring("name:".length()), attributeValue);
+						} else {
+							city.setName(attributeTag, attributeValue);
+						}
+					}
+					break;
+				case OsmandOdb.CityIndex.NAME_EN_FIELD_NUMBER:
+					if (city != null) {
+						city.setEnName(codedIS.readString());
+					} else {
+						codedIS.readString();
+					}
+					break;
+				case OsmandOdb.CityIndex.BOUNDARY_FIELD_NUMBER:
+					int size = codedIS.readRawVarint32();
+					codedIS.skipRawBytes(size);
+					break;
+				case OsmandOdb.CityIndex.NAME_FIELD_NUMBER:
+					String name = codedIS.readString();
+					if (city == null) {
+						city = City.createPostcode(name);
+					}
+					city.setName(name);
+					break;
+				case OsmandOdb.CityIndex.X_FIELD_NUMBER:
+					x = codedIS.readUInt32();
+					break;
+				case OsmandOdb.CityIndex.Y_FIELD_NUMBER:
+					y = codedIS.readUInt32();
+					break;
+				case OsmandOdb.CityIndex.SHIFTTOCITYBLOCKINDEX_FIELD_NUMBER:
+					long offset = readInt(codedIS) + filePointer;
+					if (city != null) {
+						city.setFileOffset(offset);
+					}
+					break;
+				default:
+					skipUnknownField(codedIS, tagWithType);
+					break;
+			}
+		}
+	}
+	
+	default Street readStreetAtOffset(CodedInputStream codedIS,
+	                                  City city,
+	                                  int city24X,
+	                                  int city24Y,
+	                                  List<String> additionalTagsTable) throws IOException {
+		Street street = new Street(city);
+		int x = 0;
+		int y = 0;
+		LinkedList<String> additionalTags = null;
+		while (true) {
+			int tagWithType = codedIS.readTag();
+			int tag = WireFormat.getTagFieldNumber(tagWithType);
+			switch (tag) {
+				case 0:
+					street.setLocation(MapUtils.getLatitudeFromTile(24, y), MapUtils.getLongitudeFromTile(24, x));
+					return street;
+				case OsmandOdb.StreetIndex.ID_FIELD_NUMBER:
+					street.setId(codedIS.readUInt64());
+					break;
+				case OsmandOdb.StreetIndex.ATTRIBUTETAGIDS_FIELD_NUMBER:
+					int tagId = codedIS.readUInt32();
+					if (additionalTags == null) {
+						additionalTags = new LinkedList<>();
+					}
+					if (additionalTagsTable != null && tagId < additionalTagsTable.size()) {
+						additionalTags.add(additionalTagsTable.get(tagId));
+					}
+					break;
+				case OsmandOdb.StreetIndex.ATTRIBUTEVALUES_FIELD_NUMBER:
+					String attributeValue = codedIS.readString();
+					if (additionalTags != null && !additionalTags.isEmpty()) {
+						String attributeTag = additionalTags.pollFirst();
+						if (attributeTag.startsWith("name:")) {
+							street.setName(attributeTag.substring("name:".length()), attributeValue);
+						} else {
+							street.setName(attributeTag, attributeValue);
+						}
+					}
+					break;
+				case OsmandOdb.StreetIndex.NAME_EN_FIELD_NUMBER:
+					street.setEnName(codedIS.readString());
+					break;
+				case OsmandOdb.StreetIndex.NAME_FIELD_NUMBER:
+					street.setName(codedIS.readString());
+					break;
+				case OsmandOdb.StreetIndex.X_FIELD_NUMBER:
+					x = codedIS.readSInt32() + city24X;
+					break;
+				case OsmandOdb.StreetIndex.Y_FIELD_NUMBER:
+					y = codedIS.readSInt32() + city24Y;
+					break;
+				case OsmandOdb.StreetIndex.INTERSECTIONS_FIELD_NUMBER:
+				case OsmandOdb.StreetIndex.BUILDINGS_FIELD_NUMBER:
+					long length = codedIS.readRawVarint32();
+					codedIS.skipRawBytes((int) length);
+					break;
+				default:
+					skipUnknownField(codedIS, tagWithType);
+					break;
+			}
+		}
 	}
 }

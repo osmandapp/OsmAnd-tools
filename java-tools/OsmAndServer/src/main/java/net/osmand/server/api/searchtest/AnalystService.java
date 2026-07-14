@@ -1,8 +1,6 @@
 package net.osmand.server.api.searchtest;
 
-import net.osmand.CollatorStringMatcher;
 import net.osmand.binary.*;
-import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
 import net.osmand.data.*;
 import net.osmand.util.Algorithms;
 import net.osmand.util.SearchAlgorithms;
@@ -13,7 +11,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
-import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.*;
@@ -279,7 +276,7 @@ public interface AnalystService extends InspectorService, GenDbService {
                             metrics.tokenDbNs.addAndGet(System.nanoTime() - insertStartNs);
                             writerBatch.recordRows(1, estimateGenerateDbTokenBytes(token));
                             for (ObjectAddress objectAddress : tokenObjects.objectsPage().content()) {
-                                if (objectAddress == null || !objectAddress.isMatched()) {
+                                if (objectAddress == null) {
                                     continue;
                                 }
                                 if (objectAddress.osmId() == null) {
@@ -465,8 +462,7 @@ public interface AnalystService extends InspectorService, GenDbService {
                         new ObjectAddressPage(Collections.emptyList(), 0, 0, 0, 0, new int[0], new int[0], 0, 0)));
                 continue;
             }
-            List<ObjectAddress> numberedObjects = assignObjectSequenceIds(objects);
-            numberedObjects = markAloneObjects(numberedObjects, token);
+            List<ObjectAddress> numberedObjects = markAloneObjects(objects, token);
             result.add(new GenerateDbTokenObjects(obfTokens.obf(), obfTokens.obfName(), obfTokens.obfIndex(), obfTokens.startMs(), token,
                     new ObjectAddressPage(numberedObjects, 0, Integer.MAX_VALUE, numberedObjects.size(), 1, new int[0], new int[0], 0, 0)));
         }
@@ -480,65 +476,7 @@ public interface AnalystService extends InspectorService, GenDbService {
         try {
             for (BinaryMapAddressReaderAdapter.AddressRegion region : reader.addressRegions()) {
                 Map<Integer, List<IndexToken>> cityTokens = new TreeMap<>();
-                Map<Integer, List<AddressTokenRef>> streetTokens = new TreeMap<>();
-                for (IndexToken token : tokens) {
-                    if (token == null || token.addressRefs() == null) {
-                        continue;
-                    }
-                    for (AddressRef ref : token.addressRefs()) {
-                        if (ref == null || !isOffsetWithinPart(ref.objectOffset(), region)) {
-                            continue;
-                        }
-                        if (ref.typeIndex() == BinaryMapAddressReaderAdapter.CityBlocks.STREET_TYPE.index) {
-                            streetTokens.computeIfAbsent(ref.objectOffset(), ignored -> new ArrayList<>())
-                                    .add(new AddressTokenRef(token, ref));
-                        } else if (ref.typeIndex() < BinaryMapAddressReaderAdapter.CityBlocks.STREET_TYPE.index) {
-                            cityTokens.computeIfAbsent(ref.objectOffset(), ignored -> new ArrayList<>()).add(token);
-                        }
-                    }
-                }
-                for (Map.Entry<Integer, List<IndexToken>> entry : cityTokens.entrySet()) {
-                    ObjectAddress objectAddress = reader.addressObjectCache.computeIfAbsent(entry.getKey(), offset -> {
-                        try {
-                            return loadCityGenerateDbObjectAddress(reader.index(), region, offset, "en");
-                        } catch (IOException e) {
-                            throw new UncheckedIOException(e);
-                        }
-                    });
-                    if (objectAddress != null) {
-                        for (IndexToken token : entry.getValue()) {
-                            tokenObjects.get(token).add(objectAddress);
-                        }
-                    }
-                }
-                TreeSet<Integer> cityOffsets = new TreeSet<>();
-                for (List<AddressTokenRef> refs : streetTokens.values()) {
-                    for (AddressTokenRef ref : refs) {
-                        if (ref.ref().cityOffset() > 0) {
-                            cityOffsets.add(ref.ref().cityOffset());
-                        }
-                    }
-                }
-                for (Integer cityOffset : cityOffsets) {
-                    if (!reader.cityCache.containsKey(cityOffset)) {
-                        reader.cityCache.put(cityOffset, loadCity(reader.index(), region, cityOffset));
-                    }
-                }
-                for (Map.Entry<Integer, List<AddressTokenRef>> entry : streetTokens.entrySet()) {
-                    AddressRef firstRef = entry.getValue().get(0).ref();
-                    ObjectAddress objectAddress = reader.addressObjectCache.computeIfAbsent(entry.getKey(), offset -> {
-                        try {
-                            return loadStreetGenerateDbObjectAddress(reader.index(), region, offset, reader.cityCache.get(firstRef.cityOffset()), "en");
-                        } catch (IOException e) {
-                            throw new UncheckedIOException(e);
-                        }
-                    });
-                    if (objectAddress != null) {
-                        for (AddressTokenRef tokenRef : entry.getValue()) {
-                            tokenObjects.get(tokenRef.token()).add(objectAddress);
-                        }
-                    }
-                }
+                
             }
         } finally {
             GenerateDbMetrics.current().addressChunkLoadNs.addAndGet(System.nanoTime() - startNs);
@@ -552,33 +490,7 @@ public interface AnalystService extends InspectorService, GenDbService {
         try {
             for (BinaryMapPoiReaderAdapter.PoiRegion poiRegion : reader.poiRegions()) {
                 Map<Integer, List<IndexToken>> tokensByOffset = new TreeMap<>();
-                for (IndexToken token : tokens) {
-                    if (token == null || token.poiRefs() == null) {
-                        continue;
-                    }
-                    for (int poiRef : token.poiRefs()) {
-                        if (poiRef >= 0 && poiRef < poiRegion.getLength()) {
-                            tokensByOffset.computeIfAbsent(poiRef, ignored -> new ArrayList<>()).add(token);
-                        }
-                    }
-                }
-                if (tokensByOffset.isEmpty()) {
-                    continue;
-                }
-                reader.index().initCategories(poiRegion);
-                Map<Integer, List<TagValuePair>> tagGroups = preloadPoiTagGroups(reader.index().getInputStream(), poiRegion);
-                for (Map.Entry<Integer, List<IndexToken>> entry : tokensByOffset.entrySet()) {
-                    List<GenerateDbRawPoiObject> rawObjects = readGenerateDbRawPoiObjectsAtShift(reader.index(), poiRegion, tagGroups, entry.getKey());
-                    GenerateDbMetrics.current().poiBoxes.incrementAndGet();
-                    GenerateDbMetrics.current().poiRawObjects.addAndGet(rawObjects.size());
-                    if (rawObjects.isEmpty()) {
-                        continue;
-                    }
-                    Map<IndexToken, CollatorStringMatcher> matchers = new HashMap<>();
-                    for (IndexToken token : entry.getValue()) {
-                        matchers.put(token, new CollatorStringMatcher(token.name(), CollatorStringMatcher.StringMatcherMode.CHECK_EQUALS_FROM_SPACE));
-                    }
-                }
+
             }
         } finally {
             GenerateDbMetrics.current().poiChunkLoadNs.addAndGet(System.nanoTime() - startNs);
@@ -670,16 +582,7 @@ public interface AnalystService extends InspectorService, GenDbService {
 
     private List<IndexToken> loadAllGenerateDbTokens(String obf) {
         List<IndexToken> tokens = new ArrayList<>();
-        int page = 0;
-        int pageSize = 100;
-        while (true) {
-            IndexTokenPage tokenPage = getIndex(obf, null, page, pageSize, "name", "asc");
-            tokens.addAll(tokenPage.content());
-            if (page + 1 >= tokenPage.totalPages()) {
-                break;
-            }
-            page++;
-        }
+
         return tokens;
     }
 
