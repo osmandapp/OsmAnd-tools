@@ -198,7 +198,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		if (routeRelationCreator != null) {
 			tags = routeRelationCreator.addClickableWayTags(icc, e, tags, true);
 		}
-		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, tags, tempAmenityList);
+		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, tags, tempAmenityList, false);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
 			if ((e instanceof Node || e instanceof Way) && icc.bboxFilter.shouldFilterPoiEntity(e)) {
 				icc.bboxFilter.logEntityWithAmenity(e, tempAmenityList.get(0));
@@ -237,7 +237,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
                     if (a.getLocation() == null) {
                         continue;
                     }
-    				EntityParser.parseMapObject(a, e, tags);
+    				EntityParser.parseMapObject(a, e, tags, false);
     				if (relationCenters.size() > 1) {
     					a.setAdditionalInfo(Amenity.ROUTE_ID, "R" + e.getId());
                         long cenId = id + ((long) i * 2);

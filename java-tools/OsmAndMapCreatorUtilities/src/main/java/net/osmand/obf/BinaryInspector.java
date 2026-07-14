@@ -113,8 +113,8 @@ public class BinaryInspector {
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
-//					System.getProperty("maps.dir") + "Map.obf",
-					System.getProperty("maps.dir") + "Us_alaska_northamerica_2.obf",				
+					System.getProperty("maps.dir") + "Map.obf",
+//					System.getProperty("maps.dir") + "Us_alaska_northamerica_2.obf",				
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {

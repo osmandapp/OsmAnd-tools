@@ -2058,7 +2058,10 @@ public interface InspectorService extends OBFService {
         if (values != null) {
             for (Map.Entry<String, String> entry : values.entrySet()) {
                 String key = entry.getKey();
-                if (key != null && (Amenity.NAME.equals(key) || key.startsWith(Amenity.NAME + ":") || isTagIndexedForSearchAsName(key) || isTagIndexedForSearchAsId(key))) {
+                if (key != null && (
+                		Amenity.NAME.equals(key) || key.startsWith(Amenity.NAME + ":")  
+                		|| isTagNonIndexedForSearchAsName (key) || isTagIndexedForSearchAsName(key) 
+                		|| isTagIndexedForSearchAsId(key))) {
                     if (!Algorithms.isEmpty(entry.getValue())) {
                         candidateNames.add(entry.getValue());
                     }
@@ -2767,8 +2770,11 @@ public interface InspectorService extends OBFService {
     }
 
     default boolean isPoiSearchIndexedTextTag(String key) {
-        return !Algorithms.isEmpty(key) && (isTagIndexedForSearchAsName(key)
-                || isTagIndexedForSearchAsId(key) || isTagIndexedAsSearchRelated(key)
+        return !Algorithms.isEmpty(key) && 
+        		(isTagIndexedForSearchAsName(key)
+                || isTagIndexedForSearchAsId(key) 
+                || isTagIndexedAsSearchRelated(key)
+                || isTagNonIndexedForSearchAsName(key)
                 || Amenity.ROUTE_MEMBERS_IDS.equals(key));
     }
 
