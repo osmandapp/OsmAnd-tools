@@ -153,6 +153,7 @@ public class DownloadOsmGPX {
 	private static final int MIN_POINTS_SIZE = 10;
 	private static final int MIN_DISTANCE = 200;
 	private static final double GAP_MAX_SPEED_KMH = 1200; // above any airliner: crossing a gap faster = teleport = garbage
+	private static final int TELEPORT_GAP_MIN_DISTANCE = 1000; // skip teleport check unless the largest gap exceeds this (m)
 	private static final long MIN_SPEED_INTERVAL_MS = 500; // min elapsed time to trust a speed sample
 	private static final double MIN_MOVING_SPEED_MPS = 0.1; // below this the interval counts as standing still
 	private static final int SRID_WGS84 = 4326;
@@ -552,7 +553,8 @@ public class DownloadOsmGPX {
 		d.analysis = analysis;
 		int pointsSize = gpxFile.getAllSegmentsPoints().size();
 		float totalDistance = analysis.getTotalDistance();
-		if (pointsSize < MIN_POINTS_SIZE || totalDistance < MIN_DISTANCE || hasTeleportGap(gpxFile)) {
+		if (pointsSize < MIN_POINTS_SIZE || totalDistance < MIN_DISTANCE
+				|| (analysis.getMaxDistanceBetweenPoints() > TELEPORT_GAP_MIN_DISTANCE && hasTeleportGap(gpxFile))) {
 			d.garbage = true;
 			return d;
 		}
