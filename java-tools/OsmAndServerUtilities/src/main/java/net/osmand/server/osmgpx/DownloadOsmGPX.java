@@ -751,7 +751,7 @@ public class DownloadOsmGPX {
 		if (analysis == null) {
 			return ERROR_ACTIVITY_TYPE;
 		}
-		if (!analysis.getHasSpeedInTrack()) {
+		if (!analysis.getHasSpeedInTrack() || avgSpeed <= 0) {
 			return NOSPEED_ACTIVITY_TYPE;
 		}
 		if (avgSpeed <= GROUP_AVG_LIMIT_KMH.get(FOOT_GROUP)) {
