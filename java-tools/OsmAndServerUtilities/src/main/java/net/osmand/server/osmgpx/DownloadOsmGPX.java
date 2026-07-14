@@ -139,9 +139,9 @@ public class DownloadOsmGPX {
 	// Garmin exports named "COURSE_<id>.gpx" would otherwise match "road_running"
 	private static final Set<String> ACTIVITY_KEYWORD_EXCLUSIONS = Set.of("course");
 
-	private static final int MIN_POINTS_SIZE = 100;
-	private static final int MIN_DISTANCE = 1000;
-	private static final int MAX_DISTANCE_BETWEEN_POINTS = 1000;
+	private static final int MIN_POINTS_SIZE = 10;
+	private static final int MIN_DISTANCE = 200;
+	private static final int MAX_DISTANCE_BETWEEN_POINTS = 5000;
 	private static final long MIN_SPEED_INTERVAL_MS = 500; // min elapsed time to trust a speed sample
 	private static final double MIN_MOVING_SPEED_MPS = 0.1; // below this the interval counts as standing still
 	private static final int SRID_WGS84 = 4326;
