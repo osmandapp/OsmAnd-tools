@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -24,6 +25,8 @@ import net.osmand.data.MapObject;
 import net.osmand.data.Street;
 import net.osmand.obf.preparation.IndexPoiCreator.PoiAdditionalType;
 import net.osmand.obf.preparation.IndexPoiCreator.PoiTileBox;
+import net.osmand.osm.MapPoiTypes;
+import net.osmand.search.core.TopIndexFilter;
 import net.osmand.util.Algorithms;
 import net.osmand.util.SearchAlgorithms;
 
@@ -33,6 +36,8 @@ public class NameIndexCreator<T> {
 	private static final int MIN_LIMIT_FREQ_COMMON = 10; // minimum required for common to have at least
 	// Large ADD_TOP_X_FREQ_WORDS many will cause to add many common words to index !
 	private static final int ADD_TOP_X_FREQ_WORDS = 10; // minimum required  for frequent to be added and indexed 
+	public static final String POI_CATEGORY_PREFIX = "#^";
+	private static final int POI_CATEGORY_PREFIX_LENGTH = 5;
 	public static boolean NOT_INDEX_COMMON_IF_THERE_ARE_RARE = true;
 	public static boolean INDEX_RARE_WORDS_FOR_COMMON = false;
 	public static boolean INDEX_RARE_WORDS_FOR_NON_COMMON = false;
@@ -248,7 +253,8 @@ public class NameIndexCreator<T> {
 			int max = -1;
 			String top = null;
 			for (Map.Entry<String, Integer> e : tokenFrequencies.entrySet()) {
-				if (e.getValue() > max && !topXFrequent.contains(e.getKey())) {
+				if (e.getValue() > max && !topXFrequent.contains(e.getKey())
+						&& !e.getKey().startsWith(POI_CATEGORY_PREFIX)) {
 					max = e.getValue();
 					top = e.getKey();
 				}
@@ -291,6 +297,69 @@ public class NameIndexCreator<T> {
 		return commonWords;
 	}
 	
+	
+	public void cleanupPoiNames(int max) {
+		for (String prefix : new ArrayList<>(namesIndex.keySet())) {
+			if (prefix.startsWith(POI_CATEGORY_PREFIX)) {
+				NamedObjectsByPrefix<T> objects = namesIndex.get(prefix);
+				Iterator<NamedObject<T>> it = objects.namedObjects.iterator();
+				Map<String, Integer> counts = new HashMap<String, Integer>();
+				while (it.hasNext()) {
+					NamedObject<T> obj = it.next();
+					for (NameObjectSingleNameIndex t : obj.singleNames) {
+						counts.compute(t.token, (_t, u) -> u == null ? 1 : u + 1);
+					}
+				}
+				it = objects.namedObjects.iterator();
+				while (it.hasNext()) {
+					NamedObject<T> obj = it.next();
+					Iterator<NameObjectSingleNameIndex> its = obj.singleNames.iterator();
+					while (its.hasNext()) {
+						NameObjectSingleNameIndex t = its.next();
+						String token = t.token;
+						if (counts.get(token) >= max) {
+							tokenFrequencies.remove(token);
+							its.remove();
+						}
+					}
+					if (obj.singleNames.isEmpty()) {
+						it.remove();
+					}
+				}
+				if (objects.namedObjects.isEmpty()) {
+					namesIndex.remove(prefix);
+				}
+			}
+		}
+	}
+	
+	public static void addPoiCategories(NameIndexCreator<PoiNameObject> th, PoiNameObject obj) {
+		addPoiCategory(th, obj, obj.subtype);
+		if (obj.additionalTags != null) {
+			for (PoiAdditionalType o : obj.additionalTags) {
+				String key = o.getTag();
+				if (o.getTag().startsWith(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX)) {
+					key = o.getTag() + "_" + TopIndexFilter.getValueKey(o.getValue());
+				}
+				addPoiCategory(th, obj, key);
+			}
+		}
+	}
+
+	private static void addPoiCategory(NameIndexCreator<PoiNameObject> th, PoiNameObject obj, String token) {
+		token = POI_CATEGORY_PREFIX + token;
+		String prefix = token.substring(0, Math.min(token.length(), POI_CATEGORY_PREFIX_LENGTH));
+		NamedObjectsByPrefix<PoiNameObject> entry = th.namesIndex.get(prefix);
+		if (entry == null) {
+			entry = new NamedObjectsByPrefix<PoiNameObject>();
+			entry.prefix = prefix;
+			th.namesIndex.put(prefix, entry);
+		}
+		boolean added = entry.addToken(obj, token, Collections.singletonList(token));
+		if (added) {
+			th.tokenFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
+		}
+	}
 	
 	public void addToNameIndex(String name, T obj, int maxPrefixLength, boolean indexNumbers) {
 		if (obj instanceof Street s) {
@@ -463,6 +532,7 @@ public class NameIndexCreator<T> {
 		}
 		o.setFileOffset((int) fileOffset);
 	}
+
 
     
 

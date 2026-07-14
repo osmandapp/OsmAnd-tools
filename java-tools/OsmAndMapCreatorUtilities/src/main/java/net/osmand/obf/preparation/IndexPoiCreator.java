@@ -22,9 +22,6 @@ import net.osmand.binary.CommonWords;
 import net.osmand.binary.GeocodingUtilities;
 import net.osmand.binary.GeocodingUtilities.GeocodingResult;
 import net.osmand.binary.ObfConstants;
-import net.osmand.binary.OsmandOdb;
-import net.osmand.binary.OsmandOdb.OsmAndCategoryTable;
-import net.osmand.binary.OsmandOdb.OsmAndSubtypesTable;
 import net.osmand.data.Amenity;
 import net.osmand.data.Boundary;
 import net.osmand.data.City;
@@ -103,6 +100,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	public static final int DEFAULT_TOP_INDEX_MIN_COUNT = PoiType.DEFAULT_MIN_COUNT; 
 	public static final int DEFAULT_TOP_INDEX_MAX_PER_MAP = PoiType.DEFAULT_MAX_PER_MAP;
 	public static final int DEFAULT_TOP_INDEX_LIMIT_PER_MAP = 1000;
+	public static final int DEFAULT_NAME_INDEX_POI_TYPES = 1000;
 
 	// some multipolygons have > 38K islands (tongass)
 	private static final int MAX_POI_OUTER_MULTIPOLYGON_SIZE = 256;
@@ -688,7 +686,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		collectTagGroups();
 		
 		// 0. process all entities
-		processPOIIntoTree(poiGeocoding, namesIndex, zoomToStart, bbox, rootZoomsTree);
+		int allCount = processPOIIntoTree(poiGeocoding, namesIndex, zoomToStart, bbox, rootZoomsTree);
+		int limit = Math.min(DEFAULT_NAME_INDEX_POI_TYPES, allCount / 100);
+		System.out.println("Clean up poi categories in name index up to " + limit);
+		namesIndex.cleanupPoiNames(limit);
 		if (bbox.isEmpty()) {
 			bbox.setWorld();
 		}
@@ -856,7 +857,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				if (Algorithms.isEmpty(originalValue)) {
 					continue;
 				}
-				System.out.println(originalValue + " " + column);
 				if (providedTopIndexes != null) {
                     String normalizedValue = TopTagValuesAnalyzer.normalizeTagValue(originalValue);
 					String key = entry.getKey().substring(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX.length());
@@ -905,7 +905,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
     private static final int MAX_OBJECTS_PER_BLOCK_LIMIT = 64;
 
-	private void processPOIIntoTree(File poiGeocoding, NameIndexCreator<PoiNameObject> namesIndex, int zoomToStart, IntBbox bbox,
+	private int processPOIIntoTree(File poiGeocoding, NameIndexCreator<PoiNameObject> namesIndex, int zoomToStart, IntBbox bbox,
 			Tree<PoiTileBox> rootZoomsTree) throws SQLException, IOException {
 		ResultSet rs = poiConnection.createStatement().executeQuery(
 				"SELECT x,y,type,subtype,id,additionalTags,taggroups from poi ORDER BY id, priority");
@@ -928,7 +928,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			log.info("Geocoding for POI is enabled");
 		}
 
-		int count = 0;
+		int allCount = 0;
 		ConsoleProgressImplementation console = new ConsoleProgressImplementation();
 		console.startWork(1000000);
 		Map<PoiAdditionalType, String> additionalTags = new LinkedHashMap<PoiAdditionalType, String>();
@@ -947,8 +947,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			bbox.maxX = Math.max(x, bbox.maxX);
 			bbox.minY = Math.min(y, bbox.minY);
 			bbox.maxY = Math.max(y, bbox.maxY);
-			if (count++ > 10000) {
-				count = 0;
+			if (allCount++ % 10000 == 0) {
 				console.progress(10000);
 			}
 
@@ -1118,7 +1117,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 						if (encoded == null) {
 							encoded = new HashSet<>();
 						}
-						// TODO measure size to add all or only top
 						encoded.add(a);
 					}
 				}
@@ -1140,10 +1138,12 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		log.info(String.format("POI geocoding full address (%d of %d for %.2f sec), city (%d of %d for %.2f sec)",
 				geocodingSuccess, geocodingCnt, geocodingTime / 1e3, geoCitySuccess, geoCityCnt, geoCityTime / 1e3));
 		log.info("Poi processing finished");
+		return allCount;
 	}
 	
 	public void putPoiObjectPrefix(NameIndexCreator<PoiNameObject> namesIndex, PoiNameObject obj, String name,
 			String nameEn, Set<String> names, Set<String> idNames, IndexCreatorSettings settings) {
+		NameIndexCreator.addPoiCategories(namesIndex, obj);
 		if (name != null) {
 			namesIndex.addToNameIndex(name, obj, settings.charsToBuildPoiNameIndex, false);
 			if (Algorithms.isEmpty(nameEn)) {
