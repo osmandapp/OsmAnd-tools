@@ -1902,7 +1902,14 @@ public class BinaryMapIndexWriter {
 				types.clear();
 				globalCategories.internalBuildType(no.object.type(), no.object.subtype(), types);
 				for (int s = 0; s < types.size(); s++) {
-					bs.addPoiCategories(types.get(s));
+					bs.addPoiCategories(types.get(s) << 1);
+				}
+				Set<PoiAdditionalType> addTypes = no.object.additionalTags();
+				if (addTypes != null) {
+					for (PoiAdditionalType key : addTypes) {
+						int id = (key.getTargetId() << 1) + 1;
+						bs.addPoiCategories(id);
+					}
 				}
 				if (no.object.eloRating() >= 0) {
 					bs.addEloRating(no.object.eloRating());

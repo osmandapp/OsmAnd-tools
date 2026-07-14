@@ -100,7 +100,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	// Actual list of brands is constantly regenerated from BrandAnalyzer utlitity
 	private static final String ENV_POI_TOP_INDEXES_URL = "POI_TOP_INDEXES_URL";
-	public static final int DEFAULT_TOP_INDEX_MIN_COUNT = PoiType.DEFAULT_MIN_COUNT;
+	public static final int DEFAULT_TOP_INDEX_MIN_COUNT = PoiType.DEFAULT_MIN_COUNT; 
 	public static final int DEFAULT_TOP_INDEX_MAX_PER_MAP = PoiType.DEFAULT_MAX_PER_MAP;
 	public static final int DEFAULT_TOP_INDEX_LIMIT_PER_MAP = 1000;
 
@@ -559,7 +559,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		Map<String, Integer> categoriesUsage = new HashMap<String, Integer>();
 		Set<PoiAdditionalType> additionalAttributes = new LinkedHashSet<PoiAdditionalType>();
 
-
 		// build indexes to write
 		Map<String, Integer> catIndexes;
 		Map<String, Integer> subcatIndexes;
@@ -579,6 +578,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			return subCat.contains(";") || subCat.contains(",");
 		}
 
+		
 		public void addCategory(String cat, String subCat, Map<PoiAdditionalType, String> additionalTags, boolean stats) {
 			for (PoiAdditionalType rt : additionalTags.keySet()) {
 				if (!rt.isText() && rt.getValue() == null) {
@@ -840,7 +840,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			}
 			int minCount = entry.getValue().getMinCount();
 			int maxPerMap = entry.getValue().getMaxPerMap();
-			minCount = minCount > 0 ? minCount : DEFAULT_TOP_INDEX_MIN_COUNT;
+			minCount =  minCount > 0 ? minCount : DEFAULT_TOP_INDEX_MIN_COUNT;
 			maxPerMap = maxPerMap > 0 ? maxPerMap : DEFAULT_TOP_INDEX_MAX_PER_MAP;
 			if (providedTopIndexes != null) {
 				minCount = 0;
@@ -856,6 +856,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				if (Algorithms.isEmpty(originalValue)) {
 					continue;
 				}
+				System.out.println(originalValue + " " + column);
 				if (providedTopIndexes != null) {
                     String normalizedValue = TopTagValuesAnalyzer.normalizeTagValue(originalValue);
 					String key = entry.getKey().substring(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX.length());
@@ -1110,8 +1111,20 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				poiData.tagGroups.addAll(tagGroupIds);
 				prevTree.getNode().poiData.add(poiData);
 				int rawRating = poiData.getRating();
-				int elo = rawRating <= 1000 ? -1 : ((rawRating - 1000) / 50); 
-				PoiNameObject obj = new PoiNameObject(prevTree.getNode(), poiIndInBlock, elo, type, subtype);
+				int elo = rawRating <= 1000 ? -1 : ((rawRating - 1000) / 50);
+				Set<PoiAdditionalType> encoded = null;
+				for (PoiAdditionalType a : additionalTags.keySet()) {
+					if (!a.isText()) {
+						if (encoded == null) {
+							encoded = new HashSet<>();
+						}
+						// TODO measure size to add all or only top
+						encoded.add(a);
+					}
+				}
+ 				
+				PoiNameObject obj = new PoiNameObject(prevTree.getNode(), poiIndInBlock, elo, type, subtype,
+						encoded);
 				putPoiObjectPrefix(namesIndex, obj, additionalTags.get(nameRuleType),
 						additionalTags.get(nameEnRuleType), otherNames, idNames, settings);
 			} else {

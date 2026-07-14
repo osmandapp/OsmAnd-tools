@@ -862,8 +862,8 @@ public class IndexCreator {
 		// settings.keepOnlySeaObjects = true;
 		// settings.srtmDataFolder = new File(rootFolder + "/maps/srtm/");
 		// settings.gtfsData = new File(rootFolder + "/maps/transport/Netherlands.sqlite");
-//		settings.wikidataMappingUrl = rootFolder + "/wikidata_mapping.sqlitedb";
-//		settings.wikirankingMappingUrl = rootFolder + "/wiki_ranking.sqlitedb";
+		settings.wikidataMappingUrl = rootFolder + "/wikidata_mapping.sqlitedb";
+		settings.wikirankingMappingUrl = rootFolder + "/wiki_ranking.sqlitedb";
 //		settings.srtmDataFolderUrl  = null;
 
 		// settings.zoomWaySmoothness = 2;

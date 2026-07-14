@@ -22,6 +22,7 @@ import net.osmand.data.City;
 import net.osmand.data.City.CityType;
 import net.osmand.data.MapObject;
 import net.osmand.data.Street;
+import net.osmand.obf.preparation.IndexPoiCreator.PoiAdditionalType;
 import net.osmand.obf.preparation.IndexPoiCreator.PoiTileBox;
 import net.osmand.util.Algorithms;
 import net.osmand.util.SearchAlgorithms;
@@ -49,7 +50,9 @@ public class NameIndexCreator<T> {
 		this.predefinedWords = c;
 	}
 	
-	public record PoiNameObject(PoiTileBox tileBox, int ind, int eloRating, String type, String subtype) {  }
+	public record PoiNameObject(PoiTileBox tileBox, int ind, int eloRating, 
+			String type, String subtype, Set<PoiAdditionalType> additionalTags) {
+	}
 	
 	// common words
 	public record PrepareWordIndex (int index, String word, int frequency, int nonindexed) { }
