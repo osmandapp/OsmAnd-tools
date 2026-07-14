@@ -279,26 +279,6 @@ public interface InspectorService extends OBFService {
         }
     }
 
-
-    record AddressTokenRef(IndexToken token, AddressRef ref) {
-    }
-
-
-    record GenerateDbRawPoiObject(RawPoiObject rawPoiObject, int payloadOffset, int payloadSize, int sourceOffset) {
-    }
-
-    record CommonSuffix(String value, int matched, int nonindexed) {
-    }
-
-    record NameIndexTableInfo(long tableContentStart, Map<String, Integer> prefixOffsets) {
-    }
-
-    record NameIndexSuffixInfo(List<String> suffixDictionary, List<CommonSuffix> commonSuffixes,
-                               Set<String> integerSuffixes, Set<String> extraSuffixes, int otherWordsCount) {
-    }
-
-
-
     default void collectAddressObjects(BinaryMapIndexReaderExt index,
                                        BinaryMapAddressReaderAdapter.AddressRegion region,
                                        AddressRef[] addressRefs,

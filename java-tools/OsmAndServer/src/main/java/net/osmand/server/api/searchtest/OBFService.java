@@ -137,33 +137,53 @@ public interface OBFService extends BaseService {
 			"northamerica",
 			"centralamerica",
 			"southamerica");
-
+	
+	record ObfFileInfo(String path, String name, String continent, String country, String region, long lastModified, long size) {}
+	
 	record IndexToken(String name, AddressRef[] addressRefs, int[] poiRefs, int[] poiAtomRefs, int[] poiAtomSizes,
 	                  Map<Integer, int[]> poiIndexes,
 	                  List<IndexSuffixRef> poiSuffixRefs, List<IndexSuffixRef> addressSuffixRefs,
 	                  IndexSuffixCounts poiSuffixCounts, IndexSuffixCounts addressSuffixCounts,
 	                  boolean isCommon, boolean isFrequent, String obf,
 	                  int poiCount, int addressCount) {}
-	record ObfFileInfo(String path, String name, String continent, String country, String region, long lastModified, long size) {}
 	record IndexTokenPage(List<IndexToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, IndexTokenSummary summary) {}
+	
 	record IndexTokenSummary(int poiSum, int addressSum, int commonSum, int frequentSum,
 	                         int dictSuffixSum, int commonSuffixSum, int integerSuffixSum, int partSuffixSum,
 	                         int extraSuffixSum, int otherSuffixSum,
 	                         int poiMax, int addressMax,
 	                         int dictSuffixMax, int commonSuffixMax, int integerSuffixMax, int partSuffixMax,
 	                         int extraSuffixMax, int otherSuffixMax) {}
+	
 	record IndexSuffixRequest(List<String> tokens, String key, String objectType) {}
+	
 	record IndexSuffixMetric(String name, String obf, int dict, int common, int part, int integer, int extra, int other) {}
+	
 	record IndexSuffixResponse(List<IndexSuffixMetric> metrics, List<String> values) {}
+	
 	record IndexSuffixRef(String obf, int offset, int suffixIndex, boolean poi, int[] metricSuffixIndexes,
 	                      String[] metricIntegerSuffixes, String[] metricExtraSuffixes) {}
+	
 	record IndexSuffixCounts(int dict, int common, int part, int integer, int extra, int other) {}
+	
 	record IndexTokenBuilder(String name, int[] addressOffsets, int[] addressSuffixIndexes, AddressRef[] addressRefs,
 	                         int[] poiRefs, int[] poiAtomRefs,
 	                         int[] poiAtomSizes, Map<Integer, int[]> poiIndexes,
 	                         List<IndexSuffixRef> poiSuffixRefs, List<IndexSuffixRef> addressSuffixRefs,
 	                         IndexSuffixCounts poiSuffixCounts, IndexSuffixCounts addressSuffixCounts) {}
+	
 	record AddressRef(int shiftToIndex, int shiftToCityIndex, int objectOffset, int cityOffset, int typeIndex, int atomSize) {}
+
+	record AddressTokenRef(IndexToken token, AddressRef ref) {}
+
+	record GenerateDbRawPoiObject(RawPoiObject rawPoiObject, int payloadOffset, int payloadSize, int sourceOffset) {}
+
+	record CommonSuffix(String value, int matched, int nonindexed) {}
+
+	record NameIndexTableInfo(long tableContentStart, Map<String, Integer> prefixOffsets) {}
+
+	record NameIndexSuffixInfo(List<String> suffixDictionary, List<CommonSuffix> commonSuffixes,
+	                           Set<String> integerSuffixes, Set<String> extraSuffixes, int otherWordsCount) {}
 
 	record ObjectAddress(int sequenceId, String name, LatLon point, Map<String, String> commonTags,
 	                     boolean isPoi, boolean isMatched,
@@ -177,45 +197,19 @@ public interface OBFService extends BaseService {
 					osmType, payloadOffset, payloadSize, sourceOffset, null);
 		}
 	}
+	
 	record ObjectAddressPage(List<ObjectAddress> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, int[] countMetrics, int[] sizeMetrics, int aloneCount, int aloneSize) {}
 	record ObjectAddressStats(int size, int count) {}
 	record PoiTokenRefs(Set<Integer> offsets, List<Integer> atomRefs, List<Integer> atomSizes,
 	                    Map<Integer, int[]> poiIndexes, Set<Integer> metricSuffixIndexes,
 	                    Set<String> metricIntegerSuffixes, Set<String> metricExtraSuffixes) {}
 	record PoiCategoryMeta(String type, String subtype) {}
-	record GenerateDbProgress(String status, String obfName, int obfIndex, int totalObfs, int processedTokens,
-	                          int totalTokens, long elapsedMs, long estimatedMs, String error,
-	                          List<GenerateDbObfProgress> obfs) {}
-	record GenerateDbObfProgress(String obfName, int obfIndex, int totalTokens, int processedTokens,
-	                             long elapsedMs, long estimatedMs, String status) {}
-	record GenerateDbObfTokens(String obf, String obfName, int obfIndex, long startMs, List<IndexToken> tokens) {}
-	record GenerateDbTokenObjects(String obf, String obfName, int obfIndex, long startMs, IndexToken token, ObjectAddressPage objectsPage) {}
-	record GenerateDbTokenChunk(String obf, String obfName, int obfIndex, long startMs, List<GenerateDbTokenObjects> tokens) {}
-	record Datasource(String name, long size, long lastModified, boolean valid, String error) {}
-	record DbTagName(String name, long objects, boolean isSkipped) {}
-	record DbTagValue(String value, long objects_count) {}
-	record DbToken(long id, String name, long matched, long alone, boolean isCommon, boolean isFrequent, boolean isGenerated) {}
-	record DbTokenSummary(long matchedSum, long aloneSum, long commonSum, long frequentSum, long generatedSum, long matchedMax, long aloneMax) {}
-	record DbTokenPage(List<DbToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, DbTokenSummary summary) {}
-	record DbObjectToken(long id, String name, boolean isCommon, boolean isFrequent, boolean isGenerated, String obfName) {}
-	record DbObjectTokenPage(List<DbObjectToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages) {}
-	record DbObject(int sequenceId, String name, LatLon point, Map<String, String> commonTags,
-	                String type, Long osmId, String osmType,
-	                boolean isAlone, String obfName, long tokens) {}
-	record DbObjectPage(List<DbObject> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages) {}
-	record DbReportDistribution(String bucket, int ord, long tokens, long postings, long tokensNew, long postingsNew) {}
-	record DbReportTagHit(String tag, long hits, double sharePct) {}
-	record DbReportPruneToken(String name, boolean isCommon, boolean isFrequent, long matched, long alone,
-	                          double cumulativePct, List<DbReportTagHit> topTags) {}
-	record TestCaseObject(String name, String type, LatLon point, long tokens,
-	                      long commonFrequentTokens, long commonTokens, long frequentTokens,
-	                      long newTokens, double proneScore, String topCommonFrequentTokens) {}
-	record DbReport(long totalTokens, long totalPostings, List<DbReportDistribution> distribution,
-	                List<DbReportPruneToken> pruning, List<TestCaseObject> mainWordInconsistency) {}
+
 	@FunctionalInterface
 	interface GenerateDbProgressListener {
-		void onProgress(GenerateDbProgress progress);
+		void onProgress(GenDbService.GenerateDbProgress progress);
 	}
+	
 	record CityAddress(String name, LatLon point, List<StreetAddress> streets, int streetsCount, String type, String obf) {
 		public CityAddress(String name, LatLon point, List<StreetAddress> streets, int streetsCount, String type) {
 			this(name, point, streets, streetsCount, type, null);

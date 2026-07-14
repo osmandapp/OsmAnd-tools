@@ -2,10 +2,8 @@ package net.osmand.server.controllers.pub;
 
 import jakarta.servlet.http.HttpServletResponse;
 import net.osmand.server.SearchTestRepositoryConfiguration;
+import net.osmand.server.api.searchtest.*;
 import net.osmand.server.api.searchtest.BaseService.GenParam;
-import net.osmand.server.api.searchtest.AnalystService;
-import net.osmand.server.api.searchtest.DetectorService;
-import net.osmand.server.api.searchtest.OBFService;
 import net.osmand.server.api.searchtest.ReportService.RunStatus;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
 import net.osmand.server.api.services.SearchService;
@@ -53,7 +51,7 @@ public class SearchTestController {
 											  Boolean skipTokenInTagValue) {}
 	public record GenerateDbJobStatus(String jobId, String status, String obfName, int obfIndex, int totalObfs,
 									  int processedTokens, int totalTokens, long elapsedMs, long estimatedMs,
-									  boolean downloadReady, String error, List<OBFService.GenerateDbObfProgress> obfs) {}
+									  boolean downloadReady, String error, List<GenDbService.GenerateDbObfProgress> obfs) {}
 
 	private static final ConcurrentHashMap<String, GenerateDbJob> GENERATE_DB_JOBS = new ConcurrentHashMap<>();
 
@@ -67,7 +65,7 @@ public class SearchTestController {
 		volatile long elapsedMs = 0;
 		volatile long estimatedMs = -1;
 		volatile String error = null;
-		volatile List<OBFService.GenerateDbObfProgress> obfs = Collections.emptyList();
+		volatile List<GenDbService.GenerateDbObfProgress> obfs = Collections.emptyList();
 		volatile Path zipFile = null;
 		volatile String datasourceName = null;
 		volatile boolean cancelRequested = false;
@@ -623,7 +621,7 @@ public class SearchTestController {
 
 	@GetMapping(value = "/tags-datasources", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<List<OBFService.Datasource>> getTagsDatasources() throws IOException {
+	public ResponseEntity<List<GenDbService.Datasource>> getTagsDatasources() throws IOException {
 		return ResponseEntity.ok(testSearchService.getTagsDatasources());
 	}
 
@@ -692,7 +690,7 @@ public class SearchTestController {
 
 	@GetMapping(value = "/tags-datasources/{name}/tokens", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<OBFService.DbTokenPage> getTagsDbTokens(@PathVariable String name,
+	public ResponseEntity<GenDbService.DbTokenPage> getTagsDbTokens(@PathVariable String name,
 	                                                              @RequestParam(required = false) String prefix,
 	                                                              @RequestParam(defaultValue = "all") String objectType,
 	                                                              @RequestParam(defaultValue = "false") boolean perObf,
@@ -711,7 +709,7 @@ public class SearchTestController {
 
 	@GetMapping(value = "/tags-datasources/{name}/tags", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<List<OBFService.DbTagName>> getTagsDbTagNames(@PathVariable String name) throws IOException, SQLException {
+	public ResponseEntity<List<GenDbService.DbTagName>> getTagsDbTagNames(@PathVariable String name) throws IOException, SQLException {
 		try {
 			return ResponseEntity.ok(testSearchService.getTagsDbTagNames(name));
 		} catch (SQLException e) {
@@ -721,7 +719,7 @@ public class SearchTestController {
 
 	@GetMapping(value = "/tags-datasources/{name}/tag-values", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<List<OBFService.DbTagValue>> getTagsDbTagValues(@PathVariable String name,
+	public ResponseEntity<List<GenDbService.DbTagValue>> getTagsDbTagValues(@PathVariable String name,
 	                                                                      @RequestParam String tag) throws IOException, SQLException {
 		try {
 			return ResponseEntity.ok(testSearchService.getTagsDbTagValues(name, tag));
@@ -732,17 +730,17 @@ public class SearchTestController {
 
 	@GetMapping(value = "/tags-datasources/{name}/objects", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<OBFService.DbObjectPage> getTagsDbObjects(@PathVariable String name,
-	                                                                @RequestParam long tokenId,
-	                                                                @RequestParam(defaultValue = "all") String objectType,
-	                                                                @RequestParam(defaultValue = "false") boolean perObf,
-	                                                                @RequestParam(required = false) String regExp,
-	                                                                @RequestParam(required = false) String tag,
-	                                                                @RequestParam(required = false) List<String> values,
-	                                                                @RequestParam(defaultValue = "0") int pageToShow,
-	                                                                @RequestParam(defaultValue = "100") int pageSizeLimit,
-	                                                                @RequestParam(required = false) String sortBy,
-	                                                                @RequestParam(required = false) String sortOrder) throws IOException, SQLException {
+	public ResponseEntity<GenDbService.DbObjectPage> getTagsDbObjects(@PathVariable String name,
+	                                                                  @RequestParam long tokenId,
+	                                                                  @RequestParam(defaultValue = "all") String objectType,
+	                                                                  @RequestParam(defaultValue = "false") boolean perObf,
+	                                                                  @RequestParam(required = false) String regExp,
+	                                                                  @RequestParam(required = false) String tag,
+	                                                                  @RequestParam(required = false) List<String> values,
+	                                                                  @RequestParam(defaultValue = "0") int pageToShow,
+	                                                                  @RequestParam(defaultValue = "100") int pageSizeLimit,
+	                                                                  @RequestParam(required = false) String sortBy,
+	                                                                  @RequestParam(required = false) String sortOrder) throws IOException, SQLException {
 		try {
 			return ResponseEntity.ok(testSearchService.getTagsDbObjects(name, tokenId, objectType, perObf, regExp, tag, values, pageToShow, pageSizeLimit, sortBy, sortOrder));
 		} catch (SQLException e) {
@@ -752,7 +750,7 @@ public class SearchTestController {
 
 	@GetMapping(value = "/tags-datasources/{name}/address-poi-objects", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<OBFService.DbObjectPage> getTagsDbAddressPoiObjects(@PathVariable String name,
+	public ResponseEntity<GenDbService.DbObjectPage> getTagsDbAddressPoiObjects(@PathVariable String name,
 	                                                                          @RequestParam String objectType,
 	                                                                          @RequestParam(required = false) String regExp,
 	                                                                          @RequestParam(required = false) String tokenFind,
@@ -772,7 +770,7 @@ public class SearchTestController {
 
 	@GetMapping(value = "/tags-datasources/{name}/object-tokens", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<OBFService.DbObjectTokenPage> getTagsDbObjectTokens(@PathVariable String name,
+	public ResponseEntity<GenDbService.DbObjectTokenPage> getTagsDbObjectTokens(@PathVariable String name,
 	                                                                          @RequestParam long objectId,
 	                                                                          @RequestParam(required = false) String find,
 	                                                                          @RequestParam(defaultValue = "0") int pageToShow,
@@ -788,12 +786,12 @@ public class SearchTestController {
 
 	@GetMapping(value = "/tags-datasources/{name}/report", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<OBFService.DbReport> getReport(@PathVariable String name,
-	                                                     @RequestParam(defaultValue = "all") String objectType,
-	                                                     @RequestParam(defaultValue = "all") String pruneGenerated,
-	                                                     @RequestParam(defaultValue = "desc") String pruneSort,
-	                                                     @RequestParam(defaultValue = "-1") long bucketMin,
-	                                                     @RequestParam(defaultValue = "-1") long bucketMax) throws IOException, SQLException {
+	public ResponseEntity<GenDbService.DbReport> getReport(@PathVariable String name,
+	                                                                   @RequestParam(defaultValue = "all") String objectType,
+	                                                                   @RequestParam(defaultValue = "all") String pruneGenerated,
+	                                                                   @RequestParam(defaultValue = "desc") String pruneSort,
+	                                                                   @RequestParam(defaultValue = "-1") long bucketMin,
+	                                                                   @RequestParam(defaultValue = "-1") long bucketMax) throws IOException, SQLException {
 		try {
 			return ResponseEntity.ok(testSearchService.getReport(name, objectType, pruneGenerated, pruneSort, bucketMin, bucketMax));
 		} catch (SQLException e) {
@@ -803,7 +801,7 @@ public class SearchTestController {
 
 	@GetMapping(value = "/tags-datasources/{name}/test-cases", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<List<OBFService.TestCaseObject>> getTestCases(@PathVariable String name,
+	public ResponseEntity<List<GenDbService.TestCaseObject>> getTestCases(@PathVariable String name,
 	                                                                    @RequestParam(defaultValue = "all") String objectType) throws IOException, SQLException {
 		try {
 			return ResponseEntity.ok(testSearchService.getTestCases(name, objectType));

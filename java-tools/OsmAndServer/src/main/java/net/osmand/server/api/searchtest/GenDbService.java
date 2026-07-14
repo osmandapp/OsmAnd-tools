@@ -1,5 +1,6 @@
 package net.osmand.server.api.searchtest;
 
+import net.osmand.data.LatLon;
 import net.osmand.util.Algorithms;
 
 import java.io.IOException;
@@ -11,6 +12,38 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 public interface GenDbService extends OBFService {
+    record GenerateDbProgress(String status, String obfName, int obfIndex, int totalObfs, int processedTokens,
+                              int totalTokens, long elapsedMs, long estimatedMs, String error,
+                              List<GenerateDbObfProgress> obfs) {}
+    record GenerateDbObfProgress(String obfName, int obfIndex, int totalTokens, int processedTokens,
+                                 long elapsedMs, long estimatedMs, String status) {}
+    record GenerateDbObfTokens(String obf, String obfName, int obfIndex, long startMs, List<IndexToken> tokens) {}
+    record GenerateDbTokenObjects(String obf, String obfName, int obfIndex, long startMs, IndexToken token, ObjectAddressPage objectsPage) {}
+    record GenerateDbTokenChunk(String obf, String obfName, int obfIndex, long startMs, List<GenerateDbTokenObjects> tokens) {}
+
+    record Datasource(String name, long size, long lastModified, boolean valid, String error) {}
+    record DbTagName(String name, long objects, boolean isSkipped) {}
+    record DbTagValue(String value, long objects_count) {}
+    record DbToken(long id, String name, long matched, long alone, boolean isCommon, boolean isFrequent, boolean isGenerated) {}
+    record DbTokenSummary(long matchedSum, long aloneSum, long commonSum, long frequentSum, long generatedSum, long matchedMax, long aloneMax) {}
+    record DbTokenPage(List<DbToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, DbTokenSummary summary) {}
+    record DbObjectToken(long id, String name, boolean isCommon, boolean isFrequent, boolean isGenerated, String obfName) {}
+    record DbObjectTokenPage(List<DbObjectToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages) {}
+    record DbObject(int sequenceId, String name, LatLon point, Map<String, String> commonTags,
+                    String type, Long osmId, String osmType,
+                    boolean isAlone, String obfName, long tokens) {}
+    record TestCaseObject(String name, String type, LatLon point, long tokens,
+                          long commonFrequentTokens, long commonTokens, long frequentTokens,
+                          long newTokens, double proneScore, String topCommonFrequentTokens) {}
+    record DbReport(long totalTokens, long totalPostings, List<DbReportDistribution> distribution,
+                    List<DbReportPruneToken> pruning, List<TestCaseObject> mainWordInconsistency) {}
+    record DbReportDistribution(String bucket, int ord, long tokens, long postings, long tokensNew, long postingsNew) {}
+    record DbReportTagHit(String tag, long hits, double sharePct) {}
+    record DbReportPruneToken(String name, boolean isCommon, boolean isFrequent, long matched, long alone,
+                              double cumulativePct, List<DbReportTagHit> topTags) {}
+
+    record DbObjectPage(List<DbObject> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages) {}
+    
     int TAGS_DB_PAGE_SIZE = 100;
 
     default Path getTagsDatasourceDir() throws IOException {
