@@ -127,14 +127,25 @@ public class DownloadOsmGPX {
 	private static final String WINTER_SPORT_GROUP = "winter_sport";
 	private static final String DRIVING_GROUP = "driving";
 	private static final String MOTORCYCLING_GROUP = "motorcycling";
+	private static final String OTHER_GROUP = "other";
 
 	private static final Map<String, String> ACTIVITY_GROUPS = new LinkedHashMap<>();
 	private static final Map<String, Double> GROUP_AVG_LIMIT_KMH = Map.of(
 			FOOT_GROUP, 12d,
-			CYCLING_GROUP, 30d,
-			WINTER_SPORT_GROUP, 30d,
-			DRIVING_GROUP, 200d,
-			MOTORCYCLING_GROUP, 200d);
+			CYCLING_GROUP, 25d,
+			WINTER_SPORT_GROUP, 45d,
+			DRIVING_GROUP, 130d,
+			MOTORCYCLING_GROUP, 130d,
+			AVIATION_ACTIVITY_TYPE, 1000d);
+	private static final Map<String, Double> GROUP_MAX_LIMIT_KMH = Map.of(
+			FOOT_GROUP, 25d,
+			CYCLING_GROUP, 65d,
+			WINTER_SPORT_GROUP, 130d,
+			DRIVING_GROUP, 250d,
+			MOTORCYCLING_GROUP, 300d,
+			AVIATION_ACTIVITY_TYPE, 1200d);
+	private static final List<String> ACTIVITY_BY_SPEED = List.of(
+			FOOT_GROUP, CYCLING_GROUP, DRIVING_GROUP, AVIATION_ACTIVITY_TYPE);
 
 	// Garmin exports named "COURSE_<id>.gpx" would otherwise match "road_running"
 	private static final Set<String> ACTIVITY_KEYWORD_EXCLUSIONS = Set.of("course");
@@ -451,9 +462,9 @@ public class DownloadOsmGPX {
 						if (activity == null) {
 							activity = analyzeActivity(rs, activitiesMap);
 						}
-						Boolean speedMatches = speedMatchesActivity(activity, avgSpeedKmh);
+						Boolean speedMatches = speedMatchesActivity(activity, avgSpeedKmh, maxSpeedKmh);
 						if (activity == null) {
-							activity = analyzeActivityFromGpx(analysis, avgSpeedKmh);
+							activity = analyzeActivityFromGpx(analysis, avgSpeedKmh, maxSpeedKmh);
 						}
 
 						if (activity == null) {
@@ -767,31 +778,33 @@ public class DownloadOsmGPX {
 		return activitiesMap;
 	}
 
-	private String analyzeActivityFromGpx(GpxTrackAnalysis analysis, float avgSpeed) {
+	private String analyzeActivityFromGpx(GpxTrackAnalysis analysis, float avgSpeed, float maxSpeed) {
 		if (analysis == null) {
 			return ERROR_ACTIVITY_TYPE;
 		}
 		if (!analysis.getHasSpeedInTrack() || avgSpeed <= 0) {
 			return NOSPEED_ACTIVITY_TYPE;
 		}
-		if (avgSpeed <= GROUP_AVG_LIMIT_KMH.get(FOOT_GROUP)) {
-			return FOOT_GROUP;
-		} else if (avgSpeed <= GROUP_AVG_LIMIT_KMH.get(CYCLING_GROUP)) {
-			return CYCLING_GROUP;
-		} else if (avgSpeed <= GROUP_AVG_LIMIT_KMH.get(DRIVING_GROUP)) {
-			return DRIVING_GROUP;
-		} else {
-			return AVIATION_ACTIVITY_TYPE;
+		for (String type : ACTIVITY_BY_SPEED) {
+			if (avgSpeed <= GROUP_AVG_LIMIT_KMH.get(type) && maxSpeed <= GROUP_MAX_LIMIT_KMH.get(type)) {
+				return type;
+			}
 		}
+		return OTHER_GROUP;
 	}
 
 	@Nullable
-	private static Boolean speedMatchesActivity(String activity, float avgSpeedKmh) {
+	private static Boolean speedMatchesActivity(String activity, float avgSpeedKmh, float maxSpeedKmh) {
 		if (activity == null || avgSpeedKmh <= 0) {
 			return null;
 		}
-		Double avgLimitKmh = GROUP_AVG_LIMIT_KMH.get(ACTIVITY_GROUPS.get(activity));
-		return avgLimitKmh == null ? null : avgSpeedKmh <= avgLimitKmh;
+		String group = ACTIVITY_GROUPS.get(activity);
+		Double avgLimitKmh = GROUP_AVG_LIMIT_KMH.get(group);
+		Double maxLimitKmh = GROUP_MAX_LIMIT_KMH.get(group);
+		if (avgLimitKmh == null || maxLimitKmh == null) {
+			return null;
+		}
+		return avgSpeedKmh <= avgLimitKmh && maxSpeedKmh <= maxLimitKmh;
 	}
 
 	protected void queryGPXForBBOX(QueryParams qp) throws SQLException, IOException, FactoryConfigurationError, XMLStreamException, InterruptedException, XmlPullParserException {
