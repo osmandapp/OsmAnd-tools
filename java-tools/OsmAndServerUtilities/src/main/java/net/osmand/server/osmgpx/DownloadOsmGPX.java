@@ -22,6 +22,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
+import javax.annotation.Nullable;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -119,6 +121,20 @@ public class DownloadOsmGPX {
 	private static final String GARBAGE_ACTIVITY_TYPE = "garbage";
 	private static final String ERROR_ACTIVITY_TYPE = "error";
 	private static final String NOSPEED_ACTIVITY_TYPE = "nospeed";
+	private static final String AVIATION_ACTIVITY_TYPE = "aviation";
+	private static final String FOOT_GROUP = "foot";
+	private static final String CYCLING_GROUP = "cycling";
+	private static final String WINTER_SPORT_GROUP = "winter_sport";
+	private static final String DRIVING_GROUP = "driving";
+	private static final String MOTORCYCLING_GROUP = "motorcycling";
+
+	private static final Map<String, String> ACTIVITY_GROUPS = new LinkedHashMap<>();
+	private static final Map<String, Double> GROUP_AVG_LIMIT_KMH = Map.of(
+			FOOT_GROUP, 12d,
+			CYCLING_GROUP, 30d,
+			WINTER_SPORT_GROUP, 30d,
+			DRIVING_GROUP, 200d,
+			MOTORCYCLING_GROUP, 200d);
 
 	// Garmin exports named "COURSE_<id>.gpx" would otherwise match "road_running"
 	private static final Set<String> ACTIVITY_KEYWORD_EXCLUSIONS = Set.of("course");
@@ -277,6 +293,7 @@ public class DownloadOsmGPX {
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS time_minutes integer");
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS waypoints integer");
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS simplified_geometry bytea");
+			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS speed_matches_activity boolean");
 
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_speed ON " + GPX_METADATA_TABLE_NAME + " (speed)");
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_distance ON " + GPX_METADATA_TABLE_NAME + " (distance)");
@@ -339,7 +356,7 @@ public class DownloadOsmGPX {
 		PreparedStatement updateStmtMetrics = dbConn.prepareStatement(
 				"UPDATE " + GPX_METADATA_TABLE_NAME + " SET activity = ?, speed = ?, distance = ?, points = ?, " +
 						"max_speed = ?, max_dist_between_points = ?, time_minutes = ?, waypoints = ?, " +
-						"simplified_geometry = ? WHERE id = ?"
+						"simplified_geometry = ?, speed_matches_activity = ? WHERE id = ?"
 		);
 		PreparedStatement updateStmtActivityOnly = dbConn.prepareStatement(
 				"UPDATE " + GPX_METADATA_TABLE_NAME + " SET activity = ? WHERE id = ?"
@@ -434,6 +451,7 @@ public class DownloadOsmGPX {
 						if (activity == null) {
 							activity = analyzeActivity(rs, activitiesMap);
 						}
+						Boolean speedMatches = speedMatchesActivity(activity, avgSpeedKmh);
 						if (activity == null) {
 							activity = analyzeActivityFromGpx(analysis, avgSpeedKmh);
 						}
@@ -457,7 +475,8 @@ public class DownloadOsmGPX {
 							updateStmtMetrics.setInt(7, timeMinutes);
 							updateStmtMetrics.setInt(8, waypointsCount);
 							updateStmtMetrics.setBytes(9, simplifiedGeometry);
-							updateStmtMetrics.setLong(10, id);
+							updateStmtMetrics.setObject(10, speedMatches, Types.BOOLEAN);
+							updateStmtMetrics.setLong(11, id);
 							updateStmtMetrics.addBatch();
 						} else {
 							updateStmtActivityOnly.setString(1, activity);
@@ -718,6 +737,7 @@ public class DownloadOsmGPX {
 						}
 					}
 					activitiesMap.put(activityId, activityTags);
+					ACTIVITY_GROUPS.put(activityId, groupId);
 				}
 			}
 		} catch (IOException e) {
@@ -728,23 +748,30 @@ public class DownloadOsmGPX {
 	}
 
 	private String analyzeActivityFromGpx(GpxTrackAnalysis analysis, float avgSpeed) {
-		if (analysis != null) {
-			if (analysis.getHasSpeedInTrack()) {
-				if (avgSpeed > 0 && avgSpeed <= 12) {
-					return "foot";
-				} else if (avgSpeed <= 25) {
-					return "cycling";
-				} else if (avgSpeed <= 150) {
-					return "driving";
-				} else if (avgSpeed > 150) {
-					return "aviation";
-				} else {
-					return "other";
-				}
-			}
+		if (analysis == null) {
+			return ERROR_ACTIVITY_TYPE;
+		}
+		if (!analysis.getHasSpeedInTrack()) {
 			return NOSPEED_ACTIVITY_TYPE;
 		}
-		return ERROR_ACTIVITY_TYPE;
+		if (avgSpeed <= GROUP_AVG_LIMIT_KMH.get(FOOT_GROUP)) {
+			return FOOT_GROUP;
+		} else if (avgSpeed <= GROUP_AVG_LIMIT_KMH.get(CYCLING_GROUP)) {
+			return CYCLING_GROUP;
+		} else if (avgSpeed <= GROUP_AVG_LIMIT_KMH.get(DRIVING_GROUP)) {
+			return DRIVING_GROUP;
+		} else {
+			return AVIATION_ACTIVITY_TYPE;
+		}
+	}
+
+	@Nullable
+	private static Boolean speedMatchesActivity(String activity, float avgSpeedKmh) {
+		if (activity == null || avgSpeedKmh <= 0) {
+			return null;
+		}
+		Double avgLimitKmh = GROUP_AVG_LIMIT_KMH.get(ACTIVITY_GROUPS.get(activity));
+		return avgLimitKmh == null ? null : avgSpeedKmh <= avgLimitKmh;
 	}
 
 	protected void queryGPXForBBOX(QueryParams qp) throws SQLException, IOException, FactoryConfigurationError, XMLStreamException, InterruptedException, XmlPullParserException {
