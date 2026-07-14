@@ -1840,7 +1840,7 @@ public class BinaryMapIndexWriter {
 	}
 	
 
-	public Map<PoiTileBox, List<BinaryFileReference>> writePoiNameIndex(
+	public Map<PoiTileBox, List<BinaryFileReference>> writePoiNameIndex(PoiCreatorCategories globalCategories,
 			NameIndexCreator<PoiNameObject> namesIndex, long startPoiIndex) throws IOException {
 		checkPeekState(POI_INDEX_INIT);
 		codedOutStream.writeTag(OsmandOdb.OsmAndPoiIndex.NAMEINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
@@ -1884,6 +1884,7 @@ public class BinaryMapIndexWriter {
 				builder.addSuffixesCommonDictionary(i);
 			}
 			List<PoiTileBox> tileBoxes = new ArrayList<>();
+			TIntArrayList types = new TIntArrayList();
 			for (NamedObject<PoiNameObject> no : e.getValue().namedObjects) {
 				if (no.bitsetIndex.size() == 0) {
 					// skip common words
@@ -1897,6 +1898,14 @@ public class BinaryMapIndexWriter {
 				bs.setZoom(box.getZoom());
 				for (int bitsetWord : no.bitsetIndex.toArray()) {
 					bs.addSuffixesBitsetIndex(bitsetWord);
+				}
+				types.clear();
+				globalCategories.internalBuildType(no.object.type(), no.object.subtype(), types);
+				for (int s = 0; s < types.size(); s++) {
+					bs.addPoiCategories(types.get(s));
+				}
+				if (no.object.eloRating() >= 0) {
+					bs.addEloRating(no.object.eloRating());
 				}
 				bs.addPoiIndInBlock(no.object.ind());
 				if (no.isOtherWordsNonZeros()) {

@@ -49,7 +49,7 @@ public class NameIndexCreator<T> {
 		this.predefinedWords = c;
 	}
 	
-	public record PoiNameObject(PoiTileBox tileBox, int ind) {  }
+	public record PoiNameObject(PoiTileBox tileBox, int ind, int eloRating, String type, String subtype) {  }
 	
 	// common words
 	public record PrepareWordIndex (int index, String word, int frequency, int nonindexed) { }

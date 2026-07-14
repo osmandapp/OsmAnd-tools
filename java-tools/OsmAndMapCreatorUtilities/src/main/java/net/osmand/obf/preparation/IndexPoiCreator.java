@@ -22,6 +22,9 @@ import net.osmand.binary.CommonWords;
 import net.osmand.binary.GeocodingUtilities;
 import net.osmand.binary.GeocodingUtilities.GeocodingResult;
 import net.osmand.binary.ObfConstants;
+import net.osmand.binary.OsmandOdb;
+import net.osmand.binary.OsmandOdb.OsmAndCategoryTable;
+import net.osmand.binary.OsmandOdb.OsmAndSubtypesTable;
 import net.osmand.data.Amenity;
 import net.osmand.data.Boundary;
 import net.osmand.data.City;
@@ -615,7 +618,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			return types;
 		}
 
-		private void internalBuildType(String category, String subcategory, TIntArrayList types) {
+		public void internalBuildType(String category, String subcategory, TIntArrayList types) {
 			int catInd = catIndexes.get(category);
 			if (toSplit(subcategory)) {
 				for (String sub : split(subcategory)) {
@@ -683,6 +686,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		Tree<PoiTileBox> rootZoomsTree = new Tree<PoiTileBox>();
 		collectTopIndexMap();
 		collectTagGroups();
+		
 		// 0. process all entities
 		processPOIIntoTree(poiGeocoding, namesIndex, zoomToStart, bbox, rootZoomsTree);
 		if (bbox.isEmpty()) {
@@ -698,7 +702,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		writer.writePoiSubtypesTable(globalCategories, topIndexAdditional);
 		
 		// 2.5 write names table
-		Map<PoiTileBox, List<BinaryFileReference>> fpToWriteSeeks = writer.writePoiNameIndex(namesIndex, startFpPoiIndex);
+		Map<PoiTileBox, List<BinaryFileReference>> fpToWriteSeeks = writer.writePoiNameIndex(globalCategories,
+				namesIndex, startFpPoiIndex);
 
 		// 3. write boxes
 		log.info("Poi box processing finished");
@@ -901,7 +906,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	private void processPOIIntoTree(File poiGeocoding, NameIndexCreator<PoiNameObject> namesIndex, int zoomToStart, IntBbox bbox,
 			Tree<PoiTileBox> rootZoomsTree) throws SQLException, IOException {
-		ResultSet rs = poiConnection.createStatement().executeQuery("SELECT x,y,type,subtype,id,additionalTags,taggroups from poi ORDER BY id, priority");
+		ResultSet rs = poiConnection.createStatement().executeQuery(
+				"SELECT x,y,type,subtype,id,additionalTags,taggroups from poi ORDER BY id, priority");
 		rootZoomsTree.setNode(new PoiTileBox());
 		long geocodingTime = 0, geocodingCnt = 0, geocodingSuccess = 0, geoCitySuccess = 0, geoCityCnt = 0, geoCityTime = 0;
 		RoutingContext geocodingCtx = null;
@@ -1103,7 +1109,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				poiData.additionalTags.putAll(additionalTags);
 				poiData.tagGroups.addAll(tagGroupIds);
 				prevTree.getNode().poiData.add(poiData);
-				putPoiObjectPrefix(namesIndex, prevTree.getNode(), poiIndInBlock, additionalTags.get(nameRuleType), 
+				int rawRating = poiData.getRating();
+				int elo = rawRating <= 1000 ? -1 : ((rawRating - 1000) / 50); 
+				PoiNameObject obj = new PoiNameObject(prevTree.getNode(), poiIndInBlock, elo, type, subtype);
+				putPoiObjectPrefix(namesIndex, obj, additionalTags.get(nameRuleType),
 						additionalTags.get(nameEnRuleType), otherNames, idNames, settings);
 			} else {
 				if (!useInMemoryCreator) {
@@ -1120,9 +1129,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		log.info("Poi processing finished");
 	}
 	
-	public void putPoiObjectPrefix(NameIndexCreator<PoiNameObject> namesIndex, PoiTileBox data, int ind, String name, String nameEn, Set<String> names, Set<String> idNames,
-			IndexCreatorSettings settings) {
-		PoiNameObject obj = new PoiNameObject(data, ind);
+	public void putPoiObjectPrefix(NameIndexCreator<PoiNameObject> namesIndex, PoiNameObject obj, String name,
+			String nameEn, Set<String> names, Set<String> idNames, IndexCreatorSettings settings) {
 		if (name != null) {
 			namesIndex.addToNameIndex(name, obj, settings.charsToBuildPoiNameIndex, false);
 			if (Algorithms.isEmpty(nameEn)) {
