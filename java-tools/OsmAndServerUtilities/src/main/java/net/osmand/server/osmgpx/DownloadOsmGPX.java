@@ -22,6 +22,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
+import javax.annotation.Nullable;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -47,6 +49,10 @@ import net.osmand.obf.ToolsOsmAndContextImpl;
 import net.osmand.shared.data.KQuadRect;
 import net.osmand.shared.gpx.RouteActivityHelper;
 import net.osmand.shared.gpx.primitives.RouteActivity;
+import net.osmand.shared.gpx.primitives.Track;
+import net.osmand.shared.gpx.primitives.TrkSegment;
+import net.osmand.shared.gpx.primitives.WptPt;
+import net.osmand.util.MapUtils;
 import okio.Source;
 import okio.Buffer;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
@@ -101,13 +107,13 @@ public class DownloadOsmGPX {
 	private static final long FETCH_INTERVAL = 200;
 	private static final long FETCH_MAX_INTERVAL = 50000;
 	private static int MAX_EMPTY_FETCH = 7;
-	
+
 	// preindex before 76787 with maxlat/minlat
 	private static final long INITIAL_ID = 1000; // start with 1000
 	private static final String GPX_METADATA_TABLE_NAME = "osm_gpx_data";
 	private static final String GPX_FILES_TABLE_NAME = "osm_gpx_files";
 	private static final long FETCH_INTERVAL_SLEEP = 10000;
-	
+
 	private static final int HTTP_TIMEOUT = 5000;
 	private static final int MAX_RETRY_TIMEOUT = 5;
 	private static final int RETRY_TIMEOUT = 15000;
@@ -115,10 +121,42 @@ public class DownloadOsmGPX {
 	private static final String GARBAGE_ACTIVITY_TYPE = "garbage";
 	private static final String ERROR_ACTIVITY_TYPE = "error";
 	private static final String NOSPEED_ACTIVITY_TYPE = "nospeed";
+	private static final String AVIATION_ACTIVITY_TYPE = "aviation";
+	private static final String FOOT_GROUP = "foot";
+	private static final String CYCLING_GROUP = "cycling";
+	private static final String WINTER_SPORT_GROUP = "winter_sport";
+	private static final String DRIVING_GROUP = "driving";
+	private static final String MOTORCYCLING_GROUP = "motorcycling";
+	private static final String OTHER_GROUP = "other";
 
-	private static final int MIN_POINTS_SIZE = 100;
-	private static final int MIN_DISTANCE = 1000;
-	private static final int MAX_DISTANCE_BETWEEN_POINTS = 1000;
+	private static final Map<String, String> ACTIVITY_GROUPS = new LinkedHashMap<>();
+	private static final Map<String, Double> GROUP_AVG_LIMIT_KMH = Map.of(
+			FOOT_GROUP, 12d,
+			CYCLING_GROUP, 25d,
+			WINTER_SPORT_GROUP, 45d,
+			DRIVING_GROUP, 130d,
+			MOTORCYCLING_GROUP, 130d,
+			AVIATION_ACTIVITY_TYPE, 1000d);
+	private static final Map<String, Double> GROUP_MAX_LIMIT_KMH = Map.of(
+			FOOT_GROUP, 25d,
+			CYCLING_GROUP, 65d,
+			WINTER_SPORT_GROUP, 130d,
+			DRIVING_GROUP, 250d,
+			MOTORCYCLING_GROUP, 300d,
+			AVIATION_ACTIVITY_TYPE, 1200d);
+	private static final List<String> ACTIVITY_BY_SPEED = List.of(
+			FOOT_GROUP, CYCLING_GROUP, DRIVING_GROUP, AVIATION_ACTIVITY_TYPE);
+
+	// Garmin exports named "COURSE_<id>.gpx" would otherwise match "road_running"
+	private static final Set<String> ACTIVITY_KEYWORD_EXCLUSIONS = Set.of("course");
+
+	private static final int MIN_POINTS_SIZE = 10;
+	private static final int MIN_DISTANCE = 200;
+	private static final double GAP_MAX_SPEED_KMH = 1200; // above any airliner: crossing a gap faster = teleport = garbage
+	private static final int TELEPORT_GAP_MIN_DISTANCE = 1000; // skip teleport check unless the largest gap exceeds this (m)
+	private static final long MIN_SPEED_INTERVAL_MS = 500; // min elapsed time to trust a speed sample
+	private static final double MIN_MOVING_SPEED_MPS = 0.1; // below this the interval counts as standing still
+	private static final int SRID_WGS84 = 4326;
 
 	private static final String GPX_FILE_PREIX = "OG";
 	private final RouteActivityHelper routeActivityHelper = RouteActivityHelper.INSTANCE;
@@ -130,13 +168,13 @@ public class DownloadOsmGPX {
 	private boolean sslInit;
 	private Connection dbConn;
 	private PreparedStatementWrapper[] preparedStatements = new PreparedStatementWrapper[PS_INSERT_GPX_DETAILS + 1];
-	
+
 	public DownloadOsmGPX() throws SQLException {
 		net.osmand.shared.util.PlatformUtil.INSTANCE.initialize(new ToolsOsmAndContextImpl());
 		java.util.logging.Logger.getLogger("GpxUtilities").setLevel(java.util.logging.Level.OFF);
 		initDBConnection();
 	}
-	
+
 	public static void main(String[] args) throws Exception {
 		String main = args.length > 0 ? args[0] : "";
 		DownloadOsmGPX utility = new DownloadOsmGPX();
@@ -169,55 +207,55 @@ public class DownloadOsmGPX {
 					continue;
 				}
 				switch (s[0]) {
-				case "--acitivity-type":
-					if (val.trim().length() > 0) {
-						qp.activityTypes = new HashSet<>();
-						String[] avls = val.split(",");
-						for (String av : avls) {
-							if (av.trim().length() == 0) {
-								continue;
+					case "--acitivity-type":
+						if (val.trim().length() > 0) {
+							qp.activityTypes = new HashSet<>();
+							String[] avls = val.split(",");
+							for (String av : avls) {
+								if (av.trim().length() == 0) {
+									continue;
+								}
+								qp.activityTypes.add(OsmRouteType.getOrCreateTypeFromName(av.trim()));
 							}
-							qp.activityTypes.add(OsmRouteType.getOrCreateTypeFromName(av.trim()));
 						}
-					}
-					break;
-				case "--bbox":
-					String[] vls = val.split(",");
-					qp.minlat = Double.parseDouble(vls[0]);
-					qp.minlon = Double.parseDouble(vls[1]);
-					qp.maxlat = Double.parseDouble(vls[2]);
-					qp.maxlon = Double.parseDouble(vls[3]);
-					break;
-				case "--details":
-					qp.details = Integer.parseInt(val);
-					break;
-				case "--out":
-					if (val.endsWith(".obf")) {
-						qp.obfFile = new File(val);
-						File dir = qp.obfFile.getParentFile();
-						qp.osmFile = new File(dir, Algorithms.getFileNameWithoutExtension(qp.obfFile) + ".osm.gz");
-					} else {
-						qp.osmFile = new File(val);
-					}
-					break;
-				case "--user":
-					qp.user = val;
-					break;
-				case "--limit":
-					qp.limit = Integer.parseInt(val);
-					break;
-				case "--datestart":
-					qp.datestart = val;
-					break;
-				case "--dateend":
-					qp.dateend = val;
-					break;
-				case "--tag":
-					qp.tag = val;
-					break;
+						break;
+					case "--bbox":
+						String[] vls = val.split(",");
+						qp.minlat = Double.parseDouble(vls[0]);
+						qp.minlon = Double.parseDouble(vls[1]);
+						qp.maxlat = Double.parseDouble(vls[2]);
+						qp.maxlon = Double.parseDouble(vls[3]);
+						break;
+					case "--details":
+						qp.details = Integer.parseInt(val);
+						break;
+					case "--out":
+						if (val.endsWith(".obf")) {
+							qp.obfFile = new File(val);
+							File dir = qp.obfFile.getParentFile();
+							qp.osmFile = new File(dir, Algorithms.getFileNameWithoutExtension(qp.obfFile) + ".osm.gz");
+						} else {
+							qp.osmFile = new File(val);
+						}
+						break;
+					case "--user":
+						qp.user = val;
+						break;
+					case "--limit":
+						qp.limit = Integer.parseInt(val);
+						break;
+					case "--datestart":
+						qp.datestart = val;
+						break;
+					case "--dateend":
+						qp.dateend = val;
+						break;
+					case "--tag":
+						qp.tag = val;
+						break;
 				}
 			}
-			if("query".equals(main)) {
+			if ("query".equals(main)) {
 				utility.queryGPXForBBOX(qp);
 			} else {
 				utility.generateObfFile(qp);
@@ -244,10 +282,10 @@ public class DownloadOsmGPX {
 					continue;
 				}
 				switch (s[0]) {
-				case "--max-empty-fetch":
-					MAX_EMPTY_FETCH = Integer.parseInt(val);
-					System.out.println("Max empty fetch " + MAX_EMPTY_FETCH);
-					break;
+					case "--max-empty-fetch":
+						MAX_EMPTY_FETCH = Integer.parseInt(val);
+						System.out.println("Max empty fetch " + MAX_EMPTY_FETCH);
+						break;
 				}
 			}
 			utility.downloadGPXMain();
@@ -267,6 +305,7 @@ public class DownloadOsmGPX {
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS time_minutes integer");
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS waypoints integer");
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS simplified_geometry bytea");
+			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS speed_matches_activity boolean");
 
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_speed ON " + GPX_METADATA_TABLE_NAME + " (speed)");
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_distance ON " + GPX_METADATA_TABLE_NAME + " (distance)");
@@ -280,12 +319,22 @@ public class DownloadOsmGPX {
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_tags_gin ON " + GPX_METADATA_TABLE_NAME + " USING GIN (tags)");
 
 			statement.executeUpdate("CREATE EXTENSION IF NOT EXISTS postgis");
-			statement.executeUpdate(
-					"CREATE INDEX IF NOT EXISTS idx_osm_gpx_bbox_gist " +
-							"ON " + GPX_METADATA_TABLE_NAME +
-							" USING GIST (ST_MakeEnvelope(minlon, minlat, maxlon, maxlat, 4326))"
-			);
+			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS bbox geometry"
+					+ " GENERATED ALWAYS AS (ST_MakeEnvelope(minlon, minlat, maxlon, maxlat, " + SRID_WGS84 + ")) STORED");
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_bbox_geom ON " + GPX_METADATA_TABLE_NAME
+					+ " USING GIST (bbox)");
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_year ON " + GPX_METADATA_TABLE_NAME + " ((extract(year from date)))");
+
+			// Partial covering indexes for the /ranges endpoint (bbox + activity, carrying distance/speed),
+			// limited to non-garbage tracks with a valid distance or speed.
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_ranges_optimized ON " + GPX_METADATA_TABLE_NAME
+					+ " (minlat, maxlat, minlon, maxlon, activity) INCLUDE (distance, speed)"
+					+ " WHERE (distance > 0::double precision OR speed > 0::double precision)"
+					+ " AND (activity <> ALL (ARRAY['garbage'::text, 'error'::text]))");
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_ranges_composite ON " + GPX_METADATA_TABLE_NAME
+					+ " (activity, minlat, minlon, maxlat, maxlon) INCLUDE (distance, speed)"
+					+ " WHERE (distance > 0::double precision OR speed > 0::double precision)"
+					+ " AND (activity <> ALL (ARRAY['garbage'::text, 'error'::text]))");
 		}
 		LOG.info("Activity schema (columns and indexes) ensured.");
 	}
@@ -319,7 +368,7 @@ public class DownloadOsmGPX {
 		PreparedStatement updateStmtMetrics = dbConn.prepareStatement(
 				"UPDATE " + GPX_METADATA_TABLE_NAME + " SET activity = ?, speed = ?, distance = ?, points = ?, " +
 						"max_speed = ?, max_dist_between_points = ?, time_minutes = ?, waypoints = ?, " +
-						"simplified_geometry = ? WHERE id = ?"
+						"simplified_geometry = ?, speed_matches_activity = ? WHERE id = ?"
 		);
 		PreparedStatement updateStmtActivityOnly = dbConn.prepareStatement(
 				"UPDATE " + GPX_METADATA_TABLE_NAME + " SET activity = ? WHERE id = ?"
@@ -414,8 +463,9 @@ public class DownloadOsmGPX {
 						if (activity == null) {
 							activity = analyzeActivity(rs, activitiesMap);
 						}
+						Boolean speedMatches = speedMatchesActivity(activity, avgSpeedKmh, maxSpeedKmh);
 						if (activity == null) {
-							activity = analyzeActivityFromGpx(analysis);
+							activity = analyzeActivityFromGpx(analysis, avgSpeedKmh, maxSpeedKmh);
 						}
 
 						if (activity == null) {
@@ -437,7 +487,8 @@ public class DownloadOsmGPX {
 							updateStmtMetrics.setInt(7, timeMinutes);
 							updateStmtMetrics.setInt(8, waypointsCount);
 							updateStmtMetrics.setBytes(9, simplifiedGeometry);
-							updateStmtMetrics.setLong(10, id);
+							updateStmtMetrics.setObject(10, speedMatches, Types.BOOLEAN);
+							updateStmtMetrics.setLong(11, id);
 							updateStmtMetrics.addBatch();
 						} else {
 							updateStmtActivityOnly.setString(1, activity);
@@ -502,32 +553,17 @@ public class DownloadOsmGPX {
 		d.analysis = analysis;
 		int pointsSize = gpxFile.getAllSegmentsPoints().size();
 		float totalDistance = analysis.getTotalDistance();
-		if (pointsSize < MIN_POINTS_SIZE
-				|| totalDistance < MIN_DISTANCE
-				|| analysis.getMaxDistanceBetweenPoints() >= MAX_DISTANCE_BETWEEN_POINTS) {
+		if (pointsSize < MIN_POINTS_SIZE || totalDistance < MIN_DISTANCE
+				|| (analysis.getMaxDistanceBetweenPoints() > TELEPORT_GAP_MIN_DISTANCE && hasTeleportGap(gpxFile))) {
 			d.garbage = true;
 			return d;
 		}
 		d.metrics = true;
 		d.pointsCount = pointsSize;
 		d.distanceMeters = totalDistance;
-		double avgSpeedMs = analysis.getAvgSpeed();
-		if (avgSpeedMs > 0) {
-			d.avgSpeedKmh = (float) (avgSpeedMs * 3.6d);
-		} else if (totalDistance > 0) {
-			// Fallback: calculate speed manually when not available in track
-			double timeMs = analysis.getTimeMoving();
-			if (timeMs <= 0) {
-				timeMs = analysis.getTimeSpan();
-			}
-			if (timeMs > 0) {
-				d.avgSpeedKmh = (float) ((totalDistance / (timeMs / 1000d)) * 3.6d);
-			}
-		}
-		double maxSpeedMs = analysis.getMaxSpeed();
-		if (maxSpeedMs > 0) {
-			d.maxSpeedKmh = (float) (maxSpeedMs * 3.6d);
-		}
+		SpeedMetrics speed = computeSpeedMetrics(gpxFile);
+		d.avgSpeedKmh = speed.avgKmh();
+		d.maxSpeedKmh = speed.maxKmh();
 		d.maxDistBetweenPoints = analysis.getMaxDistanceBetweenPoints();
 		double timeSpanMs = analysis.getTimeSpan();
 		if (timeSpanMs > 0) {
@@ -537,6 +573,69 @@ public class DownloadOsmGPX {
 		d.simplifiedGeometry = TrackSimplifyEncoder.encodeGeometry(
 				TrackSimplifyEncoder.simplifyGpx(gpxFile, TrackSimplifyEncoder.SIMPLIFY_ZOOM));
 		return d;
+	}
+
+	// A gap crossed faster than any real vehicle (incl. aircraft) is a teleport, not a tunnel/flight.
+	static boolean hasTeleportGap(GpxFile gpxFile) {
+		for (Track track : gpxFile.getTracks(false)) {
+			for (TrkSegment seg : track.getSegments()) {
+				WptPt prev = null;
+				for (WptPt p : seg.getPoints()) {
+					if (prev != null) {
+						long dtMs = p.getTime() - prev.getTime();
+						if (dtMs >= MIN_SPEED_INTERVAL_MS) {
+							double dist = MapUtils.getDistance(prev.getLat(), prev.getLon(), p.getLat(), p.getLon());
+							if (dist * 3600d / dtMs > GAP_MAX_SPEED_KMH) { // m/ms -> km/h
+								return true;
+							}
+						}
+					}
+					prev = p;
+				}
+			}
+		}
+		return false;
+	}
+
+	// Measures each move from the last distinct position (skipping frozen duplicate coordinates),
+	// so a stuck-then-jumping GPS doesn't inflate speed.
+	static SpeedMetrics computeSpeedMetrics(GpxFile gpxFile) {
+		double movingDist = 0d;
+		long movingTimeMs = 0L;
+		double coordMaxMps = 0d;
+		float recordedMaxMps = 0f;
+		for (Track track : gpxFile.getTracks(false)) {
+			for (TrkSegment seg : track.getSegments()) {
+				WptPt anchor = null; // last distinct position, with the time we first reached it
+				for (WptPt p : seg.getPoints()) {
+					recordedMaxMps = Math.max(recordedMaxMps, p.getSpeed());
+					if (anchor == null) {
+						anchor = p;
+						continue;
+					}
+					if (p.getLat() == anchor.getLat() && p.getLon() == anchor.getLon()) {
+						continue; // frozen: keep the anchor and its arrival time
+					}
+					long dtMs = p.getTime() - anchor.getTime();
+					if (dtMs >= MIN_SPEED_INTERVAL_MS) { // ignore sub-second bursts with unreliable timestamps
+						double dist = MapUtils.getDistance(anchor.getLat(), anchor.getLon(), p.getLat(), p.getLon());
+						double speedMps = dist * 1000d / dtMs;
+						if (speedMps > MIN_MOVING_SPEED_MPS) {
+							movingDist += dist;
+							movingTimeMs += dtMs;
+							coordMaxMps = Math.max(coordMaxMps, speedMps);
+						}
+					}
+					anchor = p;
+				}
+			}
+		}
+		float avgKmh = movingTimeMs > 0 ? (float) (movingDist * 1000d / movingTimeMs * 3.6d) : 0f;
+		double maxMps = recordedMaxMps > 0 ? recordedMaxMps : coordMaxMps;
+		return new SpeedMetrics(avgKmh, (float) (maxMps * 3.6d));
+	}
+
+	record SpeedMetrics(float avgKmh, float maxKmh) {
 	}
 
 	private static class TrackData {
@@ -612,14 +711,29 @@ public class DownloadOsmGPX {
 		for (Map.Entry<String, String> entry : tagMap.entrySet()) {
 			String tag = entry.getKey();
 			String activityId = entry.getValue();
-			if (name != null && name.toLowerCase().contains(tag)) {
+			if (containsWord(name, tag)) {
+				if (ACTIVITY_KEYWORD_EXCLUSIONS.contains(tag)) {
+					continue;
+				}
 				return activityId;
 			}
-			if (desc != null && desc.toLowerCase().contains(tag)) {
+			if (containsWord(desc, tag)) {
 				return activityId;
 			}
 		}
 		return null;
+	}
+
+	private static boolean containsWord(String text, String word) {
+		if (text == null) {
+			return false;
+		}
+		for (String part : text.split("[\\s_]+")) {
+			if (part.equalsIgnoreCase(word)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private static Map<String, List<String>> createActivitiesMap(String rootPath) {
@@ -656,6 +770,7 @@ public class DownloadOsmGPX {
 						}
 					}
 					activitiesMap.put(activityId, activityTags);
+					ACTIVITY_GROUPS.put(activityId, groupId);
 				}
 			}
 		} catch (IOException e) {
@@ -665,25 +780,33 @@ public class DownloadOsmGPX {
 		return activitiesMap;
 	}
 
-	private String analyzeActivityFromGpx(GpxTrackAnalysis analysis) {
-		if (analysis != null) {
-			if (analysis.getHasSpeedInTrack()) {
-				float avgSpeed = analysis.getAvgSpeed() * 3.6f;
-				if (avgSpeed > 0 && avgSpeed <= 12) {
-					return "foot";
-				} else if (avgSpeed <= 25) {
-					return "cycling";
-				} else if (avgSpeed <= 150) {
-					return "driving";
-				} else if (avgSpeed > 150) {
-					return "aviation";
-				} else {
-					return "other";
-				}
-			}
+	private String analyzeActivityFromGpx(GpxTrackAnalysis analysis, float avgSpeed, float maxSpeed) {
+		if (analysis == null) {
+			return ERROR_ACTIVITY_TYPE;
+		}
+		if (!analysis.getHasSpeedInTrack() || avgSpeed <= 0) {
 			return NOSPEED_ACTIVITY_TYPE;
 		}
-		return ERROR_ACTIVITY_TYPE;
+		for (String type : ACTIVITY_BY_SPEED) {
+			if (avgSpeed <= GROUP_AVG_LIMIT_KMH.get(type) && maxSpeed <= GROUP_MAX_LIMIT_KMH.get(type)) {
+				return type;
+			}
+		}
+		return OTHER_GROUP;
+	}
+
+	@Nullable
+	private static Boolean speedMatchesActivity(String activity, float avgSpeedKmh, float maxSpeedKmh) {
+		if (activity == null || avgSpeedKmh <= 0) {
+			return null;
+		}
+		String group = ACTIVITY_GROUPS.get(activity);
+		Double avgLimitKmh = GROUP_AVG_LIMIT_KMH.get(group);
+		Double maxLimitKmh = GROUP_MAX_LIMIT_KMH.get(group);
+		if (avgLimitKmh == null || maxLimitKmh == null) {
+			return null;
+		}
+		return avgSpeedKmh <= avgLimitKmh && maxSpeedKmh <= maxLimitKmh;
 	}
 
 	protected void queryGPXForBBOX(QueryParams qp) throws SQLException, IOException, FactoryConfigurationError, XMLStreamException, InterruptedException, XmlPullParserException {
@@ -698,7 +821,7 @@ public class DownloadOsmGPX {
 				conditions += " and (";
 				String[] tagsOr = tagAnd.split("\\;");
 				boolean t = false;
-				for(String tagOr : tagsOr) {
+				for (String tagOr : tagsOr) {
 					if (t) {
 						conditions += " or ";
 					}
@@ -714,7 +837,7 @@ public class DownloadOsmGPX {
 		if (!Algorithms.isEmpty(qp.dateend)) {
 			conditions += " and t.date <= '" + qp.dateend + "'";
 		}
-		
+
 		if (qp.minlat != OsmGpxFile.ERROR_NUMBER) {
 			conditions += " and t.maxlat >= " + qp.minlat;
 			conditions += " and t.minlat <= " + qp.maxlat;
@@ -731,7 +854,7 @@ public class DownloadOsmGPX {
 		ResultSet rs = dbConn.createStatement().executeQuery(query);
 		OsmGpxWriteContext ctx = new OsmGpxWriteContext(qp);
 		ctx.startDocument();
-		Date lastTimestamp = null; 
+		Date lastTimestamp = null;
 		while (rs.next()) {
 			if ((ctx.tracks + 1) % 1000 == 0) {
 				System.out.println(
@@ -774,7 +897,7 @@ public class DownloadOsmGPX {
 			ctx.writeTrack(gpxInfo, gpxFile, analysis);
 		}
 		ctx.endDocument();
-		
+
 		System.out.println(String.format("Fetched %d tracks %d segments", ctx.tracks, ctx.segments));
 		generateObfFile(qp);
 	}
@@ -876,7 +999,7 @@ public class DownloadOsmGPX {
 		preparedStatements[PS_UPDATE_GPX_DETAILS] = wgpx;
 		wgpx.ps = dbConn.prepareStatement("UPDATE " + GPX_METADATA_TABLE_NAME
 				+ " SET description = ?, tags = ? where id = ?");
-		ResultSet rs = dbConn.createStatement().executeQuery("SELECT id, name from " + GPX_METADATA_TABLE_NAME 
+		ResultSet rs = dbConn.createStatement().executeQuery("SELECT id, name from " + GPX_METADATA_TABLE_NAME
 				+ " where description is null order by 1 asc");
 		long minId = 0;
 		long maxId = 0;
@@ -929,7 +1052,7 @@ public class DownloadOsmGPX {
 			OsmGpxFile r = new OsmGpxFile(GPX_FILE_PREIX);
 			try {
 				r.id = rs.getLong(1);
-				r.name= rs.getString(2);
+				r.name = rs.getString(2);
 				r.lat = rs.getDouble(3);
 				r.lon = rs.getDouble(4);
 				if (++batchSize == FETCH_INTERVAL) {
@@ -974,9 +1097,9 @@ public class DownloadOsmGPX {
 
 	protected void downloadGPXMain() throws Exception {
 		Long maxId = (Long) executeSQLQuery("SELECT max(id) from " + GPX_METADATA_TABLE_NAME);
-		long ID_INIT = Math.max(INITIAL_ID, maxId == null ? 0 : (maxId.longValue()  + 1));
+		long ID_INIT = Math.max(INITIAL_ID, maxId == null ? 0 : (maxId.longValue() + 1));
 		long ID_END = ID_INIT + FETCH_MAX_INTERVAL;
-		int batchFetch = 0; 
+		int batchFetch = 0;
 		int success = 0;
 		OsmGpxFile lastSuccess = null;
 		System.out.println("Start with id: " + ID_INIT);
@@ -1019,7 +1142,7 @@ public class DownloadOsmGPX {
 				} else {
 					long last = (lastSuccess == null ? ID_INIT : lastSuccess.id) + emptyFetch * FETCH_INTERVAL;
 					System.out.println(String.format("No successful fetch after %d - %d %s ",
-							last,  last + FETCH_INTERVAL, lastTime));
+							last, last + FETCH_INTERVAL, lastTime));
 					if (++emptyFetch >= MAX_EMPTY_FETCH) {
 						break;
 					}
@@ -1028,7 +1151,7 @@ public class DownloadOsmGPX {
 				success = 0;
 				Thread.sleep(FETCH_INTERVAL_SLEEP);
 			}
-			
+
 		}
 		commitAllStatements();
 	}
@@ -1055,7 +1178,7 @@ public class DownloadOsmGPX {
 
 	private void insertGPXFile(OsmGpxFile r) throws SQLException {
 		PreparedStatementWrapper wrapper = preparedStatements[PS_INSERT_GPX_DETAILS];
-		if(wrapper == null) {
+		if (wrapper == null) {
 			wrapper = new PreparedStatementWrapper();
 			wrapper.ps = dbConn.prepareStatement("INSERT INTO " + GPX_METADATA_TABLE_NAME
 					+ "(id, \"user\", \"date\", name, lat, lon, minlat, minlon, maxlat, maxlon, pending, visibility, tags, description) "
@@ -1085,9 +1208,9 @@ public class DownloadOsmGPX {
 		wrapper.ps.setArray(ind++, r.tags == null ? null : dbConn.createArrayOf("text", r.tags));
 		wrapper.ps.setString(ind++, r.description);
 		wrapper.addBatch();
-		
+
 		PreparedStatementWrapper wrapperFile = preparedStatements[PS_INSERT_GPX_FILE];
-		if(wrapperFile == null) {
+		if (wrapperFile == null) {
 			wrapperFile = new PreparedStatementWrapper();
 			wrapperFile.ps = dbConn.prepareStatement("INSERT INTO " + GPX_FILES_TABLE_NAME
 					+ "(id, data) "
@@ -1100,9 +1223,9 @@ public class DownloadOsmGPX {
 	}
 
 	private void commitAllStatements() throws SQLException {
-		for(PreparedStatementWrapper w : preparedStatements) {
-			if(w != null && w.ps != null) {
-				if(w.pending > 0) {
+		for (PreparedStatementWrapper w : preparedStatements) {
+			if (w != null && w.ps != null) {
+				if (w.pending > 0) {
 					w.ps.executeBatch();
 					w.pending = 0;
 				}
@@ -1134,11 +1257,11 @@ public class DownloadOsmGPX {
 		statement.execute(sql);
 		statement.close();
 	}
-	
+
 	private Object executeSQLQuery(String sql) throws SQLException {
 		Statement statement = dbConn.createStatement();
 		ResultSet rs = statement.executeQuery(sql);
-		if(rs.next()) {
+		if (rs.next()) {
 			return rs.getObject(1);
 		}
 		statement.close();
@@ -1151,7 +1274,7 @@ public class DownloadOsmGPX {
 		try {
 			if (!sslInit) {
 				SSLContext ctx = SSLContext.getInstance("TLS");
-				ctx.init(new KeyManager[0], new X509TrustManager[] { new X509TrustManager() {
+				ctx.init(new KeyManager[0], new X509TrustManager[]{new X509TrustManager() {
 					@Override
 					public X509Certificate[] getAcceptedIssuers() {
 						return null;
@@ -1164,7 +1287,7 @@ public class DownloadOsmGPX {
 					@Override
 					public void checkClientTrusted(X509Certificate[] arg0, String arg1) throws CertificateException {
 					}
-				} }, new SecureRandom());
+				}}, new SecureRandom());
 				SSLContext.setDefault(ctx);
 				sslInit = true;
 			}
@@ -1176,12 +1299,12 @@ public class DownloadOsmGPX {
 			con.setRequestProperty("Authorization", "Bearer" + " " + accessToken); // oauth2
 
 			con.setHostnameVerifier(new HostnameVerifier() {
-			    @Override
-			    public boolean verify(String arg0, SSLSession arg1) {
-			        return true;
-			    }
+				@Override
+				public boolean verify(String arg0, SSLSession arg1) {
+					return true;
+				}
 			});
-			
+
 			con.getResponseCode();
 			return con;
 		} catch (IOException e) {
@@ -1205,9 +1328,9 @@ public class DownloadOsmGPX {
 		int tok;
 		OsmGpxFile p = null;
 		List<String> tags = new ArrayList<String>();
-		while((tok = parser.next()) != XmlPullParser.END_DOCUMENT) {
-			if(tok == XmlPullParser.START_TAG) {
-				if(parser.getName().equals("gpx_file")) {
+		while ((tok = parser.next()) != XmlPullParser.END_DOCUMENT) {
+			if (tok == XmlPullParser.START_TAG) {
+				if (parser.getName().equals("gpx_file")) {
 					p = new OsmGpxFile(GPX_FILE_PREIX);
 					p.id = Long.parseLong(parser.getAttributeValue("", "id"));
 					p.user = parser.getAttributeValue("", "user");
@@ -1219,18 +1342,18 @@ public class DownloadOsmGPX {
 					p.timestamp = tsStr != null ? new Date(GpxUtilities.INSTANCE.parseTime(tsStr)) : new Date(0);
 					p.lat = Double.parseDouble(getAttributeDoubleValue(parser, "lat"));
 					p.lon = Double.parseDouble(getAttributeDoubleValue(parser, "lon"));
-				} else if(parser.getName().equals("description") && p != null) {
+				} else if (parser.getName().equals("description") && p != null) {
 					p.description = readText(parser, parser.getName());
-				} else if(parser.getName().equals("tag")) {
+				} else if (parser.getName().equals("tag")) {
 					String value = readText(parser, parser.getName());
 					tags.add(value);
-				} 
-			} else if(tok == XmlPullParser.END_TAG) {
-				if(parser.getName().equals("gpx_file")) {
-					if(p != null && gpxFiles != null) {
+				}
+			} else if (tok == XmlPullParser.END_TAG) {
+				if (parser.getName().equals("gpx_file")) {
+					if (p != null && gpxFiles != null) {
 						gpxFiles.add(p);
 					}
-				} 
+				}
 			}
 		}
 		if (tags.size() > 0) {
@@ -1272,7 +1395,7 @@ public class DownloadOsmGPX {
 
 		}
 	}
-	
+
 	private static String getAttributeDoubleValue(XmlPullParser parser, String key) {
 		String vl = parser.getAttributeValue("", key);
 		if (isEmpty(vl)) {
