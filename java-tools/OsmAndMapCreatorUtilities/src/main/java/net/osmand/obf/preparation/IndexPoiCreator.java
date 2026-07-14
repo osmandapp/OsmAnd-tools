@@ -101,6 +101,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	public static final int DEFAULT_TOP_INDEX_MAX_PER_MAP = PoiType.DEFAULT_MAX_PER_MAP;
 	public static final int DEFAULT_TOP_INDEX_LIMIT_PER_MAP = 1000;
 
+	// some multipolygons have > 38K islands (tongass)
+	private static final int MAX_POI_OUTER_MULTIPOLYGON_SIZE = 1024;
+
     private final List<String> WORLD_BRANDS = Arrays.asList("McDonald's", "Starbucks", "Subway", "KFC", "Burger King", "Domino's Pizza",
             "Pizza Hut", "Dunkin'", "Costa Coffee", "Tim Hortons", "7-Eleven", "Żabka", "Shell", "BP", "Chevron",
             "TotalEnergies", "Aral", "Q8", "Petronas", "Caltex", "Esso", "Tesla Supercharger", "Ionity", "Walmart", "Carrefour",
@@ -282,6 +285,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				}
 				List<Multipolygon> multipolygons = original.splitPerOuterRing(log);
 				centers = new ArrayList<>();
+				if (multipolygons.size() > MAX_POI_OUTER_MULTIPOLYGON_SIZE) {
+					multipolygons = multipolygons.subList(0, MAX_POI_OUTER_MULTIPOLYGON_SIZE);
+				}
 				for (Multipolygon m : multipolygons) {
 					assert m.getOuterRings().size() == 1;
 					if (!m.areRingsComplete()) {
