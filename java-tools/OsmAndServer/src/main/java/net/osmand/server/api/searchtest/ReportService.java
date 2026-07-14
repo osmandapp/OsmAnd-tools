@@ -66,6 +66,7 @@ public interface ReportService {
 			)""";
 	String REPORT_SQL = GEN_SQL + """
 			 SELECT CASE
+			    WHEN r.error IS NOT NULL THEN 'Error'
 				WHEN g.gen_count <= 0 OR g.query IS NULL OR trim(g.query) = '' THEN 'Not Processed'
 				WHEN COALESCE(found, res_distance <= 50) THEN 'Found'
 			    WHEN SUBSTR(COALESCE(json_extract(r.row, '$.actual_place'), ''), 1, INSTR(json_extract(r.row, '$.actual_place'), ' -') - 1) IN ('2','3','4','5') THEN 'Partial'
@@ -161,7 +162,7 @@ public interface ReportService {
 					JsonNode outRow = getObjectMapper().readTree(outRowJson);
 					// For consistency with CSV, serialize values as text, skipping excluded keys
 					outRow.fieldNames().forEachRemaining(fn -> {
-						if (exclude.contains(fn) || fn.startsWith("stat_") || fn.endsWith("_stats") || fn.startsWith("spatial_"))
+						if (exclude.contains(fn) || fn.startsWith("stat_") || fn.endsWith("_stats") || (fn.startsWith("spatial_") && !fn.contains("_step")))
 							return; // remove from the inner 'row' map
 						JsonNode v = outRow.get(fn);
 						if (outProps.contains(fn)) {
