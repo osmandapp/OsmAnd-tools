@@ -47,6 +47,10 @@ import net.osmand.obf.ToolsOsmAndContextImpl;
 import net.osmand.shared.data.KQuadRect;
 import net.osmand.shared.gpx.RouteActivityHelper;
 import net.osmand.shared.gpx.primitives.RouteActivity;
+import net.osmand.shared.gpx.primitives.Track;
+import net.osmand.shared.gpx.primitives.TrkSegment;
+import net.osmand.shared.gpx.primitives.WptPt;
+import net.osmand.util.MapUtils;
 import okio.Source;
 import okio.Buffer;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
@@ -122,6 +126,8 @@ public class DownloadOsmGPX {
 	private static final int MIN_POINTS_SIZE = 100;
 	private static final int MIN_DISTANCE = 1000;
 	private static final int MAX_DISTANCE_BETWEEN_POINTS = 1000;
+	private static final long MIN_SPEED_INTERVAL_MS = 500; // min elapsed time to trust a speed sample
+	private static final double MIN_MOVING_SPEED_MPS = 0.1; // below this the interval counts as standing still
 	private static final int SRID_WGS84 = 4326;
 
 	private static final String GPX_FILE_PREIX = "OG";
@@ -429,7 +435,7 @@ public class DownloadOsmGPX {
 							activity = analyzeActivity(rs, activitiesMap);
 						}
 						if (activity == null) {
-							activity = analyzeActivityFromGpx(analysis);
+							activity = analyzeActivityFromGpx(analysis, avgSpeedKmh);
 						}
 
 						if (activity == null) {
@@ -525,23 +531,9 @@ public class DownloadOsmGPX {
 		d.metrics = true;
 		d.pointsCount = pointsSize;
 		d.distanceMeters = totalDistance;
-		double avgSpeedMs = analysis.getAvgSpeed();
-		if (avgSpeedMs > 0) {
-			d.avgSpeedKmh = (float) (avgSpeedMs * 3.6d);
-		} else if (totalDistance > 0) {
-			// Fallback: calculate speed manually when not available in track
-			double timeMs = analysis.getTimeMoving();
-			if (timeMs <= 0) {
-				timeMs = analysis.getTimeSpan();
-			}
-			if (timeMs > 0) {
-				d.avgSpeedKmh = (float) ((totalDistance / (timeMs / 1000d)) * 3.6d);
-			}
-		}
-		double maxSpeedMs = analysis.getMaxSpeed();
-		if (maxSpeedMs > 0) {
-			d.maxSpeedKmh = (float) (maxSpeedMs * 3.6d);
-		}
+		SpeedMetrics speed = computeSpeedMetrics(gpxFile);
+		d.avgSpeedKmh = speed.avgKmh();
+		d.maxSpeedKmh = speed.maxKmh();
 		d.maxDistBetweenPoints = analysis.getMaxDistanceBetweenPoints();
 		double timeSpanMs = analysis.getTimeSpan();
 		if (timeSpanMs > 0) {
@@ -551,6 +543,47 @@ public class DownloadOsmGPX {
 		d.simplifiedGeometry = TrackSimplifyEncoder.encodeGeometry(
 				TrackSimplifyEncoder.simplifyGpx(gpxFile, TrackSimplifyEncoder.SIMPLIFY_ZOOM));
 		return d;
+	}
+
+	// Measures each move from the last distinct position (skipping frozen duplicate coordinates),
+	// so a stuck-then-jumping GPS doesn't inflate speed.
+	static SpeedMetrics computeSpeedMetrics(GpxFile gpxFile) {
+		double movingDist = 0d;
+		long movingTimeMs = 0L;
+		double coordMaxMps = 0d;
+		float recordedMaxMps = 0f;
+		for (Track track : gpxFile.getTracks(false)) {
+			for (TrkSegment seg : track.getSegments()) {
+				WptPt anchor = null; // last distinct position, with the time we first reached it
+				for (WptPt p : seg.getPoints()) {
+					recordedMaxMps = Math.max(recordedMaxMps, p.getSpeed());
+					if (anchor == null) {
+						anchor = p;
+						continue;
+					}
+					if (p.getLat() == anchor.getLat() && p.getLon() == anchor.getLon()) {
+						continue; // frozen: keep the anchor and its arrival time
+					}
+					long dtMs = p.getTime() - anchor.getTime();
+					if (dtMs >= MIN_SPEED_INTERVAL_MS) { // ignore sub-second bursts with unreliable timestamps
+						double dist = MapUtils.getDistance(anchor.getLat(), anchor.getLon(), p.getLat(), p.getLon());
+						double speedMps = dist * 1000d / dtMs;
+						if (speedMps > MIN_MOVING_SPEED_MPS) {
+							movingDist += dist;
+							movingTimeMs += dtMs;
+							coordMaxMps = Math.max(coordMaxMps, speedMps);
+						}
+					}
+					anchor = p;
+				}
+			}
+		}
+		float avgKmh = movingTimeMs > 0 ? (float) (movingDist * 1000d / movingTimeMs * 3.6d) : 0f;
+		double maxMps = recordedMaxMps > 0 ? recordedMaxMps : coordMaxMps;
+		return new SpeedMetrics(avgKmh, (float) (maxMps * 3.6d));
+	}
+
+	record SpeedMetrics(float avgKmh, float maxKmh) {
 	}
 
 	private static class TrackData {
@@ -694,10 +727,9 @@ public class DownloadOsmGPX {
 		return activitiesMap;
 	}
 
-	private String analyzeActivityFromGpx(GpxTrackAnalysis analysis) {
+	private String analyzeActivityFromGpx(GpxTrackAnalysis analysis, float avgSpeed) {
 		if (analysis != null) {
 			if (analysis.getHasSpeedInTrack()) {
-				float avgSpeed = analysis.getAvgSpeed() * 3.6f;
 				if (avgSpeed > 0 && avgSpeed <= 12) {
 					return "foot";
 				} else if (avgSpeed <= 25) {
