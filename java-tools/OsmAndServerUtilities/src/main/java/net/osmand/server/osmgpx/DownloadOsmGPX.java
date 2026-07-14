@@ -139,7 +139,7 @@ public class DownloadOsmGPX {
 			AVIATION_ACTIVITY_TYPE, 1000d);
 	private static final Map<String, Double> GROUP_MAX_LIMIT_KMH = Map.of(
 			FOOT_GROUP, 25d,
-			CYCLING_GROUP, 65d,
+			CYCLING_GROUP, 45d,
 			WINTER_SPORT_GROUP, 130d,
 			DRIVING_GROUP, 250d,
 			MOTORCYCLING_GROUP, 300d,
