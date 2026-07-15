@@ -35,14 +35,20 @@ public interface InspectorService extends OBFService {
      * repeated proto fields are preserved here so Inspector can expose malformed or legacy data.
      */
     abstract class Atom {
-        private final String obf;
-        private final int atomOrder, nameIndexDataOffset, suffixIndex, atomSize;
-        private final int[] suffixesBitsetIndex, otherWordsCount;
-        private final String[] extraSuffix;
-        private final byte[] bbox;
+        protected final String obf;
+        protected final int atomOrder, nameIndexDataOffset, suffixIndex, atomSize, commonSuffixOffset;
+        protected final int[] suffixesBitsetIndex, otherWordsCount;
+        protected final String[] extraSuffixes;
+        protected final byte[] bbox;
         
         protected Atom(String obf, int atomOrder, int nameIndexDataOffset, int suffixIndex, int atomSize,
-                       int[] suffixesBitsetIndex, int[] otherWordsCount, String[] extraSuffix, byte[] bbox) {
+                       int[] suffixesBitsetIndex, int[] otherWordsCount, String[] extraSuffixes, byte[] bbox) {
+            this(obf, atomOrder, nameIndexDataOffset, suffixIndex, atomSize,
+                    suffixesBitsetIndex, otherWordsCount, extraSuffixes, bbox, nameIndexDataOffset);
+        }
+
+        protected Atom(String obf, int atomOrder, int nameIndexDataOffset, int suffixIndex, int atomSize,
+                       int[] suffixesBitsetIndex, int[] otherWordsCount, String[] extraSuffixes, byte[] bbox, int commonSuffixOffset) {
             this.obf = obf;
             this.atomOrder = atomOrder;
             this.nameIndexDataOffset = nameIndexDataOffset;
@@ -50,88 +56,59 @@ public interface InspectorService extends OBFService {
             this.atomSize = atomSize;
             this.suffixesBitsetIndex = suffixesBitsetIndex == null ? new int[0] : suffixesBitsetIndex;
             this.otherWordsCount = otherWordsCount == null ? new int[0] : otherWordsCount;
-            this.extraSuffix = extraSuffix == null ? new String[0] : extraSuffix;
+            this.extraSuffixes = extraSuffixes == null ? new String[0] : extraSuffixes;
             this.bbox = bbox == null ? new byte[0] : bbox;
+            this.commonSuffixOffset = commonSuffixOffset;
         }
 
-        public String obf() {
-            return obf;
-        }
-
-        public int atomOrder() {
-            return atomOrder;
-        }
-
-        public int nameIndexDataOffset() {
-            return nameIndexDataOffset;
-        }
-
-        public int suffixIndex() {
-            return suffixIndex;
-        }
-
-        public int atomSize() {
-            return atomSize;
-        }
-
-        public int[] suffixesBitsetIndex() {
-            return suffixesBitsetIndex;
-        }
-
-        public int[] otherWordsCount() {
-            return otherWordsCount;
-        }
-
-        public String[] extraSuffix() {
-            return extraSuffix;
+        public String[] getCommonSuffixes() {
+            return null;
         }
         
-        public byte[] bbox() {
-            return bbox;
+        public String[] getPartialSuffixes() {
+            return null;
+        }
+        
+        public String[] getIntSuffixes() {
+            return null;
+        }
+        
+        public String[] getExtraSuffixes() {
+            return extraSuffixes;
+        }
+        
+        public List<CommonSuffix> getSuffixDictionary() {
+            return getCachedCommonSuffixStats(obf, isPoi(), commonSuffixOffset);
         }
         
         public abstract boolean isPoi();
 
-        public abstract int objectRefCount();
+        public abstract int getObjectRefsCount();
     }
 
     // Complies with OsmAndPoiNameIndexDataAtom in OBF.proto.
     class POIAtom extends Atom {
-        private final int zoom;
-        private final int x;
-        private final int y;
-        private final int[] poiIndInBlock;
-        private final int shiftTo;
+        protected final int zoom, x, y, shiftTo;
+        protected final int[] poiIndInBlock;
 
         public POIAtom(String obf, int atomOrder, int nameIndexDataOffset, int suffixIndex, int atomSize,
                        int[] suffixesBitsetIndex, int[] otherWordsCount, String[] extraSuffix,
                        int zoom, int x, int y, int[] poiIndInBlock, byte[] bbox, int shiftTo) {
-            super(obf, atomOrder, nameIndexDataOffset, suffixIndex, atomSize, suffixesBitsetIndex, otherWordsCount, extraSuffix, bbox);
+            this(obf, atomOrder, nameIndexDataOffset, suffixIndex, atomSize,
+                    suffixesBitsetIndex, otherWordsCount, extraSuffix, zoom, x, y, poiIndInBlock, bbox, shiftTo,
+                    nameIndexDataOffset);
+        }
+
+        public POIAtom(String obf, int atomOrder, int nameIndexDataOffset, int suffixIndex, int atomSize,
+                       int[] suffixesBitsetIndex, int[] otherWordsCount, String[] extraSuffix,
+                       int zoom, int x, int y, int[] poiIndInBlock, byte[] bbox, int shiftTo, int commonSuffixOffset) {
+            super(obf, atomOrder, nameIndexDataOffset, suffixIndex, atomSize,
+                    suffixesBitsetIndex, otherWordsCount, extraSuffix, bbox, commonSuffixOffset);
             this.zoom = zoom;
             this.x = x;
             this.y = y;
             this.poiIndInBlock = poiIndInBlock == null ? new int[0] : poiIndInBlock;
             this.shiftTo = shiftTo;
-        }
-
-        public int zoom() {
-            return zoom;
-        }
-
-        public int x() {
-            return x;
-        }
-
-        public int y() {
-            return y;
-        }
-
-        public int[] poiIndInBlock() {
-            return poiIndInBlock;
-        }
-
-        public int shiftTo() {
-            return shiftTo;
         }
 
         @Override
@@ -140,24 +117,31 @@ public interface InspectorService extends OBFService {
         }
 
         @Override
-        public int objectRefCount() {
-            return poiIndInBlock.length > 0 ? poiIndInBlock.length : shiftTo == 0 ? 0 : 1;
+        public int getObjectRefsCount() {
+            return poiIndInBlock.length > 0 ? poiIndInBlock.length : (shiftTo == 0 ? 0 : 1);
         }
     }
 
     // Complies with AddressNameIndexDataAtom in OBF.proto.
     class AddressAtom extends Atom {
-        private final int type;
-        private final int enclosingObjects;
-        private final int[] shiftToIndex;
-        private final int[] shiftToCityIndex;
-        private final int[] xy16;
+        private final int type, enclosingObjects;
+        private final int[] shiftToIndex, shiftToCityIndex, xy16;
 
         public AddressAtom(String obf, int atomOrder, int nameIndexDataOffset, int suffixIndex, int atomSize,
                            int[] suffixesBitsetIndex, int[] otherWordsCount, String[] extraSuffix,
                            int type, byte[] bbox, int enclosingObjects,
                            int[] shiftToIndex, int[] shiftToCityIndex, int[] xy16) {
-            super(obf, atomOrder, nameIndexDataOffset, suffixIndex, atomSize, suffixesBitsetIndex, otherWordsCount, extraSuffix, bbox);
+            this(obf, atomOrder, nameIndexDataOffset, suffixIndex, atomSize,
+                    suffixesBitsetIndex, otherWordsCount, extraSuffix, type, bbox, enclosingObjects,
+                    shiftToIndex, shiftToCityIndex, xy16, nameIndexDataOffset);
+        }
+
+        public AddressAtom(String obf, int atomOrder, int nameIndexDataOffset, int suffixIndex, int atomSize,
+                           int[] suffixesBitsetIndex, int[] otherWordsCount, String[] extraSuffix,
+                           int type, byte[] bbox, int enclosingObjects,
+                           int[] shiftToIndex, int[] shiftToCityIndex, int[] xy16, int commonSuffixOffset) {
+            super(obf, atomOrder, nameIndexDataOffset, suffixIndex, atomSize,
+                    suffixesBitsetIndex, otherWordsCount, extraSuffix, bbox, commonSuffixOffset);
             this.type = type;
             this.enclosingObjects = enclosingObjects;
             this.shiftToIndex = shiftToIndex == null ? new int[0] : shiftToIndex;
@@ -191,77 +175,27 @@ public interface InspectorService extends OBFService {
         }
 
         @Override
-        public int objectRefCount() {
+        public int getObjectRefsCount() {
             return shiftToIndex.length;
         }
     }
 
     record IndexToken(String name, boolean isPoi, Atom[] atoms, boolean isCommon, boolean isFrequent, String obf, int count) {
         public IndexToken {
-            atoms = filterAtomsByType(atoms, isPoi);
-            count = count > 0 ? count : objectRefCount(atoms);
+            count = count > 0 ? count : getObjectRefsCount();
         }
 
-        public int atomCount() {
-            return atoms.length;
-        }
-
-        public int objectRefCount() {
-            return objectRefCount(atoms);
-        }
-
-        public int poiAtomCount() {
-            return isPoi ? atoms.length : 0;
-        }
-
-        public int addressAtomCount() {
-            return isPoi ? 0 : atoms.length;
-        }
-
-        public POIAtom[] poiAtoms() {
-            List<POIAtom> result = new ArrayList<>();
-            for (Atom atom : atoms) {
-                if (atom instanceof POIAtom poiAtom) {
-                    result.add(poiAtom);
-                }
-            }
-            return result.toArray(new POIAtom[0]);
-        }
-
-        public AddressAtom[] addressAtoms() {
-            List<AddressAtom> result = new ArrayList<>();
-            for (Atom atom : atoms) {
-                if (atom instanceof AddressAtom addressAtom) {
-                    result.add(addressAtom);
-                }
-            }
-            return result.toArray(new AddressAtom[0]);
-        }
-
-        private static int objectRefCount(Atom[] atoms) {
+        private int getObjectRefsCount() {
             if (atoms == null || atoms.length == 0) {
                 return 0;
             }
             long count = 0;
             for (Atom atom : atoms) {
                 if (atom != null) {
-                    count += atom.objectRefCount();
+                    count += atom.getObjectRefsCount();
                 }
             }
             return count >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) count;
-        }
-
-        private static Atom[] filterAtomsByType(Atom[] atoms, boolean isPoi) {
-            if (atoms == null || atoms.length == 0) {
-                return new Atom[0];
-            }
-            List<Atom> filtered = new ArrayList<>(atoms.length);
-            for (Atom atom : atoms) {
-                if (atom != null && atom.isPoi() == isPoi) {
-                    filtered.add(atom);
-                }
-            }
-            return filtered.toArray(new Atom[0]);
         }
     }
     record IndexTokenPage(List<IndexToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages) {}
@@ -276,7 +210,7 @@ public interface InspectorService extends OBFService {
     record ObjectAddressPage(List<ObjectAddress> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, int[] countMetrics, int[] sizeMetrics, int aloneCount, int aloneSize) {}
     record CachedIndexTokens(String cacheKey, long fileLength, long lastModified, List<IndexToken> tokens) {}
 
-    default IndexTokenPage getIndex(String obf, String prefix, int pageToShow, int pageSizeLimit, String sortBy, String sortOrder, boolean isPOI) {
+    default IndexTokenPage getIndex(String obf, String prefix, int pageToShow, int pageSizeLimit, String sortBy, String sortOrder, boolean isPoi) {
         File file = new File(obf);
         Pattern prefixPattern = compileIndexPrefixPattern(prefix);
         final int safePage = Math.max(pageToShow, 0);
@@ -284,16 +218,12 @@ public interface InspectorService extends OBFService {
         long startedNs = System.nanoTime();
         try {
             long loadStartedNs = System.nanoTime();
-            List<IndexToken> allTokens = getCachedOrLoadIndexTokens(file, isPOI);
+            List<IndexToken> allTokens = getCachedOrLoadIndexTokens(file, isPoi);
             long loadNs = System.nanoTime() - loadStartedNs;
             long filterStartedNs = System.nanoTime();
             List<IndexToken> results = new ArrayList<>();
             if (prefixPattern == null) {
-                for (IndexToken token : allTokens) {
-                    if (matchesIndexTokenObjectType(token, isPOI)) {
-                        results.add(token);
-                    }
-                }
+                results.addAll(allTokens);
             } else {
                 for (IndexToken token : allTokens) {
                     if (prefixPattern.matcher(token.name()).find()) {
@@ -335,8 +265,7 @@ public interface InspectorService extends OBFService {
                         if (token == null || token.name() == null) {
                             continue;
                         }
-                        if ((prefixPattern == null || prefixPattern.matcher(token.name()).find())
-                                && matchesIndexTokenObjectType(token, objectTypeFilter)) {
+                        if ((prefixPattern == null || prefixPattern.matcher(token.name()).find())) {
 
                         }
                     }
@@ -375,20 +304,6 @@ public interface InspectorService extends OBFService {
 		return TimeUnit.NANOSECONDS.toMillis(elapsedNs);
 	}
 	
-	default boolean matchesIndexTokenObjectType(IndexToken token, Boolean objectTypeFilter) {
-		if (objectTypeFilter == null) {
-			return true;
-		}
-		if (token == null) {
-			return false;
-		}
-		return token.isPoi() == objectTypeFilter;
-	}
-	
-    default List<IndexToken> getCachedOrLoadIndexTokens(File file) throws IOException {
-        return getCachedOrLoadIndexTokens(file, true);
-    }
-
     default List<IndexToken> getCachedOrLoadIndexTokens(File file, boolean isPoi) throws IOException {
         String cacheKey = getIndexCacheKey(file, isPoi);
         long fileLength = file.length();
@@ -443,7 +358,7 @@ public interface InspectorService extends OBFService {
         }
     }
 
-    default List<CommonSuffix> getCachedCommonSuffixStats(String obfKey, boolean poi, int offset) {
+    private static List<CommonSuffix> getCachedCommonSuffixStats(String obfKey, boolean poi, int offset) {
         if (Algorithms.isEmpty(obfKey)) {
             return List.of();
         }
@@ -453,7 +368,7 @@ public interface InspectorService extends OBFService {
         }
     }
 
-    default String commonSuffixStatsCacheKey(String obfKey, boolean poi, int offset) {
+    private static String commonSuffixStatsCacheKey(String obfKey, boolean poi, int offset) {
         return obfKey + "|" + (poi ? "poi" : "address") + "|" + offset;
     }
 	
