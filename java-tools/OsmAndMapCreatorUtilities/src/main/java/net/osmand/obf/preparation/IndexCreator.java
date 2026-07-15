@@ -50,6 +50,8 @@ public class IndexCreator {
 	private DBDialect mapIndexDBDialect = DBDialect.SQLITE;
 	public static boolean REMOVE_POI_DB = true;
 
+    public static String GENERATE_OBF_VERSION = "spatial-search default version"; // change version each time for regenerate search tests
+
 	public static final int BATCH_SIZE = 5000;
 	public static final int BATCH_SIZE_OSM = 10000;
 	public static final String TEMP_NODES_DB = "nodes.tmp.odb";
@@ -912,7 +914,7 @@ public class IndexCreator {
 		log.info("- STRING_TABLE_SIZE " + BinaryMapIndexWriter.STRING_TABLE_SIZE); //$NON-NLS-1$
 		log.info("-- MAP_DATA_AND_STRINGS SIZE " //$NON-NLS-1$
 				+ (BinaryMapIndexWriter.MAP_DATA_SIZE + BinaryMapIndexWriter.STRING_TABLE_SIZE));
-		
+
 	}
 
 	public static void generateRegionsFile()
