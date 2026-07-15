@@ -69,15 +69,9 @@ public class SpatialSearch implements SearchEngine {
                 break;
             }
         }
-        return String.format(Locale.US, "%s [[%d, %s,%s%s%s, %.2f km]]", b,
-                tCount, testTypeStr(atom), rs("sw", surplusWords), rs("os", sumOther), rs("r", rating), dist / 1000);
-    }
-
-    private String rs(String p, int i) {
-        if (i == 0) {
-            return "";
-        }
-        return " " + p+":" + i;
+        String sorting = SpatialSearchResult.compareKeyString(r);
+        return String.format(Locale.US, "%s [[%d, %s, %s, %.2f km]]", b,
+                tCount, testTypeStr(atom), sorting, dist / 1000);
     }
 
     private void appendName(StringBuilder b, MapObject object) {
@@ -140,12 +134,12 @@ public class SpatialSearch implements SearchEngine {
         settings.OPTIM_DELETE_POI_SAME_AS_CITY_STREET = settingsJson.optBoolean("OPTIM_DELETE_POI_SAME_AS_CITY_STREET",
                 settings.OPTIM_DELETE_POI_SAME_AS_CITY_STREET);
         settings.DEDUPLICATE_RES = settingsJson.optBoolean("DEDUPLICATE_RES", settings.DEDUPLICATE_RES);
-        settings.TEST_ALLOW_HOUSE_POI_TYPE_INTERSECTION = settingsJson.optBoolean("TEST_ALLOW_HOUSE_POI_TYPE_INTERSECTION",
-                settings.TEST_ALLOW_HOUSE_POI_TYPE_INTERSECTION);
-        settings.ALWAYS_READ_COMMON_WORDS_ATOMS = settingsJson.optBoolean("ALWAYS_READ_COMMON_WORDS_ATOMS",
-                settings.ALWAYS_READ_COMMON_WORDS_ATOMS);
-        settings.ALWAYS_READ_FREQ_WORDS_ATOMS = settingsJson.optBoolean("ALWAYS_READ_FREQ_WORDS_ATOMS",
-                settings.ALWAYS_READ_FREQ_WORDS_ATOMS);
+//        settings.TEST_ALLOW_HOUSE_POI_TYPE_INTERSECTION = settingsJson.optBoolean("TEST_ALLOW_HOUSE_POI_TYPE_INTERSECTION",
+//                settings.TEST_ALLOW_HOUSE_POI_TYPE_INTERSECTION);
+//        settings.ALWAYS_READ_COMMON_WORDS_ATOMS = settingsJson.optBoolean("ALWAYS_READ_COMMON_WORDS_ATOMS",
+//                settings.ALWAYS_READ_COMMON_WORDS_ATOMS);
+//        settings.ALWAYS_READ_FREQ_WORDS_ATOMS = settingsJson.optBoolean("ALWAYS_READ_FREQ_WORDS_ATOMS",
+//                settings.ALWAYS_READ_FREQ_WORDS_ATOMS);
         settings.LANG_DEDUPLICATE = settingsJson.optString("LANG_DEDUPLICATE", settings.LANG_DEDUPLICATE);
         settings.MIN_ELO_RATING = settingsJson.optInt("MIN_ELO_RATING", settings.MIN_ELO_RATING);
         settings.MIN_CHARACTERS_INCOMPLETE = settingsJson.optInt("MIN_CHARACTERS_INCOMPLETE", settings.MIN_CHARACTERS_INCOMPLETE);
