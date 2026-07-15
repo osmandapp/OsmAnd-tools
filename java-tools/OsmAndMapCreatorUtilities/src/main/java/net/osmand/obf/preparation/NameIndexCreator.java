@@ -36,7 +36,7 @@ public class NameIndexCreator<T> {
 	private static final int MIN_LIMIT_FREQ_COMMON = 10; // minimum required for common to have at least
 	// Large ADD_TOP_X_FREQ_WORDS many will cause to add many common words to index !
 	private static final int ADD_TOP_X_FREQ_WORDS = 10; // minimum required  for frequent to be added and indexed 
-	public static final String POI_CATEGORY_PREFIX = "#^";
+	
 	private static final int POI_CATEGORY_PREFIX_LENGTH = 5;
 	public static boolean NOT_INDEX_COMMON_IF_THERE_ARE_RARE = true;
 	public static boolean INDEX_RARE_WORDS_FOR_COMMON = false;
@@ -254,7 +254,7 @@ public class NameIndexCreator<T> {
 			String top = null;
 			for (Map.Entry<String, Integer> e : tokenFrequencies.entrySet()) {
 				if (e.getValue() > max && !topXFrequent.contains(e.getKey())
-						&& !e.getKey().startsWith(POI_CATEGORY_PREFIX)) {
+						&& !e.getKey().startsWith(NameIndexReader.POI_CATEGORY_PREFIX)) {
 					max = e.getValue();
 					top = e.getKey();
 				}
@@ -300,7 +300,7 @@ public class NameIndexCreator<T> {
 	
 	public void cleanupPoiNames(int max) {
 		for (String prefix : new ArrayList<>(namesIndex.keySet())) {
-			if (prefix.startsWith(POI_CATEGORY_PREFIX)) {
+			if (prefix.startsWith(NameIndexReader.POI_CATEGORY_PREFIX)) {
 				NamedObjectsByPrefix<T> objects = namesIndex.get(prefix);
 				Iterator<NamedObject<T>> it = objects.namedObjects.iterator();
 				Map<String, Integer> counts = new HashMap<String, Integer>();
@@ -347,7 +347,7 @@ public class NameIndexCreator<T> {
 	}
 
 	private static void addPoiCategory(NameIndexCreator<PoiNameObject> th, PoiNameObject obj, String token) {
-		token = POI_CATEGORY_PREFIX + token;
+		token = NameIndexReader.POI_CATEGORY_PREFIX + token;
 		String prefix = token.substring(0, Math.min(token.length(), POI_CATEGORY_PREFIX_LENGTH));
 		NamedObjectsByPrefix<PoiNameObject> entry = th.namesIndex.get(prefix);
 		if (entry == null) {
