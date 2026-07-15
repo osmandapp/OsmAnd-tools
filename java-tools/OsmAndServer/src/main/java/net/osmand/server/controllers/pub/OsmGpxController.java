@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import net.osmand.server.DatasourceConfiguration;
 import net.osmand.server.api.services.GpxService;
+import net.osmand.server.osmgpx.GarbageClassifier;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
@@ -70,7 +71,11 @@ public class OsmGpxController {
 	private static final String GPX_METADATA_TABLE_NAME = "osm_gpx_data";
 	private static final String GPX_FILES_TABLE_NAME = "osm_gpx_files";
 	private static final int SRID_WGS84 = 4326;
-	private static final Set<String> INVALID_ACTIVITIES = Set.of("garbage", "error");
+	private static final String ERROR_ACTIVITY = "error";
+	private static final Set<String> INVALID_ACTIVITIES = new HashSet<>(GarbageClassifier.TYPES);
+	static {
+		INVALID_ACTIVITIES.add(ERROR_ACTIVITY);
+	}
 
 	public record RoutesListRequest(
 			List<String> activityArr,
@@ -171,8 +176,8 @@ public class OsmGpxController {
 		applyTagsFilter(req.tags(), tagMatchMode, conditions, params);
 
 		List<Feature> features;
-		if (invalidActivities) {
-			// garbage/error tracks have no geometry — return them as points only
+		if (isPointsOnlyRequest(req.activityArr())) {
+			// error tracks have no geometry — return them as points only
 			features = queryRouteFeatures(conditions, params, false, MAX_ROUTES_SUMMARY, false);
 		} else {
 			features = queryRouteFeatures(conditions, params, true, MAX_ROUTES_FULL_MODE_THRESHOLD + 1, true);
@@ -568,6 +573,11 @@ public class OsmGpxController {
 		return activityArr != null && !activityArr.isEmpty() && INVALID_ACTIVITIES.containsAll(activityArr);
 	}
 
+	private boolean isPointsOnlyRequest(List<String> activityArr) {
+		return activityArr != null && !activityArr.isEmpty()
+				&& activityArr.stream().allMatch(ERROR_ACTIVITY::equals);
+	}
+
 	private String placeholders(Collection<?> values, List<Object> params) {
 		params.addAll(values);
 		return "(" + String.join(",", Collections.nCopies(values.size(), "?")) + ")";
@@ -581,7 +591,15 @@ public class OsmGpxController {
 		if (activityArr == null || activityArr.isEmpty()) {
 			return ResponseEntity.badRequest().body("Activity parameter is required.");
 		}
-		conditions.append(" AND m.activity IN ").append(placeholders(activityArr, params));
+		Set<String> activities = new LinkedHashSet<>();
+		for (String activity : activityArr) {
+			if (GarbageClassifier.GARBAGE.equals(activity)) {
+				activities.addAll(GarbageClassifier.TYPES);
+			} else {
+				activities.add(activity);
+			}
+		}
+		conditions.append(" AND m.activity IN ").append(placeholders(activities, params));
 		return null;
 	}
 
