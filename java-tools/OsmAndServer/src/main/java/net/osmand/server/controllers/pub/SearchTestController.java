@@ -460,7 +460,7 @@ public class SearchTestController {
 
 	@GetMapping(value = "/index", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<OBFService.IndexTokenPage> getIndex(@RequestParam(required = false) String obf,
+	public ResponseEntity<InspectorService.IndexTokenPage> getIndex(@RequestParam(required = false) String obf,
 															  @RequestParam(required = false) List<String> obfs,
 															  @RequestParam(required = false) String prefix,
 															  @RequestParam(defaultValue = "0") int pageToShow,
@@ -477,7 +477,7 @@ public class SearchTestController {
 
 	@PostMapping(value = "/objects", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<OBFService.ObjectAddressPage> getObjects(@RequestParam(required = false) String obf,
+	public ResponseEntity<InspectorService.ObjectAddressPage> getObjects(@RequestParam(required = false) String obf,
 																 @RequestParam(required = false) List<String> obfs,
 																 @RequestParam(required = false) String lang,
 																 @RequestParam(required = false) String regExp,
@@ -485,13 +485,12 @@ public class SearchTestController {
 																 @RequestParam(defaultValue = "100") int pageSizeLimit,
 																 @RequestParam(required = false) String sortBy,
 																 @RequestParam(required = false) String sortOrder,
-																 @RequestParam(defaultValue = "true") boolean isFiltered,
 																 @RequestParam(required = false) boolean objectType,
-																 @RequestBody OBFService.IndexToken token) {
+																 @RequestBody InspectorService.IndexToken token) {
 		List<String> selectedObfs = normalizeObfs(obf, obfs);
-		OBFService.ObjectAddressPage objects = selectedObfs.size() == 1
-				? testSearchService.getObjects(selectedObfs.get(0), lang == null ? "en" : lang, token, regExp, pageToShow, pageSizeLimit, sortBy, sortOrder, isFiltered, objectType)
-				: testSearchService.getObjects(selectedObfs, lang == null ? "en" : lang, token, regExp, pageToShow, pageSizeLimit, sortBy, sortOrder, isFiltered, objectType);
+		InspectorService.ObjectAddressPage objects = selectedObfs.size() == 1
+				? testSearchService.getObjects(selectedObfs.get(0), lang == null ? "en" : lang, token, regExp, pageToShow, pageSizeLimit, sortBy, sortOrder, objectType)
+				: testSearchService.getObjects(selectedObfs, lang == null ? "en" : lang, token, regExp, pageToShow, pageSizeLimit, sortBy, sortOrder, objectType);
 		return ResponseEntity.ok(objects);
 	}
 
@@ -669,7 +668,7 @@ public class SearchTestController {
 	                                                              @RequestParam(defaultValue = "0") int pageToShow,
 	                                                              @RequestParam(defaultValue = "100") int pageSizeLimit,
 	                                                              @RequestParam(required = false) String sortBy,
-	                                                              @RequestParam(required = false) String sortOrder) throws IOException, SQLException {
+	                                                              @RequestParam(required = false) String sortOrder) throws IOException {
 		try {
 			return ResponseEntity.ok(testSearchService.getTagsDbTokens(name, prefix, objectType, perObf, tag, values, pageToShow, pageSizeLimit, sortBy, sortOrder));
 		} catch (SQLException e) {
@@ -679,7 +678,7 @@ public class SearchTestController {
 
 	@GetMapping(value = "/tags-datasources/{name}/tags", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<List<GenDbService.DbTagName>> getTagsDbTagNames(@PathVariable String name) throws IOException, SQLException {
+	public ResponseEntity<List<GenDbService.DbTagName>> getTagsDbTagNames(@PathVariable String name) throws IOException {
 		try {
 			return ResponseEntity.ok(testSearchService.getTagsDbTagNames(name));
 		} catch (SQLException e) {
@@ -690,7 +689,7 @@ public class SearchTestController {
 	@GetMapping(value = "/tags-datasources/{name}/tag-values", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public ResponseEntity<List<GenDbService.DbTagValue>> getTagsDbTagValues(@PathVariable String name,
-	                                                                      @RequestParam String tag) throws IOException, SQLException {
+	                                                                      @RequestParam String tag) throws IOException {
 		try {
 			return ResponseEntity.ok(testSearchService.getTagsDbTagValues(name, tag));
 		} catch (SQLException e) {
@@ -710,7 +709,7 @@ public class SearchTestController {
 	                                                                  @RequestParam(defaultValue = "0") int pageToShow,
 	                                                                  @RequestParam(defaultValue = "100") int pageSizeLimit,
 	                                                                  @RequestParam(required = false) String sortBy,
-	                                                                  @RequestParam(required = false) String sortOrder) throws IOException, SQLException {
+	                                                                  @RequestParam(required = false) String sortOrder) throws IOException {
 		try {
 			return ResponseEntity.ok(testSearchService.getTagsDbObjects(name, tokenId, objectType, perObf, regExp, tag, values, pageToShow, pageSizeLimit, sortBy, sortOrder));
 		} catch (SQLException e) {
@@ -730,7 +729,7 @@ public class SearchTestController {
 	                                                                          @RequestParam(defaultValue = "0") int pageToShow,
 	                                                                          @RequestParam(defaultValue = "100") int pageSizeLimit,
 	                                                                          @RequestParam(required = false) String sortBy,
-	                                                                          @RequestParam(required = false) String sortOrder) throws IOException, SQLException {
+	                                                                          @RequestParam(required = false) String sortOrder) throws IOException {
 		try {
 			return ResponseEntity.ok(testSearchService.getTagsDbAddressPoiObjects(name, objectType, regExp, tokenFind, tag, values, perObf, pageToShow, pageSizeLimit, sortBy, sortOrder));
 		} catch (SQLException e) {
@@ -746,7 +745,7 @@ public class SearchTestController {
 	                                                                          @RequestParam(defaultValue = "0") int pageToShow,
 	                                                                          @RequestParam(defaultValue = "100") int pageSizeLimit,
 	                                                                          @RequestParam(required = false) String sortBy,
-	                                                                          @RequestParam(required = false) String sortOrder) throws IOException, SQLException {
+	                                                                          @RequestParam(required = false) String sortOrder) throws IOException {
 		try {
 			return ResponseEntity.ok(testSearchService.getTagsDbObjectTokens(name, objectId, find, pageToShow, pageSizeLimit, sortBy, sortOrder));
 		} catch (SQLException e) {
@@ -761,7 +760,7 @@ public class SearchTestController {
 	                                                                   @RequestParam(defaultValue = "all") String pruneGenerated,
 	                                                                   @RequestParam(defaultValue = "desc") String pruneSort,
 	                                                                   @RequestParam(defaultValue = "-1") long bucketMin,
-	                                                                   @RequestParam(defaultValue = "-1") long bucketMax) throws IOException, SQLException {
+	                                                                   @RequestParam(defaultValue = "-1") long bucketMax) throws IOException {
 		try {
 			return ResponseEntity.ok(testSearchService.getReport(name, objectType, pruneGenerated, pruneSort, bucketMin, bucketMax));
 		} catch (SQLException e) {
@@ -772,7 +771,7 @@ public class SearchTestController {
 	@GetMapping(value = "/tags-datasources/{name}/test-cases", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public ResponseEntity<List<GenDbService.TestCaseObject>> getTestCases(@PathVariable String name,
-	                                                                    @RequestParam(defaultValue = "all") String objectType) throws IOException, SQLException {
+	                                                                    @RequestParam(defaultValue = "all") String objectType) throws IOException {
 		try {
 			return ResponseEntity.ok(testSearchService.getTestCases(name, objectType));
 		} catch (SQLException e) {

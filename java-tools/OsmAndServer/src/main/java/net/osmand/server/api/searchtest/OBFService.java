@@ -2,6 +2,7 @@ package net.osmand.server.api.searchtest;
 
 import com.google.protobuf.CodedInputStream;
 import com.google.protobuf.WireFormat;
+import net.osmand.ResultMatcher;
 import net.osmand.binary.*;
 import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
 import net.osmand.data.*;
@@ -10,11 +11,16 @@ import net.osmand.osm.PoiCategory;
 import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.text.Normalizer;
 import java.util.*;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -24,28 +30,14 @@ public interface OBFService extends BaseService {
 	int BASE_POI_ZOOM = 31 - BASE_POI_SHIFT;
 	int FINAL_POI_ZOOM = 31 - FINAL_POI_SHIFT;
 	int CATEGORY_MASK = (1 << BinaryMapPoiReaderAdapter.SHIFT_BITS_CATEGORY) - 1;
-	int INDEX_TOKEN_CACHE_LIMIT = 32;
-	Map<String, CachedIndexTokens> INDEX_TOKENS_CACHE = Collections.synchronizedMap(
-			new LinkedHashMap<>(16, 0.75f, true) {
-				@Override
-				protected boolean removeEldestEntry(Map.Entry<String, CachedIndexTokens> eldest) {
-					return size() > INDEX_TOKEN_CACHE_LIMIT;
-				}
-			});
-	Map<String, List<InspectorService.CommonSuffix>> INDEX_COMMON_SUFFIX_CACHE = Collections.synchronizedMap(
-			new LinkedHashMap<>(1024, 0.75f, true) {
-				@Override
-				protected boolean removeEldestEntry(Map.Entry<String, List<InspectorService.CommonSuffix>> eldest) {
-					return size() > 65536;
-				}
-			});
 
 	Map<String, Map<Integer, InspectorService.ObfFieldSpec>> OBF_MESSAGE_SCHEMA = buildObfMessageSchema();
 
 	Map<Integer, String> OBF_STRUCTURE_FIELD_NAMES = buildObfStructureFieldNames();
 
 	record ObfFieldSpec(String fieldName, String childMessageType, InspectorService.ObfLengthType lengthType, boolean packedVarInt, boolean repeated) {}
-
+	record PoiCategoryMeta(String type, String subtype) {}
+	
 	static String toLowerCamelFromUpperUnderscore(String upperUnderscore) {
 		String[] parts = upperUnderscore.toLowerCase(Locale.ROOT).split("_");
 		if (parts.length == 0) {
@@ -93,9 +85,6 @@ public interface OBFService extends BaseService {
 	String getSearchTestDatasourceUrl();
 
 	default List<String> getOBFs(Double radius, Double lat, Double lon) throws IOException {
-		synchronized (INDEX_TOKENS_CACHE) {
-			INDEX_TOKENS_CACHE.clear();
-		}
 		radius = radius == null ? 1.5 : radius;
 		if (lat == null || lon == null) {
 			return getMapsService().getOBFs();
@@ -115,8 +104,6 @@ public interface OBFService extends BaseService {
 			obfList.add(ref.getFile().getAbsolutePath());
 		return obfList;
 	}
-
-	record CachedIndexTokens(String cacheKey, long fileLength, long lastModified, List<IndexToken> tokens) {}
 
     class BinaryMapIndexReaderExt extends BinaryMapIndexReader {
         BinaryMapIndexReaderExt(final RandomAccessFile raf, File file) throws IOException {
@@ -140,40 +127,6 @@ public interface OBFService extends BaseService {
 	
 	record ObfFileInfo(String path, String name, String continent, String country, String region, long lastModified, long size) {}
 	
-	abstract class Atom {
-		public IndexSuffixRef suffixRefs;
-	}
-	class POIAtom extends Atom {
-	}
-	class AddressAtom extends Atom {
-
-	}
-	
-	record IndexToken(String name, boolean isPOI, Atom[] atoms, boolean isCommon, boolean isFrequent, String obf, int count) {}
-	record IndexTokenPage(List<IndexToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages) {}
-	
-	record IndexSuffixRef(String obf, int offset, int suffixIndex, boolean poi, int[] metricSuffixIndexes,
-	                      String[] metricIntegerSuffixes, String[] metricExtraSuffixes) {}
-
-	record CommonSuffix(String value, int matched, int nonindexed) {}
-
-	record NameIndexTableInfo(long tableContentStart, Map<String, Integer> prefixOffsets) {}
-
-	record NameIndexSuffixInfo(List<String> suffixDictionary, List<CommonSuffix> commonSuffixes,
-	                           Set<String> integerSuffixes, Set<String> extraSuffixes, int otherWordsCount) {}
-
-	record ObjectAddress(int sequenceId, String name, LatLon point, Map<String, String> commonTags,
-	                     boolean isPoi, boolean isAlone, String type, Long osmId,
-	                     String osmType, int payloadOffset, int payloadSize, int sourceOffset, String obf) {
-	}
-	
-	record ObjectAddressPage(List<ObjectAddress> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, int[] countMetrics, int[] sizeMetrics, int aloneCount, int aloneSize) {}
-	record ObjectAddressStats(int size, int count) {}
-	record PoiTokenRefs(Set<Integer> offsets, List<Integer> atomRefs, List<Integer> atomSizes,
-	                    Map<Integer, int[]> poiIndexes, Set<Integer> metricSuffixIndexes,
-	                    Set<String> metricIntegerSuffixes, Set<String> metricExtraSuffixes) {}
-	record PoiCategoryMeta(String type, String subtype) {}
-
 	@FunctionalInterface
 	interface GenerateDbProgressListener {
 		void onProgress(GenDbService.GenerateDbProgress progress);
@@ -1436,5 +1389,375 @@ public interface OBFService extends BaseService {
 					break;
 			}
 		}
+	}
+
+
+	default List<Record> getAddresses(String obf, String lang, boolean includesBoundaryPostcode, String cityRegExp, String streetRegExp, String houseRegExp, String poiRegExp) {
+		List<Record> results = new ArrayList<>();
+		boolean isCityEmpty = cityRegExp == null || cityRegExp.trim().isEmpty();
+		boolean isStreetEmpty = streetRegExp == null || streetRegExp.trim().isEmpty();
+		boolean isHouseEmpty = houseRegExp == null || houseRegExp.trim().isEmpty();
+		boolean isPoiEmpty = poiRegExp == null || poiRegExp.trim().isEmpty();
+		if (isCityEmpty && isStreetEmpty && isPoiEmpty)
+			return results;
+
+		File file = new File(obf);
+		try (RandomAccessFile r = new RandomAccessFile(file.getAbsolutePath(), "r");
+		     RandomAccessFile poiRawFile = new RandomAccessFile(file.getAbsolutePath(), "r")) {
+			final Pattern cityPattern, streetPattern, housePattern, poiPattern, normalizedPoiPattern;
+			try {
+				cityPattern = isCityEmpty ? null : Pattern.compile(cityRegExp, Pattern.CASE_INSENSITIVE);
+				streetPattern = isStreetEmpty ? null : Pattern.compile(streetRegExp, Pattern.CASE_INSENSITIVE);
+				housePattern = isHouseEmpty ? null : Pattern.compile(houseRegExp, Pattern.CASE_INSENSITIVE);
+				poiPattern = !(isCityEmpty || isStreetEmpty) || !isHouseEmpty || isPoiEmpty ? null : Pattern.compile(poiRegExp, Pattern.CASE_INSENSITIVE);
+				normalizedPoiPattern = poiPattern == null ? null : compileNormalizedPattern(poiRegExp);
+			} catch (PatternSyntaxException e) {
+				throw new RuntimeException("Invalid regex provided: " + e.getDescription(), e);
+			}
+
+			BinaryMapIndexReader index = new BinaryMapIndexReader(r, file);
+			try {
+				for (BinaryIndexPart p : index.getIndexes()) {
+					if (poiPattern == null && p instanceof BinaryMapAddressReaderAdapter.AddressRegion region) {
+						for (BinaryMapAddressReaderAdapter.CityBlocks type : BinaryMapAddressReaderAdapter.CityBlocks.values()) {
+							if (type == BinaryMapAddressReaderAdapter.CityBlocks.UNKNOWN_TYPE)
+								continue;
+
+							final List<City> cities = index.getCities(null, type, region, null);
+							for (City c : cities) {
+								final boolean isBoundaryOrPostcode = c.getType() == City.CityType.BOUNDARY || c.getType() == City.CityType.POSTCODE;
+								if (isBoundaryOrPostcode && !includesBoundaryPostcode) {
+									continue;
+								}
+
+								final String cityName = c.getName(lang);
+								List<StreetAddress> streets = new ArrayList<>();
+								if (cityName == null || (!isCityEmpty && !cityPattern.matcher(cityName).find()))
+									continue;
+
+								index.preloadStreets(c, null, null);
+								if (isStreetEmpty && isHouseEmpty) {
+									results.add(new CityAddress(cityName, c.getLocation(), streets, c.getStreets().size(), c.getType().name().toLowerCase()));
+									continue;
+								}
+
+								for (Street s : new ArrayList<>(c.getStreets())) {
+									List<HouseAddress> buildings = new ArrayList<>();
+									final String streetName = s.getName(lang);
+									if (streetName == null || !isStreetEmpty && !streetPattern.matcher(streetName).find())
+										continue;
+
+									index.preloadBuildings(s, null, null);
+									if (isHouseEmpty) {
+										streets.add(new StreetAddress(streetName, s.getLocation(), buildings, s.getBuildings().size()));
+										continue;
+									}
+
+									final List<Building> bs = s.getBuildings();
+									if (bs != null && !bs.isEmpty()) {
+										for (Building b : bs) {
+											final String houseName = b.getName(lang);
+											if (houseName != null && housePattern.matcher(houseName).find())
+												buildings.add(new HouseAddress(houseName, b.getLocation()));
+										}
+									}
+									if (!buildings.isEmpty()) {
+										StreetAddress street = new StreetAddress(streetName, s.getLocation(), buildings, s.getBuildings().size());
+										streets.add(street);
+									}
+								}
+								if (!streets.isEmpty())
+									results.add(new CityAddress(cityName, c.getLocation(), streets, c.getStreets().size(), c.getType().name().toLowerCase()));
+							}
+						}
+					} else if (poiPattern != null && p instanceof BinaryMapPoiReaderAdapter.PoiRegion poi) {
+						results.addAll(findPoiAddressesRaw(poiRawFile, index, poi, poiPattern, normalizedPoiPattern));
+					}
+				}
+			} finally {
+				index.close();
+			}
+			// Sort results by name (case-insensitive) for CityAddress and Address records
+			results.sort(Comparator.comparing(o -> {
+				if (o instanceof CityAddress ca) {
+					return ca.name();
+				} else if (o instanceof PoiAddress a) {
+					return a.name();
+				}
+				return "";
+			}, String.CASE_INSENSITIVE_ORDER));
+			return results;
+		} catch (Exception e) {
+			getLogger().error("Failed to read OBF {}", file, e);
+			throw new RuntimeException("Failed to read OBF:BinaryMapIndexReader.buildSearchPoiRequest( " + e.getMessage(), e);
+		}
+	}
+
+	default List<Record> getAddresses(List<String> obfs, String lang, boolean includesBoundaryPostcode, String cityRegExp, String streetRegExp, String houseRegExp, String poiRegExp) {
+		List<Record> results = new ArrayList<>();
+		if (obfs != null) {
+			for (String obf : obfs) {
+				if (obf == null || obf.isBlank()) {
+					continue;
+				}
+				for (Record record : getAddresses(obf, lang, includesBoundaryPostcode, cityRegExp, streetRegExp, houseRegExp, poiRegExp)) {
+					results.add(withObf(record, obf));
+				}
+			}
+		}
+		results.sort(Comparator.comparing(o -> {
+			if (o instanceof CityAddress ca) {
+				return ca.name();
+			} else if (o instanceof PoiAddress a) {
+				return a.name();
+			}
+			return "";
+		}, String.CASE_INSENSITIVE_ORDER));
+		return results;
+	}
+
+	private Record withObf(Record record, String obf) {
+		if (record instanceof CityAddress city) {
+			List<StreetAddress> streets = new ArrayList<>();
+			if (city.streets() != null) {
+				for (StreetAddress street : city.streets()) {
+					streets.add((StreetAddress) withObf(street, obf));
+				}
+			}
+			return new CityAddress(city.name(), city.point(), streets, city.streetsCount(), city.type(), obf);
+		}
+		if (record instanceof StreetAddress street) {
+			List<HouseAddress> houses = new ArrayList<>();
+			if (street.houses() != null) {
+				for (HouseAddress house : street.houses()) {
+					houses.add((HouseAddress) withObf(house, obf));
+				}
+			}
+			return new StreetAddress(street.name(), street.point(), houses, street.houseCount(), obf);
+		}
+		if (record instanceof HouseAddress house) {
+			return new HouseAddress(house.name(), house.point(), obf);
+		}
+		if (record instanceof PoiAddress poi) {
+			return new PoiAddress(poi.name(), poi.point(), poi.value(), obf);
+		}
+		return record;
+	}
+
+
+	default List<Amenity> getAmenities(String obf, String lang) {
+		List<Amenity> results = new ArrayList<>();
+		File file = new File(obf);
+		try (RandomAccessFile r = new RandomAccessFile(file.getAbsolutePath(), "r")) {
+			BinaryMapIndexReader index = new BinaryMapIndexReader(r, file);
+			try {
+				for (BinaryMapPoiReaderAdapter.PoiRegion poiIndex : index.getPoiIndexes()) {
+					BinaryMapIndexReader.SearchRequest<Amenity> request = BinaryMapIndexReader.buildSearchPoiRequest(
+							0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE,
+							-1, BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER, null);
+					results.addAll(index.searchPoi(request, poiIndex));
+				}
+				results.sort(Comparator.comparing(a -> {
+					String name = a == null ? null : a.getName(lang);
+					return name == null ? "" : name;
+				}, String.CASE_INSENSITIVE_ORDER));
+				return results;
+			} finally {
+				index.close();
+			}
+		} catch (Exception e) {
+			getLogger().error("Failed to read OBF amenities {}", file, e);
+			throw new RuntimeException("Failed to read OBF amenities: " + e.getMessage(), e);
+		}
+	}
+
+	default List<City> getCities(String obf, String lang) {
+		Map<String, City> mergedCities = new LinkedHashMap<>();
+		File file = new File(obf);
+		try (RandomAccessFile r = new RandomAccessFile(file.getAbsolutePath(), "r")) {
+			BinaryMapIndexReader index = new BinaryMapIndexReader(r, file);
+			try {
+				for (BinaryMapAddressReaderAdapter.AddressRegion region : index.getAddressIndexes()) {
+					for (BinaryMapAddressReaderAdapter.CityBlocks type : BinaryMapAddressReaderAdapter.CityBlocks.values()) {
+						if (type == BinaryMapAddressReaderAdapter.CityBlocks.UNKNOWN_TYPE) {
+							continue;
+						}
+						for (City city : index.getCities(null, type, region, null)) {
+							index.preloadStreets(city, null, true, null);
+							for (Street street : new ArrayList<>(city.getStreets())) {
+								index.preloadBuildings(street, null, null);
+							}
+							mergeCity(mergedCities, city, lang);
+						}
+					}
+				}
+				List<City> results = new ArrayList<>(mergedCities.values());
+				results.sort(Comparator.comparing(c -> {
+					String name = c == null ? null : c.getName(lang);
+					return name == null ? "" : name;
+				}, String.CASE_INSENSITIVE_ORDER));
+				return results;
+			} finally {
+				index.close();
+			}
+		} catch (Exception e) {
+			getLogger().error("Failed to read OBF cities {}", file, e);
+			throw new RuntimeException("Failed to read OBF cities: " + e.getMessage(), e);
+		}
+	}
+
+	default List<RouteDataObject> getRoutes(String obf, String lang) {
+		List<RouteDataObject> results = new ArrayList<>();
+		File file = new File(obf);
+		try (RandomAccessFile r = new RandomAccessFile(file.getAbsolutePath(), "r")) {
+			BinaryMapIndexReader index = new BinaryMapIndexReader(r, file);
+			try {
+				for (BinaryMapRouteReaderAdapter.RouteRegion region : index.getRoutingIndexes()) {
+					BinaryMapIndexReader.SearchRequest<RouteDataObject> request = BinaryMapIndexReader.buildSearchRouteRequest(
+							0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, null);
+					List<BinaryMapRouteReaderAdapter.RouteSubregion> subregions =
+							index.searchRouteIndexTree(request, region.getSubregions());
+					index.loadRouteIndexData(subregions, new ResultMatcher<>() {
+						@Override
+						public boolean publish(RouteDataObject object) {
+							results.add(object);
+							return true;
+						}
+
+						@Override
+						public boolean isCancelled() {
+							return false;
+						}
+					});
+				}
+				results.sort(Comparator.comparingLong(rdo -> rdo == null ? Long.MAX_VALUE : rdo.id));
+				return results;
+			} finally {
+				index.close();
+			}
+		} catch (Exception e) {
+			getLogger().error("Failed to read OBF routes {}", file, e);
+			throw new RuntimeException("Failed to read OBF routes: " + e.getMessage(), e);
+		}
+	}
+
+	default void createJsonFile(File sourceJsonFile, List<Amenity> amenities, List<City> cities, List<RouteDataObject> routings) throws IOException {
+		JSONObject sourceJson = new JSONObject();
+		if (amenities != null && !amenities.isEmpty()) {
+			JSONArray amenitiesJson = new JSONArray();
+			for (Amenity amenity : amenities) {
+				if (amenity != null) {
+					amenitiesJson.put(amenity.toJSON());
+				}
+			}
+			if (!amenitiesJson.isEmpty()) {
+				sourceJson.put("amenities", amenitiesJson);
+			}
+		}
+		List<City> mergedCities = mergeCities(cities, "");
+		if (!mergedCities.isEmpty()) {
+			JSONArray citiesJson = new JSONArray();
+			for (City city : mergedCities) {
+				citiesJson.put(city.toJSON(true));
+			}
+			sourceJson.put("cities", citiesJson);
+		}
+		if (routings != null && !routings.isEmpty()) {
+			JSONArray routingJson = new JSONArray();
+			long routeId = 1;
+			for (RouteDataObject route : routings) {
+				if (route != null) {
+					routingJson.put(routeDataObjectToJson(route, routeId++));
+				}
+			}
+			if (!routingJson.isEmpty()) {
+				sourceJson.put("routing", routingJson);
+			}
+		}
+		File parent = sourceJsonFile.getParentFile();
+		if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
+			throw new IOException("Cannot create directory " + parent);
+		}
+		Files.writeString(sourceJsonFile.toPath(), sourceJson.toString(4), StandardCharsets.UTF_8);
+	}
+
+	private List<City> mergeCities(List<City> cities, String lang) {
+		Map<String, City> merged = new LinkedHashMap<>();
+		if (cities != null) {
+			for (City city : cities) {
+				mergeCity(merged, city, lang);
+			}
+		}
+		return new ArrayList<>(merged.values());
+	}
+
+	private void mergeCity(Map<String, City> mergedCities, City city, String lang) {
+		if (city == null) {
+			return;
+		}
+		String key = cityMergeKey(city, lang);
+		City existing = mergedCities.get(key);
+		if (existing == null) {
+			mergedCities.put(key, city);
+		} else {
+			existing.mergeWith(city);
+		}
+	}
+
+	private String cityMergeKey(City city, String lang) {
+		Long id = city.getId();
+		if (id != null) {
+			return id.toString();
+		}
+		String name = city.getName(lang);
+		LatLon location = city.getLocation();
+		return city.getType() + "|" + (name == null ? "" : name.toLowerCase(Locale.ROOT)) + "|"
+				+ (location == null ? "" : String.format(Locale.US, "%.6f,%.6f", location.getLatitude(), location.getLongitude()));
+	}
+
+	private JSONObject routeDataObjectToJson(RouteDataObject road, long routeId) {
+		JSONObject routeJson = new JSONObject();
+		routeJson.put("id", routeId);
+		routeJson.put("pointsX", toJsonArray(road.pointsX));
+		routeJson.put("pointsY", toJsonArray(road.pointsY));
+		JSONArray types = new JSONArray();
+		if (road.types != null) {
+			for (int type : road.types) {
+				BinaryMapRouteReaderAdapter.RouteTypeRule rule = road.region.quickGetEncodingRule(type);
+				if (rule != null) {
+					JSONObject typeJson = new JSONObject();
+					typeJson.put("tag", rule.getTag());
+					typeJson.put("value", rule.getValue());
+					types.put(typeJson);
+				}
+			}
+		}
+		routeJson.put("types", types);
+		JSONArray names = new JSONArray();
+		if (road.nameIds != null && road.names != null) {
+			for (int nameId : road.nameIds) {
+				BinaryMapRouteReaderAdapter.RouteTypeRule rule = road.region.quickGetEncodingRule(nameId);
+				if (rule == null) {
+					continue;
+				}
+				JSONObject nameJson = new JSONObject();
+				nameJson.put("tag", rule.getTag());
+				nameJson.put("value", road.names.get(nameId));
+				names.put(nameJson);
+			}
+		}
+		routeJson.put("names", names);
+		return routeJson;
+	}
+	
+	private JSONArray toJsonArray(int[] values) {
+		JSONArray arr = new JSONArray();
+		if (values == null) {
+			return arr;
+		}
+		for (int value : values) {
+			arr.put(value);
+		}
+		return arr;
 	}
 }

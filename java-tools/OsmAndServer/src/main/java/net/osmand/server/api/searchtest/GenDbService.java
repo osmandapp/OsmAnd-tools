@@ -11,7 +11,7 @@ import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-public interface GenDbService extends OBFService {
+public interface GenDbService extends InspectorService {
     record GenerateDbProgress(String status, String obfName, int obfIndex, int totalObfs, int processedTokens,
                               int totalTokens, long elapsedMs, long estimatedMs, String error,
                               List<GenerateDbObfProgress> obfs) {}
