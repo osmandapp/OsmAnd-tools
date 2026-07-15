@@ -40,22 +40,15 @@ public class SpatialSearch implements SearchEngine {
 
     public String formatResult(SpatialSearchResult r) {
         int tCount = r.getParent().getTokenCount();
-        //int objSize = r.getObjectsSize();
-        int surplusWords = r.getSurplusWords();
-        int sumOther = r.sumOther();
-        int rating = r.getRating();
-        if (rating == SpatialTextSearch.SpatialTextSearchSettings.MIN_ELO_RATING) {
-            rating = 0;
-        }
         double dist = 0.0;
         if (location != null && r.getLatLon() != null) {
             dist = MapUtils.getDistance(location, r.getLatLon());
         }
         StringBuilder b = new StringBuilder();
-        SpatialSearchToken.NameIndexAtom atom = r.getFirstRef().atom;
-        appendName(b, atom.bldObject);
-        appendName(b, atom.object);
-        if (atom.bldObject == null && atom.object == null) {
+        SpatialSearchToken.NameIndexAtom atom = r.getFirstRef().getNameIndexAtom();
+        appendName(b, atom.getBuilding());
+        appendName(b, atom.getObject());
+        if (atom.getBuilding() == null && atom.getObject() == null) {
             b.append(atom.getName());
         }
         List<MapObject> allObjs = r.getAllObjects();
@@ -101,7 +94,7 @@ public class SpatialSearch implements SearchEngine {
             return "STREET";
         } else if (atom.isPoiCategory()) {
             return "POI_TYPE";
-        } else if (atom.object instanceof City) {
+        } else if (atom.getObject() instanceof City) {
             return "CITY";
         }
         return atom.typeStr().toUpperCase(Locale.US);
