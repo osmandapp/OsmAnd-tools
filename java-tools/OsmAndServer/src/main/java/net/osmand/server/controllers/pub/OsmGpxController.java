@@ -72,11 +72,9 @@ public class OsmGpxController {
 	private static final String GPX_FILES_TABLE_NAME = "osm_gpx_files";
 	private static final int SRID_WGS84 = 4326;
 	private static final String ERROR_ACTIVITY = "error";
-	private static final Set<String> INVALID_ACTIVITIES;
+	private static final Set<String> INVALID_ACTIVITIES = new HashSet<>(GarbageClassifier.TYPES);
 	static {
-		Set<String> invalid = new HashSet<>(GarbageClassifier.TYPES);
-		invalid.add(ERROR_ACTIVITY);
-		INVALID_ACTIVITIES = Set.copyOf(invalid);
+		INVALID_ACTIVITIES.add(ERROR_ACTIVITY);
 	}
 
 	public record RoutesListRequest(
