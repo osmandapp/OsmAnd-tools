@@ -38,6 +38,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import net.osmand.data.*;
+import net.osmand.search.core.spatial.SpatialPoiSearch.SpatialPoiType;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.jetbrains.annotations.Nullable;
@@ -96,6 +97,13 @@ public class SearchService {
 	private static final Log LOGGER = LogFactory.getLog(SearchService.class);
 	public static final String IS_OPENED_PREFIX = "open:";
 	public static final String OPENING_HOURS_INFO_SUFFIX = "_info";
+
+	private static final ObjectType[] CLASSIC_SEARCH_TYPES = {
+			// Exclude PARTIAL_LOCATION and app-only types (fav, tracks, markers, etc.)
+			ObjectType.CITY, ObjectType.VILLAGE, ObjectType.BOUNDARY, ObjectType.POSTCODE,
+			ObjectType.STREET, ObjectType.HOUSE, ObjectType.STREET_INTERSECTION,
+			ObjectType.POI_TYPE, ObjectType.POI, ObjectType.LOCATION, ObjectType.REGION
+	};
 
 	@Autowired
 	OsmAndMapsService osmAndMapsService;
@@ -269,7 +277,7 @@ public class SearchService {
 	public List<Feature> search(SearchContext ctx, String timeZone) throws IOException {
 		long tm = System.currentTimeMillis();
 		SearchResults searchResults = getImmediateSearchResults(ctx,
-				new SearchOption(false, null, null, true, false, (ObjectType[]) null), null);
+				new SearchOption(false, null, null, true, false, CLASSIC_SEARCH_TYPES), null);
 		List<SearchResult> res = searchResults.results();
 		if (System.currentTimeMillis() - tm > 1000) {
 			BinaryMapIndexReaderStats.SearchStat stat = searchResults.settings != null
@@ -448,12 +456,21 @@ public class SearchService {
 				String dominatedCity = calculateSpatialDominatedCity(res.mainResults, ctx.locale);
 				for (SpatialSearchResult r : res.mainResults) {
 					List<MapObject> objs = r.getObjects();
+					if (r.hasPoiTypes()) {
+						for (SpatialPoiType type : r.getPoiTypes(poiSearch)) {
+							Feature f = getSpatialPoiTypeFeature(type);
+							f.prop(PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
+							f.prop(PoiTypeField.COMPARE_KEY.getFieldName(), SpatialSearchResult.compareKeyString(r));
+							response.features.add(f);
+						}
+					}
 					if (!objs.isEmpty()) {
 						LatLon l = r.getLatLon() == null ? new LatLon(ctx.lat, ctx.lon) : r.getLatLon();
-						Feature f = getSpatialFeature(l, objs.get(0), ctx.locale, timeZone, dominatedCity);
+						Feature f = getSpatialFeature(l, objs, ctx.locale, timeZone, dominatedCity);
 						if (f != null) {
 							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(), matchedObjects(objs, ctx.locale));
 							f.prop(PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
+							f.prop(PoiTypeField.COMPARE_KEY.getFieldName(), SpatialSearchResult.compareKeyString(r));
 							response.features.add(f);
 						}
 					}
@@ -477,6 +494,47 @@ public class SearchService {
 		return response;
 	}
 
+	private Feature getSpatialPoiTypeFeature(SpatialPoiType type) {
+		Feature feature = new Feature(Geometry.point(new LatLon(0, 0)))
+				.prop(PoiTypeField.TYPE.getFieldName(), ObjectType.POI_TYPE);
+		Map<String, String> tags = getSpatialPoiTypeFields(type);
+		for (Map.Entry<String, String> entry : tags.entrySet()) {
+			feature.prop(entry.getKey(), entry.getValue());
+		}
+		return feature;
+	}
+
+	private Map<String, String> getSpatialPoiTypeFields(SpatialPoiType type) {
+		if (type.singleType != null) {
+			if (type.singleType instanceof PoiType poiType && poiType.isAdditional()
+					&& type.getParentTypes() != null && type.getParentTypes().size() > 1) {
+				SearchCoreFactory.PoiAdditionalCustomFilter filter =
+						new SearchCoreFactory.PoiAdditionalCustomFilter(MapPoiTypes.getDefault(), poiType);
+				Map<String, String> tags = getPoiTypeFields(filter);
+				tags.put(PoiTypeField.NAME.getFieldName(), filter.getTranslation());
+				return tags;
+			}
+			Map<String, String> tags = getPoiTypeFields(type.singleType);
+			tags.put(PoiTypeField.NAME.getFieldName(), type.singleType.getTranslation());
+			return tags;
+		}
+		Map<String, String> tags = new HashMap<>();
+		if (type.poiAdditional != null) {
+			String valueKey = TopIndexFilter.getValueKey(type.poiAdditional);
+			String tag = type.getKey();
+			if (tag.endsWith("_" + valueKey)) {
+				tag = tag.substring(0, tag.length() - valueKey.length() - 1);
+			}
+			if (tag.startsWith(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX)) {
+				tag = tag.substring(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX.length());
+			}
+			tags.put(PoiTypeField.CATEGORY_KEY_NAME.getFieldName(), tag);
+			tags.put(PoiTypeField.CATEGORY_ICON.getFieldName(), tag);
+			tags.put(PoiTypeField.NAME.getFieldName(), type.poiAdditional);
+		}
+		return tags;
+	}
+
 	private List<Map<String, Object>> matchedObjects(List<MapObject> objs, String locale) {
 		List<Map<String, Object>> matched = new ArrayList<>();
 		for (MapObject o : objs) {
@@ -493,7 +551,8 @@ public class SearchService {
 		return matched;
 	}
 
-	private Feature getSpatialFeature(LatLon loc, MapObject obj, String locale, String timeZone, String dominatedCity) {
+	private Feature getSpatialFeature(LatLon loc, List<MapObject> objs, String locale, String timeZone, String dominatedCity) {
+		MapObject obj = objs.isEmpty() ? null : objs.get(0);
 		if (obj == null || loc == null) {
 			return null;
 		}
@@ -506,20 +565,51 @@ public class SearchService {
 		result.object = obj;
 		result.location = loc;
 		result.localeName = obj.getName(locale);
-		if (obj instanceof Street street) {
+		if (obj instanceof Street) {
 			result.objectType = ObjectType.STREET;
-			City city = street.getCity();
+			City city = getSpatialCity(objs);
 			if (city != null) {
 				result.localeRelatedObjectName = city.getName(locale);
 			}
 		} else if (obj instanceof Building) {
 			result.objectType = ObjectType.HOUSE;
+			Street street = getSpatialStreet(objs);
+			if (street != null) {
+				result.localeRelatedObjectName = street.getName(locale);
+			}
+			City city = getSpatialCity(objs);
+			if (city != null) {
+				SearchResult parent = new SearchResult();
+				parent.localeRelatedObjectName = city.getName(locale);
+				result.parentSearchResult = parent;
+			}
 		} else if (obj instanceof City) {
 			result.objectType = ObjectType.CITY;
 		} else {
 			result.objectType = ObjectType.LOCATION;
 		}
 		return getFeature(result, timeZone);
+	}
+
+	private Street getSpatialStreet(List<MapObject> objs) {
+		for (MapObject obj : objs) {
+			if (obj instanceof Street street) {
+				return street;
+			}
+		}
+		return null;
+	}
+
+	private City getSpatialCity(List<MapObject> objs) {
+		for (MapObject obj : objs) {
+			if (obj instanceof City city) {
+				return city;
+			}
+			if (obj instanceof Street street && street.getCity() != null) {
+				return street.getCity();
+			}
+		}
+		return null;
 	}
 
 	public SearchResults getImmediateSearchResults(SearchContext ctx, SearchOption option,
@@ -1423,7 +1513,10 @@ public class SearchService {
 			tags.put(PoiTypeField.KEY_NAME.getFieldName(), type.getKeyName());
 			tags.put(PoiTypeField.ICON_NAME.getFieldName(), type.getIconKeyName());
 		} else if (obj instanceof MapObject type) {
-			tags.put(PoiTypeField.EN_NAME.getFieldName(), type.getEnName(false));
+			String enName = type.getEnName(false);
+			if (Algorithms.isNotEmpty(enName)) {
+				tags.put(PoiTypeField.EN_NAME.getFieldName(), enName);
+			}
 		}
 		return tags;
 	}
@@ -1436,7 +1529,8 @@ public class SearchService {
 		POI_NAME("web_poi_name"), POI_COLOR("web_poi_color"), POI_ICON_NAME("web_poi_iconName"),
 		POI_TYPE("web_poi_type"), POI_SUBTYPE("web_poi_subType"), POI_OSM_URL("web_poi_osmUrl"), CITY("web_city"),
 		// names of all objects matched in a spatial-search result (street, city, ...)
-		MATCHED_OBJECTS("web_matched_objects"), VISIBLE_LEVEL("web_visible_level");
+		MATCHED_OBJECTS("web_matched_objects"), VISIBLE_LEVEL("web_visible_level"),
+		COMPARE_KEY("web_compare_key");
 
 		private final String fieldName;
 

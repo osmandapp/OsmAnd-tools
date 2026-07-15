@@ -1049,6 +1049,10 @@ public class BinaryMapIndexWriter {
 				builder.addSuffixesCommonDictionary(i);
 			}
 			for (NamedObject<MapObject> no : indexEntry.namedObjects) {
+				if (no.bitsetIndex.size() == 0) {
+					// skip common words
+					continue;
+				}
 				AddressNameIndexDataAtom.Builder atom = AddressNameIndexDataAtom.newBuilder();
 				CityBlocks type = CityBlocks.CITY_TOWN_TYPE;
 				LatLon ll = no.object.getLocation();
@@ -1115,7 +1119,25 @@ public class BinaryMapIndexWriter {
 				}
 				builder.addAtom(atom.build());
 			}
-			codedOutStream.writeMessageNoTag(builder.build());
+			builder.setAtomsLength(builder.getAtomCount());
+			// order has changed
+//			codedOutStream.writeMessageNoTag(builder.build());
+			AddressNameIndexData msg = builder.build();
+			codedOutStream.writeRawVarint32(msg.getSerializedSize());
+			codedOutStream.writeUInt32(OsmandOdb.OsmAndAddressNameIndexData.AddressNameIndexData.ATOMSLENGTH_FIELD_NUMBER,
+					msg.getAtomsLength());
+			for (int i = 0; i < msg.getSuffixesCommonDictionaryCount(); i++) {
+				codedOutStream.writeUInt32(OsmandOdb.OsmAndAddressNameIndexData.AddressNameIndexData.SUFFIXESCOMMONDICTIONARY_FIELD_NUMBER,
+						msg.getSuffixesCommonDictionary(i));
+			}
+			for (int i = 0; i < msg.getSuffixesDictionaryCount(); i++) {
+				codedOutStream.writeBytes(OsmandOdb.OsmAndAddressNameIndexData.AddressNameIndexData.SUFFIXESDICTIONARY_FIELD_NUMBER, 
+						msg.getSuffixesDictionaryBytes(i));
+			}
+			for (int i = 0; i < msg.getAtomCount(); i++) {
+				codedOutStream.writeMessage(OsmandOdb.OsmAndAddressNameIndexData.AddressNameIndexData.ATOM_FIELD_NUMBER,
+						msg.getAtom(i));
+			}
 		}
 
 		long len = writeInt32Size();
@@ -1816,8 +1838,9 @@ public class BinaryMapIndexWriter {
 		}
 		codedOutStream.writeMessageNoTag(groupsBuilder.build());
 	}
+	
 
-	public Map<PoiTileBox, List<BinaryFileReference>> writePoiNameIndex(
+	public Map<PoiTileBox, List<BinaryFileReference>> writePoiNameIndex(PoiCreatorCategories globalCategories,
 			NameIndexCreator<PoiNameObject> namesIndex, long startPoiIndex) throws IOException {
 		checkPeekState(POI_INDEX_INIT);
 		codedOutStream.writeTag(OsmandOdb.OsmAndPoiIndex.NAMEINDEX_FIELD_NUMBER, WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
@@ -1861,7 +1884,12 @@ public class BinaryMapIndexWriter {
 				builder.addSuffixesCommonDictionary(i);
 			}
 			List<PoiTileBox> tileBoxes = new ArrayList<>();
+			TIntArrayList types = new TIntArrayList();
 			for (NamedObject<PoiNameObject> no : e.getValue().namedObjects) {
+				if (no.bitsetIndex.size() == 0) {
+					// skip common words
+					continue;
+				}
 				PoiTileBox box = no.object.tileBox();
 				tileBoxes.add(box);
 				OsmandOdb.OsmAndPoiNameIndexDataAtom.Builder bs = OsmandOdb.OsmAndPoiNameIndexDataAtom.newBuilder();
@@ -1870,6 +1898,21 @@ public class BinaryMapIndexWriter {
 				bs.setZoom(box.getZoom());
 				for (int bitsetWord : no.bitsetIndex.toArray()) {
 					bs.addSuffixesBitsetIndex(bitsetWord);
+				}
+				types.clear();
+				globalCategories.internalBuildType(no.object.type(), no.object.subtype(), types);
+				for (int s = 0; s < types.size(); s++) {
+					bs.addPoiCategories(types.get(s) << 1);
+				}
+				Set<PoiAdditionalType> addTypes = no.object.additionalTags();
+				if (addTypes != null) {
+					for (PoiAdditionalType key : addTypes) {
+						int id = (key.getTargetId() << 1) + 1;
+						bs.addPoiCategories(id);
+					}
+				}
+				if (no.object.eloRating() >= 0) {
+					bs.addEloRating(no.object.eloRating());
 				}
 				bs.addPoiIndInBlock(no.object.ind());
 				if (no.isOtherWordsNonZeros()) {
@@ -1884,9 +1927,26 @@ public class BinaryMapIndexWriter {
 				OsmAndPoiNameIndexDataAtom atom = bs.build();
 				builder.addAtoms(atom);
 			}
+			builder.setAtomsLength(builder.getAtomsCount());
 			OsmAndPoiNameIndex.OsmAndPoiNameIndexData msg = builder.build();
-			// simple version doesnt' work because it's changed 4->2
-			codedOutStream.writeMessageNoTag(msg);
+//			codedOutStream.writeMessageNoTag(msg);
+			// order changed
+			codedOutStream.writeRawVarint32(msg.getSerializedSize());
+			codedOutStream.writeUInt32(OsmandOdb.OsmAndPoiNameIndex.OsmAndPoiNameIndexData.ATOMSLENGTH_FIELD_NUMBER,
+					msg.getAtomsLength());
+			for (int i = 0; i < msg.getSuffixesCommonDictionaryCount(); i++) {
+				codedOutStream.writeUInt32(OsmandOdb.OsmAndPoiNameIndex.OsmAndPoiNameIndexData.SUFFIXESCOMMONDICTIONARY_FIELD_NUMBER,
+						msg.getSuffixesCommonDictionary(i));
+			}
+			for (int i = 0; i < msg.getSuffixesDictionaryCount(); i++) {
+				codedOutStream.writeBytes(OsmandOdb.OsmAndPoiNameIndex.OsmAndPoiNameIndexData.SUFFIXESDICTIONARY_FIELD_NUMBER, 
+						msg.getSuffixesDictionaryBytes(i));
+			}
+			for (int i = 0; i < msg.getAtomsCount(); i++) {
+				codedOutStream.writeMessage(OsmandOdb.OsmAndPoiNameIndex.OsmAndPoiNameIndexData.ATOMS_FIELD_NUMBER,
+						msg.getAtoms(i));
+			}
+			
 			long endPointer = getFilePointer();
 			// first message
 			int accumulateSize = 4;

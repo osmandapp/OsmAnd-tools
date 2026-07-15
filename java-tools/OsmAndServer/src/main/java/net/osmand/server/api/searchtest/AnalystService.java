@@ -1000,6 +1000,7 @@ public interface AnalystService extends InspectorService, GenDbService {
         }
         if (isPoi) {
             return isTagIndexedForSearchAsName(tag) || isTagIndexedForSearchAsId(tag)
+            		|| isTagNonIndexedForSearchAsName(tag) 
                     || isTagIndexedAsSearchRelated(tag) || Amenity.ROUTE_MEMBERS_IDS.equals(tag);
         }
         return "place".equals(tag) || isTagIndexedForSearchAsName(tag) || isTagIndexedForSearchAsId(tag);
@@ -1011,7 +1012,7 @@ public interface AnalystService extends InspectorService, GenDbService {
         }
         String preparedValue = isPoi ? value : removeGenerateDbAddressBraces(value);
         List<String> splitValues = SearchAlgorithms.splitAndNormalize(preparedValue, true);
-        SearchAlgorithms.removeCommonWords(splitValues);
+        SearchAlgorithms.removeCommonWords(CommonWords.getInstance(), splitValues);
         for (String token : splitValues) {
             if (!Algorithms.isEmpty(token)) {
                 tokens.add(token);

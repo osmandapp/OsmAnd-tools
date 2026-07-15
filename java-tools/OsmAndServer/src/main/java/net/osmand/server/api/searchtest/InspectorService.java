@@ -91,6 +91,7 @@ public interface InspectorService extends OBFService {
 					skipUnknownField(codedIS, tag);
 					continue;
 				}
+				payloadLength = clampPayloadLengthToLimit(codedIS, payloadLength);
 				long[] stats = getOrCreateSectionStats(sizes, spec.fieldName());
 				if (payloadLength > 0) {
 					stats[0] += payloadLength;
@@ -139,6 +140,7 @@ public interface InspectorService extends OBFService {
 					skipUnknownField(codedIS, tag);
 					continue;
 				}
+				payloadLength = clampPayloadLengthToLimit(codedIS, payloadLength);
 				found = true;
 				long oldLimit = codedIS.pushLimitLong(payloadLength);
 				try {
@@ -173,6 +175,14 @@ public interface InspectorService extends OBFService {
 			l = (l << 8) + readUnsignedByte(codedIS);
 		}
 		return l;
+	}
+
+	static long clampPayloadLengthToLimit(CodedInputStream codedIS, long payloadLength) {
+		long remainingInLimit = codedIS.getBytesUntilLimit();
+		if (remainingInLimit >= 0 && payloadLength > remainingInLimit) {
+			return remainingInLimit;
+		}
+		return payloadLength;
 	}
 
 	static int readUnsignedByte(CodedInputStream codedIS) throws IOException {
@@ -1604,6 +1614,7 @@ public interface InspectorService extends OBFService {
 
     default List<IndexToken> buildIndexTokensWithRefs(Map<String, IndexTokenBuilder> tokens, String obf) {
         List<IndexToken> tokensWithRefs = new ArrayList<>(tokens.size());
+        CommonWords cw = CommonWords.getInstance();
         for (IndexTokenBuilder token : tokens.values()) {
             AddressRef[] addressRefs = distinctAddressRefs(token.addressRefs());
             int poiCount = countPoiIndexes(token.poiIndexes());
@@ -1613,8 +1624,8 @@ public interface InspectorService extends OBFService {
             tokensWithRefs.add(new IndexToken(token.name(), addressRefs, token.poiRefs(), token.poiAtomRefs(),
                     token.poiAtomSizes(), token.poiIndexes(), withObf(token.poiSuffixRefs(), obf), withObf(token.addressSuffixRefs(), obf),
                     token.poiSuffixCounts(), token.addressSuffixCounts(),
-                    CommonWords.getCommon(token.name()) != -1,
-                    CommonWords.getFrequentlyUsed(token.name()) != -1, null, poiCount, addressRefs.length));
+                    cw.getCommon(token.name()) != -1,
+                    cw.getFrequentlyUsed(token.name()) != -1, null, poiCount, addressRefs.length));
         }
         return tokensWithRefs;
     }
@@ -2057,16 +2068,20 @@ public interface InspectorService extends OBFService {
         if (values != null) {
             for (Map.Entry<String, String> entry : values.entrySet()) {
                 String key = entry.getKey();
-                if (key != null && (Amenity.NAME.equals(key) || key.startsWith(Amenity.NAME + ":") || isTagIndexedForSearchAsName(key) || isTagIndexedForSearchAsId(key))) {
+                if (key != null && (
+                		Amenity.NAME.equals(key) || key.startsWith(Amenity.NAME + ":")  
+                		|| isTagNonIndexedForSearchAsName (key) || isTagIndexedForSearchAsName(key) 
+                		|| isTagIndexedForSearchAsId(key))) {
                     if (!Algorithms.isEmpty(entry.getValue())) {
                         candidateNames.add(entry.getValue());
                     }
                 }
             }
         }
+        CommonWords defaultInstance = CommonWords.getInstance();
         for (String candidateName : candidateNames) {
             List<String> tokens = SearchAlgorithms.splitAndNormalize(candidateName, true);
-            SearchAlgorithms.removeCommonWords(tokens);
+            SearchAlgorithms.removeCommonWords(defaultInstance, tokens);
             if (tokens.size() == 1 && tokens.contains(tokenName)) {
                 return true;
             }
@@ -2765,8 +2780,11 @@ public interface InspectorService extends OBFService {
     }
 
     default boolean isPoiSearchIndexedTextTag(String key) {
-        return !Algorithms.isEmpty(key) && (isTagIndexedForSearchAsName(key)
-                || isTagIndexedForSearchAsId(key) || isTagIndexedAsSearchRelated(key)
+        return !Algorithms.isEmpty(key) && 
+        		(isTagIndexedForSearchAsName(key)
+                || isTagIndexedForSearchAsId(key) 
+                || isTagIndexedAsSearchRelated(key)
+                || isTagNonIndexedForSearchAsName(key)
                 || Amenity.ROUTE_MEMBERS_IDS.equals(key));
     }
 
@@ -3354,8 +3372,12 @@ public interface InspectorService extends OBFService {
 		if (obfs == null) {
 			return merged;
 		}
+		Set<String> visitedObfs = new HashSet<>();
 		for (String obf : obfs) {
 			if (obf == null || obf.isBlank()) {
+				continue;
+			}
+			if (!visitedObfs.add(obf)) {
 				continue;
 			}
 			Map<String, long[]> sizes = getSectionSizes(obf, fieldPath);
@@ -3368,8 +3390,14 @@ public interface InspectorService extends OBFService {
 				if (source == null) {
 					continue;
 				}
-				for (int i = 0; i < Math.min(target.length, source.length); i++) {
-					target[i] += source[i];
+				if (source.length > 0) {
+					target[0] += source[0];
+				}
+				if (source.length > 1 && source[1] > 0) {
+					target[1] = 1;
+				}
+				if (source.length > 2) {
+					target[2] += source[2];
 				}
 			}
 		}

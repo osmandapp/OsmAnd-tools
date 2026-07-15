@@ -782,10 +782,13 @@ public interface OBFService extends BaseService {
 		addObfSpec(schema, "OsmAndPoiNameIndex", 5, "data", "OsmAndPoiNameIndexData", InspectorService.ObfLengthType.VAR_INT, false, true);
 		addObfSpec(schema, "OsmAndPoiNameIndexData", 1, "suffixesCommonDictionary", null, InspectorService.ObfLengthType.VAR_INT, false, true);
 		addObfSpec(schema, "OsmAndPoiNameIndexData", 3, "atoms", "OsmAndPoiNameIndexDataAtom", InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "OsmAndPoiNameIndexData", 7, "atomsLength", null, InspectorService.ObfLengthType.VAR_INT);
 		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 2, "zoom", null, InspectorService.ObfLengthType.VAR_INT);
 		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 3, "x", null, InspectorService.ObfLengthType.VAR_INT);
 		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 4, "y", null, InspectorService.ObfLengthType.VAR_INT);
 		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 5, "bloomIndex", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 11, "poiCategories", null, InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 12, "eloRating", null, InspectorService.ObfLengthType.VAR_INT, false, true);
 		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 14, "shiftTo", null, InspectorService.ObfLengthType.FIXED32);
 
 		addObfSpec(schema, "IndexedStringTable", 1, "prefix", null, InspectorService.ObfLengthType.VAR_INT);
@@ -850,6 +853,7 @@ public interface OBFService extends BaseService {
 		addObfSpec(schema, "OsmAndAddressNameIndexData", 4, "table", "IndexedStringTable", InspectorService.ObfLengthType.FIXED32);
 		addObfSpec(schema, "OsmAndAddressNameIndexData", 6, "commonStats", "CommonIndexedStats", InspectorService.ObfLengthType.VAR_INT);
 		addObfSpec(schema, "OsmAndAddressNameIndexData", 7, "atom", "AddressNameIndexData", InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "AddressNameIndexData", 7, "atomsLength", null, InspectorService.ObfLengthType.VAR_INT);
 		addObfSpec(schema, "AddressNameIndexData", 3, "suffixesCommonDictionary", null, InspectorService.ObfLengthType.VAR_INT, false, true);
 		addObfSpec(schema, "AddressNameIndexData", 4, "atom", "AddressNameIndexDataAtom", InspectorService.ObfLengthType.VAR_INT, false, true);
 
