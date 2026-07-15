@@ -9,13 +9,14 @@ import net.osmand.shared.gpx.primitives.TrkSegment;
 import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.util.MapUtils;
 
-final class GarbageClassifier {
+public final class GarbageClassifier {
 
-	static final String GARBAGE = "garbage";
-	static final String SHORT = "garbage_short";
-	static final String SPARSE = "garbage_sparse";
-	static final String TELEPORT = "garbage_teleport";
-	static final Set<String> TYPES = Set.of(GARBAGE, SHORT, SPARSE, TELEPORT);
+	public static final String GARBAGE = "garbage";
+	public static final String SHORT = "garbage_short";
+	public static final String SPARSE = "garbage_sparse";
+	public static final String TELEPORT = "garbage_teleport";
+	// The "garbage" category and all its concrete subtypes.
+	public static final Set<String> TYPES = Set.of(GARBAGE, SHORT, SPARSE, TELEPORT);
 
 	private static final int MIN_POINTS = 10;
 	private static final int MIN_DISTANCE = 200;
@@ -26,7 +27,7 @@ final class GarbageClassifier {
 	private GarbageClassifier() {
 	}
 
-	static boolean isGarbage(String activity) {
+	public static boolean isGarbage(String activity) {
 		return activity != null && activity.startsWith(GARBAGE);
 	}
 
