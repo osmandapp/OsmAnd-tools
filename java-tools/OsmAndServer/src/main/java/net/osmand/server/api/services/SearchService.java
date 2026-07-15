@@ -1274,8 +1274,6 @@ public class SearchService {
 			return Collections.emptyMap();
 		}
 		AdditionalInfoBundle infoFilter = new AdditionalInfoBundle(MapPoiTypes.getDefault(), tags);
-		String subtype = tags.get(Amenity.SUBTYPE);
-		MapPoiTypes mapPoiTypes = MapPoiTypes.getDefault();
 		Map<String, Object> visible = new HashMap<>();
 		infoFilter.getFilteredLocalizedInfo().forEach((key, value) -> {
 			if (infoFilter.shouldDisplayKey(key)) {
