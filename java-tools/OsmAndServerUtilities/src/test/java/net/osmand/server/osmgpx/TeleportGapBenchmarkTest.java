@@ -30,11 +30,11 @@ public class TeleportGapBenchmarkTest {
 			}
 			int points = gpx.getAllSegmentsPoints().size();
 
-			boolean teleport = DownloadOsmGPX.hasTeleportGap(gpx); // warm up + result
+			boolean teleport = GarbageClassifier.hasTeleportGap(gpx); // warm up + result
 
 			long start = System.nanoTime();
 			for (int i = 0; i < iterations; i++) {
-				DownloadOsmGPX.hasTeleportGap(gpx);
+				GarbageClassifier.hasTeleportGap(gpx);
 			}
 			long elapsedNs = System.nanoTime() - start;
 
