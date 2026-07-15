@@ -11,10 +11,14 @@ import net.osmand.data.City;
 import net.osmand.data.LatLon;
 import net.osmand.data.Street;
 import net.osmand.obf.OBFDataCreator;
+import net.osmand.obf.preparation.IndexAddressCreator;
+import net.osmand.obf.preparation.IndexCreator;
+import net.osmand.obf.preparation.IndexPoiCreator;
 import net.osmand.osm.AbstractPoiType;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.search.core.*;
 import net.osmand.util.Algorithms;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -62,6 +66,7 @@ public class SearchUICoreGenOBFTest {
 	private static final boolean REGENERATE_OBF = true;
 	private static final boolean SPATIAL_SEARCH = getEnvBoolean();
 	private static boolean TEST_EXTRA_RESULTS = true;
+	private static List<Class<?>> OBF_GENERATE_CLASSES = List.of(IndexCreator.class, IndexPoiCreator.class, IndexAddressCreator.class);
 
 	private final File testFile;
 
@@ -835,6 +840,33 @@ public class SearchUICoreGenOBFTest {
 				}
 			}
 			return val;
+		}
+	}
+
+	private String getObfGenerateHash() {
+		List<String> individualHashes = new ArrayList<>();
+
+		for (Class<?> clazz : OBF_GENERATE_CLASSES) {
+			String hash = getClassHash(clazz);
+			if (!hash.startsWith("Error")) {
+				individualHashes.add(hash);
+			}
+		}
+
+		String allHashesCombined = String.join("\n", individualHashes);
+		return DigestUtils.sha256Hex(allHashesCombined);
+	}
+
+	private String getClassHash(Class<?> clazz) {
+		String classResourcePath = "/" + clazz.getName().replace('.', '/') + ".class";
+		try (InputStream is = clazz.getResourceAsStream(classResourcePath)) {
+			if (is == null) {
+				return "Error. Class not found";
+			}
+			return DigestUtils.sha256Hex(is);
+		} catch (IOException e) {
+			e.printStackTrace();
+			return "Error: " + e.getMessage();
 		}
 	}
 }
