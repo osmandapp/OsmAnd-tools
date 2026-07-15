@@ -114,10 +114,6 @@ public class IndexCreator {
 		return regionName;
 	}
 
-    public String testAnd() {
-        return "testAnd";
-    }
-
 	public void setRegionName(String regionName) {
 		this.regionName = regionName;
 	}
