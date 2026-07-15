@@ -819,6 +819,9 @@ public class DownloadOsmGPX {
 			return null;
 		}
 		String group = ACTIVITY_GROUPS.get(activity);
+		if (group == null) {
+			return null; // unknown/garbage/error activity
+		}
 		Double avgLimitKmh = GROUP_AVG_LIMIT_KMH.get(group);
 		Double maxLimitKmh = GROUP_MAX_LIMIT_KMH.get(group);
 		if (avgLimitKmh == null || maxLimitKmh == null) {
