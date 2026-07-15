@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -382,8 +383,19 @@ public class SearchTestController {
 	public ResponseEntity<List<String>> getOBFs(
 			@RequestParam(required = false) Double radius,
 			@RequestParam(required = false) Double lat,
-			@RequestParam(required = false) Double lon) throws IOException {
-		return ResponseEntity.ok(testSearchService.getOBFs(radius, lat, lon));
+			@RequestParam(required = false) Double lon,
+			@RequestParam(required = false) String obfPath) throws IOException {
+		String normalizedObfPath = obfPath == null ? null : obfPath.trim();
+		if (normalizedObfPath != null && !normalizedObfPath.isBlank()) {
+			try {
+				if (!Files.isDirectory(Path.of(normalizedObfPath))) {
+					throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OBF Location Dir is not a valid directory: " + normalizedObfPath);
+				}
+			} catch (InvalidPathException e) {
+				throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OBF Location Dir is not a valid path: " + normalizedObfPath);
+			}
+		}
+		return ResponseEntity.ok(testSearchService.getOBFs(radius, lat, lon, normalizedObfPath));
 	}
 
 	@GetMapping(value = "/obf-tags", produces = MediaType.APPLICATION_JSON_VALUE)
