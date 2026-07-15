@@ -67,6 +67,7 @@ public class SearchUICoreGenOBFTest {
 	private static final boolean SPATIAL_SEARCH = getEnvBoolean();
 	private static boolean TEST_EXTRA_RESULTS = true;
 	private static List<Class<?>> OBF_GENERATE_CLASSES = List.of(IndexCreator.class, IndexPoiCreator.class, IndexAddressCreator.class);
+	private static final boolean RUN_IGNORED_TESTS = false;
 
 	private final File testFile;
 
@@ -402,6 +403,10 @@ public class SearchUICoreGenOBFTest {
         Assert.assertFalse(sourceJsonText.isEmpty());
 
 		JSONObject sourceJson = new JSONObject(sourceJsonText);
+		boolean ignore = sourceJson.optBoolean("ignore");
+		if (ignore && !RUN_IGNORED_TESTS) {
+			return;
+		}
 		JSONObject settingsJson = sourceJson.getJSONObject("settings");
 		List<String> phrases = parsePhrases(sourceJson);
 		boolean useData = settingsJson.optBoolean("useData", true);

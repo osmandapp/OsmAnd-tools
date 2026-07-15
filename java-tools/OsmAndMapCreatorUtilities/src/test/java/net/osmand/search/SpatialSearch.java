@@ -59,6 +59,7 @@ public class SpatialSearch implements SearchEngine {
             b.append(atom.getName());
         }
         List<MapObject> allObjs = r.getAllObjects();
+        String subtype = "";
         for (MapObject o : allObjs) {
             if (o instanceof Street street) {
                 appendName(b, street.getCity());
@@ -68,10 +69,13 @@ public class SpatialSearch implements SearchEngine {
                 appendName(b, city);
                 break;
             }
+            if (o instanceof Amenity am) {
+                subtype = " " + am.getSubType();
+            }
         }
         String sorting = SpatialSearchResult.compareKeyString(r);
         return String.format(Locale.US, "%s [[%d, %s, %s, %.2f km]]", b,
-                tCount, testTypeStr(atom), sorting, dist / 1000);
+                tCount, testTypeStr(atom) + subtype, sorting, dist / 1000);
     }
 
     private void appendName(StringBuilder b, MapObject object) {
