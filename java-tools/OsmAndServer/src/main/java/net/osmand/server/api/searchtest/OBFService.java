@@ -227,6 +227,21 @@ public interface OBFService extends BaseService {
 		return result;
 	}
 
+	default List<ObfFileInfo> getObfFileInfos(String obfPath) throws IOException {
+		if (Algorithms.isEmpty(obfPath)) {
+			return getObfFileInfos();
+		}
+		List<ObfFileInfo> result = new ArrayList<>();
+		for (File file : getCustomObfFiles(obfPath)) {
+			if (OBFService.getObfFileName(file.getName()).startsWith("World_base")) {
+				continue;
+			}
+			result.add(parseObfFileInfo(file.getAbsolutePath()));
+		}
+		result.sort(Comparator.comparing(ObfFileInfo::name, String.CASE_INSENSITIVE_ORDER));
+		return result;
+	}
+
 	default ObfFileInfo parseObfFileInfo(String obf) {
 		String name = OBFService.getObfFileName(obf);
 		String baseName = stripObfExtension(name);

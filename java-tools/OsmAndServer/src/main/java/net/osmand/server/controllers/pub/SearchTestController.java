@@ -398,8 +398,18 @@ public class SearchTestController {
 
 	@GetMapping(value = "/obf-tags", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<List<OBFService.ObfFileInfo>> getObfTags() throws IOException {
-		return ResponseEntity.ok(testSearchService.getObfFileInfos());
+	public ResponseEntity<List<OBFService.ObfFileInfo>> getObfTags(@RequestParam(required = false) String obfPath) throws IOException {
+		String normalizedObfPath = obfPath == null ? null : obfPath.trim();
+		if (normalizedObfPath != null && !normalizedObfPath.isBlank()) {
+			try {
+				if (!Files.isDirectory(Path.of(normalizedObfPath))) {
+					throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OBF Location Dir is not a valid directory: " + normalizedObfPath);
+				}
+			} catch (InvalidPathException e) {
+				throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OBF Location Dir is not a valid path: " + normalizedObfPath);
+			}
+		}
+		return ResponseEntity.ok(testSearchService.getObfFileInfos(normalizedObfPath));
 	}
 
 	@GetMapping(value = "/addresses", produces = MediaType.APPLICATION_JSON_VALUE)
