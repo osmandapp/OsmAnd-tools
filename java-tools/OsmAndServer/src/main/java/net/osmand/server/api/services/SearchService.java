@@ -472,7 +472,7 @@ public class SearchService {
 					}
 					if (!objs.isEmpty()) {
 						LatLon l = r.getLatLon() == null ? new LatLon(ctx.lat, ctx.lon) : r.getLatLon();
-						Feature f = getSpatialFeature(l, objs, ctx.locale, timeZone, dominatedCity);
+						Feature f = getSpatialFeature(l, objs, ctx.locale, timeZone, dominatedCity, r.getExtraNameMatch());
 						if (f != null) {
 							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(), matchedObjects(objs, ctx.locale));
 							f.prop(PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
@@ -557,7 +557,8 @@ public class SearchService {
 		return matched;
 	}
 
-	private Feature getSpatialFeature(LatLon loc, List<MapObject> objs, String locale, String timeZone, String dominatedCity) {
+	private Feature getSpatialFeature(LatLon loc, List<MapObject> objs, String locale, String timeZone,
+			String dominatedCity, String extraNameMatch) {
 		MapObject obj = objs.isEmpty() ? null : objs.get(0);
 		if (obj == null || loc == null) {
 			return null;
@@ -565,12 +566,22 @@ public class SearchService {
 		if (obj instanceof Amenity amenity) {
 			SearchResult result = buildPoiSearchResult(amenity, locale, dominatedCity);
 			result.localeName = amenity.getName(locale);
+			if (Algorithms.isNotEmpty(extraNameMatch)) {
+				result.localeName += " (" + extraNameMatch + ")"; // ref
+			}
 			return getFeature(result, timeZone);
 		}
 		SearchResult result = new SearchResult();
 		result.object = obj;
 		result.location = loc;
-		result.localeName = obj.getName(locale);
+		if (obj instanceof Building b && b.isInterpolation() && Algorithms.isNotEmpty(extraNameMatch)) {
+			result.localeName = extraNameMatch; // interpolated house number
+		} else {
+			result.localeName = obj.getName(locale);
+			if (Algorithms.isNotEmpty(extraNameMatch)) {
+				result.localeName += " [" + extraNameMatch + "]"; // ref for non-Amenity objects
+			}
+		}
 		if (obj instanceof Street) {
 			result.objectType = ObjectType.STREET;
 			City city = getSpatialCity(objs);
