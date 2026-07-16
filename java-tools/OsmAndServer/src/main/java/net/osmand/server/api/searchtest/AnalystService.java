@@ -462,9 +462,8 @@ public interface AnalystService extends InspectorService, GenDbService {
                         new ObjectAddressPage(Collections.emptyList(), 0, 0, 0, 0, new int[0], new int[0], 0, 0)));
                 continue;
             }
-            List<ObjectAddress> numberedObjects = markAloneObjects(objects, token);
             result.add(new GenerateDbTokenObjects(obfTokens.obf(), obfTokens.obfName(), obfTokens.obfIndex(), obfTokens.startMs(), token,
-                    new ObjectAddressPage(numberedObjects, 0, Integer.MAX_VALUE, numberedObjects.size(), 1, new int[0], new int[0], 0, 0)));
+                    new ObjectAddressPage(objects, 0, Integer.MAX_VALUE, objects.size(), 1, new int[0], new int[0], 0, 0)));
         }
         return new GenerateDbTokenChunk(obfTokens.obf(), obfTokens.obfName(), obfTokens.obfIndex(), obfTokens.startMs(), result);
     }

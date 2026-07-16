@@ -1248,8 +1248,14 @@ public interface OBFService extends BaseService {
 				if (source == null) {
 					continue;
 				}
-				for (int i = 0; i < Math.min(target.length, source.length); i++) {
-					target[i] += source[i];
+				if (source.length > 0) {
+					target[0] += source[0];
+				}
+				if (source.length > 1 && source[1] == 1) {
+					target[1] = 1;
+				}
+				if (source.length > 2) {
+					target[2] += source[2];
 				}
 			}
 		}

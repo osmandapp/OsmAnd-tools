@@ -216,9 +216,10 @@ public interface InspectorService extends OBFService {
         }
     }
 
-    record IndexToken(String name, boolean isPoi, Atom[] atoms, boolean isCommon, boolean isFrequent, int count) {
+    record IndexToken(String name, boolean isPoi, Atom[] atoms, boolean isCommon, boolean isFrequent, int count, int size) {
         public IndexToken {
             count = count > 0 ? count : getObjectRefsCount();
+            size = size > 0 ? size : getAtomsSize();
         }
 
         private int getObjectRefsCount() {
@@ -232,6 +233,19 @@ public interface InspectorService extends OBFService {
                 }
             }
             return count >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) count;
+        }
+
+        private int getAtomsSize() {
+            if (atoms == null || atoms.length == 0) {
+                return 0;
+            }
+            long size = 0;
+            for (Atom atom : atoms) {
+                if (atom != null && atom.atomSize > 0) {
+                    size += atom.atomSize;
+                }
+            }
+            return size >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) size;
         }
     }
     record IndexTokenPage(List<IndexToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages) {}
@@ -368,7 +382,7 @@ public interface InspectorService extends OBFService {
         }
         return new IndexToken(left.name(), left.isPoi(), atoms.toArray(new Atom[0]),
                 left.isCommon() || right.isCommon(),
-                left.isFrequent() || right.isFrequent(), 0);
+                left.isFrequent() || right.isFrequent(), 0, 0);
     }
 
     private static long elapsedMs(long elapsedNs) {
@@ -379,6 +393,7 @@ public interface InspectorService extends OBFService {
         String normalizedSortBy = Algorithms.isEmpty(sortBy) ? "name" : sortBy.trim().toLowerCase(Locale.ROOT);
         Comparator<IndexToken> comparator = switch (normalizedSortBy) {
             case "count" -> Comparator.comparingInt(token -> token == null ? 0 : token.count());
+            case "size" -> Comparator.comparingInt(token -> token == null ? 0 : token.size());
             default -> Comparator.comparing(token -> token == null || token.name() == null ? "" : token.name(), String.CASE_INSENSITIVE_ORDER);
         };
         comparator = comparator.thenComparing(token -> token == null || token.name() == null ? "" : token.name(), String.CASE_INSENSITIVE_ORDER);
@@ -442,7 +457,7 @@ public interface InspectorService extends OBFService {
             tokens.add(new IndexToken(tokenName, isPoi, entry.getValue().toArray(new Atom[0]),
                     commonWords.getCommon(tokenName) != -1,
                     commonWords.getFrequentlyUsed(tokenName) != -1,
-                    0));
+                    0, 0));
         }
         getLogger().info("loadIndexTokens obf={} objectType={} prefixes={} atoms={} tokens={} elapsedMs={}",
                 file.getName(), isPoi ? "poi" : "address", prefixBlocks, atomCount, tokens.size(),
@@ -639,8 +654,8 @@ public interface InspectorService extends OBFService {
     private static String commonSuffixStatsCacheKey(String obfKey, boolean poi, int offset) {
         return obfKey + "|" + (poi ? "poi" : "address") + "|" + offset;
     }
-	
-    default boolean isAloneTokenObject(ObjectAddress object, String tokenName) {
+
+    private static boolean isAloneTokenObject(ObjectAddress object, String tokenName) {
         if (Algorithms.isEmpty(tokenName)) {
             return false;
         }
@@ -695,8 +710,8 @@ public interface InspectorService extends OBFService {
         }
         return value >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) value;
     }
-    
-    default ObjectAddress toPoiObjectAddress(RawPoiObject rawPoiObject,
+
+    private static ObjectAddress toPoiObjectAddress(RawPoiObject rawPoiObject,
                                              String lang) {
         LatLon location = new LatLon(rawPoiObject.lat, rawPoiObject.lon);
         Map<String, String> values = new LinkedHashMap<>();
@@ -732,13 +747,13 @@ public interface InspectorService extends OBFService {
                 true, false, "POI", osmId, osmType, 0, 0, 0, "");
     }
 
-    default boolean isPoiSearchIndexedTextTag(String key) {
+    private static boolean isPoiSearchIndexedTextTag(String key) {
         return !Algorithms.isEmpty(key) && (isTagIndexedForSearchAsName(key)
                 || isTagIndexedForSearchAsId(key) || isTagIndexedAsSearchRelated(key)
                 || Amenity.ROUTE_MEMBERS_IDS.equals(key));
     }
 
-    default Map<String, String> arrangeObjectAddressValues(Map<String, String> values) {
+    private static Map<String, String> arrangeObjectAddressValues(Map<String, String> values) {
         if (values == null || values.isEmpty()) {
             return new LinkedHashMap<>();
         }
@@ -756,7 +771,7 @@ public interface InspectorService extends OBFService {
         return new LinkedHashMap<>(sortedValues);
     }
 
-    default String decodePoiOsmType(long rawPoiObjectId) {
+    private static String decodePoiOsmType(long rawPoiObjectId) {
         if (rawPoiObjectId <= 0) {
             return null;
         }
@@ -766,7 +781,7 @@ public interface InspectorService extends OBFService {
         return entityType == null ? null : entityType.name().toLowerCase(Locale.US);
     }
 
-    default String selectPoiDisplayName(RawPoiObject rawPoiObject, String lang) {
+    private static String selectPoiDisplayName(RawPoiObject rawPoiObject, String lang) {
         if ("en".equalsIgnoreCase(lang) && !Algorithms.isEmpty(rawPoiObject.nameEn)) {
             return rawPoiObject.nameEn;
         }
@@ -779,29 +794,7 @@ public interface InspectorService extends OBFService {
         return "";
     }
 
-    default boolean matchesObjectAddressText(ObjectAddress objectAddress,
-                                             Pattern pattern,
-                                             Pattern normalizedPattern) {
-        if (objectAddress == null) {
-            return false;
-        }
-        if (matchesPattern(objectAddress.name(), pattern, normalizedPattern)) {
-            return true;
-        }
-        Map<String, String> values = objectAddress.commonTags();
-        if (values == null || values.isEmpty()) {
-            return false;
-        }
-        for (Map.Entry<String, String> entry : values.entrySet()) {
-            if (matchesPattern(entry.getKey(), pattern, normalizedPattern)
-                    || matchesPattern(entry.getValue(), pattern, normalizedPattern)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    default List<ObjectAddress> markAloneObjects(List<ObjectAddress> results, IndexToken token) {
+    private static List<ObjectAddress> markAloneObjects(List<ObjectAddress> results, IndexToken token) {
         if (results == null || results.isEmpty()) {
             return new ArrayList<>();
         }
@@ -818,15 +811,8 @@ public interface InspectorService extends OBFService {
         return markedResults;
     }
 
-    default ObjectAddressPage getObjects(String obf,
-                                         String lang,
-                                         IndexToken token,
-                                         String regExp,
-                                         int pageToShow,
-                                         int pageSizeLimit,
-                                         String sortBy,
-                                         String sortOrder,
-                                         boolean isPoi) {
+    default ObjectAddressPage getObjects(String obf, String lang, IndexToken token, String regExp, int pageToShow,
+                                         int pageSizeLimit, String sortBy, String sortOrder, boolean isPoi) {
         List<ObjectAddress> results = new ArrayList<>();
         if (token == null) {
             return new ObjectAddressPage(List.of(), Math.max(pageToShow, 0), Math.max(pageSizeLimit, 1), 0, 0, new int[7], new int[12], 0, 0);
@@ -858,15 +844,8 @@ public interface InspectorService extends OBFService {
         }
     }
 
-    default ObjectAddressPage getObjects(List<String> obfs,
-                                         String lang,
-                                         IndexToken token,
-                                         String regExp,
-                                         int pageToShow,
-                                         int pageSizeLimit,
-                                         String sortBy,
-                                         String sortOrder,
-                                         boolean isPOI) {
+    default ObjectAddressPage getObjects(List<String> obfs, String lang, IndexToken token, String regExp, int pageToShow,
+                                         int pageSizeLimit, String sortBy, String sortOrder, boolean isPOI) {
         final int safePage = Math.max(pageToShow, 0);
         final int safeSize = Math.max(pageSizeLimit, 1);
         if (token == null) {
@@ -881,29 +860,27 @@ public interface InspectorService extends OBFService {
         if (targetObfs.isEmpty()) {
             targetObfs = obfs == null ? List.of() : obfs;
         }
-        if (targetObfs != null) {
-            for (String obf : targetObfs) {
-                if (Algorithms.isEmpty(obf)) {
-                    continue;
-                }
-                IndexToken obfToken = findIndexTokenByName(obf, token.name(), isPOI);
-                if (obfToken == null) {
-                    continue;
-                }
-                ObjectAddressPage page = getObjects(obf, lang, obfToken, regExp, 0, Integer.MAX_VALUE, sortBy, sortOrder, isPOI);
-                if (page == null) {
-                    continue;
-                }
-                if (page.content() != null) {
-                    for (ObjectAddress objectAddress : page.content()) {
-                        content.add(withObf(objectAddress, obf));
-                    }
-                }
-                addMetrics(countMetrics, page.countMetrics());
-                addMetrics(sizeMetrics, page.sizeMetrics());
-                aloneCount += page.aloneCount();
-                aloneSize += page.aloneSize();
+        for (String obf : targetObfs) {
+            if (Algorithms.isEmpty(obf)) {
+                continue;
             }
+            IndexToken obfToken = findIndexTokenByName(obf, token.name(), isPOI);
+            if (obfToken == null) {
+                continue;
+            }
+            ObjectAddressPage page = getObjects(obf, lang, obfToken, regExp, 0, Integer.MAX_VALUE, sortBy, sortOrder, isPOI);
+            if (page == null) {
+                continue;
+            }
+            if (page.content() != null) {
+                for (ObjectAddress objectAddress : page.content()) {
+                    content.add(withObf(objectAddress, obf));
+                }
+            }
+            addMetrics(countMetrics, page.countMetrics());
+            addMetrics(sizeMetrics, page.sizeMetrics());
+            aloneCount += page.aloneCount();
+            aloneSize += page.aloneSize();
         }
         content.sort(buildObjectAddressComparator(sortBy, sortOrder));
         long totalElements = content.size();
