@@ -566,6 +566,9 @@ public class SearchService {
 		if (obj instanceof Amenity amenity) {
 			SearchResult result = buildPoiSearchResult(amenity, locale, dominatedCity);
 			result.localeName = amenity.getName(locale);
+			if (Algorithms.isNotEmpty(extraNameMatch)) {
+				result.localeName += " (" + extraNameMatch + ")"; // ref
+			}
 			return getFeature(result, timeZone);
 		}
 		SearchResult result = new SearchResult();
@@ -575,6 +578,9 @@ public class SearchService {
 			result.localeName = extraNameMatch; // interpolated house number
 		} else {
 			result.localeName = obj.getName(locale);
+			if (Algorithms.isNotEmpty(extraNameMatch)) {
+				result.localeName += " [" + extraNameMatch + "]"; // ref for non-Amenity objects
+			}
 		}
 		if (obj instanceof Street) {
 			result.objectType = ObjectType.STREET;
