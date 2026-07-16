@@ -6,6 +6,7 @@ import net.osmand.ResultMatcher;
 import net.osmand.binary.*;
 import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
 import net.osmand.data.*;
+import net.osmand.map.WorldRegion;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiCategory;
 import net.osmand.server.api.services.OsmAndMapsService;
@@ -948,6 +949,7 @@ public interface OBFService extends BaseService {
 					skipUnknownField(codedIS, tag);
 					continue;
 				}
+				payloadLength = clampPayloadLengthToLimit(codedIS, payloadLength);
 				long[] stats = getOrCreateSectionStats(sizes, spec.fieldName());
 				if (payloadLength > 0) {
 					stats[0] += payloadLength;
@@ -996,6 +998,7 @@ public interface OBFService extends BaseService {
 					skipUnknownField(codedIS, tag);
 					continue;
 				}
+				payloadLength = clampPayloadLengthToLimit(codedIS, payloadLength);
 				found = true;
 				long oldLimit = codedIS.pushLimitLong(payloadLength);
 				try {
@@ -1030,6 +1033,14 @@ public interface OBFService extends BaseService {
 			l = (l << 8) + readUnsignedByte(codedIS);
 		}
 		return l;
+	}
+
+	static long clampPayloadLengthToLimit(CodedInputStream codedIS, long payloadLength) {
+		long remainingInLimit = codedIS.getBytesUntilLimit();
+		if (remainingInLimit >= 0 && payloadLength > remainingInLimit) {
+			return remainingInLimit;
+		}
+		return payloadLength;
 	}
 
 	static int readUnsignedByte(CodedInputStream codedIS) throws IOException {
