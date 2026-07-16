@@ -5,6 +5,7 @@ import net.osmand.data.*;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.search.core.spatial.*;
 import net.osmand.search.core.spatial.SpatialSearchResult.SpatialSearchResultRef;
+import net.osmand.search.core.spatial.SpatialTextSearch.SpatialTextSearchSettings;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import org.json.JSONObject;
@@ -120,7 +121,7 @@ public class SpatialSearch implements SearchEngine {
     }
 
     private SpatialTextSearch.SpatialTextSearchSettings parseSpatialSettings(JSONObject settingsJson) {
-        SpatialTextSearch.SpatialTextSearchSettings settings = new SpatialTextSearch.SpatialTextSearchSettings();
+        SpatialTextSearch.SpatialTextSearchSettings settings = SpatialTextSearchSettings.defaultSettings();
         settings.SEARCH_ADDR = settingsJson.optBoolean("SEARCH_ADDR", settings.SEARCH_ADDR);
         settings.SEARCH_POI = settingsJson.optBoolean("SEARCH_POI", settings.SEARCH_POI);
         settings.SEARCH_BUILDINGS = settingsJson.optBoolean("SEARCH_BUILDINGS", settings.SEARCH_BUILDINGS);

@@ -66,11 +66,12 @@ public class SearchUICoreGenOBFTest {
 	private static final Set<String> GENERATED_OBFS = Collections.synchronizedSet(new HashSet<>());
 	private static final boolean REGENERATE_OBF = true;
 	private static final boolean TEST_EXTRA_RESULTS = true;
-	private static final List<Class<?>> OBF_GENERATE_CLASSES = List.of(IndexCreator.class, IndexPoiCreator.class, IndexAddressCreator.class);
+	private static final List<Class<?>> OBF_GENERATE_CLASSES = List.of(IndexCreator.class, IndexPoiCreator.class,
+			IndexAddressCreator.class);
 	private static final String OBF_HASH_FILE_NAME = ".obf.hash";
 	private static final boolean RUN_IGNORED_TESTS = false;
-  private static final boolean FILTER_DATA_JSON = false;
-  private static final double FILTER_REMOVE_PROBABILITY = 0.8; // means 80% probability of removal
+	private static final boolean FILTER_DATA_JSON = false;
+	private static final double FILTER_REMOVE_PROBABILITY = 0.8; // means 80% probability of removal
 	private static boolean HASH_IS_ACTUAL_FOR_RUN;
 
 	private final File testFile;

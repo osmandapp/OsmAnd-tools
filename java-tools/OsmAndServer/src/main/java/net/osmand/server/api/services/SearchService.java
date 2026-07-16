@@ -342,7 +342,7 @@ public class SearchService {
 		if (readers == null || readers.isEmpty()) {
 			return null;
 		}
-		SpatialTextSearchSettings settings = new SpatialTextSearchSettings();
+		SpatialTextSearchSettings settings = SpatialTextSearchSettings.defaultSettings();
 		settings.AUTO_CLEAR_PREFIX_CACHE_LIMIT = TEST_CACHE_PREFIX_LIMIT;
 		SpatialSearchContext sscontext = new SpatialSearchContext(settings, readers, poiSearch, new LatLon(ctx.lat, ctx.lon));
 		SpatialSearchContext.SpatialSearchStats stats = sscontext.getStats();
@@ -452,7 +452,7 @@ public class SearchService {
 			}
 			SpatialSearchResults res;
 			// In future multiple spatialTextSearch & multiple osmand regions
-			SpatialSearchContext sscontext = new SpatialSearchContext(new SpatialTextSearchSettings(), usedMapList,
+			SpatialSearchContext sscontext = new SpatialSearchContext(SpatialTextSearchSettings.defaultSettings(), usedMapList,
 					poiSearch, new LatLon(ctx.lat, ctx.lon));
 			synchronized (spatialTextSearch) {
 				usedMapList.add(osmandRegions.getFile());
