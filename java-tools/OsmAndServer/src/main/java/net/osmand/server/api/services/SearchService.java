@@ -572,7 +572,7 @@ public class SearchService {
 		result.object = obj;
 		result.location = loc;
 		if (obj instanceof Building b && b.isInterpolation() && Algorithms.isNotEmpty(extraNameMatch)) {
-			result.localeName = extraNameMatch;
+			result.localeName = extraNameMatch; // interpolated house number
 		} else {
 			result.localeName = obj.getName(locale);
 		}
