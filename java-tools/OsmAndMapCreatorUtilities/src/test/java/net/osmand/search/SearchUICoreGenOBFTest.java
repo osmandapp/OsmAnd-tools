@@ -10,6 +10,7 @@ import net.osmand.data.Amenity;
 import net.osmand.data.City;
 import net.osmand.data.LatLon;
 import net.osmand.data.Street;
+import net.osmand.data.Building;
 import net.osmand.obf.OBFDataCreator;
 import net.osmand.obf.preparation.IndexAddressCreator;
 import net.osmand.obf.preparation.IndexCreator;
@@ -34,6 +35,7 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -68,8 +70,11 @@ public class SearchUICoreGenOBFTest {
 	private static boolean TEST_EXTRA_RESULTS = true;
 	private static List<Class<?>> OBF_GENERATE_CLASSES = List.of(IndexCreator.class, IndexPoiCreator.class, IndexAddressCreator.class);
 	private static final boolean RUN_IGNORED_TESTS = false;
+    private static final boolean FILTER_DATA_JSON = false;
+    private static final double FILTER_REMOVE_PROBABILITY = 0.8; // means 80% probability of removal
 
 	private final File testFile;
+    private Set<String> searchKeywords;
 
 	public SearchUICoreGenOBFTest(String name, File file) {
 		this.testFile = file;
@@ -386,6 +391,9 @@ public class SearchUICoreGenOBFTest {
 	private File exportSourceJson(File originalObfFile, String generatedObfName) throws IOException {
 		List<Amenity> amenities = getAmenities(originalObfFile.getAbsolutePath());
 		List<City> cities = getCities(originalObfFile.getAbsolutePath());
+        if (FILTER_DATA_JSON) {
+            filterCities(cities);
+        }
 		List<RouteDataObject> routes = getRoutes(originalObfFile.getAbsolutePath());
 		String jsonName = generatedObfName.endsWith(".obf")
 				? generatedObfName.substring(0, generatedObfName.length() - ".obf".length()) + ".json"
@@ -407,6 +415,7 @@ public class SearchUICoreGenOBFTest {
 		if (ignore && !RUN_IGNORED_TESTS) {
 			return;
 		}
+        searchKeywords = getKeywords(sourceJson);
 		JSONObject settingsJson = sourceJson.getJSONObject("settings");
 		List<String> phrases = parsePhrases(sourceJson);
 		boolean useData = settingsJson.optBoolean("useData", true);
@@ -874,4 +883,94 @@ public class SearchUICoreGenOBFTest {
 			return "Error: " + e.getMessage();
 		}
 	}
+
+    public Set<String> getKeywords(JSONObject sourceJson) {
+        Set<String> keywords = new HashSet<>();
+        List<String> phrases = parsePhrases(sourceJson);
+        for (String phrase : phrases) {
+            extractAndAddWords(phrase, keywords);
+        }
+
+        List<List<String>> parsedResults = new ArrayList<>();
+        for (int i = 0; i < phrases.size(); i++) {
+            parsedResults.add(new ArrayList<String>());
+        }
+        String tag = sourceJson.has("results") ? "results" : "result";
+        parseResults(sourceJson, tag, parsedResults);
+
+        for (List<String> group : parsedResults) {
+            if (group != null) {
+                for (String resultStr : group) {
+                    if (resultStr != null) {
+                        int bracketIndex = resultStr.indexOf("[[");
+                        if (bracketIndex != -1) {
+                            resultStr = resultStr.substring(0, bracketIndex);
+                        }
+                        extractAndAddWords(resultStr, keywords);
+                    }
+                }
+            }
+        }
+
+        return keywords;
+    }
+
+    private void extractAndAddWords(String text, Set<String> keywords) {
+        if (text == null || text.trim().isEmpty()) {
+            return;
+        }
+        String[] words = text.split("[\\s\\-,'.<>_\\(\\)\\[\\]]+");
+
+        for (String word : words) {
+            if (!word.isEmpty()) {
+                keywords.add(word.toLowerCase());
+            }
+        }
+    }
+
+    private void filterCities(List<City> cities) {
+        if (Algorithms.isEmpty(searchKeywords)) {
+            return;
+        }
+
+        Iterator<City> cityIterator = cities.iterator();
+        while (cityIterator.hasNext()) {
+            City c = cityIterator.next();
+            boolean match = false;
+            if (match(c.getName()) || match(c.getNamesMap(true).values())) {
+                match = true;
+            }
+            Iterator<Street> streetIterator = c.getStreets().iterator();
+            while (streetIterator.hasNext()) {
+                Street s = streetIterator.next();
+                if (match(s.getName()) || match(s.getNamesMap(true).values())) {
+                    match = true;
+                } else {
+                    for (Building b : s.getBuildings()) {
+                        if (match(b.getName()) || match(b.getNamesMap(true).values())) {
+                            match = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (!match) {
+                if (ThreadLocalRandom.current().nextDouble() < FILTER_REMOVE_PROBABILITY) {
+                    cityIterator.remove();
+                }
+            }
+        }
+    }
+
+    private boolean match(String name) {
+        return name != null && searchKeywords.contains(name);
+    }
+
+    private boolean match(Collection<String> names) {
+        for (String name : names) {
+            if (match(name))
+                return true;
+        }
+        return false;
+    }
 }
