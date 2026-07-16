@@ -1,8 +1,11 @@
 package net.osmand.server.api.searchtest;
 
+import com.google.protobuf.CodedInputStream;
 import net.osmand.binary.*;
+import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
 import net.osmand.data.*;
 import net.osmand.util.Algorithms;
+import net.osmand.util.MapUtils;
 import net.osmand.util.SearchAlgorithms;
 import java.io.*;
 import java.util.*;
@@ -400,7 +403,7 @@ public interface InspectorService extends OBFService {
         return "desc".equalsIgnoreCase(sortOrder) ? comparator.reversed() : comparator;
     }
 	
-    default List<IndexToken> getCachedOrLoadIndexTokens(File file, boolean isPoi) throws IOException {
+    private List<IndexToken> getCachedOrLoadIndexTokens(File file, boolean isPoi) throws IOException {
         String cacheKey = getIndexCacheKey(file, isPoi);
         long fileLength = file.length();
         long lastModified = file.lastModified();
@@ -412,9 +415,6 @@ public interface InspectorService extends OBFService {
             return cached.tokens();
         }
         List<IndexToken> loadedTokens = loadIndexTokens(file, isPoi);
-        if (loadedTokens == null) {
-            loadedTokens = List.of();
-        }
         List<IndexToken> cachedTokens = List.copyOf(loadedTokens);
         synchronized (INDEX_TOKENS_CACHE) {
             INDEX_TOKENS_CACHE.put(cacheKey, new CachedIndexTokens(cacheKey, fileLength, lastModified, cachedTokens));
@@ -422,7 +422,7 @@ public interface InspectorService extends OBFService {
         return cachedTokens;
     }
 
-    default List<IndexToken> loadIndexTokens(File file, boolean isPoi) throws IOException {
+	private List<IndexToken> loadIndexTokens(File file, boolean isPoi) throws IOException {
         long startedNs = System.nanoTime();
         Map<String, List<Atom>> atomsByToken = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         CommonWords commonWords = isPoi ? CommonWords.getPoiInstance() : CommonWords.getAddrInstance();
@@ -621,7 +621,7 @@ public interface InspectorService extends OBFService {
         return file.getName() + "|" + (isPoi ? "poi" : "address");
     }
 
-    default Pattern compileIndexPrefixPattern(String prefix) {
+    private Pattern compileIndexPrefixPattern(String prefix) {
         if (prefix == null || prefix.trim().isEmpty()) {
             return null;
         }
@@ -811,8 +811,54 @@ public interface InspectorService extends OBFService {
         return markedResults;
     }
 
-    default ObjectAddressPage getObjects(String obf, String lang, IndexToken token, String regExp, int pageToShow,
+    private static List<ObjectAddress> assignObjectSequenceIds(List<ObjectAddress> results) {
+        if (results == null || results.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<ObjectAddress> assigned = new ArrayList<>(results.size());
+        int sequenceId = 1;
+        for (ObjectAddress objectAddress : results) {
+            if (objectAddress == null) {
+                continue;
+            }
+            assigned.add(new ObjectAddress(sequenceId++, objectAddress.name(), objectAddress.point(),
+                    objectAddress.commonTags(), objectAddress.isPoi(), objectAddress.isAlone(), objectAddress.type(),
+                    objectAddress.osmId(), objectAddress.osmType(), objectAddress.payloadOffset(),
+                    objectAddress.payloadSize(), objectAddress.sourceOffset(), objectAddress.obf()));
+        }
+        return assigned;
+    }
+
+    private boolean matchesObjectAddressFilter(ObjectAddress objectAddress,
+                                               Pattern pattern,
+                                               Pattern normalizedPattern) {
+        if (objectAddress == null) {
+            return false;
+        }
+        if (pattern == null) {
+            return true;
+        }
+        if (matchesPattern(objectAddress.name(), pattern, normalizedPattern)) {
+            return true;
+        }
+        Map<String, String> values = objectAddress.commonTags();
+        if (values != null) {
+            for (Map.Entry<String, String> entry : values.entrySet()) {
+                if (matchesPattern(entry.getKey(), pattern, normalizedPattern)
+                        || matchesPattern(entry.getValue(), pattern, normalizedPattern)) {
+                    return true;
+                }
+            }
+        }
+        if (objectAddress.osmId() != null && pattern.matcher(objectAddress.osmId().toString()).find()) {
+            return true;
+        }
+        return objectAddress.type() != null && pattern.matcher(objectAddress.type()).find();
+    }
+
+    private ObjectAddressPage getObjects(String obf, IndexToken token, String lang, String regExp, int pageToShow,
                                          int pageSizeLimit, String sortBy, String sortOrder, boolean isPoi) {
+        long startedNs = System.nanoTime();
         List<ObjectAddress> results = new ArrayList<>();
         if (token == null) {
             return new ObjectAddressPage(List.of(), Math.max(pageToShow, 0), Math.max(pageSizeLimit, 1), 0, 0, new int[7], new int[12], 0, 0);
@@ -834,7 +880,44 @@ public interface InspectorService extends OBFService {
         try (RandomAccessFile randomAccessFile = new RandomAccessFile(file.getAbsolutePath(), "r")) {
             BinaryMapIndexReaderExt index = new BinaryMapIndexReaderExt(randomAccessFile, file);
             try {
-                return null;
+                long collectStartedNs = System.nanoTime();
+                if (isPoi) {
+                    collectPoiObjects(index, token, results, lang);
+                } else {
+                    collectAddressObjects(index, token, results, lang);
+                }
+                long collectNs = System.nanoTime() - collectStartedNs;
+                int collectedCount = results.size();
+                long filterStartedNs = System.nanoTime();
+                if (hasAnyFilter) {
+                    results.removeIf(objectAddress -> !matchesObjectAddressFilter(objectAddress, objectPattern, normalizedObjectPattern));
+                }
+                long filterNs = System.nanoTime() - filterStartedNs;
+                long markStartedNs = System.nanoTime();
+                results = markAloneObjects(assignObjectSequenceIds(results), token);
+                long markNs = System.nanoTime() - markStartedNs;
+                long sortStartedNs = System.nanoTime();
+                results.sort(buildObjectAddressComparator(sortBy, sortOrder));
+                long sortNs = System.nanoTime() - sortStartedNs;
+                long pageStartedNs = System.nanoTime();
+                long totalElements = results.size();
+                int totalPages = totalElements == 0 ? 0 : (int) ((totalElements + safeSize - 1) / safeSize);
+                int fromIndex = Math.min(safePage * safeSize, results.size());
+                int toIndex = Math.min(fromIndex + safeSize, results.size());
+                List<ObjectAddress> pageContent = fromIndex >= toIndex
+                        ? List.of()
+                        : new ArrayList<>(results.subList(fromIndex, toIndex));
+                int totalSize = 0;
+                for (ObjectAddress objectAddress : results) {
+                    totalSize = safeMetricInt((long) totalSize + (objectAddress == null ? 0 : Math.max(0, objectAddress.payloadSize())));
+                }
+                long pageNs = System.nanoTime() - pageStartedNs;
+                getLogger().info("getObjects obf={} token={} objectType={} page={}/{} size={} collected={} filtered={} content={} timingsMs collect={} filter={} mark={} sort={} page={} total={}",
+                        file.getName(), token.name(), isPoi ? "poi" : "address", safePage, totalPages, safeSize,
+                        collectedCount, totalElements, pageContent.size(), elapsedMs(collectNs), elapsedMs(filterNs),
+                        elapsedMs(markNs), elapsedMs(sortNs), elapsedMs(pageNs), elapsedMs(System.nanoTime() - startedNs));
+                return new ObjectAddressPage(pageContent, safePage, safeSize, totalElements, totalPages,
+                        new int[]{results.size()}, new int[]{totalSize}, 0, 0);
             } finally {
                 index.close();
             }
@@ -844,8 +927,261 @@ public interface InspectorService extends OBFService {
         }
     }
 
-    default ObjectAddressPage getObjects(List<String> obfs, String lang, IndexToken token, String regExp, int pageToShow,
+    private void collectAddressObjects(BinaryMapIndexReaderExt index, IndexToken token, List<ObjectAddress> results, String lang) throws IOException {
+        if (token == null || token.atoms() == null) {
+            return;
+        }
+        Map<Integer, BinaryMapAddressReaderAdapter.AddressRegion> regionsByOffset = new LinkedHashMap<>();
+        for (BinaryIndexPart part : index.getIndexes()) {
+            if (part instanceof BinaryMapAddressReaderAdapter.AddressRegion region) {
+                regionsByOffset.put((int) region.getFilePointer(), region);
+            }
+        }
+        Set<String> visited = new LinkedHashSet<>();
+        for (Atom atom : token.atoms()) {
+            if (!(atom instanceof AddressAtom addressAtom)) {
+                continue;
+            }
+            for (int i = 0; i < addressAtom.shiftToIndex.length; i++) {
+                int objectOffset = addressAtom.nameIndexDataOffset - addressAtom.shiftToIndex[i];
+                int cityOffset = i < addressAtom.shiftToCityIndex.length && addressAtom.shiftToCityIndex[i] != 0
+                        ? addressAtom.nameIndexDataOffset - addressAtom.shiftToCityIndex[i] : 0;
+                if (!visited.add(objectOffset + ":" + cityOffset + ":" + addressAtom.type)) {
+                    continue;
+                }
+                BinaryMapAddressReaderAdapter.AddressRegion region = findAddressRegion(regionsByOffset.values(), objectOffset);
+                if (region == null) {
+                    continue;
+                }
+                ObjectAddress objectAddress = loadAddressObject(index, region, addressAtom, objectOffset, cityOffset, lang);
+                if (objectAddress != null) {
+                    results.add(objectAddress);
+                }
+            }
+        }
+    }
+
+    private BinaryMapAddressReaderAdapter.AddressRegion findAddressRegion(Collection<BinaryMapAddressReaderAdapter.AddressRegion> regions, int offset) {
+        for (BinaryMapAddressReaderAdapter.AddressRegion region : regions) {
+            long start = region.getFilePointer();
+            long end = start + region.getLength();
+            if (offset >= start && offset < end) {
+                return region;
+            }
+        }
+        return null;
+    }
+
+    private ObjectAddress loadAddressObject(BinaryMapIndexReaderExt index,
+                                            BinaryMapAddressReaderAdapter.AddressRegion region,
+                                            AddressAtom atom,
+                                            int objectOffset,
+                                            int cityOffset,
+                                            String lang) throws IOException {
+        CodedInputStream codedIS = index.getInputStream();
+        if (atom.type == BinaryMapAddressReaderAdapter.CityBlocks.STREET_TYPE.index) {
+            City city = cityOffset > 0 ? loadCity(index, region, cityOffset) : null;
+            if (city == null) {
+                return null;
+            }
+            codedIS.seek(objectOffset);
+            int length = codedIS.readRawVarint32();
+            long oldLimit = codedIS.pushLimitLong(length);
+            try {
+                Street street = readStreetAtOffset(codedIS, city,
+                        (int) MapUtils.getTileNumberX(24, city.getLocation().getLongitude()),
+                        (int) MapUtils.getTileNumberY(24, city.getLocation().getLatitude()),
+                        region.getAttributeTagsTable());
+                return toAddressObjectAddress(street, lang, "street", objectOffset, length, atom.nameIndexDataOffset);
+            } finally {
+                codedIS.popLimit(oldLimit);
+            }
+        }
+        City city = loadCity(index, region, objectOffset);
+        return city == null ? null : toAddressObjectAddress(city, lang,
+                city.getType() == null ? "address" : city.getType().name().toLowerCase(Locale.ROOT),
+                objectOffset, 0, atom.nameIndexDataOffset);
+    }
+
+    private City loadCity(BinaryMapIndexReaderExt index,
+                          BinaryMapAddressReaderAdapter.AddressRegion region,
+                          int offset) throws IOException {
+        CodedInputStream codedIS = index.getInputStream();
+        codedIS.seek(offset);
+        int length = codedIS.readRawVarint32();
+        long oldLimit = codedIS.pushLimitLong(length);
+        try {
+            return readCityAtOffset(codedIS, offset, region.getAttributeTagsTable());
+        } finally {
+            codedIS.popLimit(oldLimit);
+        }
+    }
+
+    private ObjectAddress toAddressObjectAddress(MapObject object, String lang, String type,
+                                                 int payloadOffset, int payloadSize, int sourceOffset) {
+        if (object == null) {
+            return null;
+        }
+        Map<String, String> values = new LinkedHashMap<>();
+        String name = object.getName(lang);
+        if (!Algorithms.isEmpty(object.getName())) {
+            values.put(Amenity.NAME, object.getName());
+        }
+        if (!Algorithms.isEmpty(object.getEnName(false))) {
+            values.put("name:en", object.getEnName(false));
+        }
+        Map<String, String> names = object.getNamesMap(false);
+        if (names != null) {
+            for (Map.Entry<String, String> entry : names.entrySet()) {
+                if (!Algorithms.isEmpty(entry.getKey()) && !Algorithms.isEmpty(entry.getValue())) {
+                    values.put(entry.getKey().startsWith("name:") ? entry.getKey() : "name:" + entry.getKey(), entry.getValue());
+                }
+            }
+        }
+        Long osmId = object.getId() == null ? null : object.getId();
+        return new ObjectAddress(0, Algorithms.isEmpty(name) ? object.getName() : name, object.getLocation(),
+                arrangeObjectAddressValues(values), false, false, type, osmId, null, payloadOffset, payloadSize, sourceOffset, "");
+    }
+
+    private void collectPoiObjects(BinaryMapIndexReaderExt index, IndexToken token, List<ObjectAddress> results, String lang) throws IOException {
+        if (token == null || token.atoms() == null) {
+            return;
+        }
+        Map<BinaryMapPoiReaderAdapter.PoiRegion, Map<Integer, List<POIAtom>>> atomsByRegionAndShift = new LinkedHashMap<>();
+        for (Atom atom : token.atoms()) {
+            if (!(atom instanceof POIAtom poiAtom) || poiAtom.shiftTo == 0) {
+                continue;
+            }
+            BinaryMapPoiReaderAdapter.PoiRegion region = findPoiRegion(index, poiAtom);
+            if (region != null) {
+                int absoluteShiftTo = resolvePoiShiftTo(region, poiAtom);
+                atomsByRegionAndShift.computeIfAbsent(region, ignored -> new LinkedHashMap<>())
+                        .computeIfAbsent(absoluteShiftTo, ignored -> new ArrayList<>()).add(poiAtom);
+            }
+        }
+        Set<String> visited = new LinkedHashSet<>();
+        for (Map.Entry<BinaryMapPoiReaderAdapter.PoiRegion, Map<Integer, List<POIAtom>>> regionEntry : atomsByRegionAndShift.entrySet()) {
+            BinaryMapPoiReaderAdapter.PoiRegion region = regionEntry.getKey();
+            index.initCategories(region);
+            Map<Integer, List<TagValuePair>> tagGroups = preloadPoiTagGroups(index.getInputStream(), region);
+            for (Map.Entry<Integer, List<POIAtom>> shiftEntry : regionEntry.getValue().entrySet()) {
+                collectPoiObjectsAtShift(index, region, tagGroups, shiftEntry.getKey(), shiftEntry.getValue(), results, visited, lang);
+            }
+        }
+    }
+
+    private BinaryMapPoiReaderAdapter.PoiRegion findPoiRegion(BinaryMapIndexReaderExt index, POIAtom atom) {
+        int absoluteOffset = atom.shiftTo;
+        for (BinaryMapPoiReaderAdapter.PoiRegion region : index.getPoiIndexes()) {
+            long start = region.getFilePointer();
+            long end = start + region.getLength();
+            long candidate = start + atom.shiftTo;
+            if (absoluteOffset >= start && absoluteOffset < end) {
+                return region;
+            }
+            if (candidate >= start && candidate < end) {
+                return region;
+            }
+        }
+        return null;
+    }
+
+    private int resolvePoiShiftTo(BinaryMapPoiReaderAdapter.PoiRegion region, POIAtom atom) {
+        long start = region.getFilePointer();
+        long end = start + region.getLength();
+        if (atom.shiftTo >= start && atom.shiftTo < end) {
+            return atom.shiftTo;
+        }
+        return (int) (start + atom.shiftTo);
+    }
+
+    private void collectPoiObjectsAtShift(BinaryMapIndexReaderExt index,
+                                          BinaryMapPoiReaderAdapter.PoiRegion region,
+                                          Map<Integer, List<TagValuePair>> tagGroups,
+                                          int shiftTo,
+                                          List<POIAtom> atoms,
+                                          List<ObjectAddress> results,
+                                          Set<String> visited,
+                                          String lang) throws IOException {
+        Set<Integer> requestedIndexes = new LinkedHashSet<>();
+        for (POIAtom atom : atoms) {
+            if (atom.poiIndInBlock.length == 0) {
+                requestedIndexes.add(-1);
+            } else {
+                for (int poiIndex : atom.poiIndInBlock) {
+                    requestedIndexes.add(poiIndex);
+                }
+            }
+        }
+        CodedInputStream codedIS = index.getInputStream();
+        codedIS.seek(Math.max(0, shiftTo - 4));
+        int length = (int) OBFService.readFixed32Length(codedIS);
+        if (codedIS.getTotalBytesRead() != shiftTo) {
+            codedIS.seek(shiftTo);
+            length = Integer.MAX_VALUE;
+        }
+        long oldLimit = length == Integer.MAX_VALUE ? -1 : codedIS.pushLimitLong(length);
+        try {
+            int x = 0;
+            int y = 0;
+            int zoom = 0;
+            int poiIndex = 0;
+            while (true) {
+                int tagValue = codedIS.readTag();
+                int tag = com.google.protobuf.WireFormat.getTagFieldNumber(tagValue);
+                switch (tag) {
+                    case 0:
+                        return;
+                    case OsmandOdb.OsmAndPoiBoxData.X_FIELD_NUMBER:
+                        x = codedIS.readUInt32();
+                        break;
+                    case OsmandOdb.OsmAndPoiBoxData.Y_FIELD_NUMBER:
+                        y = codedIS.readUInt32();
+                        break;
+                    case OsmandOdb.OsmAndPoiBoxData.ZOOM_FIELD_NUMBER:
+                        zoom = codedIS.readUInt32();
+                        break;
+                    case OsmandOdb.OsmAndPoiBoxData.POIDATA_FIELD_NUMBER: {
+                        int atomOffset = (int) codedIS.getTotalBytesRead();
+                        int atomLength = codedIS.readRawVarint32();
+                        long atomOldLimit = codedIS.pushLimitLong(atomLength);
+                        try {
+                            if (requestedIndexes.contains(-1) || requestedIndexes.contains(poiIndex)) {
+                                RawPoiObject rawPoiObject = readRawPoiObject(codedIS, x, y, zoom, region, tagGroups);
+                                if (rawPoiObject != null) {
+                                    String key = rawPoiObject.id + ":" + atomOffset;
+                                    if (visited.add(key)) {
+                                        ObjectAddress objectAddress = toPoiObjectAddress(rawPoiObject, lang);
+                                        results.add(new ObjectAddress(0, objectAddress.name(), objectAddress.point(),
+                                                objectAddress.commonTags(), objectAddress.isPoi(), objectAddress.isAlone(), objectAddress.type(),
+                                                objectAddress.osmId(), objectAddress.osmType(), shiftTo, length == Integer.MAX_VALUE ? 0 : length,
+                                                atomOffset, ""));
+                                    }
+                                }
+                            } else {
+                                codedIS.skipRawBytes(codedIS.getBytesUntilLimit());
+                            }
+                        } finally {
+                            codedIS.popLimit(atomOldLimit);
+                        }
+                        poiIndex++;
+                        break;
+                    }
+                    default:
+                        OBFService.skipUnknownField(codedIS, tagValue);
+                        break;
+                }
+            }
+        } finally {
+            if (oldLimit >= 0) {
+                codedIS.popLimit(oldLimit);
+            }
+        }
+    }
+
+    default ObjectAddressPage getObjects(IndexToken token, String lang, String regExp, int pageToShow,
                                          int pageSizeLimit, String sortBy, String sortOrder, boolean isPOI) {
+        long startedNs = System.nanoTime();
         final int safePage = Math.max(pageToShow, 0);
         final int safeSize = Math.max(pageSizeLimit, 1);
         if (token == null) {
@@ -857,9 +1193,8 @@ public interface InspectorService extends OBFService {
         int aloneCount = 0;
         int aloneSize = 0;
         List<String> targetObfs = getIndexTokenObfs(token);
-        if (targetObfs.isEmpty()) {
-            targetObfs = obfs == null ? List.of() : obfs;
-        }
+        long collectStartedNs = System.nanoTime();
+        int loadedObfs = 0;
         for (String obf : targetObfs) {
             if (Algorithms.isEmpty(obf)) {
                 continue;
@@ -868,10 +1203,8 @@ public interface InspectorService extends OBFService {
             if (obfToken == null) {
                 continue;
             }
-            ObjectAddressPage page = getObjects(obf, lang, obfToken, regExp, 0, Integer.MAX_VALUE, sortBy, sortOrder, isPOI);
-            if (page == null) {
-                continue;
-            }
+            loadedObfs++;
+            ObjectAddressPage page = getObjects(obf, obfToken, lang, regExp, 0, Integer.MAX_VALUE, sortBy, sortOrder, isPOI);
             if (page.content() != null) {
                 for (ObjectAddress objectAddress : page.content()) {
                     content.add(withObf(objectAddress, obf));
@@ -882,7 +1215,11 @@ public interface InspectorService extends OBFService {
             aloneCount += page.aloneCount();
             aloneSize += page.aloneSize();
         }
+        long collectNs = System.nanoTime() - collectStartedNs;
+        long sortStartedNs = System.nanoTime();
         content.sort(buildObjectAddressComparator(sortBy, sortOrder));
+        long sortNs = System.nanoTime() - sortStartedNs;
+        long pageStartedNs = System.nanoTime();
         long totalElements = content.size();
         int totalPages = totalElements == 0 ? 0 : (int) ((totalElements + safeSize - 1) / safeSize);
         int fromIndex = Math.min(safePage * safeSize, content.size());
@@ -890,10 +1227,15 @@ public interface InspectorService extends OBFService {
         List<ObjectAddress> pageContent = fromIndex >= toIndex
                 ? List.of()
                 : new ArrayList<>(content.subList(fromIndex, toIndex));
+        long pageNs = System.nanoTime() - pageStartedNs;
+        getLogger().info("getObjects token={} objectType={} obfs={} page={}/{} size={} total={} content={} timingsMs collect={} sort={} page={} total={}",
+                token.name(), isPOI ? "poi" : "address", loadedObfs, safePage, totalPages, safeSize,
+                totalElements, pageContent.size(), elapsedMs(collectNs), elapsedMs(sortNs), elapsedMs(pageNs),
+                elapsedMs(System.nanoTime() - startedNs));
         return new ObjectAddressPage(pageContent, safePage, safeSize, totalElements, totalPages, countMetrics, sizeMetrics, aloneCount, aloneSize);
     }
 
-    default IndexToken findIndexTokenByName(String obf, String tokenName, boolean isPoi) {
+    private IndexToken findIndexTokenByName(String obf, String tokenName, boolean isPoi) {
         if (Algorithms.isEmpty(obf) || tokenName == null) {
             return null;
         }
@@ -911,7 +1253,7 @@ public interface InspectorService extends OBFService {
         }
     }
 
-    default List<String> getIndexTokenObfs(IndexToken token) {
+    private List<String> getIndexTokenObfs(IndexToken token) {
         if (token == null || token.atoms() == null || token.atoms().length == 0) {
             return List.of();
         }
@@ -950,7 +1292,7 @@ public interface InspectorService extends OBFService {
                     Comparator.comparingInt(object -> object == null ? Integer.MAX_VALUE : object.sequenceId());
             case "type" ->
                     Comparator.comparing(object -> object == null || object.type() == null ? "" : object.type(), String.CASE_INSENSITIVE_ORDER);
-            case "osmid" ->
+            case "osmid", "osm id", "osm_id" ->
                     Comparator.comparingLong(object -> object == null || object.osmId() == null ? Long.MAX_VALUE : object.osmId());
             case "matched" -> Comparator.comparingInt(object -> object != null ? 1 : 0);
             case "alone", "isalone" -> Comparator.comparingInt(object -> object != null && object.isAlone() ? 1 : 0);

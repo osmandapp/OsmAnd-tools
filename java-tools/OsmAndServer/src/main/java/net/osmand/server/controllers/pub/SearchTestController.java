@@ -499,8 +499,7 @@ public class SearchTestController {
 
 	@PostMapping(value = "/objects", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<InspectorService.ObjectAddressPage> getObjects(@RequestParam(required = false) String obf,
-																 @RequestParam(required = false) List<String> obfs,
+	public ResponseEntity<InspectorService.ObjectAddressPage> getObjects(
 																 @RequestParam(required = false) String lang,
 																 @RequestParam(required = false) String regExp,
 																 @RequestParam(defaultValue = "0") int pageToShow,
@@ -509,10 +508,9 @@ public class SearchTestController {
 																 @RequestParam(required = false) String sortOrder,
 																 @RequestParam(required = false) boolean objectType,
 																 @RequestBody InspectorService.IndexToken token) {
-		List<String> selectedObfs = normalizeObfs(obf, obfs);
-		InspectorService.ObjectAddressPage objects = selectedObfs.size() == 1
-				? testSearchService.getObjects(selectedObfs.get(0), lang == null ? "en" : lang, token, regExp, pageToShow, pageSizeLimit, sortBy, sortOrder, objectType)
-				: testSearchService.getObjects(selectedObfs, lang == null ? "en" : lang, token, regExp, pageToShow, pageSizeLimit, sortBy, sortOrder, objectType);
+
+		InspectorService.ObjectAddressPage objects = 
+				testSearchService.getObjects(token, lang == null ? "en" : lang, regExp, pageToShow, pageSizeLimit, sortBy, sortOrder, objectType);
 		return ResponseEntity.ok(objects);
 	}
 
