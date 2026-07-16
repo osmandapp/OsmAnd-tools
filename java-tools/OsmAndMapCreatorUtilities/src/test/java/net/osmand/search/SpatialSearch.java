@@ -46,7 +46,12 @@ public class SpatialSearch implements SearchEngine {
         }
         StringBuilder b = new StringBuilder();
         SpatialSearchToken.NameIndexAtom atom = r.getFirstRef().getNameIndexAtom();
-        appendName(b, atom.getBuilding());
+        Building building = atom.getBuilding();
+        if (building != null && building.isInterpolation() && r.getExtraNameMatch() != null) {
+            b.append(r.getExtraNameMatch()); // interpolated house number
+        } else {
+            appendName(b, atom.getBuilding());
+        }
         appendName(b, atom.getObject());
         if (atom.getBuilding() == null && atom.getObject() == null) {
             b.append(atom.getName());
