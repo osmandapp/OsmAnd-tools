@@ -65,9 +65,11 @@ public class SearchUICoreGenOBFTest {
 	private static final Set<String> GENERATED_OBFS = Collections.synchronizedSet(new HashSet<>());
 	private static final boolean REGENERATE_OBF = true;
 	private static final boolean SPATIAL_SEARCH = getEnvBoolean();
-	private static boolean TEST_EXTRA_RESULTS = true;
-	private static List<Class<?>> OBF_GENERATE_CLASSES = List.of(IndexCreator.class, IndexPoiCreator.class, IndexAddressCreator.class);
+	private static final boolean TEST_EXTRA_RESULTS = true;
+	private static final List<Class<?>> OBF_GENERATE_CLASSES = List.of(IndexCreator.class, IndexPoiCreator.class, IndexAddressCreator.class);
+	private static final String OBF_HASH_FILE_NAME = ".obf.hash";
 	private static final boolean RUN_IGNORED_TESTS = false;
+	private static boolean HASH_IS_ACTUAL_FOR_RUN;
 
 	private final File testFile;
 
@@ -94,7 +96,7 @@ public class SearchUICoreGenOBFTest {
 	private static String getSearchResourcesPath() {
 		String searchResourcesPath = System.getenv(SEARCH_RESOURCES_PATH_ENV);
 		if (Algorithms.isEmpty(searchResourcesPath)) {
-			searchResourcesPath = RESOURCES_PATH + "test-resources/spatial_search";
+			searchResourcesPath = RESOURCES_PATH + "test-resources/search";
 		} else {
 			searchResourcesPath = RESOURCES_PATH + searchResourcesPath;
 		}
@@ -127,12 +129,16 @@ public class SearchUICoreGenOBFTest {
 	@BeforeClass
 	public static void setUp() {
 		GENERATED_OBFS.clear();
+		HASH_IS_ACTUAL_FOR_RUN = isHashActual();
+		if (!HASH_IS_ACTUAL_FOR_RUN) {
+			deleteGeneratedFiles(GEN_DIR, ".obf", ".obf.gz");
+		}
 		defaultSetup();
 	}
 
 	@AfterClass
 	public static void tearDown() {
-		deleteGeneratedFiles(GEN_DIR);
+		deleteGeneratedFiles(GEN_DIR, ".obf", ".json");
 		GENERATED_OBFS.clear();
 	}
 
@@ -189,23 +195,23 @@ public class SearchUICoreGenOBFTest {
 			if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
 				throw new IOException("Cannot create generated OBF directory " + parent);
 			}
-			if (preparedObf != null && sourceJson == null && originalObf == null) {
-				File obfFile = prepareObfFile(preparedObf, generatedObfFile);
-				cacheObfIfNeeded(preparedObf, obfFile, baseName);
-				GENERATED_OBFS.add(obfPath);
-				return obfFile;
-			}
-			if (isPreparedObfActual(preparedObf, sourceJson, originalObf)) {
+
+			boolean alreadyGenerated = GENERATED_OBFS.contains(obfPath);
+			boolean noSourceAvailable = sourceJson == null && originalObf == null;
+			boolean canUsePreparedObf = preparedObf != null
+					&& (isPreparedObfActual(preparedObf, sourceJson, originalObf) || noSourceAvailable && alreadyGenerated);
+			if (canUsePreparedObf) {
 				File obfFile = prepareObfFile(preparedObf, generatedObfFile);
 				cacheObfIfNeeded(preparedObf, obfFile, baseName);
 				GENERATED_OBFS.add(obfPath);
 				return obfFile;
 			}
 			File sourceFile = getSourceFile(baseName, originalObf, sourceJson);
-			if (!GENERATED_OBFS.contains(obfPath) || !generatedObfFile.isFile()
+			if (!alreadyGenerated || !generatedObfFile.isFile()
 					|| generatedObfFile.lastModified() < sourceFile.lastModified()) {
 				OBFDataCreator creator = new OBFDataCreator();
 				creator.create(generatedObfFile.getAbsolutePath(), new String[] { sourceFile.getAbsolutePath() });
+				writeHash();
 			}
 			cacheGzipIfNeeded(generatedObfFile, new File(GEN_DIR, baseName + ".obf.gz"));
 			GENERATED_OBFS.add(obfPath);
@@ -259,13 +265,42 @@ public class SearchUICoreGenOBFTest {
 	}
 
 	private boolean isPreparedObfActual(File preparedObf, File sourceJson, File originalObf) {
-		if (preparedObf == null) {
+		if (preparedObf == null || !HASH_IS_ACTUAL_FOR_RUN) {
 			return false;
 		}
 		File source = sourceJson != null && (originalObf == null || sourceJson.lastModified() > originalObf.lastModified())
 				? sourceJson
 				: originalObf;
-		return source != null && preparedObf.lastModified() > source.lastModified();
+		return source == null || preparedObf.lastModified() > source.lastModified();
+	}
+
+	private static boolean isHashActual() {
+		return Algorithms.stringsEqual(getHash(), getObfGenerateHash());
+	}
+
+	private static File getObfHashFile() {
+		return new File(GEN_DIR, OBF_HASH_FILE_NAME);
+	}
+
+	private static String getHash() {
+		File hashFile = getObfHashFile();
+		if (!hashFile.isFile()) {
+			return null;
+		}
+		String hash = Algorithms.getFileAsString(hashFile);
+		return hash == null ? null : hash.trim();
+	}
+
+	private void writeHash() throws IOException {
+		File hashFile = getObfHashFile();
+		File parent = hashFile.getParentFile();
+		if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
+			throw new IOException("Cannot create generated OBF directory " + parent);
+		}
+		try (Writer writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(hashFile), StandardCharsets.UTF_8))) {
+			writer.write(getObfGenerateHash());
+			writer.write(System.lineSeparator());
+		}
 	}
 
 	private File getNewestExistingFile(File... files) {
@@ -508,7 +543,7 @@ public class SearchUICoreGenOBFTest {
 				|| fileName.endsWith(".json") || fileName.endsWith(".json.gz");
 	}
 
-	private static void deleteGeneratedFiles(File dir) {
+	private static void deleteGeneratedFiles(File dir, String... extensions) {
 		if (dir == null || !dir.isDirectory()) {
 			return;
 		}
@@ -518,11 +553,20 @@ public class SearchUICoreGenOBFTest {
 		}
 		for (File file : files) {
 			if (file.isDirectory()) {
-				deleteGeneratedFiles(file);
-			} else if (file.getName().endsWith(".obf") || file.getName().endsWith(".json")) {
+				deleteGeneratedFiles(file, extensions);
+			} else if (hasAnyExtension(file, extensions)) {
 				deleteRecursively(file);
 			}
 		}
+	}
+
+	private static boolean hasAnyExtension(File file, String... extensions) {
+		for (String extension : extensions) {
+			if (file.getName().endsWith(extension)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private List<Amenity> getAmenities(String obf) throws IOException {
@@ -848,7 +892,7 @@ public class SearchUICoreGenOBFTest {
 		}
 	}
 
-	private String getObfGenerateHash() {
+	private static String getObfGenerateHash() {
 		List<String> individualHashes = new ArrayList<>();
 
 		for (Class<?> clazz : OBF_GENERATE_CLASSES) {
@@ -862,7 +906,7 @@ public class SearchUICoreGenOBFTest {
 		return DigestUtils.sha256Hex(allHashesCombined);
 	}
 
-	private String getClassHash(Class<?> clazz) {
+	private static String getClassHash(Class<?> clazz) {
 		String classResourcePath = "/" + clazz.getName().replace('.', '/') + ".class";
 		try (InputStream is = clazz.getResourceAsStream(classResourcePath)) {
 			if (is == null) {
