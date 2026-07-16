@@ -57,14 +57,12 @@ import java.util.zip.GZIPOutputStream;
 public class SearchUICoreGenOBFTest {
 	private static final String ANDROID_PATH_ENV = "ANDROID_PATH",
 			RESOURCES_PATH_ENV = "RESOURCES_PATH",
-			SEARCH_RESOURCES_PATH_ENV = "SEARCH_RESOURCES_PATH",
-			SPATIAL_SEARCH_ENV = "SPATIAL_SEARCH";
+			SEARCH_RESOURCES_PATH_ENV = "SEARCH_RESOURCES_PATH";
 	private static final String RESOURCES_PATH = getResourcesPath();
 	private static final String SEARCH_RESOURCES_PATH = getSearchResourcesPath();
 	private static final File GEN_DIR = new File(SEARCH_RESOURCES_PATH, "gen-source");
 	private static final Set<String> GENERATED_OBFS = Collections.synchronizedSet(new HashSet<>());
 	private static final boolean REGENERATE_OBF = true;
-	private static final boolean SPATIAL_SEARCH = getEnvBoolean();
 	private static final boolean TEST_EXTRA_RESULTS = true;
 	private static final List<Class<?>> OBF_GENERATE_CLASSES = List.of(IndexCreator.class, IndexPoiCreator.class, IndexAddressCreator.class);
 	private static final String OBF_HASH_FILE_NAME = ".obf.hash";
@@ -96,18 +94,13 @@ public class SearchUICoreGenOBFTest {
 	private static String getSearchResourcesPath() {
 		String searchResourcesPath = System.getenv(SEARCH_RESOURCES_PATH_ENV);
 		if (Algorithms.isEmpty(searchResourcesPath)) {
-			searchResourcesPath = RESOURCES_PATH + "test-resources/search";
+			searchResourcesPath = RESOURCES_PATH + "test-resources/spatial_search";
 		} else {
 			searchResourcesPath = RESOURCES_PATH + searchResourcesPath;
 		}
 		return searchResourcesPath.endsWith("/") || searchResourcesPath.endsWith("\\")
 				? searchResourcesPath
 				: searchResourcesPath + File.separator;
-	}
-
-	private static boolean getEnvBoolean() {
-		String value = System.getenv(SearchUICoreGenOBFTest.SPATIAL_SEARCH_ENV);
-		return !Algorithms.isEmpty(value) && Boolean.parseBoolean(value);
 	}
 
 	@Parameterized.Parameters(name = "{index}: {0}")
@@ -511,7 +504,7 @@ public class SearchUICoreGenOBFTest {
 	}
 
 	private SearchEngine createSearchEngine(JSONObject settingsJson, List<BinaryMapIndexReader> readers) {
-		return SPATIAL_SEARCH ? new SpatialSearch(settingsJson, readers) : new LegacySearch(settingsJson, readers);
+		return new SpatialSearch(settingsJson, readers);
 	}
 
 	private static void deleteRecursively(File file) {
