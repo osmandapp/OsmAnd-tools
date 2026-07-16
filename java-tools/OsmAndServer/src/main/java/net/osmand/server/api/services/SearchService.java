@@ -465,12 +465,13 @@ public class SearchService {
 					if (r.hasPoiTypes()) {
 						for (SpatialPoiType type : r.getPoiTypes(poiSearch)) {
 							Feature f = getSpatialPoiTypeFeature(type);
+							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(), matchedObjects(objs, ctx.locale));
 							f.prop(PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
 							f.prop(PoiTypeField.COMPARE_KEY.getFieldName(), SpatialSearchResult.compareKeyString(r));
 							response.features.add(f);
+							break; // 1st type only
 						}
-					}
-					if (!objs.isEmpty()) {
+					} else if (!objs.isEmpty()) {
 						LatLon l = r.getLatLon() == null ? new LatLon(ctx.lat, ctx.lon) : r.getLatLon();
 						Feature f = getSpatialFeature(l, objs, ctx.locale, timeZone, dominatedCity, r.getExtraNameMatch());
 						if (f != null) {
