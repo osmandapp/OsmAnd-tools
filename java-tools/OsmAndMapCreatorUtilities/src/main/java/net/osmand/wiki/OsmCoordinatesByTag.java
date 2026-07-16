@@ -205,7 +205,7 @@ public class OsmCoordinatesByTag {
 				osmLatLonId.wikiCommonsCat = wikiCommonsTags.get("cat");
 				osmLatLonId.tagsJson = gson.toJson(etags);
 				alist.clear();
-				alist = EntityParser.parseAmenities(poiTypes, entity, etags, alist);
+				alist = EntityParser.parseAmenities(poiTypes, entity, etags, alist, false);
 				if (alist.size() > 0) {
 					osmLatLonId.amenity = alist.get(0);
 				}

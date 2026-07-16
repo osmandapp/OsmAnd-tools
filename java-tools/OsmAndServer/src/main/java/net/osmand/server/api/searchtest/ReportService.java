@@ -66,20 +66,21 @@ public interface ReportService {
 			)""";
 	String REPORT_SQL = GEN_SQL + """
 			 SELECT CASE
+			    WHEN r.error IS NOT NULL THEN 'Error'
 				WHEN g.gen_count <= 0 OR g.query IS NULL OR trim(g.query) = '' THEN 'Not Processed'
 				WHEN COALESCE(found, res_distance <= 50) THEN 'Found'
 			    WHEN SUBSTR(COALESCE(json_extract(r.row, '$.actual_place'), ''), 1, INSTR(json_extract(r.row, '$.actual_place'), ' -') - 1) IN ('2','3','4','5') THEN 'Partial'
 				ELSE 'Not Found'
 			END AS "group", UPPER(COALESCE(json_extract(r.row, '$.web_type'), 'absence')) AS type,
 			    g.ds_id || '.' || g.tc_id AS row_id, g.id as gen_id, g.lat_lon, g.query, g.obj_id as id, g.in_row, res_count, res_place, CAST((r.res_distance/10) AS INTEGER)*10 as res_dist,
-			    r.lat || ', ' || r.lon as search_lat_lon, r.bbox as search_bbox, res_lat_lon, r.row AS out_row FROM gen AS g, run_result AS r WHERE g.id = r.gen_id AND run_id = ? """;
+			    r.lat || ', ' || r.lon as search_lat_lon, r.bbox as search_bbox, res_lat_lon, r.row AS out_row, r.stat_bytes, r.stat_time, r.duration AS time FROM gen AS g, run_result AS r WHERE g.id = r.gen_id AND run_id = ? """;
 	String FULL_REPORT_SQL = REPORT_SQL + """
 			 UNION SELECT 'Generated' AS "group", CASE
 			    WHEN error IS NOT NULL THEN 'Error'
 			    WHEN gen_count <= 0 THEN 'Filtered'
 				WHEN query IS NULL OR trim(query) = '' THEN 'Empty' ELSE 'Processed' END AS type,
 			ds_id || '.' || tc_id AS row_id, id as gen_id, lat_lon, query, obj_id as id,
-			in_row, NULL, NULL, NULL, NULL, NULL, NULL, NULL as out_row FROM gen ORDER BY "group", gen_id""";
+			in_row, NULL, NULL, NULL, NULL, NULL, NULL, NULL as out_row, NULL, NULL, NULL FROM gen ORDER BY "group", gen_id""";
 	String[] IN_PROPS = new String[]{"group", "type", "row_id", "id", "lat_lon", "search_lat_lon", "query", "src_map_found", "actual_name"};
 	String[] OUT_PROPS = new String[]{"res_name", "res_dist", "actual_dist", "res_lat_lon", "actual_lat_lon", "res_place", "actual_place", "res_id", "actual_id", 
 			"oid", "res_count", "search_bbox", "stat_bytes", "stat_time", "time"};

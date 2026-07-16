@@ -593,6 +593,7 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 		row.put("stat_bytes", stats.readTableBytes + stats.readAtomsBytes + stats.readObjsBytes);
 		row.put("stat_table_bytes", stats.readTableBytes);
 		row.put("stat_atoms_bytes", stats.readAtomsBytes);
+		row.put("stat_objs_bytes", stats.readObjsBytes);
 		
 		row.put("spatial_step1_atoms_time", stats.step1Atoms.time);
 		row.put("spatial_match_time", stats.sub1MatchTime.time);

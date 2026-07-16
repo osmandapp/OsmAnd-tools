@@ -97,9 +97,13 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	// Actual list of brands is constantly regenerated from BrandAnalyzer utlitity
 	private static final String ENV_POI_TOP_INDEXES_URL = "POI_TOP_INDEXES_URL";
-	public static final int DEFAULT_TOP_INDEX_MIN_COUNT = PoiType.DEFAULT_MIN_COUNT;
+	public static final int DEFAULT_TOP_INDEX_MIN_COUNT = PoiType.DEFAULT_MIN_COUNT; 
 	public static final int DEFAULT_TOP_INDEX_MAX_PER_MAP = PoiType.DEFAULT_MAX_PER_MAP;
 	public static final int DEFAULT_TOP_INDEX_LIMIT_PER_MAP = 1000;
+	public static final int DEFAULT_NAME_INDEX_POI_TYPES = 1000;
+
+	// some multipolygons have > 38K islands (tongass)
+	private static final int MAX_POI_OUTER_MULTIPOLYGON_SIZE = 256;
 
     private final List<String> WORLD_BRANDS = Arrays.asList("McDonald's", "Starbucks", "Subway", "KFC", "Burger King", "Domino's Pizza",
             "Pizza Hut", "Dunkin'", "Costa Coffee", "Tim Hortons", "7-Eleven", "Żabka", "Shell", "BP", "Chevron",
@@ -195,7 +199,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		if (routeRelationCreator != null) {
 			tags = routeRelationCreator.addClickableWayTags(icc, e, tags, true);
 		}
-		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, tags, tempAmenityList);
+		tempAmenityList = EntityParser.parseAmenities(poiTypes, e, tags, tempAmenityList, false);
 		if (!tempAmenityList.isEmpty() && poiPreparedStatement != null) {
 			if ((e instanceof Node || e instanceof Way) && icc.bboxFilter.shouldFilterPoiEntity(e)) {
 				icc.bboxFilter.logEntityWithAmenity(e, tempAmenityList.get(0));
@@ -234,7 +238,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
                     if (a.getLocation() == null) {
                         continue;
                     }
-    				EntityParser.parseMapObject(a, e, tags);
+    				EntityParser.parseMapObject(a, e, tags, false);
     				if (relationCenters.size() > 1) {
     					a.setAdditionalInfo(Amenity.ROUTE_ID, "R" + e.getId());
                         long cenId = id + ((long) i * 2);
@@ -282,6 +286,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				}
 				List<Multipolygon> multipolygons = original.splitPerOuterRing(log);
 				centers = new ArrayList<>();
+				if (multipolygons.size() > MAX_POI_OUTER_MULTIPOLYGON_SIZE) {
+					multipolygons = multipolygons.subList(0, MAX_POI_OUTER_MULTIPOLYGON_SIZE);
+				}
 				for (Multipolygon m : multipolygons) {
 					assert m.getOuterRings().size() == 1;
 					if (!m.areRingsComplete()) {
@@ -550,7 +557,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		Map<String, Integer> categoriesUsage = new HashMap<String, Integer>();
 		Set<PoiAdditionalType> additionalAttributes = new LinkedHashSet<PoiAdditionalType>();
 
-
 		// build indexes to write
 		Map<String, Integer> catIndexes;
 		Map<String, Integer> subcatIndexes;
@@ -570,6 +576,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			return subCat.contains(";") || subCat.contains(",");
 		}
 
+		
 		public void addCategory(String cat, String subCat, Map<PoiAdditionalType, String> additionalTags, boolean stats) {
 			for (PoiAdditionalType rt : additionalTags.keySet()) {
 				if (!rt.isText() && rt.getValue() == null) {
@@ -609,7 +616,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			return types;
 		}
 
-		private void internalBuildType(String category, String subcategory, TIntArrayList types) {
+		public void internalBuildType(String category, String subcategory, TIntArrayList types) {
 			int catInd = catIndexes.get(category);
 			if (toSplit(subcategory)) {
 				for (String sub : split(subcategory)) {
@@ -677,8 +684,12 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		Tree<PoiTileBox> rootZoomsTree = new Tree<PoiTileBox>();
 		collectTopIndexMap();
 		collectTagGroups();
+		
 		// 0. process all entities
-		processPOIIntoTree(poiGeocoding, namesIndex, zoomToStart, bbox, rootZoomsTree);
+		int allCount = processPOIIntoTree(poiGeocoding, namesIndex, zoomToStart, bbox, rootZoomsTree);
+		int limit = Math.min(DEFAULT_NAME_INDEX_POI_TYPES, allCount / 100);
+		System.out.println("Clean up poi categories in name index up to " + limit);
+		namesIndex.cleanupPoiNames(limit);
 		if (bbox.isEmpty()) {
 			bbox.setWorld();
 		}
@@ -692,7 +703,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		writer.writePoiSubtypesTable(globalCategories, topIndexAdditional);
 		
 		// 2.5 write names table
-		Map<PoiTileBox, List<BinaryFileReference>> fpToWriteSeeks = writer.writePoiNameIndex(namesIndex, startFpPoiIndex);
+		Map<PoiTileBox, List<BinaryFileReference>> fpToWriteSeeks = writer.writePoiNameIndex(globalCategories,
+				namesIndex, startFpPoiIndex);
 
 		// 3. write boxes
 		log.info("Poi box processing finished");
@@ -829,7 +841,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			}
 			int minCount = entry.getValue().getMinCount();
 			int maxPerMap = entry.getValue().getMaxPerMap();
-			minCount = minCount > 0 ? minCount : DEFAULT_TOP_INDEX_MIN_COUNT;
+			minCount =  minCount > 0 ? minCount : DEFAULT_TOP_INDEX_MIN_COUNT;
 			maxPerMap = maxPerMap > 0 ? maxPerMap : DEFAULT_TOP_INDEX_MAX_PER_MAP;
 			if (providedTopIndexes != null) {
 				minCount = 0;
@@ -893,9 +905,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
     private static final int MAX_OBJECTS_PER_BLOCK_LIMIT = 64;
 
-	private void processPOIIntoTree(File poiGeocoding, NameIndexCreator<PoiNameObject> namesIndex, int zoomToStart, IntBbox bbox,
+	private int processPOIIntoTree(File poiGeocoding, NameIndexCreator<PoiNameObject> namesIndex, int zoomToStart, IntBbox bbox,
 			Tree<PoiTileBox> rootZoomsTree) throws SQLException, IOException {
-		ResultSet rs = poiConnection.createStatement().executeQuery("SELECT x,y,type,subtype,id,additionalTags,taggroups from poi ORDER BY id, priority");
+		ResultSet rs = poiConnection.createStatement().executeQuery(
+				"SELECT x,y,type,subtype,id,additionalTags,taggroups from poi ORDER BY id, priority");
 		rootZoomsTree.setNode(new PoiTileBox());
 		long geocodingTime = 0, geocodingCnt = 0, geocodingSuccess = 0, geoCitySuccess = 0, geoCityCnt = 0, geoCityTime = 0;
 		RoutingContext geocodingCtx = null;
@@ -915,7 +928,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			log.info("Geocoding for POI is enabled");
 		}
 
-		int count = 0;
+		int allCount = 0;
 		ConsoleProgressImplementation console = new ConsoleProgressImplementation();
 		console.startWork(1000000);
 		Map<PoiAdditionalType, String> additionalTags = new LinkedHashMap<PoiAdditionalType, String>();
@@ -934,8 +947,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			bbox.maxX = Math.max(x, bbox.maxX);
 			bbox.minY = Math.min(y, bbox.minY);
 			bbox.maxY = Math.max(y, bbox.maxY);
-			if (count++ > 10000) {
-				count = 0;
+			if (allCount++ % 10000 == 0) {
 				console.progress(10000);
 			}
 
@@ -1097,7 +1109,21 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				poiData.additionalTags.putAll(additionalTags);
 				poiData.tagGroups.addAll(tagGroupIds);
 				prevTree.getNode().poiData.add(poiData);
-				putPoiObjectPrefix(namesIndex, prevTree.getNode(), poiIndInBlock, additionalTags.get(nameRuleType), 
+				int rawRating = poiData.getRating();
+				int elo = rawRating <= 1000 ? -1 : ((rawRating - 1000) / 50);
+				Set<PoiAdditionalType> encoded = null;
+				for (PoiAdditionalType a : additionalTags.keySet()) {
+					if (!a.isText()) {
+						if (encoded == null) {
+							encoded = new HashSet<>();
+						}
+						encoded.add(a);
+					}
+				}
+ 				
+				PoiNameObject obj = new PoiNameObject(prevTree.getNode(), poiIndInBlock, elo, type, subtype,
+						encoded);
+				putPoiObjectPrefix(namesIndex, obj, additionalTags.get(nameRuleType),
 						additionalTags.get(nameEnRuleType), otherNames, idNames, settings);
 			} else {
 				if (!useInMemoryCreator) {
@@ -1112,11 +1138,12 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		log.info(String.format("POI geocoding full address (%d of %d for %.2f sec), city (%d of %d for %.2f sec)",
 				geocodingSuccess, geocodingCnt, geocodingTime / 1e3, geoCitySuccess, geoCityCnt, geoCityTime / 1e3));
 		log.info("Poi processing finished");
+		return allCount;
 	}
 	
-	public void putPoiObjectPrefix(NameIndexCreator<PoiNameObject> namesIndex, PoiTileBox data, int ind, String name, String nameEn, Set<String> names, Set<String> idNames,
-			IndexCreatorSettings settings) {
-		PoiNameObject obj = new PoiNameObject(data, ind);
+	public void putPoiObjectPrefix(NameIndexCreator<PoiNameObject> namesIndex, PoiNameObject obj, String name,
+			String nameEn, Set<String> names, Set<String> idNames, IndexCreatorSettings settings) {
+		NameIndexCreator.addPoiCategories(namesIndex, obj);
 		if (name != null) {
 			namesIndex.addToNameIndex(name, obj, settings.charsToBuildPoiNameIndex, false);
 			if (Algorithms.isEmpty(nameEn)) {

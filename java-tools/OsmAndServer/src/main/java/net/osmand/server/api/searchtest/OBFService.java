@@ -84,9 +84,20 @@ public interface OBFService extends BaseService {
 	OsmAndMapsService getMapsService();
 	String getSearchTestDatasourceUrl();
 
-	default List<String> getOBFs(Double radius, Double lat, Double lon) throws IOException {
+	default List<String> getOBFs(Double radius, Double lat, Double lon, String obfPath) throws IOException {
 		radius = radius == null ? 1.5 : radius;
+		File[] customObfs = null;
+		if (!Algorithms.isEmpty(obfPath)) {
+			customObfs = getCustomObfFiles(obfPath);
+		}
 		if (lat == null || lon == null) {
+			if (customObfs != null) {
+				List<String> obfList = new ArrayList<>();
+				for (File file : customObfs) {
+					obfList.add(file.getAbsolutePath());
+				}
+				return obfList;
+			}
 			return getMapsService().getOBFs();
 		}
 		double latPlusRadius = lat + radius;
@@ -98,11 +109,61 @@ public interface OBFService extends BaseService {
 				new LatLon(latMinusRadius, lonPlusRadius));
 
 		List<String> obfList = new ArrayList<>();
-		List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsService().getObfReaders(
-				points, OsmAndMapsService.ObfReason.SEARCH_TEST.value());
-		for (OsmAndMapsService.BinaryMapIndexReaderReference ref : list)
-			obfList.add(ref.getFile().getAbsolutePath());
-		return obfList;
+		if (Algorithms.isEmpty(obfPath)) {
+			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsService().getObfReaders(
+					points, OsmAndMapsService.ObfReason.SEARCH_TEST.value());
+			for (OsmAndMapsService.BinaryMapIndexReaderReference ref : list)
+				obfList.add(ref.getFile().getAbsolutePath());
+			return obfList;
+		}
+		return getMaps(points, customObfs);
+	}
+
+	private File[] getCustomObfFiles(String obfPath) {
+		File mapsFolder = new File(obfPath);
+		File[] files = Algorithms.getSortedFilesVersions(mapsFolder);
+		if (files == null || files.length == 0) {
+			return new File[0];
+		}
+		return Arrays.stream(files)
+				.filter(file -> file != null && file.isFile() && file.getName().toLowerCase(Locale.ROOT).endsWith(".obf"))
+				.toArray(File[]::new);
+	}
+
+	
+	private List<String> getMaps(QuadRect quadRect, File[] candidates) {
+		List<String> maps = new ArrayList<>();
+		if (quadRect == null || quadRect.hasInitialState() || candidates == null) {
+			return maps;
+		}
+
+		QuadRect queryLatLon = new QuadRect(
+				MapUtils.get31LongitudeX((int) Math.min(quadRect.left, quadRect.right)),
+				MapUtils.get31LatitudeY((int) Math.min(quadRect.top, quadRect.bottom)),
+				MapUtils.get31LongitudeX((int) Math.max(quadRect.left, quadRect.right)),
+				MapUtils.get31LatitudeY((int) Math.max(quadRect.top, quadRect.bottom)));
+
+		for (File file : candidates) {
+			String downloadName = getDownloadNameByFileName(file.getName());
+			WorldRegion wr = getMapsService().getOsmandRegions().getRegionDataByDownloadName(downloadName);
+			if (wr == null) {
+				continue;
+			}
+			List<QuadRect> polyBoxes = wr.getAllPolygonsBounds();
+			if (polyBoxes != null && !polyBoxes.isEmpty()
+					&& polyBoxes.stream().anyMatch(pb -> QuadRect.intersects(pb, queryLatLon))) {
+				maps.add(file.getAbsolutePath());
+			}
+		}
+		return maps;
+	}
+
+	private String getDownloadNameByFileName(String fileName) {
+		String dwName = fileName.substring(0, fileName.indexOf('.')).toLowerCase();
+		if (dwName.endsWith("_2")) {
+			dwName = dwName.substring(0, dwName.length() - 2);
+		}
+		return dwName;
 	}
 
     class BinaryMapIndexReaderExt extends BinaryMapIndexReader {
@@ -698,10 +759,13 @@ public interface OBFService extends BaseService {
 		addObfSpec(schema, "OsmAndPoiNameIndex", 5, "data", "OsmAndPoiNameIndexData", InspectorService.ObfLengthType.VAR_INT, false, true);
 		addObfSpec(schema, "OsmAndPoiNameIndexData", 1, "suffixesCommonDictionary", null, InspectorService.ObfLengthType.VAR_INT, false, true);
 		addObfSpec(schema, "OsmAndPoiNameIndexData", 3, "atoms", "OsmAndPoiNameIndexDataAtom", InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "OsmAndPoiNameIndexData", 7, "atomsLength", null, InspectorService.ObfLengthType.VAR_INT);
 		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 2, "zoom", null, InspectorService.ObfLengthType.VAR_INT);
 		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 3, "x", null, InspectorService.ObfLengthType.VAR_INT);
 		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 4, "y", null, InspectorService.ObfLengthType.VAR_INT);
 		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 5, "bloomIndex", null, InspectorService.ObfLengthType.VAR_INT);
+		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 11, "poiCategories", null, InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 12, "eloRating", null, InspectorService.ObfLengthType.VAR_INT, false, true);
 		addObfSpec(schema, "OsmAndPoiNameIndexDataAtom", 14, "shiftTo", null, InspectorService.ObfLengthType.FIXED32);
 
 		addObfSpec(schema, "IndexedStringTable", 1, "prefix", null, InspectorService.ObfLengthType.VAR_INT);
@@ -766,6 +830,7 @@ public interface OBFService extends BaseService {
 		addObfSpec(schema, "OsmAndAddressNameIndexData", 4, "table", "IndexedStringTable", InspectorService.ObfLengthType.FIXED32);
 		addObfSpec(schema, "OsmAndAddressNameIndexData", 6, "commonStats", "CommonIndexedStats", InspectorService.ObfLengthType.VAR_INT);
 		addObfSpec(schema, "OsmAndAddressNameIndexData", 7, "atom", "AddressNameIndexData", InspectorService.ObfLengthType.VAR_INT, false, true);
+		addObfSpec(schema, "AddressNameIndexData", 7, "atomsLength", null, InspectorService.ObfLengthType.VAR_INT);
 		addObfSpec(schema, "AddressNameIndexData", 3, "suffixesCommonDictionary", null, InspectorService.ObfLengthType.VAR_INT, false, true);
 		addObfSpec(schema, "AddressNameIndexData", 4, "atom", "AddressNameIndexDataAtom", InspectorService.ObfLengthType.VAR_INT, false, true);
 
