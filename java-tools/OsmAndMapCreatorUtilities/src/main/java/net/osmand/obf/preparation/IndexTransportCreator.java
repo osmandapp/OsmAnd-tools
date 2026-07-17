@@ -1100,9 +1100,13 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			Entity e = entry.getEntity();
 			icc.translitJapaneseNames(e);
 			icc.translitChineseNames(e);
-			if (role.startsWith("platform")) {
-				platformsAndStops.add(e);
+			boolean isPlatform = role.startsWith("platform");
+			boolean isMergePlatformCandidate = role.isEmpty() && ("platform".equals(e.getTag(OSMTagKey.PUBLIC_TRANSPORT)) || "platform".equals(e.getTag(OSMTagKey.RAILWAY)));
+			if (isPlatform || isMergePlatformCandidate) {
 				platforms.add(e);
+				if (isPlatform) {
+					platformsAndStops.add(e);
+				}
 			} else if (role.startsWith("stop")) {
 				platformsAndStops.add(e);
 				stops.add(e);
@@ -1136,7 +1140,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		return true;
 	}
 
-	private void mergePlatformsStops(List<Entity> platformsAndStopsToProcess, List<Entity> platforms, List<Entity> stops, 
+	private void mergePlatformsStops(List<Entity> platformsAndStopsToProcess, List<Entity> platforms, List<Entity> stops,
 			Map<EntityId, Entity> nameReplacement) {
 		// walk through platforms  and verify names from the second:
 		for(Entity platform : platforms) {
@@ -1161,14 +1165,20 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				}
 			}
 			if(replaceStop != null) {
-				platformsAndStopsToProcess.remove(platform);
-				if (!Algorithms.isEmpty(platform.getTag(OSMTagKey.NAME))) {
-					nameReplacement.put(EntityId.valueOf(replaceStop), platform);
+				replaceStopWithPlatform(platformsAndStopsToProcess, platform, replaceStop);
+				if (!Algorithms.isEmpty(replaceStop.getTag(OSMTagKey.NAME))) {
+					nameReplacement.put(EntityId.valueOf(platform), replaceStop);
 				}
 			}
 		}
 	}
 
+	private void replaceStopWithPlatform(List<Entity> platformsAndStopsToProcess, Entity platform, Entity replaceStop) {
+		int stopInd = platformsAndStopsToProcess.indexOf(replaceStop);
+        if (stopInd >= 0) {
+            platformsAndStopsToProcess.set(stopInd, platform);
+		}
+	}
 
 	private boolean processTransportRelationV1(Relation rel, TransportRoute directRoute, TransportRoute backwardRoute) {
 		final Map<TransportStop, Integer> forwardStops = new LinkedHashMap<TransportStop, Integer>();
