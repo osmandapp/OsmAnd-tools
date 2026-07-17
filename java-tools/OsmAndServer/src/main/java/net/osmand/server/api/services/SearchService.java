@@ -1,7 +1,7 @@
 package net.osmand.server.api.services;
 
 import static net.osmand.binary.BinaryMapIndexReader.SearchRequest.ZOOM_TO_SEARCH_POI;
-import static net.osmand.data.Amenity.OPENING_HOURS;
+import static net.osmand.data.Amenity.*;
 import static net.osmand.data.MapObject.unzipContent;
 import static net.osmand.gpx.GPXUtilities.AMENITY_PREFIX;
 import static net.osmand.search.SearchUICore.createAddressString;
@@ -1366,7 +1366,27 @@ public class SearchService {
 		AdditionalInfoBundle infoFilter = new AdditionalInfoBundle(MapPoiTypes.getDefault(), tags);
 		Map<String, Object> visible = new HashMap<>();
 		infoFilter.getFilteredLocalizedInfo().forEach((key, value) -> {
-			if (infoFilter.shouldDisplayKey(key)) {
+			if (!infoFilter.shouldDisplayKey(key) && !key.equals(NAME)) {
+				return;
+			}
+			String vl = null;
+			if (value instanceof String str) {
+				if (infoFilter.isKeyToSkip(key)) {
+					return;
+				}
+				vl = str;
+			}
+			PoiType poiType = infoFilter.getPoiAdditionalType(key, vl);
+			if (poiType == null) {
+				poiType = infoFilter.getPoiAdditionalType(key.replaceAll(":", "_"), vl);
+			}
+			if (poiType == null || poiType.isFilterOnly()) {
+				return;
+			}
+			visible.put(key, value);
+		});
+		infoFilter.getFilteredLocalizedInfo().forEach((key, value) -> {
+			if (key.startsWith(COLLAPSABLE_PREFIX)) {
 				visible.put(key, value);
 			}
 		});
