@@ -51,9 +51,9 @@ public class SpatialSearch implements SearchEngine {
         if (building != null && building.isInterpolation() && r.getExtraNameMatch() != null) {
             b.append(r.getExtraNameMatch()); // interpolated house number
         } else {
-            appendName(b, atom.getBuilding());
+            appendName(b, r.getExtraNameMatch(), atom.getBuilding());
         }
-        appendName(b, atom.getObject());
+        appendName(b, r.getExtraNameMatch(), atom.getObject());
         if (atom.getBuilding() == null && atom.getObject() == null) {
             b.append(atom.getName());
         }
@@ -61,11 +61,11 @@ public class SpatialSearch implements SearchEngine {
         String subtype = "";
         for (MapObject o : allObjs) {
             if (o instanceof Street street) {
-                appendName(b, street.getCity());
+                appendName(b, r.getExtraNameMatch(), street.getCity());
                 break;
             }
             if (o instanceof City city) {
-                appendName(b, city);
+                appendName(b, r.getExtraNameMatch(), city);
                 break;
             }
             if (o instanceof Amenity am) {
@@ -77,19 +77,23 @@ public class SpatialSearch implements SearchEngine {
                 tCount, testTypeStr(atom) + subtype, sorting, dist / 1000);
     }
 
-    private void appendName(StringBuilder b, MapObject object) {
-        if (object == null) {
-            return;
-        }
-        String name = object instanceof Building building ? building.getName() : object.getName();
-        if (Algorithms.isEmpty(name)) {
-            return;
-        }
-        if (!b.isEmpty()) {
-            b.append(", ");
-        }
-        b.append(name);
-    }
+	private void appendName(StringBuilder b, String extraMatch, MapObject object) {
+		if (object == null) {
+			return;
+		}
+		String name = object instanceof Building building ? building.getName() : object.getName();
+		if ((Algorithms.isEmpty(name) || extraMatch != null) && object instanceof Amenity a
+				&& a.getAdditionalInfo("ref") != null) {
+			name = (Algorithms.isEmpty(name) ? "" : (name + " ")) + a.getAdditionalInfo("ref");
+		}
+		if (Algorithms.isEmpty(name)) {
+			return;
+		}
+		if (!b.isEmpty()) {
+			b.append(", ");
+		}
+		b.append(name);
+	}
 
     private String testTypeStr(SpatialSearchToken.NameIndexAtom atom) {
         if (atom.isBuilding()) {
