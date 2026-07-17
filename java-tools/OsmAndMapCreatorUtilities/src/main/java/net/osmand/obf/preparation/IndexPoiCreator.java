@@ -1144,7 +1144,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	
 	public void putPoiObjectPrefix(NameIndexCreator<PoiNameObject> namesIndex, PoiNameObject obj, String name,
 			String nameEn, Set<String> names, Set<String> idNames, IndexCreatorSettings settings) {
-		NameIndexCreator.addPoiCategories(namesIndex, obj);
+		NameIndexCreator.addPoiCategories(namesIndex, obj, poiTypes);
 		if (name != null) {
 			namesIndex.addToNameIndex(name, obj, settings.charsToBuildPoiNameIndex, false);
 			if (Algorithms.isEmpty(nameEn)) {
