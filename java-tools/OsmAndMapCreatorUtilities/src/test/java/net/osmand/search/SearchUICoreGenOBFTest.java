@@ -69,7 +69,7 @@ public class SearchUICoreGenOBFTest {
 	private static final List<Class<?>> OBF_GENERATE_CLASSES = List.of(IndexCreator.class, IndexPoiCreator.class,
 			IndexAddressCreator.class);
 	private static final String OBF_HASH_FILE_NAME = ".obf.hash";
-	private static final boolean RUN_IGNORED_TESTS = false;
+	private static final boolean RUN_IGNORED_TESTS = true;
 	private static final boolean FILTER_DATA_JSON = false;
 	private static final double FILTER_REMOVE_PROBABILITY = 0.8; // means 80% probability of removal
 	private static boolean HASH_IS_ACTUAL_FOR_RUN;
@@ -120,7 +120,7 @@ public class SearchUICoreGenOBFTest {
 					String sourceJsonText = Algorithms.getFileAsString(file);
 					JSONObject sourceJson = new JSONObject(sourceJsonText);
 					boolean ignore = sourceJson.optBoolean("ignore");
-					if (!ignore) {
+					if (!ignore || RUN_IGNORED_TESTS) {
 						String name = fileName.substring(0, fileName.length() - ".json".length());
 						arrayList.add(new Object[] { name, file });
 					}
