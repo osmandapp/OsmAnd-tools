@@ -117,8 +117,13 @@ public class SearchUICoreGenOBFTest {
 			for (File file : files) {
 				String fileName = file.getName();
 				if (fileName.endsWith(".json")) {
-					String name = fileName.substring(0, fileName.length() - ".json".length());
-					arrayList.add(new Object[] { name, file });
+					String sourceJsonText = Algorithms.getFileAsString(file);
+					JSONObject sourceJson = new JSONObject(sourceJsonText);
+					boolean ignore = sourceJson.optBoolean("ignore");
+					if (!ignore) {
+						String name = fileName.substring(0, fileName.length() - ".json".length());
+						arrayList.add(new Object[] { name, file });
+					}
 				}
 			}
 		}
@@ -442,7 +447,6 @@ public class SearchUICoreGenOBFTest {
 		JSONObject sourceJson = new JSONObject(sourceJsonText);
 		boolean ignore = sourceJson.optBoolean("ignore");
 		if (ignore && !RUN_IGNORED_TESTS) {
-//		if (!RUN_IGNORED_TESTS) { // FIXME
 			return;
 		}
         searchKeywords = getKeywords(sourceJson);
