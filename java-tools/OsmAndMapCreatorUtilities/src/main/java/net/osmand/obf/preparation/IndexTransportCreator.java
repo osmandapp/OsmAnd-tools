@@ -1175,8 +1175,12 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 	private void replaceStopWithPlatform(List<Entity> platformsAndStopsToProcess, Entity platform, Entity replaceStop) {
 		int stopInd = platformsAndStopsToProcess.indexOf(replaceStop);
+		int platformInd = platformsAndStopsToProcess.indexOf(platform);
         if (stopInd >= 0) {
             platformsAndStopsToProcess.set(stopInd, platform);
+			if (platformInd >= 0 && platformInd != stopInd) {
+				platformsAndStopsToProcess.remove(platformInd);
+			}
 		}
 	}
 
