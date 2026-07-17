@@ -418,7 +418,7 @@ public class SearchService {
 		}
 	}
 
-	public SpatialResponse searchSpatial(SearchContext ctx, String timeZone) throws IOException {
+	public SpatialResponse searchSpatial(SearchContext ctx, String timeZone, boolean autocomplete) throws IOException {
 		long sTime = System.currentTimeMillis();
 		SpatialResponse response = new SpatialResponse();
 		if (!osmAndMapsService.validateAndInitConfig()) {
@@ -433,7 +433,7 @@ public class SearchService {
 //			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsForSearch(points, ctx.baseSearch);
 			// OPTION B
 			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = osmAndMapsService
-					.getObfReadersForSpatialSearch(ctx.lat, ctx.lon);
+					.getObfReadersForSpatialSearch(ctx.lat, ctx.lon, autocomplete);
 			if (list.isEmpty()) {
 				return response;
 			}
@@ -452,8 +452,11 @@ public class SearchService {
 			}
 			SpatialSearchResults res;
 			// In future multiple spatialTextSearch & multiple osmand regions
-			SpatialSearchContext sscontext = new SpatialSearchContext(SpatialTextSearchSettings.defaultSettings(), usedMapList,
-					poiSearch, new LatLon(ctx.lat, ctx.lon));
+			SpatialTextSearchSettings settings = autocomplete
+					? SpatialTextSearchSettings.suggestionSettings()
+					: SpatialTextSearchSettings.defaultSettings();
+			SpatialSearchContext sscontext =
+					new SpatialSearchContext(settings, usedMapList, poiSearch, new LatLon(ctx.lat, ctx.lon));
 			synchronized (spatialTextSearch) {
 				usedMapList.add(osmandRegions.getFile());
 				res = spatialTextSearch.searchAPI(ctx.text, sscontext);
