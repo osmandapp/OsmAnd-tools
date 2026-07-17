@@ -94,7 +94,7 @@ public class SearchUICoreGenOBFTest {
 	private static String getSearchResourcesPath() {
 		String searchResourcesPath = System.getenv(SEARCH_RESOURCES_PATH_ENV);
 		if (Algorithms.isEmpty(searchResourcesPath)) {
-			searchResourcesPath = RESOURCES_PATH + "test-resources/spatial_search";
+			searchResourcesPath = RESOURCES_PATH + "test-resources/search-spatial";
 		} else {
 			searchResourcesPath = RESOURCES_PATH + searchResourcesPath;
 		}

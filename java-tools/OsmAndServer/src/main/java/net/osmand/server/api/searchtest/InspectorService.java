@@ -251,6 +251,7 @@ public interface InspectorService extends OBFService {
             return size >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) size;
         }
     }
+    record IndexTokenRequest(String name, boolean isPoi) {}
     record IndexTokenPage(List<IndexToken> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages) {}
 
     record CommonSuffix(String value, int matched, int nonindexed) {}
@@ -262,51 +263,6 @@ public interface InspectorService extends OBFService {
 
     record ObjectAddressPage(List<ObjectAddress> content, int pageToShow, int pageSizeLimit, long totalElements, int totalPages, int[] countMetrics, int[] sizeMetrics, int aloneCount, int aloneSize) {}
     record CachedIndexTokens(String cacheKey, long fileLength, long lastModified, List<IndexToken> tokens) {}
-
-    default IndexTokenPage getIndex(String obf, String prefix, int pageToShow, int pageSizeLimit, String sortBy, String sortOrder, boolean isPoi) {
-        File file = new File(obf);
-        Pattern prefixPattern = compileIndexPrefixPattern(prefix);
-        final int safePage = Math.max(pageToShow, 0);
-        final int safeSize = Math.max(1, Math.min(pageSizeLimit, 100));
-        long startedNs = System.nanoTime();
-        try {
-            long loadStartedNs = System.nanoTime();
-            List<IndexToken> allTokens = getCachedOrLoadIndexTokens(file, isPoi);
-            long loadNs = System.nanoTime() - loadStartedNs;
-            long filterStartedNs = System.nanoTime();
-            List<IndexToken> results = new ArrayList<>();
-            if (prefixPattern == null) {
-                results.addAll(allTokens);
-            } else {
-                for (IndexToken token : allTokens) {
-                    if (prefixPattern.matcher(token.name()).find()) {
-                        results.add(token);
-                    }
-                }
-            }
-            long filterNs = System.nanoTime() - filterStartedNs;
-            long sortStartedNs = System.nanoTime();
-            results.sort(buildIndexTokenComparator(sortBy, sortOrder));
-            long sortNs = System.nanoTime() - sortStartedNs;
-            long pageStartedNs = System.nanoTime();
-            long totalElements = results.size();
-            int totalPages = totalElements == 0 ? 0 : (int) ((totalElements + safeSize - 1) / safeSize);
-            int fromIndex = Math.min(safePage * safeSize, results.size());
-            int toIndex = Math.min(fromIndex + safeSize, results.size());
-            List<IndexToken> pageContent = fromIndex >= toIndex
-                    ? List.of()
-                    : new ArrayList<>(results.subList(fromIndex, toIndex));
-            long pageNs = System.nanoTime() - pageStartedNs;
-            getLogger().info("getIndex obf={} objectType={} prefix={} page={}/{} size={} tokens={} filtered={} content={} timingsMs load={} filter={} sort={} page={} total={}",
-                    file.getName(), isPoi ? "poi" : "address", prefix, safePage, totalPages, safeSize,
-                    allTokens.size(), totalElements, pageContent.size(), elapsedMs(loadNs), elapsedMs(filterNs),
-                    elapsedMs(sortNs), elapsedMs(pageNs), elapsedMs(System.nanoTime() - startedNs));
-            return new IndexTokenPage(pageContent, safePage, safeSize, totalElements, totalPages);
-        } catch (Exception e) {
-            getLogger().error("Failed to read OBF index {}", file, e);
-            throw new RuntimeException("Failed to read OBF index: " + e.getMessage(), e);
-        }
-    }
 
     default IndexTokenPage getIndex(List<String> obfs, String prefix, int pageToShow, int pageSizeLimit, String sortBy, String sortOrder,
                                     boolean isPoi) {
@@ -336,7 +292,7 @@ public interface InspectorService extends OBFService {
                             mergedByName.merge(token.name(), token, InspectorService::mergeIndexTokens);
                         }
                     }
-                    getLogger().info("getIndex obfPart={} prefix={} objectType={} sourceTokens={} mergedSoFar={} elapsedMs={}",
+                    getLogger().info("getIndex obfPart={} prefix={} poi={} sourceTokens={} mergedSoFar={} elapsedMs={}",
                             new File(obf).getName(), prefix, isPoi, allTokens.size(), mergedByName.size(),
                             elapsedMs(System.nanoTime() - obfStartedNs));
                 }
@@ -358,7 +314,7 @@ public interface InspectorService extends OBFService {
                     : new ArrayList<>(results.subList(fromIndex, toIndex));
 
             long pageNs = System.nanoTime() - pageStartedNs;
-            getLogger().info("getIndex obfs={} prefix={} objectType={} page={}/{} size={} sourceTokens={} merged={} content={} timingsMs merge={} list={} sort={} page={} total={}",
+            getLogger().info("getIndex: obfs={} prefix={} poi={} page={}/{} size={} sourceTokens={} merged={} content={}, timings (ms): merge={} list={} sort={} page={} total={}",
                     loadedObfs, prefix, isPoi, safePage, totalPages, safeSize, sourceTokens, totalElements, pageContent.size(),
                     elapsedMs(mergeNs), elapsedMs(listNs), elapsedMs(sortNs), elapsedMs(pageNs),
                     elapsedMs(System.nanoTime() - startedNs));
@@ -393,14 +349,34 @@ public interface InspectorService extends OBFService {
 	}
 
     private static Comparator<IndexToken> buildIndexTokenComparator(String sortBy, String sortOrder) {
-        String normalizedSortBy = Algorithms.isEmpty(sortBy) ? "name" : sortBy.trim().toLowerCase(Locale.ROOT);
+        String[] sortKeys = Algorithms.isEmpty(sortBy) ? new String[]{"name"} : sortBy.split(",");
+        String[] sortOrders = Algorithms.isEmpty(sortOrder) ? new String[0] : sortOrder.split(",");
+        Comparator<IndexToken> comparator = null;
+        for (int i = 0; i < sortKeys.length; i++) {
+            String normalizedSortBy = sortKeys[i] == null ? "" : sortKeys[i].trim().toLowerCase(Locale.ROOT);
+            if (Algorithms.isEmpty(normalizedSortBy)) {
+                continue;
+            }
+            Comparator<IndexToken> next = buildIndexTokenSingleComparator(normalizedSortBy);
+            String direction = i < sortOrders.length ? sortOrders[i].trim() : "";
+            if ("desc".equalsIgnoreCase(direction)) {
+                next = next.reversed();
+            }
+            comparator = comparator == null ? next : comparator.thenComparing(next);
+        }
+        if (comparator == null) {
+            comparator = buildIndexTokenSingleComparator("name");
+        }
+        return comparator.thenComparing(token -> token == null || token.name() == null ? "" : token.name(), String.CASE_INSENSITIVE_ORDER);
+    }
+
+    private static Comparator<IndexToken> buildIndexTokenSingleComparator(String normalizedSortBy) {
         Comparator<IndexToken> comparator = switch (normalizedSortBy) {
             case "count" -> Comparator.comparingInt(token -> token == null ? 0 : token.count());
             case "size" -> Comparator.comparingInt(token -> token == null ? 0 : token.size());
             default -> Comparator.comparing(token -> token == null || token.name() == null ? "" : token.name(), String.CASE_INSENSITIVE_ORDER);
         };
-        comparator = comparator.thenComparing(token -> token == null || token.name() == null ? "" : token.name(), String.CASE_INSENSITIVE_ORDER);
-        return "desc".equalsIgnoreCase(sortOrder) ? comparator.reversed() : comparator;
+        return comparator;
     }
 	
     private List<IndexToken> getCachedOrLoadIndexTokens(File file, boolean isPoi) throws IOException {
@@ -436,12 +412,18 @@ public interface InspectorService extends OBFService {
                     if (isPoi && part instanceof BinaryMapPoiReaderAdapter.PoiRegion poiRegion) {
                         NameIndexReader nameIndexReader = new NameIndexReader(poiRegion);
                         List<NameIndexReader.PrefixNameValue> prefixes = index.readFullNameIndex(nameIndexReader);
+                        if (prefixes == null) {
+                            prefixes = nameIndexReader.getLoadedPrefixes();
+                        }
                         PrefixLoadStats stats = collectPoiIndexTokens(obfKey, prefixes, nameIndexReader, atomsByToken);
                         prefixBlocks += stats.prefixBlocks();
                         atomCount += stats.atoms();
                     } else if (!isPoi && part instanceof BinaryMapAddressReaderAdapter.AddressRegion addressRegion) {
                         NameIndexReader nameIndexReader = new NameIndexReader(addressRegion);
                         List<NameIndexReader.PrefixNameValue> prefixes = index.readFullNameIndex(nameIndexReader);
+                        if (prefixes == null) {
+                            prefixes = nameIndexReader.getLoadedPrefixes();
+                        }
                         PrefixLoadStats stats = collectAddressIndexTokens(obfKey, prefixes, nameIndexReader, atomsByToken);
                         prefixBlocks += stats.prefixBlocks();
                         atomCount += stats.atoms();
@@ -459,7 +441,7 @@ public interface InspectorService extends OBFService {
                     commonWords.getFrequentlyUsed(tokenName) != -1,
                     0, 0));
         }
-        getLogger().info("loadIndexTokens obf={} objectType={} prefixes={} atoms={} tokens={} elapsedMs={}",
+        getLogger().info("loadIndexTokens obf={} poi={} prefixes={} atoms={} tokens={} elapsedMs={}",
                 file.getName(), isPoi ? "poi" : "address", prefixBlocks, atomCount, tokens.size(),
                 elapsedMs(System.nanoTime() - startedNs));
         return tokens;
@@ -912,7 +894,7 @@ public interface InspectorService extends OBFService {
                     totalSize = safeMetricInt((long) totalSize + (objectAddress == null ? 0 : Math.max(0, objectAddress.payloadSize())));
                 }
                 long pageNs = System.nanoTime() - pageStartedNs;
-                getLogger().info("getObjects obf={} token={} objectType={} page={}/{} size={} collected={} filtered={} content={} timingsMs collect={} filter={} mark={} sort={} page={} total={}",
+                getLogger().info("getObjects: obf={} token={} poi={} page={}/{} size={} collected={} filtered={} content={}, timings (ms): collect={} filter={} mark={} sort={} page={} total={}",
                         file.getName(), token.name(), isPoi ? "poi" : "address", safePage, totalPages, safeSize,
                         collectedCount, totalElements, pageContent.size(), elapsedMs(collectNs), elapsedMs(filterNs),
                         elapsedMs(markNs), elapsedMs(sortNs), elapsedMs(pageNs), elapsedMs(System.nanoTime() - startedNs));
@@ -1181,10 +1163,22 @@ public interface InspectorService extends OBFService {
 
     default ObjectAddressPage getObjects(IndexToken token, String lang, String regExp, int pageToShow,
                                          int pageSizeLimit, String sortBy, String sortOrder, boolean isPOI) {
+        return getObjects(getIndexTokenObfs(token), token == null ? null : token.name(), lang, regExp, pageToShow,
+                pageSizeLimit, sortBy, sortOrder, isPOI);
+    }
+
+    default ObjectAddressPage getObjects(List<String> obfs, IndexTokenRequest token, String lang, String regExp, int pageToShow,
+                                         int pageSizeLimit, String sortBy, String sortOrder, boolean isPOI) {
+        return getObjects(obfs, token == null ? null : token.name(), lang, regExp, pageToShow,
+                pageSizeLimit, sortBy, sortOrder, isPOI);
+    }
+
+    private ObjectAddressPage getObjects(List<String> targetObfs, String tokenName, String lang, String regExp, int pageToShow,
+                                         int pageSizeLimit, String sortBy, String sortOrder, boolean isPOI) {
         long startedNs = System.nanoTime();
         final int safePage = Math.max(pageToShow, 0);
         final int safeSize = Math.max(pageSizeLimit, 1);
-        if (token == null) {
+        if (Algorithms.isEmpty(tokenName)) {
             return new ObjectAddressPage(List.of(), safePage, safeSize, 0, 0, new int[10], new int[15], 0, 0);
         }
         List<ObjectAddress> content = new ArrayList<>();
@@ -1192,14 +1186,13 @@ public interface InspectorService extends OBFService {
         int[] sizeMetrics = new int[15];
         int aloneCount = 0;
         int aloneSize = 0;
-        List<String> targetObfs = getIndexTokenObfs(token);
         long collectStartedNs = System.nanoTime();
         int loadedObfs = 0;
-        for (String obf : targetObfs) {
+        for (String obf : targetObfs == null ? List.<String>of() : targetObfs) {
             if (Algorithms.isEmpty(obf)) {
                 continue;
             }
-            IndexToken obfToken = findIndexTokenByName(obf, token.name(), isPOI);
+            IndexToken obfToken = findIndexTokenByName(obf, tokenName, isPOI);
             if (obfToken == null) {
                 continue;
             }
@@ -1228,8 +1221,8 @@ public interface InspectorService extends OBFService {
                 ? List.of()
                 : new ArrayList<>(content.subList(fromIndex, toIndex));
         long pageNs = System.nanoTime() - pageStartedNs;
-        getLogger().info("getObjects token={} objectType={} obfs={} page={}/{} size={} total={} content={} timingsMs collect={} sort={} page={} total={}",
-                token.name(), isPOI ? "poi" : "address", loadedObfs, safePage, totalPages, safeSize,
+        getLogger().info("getObjects: token={} poi={} obfs={} page={}/{} size={} total={} content={}, timings (ms): collect={} sort={} page={} total={}",
+                tokenName, isPOI ? "poi" : "address", loadedObfs, safePage, totalPages, safeSize,
                 totalElements, pageContent.size(), elapsedMs(collectNs), elapsedMs(sortNs), elapsedMs(pageNs),
                 elapsedMs(System.nanoTime() - startedNs));
         return new ObjectAddressPage(pageContent, safePage, safeSize, totalElements, totalPages, countMetrics, sizeMetrics, aloneCount, aloneSize);
@@ -1286,7 +1279,29 @@ public interface InspectorService extends OBFService {
     }
 
     private static Comparator<ObjectAddress> buildObjectAddressComparator(String sortBy, String sortOrder) {
-        String normalizedSortBy = Algorithms.isEmpty(sortBy) ? "sequenceid" : sortBy.trim().toLowerCase(Locale.ROOT);
+        String[] sortKeys = Algorithms.isEmpty(sortBy) ? new String[]{"sequenceid"} : sortBy.split(",");
+        String[] sortOrders = Algorithms.isEmpty(sortOrder) ? new String[0] : sortOrder.split(",");
+        Comparator<ObjectAddress> comparator = null;
+        for (int i = 0; i < sortKeys.length; i++) {
+            String normalizedSortBy = sortKeys[i] == null ? "" : sortKeys[i].trim().toLowerCase(Locale.ROOT);
+            if (Algorithms.isEmpty(normalizedSortBy)) {
+                continue;
+            }
+            Comparator<ObjectAddress> next = buildObjectAddressSingleComparator(normalizedSortBy);
+            String direction = i < sortOrders.length ? sortOrders[i].trim() : "";
+            if ("desc".equalsIgnoreCase(direction)) {
+                next = next.reversed();
+            }
+            comparator = comparator == null ? next : comparator.thenComparing(next);
+        }
+        if (comparator == null) {
+            comparator = buildObjectAddressSingleComparator("sequenceid");
+        }
+        return comparator.thenComparingInt(object -> object == null ? Integer.MAX_VALUE : object.sequenceId())
+                .thenComparing(object -> object == null || object.name() == null ? "" : object.name(), String.CASE_INSENSITIVE_ORDER);
+    }
+
+    private static Comparator<ObjectAddress> buildObjectAddressSingleComparator(String normalizedSortBy) {
         Comparator<ObjectAddress> comparator = switch (normalizedSortBy) {
             case "#", "sequence", "sequenceid" ->
                     Comparator.comparingInt(object -> object == null ? Integer.MAX_VALUE : object.sequenceId());
@@ -1299,8 +1314,6 @@ public interface InspectorService extends OBFService {
             default ->
                     Comparator.comparing(object -> object == null || object.name() == null ? "" : object.name(), String.CASE_INSENSITIVE_ORDER);
         };
-        comparator = comparator.thenComparingInt(object -> object == null ? Integer.MAX_VALUE : object.sequenceId())
-                .thenComparing(object -> object == null || object.name() == null ? "" : object.name(), String.CASE_INSENSITIVE_ORDER);
-        return "desc".equalsIgnoreCase(sortOrder) ? comparator.reversed() : comparator;
+        return comparator;
     }
 }

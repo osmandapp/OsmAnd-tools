@@ -489,29 +489,39 @@ public class SearchTestController {
 															  @RequestParam(defaultValue = "100") int pageSizeLimit,
 															  @RequestParam(required = false) String sortBy,
 															  @RequestParam(required = false) String sortOrder,
-															  @RequestParam() boolean objectType) {
+															  @RequestParam(required = false) String objectType) {
+		boolean isPoi = parseInspectorObjectType(objectType);
 		List<String> selectedObfs = normalizeObfs(obf, obfs);
-		if (selectedObfs.size() == 1) {
-			return ResponseEntity.ok(testSearchService.getIndex(selectedObfs.get(0), prefix, pageToShow, pageSizeLimit, sortBy, sortOrder, objectType));
-		}
-		return ResponseEntity.ok(testSearchService.getIndex(selectedObfs, prefix, pageToShow, pageSizeLimit, sortBy, sortOrder, objectType));
+		return ResponseEntity.ok(testSearchService.getIndex(selectedObfs, prefix, pageToShow, pageSizeLimit, sortBy, sortOrder, isPoi));
 	}
 
 	@PostMapping(value = "/objects", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public ResponseEntity<InspectorService.ObjectAddressPage> getObjects(
+																 @RequestParam(required = false) String obf,
+																 @RequestParam(required = false) List<String> obfs,
 																 @RequestParam(required = false) String lang,
 																 @RequestParam(required = false) String regExp,
 																 @RequestParam(defaultValue = "0") int pageToShow,
 																 @RequestParam(defaultValue = "100") int pageSizeLimit,
 																 @RequestParam(required = false) String sortBy,
 																 @RequestParam(required = false) String sortOrder,
-																 @RequestParam(required = false) boolean objectType,
-																 @RequestBody InspectorService.IndexToken token) {
+																 @RequestParam(required = false) String objectType,
+																 @RequestBody InspectorService.IndexTokenRequest token) {
 
+		boolean isPoi = parseInspectorObjectType(objectType);
+		List<String> selectedObfs = normalizeObfs(obf, obfs);
 		InspectorService.ObjectAddressPage objects = 
-				testSearchService.getObjects(token, lang == null ? "en" : lang, regExp, pageToShow, pageSizeLimit, sortBy, sortOrder, objectType);
+				testSearchService.getObjects(selectedObfs, token, lang == null ? "en" : lang, regExp, pageToShow, pageSizeLimit, sortBy, sortOrder, isPoi);
 		return ResponseEntity.ok(objects);
+	}
+
+	private boolean parseInspectorObjectType(String objectType) {
+		if (objectType == null || objectType.isBlank()) {
+			return true;
+		}
+		String normalized = objectType.trim();
+		return "true".equalsIgnoreCase(normalized) || "poi".equalsIgnoreCase(normalized);
 	}
 
 	private List<String> normalizeObfs(String obf, List<String> obfs) {
