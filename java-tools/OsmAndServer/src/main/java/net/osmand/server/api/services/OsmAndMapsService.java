@@ -63,7 +63,6 @@ import com.google.gson.JsonObject;
 import net.osmand.IndexConstants;
 import net.osmand.LocationsHolder;
 import net.osmand.NativeJavaRendering;
-import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.CachedOsmandIndexes;
 import net.osmand.binary.GeocodingUtilities;
@@ -124,7 +123,8 @@ public class OsmAndMapsService {
 	private static final long CACHE_MAX_ROUTING_CONTEXT_SEC = Integer.MAX_VALUE; //12 * 60 * 60; // 12h
 
 	private static final double SPATIAL_SEARCH_RADIUS_KM = 400;
-	
+	private static final double SPATIAL_SEARCH_RADIUS_KM_AUTOCOMPLETE = 100;
+
 	private static final List<String> ALWAYS_IN_MEMORY = new ArrayList<String>();
 	static {
 		ALWAYS_IN_MEMORY.add("car:{}");
@@ -1404,10 +1404,12 @@ public class OsmAndMapsService {
 
 	// all maps within ~.00 km of the point, no count limit.
 	// Union of region-based selection (regions.ocbf) and the regular bbox-intersection selection.
-	public List<BinaryMapIndexReaderReference> getObfReadersForSpatialSearch(double lat, double lon) throws IOException {
+	public List<BinaryMapIndexReaderReference> getObfReadersForSpatialSearch(double lat, double lon,
+	                                                                         boolean autocomplete) throws IOException {
 		initObfReaders();
-		double dLat = SPATIAL_SEARCH_RADIUS_KM / 111.0;
-		double dLon = SPATIAL_SEARCH_RADIUS_KM / (111.0 * Math.max(0.1, Math.cos(Math.toRadians(lat))));
+		double searchRadius = autocomplete ? SPATIAL_SEARCH_RADIUS_KM_AUTOCOMPLETE : SPATIAL_SEARCH_RADIUS_KM;
+		double dLat = searchRadius / 111.0;
+		double dLon = searchRadius / (111.0 * Math.max(0.1, Math.cos(Math.toRadians(lat))));
 		QuadRect bbox = points(null, new LatLon(lat + dLat, lon - dLon), new LatLon(lat - dLat, lon + dLon));
 		Set<File> files = new LinkedHashSet<>();
 

@@ -70,6 +70,7 @@ public class SearchController {
                                          @RequestParam (required = false) String southEast,
                                          @RequestParam(required = false) Boolean baseSearch,
                                          @RequestParam(required = false) Boolean spatial,
+                                         @RequestParam(required = false) Boolean autocomplete,
                                          @RequestParam(required = false) String timeZone) throws IOException {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return osmAndMapsService.errorConfig();
@@ -77,7 +78,8 @@ public class SearchController {
         SearchService.SearchContext searchContext = new SearchService.SearchContext(lat, lon, text, locale,
                 baseSearch != null && baseSearch, northWest, southEast);
         if (spatial != null && spatial) {
-            SearchService.SpatialResponse res = searchService.searchSpatial(searchContext, timeZone);
+            SearchService.SpatialResponse res =
+                    searchService.searchSpatial(searchContext, timeZone, autocomplete != null && autocomplete);
             JsonObject json = gson.toJsonTree(new FeatureCollection(res.features.toArray(new Feature[0]))).getAsJsonObject();
             json.add("info", gson.toJsonTree(res.info));
             return ResponseEntity.ok(gson.toJson(json));
