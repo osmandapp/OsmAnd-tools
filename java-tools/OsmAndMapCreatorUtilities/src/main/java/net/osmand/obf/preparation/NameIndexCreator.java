@@ -25,6 +25,7 @@ import net.osmand.data.MapObject;
 import net.osmand.data.Street;
 import net.osmand.obf.preparation.IndexPoiCreator.PoiAdditionalType;
 import net.osmand.obf.preparation.IndexPoiCreator.PoiTileBox;
+import net.osmand.osm.AbstractPoiType;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.search.core.TopIndexFilter;
 import net.osmand.util.Algorithms;
@@ -333,20 +334,24 @@ public class NameIndexCreator<T> {
 		}
 	}
 	
-	public static void addPoiCategories(NameIndexCreator<PoiNameObject> th, PoiNameObject obj) {
-		addPoiCategory(th, obj, obj.subtype);
+	public static void addPoiCategories(NameIndexCreator<PoiNameObject> th, PoiNameObject obj, MapPoiTypes poiTypes) {
+		addPoiCategory(th, obj, obj.subtype, poiTypes);
 		if (obj.additionalTags != null) {
 			for (PoiAdditionalType o : obj.additionalTags) {
 				String key = o.getTag();
 				if (o.getTag().startsWith(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX)) {
 					key = o.getTag() + "_" + TopIndexFilter.getValueKey(o.getValue());
 				}
-				addPoiCategory(th, obj, key);
+				addPoiCategory(th, obj, key, poiTypes);
 			}
 		}
 	}
 
-	private static void addPoiCategory(NameIndexCreator<PoiNameObject> th, PoiNameObject obj, String token) {
+	private static void addPoiCategory(NameIndexCreator<PoiNameObject> th, PoiNameObject obj, String token, MapPoiTypes poiTypes) {
+		AbstractPoiType pt = poiTypes.getAnyPoiTypeByKey(token);
+		if (pt != null && pt.isNonIndx()) {
+			return;
+		}
 		token = NameIndexReader.POI_CATEGORY_PREFIX + token;
 		String prefix = token.substring(0, Math.min(token.length(), POI_CATEGORY_PREFIX_LENGTH));
 		NamedObjectsByPrefix<PoiNameObject> entry = th.namesIndex.get(prefix);
