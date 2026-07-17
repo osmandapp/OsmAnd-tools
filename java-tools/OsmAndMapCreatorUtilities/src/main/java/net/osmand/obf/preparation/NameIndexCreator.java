@@ -349,6 +349,9 @@ public class NameIndexCreator<T> {
 
 	private static void addPoiCategory(NameIndexCreator<PoiNameObject> th, PoiNameObject obj, String token, MapPoiTypes poiTypes) {
 		AbstractPoiType pt = poiTypes.getAnyPoiTypeByKey(token);
+		if (pt == null) {
+			pt = poiTypes.getAnyPoiAdditionalTypeByKey(token);
+		}
 		if (pt != null && pt.isNonIndx()) {
 			return;
 		}

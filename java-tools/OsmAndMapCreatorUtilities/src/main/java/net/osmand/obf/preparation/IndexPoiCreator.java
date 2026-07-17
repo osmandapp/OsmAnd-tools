@@ -688,8 +688,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		// 0. process all entities
 		int allCount = processPOIIntoTree(poiGeocoding, namesIndex, zoomToStart, bbox, rootZoomsTree);
 		int limit = Math.min(DEFAULT_NAME_INDEX_POI_TYPES, allCount / 100);
-		System.out.println("Clean up poi categories in name index up to " + limit);
-		// TODO cleanup
+		System.out.println("No clean up poi categories in name index up to " + limit);
 		// namesIndex.cleanupPoiNames(limit);
 		if (bbox.isEmpty()) {
 			bbox.setWorld();
