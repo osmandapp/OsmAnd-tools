@@ -98,7 +98,7 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-					"-vpoi", //"-vpoiobjects",
+					"-vpoi", "-vpoiobjects",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
@@ -113,9 +113,9 @@ public class BinaryInspector {
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
-//					System.getProperty("maps.dir") + "Map.obf",
+					System.getProperty("maps.dir") + "Map.obf",
 //					System.getProperty("maps.dir") + "regions.ocbf",				
-					System.getProperty("maps.dir") + "Liechtenstein_europe.obf",
+//					System.getProperty("maps.dir") + "Liechtenstein_europe.obf",
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
