@@ -1,6 +1,7 @@
 package net.osmand.obf.preparation;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
@@ -105,15 +106,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	// some multipolygons have > 38K islands (tongass)
 	private static final int MAX_POI_OUTER_MULTIPOLYGON_SIZE = 256;
 
-    private final List<String> WORLD_BRANDS = Arrays.asList("McDonald's", "Starbucks", "Subway", "KFC", "Burger King", "Domino's Pizza",
-            "Pizza Hut", "Dunkin'", "Costa Coffee", "Tim Hortons", "7-Eleven", "Żabka", "Shell", "BP", "Chevron",
-            "TotalEnergies", "Aral", "Q8", "Petronas", "Caltex", "Esso", "Tesla Supercharger", "Ionity", "Walmart", "Carrefour",
-            "Tesco", "Lidl", "Aldi", "Costco", "Auchan", "IKEA", "H&M", "Zara", "Uniqlo", "Nike", "Adidas", "Decathlon", "REI",
-            "The North Face", "Apple Store", "Samsung", "Media Markt", "Best Buy", "Barnes & Noble",
-            "WHSmith", "Waterstones", "Marriott", "Hilton", "Holiday Inn", "Ibis", "Best Western", "Radisson",
-            "Planet Fitness", "Anytime Fitness", "Gold's Gym", "24 Hour Fitness", "Snap Fitness", "Walgreens", "CVS Pharmacy", "Boots", "Watsons",
-            "Hertz", "Avis", "Sixt", "Enterprise", "Europcar", "Mountain Warehouse", "Intersport", "Hudson News");
-
 	public IndexPoiCreator(IndexCreatorSettings settings, MapRenderingTypesEncoder renderingTypes) {
 		this.settings = settings;
 		this.renderingTypes = renderingTypes;
@@ -205,6 +197,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				icc.bboxFilter.logEntityWithAmenity(e, tempAmenityList.get(0));
                 return;
             }
+			
 			List<LatLon> relationCenters = Collections.singletonList(null); // [null] means single amenity point
 			StringBuilder memberIds = new StringBuilder();
 			relationCenters = collectRelationCenters(e, ctx, tags, relationCenters, memberIds);
@@ -384,6 +377,43 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	private static final char SPECIAL_CHAR = ((char) -1);
 
+	
+	private String setWikidataTag(Amenity a, String tag, String mainValue,
+			Map<String, String> tempNames, PoiAdditionalType rulType) {
+		int i = tag.indexOf(':');
+		if (i >= 0) {
+			tag = tag.substring(0, tag.indexOf(':'));
+		}
+		String wd = a.getAdditionalInfo(tag + "_wikidata");
+		if (wd != null && wd.length() > 0) {
+			rulType.setWikidataId(wd);
+			addAltNames(mainValue, rulType, mainValue);
+			// add all names as alternative "tag" name (alternative brand names)
+			if (mainValue.equalsIgnoreCase(tempNames.get("name"))) {
+				for (String k : tempNames.keySet()) {
+					if (k.startsWith("name:")) {
+						addAltNamesMix(mainValue, rulType, tempNames.get(k));
+					}
+				}
+			}
+			
+		}
+		return null;
+	}
+
+	private void addAltNamesMix(String mainValue, PoiAdditionalType rulType, String val) {
+		addAltNames(mainValue, rulType, val);
+		if (val.indexOf('.') != -1) {
+			addAltNames(mainValue, rulType, val.replace(".", " "));
+			addAltNames(mainValue, rulType, val.replace(".", ""));
+		}
+	}
+	
+	private void addAltNames(String mainValue, PoiAdditionalType rulType, String val) {
+		if (!val.equalsIgnoreCase(mainValue)) {
+			rulType.getAltNames().add(val);
+		}
+	}
 
 
 	private String encodeAdditionalInfo(Amenity amenity, String name) {
@@ -400,17 +430,22 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		for(String e : amenity.getAdditionalInfoKeys()) {
 			tempNames.put(e, amenity.getAdditionalInfo(e));
 		}
-
 		StringBuilder b = new StringBuilder();
 		for (Map.Entry<String, String> e : tempNames.entrySet()) {
 			boolean text = poiTypes.isTextAdditionalInfo(e.getKey(), e.getValue());
 			PoiAdditionalType rulType = getOrCreate(e.getKey(), e.getValue(), text);
+			if (e.getKey().equals("brand_wikidata")) {
+				// no need to store for POI
+				continue;
+			}
 			if (!rulType.isText() || !Algorithms.isEmpty(e.getValue())) {
+				if (!rulType.isText() && rulType.getValue() == null) {
+					throw new IllegalStateException("Additional rule type '" + rulType.getTag()
+							+ "' should be encoded with value '" + e.getValue() + "'");
+				}
+//				setWikidataTag(amenity, e.getKey(), e.getValue(), tempNames, rulType);
 				if (b.length() > 0) {
 					b.append(SPECIAL_CHAR);
-				}
-				if (!rulType.isText() && rulType.getValue() == null) {
-					throw new IllegalStateException("Additional rule type '" + rulType.getTag() + "' should be encoded with value '" + e.getValue() + "'");
 				}
 				// avoid 0 (bug in jdk on macos)
 				b.append((char) ((rulType.getId()) + 1)).append(e.getValue());
@@ -419,6 +454,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			if (poiTypes.topIndexPoiAdditional.containsKey(topIndexKey)) {
 				topIndexKeys.add(topIndexKey);
 				rulType = getOrCreate(topIndexKey, e.getValue(), false);
+				setWikidataTag(amenity, e.getKey(), e.getValue(), tempNames, rulType);
 				if (rulType.getValue() != null) {
 					if (b.length() > 0) {
 						b.append(SPECIAL_CHAR);
@@ -809,7 +845,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			String url = settings.poiTopIndexUrl != null ? settings.poiTopIndexUrl : System.getenv(ENV_POI_TOP_INDEXES_URL);
 			log.info("Using global list of poi additionals - " + url);
 			providedTopIndexes = new LinkedHashMap<String, Set<String>>();
-			InputStream is = new URL(url).openStream();
+			InputStream is = url.startsWith("/") ? new FileInputStream(url) : new URL(url).openStream();
 			StringBuilder sb = Algorithms.readFromInputStream(is);
 			for (String s : sb.toString().split("\n")) {
 				String tag = s.substring(0, s.indexOf(','));
@@ -826,19 +862,11 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 		topIndexAdditional = new LinkedHashMap<>();
 		ResultSet rs;
-		boolean isBrand = false;
 		for (Map.Entry<String, PoiType> entry : poiTypes.topIndexPoiAdditional.entrySet()) {
 			if (!topIndexKeys.contains(entry.getKey())) {
 				continue;
 			}
             String column = entry.getKey();
-            if (column.contains(":")) {
-                // with lang
-                continue;
-            }
-			if (entry.getKey().equals(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX + "brand")) {
-				isBrand = true;
-			}
 			int minCount = entry.getValue().getMinCount();
 			int maxPerMap = entry.getValue().getMaxPerMap();
 			minCount =  minCount > 0 ? minCount : DEFAULT_TOP_INDEX_MIN_COUNT;
@@ -863,16 +891,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					if (providedTopIndexes.containsKey(key) && providedTopIndexes.get(key).contains(normalizedValue)
 							&& maxPerMap-- > 0) {
 						set.add(originalValue);
-                        addTopIndexWithLang(rs, column, originalValue);
 					}
 				} else {
 					if (maxPerMap-- > 0) {
 						set.add(originalValue);
-                        addTopIndexWithLang(rs, column, originalValue);
-					} else if (isBrand && WORLD_BRANDS.contains(originalValue)) {
-						// add world brands anyway
-						set.add(originalValue);
-                        addTopIndexWithLang(rs, column, originalValue);
 					}
 				}
 			}
@@ -880,28 +902,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 		return;
 	}
-
-    private void addTopIndexWithLang(ResultSet rs, String topIndexKey, String topIndexVal) throws SQLException {
-        ResultSetMetaData metaData = rs.getMetaData();
-        int columnCount = metaData.getColumnCount();
-
-        List<String> savedValues = new ArrayList<>();
-        for (int i = 3; i < columnCount; i++) {
-            String value = rs.getString(i);
-            if (Algorithms.isEmpty(value)) {
-                continue;
-            }
-            String columnName = metaData.getColumnName(i);
-            if (!columnName.equals(topIndexKey) && columnName.startsWith(topIndexKey)) {
-                if (!value.equals(topIndexVal) && !savedValues.contains(value)) {
-                    topIndexAdditional
-                            .computeIfAbsent(columnName, k -> new HashSet<>())
-                            .add(value);
-                    savedValues.add(value);
-                }
-            }
-        }
-    }
 
     private static final int MAX_OBJECTS_PER_BLOCK_LIMIT = 64;
 
@@ -1318,6 +1318,15 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		private String tag;
 		private String value;
 		private boolean text;
+		private String wikidataId;
+		private Set<String> altNames = new TreeSet<String>(new Comparator<String>() {
+
+			@Override
+			public int compare(String o1, String o2) {
+				// no collator ! (mix with .)
+				return o1.toLowerCase().compareTo(o2.toLowerCase());
+			}
+		});
 		private int usage;
 		private int targetId;
 		private int id;
@@ -1335,6 +1344,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 		public boolean isText() {
 			return text;
+		}
+		
+		public Set<String> getAltNames() {
+			return altNames;
 		}
 
 		public void increment() {
@@ -1355,6 +1368,14 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 		public String getValue() {
 			return value;
+		}
+		
+		public void setWikidataId(String wikidataId) {
+			this.wikidataId = wikidataId;
+		}
+		
+		public String getWikidataId() {
+			return wikidataId;
 		}
 
 

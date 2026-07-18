@@ -98,14 +98,14 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-//					"-vpoi", "-vpoiobjects",
+					"-vpoi", "-vpoiobjects",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vsearchinspect", // "-vsearchglobalonly", // "-vprefix=hh" // search index extended anlays 
-					"-vaddress",   
-					"-vcities", "-vstreetgroups", "-vcitynames",
+//					"-vaddress",   
+//					"-vcities", "-vstreetgroups", "-vcitynames",
 //					"-vstreets", //"-vbuildings",  "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
@@ -113,9 +113,9 @@ public class BinaryInspector {
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
-//					System.getProperty("maps.dir") + "Map.obf",
+					System.getProperty("maps.dir") + "Makby.obf",
 //					System.getProperty("maps.dir") + "regions.ocbf",				
-					System.getProperty("maps.dir") + "usa_wilkes-barre.obf",
+//					System.getProperty("maps.dir") + "usa_wilkes-barre.obf",
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
@@ -1871,7 +1871,12 @@ public class BinaryInspector {
 				main.subValues = new ArrayList<ValueFreq>();
 				for (int j = 0; j < st.possibleValues.size(); j++) {
 					int f = st.possibleValuesFreqs != null && j < st.possibleValuesFreqs.size() ? st.possibleValuesFreqs.get(j) : 0;
-					main.subValues.add(new ValueFreq(st.possibleValues.get(j), f));
+					String name = st.possibleValues.get(j);
+					String wiki = st.wikidataIds != null && j < st.wikidataIds.size() ? st.wikidataIds.get(j) : "";
+					if (wiki.length() > 0) {
+						name += " {" + wiki + "}";
+					}
+					main.subValues.add(new ValueFreq(name, f));
 				}
 				ps.topMulti.put(main.value, main);
 			}

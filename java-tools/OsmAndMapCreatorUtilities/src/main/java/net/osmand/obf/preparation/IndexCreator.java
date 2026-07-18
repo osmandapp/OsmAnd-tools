@@ -866,6 +866,7 @@ public class IndexCreator {
 		// settings.gtfsData = new File(rootFolder + "/maps/transport/Netherlands.sqlite");
 		settings.wikidataMappingUrl = rootFolder + "/wikidata_mapping.sqlitedb";
 		settings.wikirankingMappingUrl = rootFolder + "/wiki_ranking.sqlitedb";
+		settings.poiTopIndexUrl = rootFolder + "/brands.lst";
 //		settings.srtmDataFolderUrl  = null;
 
 		// settings.zoomWaySmoothness = 2;
@@ -878,7 +879,9 @@ public class IndexCreator {
 
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
-		String file = rootFolder + "../temp/map.osm";
+		
+//		String file = rootFolder + "../temp/map.osm";
+		String file = rootFolder + "../temp/makby.osm";
 //		String file = rootFolder + "../temp/liechtenstein_europe.pbf";
 //		String file = rootFolder + "../temp/Routing_test_76.osm";
 //		String file = rootFolder + "../repos/resources/test-resources/alarm.osm";
