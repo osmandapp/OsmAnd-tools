@@ -445,8 +445,8 @@ public class SearchUICoreGenOBFTest {
         Assert.assertFalse(sourceJsonText.isEmpty());
 
 		JSONObject sourceJson = new JSONObject(sourceJsonText);
-		boolean ignore = sourceJson.optBoolean("ignore");
-		if (ignore && !RUN_IGNORED_TESTS) {
+//		boolean ignore = sourceJson.optBoolean("ignore");
+		if (RUN_IGNORED_TESTS) {
 			return;
 		}
         searchKeywords = getKeywords(sourceJson);
