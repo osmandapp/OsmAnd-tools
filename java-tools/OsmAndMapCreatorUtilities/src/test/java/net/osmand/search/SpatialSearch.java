@@ -34,6 +34,7 @@ public class SpatialSearch implements SearchEngine {
 
         List<String> result = new ArrayList<>();
         for(SpatialSearchResult res : mainResults) {
+//        	System.out.println(SpatialSearchResult.compareKeyString(res) + " " +  res);
             result.add(formatResult(res));
         }
         return result;
@@ -68,7 +69,7 @@ public class SpatialSearch implements SearchEngine {
                 appendName(b, r.getExtraNameMatch(), city);
                 break;
             }
-            if (o instanceof Amenity am) {
+            if (o instanceof Amenity am && subtype.length() == 0) {
                 subtype = " " + am.getSubType();
             }
         }
