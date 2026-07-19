@@ -71,6 +71,7 @@ public class SearchUICoreGenOBFTest {
 	private static final String OBF_HASH_FILE_NAME = ".obf.hash";
 	private static final boolean RUN_IGNORED_TESTS = false;
 	private static final boolean FILTER_DATA_JSON = false;
+	private static final boolean TEST_NUMBER_MATCHED = false;
 	private static final double FILTER_REMOVE_PROBABILITY = 0.8; // means 80% probability of removal
 	private static boolean HASH_IS_ACTUAL_FOR_RUN;
 
@@ -483,11 +484,12 @@ public class SearchUICoreGenOBFTest {
 			for (int i = 0; i < expectedResults.size(); i++) {
 				String expected = expectedResults.get(i);
 				String actual = i >= actualResults.size() ? null : actualResults.get(i);
+				int shift = TEST_NUMBER_MATCHED ? 4 : 0;
 				if (expected.indexOf('[') != -1) {
-					expected = expected.substring(0, expected.indexOf('[')).trim();
+					expected = expected.substring(0, expected.indexOf('[') + shift).trim();
 				}
 				if (actual != null && actual.indexOf('[') != -1) {
-					actual = actual.substring(0, actual.indexOf('[')).trim();
+					actual = actual.substring(0, actual.indexOf('[') + shift).trim();
 				}
 				// String present = result.toString();
 				expected = expected.replaceFirst("^@", "");
