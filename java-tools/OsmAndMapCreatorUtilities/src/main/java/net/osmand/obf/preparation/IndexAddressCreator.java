@@ -1254,6 +1254,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		for (City s : posts) {
 			// TODO Enable in 5.3 (5.2 version will support postcode ordinal)
 //			refs.add(writer.writeCityHeader(s, CityType.POSTCODE.ordinal(), tagRules));
+			if(s.getBbox31() == null) {
+				s.calculateBbox31FromStreets();
+			}
 			refs.add(writer.writeCityHeader(s, -1, tagRules));
 		}
 		for (int i = 0; i < posts.size(); i++) {
