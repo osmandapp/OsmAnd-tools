@@ -322,13 +322,13 @@ public interface DetectorService extends OBFService {
                     baseCtx.lat(), baseCtx.lon(), q, baseCtx.locale(),
                     baseCtx.baseSearch(), baseCtx.northWest(), baseCtx.southEast());
 			
+			SearchService.SearchResults results = getSearchService().getImmediateSearchResults(ctx, options, null);
+			collectUnitTestSourceData(results.unitTestJson(), amenities, cities);
 			if (spatial != null && spatial) {
 				SearchService.SpatialResults spatialResults = getSearchService().searchTestSpatial(ctx, options, null, true);
 				collectUnitTestSourceData(ctx, spatialResults, cities, amenities);
 			} else {
-				SearchService.SearchResults results = getSearchService().getImmediateSearchResults(ctx, options, null);
 				settings = results.settings();
-				collectUnitTestSourceData(results.unitTestJson(), amenities, cities);
 			}
         }
 		
