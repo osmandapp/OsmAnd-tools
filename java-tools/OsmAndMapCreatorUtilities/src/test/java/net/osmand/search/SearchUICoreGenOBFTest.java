@@ -79,6 +79,12 @@ public class SearchUICoreGenOBFTest {
 	private final File testFile;
     private Set<String> searchKeywords;
 
+    public interface SearchTestEngine {
+        List<String> apply(String text, List<String> expectedResults) throws IOException;
+        
+        void close();
+    }
+    
 	public SearchUICoreGenOBFTest(String name, File file) {
 		this.testFile = file;
 	}
@@ -457,7 +463,7 @@ public class SearchUICoreGenOBFTest {
 		boolean useData = settingsJson.optBoolean("useData", true);
 		List<BinaryMapIndexReader> readers = new ArrayList<>();
 		boolean prevDisplayDefaultPoiTypes = SearchCoreFactory.DISPLAY_DEFAULT_POI_TYPES;
-		SearchEngine engine = null;
+		SearchTestEngine engine = null;
 		try {
 			if (useData) {
 				loadReaders(sourceJson, readers);
@@ -521,8 +527,8 @@ public class SearchUICoreGenOBFTest {
         }
 	}
 
-	private SearchEngine createSearchEngine(JSONObject settingsJson, List<BinaryMapIndexReader> readers) {
-		return new SpatialSearch(settingsJson, readers);
+	private SearchTestEngine createSearchEngine(JSONObject settingsJson, List<BinaryMapIndexReader> readers) {
+		return new SpatialTestSearchEngine(settingsJson, readers);
 	}
 
 	private static void deleteRecursively(File file) {

@@ -3,6 +3,7 @@ package net.osmand.search;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.*;
 import net.osmand.osm.MapPoiTypes;
+import net.osmand.search.SearchUICoreGenOBFTest.SearchTestEngine;
 import net.osmand.search.core.spatial.*;
 import net.osmand.search.core.spatial.SpatialSearchResult.SpatialSearchResultRef;
 import net.osmand.search.core.spatial.SpatialTextSearch.SpatialTextSearchSettings;
@@ -13,12 +14,12 @@ import org.json.JSONObject;
 import java.io.IOException;
 import java.util.*;
 
-public class SpatialSearch implements SearchEngine {
+public class SpatialTestSearchEngine implements SearchTestEngine {
     private final SpatialTextSearch spatialSearch;
     private final SpatialSearchContext searchContext;
     private final LatLon location;
 
-    public SpatialSearch(JSONObject settingsJson, List<BinaryMapIndexReader> readers) {
+    public SpatialTestSearchEngine(JSONObject settingsJson, List<BinaryMapIndexReader> readers) {
         spatialSearch = new SpatialTextSearch();
         SpatialPoiSearch poiSearch = new SpatialPoiSearch(MapPoiTypes.getDefault());
         SpatialTextSearch.SpatialTextSearchSettings spatialSettings = parseSpatialSettings(settingsJson);
