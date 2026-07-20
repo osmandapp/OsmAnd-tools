@@ -323,6 +323,12 @@ public interface DetectorService extends OBFService {
 		}
 		getLogger().info("Amenities: before = {}, after={}", before, amenities.size());
 
+		before = cities.size();
+		if (quote != null && quote < 1.0) {
+			cities.entrySet().removeIf(e -> e.getValue().getStreets() == null && Math.random() >= quote);
+		}
+		getLogger().info("Cities: before = {}, after={}", before, cities.size());
+		
 		before = 0;
 		int after = 0;
 		for (City city : cities.values()) {
@@ -371,7 +377,7 @@ public interface DetectorService extends OBFService {
 		String[] queries = normalizedUnitTestQueries(unitTest.queries(), baseCtx.text());
 		LinkedHashMap<String, Amenity> amenities = new LinkedHashMap<>();
 		LinkedHashMap<Long, City> cities = new LinkedHashMap<>();
-		SearchSettings settings = new SearchSettings(Collections.emptyList());
+		SearchSettings settings = null;
         for (String q : queries) {
             SearchService.SearchContext ctx = new SearchService.SearchContext(
                     baseCtx.lat(), baseCtx.lon(), q, baseCtx.locale(),
@@ -379,16 +385,18 @@ public interface DetectorService extends OBFService {
 
 			SearchService.SearchResults results = getSearchService().getImmediateSearchResults(ctx, options, null);
 			collectUnitTestSourceData(results.unitTestJson(), amenities, cities);
+			settings = results.settings();
         }
 		filterSourceData(amenities, cities, quote);
 
 		if (spatial != null && spatial) {
+			settings = new SearchSettings(Collections.emptyList());
 			for (String q : queries) {
 				SearchService.SearchContext ctx = new SearchService.SearchContext(
 						baseCtx.lat(), baseCtx.lon(), q, baseCtx.locale(),
 						baseCtx.baseSearch(), baseCtx.northWest(), baseCtx.southEast());
 				
-				SearchService.SpatialResults spatialResults = getSearchService().searchTestSpatial(ctx, options, null, true);
+				SearchService.SpatialResults spatialResults = getSearchService().searchTestSpatial(ctx, options, null, false);
 				collectUnitTestSourceData(spatialResults, cities, amenities);
 			}
 		}
