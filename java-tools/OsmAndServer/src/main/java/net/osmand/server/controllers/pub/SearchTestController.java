@@ -466,6 +466,9 @@ public class SearchTestController {
 		if (unitTest == null || unitTest.name() == null || query == null || lat == null || lon == null) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'unit-test name', 'query', 'lat' and 'lon' are required");
 		}
+		if (unitTest.quote() != null && !(unitTest.quote() > 0.0 && unitTest.quote() <= 1.0)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Quote must be between 0.0 and 1.0");
+		}
 		response.setContentType("application/zip");
 		response.setHeader("Content-Disposition", "attachment; filename=\"" + unitTest.name() + ".zip\"");
 		testSearchService.createUnitTest(unitTest,
