@@ -62,6 +62,7 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
         StringBuilder b = new StringBuilder();
         SpatialSearchToken.NameIndexAtom atom = r.getFirstRef().getNameIndexAtom();
         Building building = atom.getBuilding();
+        boolean poiCategory = atom.isPoiCategory();
         if (building != null && building.isInterpolation() && r.getExtraNameMatch() != null) {
             b.append(r.getExtraNameMatch()); // interpolated house number
         } else {
@@ -83,7 +84,11 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
                 break;
             }
             if (o instanceof Amenity am && subtype.length() == 0) {
-                subtype = " " + am.getSubType();
+				if (poiCategory) {
+            		appendName(b, am.getName(), o);
+            	} else {
+            		subtype = " " + am.getSubType();
+            	}
             }
         }
         String sorting = SpatialSearchResult.compareKeyString(r);
