@@ -468,7 +468,8 @@ public class SearchService {
 					if (r.hasPoiTypes()) {
 						for (SpatialPoiType type : r.getPoiTypes(poiSearch)) {
 							Feature f = getSpatialPoiTypeFeature(type);
-							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(), matchedObjects(objs, ctx.locale));
+							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(),
+									matchedObjects(objs, ctx.locale, timeZone, dominatedCity));
 							f.prop(PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
 							f.prop(PoiTypeField.COMPARE_KEY.getFieldName(), SpatialSearchResult.compareKeyString(r));
 							response.features.add(f);
@@ -478,7 +479,8 @@ public class SearchService {
 						LatLon l = r.getLatLon() == null ? new LatLon(ctx.lat, ctx.lon) : r.getLatLon();
 						Feature f = getSpatialFeature(l, objs, ctx.locale, timeZone, dominatedCity, r.getExtraNameMatch());
 						if (f != null) {
-							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(), matchedObjects(objs, ctx.locale));
+							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(),
+									matchedObjects(objs, ctx.locale, timeZone, dominatedCity));
 							f.prop(PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
 							f.prop(PoiTypeField.COMPARE_KEY.getFieldName(), SpatialSearchResult.compareKeyString(r));
 							response.features.add(f);
@@ -545,7 +547,8 @@ public class SearchService {
 		return tags;
 	}
 
-	private List<Map<String, Object>> matchedObjects(List<MapObject> objs, String locale) {
+	private List<Map<String, Object>> matchedObjects(List<MapObject> objs, String locale, String timeZone,
+			String dominatedCity) {
 		List<Map<String, Object>> matched = new ArrayList<>();
 		for (MapObject o : objs) {
 			if (o.getLocation() == null) {
@@ -556,6 +559,10 @@ public class SearchService {
 			m.put("type", o.getClass().getSimpleName());
 			m.put("lat", o.getLocation().getLatitude());
 			m.put("lon", o.getLocation().getLongitude());
+			if (o instanceof Amenity amenity) {
+				Feature feature = getPoiFeature(buildPoiSearchResult(amenity, locale, dominatedCity), timeZone);
+				m.putAll(feature.properties);
+			}
 			matched.add(m);
 		}
 		return matched;
