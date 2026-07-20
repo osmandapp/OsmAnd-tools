@@ -113,9 +113,8 @@ public class BinaryInspector {
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
-//					System.getProperty("maps.dir") + "estrado.obf",
 //					System.getProperty("maps.dir") + "regions.ocbf",				
-					System.getProperty("maps.dir") + "usa_wilkes-barre.obf",
+					System.getProperty("maps.dir") + "map.obf",
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
@@ -939,7 +938,7 @@ public class BinaryInspector {
 					boolean includeEnName = verbose.lang == null || !verbose.lang.equals("en");
 					name += " " + c.getNamesMap(includeEnName).toString();
 				}
-				String bboxStr = "";
+				String bboxStr = "no bbox";
 				double bleft = 0, btop = 0, bbottom = 0,  bright = 0;
 				if (c.getBbox31() != null) {
 					bleft = MapUtils.get31LongitudeX(c.getBbox31()[0]);

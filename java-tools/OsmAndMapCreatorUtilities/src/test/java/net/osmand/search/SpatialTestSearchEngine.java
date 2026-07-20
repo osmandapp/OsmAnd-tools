@@ -40,14 +40,16 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
     }
 
     @Override
-    public List<String> apply(String phrase, List<String> expectedResults) throws IOException {
+    public List<String> search(String phrase, boolean print) throws IOException {
         SpatialTextSearch.SpatialSearchResults searchResults = spatialSearch.searchAPI(phrase, searchContext);
         List<SpatialSearchResult> mainResults = searchResults.mainResults == null ? Collections.emptyList()
                 : searchResults.mainResults;
 
         List<String> result = new ArrayList<>();
         for(SpatialSearchResult res : mainResults) {
-//        	System.out.println(SpatialSearchResult.compareKeyString(res) + " " +  res);
+        	if(print) {
+        		System.out.println(SpatialSearchResult.compareKeyString(res) + " " +  res);
+        	}
             result.add(formatResult(res));
         }
         return result;
