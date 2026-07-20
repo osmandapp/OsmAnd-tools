@@ -439,6 +439,7 @@ public class SearchService {
 		if (!osmAndMapsService.validateAndInitConfig()) {
 			return response;
 		}
+		final boolean[] cancelled = new boolean[1];
 //		double radius = SearchOption.SEARCH_RADIUS_DEGREE;
 //		QuadRect points = osmAndMapsService.points(null,
 //				new LatLon(ctx.lat + radius, ctx.lon - radius),
@@ -470,12 +471,25 @@ public class SearchService {
 					? SpatialTextSearchSettings.suggestionSettings()
 					: SpatialTextSearchSettings.defaultSettings();
 			List<BinaryMapIndexReader> finalUsedMapList = usedMapList;
+			final ResultMatcher<SpatialSearchResult> matcher = new ResultMatcher<SpatialSearchResult>() {
+
+				@Override
+				public boolean publish(SpatialSearchResult object) {
+					return false;
+				}
+
+				@Override
+				public boolean isCancelled() {
+					return cancelled[0];
+				}
+			};
 			Future<SpatialSearchResults> task = spatialSearchThreadPool.submit(new Callable<SpatialSearchResults>() {
 				
 				@Override
 				public SpatialSearchResults call() throws Exception {
 					SpatialSearchContext sscontext =
 							new SpatialSearchContext(settings, finalUsedMapList, poiSearch, new LatLon(ctx.lat, ctx.lon));
+					sscontext.resultMatcher = matcher;
 					finalUsedMapList.add(osmandRegionsLocal.get());
 					return spatialTextSearchLocal.get().searchAPI(ctx.text, sscontext);
 				}
@@ -519,6 +533,7 @@ public class SearchService {
 		} catch (RuntimeException e) {
 			LOGGER.error(String.format("Spatial search failed for '%s': %s", ctx.text, e), e);
 		} finally {
+			cancelled[0] = true;
 			osmAndMapsService.unlockReaders(usedMapList);
 		}
 		return response;
