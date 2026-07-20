@@ -192,7 +192,8 @@ public interface DetectorService extends OBFService {
 			if (sourceData.jsonFilePath == null) {
 				return;
 			}
-			File jsonFile = dirPath.resolve(unitTest.name + ".json").toFile();
+			File configJsonFile = dirPath.resolve(unitTest.name + ".json").toFile();
+			File sourceJsonFile = gzip(new File(sourceData.jsonFilePath));
 
 			OBFDataCreator creator = new OBFDataCreator();
 			File outFile = creator.create(dirPath.resolve(unitTest.name + ".obf").toAbsolutePath().toString(),
@@ -216,24 +217,31 @@ public interface DetectorService extends OBFService {
 			rootJson.put("phrases", unitTest.queries());
 			rootJson.put("results", formattedResultsJson);
 			String unitTestJson = new JSONObject(rootJson).toString(4) + "\n";
-			Files.writeString(jsonFile.toPath(), unitTestJson, StandardCharsets.UTF_8);
+			Files.writeString(configJsonFile.toPath(), unitTestJson, StandardCharsets.UTF_8);
 			try (ZipOutputStream zipOut = new ZipOutputStream(out)) {
 				// JSON metadata entry
-				if (jsonFile.exists()) {
-					ZipEntry jsonEntry = new ZipEntry(jsonFile.getName());
-					zipOut.putNextEntry(jsonEntry);
-					try (InputStream jsonIn = new StringInputStream(unitTestJson)) {
-						Algorithms.streamCopy(jsonIn, zipOut);
+				if (configJsonFile.exists()) {
+					zipOut.putNextEntry(new ZipEntry(configJsonFile.getName()));
+					try (InputStream is = new StringInputStream(unitTestJson)) {
+						Algorithms.streamCopy(is, zipOut);
 					}
 					zipOut.closeEntry();
 				}
 
+				// JSON source entry
+				if (sourceJsonFile.exists()) {
+					zipOut.putNextEntry(new ZipEntry(sourceJsonFile.getName()));
+					try (InputStream is = new FileInputStream(sourceJsonFile)) {
+						Algorithms.streamCopy(is, zipOut);
+					}
+					zipOut.closeEntry();
+				}
+				
 				// Gzipped data archive entry
 				if (outFile.exists()) {
-					ZipEntry gzEntry = new ZipEntry(outFile.getName());
-					zipOut.putNextEntry(gzEntry);
-					try (InputStream gzIn = new FileInputStream(outFile)) {
-						Algorithms.streamCopy(gzIn, zipOut);
+					zipOut.putNextEntry(new ZipEntry(outFile.getName()));
+					try (InputStream is = new FileInputStream(outFile)) {
+						Algorithms.streamCopy(is, zipOut);
 					}
 					zipOut.closeEntry();
 				}
@@ -308,23 +316,36 @@ public interface DetectorService extends OBFService {
 		}
 	}
 
-	private void collectUnitTestSourceData(JSONObject sourceJson, Map<String, Amenity> amenities, Map<Long, City> cities, Double quote) {
+	private void filterSourceData(Map<String, Amenity> amenities, Map<Long, City> cities, Double quote) {
+		if (quote != null && !(quote > 0.0 && quote <= 1.0)) {
+			throw new IllegalArgumentException("Quote must be greater than 0.0 and less than or equal to 1.0");
+		}
+
+		int before = amenities.size();
+		if (quote != null && quote < 1.0) {
+			amenities.entrySet().removeIf(entry -> Math.random() >= quote);
+		}
+		getLogger().info("Amenities: before = {}, after={}", before, amenities.size());
+
+		before = cities.size();
+		if (quote != null && quote < 1.0) {
+			cities.entrySet().removeIf(entry -> Math.random() >= quote);
+		}
+		getLogger().info("Cities: before = {}, after={}", before, cities.size());
+	}
+
+	private void collectUnitTestSourceData(JSONObject sourceJson, Map<String, Amenity> amenities, Map<Long, City> cities) {
 		JSONArray amenitiesJson = sourceJson.optJSONArray("amenities");
 		if (amenitiesJson != null) {
 			for (int i = 0; i < amenitiesJson.length(); i++) {
-				if (quote != null && Math.random() >= quote) {
-					continue;
-				}
 				Amenity amenity = Amenity.parseJSON(amenitiesJson.getJSONObject(i));
 				amenities.putIfAbsent(amenityKey(amenity), amenity);
 			}
 		}
+
 		JSONArray citiesJson = sourceJson.optJSONArray("cities");
 		if (citiesJson != null) {
 			for (int i = 0; i < citiesJson.length(); i++) {
-				if (quote != null && Math.random() >= quote) {
-					continue;
-				}
 				City city = City.parseJSON(citiesJson.getJSONObject(i));
 				City existing = cities.get(city.getId());
 				if (existing == null) {
@@ -352,14 +373,20 @@ public interface DetectorService extends OBFService {
                     baseCtx.baseSearch(), baseCtx.northWest(), baseCtx.southEast());
 
 			SearchService.SearchResults results = getSearchService().getImmediateSearchResults(ctx, options, null);
-			if (spatial != null && spatial) {
+			collectUnitTestSourceData(results.unitTestJson(), amenities, cities);
+        }
+		filterSourceData(amenities, cities, quote);
+
+		if (spatial != null && spatial) {
+			for (String q : queries) {
+				SearchService.SearchContext ctx = new SearchService.SearchContext(
+						baseCtx.lat(), baseCtx.lon(), q, baseCtx.locale(),
+						baseCtx.baseSearch(), baseCtx.northWest(), baseCtx.southEast());
+				
 				SearchService.SpatialResults spatialResults = getSearchService().searchTestSpatial(ctx, options, null, true);
 				collectUnitTestSourceData(spatialResults, cities, amenities);
-			} else {
-				settings = results.settings();
 			}
-			collectUnitTestSourceData(results.unitTestJson(), amenities, cities, quote);
-        }
+		}
 		
 		return createUnitTestJson(dirPath, unitTest.name, settings, routing, amenities, cities);
 	}
