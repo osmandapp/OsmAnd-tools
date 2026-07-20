@@ -69,6 +69,7 @@ import net.osmand.data.Street;
 import net.osmand.map.OsmandRegions;
 import net.osmand.osm.AbstractPoiType;
 import net.osmand.osm.MapPoiTypes;
+import net.osmand.osm.MapRenderingTypes;
 import net.osmand.osm.PoiCategory;
 import net.osmand.osm.PoiFilter;
 import net.osmand.osm.PoiType;
@@ -141,7 +142,7 @@ public class SearchService {
 	private final ThreadLocal<SpatialTextSearch> spatialTextSearchLocal = ThreadLocal
 			.withInitial(() -> new SpatialTextSearch());
 	// reused for cache
-	private final SpatialPoiSearch poiSearch = new SpatialPoiSearch(MapPoiTypes.getDefault());
+	private SpatialPoiSearch poiSearch; 
 
 	public static class PoiSearchResult {
 
@@ -336,6 +337,15 @@ public class SearchService {
 		}
 		return res;
 	}
+	
+	public synchronized SpatialPoiSearch getSpatialPoiTypeSearch() {
+		if (poiSearch == null) {
+			MapPoiTypes poiTypes = MapPoiTypes.getDefault();
+			poiTypes.setPoiTranslator(parseGlobalTranslations());
+			poiSearch = new SpatialPoiSearch(poiTypes);
+		}
+		return poiSearch;
+	}
 
 	private SpatialResults searchTestSpatial(SearchContext ctx, List<BinaryMapIndexReader> readers, boolean printLogs)
 			throws IOException {
@@ -344,7 +354,7 @@ public class SearchService {
 		}
 		SpatialTextSearchSettings settings = SpatialTextSearchSettings.defaultSettings();
 		settings.AUTO_CLEAR_PREFIX_CACHE_LIMIT = TEST_CACHE_PREFIX_LIMIT;
-		SpatialSearchContext sscontext = new SpatialSearchContext(settings, readers, poiSearch, new LatLon(ctx.lat, ctx.lon));
+		SpatialSearchContext sscontext = new SpatialSearchContext(settings, readers, getSpatialPoiTypeSearch(), new LatLon(ctx.lat, ctx.lon));
 		SpatialSearchContext.SpatialSearchStats stats = sscontext.getStats();
 		stats.printLogs = printLogs;
 		
@@ -456,7 +466,7 @@ public class SearchService {
 					? SpatialTextSearchSettings.suggestionSettings()
 					: SpatialTextSearchSettings.defaultSettings();
 			SpatialSearchContext sscontext =
-					new SpatialSearchContext(settings, usedMapList, poiSearch, new LatLon(ctx.lat, ctx.lon));
+					new SpatialSearchContext(settings, usedMapList, getSpatialPoiTypeSearch(), new LatLon(ctx.lat, ctx.lon));
 			synchronized (spatialTextSearch) {
 				usedMapList.add(osmandRegions.getFile());
 				res = spatialTextSearch.searchAPI(ctx.text, sscontext);
@@ -466,7 +476,7 @@ public class SearchService {
 				for (SpatialSearchResult r : res.mainResults) {
 					List<MapObject> objs = r.getObjects();
 					if (r.hasPoiTypes()) {
-						for (SpatialPoiType type : r.getPoiTypes(poiSearch)) {
+						for (SpatialPoiType type : r.getPoiTypes(getSpatialPoiTypeSearch())) {
 							Feature f = getSpatialPoiTypeFeature(type);
 							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(), matchedObjects(objs, ctx.locale));
 							f.prop(PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
@@ -1400,6 +1410,23 @@ public class SearchService {
 				throw new RuntimeException(e);
 			}
 		});
+	}
+	
+	private MapPoiTypesTranslator parseGlobalTranslations() {
+		Map<String, String> enTranslations = getTranslations(DEFAULT_SEARCH_LANG);
+		MapPoiTypesTranslator translations = new MapPoiTypesTranslator(enTranslations, enTranslations);
+		for (String l : MapRenderingTypes.langs) {
+			InputStream phrasesStream = this.getClass().getResourceAsStream(AND_RES + "values-" + l + "/phrases.xml");
+			if (phrasesStream != null) {
+				try {
+					Map<String, String> stringsXml = parseStringsXml(phrasesStream);
+					translations.appendTranslations(l, stringsXml);
+				} catch (XmlPullParserException | IOException e) {
+					throw new RuntimeException(e);
+				}
+			}
+		}
+		return translations;
 	}
 
 	private MapPoiTypes getMapPoiTypes(String locale) {
