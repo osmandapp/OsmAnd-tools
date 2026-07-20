@@ -317,21 +317,26 @@ public interface DetectorService extends OBFService {
 	}
 
 	private void filterSourceData(Map<String, Amenity> amenities, Map<Long, City> cities, Double quote) {
-		if (quote != null && !(quote > 0.0 && quote <= 1.0)) {
-			throw new IllegalArgumentException("Quote must be greater than 0.0 and less than or equal to 1.0");
-		}
-
 		int before = amenities.size();
 		if (quote != null && quote < 1.0) {
 			amenities.entrySet().removeIf(entry -> Math.random() >= quote);
 		}
 		getLogger().info("Amenities: before = {}, after={}", before, amenities.size());
 
-		before = cities.size();
-		if (quote != null && quote < 1.0) {
-			cities.entrySet().removeIf(entry -> Math.random() >= quote);
+		before = 0;
+		int after = 0;
+		for (City city : cities.values()) {
+			List<Street> streets = city.getStreets();
+			if (streets == null) {
+				continue;
+			}
+			before += streets.size();
+			if (quote != null && quote < 1.0) {
+				streets.removeIf(street -> Math.random() >= quote);
+			}
+			after += streets.size();
 		}
-		getLogger().info("Cities: before = {}, after={}", before, cities.size());
+		getLogger().info("Streets: before = {}, after={}", before, after);
 	}
 
 	private void collectUnitTestSourceData(JSONObject sourceJson, Map<String, Amenity> amenities, Map<Long, City> cities) {
