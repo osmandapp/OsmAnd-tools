@@ -102,7 +102,7 @@ public class MapPoiTypesTranslator implements MapPoiTypes.PoiTranslator {
 					sb.append(";");
 				}
 			}
-			return "";
+			return sb.toString();
 		}
 		return null;
 	}
