@@ -16,6 +16,7 @@ import java.io.*;
 import java.text.Normalizer;
 import java.util.*;
 import java.util.regex.Pattern;
+import java.util.zip.Deflater;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -948,11 +949,18 @@ public interface OBFService extends BaseService {
 	}
 
 	default File gzip(File sourceFile) throws IOException {
+		class BestCompressionGzipStream extends GZIPOutputStream {
+			BestCompressionGzipStream(OutputStream outputStream) throws IOException {
+				super(outputStream);
+				def.setLevel(Deflater.BEST_COMPRESSION);
+			}
+		}
+
 		File gzFile = new File(sourceFile.getParentFile(), sourceFile.getName() + ".gz");
 		try (FileInputStream inputStream = new FileInputStream(sourceFile);
-		     FileOutputStream fileOutputStream = new FileOutputStream(gzFile);
-		     GZIPOutputStream gzipOutputStream = new GZIPOutputStream(fileOutputStream)) {
-			Algorithms.streamCopy(inputStream, gzipOutputStream);
+		     FileOutputStream outputStream = new FileOutputStream(gzFile);
+		     GZIPOutputStream gzipStream = new BestCompressionGzipStream(outputStream)) {
+			Algorithms.streamCopy(inputStream, gzipStream);
 		}
 		return gzFile;
 	}
