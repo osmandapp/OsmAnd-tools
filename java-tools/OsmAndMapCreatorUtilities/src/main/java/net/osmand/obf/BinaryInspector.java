@@ -98,15 +98,15 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-//					"-vpoi", "-vpoiobjects",
+					"-vpoi", "-vpoiobjects",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vsearchinspect", // "-vsearchglobalonly", // "-vprefix=hh" // search index extended anlays 
-					"-vaddress",   
-					"-vcities", "-vstreetgroups", "-vcitynames",
-					"-vstreets", "-vbuildings",//  "-vintersections",
+//					"-vaddress",   
+//					"-vcities", "-vstreetgroups", "-vcitynames",
+//					"-vstreets", "-vbuildings",//  "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
 //					"-latlon=48.804242,9.215574,0.005",

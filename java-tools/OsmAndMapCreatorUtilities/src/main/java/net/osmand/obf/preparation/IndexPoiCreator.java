@@ -53,6 +53,7 @@ import net.osmand.osm.edit.Way;
 import net.osmand.router.RoutingContext;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
+import net.osmand.util.SearchAlgorithms;
 import net.osmand.util.TopTagValuesAnalyzer;
 import net.sf.junidecode.Junidecode;
 
@@ -392,7 +393,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			if (mainValue.equalsIgnoreCase(tempNames.get("name"))) {
 				for (String k : tempNames.keySet()) {
 					if (k.startsWith("name:")) {
-						addAltNamesMix(mainValue, rulType, tempNames.get(k));
+						String v = tempNames.get(k);
+						if (SearchAlgorithms.split(v).size() == SearchAlgorithms.split(mainValue).size()) {
+							addAltNamesMix(mainValue, rulType, tempNames.get(k));
+						}
 					}
 				}
 			}
