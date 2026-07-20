@@ -325,7 +325,7 @@ public interface DetectorService extends OBFService {
 
 		before = cities.size();
 		if (quote != null && quote < 1.0) {
-			cities.entrySet().removeIf(e -> e.getValue().getStreets() == null && Math.random() >= quote);
+			cities.entrySet().removeIf(e -> (e.getValue().getStreets() == null || e.getValue().getStreets().isEmpty()) && Math.random() >= quote);
 		}
 		getLogger().info("Cities: before = {}, after={}", before, cities.size());
 		
@@ -333,7 +333,7 @@ public interface DetectorService extends OBFService {
 		int after = 0;
 		for (City city : cities.values()) {
 			List<Street> streets = city.getStreets();
-			if (streets == null) {
+			if (streets == null || streets.isEmpty()) {
 				continue;
 			}
 			before += streets.size();
