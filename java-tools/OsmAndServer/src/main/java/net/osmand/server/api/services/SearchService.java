@@ -475,7 +475,7 @@ public class SearchService {
 				String dominatedCity = calculateSpatialDominatedCity(res.mainResults, ctx.locale);
 				for (SpatialSearchResult r : res.mainResults) {
 					List<MapObject> objs = r.getObjects();
-					if (r.hasPoiTypes()) {
+					if (r.isPoiCategory()) {
 						for (SpatialPoiType type : r.getPoiTypes(getSpatialPoiTypeSearch())) {
 							Feature f = getSpatialPoiTypeFeature(type);
 							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(),
