@@ -478,7 +478,8 @@ public class SearchService {
 					if (r.hasPoiTypes()) {
 						for (SpatialPoiType type : r.getPoiTypes(getSpatialPoiTypeSearch())) {
 							Feature f = getSpatialPoiTypeFeature(type);
-							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(), matchedObjects(objs, ctx.locale));
+							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(),
+									matchedObjects(objs, ctx.locale, timeZone, dominatedCity));
 							f.prop(PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
 							f.prop(PoiTypeField.COMPARE_KEY.getFieldName(), SpatialSearchResult.compareKeyString(r));
 							response.features.add(f);
@@ -488,7 +489,8 @@ public class SearchService {
 						LatLon l = r.getLatLon() == null ? new LatLon(ctx.lat, ctx.lon) : r.getLatLon();
 						Feature f = getSpatialFeature(l, objs, ctx.locale, timeZone, dominatedCity, r.getExtraNameMatch());
 						if (f != null) {
-							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(), matchedObjects(objs, ctx.locale));
+							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(),
+									matchedObjects(objs, ctx.locale, timeZone, dominatedCity));
 							f.prop(PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
 							f.prop(PoiTypeField.COMPARE_KEY.getFieldName(), SpatialSearchResult.compareKeyString(r));
 							response.features.add(f);
@@ -555,7 +557,8 @@ public class SearchService {
 		return tags;
 	}
 
-	private List<Map<String, Object>> matchedObjects(List<MapObject> objs, String locale) {
+	private List<Map<String, Object>> matchedObjects(List<MapObject> objs, String locale, String timeZone,
+			String dominatedCity) {
 		List<Map<String, Object>> matched = new ArrayList<>();
 		for (MapObject o : objs) {
 			if (o.getLocation() == null) {
@@ -564,11 +567,38 @@ public class SearchService {
 			Map<String, Object> m = new LinkedHashMap<>();
 			m.put("name", o.getName(locale));
 			m.put("type", o.getClass().getSimpleName());
-			m.put("lat", o.getLocation().getLatitude());
-			m.put("lon", o.getLocation().getLongitude());
+			m.put("lat", roundCoord(o.getLocation().getLatitude()));
+			m.put("lon", roundCoord(o.getLocation().getLongitude()));
+			if (o instanceof Amenity amenity) {
+				Feature feature = getPoiFeature(buildPoiSearchResult(amenity, locale, dominatedCity), timeZone);
+				m.putAll(feature.properties);
+			} else if (o instanceof City city) {
+				putCityType(m, city);
+				putCityBboxLatLon(m, city);
+			}
 			matched.add(m);
 		}
 		return matched;
+	}
+
+	private void putCityType(Map<String, Object> properties, City city) {
+		properties.put(PoiTypeField.CITY_TYPE.getFieldName(), city.getType().name());
+	}
+
+	private void putCityBboxLatLon(Map<String, Object> properties, City city) {
+		int[] bbox31 = city.getBbox31();
+		if (bbox31 != null && bbox31.length >= 4) {
+			Map<String, Object> bbox = new LinkedHashMap<>();
+			bbox.put("top", roundCoord(MapUtils.get31LatitudeY(bbox31[1])));
+			bbox.put("left", roundCoord(MapUtils.get31LongitudeX(bbox31[0])));
+			bbox.put("bottom", roundCoord(MapUtils.get31LatitudeY(bbox31[3])));
+			bbox.put("right", roundCoord(MapUtils.get31LongitudeX(bbox31[2])));
+			properties.put(PoiTypeField.BBOX_LAT_LON.getFieldName(), bbox);
+		}
+	}
+
+	private double roundCoord(double value) {
+		return Math.round(value * 1000000d) / 1000000d;
 	}
 
 	private Feature getSpatialFeature(LatLon loc, List<MapObject> objs, String locale, String timeZone,
@@ -1564,7 +1594,7 @@ public class SearchService {
 		POI_TYPE("web_poi_type"), POI_SUBTYPE("web_poi_subType"), POI_OSM_URL("web_poi_osmUrl"), CITY("web_city"),
 		// names of all objects matched in a spatial-search result (street, city, ...)
 		MATCHED_OBJECTS("web_matched_objects"), VISIBLE_LEVEL("web_visible_level"),
-		COMPARE_KEY("web_compare_key");
+		COMPARE_KEY("web_compare_key"), BBOX_LAT_LON("web_bbox_lat_lon"), CITY_TYPE("web_city_type");
 
 		private final String fieldName;
 
@@ -1673,6 +1703,10 @@ public class SearchService {
 			Map<String, String> tags = getPoiTypeFields(result.object);
 			for (Map.Entry<String, String> entry : tags.entrySet()) {
 				feature.prop(entry.getKey(), entry.getValue());
+			}
+			if (result.object instanceof City city) {
+				putCityType(feature.properties, city);
+				putCityBboxLatLon(feature.properties, city);
 			}
 		}
 		return feature;
