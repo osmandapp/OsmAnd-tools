@@ -1,24 +1,37 @@
 package net.osmand.search;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
+
+import org.json.JSONObject;
+
 import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.data.*;
+import net.osmand.data.Amenity;
+import net.osmand.data.Building;
+import net.osmand.data.City;
+import net.osmand.data.LatLon;
+import net.osmand.data.MapObject;
+import net.osmand.data.Street;
 import net.osmand.osm.MapPoiTypes;
-import net.osmand.search.core.spatial.*;
-import net.osmand.search.core.spatial.SpatialSearchResult.SpatialSearchResultRef;
+import net.osmand.search.SearchUICoreGenOBFTest.SearchTestEngine;
+import net.osmand.search.core.spatial.SpatialPoiSearch;
+import net.osmand.search.core.spatial.SpatialSearchContext;
+import net.osmand.search.core.spatial.SpatialSearchResult;
+import net.osmand.search.core.spatial.SpatialSearchToken;
+import net.osmand.search.core.spatial.SpatialTextSearch;
 import net.osmand.search.core.spatial.SpatialTextSearch.SpatialTextSearchSettings;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
-import org.json.JSONObject;
 
-import java.io.IOException;
-import java.util.*;
-
-public class SpatialSearch implements SearchEngine {
+public class SpatialTestSearchEngine implements SearchTestEngine {
     private final SpatialTextSearch spatialSearch;
     private final SpatialSearchContext searchContext;
     private final LatLon location;
 
-    public SpatialSearch(JSONObject settingsJson, List<BinaryMapIndexReader> readers) {
+    public SpatialTestSearchEngine(JSONObject settingsJson, List<BinaryMapIndexReader> readers) {
         spatialSearch = new SpatialTextSearch();
         SpatialPoiSearch poiSearch = new SpatialPoiSearch(MapPoiTypes.getDefault());
         SpatialTextSearch.SpatialTextSearchSettings spatialSettings = parseSpatialSettings(settingsJson);
