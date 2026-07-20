@@ -32,7 +32,14 @@ import java.util.Set;
 import java.util.StringJoiner;
 import java.util.TimeZone;
 import java.util.TreeMap;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -137,9 +144,12 @@ public class SearchService {
 
 	private final ConcurrentHashMap<String, MapPoiTypes> poiTypesByLocale = new ConcurrentHashMap<>();
 
-	private final SpatialTextSearch spatialTextSearch = new SpatialTextSearch();
+	private final ThreadPoolExecutor spatialSearchThreadPool = 
+			new ThreadPoolExecutor(1, 4, 30, TimeUnit.HOURS, new ArrayBlockingQueue<Runnable>(0));
 	private final ThreadLocal<SpatialTextSearch> spatialTextSearchLocal = ThreadLocal
 			.withInitial(() -> new SpatialTextSearch());
+	private final ThreadLocal<BinaryMapIndexReader> osmandRegionsLocal = ThreadLocal
+			.withInitial(() -> openRegionsReader());
 	// reused for cache
 	private final SpatialPoiSearch poiSearch = new SpatialPoiSearch(MapPoiTypes.getDefault());
 
@@ -397,12 +407,17 @@ public class SearchService {
 		return readers;
 	}
 
-	private BinaryMapIndexReader openRegionsReader() throws IOException {
+	private BinaryMapIndexReader openRegionsReader() {
 		BinaryMapIndexReader regionsReader = osmandRegions.getFile();
-		if (regionsReader == null || regionsReader.getFile() == null) {
-			return null;
+		try {
+			if (regionsReader == null || regionsReader.getFile() == null) {
+				return null;
+			}
+			return new BinaryMapIndexReader(new RandomAccessFile(regionsReader.getFile(), "r"), regionsReader);
+		} catch (Exception e) {
+			LOGGER.warn("Failed to close spatial test reader.", e);
 		}
-		return new BinaryMapIndexReader(new RandomAccessFile(regionsReader.getFile(), "r"), regionsReader);
+		return regionsReader;
 	}
 
 	public void closeReaders(List<BinaryMapIndexReader> readers) {
@@ -418,7 +433,7 @@ public class SearchService {
 		}
 	}
 
-	public SpatialResponse searchSpatial(SearchContext ctx, String timeZone, boolean autocomplete) throws IOException {
+	public SpatialResponse searchSpatial(SearchContext ctx, String timeZone, boolean autocomplete) throws IOException, InterruptedException, ExecutionException, TimeoutException {
 		long sTime = System.currentTimeMillis();
 		SpatialResponse response = new SpatialResponse();
 		if (!osmAndMapsService.validateAndInitConfig()) {
@@ -450,17 +465,22 @@ public class SearchService {
 				sr.localeName = ((float) coord.getLatitude()) + ", " + ((float) coord.getLongitude());
 				response.features.add(getFeature(sr, timeZone));
 			}
-			SpatialSearchResults res;
 			// In future multiple spatialTextSearch & multiple osmand regions
 			SpatialTextSearchSettings settings = autocomplete
 					? SpatialTextSearchSettings.suggestionSettings()
 					: SpatialTextSearchSettings.defaultSettings();
-			SpatialSearchContext sscontext =
-					new SpatialSearchContext(settings, usedMapList, poiSearch, new LatLon(ctx.lat, ctx.lon));
-			synchronized (spatialTextSearch) {
-				usedMapList.add(osmandRegions.getFile());
-				res = spatialTextSearch.searchAPI(ctx.text, sscontext);
-			}
+			List<BinaryMapIndexReader> finalUsedMapList = usedMapList;
+			Future<SpatialSearchResults> task = spatialSearchThreadPool.submit(new Callable<SpatialSearchResults>() {
+				
+				@Override
+				public SpatialSearchResults call() throws Exception {
+					SpatialSearchContext sscontext =
+							new SpatialSearchContext(settings, finalUsedMapList, poiSearch, new LatLon(ctx.lat, ctx.lon));
+					finalUsedMapList.add(osmandRegionsLocal.get());
+					return spatialTextSearchLocal.get().searchAPI(ctx.text, sscontext);
+				}
+			});			
+			SpatialSearchResults res = task.get(15, TimeUnit.SECONDS);
 			if (res.mainResults != null) {
 				String dominatedCity = calculateSpatialDominatedCity(res.mainResults, ctx.locale);
 				for (SpatialSearchResult r : res.mainResults) {
@@ -488,10 +508,10 @@ public class SearchService {
 			}
 			// extra info shown in the UI
 			response.info.put("timeAll", String.format("%.1f", (System.currentTimeMillis() - sTime) / 1e3));
-			response.info.put("atoms", String.format("%.2f, %,d", sscontext.getStats().step1Atoms.ms() / 1000.0,
-					sscontext.getStats().tokenObjs));
-			response.info.put("compute", String.format("%.2f, %,d", sscontext.getStats().step2Compute.ms() / 1000.0,
-					sscontext.getStats().maxCombinations));
+			response.info.put("atoms", String.format("%.2f, %,d", res.stats.step1Atoms.ms() / 1000.0,
+					res.stats.tokenObjs));
+			response.info.put("compute", String.format("%.2f, %,d", res.stats.step2Compute.ms() / 1000.0,
+					res.stats.maxCombinations));
 			response.info.put("results", response.features.size());
 			response.info.put("words-matched", res.combinations == null || res.combinations.size() == 0 ? 0
 					: res.combinations.get(0).getTokenCount());
