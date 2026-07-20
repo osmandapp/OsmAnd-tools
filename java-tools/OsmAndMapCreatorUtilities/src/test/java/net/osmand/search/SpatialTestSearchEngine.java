@@ -165,11 +165,11 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
         settings.MIN_ELO_RATING = settingsJson.optInt("MIN_ELO_RATING", settings.MIN_ELO_RATING);
         settings.MIN_CHARACTERS_INCOMPLETE = settingsJson.optInt("MIN_CHARACTERS_INCOMPLETE", settings.MIN_CHARACTERS_INCOMPLETE);
         settings.LIMIT_ATOMIC_OBJECTS = settingsJson.optInt("LIMIT_ATOMIC_OBJECTS", settings.LIMIT_ATOMIC_OBJECTS);
-        settings.LIMIT_ALL_GOALS_MAX_UNIQUE_OBJECTS = settingsJson.optInt("LIMIT_ALL_GOALS_MAX_UNIQUE_OBJECTS",
-                settings.LIMIT_ALL_GOALS_MAX_UNIQUE_OBJECTS);
-        settings.LIMIT_GOAL_NEXT_LEVEL_MAX_UNIQUE_OBJECTS = settingsJson.optInt("LIMIT_GOAL_NEXT_LEVEL_MAX_UNIQUE_OBJECTS",
-                settings.LIMIT_GOAL_NEXT_LEVEL_MAX_UNIQUE_OBJECTS);
-        settings.LIMIT_GOAL_LEVEL_2 = settingsJson.optInt("LIMIT_GOAL_LEVEL_2", settings.LIMIT_GOAL_LEVEL_2);
+        settings.LIMIT_STOP_GOALS_ANY_LEVEL_WHEN_REACHED_RES = settingsJson.optInt("LIMIT_ALL_GOALS_MAX_UNIQUE_OBJECTS",
+                settings.LIMIT_STOP_GOALS_ANY_LEVEL_WHEN_REACHED_RES);
+        settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES = settingsJson.optInt("LIMIT_STOP_OTHER_GOALS_WHEN_REACHED_UNIQUE_OBJECTS",
+                settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES);
+        settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES = settingsJson.optInt("LIMIT_GOAL_LEVEL_2", settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES);
         return settings;
     }
 
