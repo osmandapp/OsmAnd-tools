@@ -162,8 +162,8 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
         settings.OPTIM_DELETE_POI_SAME_AS_CITY_STREET = settingsJson.optBoolean("OPTIM_DELETE_POI_SAME_AS_CITY_STREET",
                 settings.OPTIM_DELETE_POI_SAME_AS_CITY_STREET);
         settings.DEDUPLICATE_RES = settingsJson.optBoolean("DEDUPLICATE_RES", settings.DEDUPLICATE_RES);
-//        settings.TEST_ALLOW_HOUSE_POI_TYPE_INTERSECTION = settingsJson.optBoolean("TEST_ALLOW_HOUSE_POI_TYPE_INTERSECTION",
-//                settings.TEST_ALLOW_HOUSE_POI_TYPE_INTERSECTION);
+        settings.OPTIM_READ_COMMON_WORDS_LIMIT = settingsJson.optInt("OPTIM_READ_COMMON_WORDS_LIMIT",
+                settings.OPTIM_READ_COMMON_WORDS_LIMIT);
 //        settings.ALWAYS_READ_COMMON_WORDS_ATOMS = settingsJson.optBoolean("ALWAYS_READ_COMMON_WORDS_ATOMS",
 //                settings.ALWAYS_READ_COMMON_WORDS_ATOMS);
 //        settings.ALWAYS_READ_FREQ_WORDS_ATOMS = settingsJson.optBoolean("ALWAYS_READ_FREQ_WORDS_ATOMS",

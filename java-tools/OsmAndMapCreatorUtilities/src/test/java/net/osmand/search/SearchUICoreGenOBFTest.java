@@ -504,8 +504,8 @@ public class SearchUICoreGenOBFTest {
 				expected = expected.replaceFirst("^@", "");
 				String present = actual == null ? ("#MISSING " + (i + 1)) : actual;
 				if (!Algorithms.stringsEqual(expected, present)) {
-					System.out.printf("Phrase: %s%n", text);
 					engine.search(text, true);
+					System.out.printf("Phrase: %s%n", text);
 					System.out.printf("Mismatch #%s for '%s' != '%s'. %n", i + 1, expected, present);
 					System.out.println("CURRENT RESULTS: ");
 					for (String r : actualResults) {
