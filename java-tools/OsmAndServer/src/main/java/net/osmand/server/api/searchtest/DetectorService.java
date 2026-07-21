@@ -285,10 +285,15 @@ public interface DetectorService extends OBFService {
 	}
 
 	private String amenityKey(Amenity amenity) {
-		return amenity.getId() + "|" + amenity.getName();
+		return amenity.getId() + "|" + amenity.getType() + "|" + amenity.getSubType();
 	}
 
-	private void collectUnitTestSourceData(SearchService.SpatialResults spatialResponse, Map<Long, City> cities, Map<String, Amenity> amenities, int limit) {
+	private boolean isWithinUnitTestSourceRadius(MapObject object, LatLon point) {
+		return object != null && object.getLocation() != null && point != null
+				&& MapUtils.getDistance(point, object.getLocation()) < 200_000;
+	}
+
+	private void collectUnitTestSourceData(SearchService.SpatialResults spatialResponse, Map<Long, City> cities, Map<String, Amenity> amenities, int limit, LatLon point) {
 		if (spatialResponse == null || spatialResponse.results() == null || spatialResponse.results().mainResults == null) {
 			return;
 		}
@@ -304,11 +309,19 @@ public interface DetectorService extends OBFService {
 			}
 			for (MapObject object : objects) {
 				if (object instanceof Amenity amenity) {
+					if (!isWithinUnitTestSourceRadius(amenity, point)) {
+						continue;
+					}
 					String amenityKey = amenityKey(amenity);
 					amenities.putIfAbsent(amenityKey, amenity);
 				} else if (object instanceof City city) {
-					collectUnitTestCity(city, cities);
+					if (isWithinUnitTestSourceRadius(city, point)) {
+						collectUnitTestCity(city, cities);
+					}
 				} else if (object instanceof Street street) {
+					if (!isWithinUnitTestSourceRadius(street, point)) {
+						continue;
+					}
 					if (!street.getCity().getStreets().contains(street)) {
 						street.getCity().getStreets().add(street);
 					}
@@ -347,12 +360,14 @@ public interface DetectorService extends OBFService {
 		getLogger().info("Streets: before = {}, after={}", before, after);
 	}
 
-	private void collectUnitTestSourceData(JSONObject sourceJson, Map<String, Amenity> amenities, Map<Long, City> cities) {
+	private void collectUnitTestSourceData(JSONObject sourceJson, Map<String, Amenity> amenities, Map<Long, City> cities, LatLon point) {
 		JSONArray amenitiesJson = sourceJson.optJSONArray("amenities");
 		if (amenitiesJson != null) {
 			for (int i = 0; i < amenitiesJson.length(); i++) {
 				Amenity amenity = Amenity.parseJSON(amenitiesJson.getJSONObject(i));
-				amenities.putIfAbsent(amenityKey(amenity), amenity);
+				if (isWithinUnitTestSourceRadius(amenity, point)) {
+					amenities.putIfAbsent(amenityKey(amenity), amenity);
+				}
 			}
 		}
 
@@ -360,6 +375,10 @@ public interface DetectorService extends OBFService {
 		if (citiesJson != null) {
 			for (int i = 0; i < citiesJson.length(); i++) {
 				City city = City.parseJSON(citiesJson.getJSONObject(i));
+				city.getStreets().removeIf(street -> !isWithinUnitTestSourceRadius(street, point));
+				if (!isWithinUnitTestSourceRadius(city, point) && city.getStreets().isEmpty()) {
+					continue;
+				}
 				City existing = cities.get(city.getId());
 				if (existing == null) {
 					cities.put(city.getId(), city);
@@ -380,17 +399,16 @@ public interface DetectorService extends OBFService {
 		LinkedHashMap<String, Amenity> amenities = new LinkedHashMap<>();
 		LinkedHashMap<Long, City> cities = new LinkedHashMap<>();
 		SearchSettings settings = null;
+		LatLon point = new LatLon(baseCtx.lat(), baseCtx.lon());
         for (String q : queries) {
             SearchService.SearchContext ctx = new SearchService.SearchContext(
                     baseCtx.lat(), baseCtx.lon(), q, baseCtx.locale(),
                     baseCtx.baseSearch(), baseCtx.northWest(), baseCtx.southEast());
 
 			SearchService.SearchResults results = getSearchService().getImmediateSearchResults(ctx, options, null);
-			collectUnitTestSourceData(results.unitTestJson(), amenities, cities);
+			collectUnitTestSourceData(results.unitTestJson(), amenities, cities, point);
 			settings = results.settings();
         }
-		filterSourceData(amenities, cities, quote);
-
 		if (spatial != null && spatial) {
 			settings = new SearchSettings(Collections.emptyList());
 			for (String q : queries) {
@@ -399,9 +417,10 @@ public interface DetectorService extends OBFService {
 						baseCtx.baseSearch(), baseCtx.northWest(), baseCtx.southEast());
 				
 				SearchService.SpatialResults spatialResults = getSearchService().searchTestSpatial(ctx, options, null, false);
-				collectUnitTestSourceData(spatialResults, cities, amenities, limit);
+				collectUnitTestSourceData(spatialResults, cities, amenities, limit, point);
 			}
 		}
+		filterSourceData(amenities, cities, quote);
 		
 		return createUnitTestJson(dirPath, unitTest.name, settings, routing, amenities, cities);
 	}
