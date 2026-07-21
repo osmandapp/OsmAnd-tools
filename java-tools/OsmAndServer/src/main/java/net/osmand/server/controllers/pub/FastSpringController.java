@@ -137,6 +137,9 @@ public class FastSpringController {
 			if ("return.created".equals(event.type)) {
 				// https://developer.fastspring.com/reference/returncreated
 				handleReturnCreatedEvent(event);
+			} else if ("chargeback.created".equals(event.type)) {
+				// https://developer.fastspring.com/reference/order-chargeback
+				handleChargebackCreatedEvent(event);
 			}
 		}
 		return ResponseEntity.ok("OK");
@@ -153,41 +156,57 @@ public class FastSpringController {
 			LOGGER.error("FastSpring: return.created event for orderId " + orderId + " has no items, skipping");
 			return;
 		}
-		Date now = new Date();
 		Set<Integer> affectedUserIds = new HashSet<>();
 		for (FastSpringOrderCompletedRequest.Item item : data.items) {
 			String sku = item.sku;
 			if (sku == null) {
 				continue;
 			}
-			// Revoke in-app purchases for this refunded item
-			List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> iaps =
-					deviceInAppPurchasesRepository.findByOrderIdAndSku(orderId, sku);
-			for (DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase iap : iaps) {
-				iap.valid = false;
-				iap.checktime = now;
-				deviceInAppPurchasesRepository.saveAndFlush(iap);
-				if (iap.userId != null) {
-					affectedUserIds.add(iap.userId);
-				}
-				LOGGER.info(String.format("FastSpring: refunded in-app revoked for orderId: %s, sku: %s", orderId, sku));
-			}
-			// Revoke subscriptions for this refunded item
-			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subs =
-					deviceSubscriptionsRepository.findByOrderIdAndSku(orderId, sku);
-			for (DeviceSubscriptionsRepository.SupporterDeviceSubscription sub : subs) {
-				sub.valid = false;
-				sub.autorenewing = false;
-				sub.expiretime = now; // expire immediately, refund is effective right away
-				sub.checktime = now;
-				deviceSubscriptionsRepository.saveAndFlush(sub);
-				if (sub.userId != null) {
-					affectedUserIds.add(sub.userId);
-				}
-				LOGGER.info(String.format("FastSpring: refunded subscription revoked for orderId: %s, sku: %s", orderId, sku));
-			}
+			revokePurchases(deviceInAppPurchasesRepository.findByOrderIdAndSku(orderId, sku),
+					deviceSubscriptionsRepository.findByOrderIdAndSku(orderId, sku), orderId, affectedUserIds);
 		}
-		// Recompute the Pro order id for every affected user so the account status is refreshed
+		refreshAffectedUsers(affectedUserIds);
+	}
+
+	private void handleChargebackCreatedEvent(FastSpringOrderCompletedRequest.Event event) {
+		FastSpringOrderCompletedRequest.Data data = event.data;
+		if (data == null || data.order == null) {
+			LOGGER.error("FastSpring: chargeback.created event without order id, skipping");
+			return;
+		}
+		String orderId = data.order;
+		Set<Integer> affectedUserIds = new HashSet<>();
+		revokePurchases(deviceInAppPurchasesRepository.findByOrderId(orderId),
+				deviceSubscriptionsRepository.findByOrderId(orderId), orderId, affectedUserIds);
+		refreshAffectedUsers(affectedUserIds);
+	}
+
+	private void revokePurchases(List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> iaps,
+	                             List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subs, String orderId, Set<Integer> affectedUserIds) {
+		Date now = new Date();
+		for (DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase iap : iaps) {
+			iap.valid = false;
+			iap.checktime = now;
+			deviceInAppPurchasesRepository.saveAndFlush(iap);
+			if (iap.userId != null) {
+				affectedUserIds.add(iap.userId);
+			}
+			LOGGER.info(String.format("FastSpring: in-app revoked for orderId: %s, sku: %s", orderId, iap.sku));
+		}
+		for (DeviceSubscriptionsRepository.SupporterDeviceSubscription sub : subs) {
+			sub.valid = false;
+			sub.autorenewing = false;
+			sub.expiretime = now; // expire immediately
+			sub.checktime = now;
+			deviceSubscriptionsRepository.saveAndFlush(sub);
+			if (sub.userId != null) {
+				affectedUserIds.add(sub.userId);
+			}
+			LOGGER.info(String.format("FastSpring: subscription revoked for orderId: %s, sku: %s", orderId, sub.sku));
+		}
+	}
+
+	private void refreshAffectedUsers(Set<Integer> affectedUserIds) {
 		for (Integer userId : affectedUserIds) {
 			CloudUsersRepository.CloudUser user = usersRepository.findById(userId);
 			if (user != null) {
