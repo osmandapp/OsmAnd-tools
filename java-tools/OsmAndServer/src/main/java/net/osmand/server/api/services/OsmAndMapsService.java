@@ -1408,7 +1408,7 @@ public class OsmAndMapsService {
 
 		double searchRadius = autocomplete
 				? SpatialTextSearch.SpatialTextSearchSettings.suggestionSettings().SUGGESTED_SEARCH_RADIUS_KM
-				: SpatialTextSearch.SpatialTextSearchSettings.defaultSettings().SUGGESTED_SEARCH_RADIUS_KM * 1.5;
+				: SpatialTextSearch.SpatialTextSearchSettings.defaultSettings().SUGGESTED_SEARCH_RADIUS_KM;
 
 		double dLat = searchRadius / 111.0;
 		double dLon = searchRadius / (111.0 * Math.max(0.1, Math.cos(Math.toRadians(lat))));
