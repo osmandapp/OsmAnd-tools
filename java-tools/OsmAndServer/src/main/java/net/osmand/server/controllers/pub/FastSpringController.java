@@ -252,7 +252,7 @@ public class FastSpringController {
 			public Customer customer;
 			public Tags tags;
 			public List<Item> items;
-			public Original original; // present on return.created events (refund)
+			public OriginalOrder original; // present on return.created events (refund)
 		}
 
 		public static class Customer {
@@ -267,10 +267,10 @@ public class FastSpringController {
 			public String sku;
 		}
 
-		public static class Original {
-			public String id; // original order id (duplicated as "order" by FastSpring)
-			public String order; // duplicate of id for backward compatibility
-			public String reference; // original order reference
+		public static class OriginalOrder {
+			public String id;
+			public String order;
+			public String reference;
 		}
 	}
 
