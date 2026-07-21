@@ -538,6 +538,9 @@ public class SearchService {
 			}
 			Map<String, String> tags = getPoiTypeFields(type.singleType);
 			tags.put(PoiTypeField.NAME.getFieldName(), type.singleType.getTranslation());
+			if (type.getWikidataId() != null) {
+				tags.put(PoiTypeField.WIKIDATA_ID.getFieldName(), type.getWikidataId());
+			}
 			return tags;
 		}
 		Map<String, String> tags = new HashMap<>();
@@ -553,6 +556,9 @@ public class SearchService {
 			tags.put(PoiTypeField.CATEGORY_KEY_NAME.getFieldName(), tag);
 			tags.put(PoiTypeField.CATEGORY_ICON.getFieldName(), tag);
 			tags.put(PoiTypeField.NAME.getFieldName(), type.poiAdditional);
+			if (type.getWikidataId() != null) {
+				tags.put(PoiTypeField.WIKIDATA_ID.getFieldName(), type.getWikidataId());
+			}
 		}
 		return tags;
 	}
@@ -1584,7 +1590,8 @@ public class SearchService {
 		POI_TYPE("web_poi_type"), POI_SUBTYPE("web_poi_subType"), POI_OSM_URL("web_poi_osmUrl"), CITY("web_city"),
 		// names of all objects matched in a spatial-search result (street, city, ...)
 		MATCHED_OBJECTS("web_matched_objects"), VISIBLE_LEVEL("web_visible_level"),
-		COMPARE_KEY("web_compare_key"), BBOX_LAT_LON("web_bbox_lat_lon"), CITY_TYPE("web_city_type");
+		COMPARE_KEY("web_compare_key"), BBOX_LAT_LON("web_bbox_lat_lon"), 
+		WIKIDATA_ID("web_wikidata_id"), CITY_TYPE("web_city_type");
 
 		private final String fieldName;
 
