@@ -40,14 +40,16 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
     }
 
     @Override
-    public List<String> apply(String phrase, List<String> expectedResults) throws IOException {
+    public List<String> search(String phrase, boolean print) throws IOException {
         SpatialTextSearch.SpatialSearchResults searchResults = spatialSearch.searchAPI(phrase, searchContext);
         List<SpatialSearchResult> mainResults = searchResults.mainResults == null ? Collections.emptyList()
                 : searchResults.mainResults;
 
         List<String> result = new ArrayList<>();
         for(SpatialSearchResult res : mainResults) {
-//        	System.out.println(SpatialSearchResult.compareKeyString(res) + " " +  res);
+        	if(print) {
+        		System.out.println(SpatialSearchResult.compareKeyString(res) + " " +  res);
+        	}
             result.add(formatResult(res));
         }
         return result;
@@ -62,6 +64,7 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
         StringBuilder b = new StringBuilder();
         SpatialSearchToken.NameIndexAtom atom = r.getFirstRef().getNameIndexAtom();
         Building building = atom.getBuilding();
+        boolean poiCategory = atom.isPoiCategory();
         if (building != null && building.isInterpolation() && r.getExtraNameMatch() != null) {
             b.append(r.getExtraNameMatch()); // interpolated house number
         } else {
@@ -83,7 +86,11 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
                 break;
             }
             if (o instanceof Amenity am && subtype.length() == 0) {
-                subtype = " " + am.getSubType();
+				if (poiCategory) {
+            		appendName(b, am.getName(), o);
+            	} else {
+            		subtype = " " + am.getSubType();
+            	}
             }
         }
         String sorting = SpatialSearchResult.compareKeyString(r);
@@ -165,11 +172,11 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
         settings.MIN_ELO_RATING = settingsJson.optInt("MIN_ELO_RATING", settings.MIN_ELO_RATING);
         settings.MIN_CHARACTERS_INCOMPLETE = settingsJson.optInt("MIN_CHARACTERS_INCOMPLETE", settings.MIN_CHARACTERS_INCOMPLETE);
         settings.LIMIT_ATOMIC_OBJECTS = settingsJson.optInt("LIMIT_ATOMIC_OBJECTS", settings.LIMIT_ATOMIC_OBJECTS);
-        settings.LIMIT_ALL_GOALS_MAX_UNIQUE_OBJECTS = settingsJson.optInt("LIMIT_ALL_GOALS_MAX_UNIQUE_OBJECTS",
-                settings.LIMIT_ALL_GOALS_MAX_UNIQUE_OBJECTS);
-        settings.LIMIT_GOAL_NEXT_LEVEL_MAX_UNIQUE_OBJECTS = settingsJson.optInt("LIMIT_GOAL_NEXT_LEVEL_MAX_UNIQUE_OBJECTS",
-                settings.LIMIT_GOAL_NEXT_LEVEL_MAX_UNIQUE_OBJECTS);
-        settings.LIMIT_GOAL_LEVEL_2 = settingsJson.optInt("LIMIT_GOAL_LEVEL_2", settings.LIMIT_GOAL_LEVEL_2);
+        settings.LIMIT_STOP_GOALS_ANY_LEVEL_WHEN_REACHED_RES = settingsJson.optInt("LIMIT_ALL_GOALS_MAX_UNIQUE_OBJECTS",
+                settings.LIMIT_STOP_GOALS_ANY_LEVEL_WHEN_REACHED_RES);
+        settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES = settingsJson.optInt("LIMIT_STOP_OTHER_GOALS_WHEN_REACHED_UNIQUE_OBJECTS",
+                settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES);
+        settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES = settingsJson.optInt("LIMIT_GOAL_LEVEL_2", settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES);
         return settings;
     }
 

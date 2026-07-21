@@ -68,6 +68,7 @@ public class SearchUICoreGenOBFTest {
 	private static final boolean TEST_EXTRA_RESULTS = true;
 	private static final List<Class<?>> OBF_GENERATE_CLASSES = List.of(IndexCreator.class, IndexPoiCreator.class,
 			IndexAddressCreator.class);
+	private static final String HASH_VERSION = "1";
 	private static final String OBF_HASH_FILE_NAME = ".obf.hash";
 	private static final boolean RUN_IGNORED_TESTS = false;
 	private static final boolean TEST_NUMBER_MATCHED = true;
@@ -80,7 +81,8 @@ public class SearchUICoreGenOBFTest {
     private Set<String> searchKeywords;
 
     public interface SearchTestEngine {
-        List<String> apply(String text, List<String> expectedResults) throws IOException;
+    	
+        List<String> search(String text, boolean print) throws IOException;
         
         void close();
     }
@@ -487,7 +489,7 @@ public class SearchUICoreGenOBFTest {
 			String text = phrases.get(k);
 			List<String> expectedResults = results.get(k);
 
-			List<String> actualResults = engine.apply(text, expectedResults);
+			List<String> actualResults = engine.search(text, false);
 			for (int i = 0; i < expectedResults.size(); i++) {
 				String expected = expectedResults.get(i);
 				String actual = i >= actualResults.size() ? null : actualResults.get(i);
@@ -503,6 +505,7 @@ public class SearchUICoreGenOBFTest {
 				String present = actual == null ? ("#MISSING " + (i + 1)) : actual;
 				if (!Algorithms.stringsEqual(expected, present)) {
 					System.out.printf("Phrase: %s%n", text);
+					engine.search(text, true);
 					System.out.printf("Mismatch #%s for '%s' != '%s'. %n", i + 1, expected, present);
 					System.out.println("CURRENT RESULTS: ");
 					for (String r : actualResults) {
@@ -920,6 +923,7 @@ public class SearchUICoreGenOBFTest {
 		}
 
 		String allHashesCombined = String.join("\n", individualHashes);
+		allHashesCombined += HASH_VERSION;
 		return DigestUtils.sha256Hex(allHashesCombined);
 	}
 
