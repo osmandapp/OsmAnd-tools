@@ -1,11 +1,7 @@
 package net.osmand.server.utils;
 
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashSet;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Set;
 
 import net.osmand.osm.AbstractPoiType;
 import net.osmand.osm.MapPoiTypes;
@@ -26,18 +22,14 @@ public class MapPoiTypesTranslator implements MapPoiTypes.PoiTranslator {
 	}
 
 	private void appendMap(Map<String, Set<String>> phrases, Map<String, String> main) {
-		Iterator<Entry<String, String>> it = main.entrySet().iterator();
-		while (it.hasNext()) {
-			Entry<String, String> e = it.next();
+		for (Entry<String, String> e : main.entrySet()) {
 			Set<String> set = phrases.get(e.getKey());
 			if (!phrases.containsKey(e.getKey())) {
-				set = new LinkedHashSet<String>();
+				set = new LinkedHashSet<>();
 				phrases.put(e.getKey(), set);
 			}
-			String[] vls = e.getKey().split(";");
-			for (String v : vls) {
-				set.add(v);
-			}
+			String[] vls = e.getValue().split(";");
+			set.addAll(Arrays.asList(vls));
 		}
 	}
 
