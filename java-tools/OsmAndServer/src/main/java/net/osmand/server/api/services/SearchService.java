@@ -476,21 +476,21 @@ public class SearchService {
 				for (SpatialSearchResult r : res.mainResults) {
 					List<MapObject> objs = r.getObjects();
 					if (r.isPoiCategory()) {
-						for (SpatialPoiType type : r.getPoiTypes(getSpatialPoiTypeSearch())) {
+						SpatialPoiType type = r.getPoiCategory(getSpatialPoiTypeSearch());
+						if (type != null) {
 							Feature f = getSpatialPoiTypeFeature(type);
 							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(),
-									matchedObjects(objs, ctx.locale, timeZone, dominatedCity));
+									matchedObjects(objs, ctx.locale, timeZone, dominatedCity, r.getViewBBox31()));
 							f.prop(PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
 							f.prop(PoiTypeField.COMPARE_KEY.getFieldName(), SpatialSearchResult.compareKeyString(r));
 							response.features.add(f);
-							break; // 1st type only
 						}
 					} else if (!objs.isEmpty()) {
 						LatLon l = r.getLatLon() == null ? new LatLon(ctx.lat, ctx.lon) : r.getLatLon();
 						Feature f = getSpatialFeature(l, objs, ctx.locale, timeZone, dominatedCity, r.getExtraNameMatch());
 						if (f != null) {
 							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(),
-									matchedObjects(objs, ctx.locale, timeZone, dominatedCity));
+									matchedObjects(objs, ctx.locale, timeZone, dominatedCity, r.getViewBBox31()));
 							f.prop(PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
 							f.prop(PoiTypeField.COMPARE_KEY.getFieldName(), SpatialSearchResult.compareKeyString(r));
 							response.features.add(f);
@@ -558,7 +558,7 @@ public class SearchService {
 	}
 
 	private List<Map<String, Object>> matchedObjects(List<MapObject> objs, String locale, String timeZone,
-			String dominatedCity) {
+	                                                 String dominatedCity, int [] bbox31) {
 		List<Map<String, Object>> matched = new ArrayList<>();
 		for (MapObject o : objs) {
 			if (o.getLocation() == null) {
@@ -573,28 +573,19 @@ public class SearchService {
 				Feature feature = getPoiFeature(buildPoiSearchResult(amenity, locale, dominatedCity), timeZone);
 				m.putAll(feature.properties);
 			} else if (o instanceof City city) {
-				putCityType(m, city);
-				putCityBboxLatLon(m, city);
+				m.put(PoiTypeField.CITY_TYPE.getFieldName(), city.getType().name());
+			}
+			if (bbox31 != null && bbox31.length >= 4) {
+				Map<String, Object> bbox = new LinkedHashMap<>();
+				bbox.put("top", roundCoord(MapUtils.get31LatitudeY(bbox31[1])));
+				bbox.put("left", roundCoord(MapUtils.get31LongitudeX(bbox31[0])));
+				bbox.put("bottom", roundCoord(MapUtils.get31LatitudeY(bbox31[3])));
+				bbox.put("right", roundCoord(MapUtils.get31LongitudeX(bbox31[2])));
+				m.put(PoiTypeField.BBOX_LAT_LON.getFieldName(), bbox);
 			}
 			matched.add(m);
 		}
 		return matched;
-	}
-
-	private void putCityType(Map<String, Object> properties, City city) {
-		properties.put(PoiTypeField.CITY_TYPE.getFieldName(), city.getType().name());
-	}
-
-	private void putCityBboxLatLon(Map<String, Object> properties, City city) {
-		int[] bbox31 = city.getBbox31();
-		if (bbox31 != null && bbox31.length >= 4) {
-			Map<String, Object> bbox = new LinkedHashMap<>();
-			bbox.put("top", roundCoord(MapUtils.get31LatitudeY(bbox31[1])));
-			bbox.put("left", roundCoord(MapUtils.get31LongitudeX(bbox31[0])));
-			bbox.put("bottom", roundCoord(MapUtils.get31LatitudeY(bbox31[3])));
-			bbox.put("right", roundCoord(MapUtils.get31LongitudeX(bbox31[2])));
-			properties.put(PoiTypeField.BBOX_LAT_LON.getFieldName(), bbox);
-		}
 	}
 
 	private double roundCoord(double value) {
@@ -1702,10 +1693,6 @@ public class SearchService {
 			Map<String, String> tags = getPoiTypeFields(result.object);
 			for (Map.Entry<String, String> entry : tags.entrySet()) {
 				feature.prop(entry.getKey(), entry.getValue());
-			}
-			if (result.object instanceof City city) {
-				putCityType(feature.properties, city);
-				putCityBboxLatLon(feature.properties, city);
 			}
 		}
 		return feature;

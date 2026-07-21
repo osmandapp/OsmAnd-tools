@@ -391,11 +391,12 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			addAltNames(mainValue, rulType, mainValue);
 			// add all names as alternative "tag" name (alternative brand names)
 			if (mainValue.equalsIgnoreCase(tempNames.get("name"))) {
+				int mainValueParts = SearchAlgorithms.split(mainValue).size();
 				for (String k : tempNames.keySet()) {
 					if (k.startsWith("name:")) {
 						String v = tempNames.get(k);
-						if (SearchAlgorithms.split(v).size() == SearchAlgorithms.split(mainValue).size()) {
-							addAltNamesMix(mainValue, rulType, tempNames.get(k));
+						if (SearchAlgorithms.split(v).size() == mainValueParts) {
+							addAltNamesMix(mainValue, rulType, v);
 						}
 					}
 				}
