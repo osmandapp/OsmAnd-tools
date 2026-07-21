@@ -172,7 +172,8 @@ public interface DetectorService extends OBFService {
 			@JsonProperty("queries") String[] queries,
 			@JsonProperty("resultsLimit") Integer resultsLimit,
 			@JsonProperty("geocodingLimit") Integer geocodingLimit,
-			@JsonProperty("quote") Double quote) {}
+			@JsonProperty("quote") Double quote,
+			@JsonProperty("radius") Integer radius) {}
 
 	record UnitTestResultsData(List<List<String>> results, JSONArray routing) {}
 	record UnitTestSourceData(String jsonFilePath, List<String> jsonFilePaths, SearchSettings settings) {
@@ -188,7 +189,7 @@ public interface DetectorService extends OBFService {
 			int limit = unitTest.resultsLimit();
 			int geocodingLimit = unitTest.geocodingLimit();
 			UnitTestResultsData unitTestData = buildUnitTestResults(unitTest.queries(), ctx, limit, geocodingLimit);
-			UnitTestSourceData sourceData = createUnitTestSourceData(unitTest, ctx, dirPath, unitTestData.routing(), spatial, unitTest.quote, limit);
+			UnitTestSourceData sourceData = createUnitTestSourceData(unitTest, ctx, dirPath, unitTestData.routing(), spatial);
 			if (sourceData.jsonFilePath == null) {
 				return;
 			}
@@ -288,17 +289,20 @@ public interface DetectorService extends OBFService {
 		return amenity.getId() + "|" + amenity.getType() + "|" + amenity.getSubType();
 	}
 
-	private boolean isWithinUnitTestSourceRadius(MapObject object, LatLon point) {
+	private boolean isWithinUnitTestSourceRadius(MapObject object, LatLon point, Integer radius) {
+		if (radius == null || radius <= 0) {
+			return true;
+		}
 		return object != null && object.getLocation() != null && point != null
-				&& MapUtils.getDistance(point, object.getLocation()) < 200_000;
+				&& MapUtils.getDistance(point, object.getLocation()) < radius;
 	}
 
-	private void collectUnitTestSourceData(SearchService.SpatialResults spatialResponse, Map<Long, City> cities, Map<String, Amenity> amenities, int limit, LatLon point) {
+	private void collectUnitTestSourceData(SearchService.SpatialResults spatialResponse, Map<Long, City> cities, Map<String, Amenity> amenities, LatLon point, UnitTestPayload unitTest) {
 		if (spatialResponse == null || spatialResponse.results() == null || spatialResponse.results().mainResults == null) {
 			return;
 		}
 		List<SpatialSearchResult> mainResults = spatialResponse.results().mainResults;
-		for (int i = 0; i < Math.min(limit, mainResults.size()); i++) {
+		for (int i = 0; i < Math.min(unitTest.resultsLimit(), mainResults.size()); i++) {
 			SpatialSearchResult res = mainResults.get(i);
 			if (res == null) {
 				continue;
@@ -309,17 +313,17 @@ public interface DetectorService extends OBFService {
 			}
 			for (MapObject object : objects) {
 				if (object instanceof Amenity amenity) {
-					if (!isWithinUnitTestSourceRadius(amenity, point)) {
+					if (!isWithinUnitTestSourceRadius(amenity, point, unitTest.radius())) {
 						continue;
 					}
 					String amenityKey = amenityKey(amenity);
 					amenities.putIfAbsent(amenityKey, amenity);
 				} else if (object instanceof City city) {
-					if (isWithinUnitTestSourceRadius(city, point)) {
+					if (isWithinUnitTestSourceRadius(city, point, unitTest.radius())) {
 						collectUnitTestCity(city, cities);
 					}
 				} else if (object instanceof Street street) {
-					if (!isWithinUnitTestSourceRadius(street, point)) {
+					if (!isWithinUnitTestSourceRadius(street, point, unitTest.radius())) {
 						continue;
 					}
 					if (!street.getCity().getStreets().contains(street)) {
@@ -331,8 +335,9 @@ public interface DetectorService extends OBFService {
 		}
 	}
 
-	private void filterSourceData(Map<String, Amenity> amenities, Map<Long, City> cities, Double quote) {
+	private void filterSourceData(Map<String, Amenity> amenities, Map<Long, City> cities, UnitTestPayload unitTest) {
 		int before = amenities.size();
+		Double quote = unitTest.quote;
 		if (quote != null && quote < 1.0) {
 			amenities.entrySet().removeIf(entry -> Math.random() >= quote);
 		}
@@ -360,12 +365,13 @@ public interface DetectorService extends OBFService {
 		getLogger().info("Streets: before = {}, after={}", before, after);
 	}
 
-	private void collectUnitTestSourceData(JSONObject sourceJson, Map<String, Amenity> amenities, Map<Long, City> cities, LatLon point) {
+	private void collectUnitTestSourceData(JSONObject sourceJson, Map<String, Amenity> amenities, Map<Long, City> cities,
+	                                       LatLon point, UnitTestPayload unitTest) {
 		JSONArray amenitiesJson = sourceJson.optJSONArray("amenities");
 		if (amenitiesJson != null) {
 			for (int i = 0; i < amenitiesJson.length(); i++) {
 				Amenity amenity = Amenity.parseJSON(amenitiesJson.getJSONObject(i));
-				if (isWithinUnitTestSourceRadius(amenity, point)) {
+				if (isWithinUnitTestSourceRadius(amenity, point, unitTest.radius())) {
 					amenities.putIfAbsent(amenityKey(amenity), amenity);
 				}
 			}
@@ -375,8 +381,8 @@ public interface DetectorService extends OBFService {
 		if (citiesJson != null) {
 			for (int i = 0; i < citiesJson.length(); i++) {
 				City city = City.parseJSON(citiesJson.getJSONObject(i));
-				city.getStreets().removeIf(street -> !isWithinUnitTestSourceRadius(street, point));
-				if (!isWithinUnitTestSourceRadius(city, point) && city.getStreets().isEmpty()) {
+				city.getStreets().removeIf(street -> !isWithinUnitTestSourceRadius(street, point, unitTest.radius()));
+				if (!isWithinUnitTestSourceRadius(city, point, unitTest.radius()) && city.getStreets().isEmpty()) {
 					continue;
 				}
 				City existing = cities.get(city.getId());
@@ -390,7 +396,7 @@ public interface DetectorService extends OBFService {
 	}
 	
 	private UnitTestSourceData createUnitTestSourceData(UnitTestPayload unitTest, SearchService.SearchContext baseCtx,
-	                                                    Path dirPath, JSONArray routing, Boolean spatial, Double quote, int limit) throws IOException {
+	                                                    Path dirPath, JSONArray routing, Boolean spatial) throws IOException {
 		SearchExportSettings exportSettings = new SearchExportSettings(true, true, -1);
 		SearchService.SearchOption options = new SearchService.SearchOption(true, exportSettings,
 				null, true, false, (net.osmand.search.core.ObjectType[]) null);
@@ -406,7 +412,7 @@ public interface DetectorService extends OBFService {
                     baseCtx.baseSearch(), baseCtx.northWest(), baseCtx.southEast());
 
 			SearchService.SearchResults results = getSearchService().getImmediateSearchResults(ctx, options, null);
-			collectUnitTestSourceData(results.unitTestJson(), amenities, cities, point);
+			collectUnitTestSourceData(results.unitTestJson(), amenities, cities, point, unitTest);
 			settings = results.settings();
         }
 		if (spatial != null && spatial) {
@@ -417,10 +423,10 @@ public interface DetectorService extends OBFService {
 						baseCtx.baseSearch(), baseCtx.northWest(), baseCtx.southEast());
 				
 				SearchService.SpatialResults spatialResults = getSearchService().searchTestSpatial(ctx, options, null, false);
-				collectUnitTestSourceData(spatialResults, cities, amenities, limit, point);
+				collectUnitTestSourceData(spatialResults, cities, amenities, point, unitTest);
 			}
 		}
-		filterSourceData(amenities, cities, quote);
+		filterSourceData(amenities, cities, unitTest);
 		
 		return createUnitTestJson(dirPath, unitTest.name, settings, routing, amenities, cities);
 	}
