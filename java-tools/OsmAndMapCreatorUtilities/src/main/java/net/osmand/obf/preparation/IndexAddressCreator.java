@@ -148,6 +148,10 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 		LatLon l = city.getLocation();
 		city.setNames(getOtherNames(e));
+		String wikidata = e.getTag(MapObject.NAME_WIKIDATA_ATTR);
+		if (wikidata != null) {
+			city.setName(MapObject.NAME_WIKIDATA_ATTR, wikidata);
+		}
 		if (!Algorithms.isEmpty(city.getName())) {
 			cityDataStorage.registerObject(l.getLatitude(), l.getLongitude(), city, e);
 			debugCityIds.add(city.getId());

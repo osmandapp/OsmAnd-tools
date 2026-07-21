@@ -104,8 +104,8 @@ public class BinaryInspector {
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vsearchinspect", // "-vsearchglobalonly", // "-vprefix=hh" // search index extended anlays 
-//					"-vaddress",   
-//					"-vcities", "-vstreetgroups", "-vcitynames",
+					"-vaddress",   
+					"-vcities", "-vstreetgroups", "-vcitynames",
 //					"-vstreets", "-vbuildings",//  "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
@@ -114,7 +114,8 @@ public class BinaryInspector {
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
 //					System.getProperty("maps.dir") + "regions.ocbf",				
-					System.getProperty("maps.dir") + "Netherlands_gelderland_europe_2.obf",
+//					System.getProperty("maps.dir") + "Netherlands_gelderland_europe_2.obf",
+					System.getProperty("maps.dir") + "Map.obf",
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
