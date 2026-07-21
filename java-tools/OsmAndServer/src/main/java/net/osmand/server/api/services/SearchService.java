@@ -476,14 +476,14 @@ public class SearchService {
 				for (SpatialSearchResult r : res.mainResults) {
 					List<MapObject> objs = r.getObjects();
 					if (r.isPoiCategory()) {
-						for (SpatialPoiType type : r.getPoiTypes(getSpatialPoiTypeSearch())) {
+						SpatialPoiType type = r.getPoiCategory(getSpatialPoiTypeSearch());
+						if (type != null) {
 							Feature f = getSpatialPoiTypeFeature(type);
 							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(),
 									matchedObjects(objs, ctx.locale, timeZone, dominatedCity));
 							f.prop(PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
 							f.prop(PoiTypeField.COMPARE_KEY.getFieldName(), SpatialSearchResult.compareKeyString(r));
 							response.features.add(f);
-							break; // 1st type only
 						}
 					} else if (!objs.isEmpty()) {
 						LatLon l = r.getLatLon() == null ? new LatLon(ctx.lat, ctx.lon) : r.getLatLon();
