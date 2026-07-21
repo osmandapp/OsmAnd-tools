@@ -188,7 +188,7 @@ public interface DetectorService extends OBFService {
 			int limit = unitTest.resultsLimit();
 			int geocodingLimit = unitTest.geocodingLimit();
 			UnitTestResultsData unitTestData = buildUnitTestResults(unitTest.queries(), ctx, limit, geocodingLimit);
-			UnitTestSourceData sourceData = createUnitTestSourceData(unitTest, ctx, dirPath, unitTestData.routing(), spatial, unitTest.quote);
+			UnitTestSourceData sourceData = createUnitTestSourceData(unitTest, ctx, dirPath, unitTestData.routing(), spatial, unitTest.quote, limit);
 			if (sourceData.jsonFilePath == null) {
 				return;
 			}
@@ -288,11 +288,13 @@ public interface DetectorService extends OBFService {
 		return amenity.getId() + "|" + amenity.getName();
 	}
 
-	private void collectUnitTestSourceData(SearchService.SpatialResults spatialResponse, Map<Long, City> cities, Map<String, Amenity> amenities) {
+	private void collectUnitTestSourceData(SearchService.SpatialResults spatialResponse, Map<Long, City> cities, Map<String, Amenity> amenities, int limit) {
 		if (spatialResponse == null || spatialResponse.results() == null || spatialResponse.results().mainResults == null) {
 			return;
 		}
-		for (SpatialSearchResult res : spatialResponse.results().mainResults) {
+		List<SpatialSearchResult> mainResults = spatialResponse.results().mainResults;
+		for (int i = 0; i < Math.min(limit, mainResults.size()); i++) {
+			SpatialSearchResult res = mainResults.get(i);
 			if (res == null) {
 				continue;
 			}
@@ -369,7 +371,7 @@ public interface DetectorService extends OBFService {
 	}
 	
 	private UnitTestSourceData createUnitTestSourceData(UnitTestPayload unitTest, SearchService.SearchContext baseCtx,
-	                                                    Path dirPath, JSONArray routing, Boolean spatial, Double quote) throws IOException {
+	                                                    Path dirPath, JSONArray routing, Boolean spatial, Double quote, int limit) throws IOException {
 		SearchExportSettings exportSettings = new SearchExportSettings(true, true, -1);
 		SearchService.SearchOption options = new SearchService.SearchOption(true, exportSettings,
 				null, true, false, (net.osmand.search.core.ObjectType[]) null);
@@ -397,7 +399,7 @@ public interface DetectorService extends OBFService {
 						baseCtx.baseSearch(), baseCtx.northWest(), baseCtx.southEast());
 				
 				SearchService.SpatialResults spatialResults = getSearchService().searchTestSpatial(ctx, options, null, false);
-				collectUnitTestSourceData(spatialResults, cities, amenities);
+				collectUnitTestSourceData(spatialResults, cities, amenities, limit);
 			}
 		}
 		
