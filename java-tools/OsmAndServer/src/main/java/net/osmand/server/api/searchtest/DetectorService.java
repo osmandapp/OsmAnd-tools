@@ -313,19 +313,11 @@ public interface DetectorService extends OBFService {
 			}
 			for (MapObject object : objects) {
 				if (object instanceof Amenity amenity) {
-					if (!isWithinUnitTestSourceRadius(amenity, point, unitTest.radius())) {
-						continue;
-					}
 					String amenityKey = amenityKey(amenity);
 					amenities.putIfAbsent(amenityKey, amenity);
 				} else if (object instanceof City city) {
-					if (isWithinUnitTestSourceRadius(city, point, unitTest.radius())) {
-						collectUnitTestCity(city, cities);
-					}
+					collectUnitTestCity(city, cities);
 				} else if (object instanceof Street street) {
-					if (!isWithinUnitTestSourceRadius(street, point, unitTest.radius())) {
-						continue;
-					}
 					if (!street.getCity().getStreets().contains(street)) {
 						street.getCity().getStreets().add(street);
 					}
