@@ -1076,6 +1076,7 @@ public class BinaryMapIndexWriter {
 					bbox31 = cityObj.getBbox31();
 				} else if (no.object instanceof Street s) {
 					type = CityBlocks.STREET_TYPE;
+					bbox31 = s.getBbox31();
 					QuadRect bb = s.getBboxPoints();
 					if (bb != null) {
 						bbox31 = new int[] { MapUtils.get31TileNumberX(bb.left), MapUtils.get31TileNumberY(bb.top),

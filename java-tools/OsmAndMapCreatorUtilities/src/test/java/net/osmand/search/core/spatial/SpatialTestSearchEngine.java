@@ -1,4 +1,4 @@
-package net.osmand.search;
+package net.osmand.search.core.spatial;
 
 import java.io.IOException;
 import java.util.ArrayList;
