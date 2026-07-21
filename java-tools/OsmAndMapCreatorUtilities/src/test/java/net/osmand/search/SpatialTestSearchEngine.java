@@ -74,7 +74,7 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
         if (atom.getBuilding() == null && atom.getObject() == null) {
             b.append(atom.getName());
         }
-        List<MapObject> allObjs = r.getAllObjects();
+        List<MapObject> allObjs = r.getObjects();
         String subtype = "";
         for (MapObject o : allObjs) {
             if (o instanceof Street street) {
