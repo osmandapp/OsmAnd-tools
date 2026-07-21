@@ -358,10 +358,8 @@ public class SearchService {
 		SpatialSearchContext.SpatialSearchStats stats = sscontext.getStats();
 		stats.printLogs = printLogs;
 		
-		stats.requestTime.start();
 		SpatialTextSearch spatialTextSearch = spatialTextSearchLocal.get();
 		SpatialSearchResults results = spatialTextSearch.searchAPI(ctx.text, sscontext);
-		stats.requestTime.finish();
 		return new SpatialResults(results, stats);
 	}
 
