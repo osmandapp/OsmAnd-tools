@@ -115,7 +115,7 @@ public class FastSpringController {
 					}
 					purchases.forEach(purchase -> deviceInAppPurchasesRepository.saveAndFlush(purchase));
 					subscriptions.forEach(subscription -> deviceSubscriptionsRepository.saveAndFlush(subscription));
-					
+
 					userSubService.verifyAndRefreshProOrderId(user);
 
 					if (sendOsmAndAndSpecialGiftEmail) {
@@ -128,6 +128,72 @@ public class FastSpringController {
 			}
 		}
 		return ResponseEntity.ok("OK");
+	}
+
+	@Transactional
+	@PostMapping("/refund")
+	public ResponseEntity<String> handleRefundEvent(@RequestBody FastSpringOrderCompletedRequest request) {
+		for (FastSpringOrderCompletedRequest.Event event : request.events) {
+			if ("return.created".equals(event.type)) {
+				// https://developer.fastspring.com/reference/returncreated
+				handleReturnCreatedEvent(event);
+			}
+		}
+		return ResponseEntity.ok("OK");
+	}
+
+	private void handleReturnCreatedEvent(FastSpringOrderCompletedRequest.Event event) {
+		FastSpringOrderCompletedRequest.Data data = event.data;
+		if (data == null || data.original == null || data.original.id == null) {
+			LOGGER.error("FastSpring: return.created event without original order id, skipping");
+			return;
+		}
+		String orderId = data.original.id;
+		if (data.items == null || data.items.isEmpty()) {
+			LOGGER.error("FastSpring: return.created event for orderId " + orderId + " has no items, skipping");
+			return;
+		}
+		Date now = new Date();
+		Set<Integer> affectedUserIds = new HashSet<>();
+		for (FastSpringOrderCompletedRequest.Item item : data.items) {
+			String sku = item.sku;
+			if (sku == null) {
+				continue;
+			}
+			// Revoke in-app purchases for this refunded item
+			List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> iaps =
+					deviceInAppPurchasesRepository.findByOrderIdAndSku(orderId, sku);
+			for (DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase iap : iaps) {
+				iap.valid = false;
+				iap.checktime = now;
+				deviceInAppPurchasesRepository.saveAndFlush(iap);
+				if (iap.userId != null) {
+					affectedUserIds.add(iap.userId);
+				}
+				LOGGER.info(String.format("FastSpring: refunded in-app revoked for orderId: %s, sku: %s", orderId, sku));
+			}
+			// Revoke subscriptions for this refunded item
+			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subs =
+					deviceSubscriptionsRepository.findByOrderIdAndSku(orderId, sku);
+			for (DeviceSubscriptionsRepository.SupporterDeviceSubscription sub : subs) {
+				sub.valid = false;
+				sub.autorenewing = false;
+				sub.expiretime = now; // expire immediately, refund is effective right away
+				sub.checktime = now;
+				deviceSubscriptionsRepository.saveAndFlush(sub);
+				if (sub.userId != null) {
+					affectedUserIds.add(sub.userId);
+				}
+				LOGGER.info(String.format("FastSpring: refunded subscription revoked for orderId: %s, sku: %s", orderId, sku));
+			}
+		}
+		// Recompute the Pro order id for every affected user so the account status is refreshed
+		for (Integer userId : affectedUserIds) {
+			CloudUsersRepository.CloudUser user = usersRepository.findById(userId);
+			if (user != null) {
+				userSubService.verifyAndRefreshProOrderId(user);
+			}
+		}
 	}
 
 	/**
@@ -167,6 +233,7 @@ public class FastSpringController {
 			public Customer customer;
 			public Tags tags;
 			public List<Item> items;
+			public Original original; // present on return.created events (refund)
 		}
 
 		public static class Customer {
@@ -179,6 +246,12 @@ public class FastSpringController {
 
 		public static class Item {
 			public String sku;
+		}
+
+		public static class Original {
+			public String id; // original order id (duplicated as "order" by FastSpring)
+			public String order; // duplicate of id for backward compatibility
+			public String reference; // original order reference
 		}
 	}
 
