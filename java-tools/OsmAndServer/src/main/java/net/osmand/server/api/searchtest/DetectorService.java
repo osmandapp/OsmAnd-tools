@@ -279,12 +279,18 @@ public interface DetectorService extends OBFService {
 	}
 
 	private City compactUnitTestCity(City city) {
+		if (city.getStreets().isEmpty()) {
+			return city;
+		}
 		JSONObject json = city.toJSON(false);
 		json.remove("listOfStreets");
 		return City.parseJSON(json);
 	}
 
 	private Street compactUnitTestStreet(Street street, City city) {
+		if (street.getBuildings().isEmpty()) {
+			return street;
+		}
 		JSONObject json = street.toJSON(false);
 		json.remove("buildings");
 		json.remove("intersectedStreets");
@@ -352,12 +358,8 @@ public interface DetectorService extends OBFService {
 			}
 			Building resultBuilding = null;
 			Street resultBuildingStreet = null;
-			if (res.getFirstRef() != null) {
-				SpatialSearchToken.NameIndexAtom atom = res.getFirstRef().getNameIndexAtom();
-				resultBuilding = atom.getBuilding();
-				if (atom.getObject() instanceof Street street) {
-					resultBuildingStreet = street;
-				}
+			if (res.getObjectsSize() > 0 && res.getObjects().get(0) instanceof Building b) {
+				resultBuilding = b;
 			}
 			if (resultBuilding == null) {
 				for (MapObject object : objects) {
@@ -368,15 +370,13 @@ public interface DetectorService extends OBFService {
 				}
 			}
 			if (resultBuilding != null) {
-				if (resultBuildingStreet == null) {
-					for (MapObject object : objects) {
-						if (object instanceof Street street) {
-							resultBuildingStreet = street;
-							break;
-						}
-					}
-				}
-				collectCompactUnitTestBuilding(resultBuilding, resultBuildingStreet, cities);
+                for (MapObject object : objects) {
+                    if (object instanceof Street street) {
+                        resultBuildingStreet = street;
+                        break;
+                    }
+                }
+                collectCompactUnitTestBuilding(resultBuilding, resultBuildingStreet, cities);
 			}
 			for (MapObject object : objects) {
 				if (object instanceof Amenity amenity) {
