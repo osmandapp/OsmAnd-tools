@@ -140,7 +140,6 @@ public class SearchService {
 	private static final int SEARCH_RADIUS_LEVEL = 1;
 	private static final int TOTAL_LIMIT_POI = 2000;
 	private static final int SPATIAL_POI_CATEGORY_VIEW_ZOOM_SHIFT = 2;
-	private static final String BRAND_TOP_INDEX = "brand";
 	private static final int TOTAL_LIMIT_SEARCH_RESULTS = 15000;
 	private static final int TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB = 1000;
 	private static final double SEARCH_POI_RADIUS_DEGREE = 0.0007;
@@ -684,6 +683,8 @@ public class SearchService {
 			}
 			tags.put(PoiTypeField.CATEGORY_KEY_NAME.getFieldName(), tag);
 			tags.put(PoiTypeField.CATEGORY_ICON.getFieldName(), tag);
+			// canonical key ("top_index_brand_<valueKey>"): web uses it as the search type in the URL
+			tags.put(PoiTypeField.KEY_NAME.getFieldName(), type.getKey());
 			tags.put(PoiTypeField.NAME.getFieldName(), type.poiAdditional);
 			if (type.getWikidataId() != null) {
 				tags.put(PoiTypeField.WIKIDATA_ID.getFieldName(), type.getWikidataId());
@@ -1261,7 +1262,7 @@ public class SearchService {
 	                                           List<BinaryMapIndexReader> readers, Map<Long, Feature> foundFeatures, PoiSearchLimit poiSearchLimit,
 	                                           int zoom, String timeZone) throws IOException {
 		SpatialPoiSearch poiTypeSearch = getSpatialPoiTypeSearch();
-		SpatialPoiType spatialType = resolveSpatialPoiType(poiTypeSearch, categoryObj);
+		SpatialPoiType spatialType = poiTypeSearch.getByKey(categoryObj.category);
 		if (spatialType == null) {
 			return false;
 		}
@@ -1304,22 +1305,6 @@ public class SearchService {
 		return true;
 	}
 
-	private SpatialPoiType resolveSpatialPoiType(SpatialPoiSearch poiSearch, PoiSearchCategory categoryObj) {
-		SpatialPoiType type = poiSearch.getByKey(categoryObj.category);
-		if (type != null) {
-			return type;
-		}
-		String valueKey = TopIndexFilter.getValueKey(categoryObj.category);
-		if (Algorithms.isNotEmpty(categoryObj.lang)) {
-			type = poiSearch.getByKey(BRAND_TOP_INDEX + ":" + categoryObj.lang + "_" + valueKey);
-			if (type != null) {
-				return type;
-			}
-		}
-
-		return poiSearch.getByKey(BRAND_TOP_INDEX + "_" + valueKey);
-	}
-
 	private BinaryMapIndexReader.SearchRequest<Amenity> createSearchRequestByBrand(BinaryMapIndexReader reader,
 	                                                                               PoiSearchCategory categoryObj, MapPoiTypes mapPoiTypes, int left31, int right31, int top31, int bottom31)
 			throws IOException {
@@ -1333,6 +1318,10 @@ public class SearchService {
 			return null;
 		}
 		String brandValueToSearch = categoryObj.category;
+		SpatialPoiType spatialBrand = getSpatialPoiTypeSearch().getByKey(brandValueToSearch);
+		if (spatialBrand != null && spatialBrand.poiAdditional != null) {
+			brandValueToSearch = spatialBrand.poiAdditional;
+		}
 		TopIndexFilter brandFilter = new TopIndexFilter(selectedBrand, mapPoiTypes, brandValueToSearch);
 		SearchPoiTypeFilter filter = BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER;
 		return BinaryMapIndexReader.buildSearchPoiRequest(left31, right31, top31, bottom31, ZOOM_TO_SEARCH_POI, filter,
@@ -1808,6 +1797,7 @@ public class SearchService {
 		} else if (obj instanceof TopIndexFilter type) {
 			tags.put(PoiTypeField.CATEGORY_KEY_NAME.getFieldName(), type.getTag());
 			tags.put(PoiTypeField.CATEGORY_ICON.getFieldName(), type.getTag());
+			tags.put(PoiTypeField.KEY_NAME.getFieldName(), type.getFilterId());
 			tags.put(PoiTypeField.NAME.getFieldName(), type.getValue());
 		} else if (obj instanceof AbstractPoiType type) {
 			tags.put(PoiTypeField.KEY_NAME.getFieldName(), type.getKeyName());
