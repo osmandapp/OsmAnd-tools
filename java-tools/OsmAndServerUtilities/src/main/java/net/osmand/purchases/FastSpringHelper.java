@@ -7,6 +7,7 @@ import org.apache.commons.logging.LogFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -104,6 +105,44 @@ public class FastSpringHelper {
 			}
 		}
 		return null;
+	}
+
+	public static String getUnprocessedEvents(int days) throws IOException {
+		HttpURLConnection connection = openConnection("/events/unprocessed?days=" + days);
+		if (connection.getResponseCode() != 200) {
+			LOG.warn("Failed to get unprocessed FastSpring events: "
+					+ connection.getResponseCode() + " " + connection.getResponseMessage());
+			return null;
+		}
+		try (InputStream is = connection.getInputStream();
+		     InputStreamReader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
+			StringBuilder sb = new StringBuilder();
+			char[] buf = new char[4096];
+			int n;
+			while ((n = reader.read(buf)) != -1) {
+				sb.append(buf, 0, n);
+			}
+
+			return sb.toString();
+		}
+	}
+
+	public static boolean markEventProcessed(String eventId) throws IOException {
+		HttpURLConnection connection = openConnection("/events/" + eventId);
+		connection.setRequestMethod("POST");
+		connection.setDoOutput(true);
+		connection.setRequestProperty("Content-Type", "application/json");
+		try (OutputStream os = connection.getOutputStream()) {
+			os.write("{\"processed\":true}".getBytes(StandardCharsets.UTF_8));
+		}
+		int code = connection.getResponseCode();
+		if (code != 200) {
+			LOG.warn("Failed to mark FastSpring event processed " + eventId + ": "
+					+ code + " " + connection.getResponseMessage());
+			return false;
+		}
+
+		return true;
 	}
 
 	private static FastSpringOrder getOrder(String orderId) throws IOException {
