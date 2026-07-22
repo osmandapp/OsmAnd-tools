@@ -14,6 +14,7 @@ import net.osmand.search.core.SearchSettings;
 import net.osmand.search.core.spatial.SpatialSearchContext;
 import net.osmand.search.core.spatial.SpatialSearchResult;
 import net.osmand.search.core.spatial.SpatialSearchResultsList;
+import net.osmand.search.core.spatial.SpatialSearchToken;
 import net.osmand.server.api.services.SearchService;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -273,20 +274,58 @@ public interface DetectorService extends OBFService {
 		return results;
 	}
 
-	private void collectUnitTestCity(City city, Map<Long, City> cities) {
+	private String amenityKey(Amenity amenity) {
+		return amenity.getId() + "|" + amenity.getType() + "|" + amenity.getSubType();
+	}
+
+	private City compactUnitTestCity(City city) {
+		JSONObject json = city.toJSON(false);
+		json.remove("listOfStreets");
+		return City.parseJSON(json);
+	}
+
+	private Street compactUnitTestStreet(Street street, City city) {
+		JSONObject json = street.toJSON(false);
+		json.remove("buildings");
+		json.remove("intersectedStreets");
+		return Street.parseJSON(city, json);
+	}
+
+	private City collectCompactUnitTestCity(City city, Map<Long, City> cities) {
 		if (city == null || city.getId() == null) {
-			return;
+			return null;
 		}
 		City existing = cities.get(city.getId());
 		if (existing == null) {
-			cities.put(city.getId(), city);
-		} else {
-			existing.mergeWith(city);
+			existing = compactUnitTestCity(city);
+			cities.put(existing.getId(), existing);
 		}
+		return existing;
 	}
 
-	private String amenityKey(Amenity amenity) {
-		return amenity.getId() + "|" + amenity.getType() + "|" + amenity.getSubType();
+	private Street collectCompactUnitTestStreet(Street street, Map<Long, City> cities) {
+		if (street == null || street.getCity() == null) {
+			return null;
+		}
+		City city = collectCompactUnitTestCity(street.getCity(), cities);
+		if (city == null) {
+			return null;
+		}
+		for (Street existing : city.getStreets()) {
+			if (existing.equals(street)) {
+				return existing;
+			}
+		}
+		Street compactStreet = compactUnitTestStreet(street, city);
+		city.registerStreet(compactStreet);
+		return compactStreet;
+	}
+
+	private void collectCompactUnitTestBuilding(Building building, Street parentStreet, Map<Long, City> cities) {
+		Street street = collectCompactUnitTestStreet(parentStreet, cities);
+		if (building != null && street != null) {
+			street.addBuildingCheckById(Building.parseJSON(building.toJSON()));
+		}
 	}
 
 	private boolean isWithinUnitTestSourceRadius(MapObject object, LatLon point, Integer radius) {
@@ -297,7 +336,7 @@ public interface DetectorService extends OBFService {
 				&& MapUtils.getDistance(point, object.getLocation()) < radius;
 	}
 
-	private void collectUnitTestSourceData(SearchService.SpatialResults spatialResponse, Map<Long, City> cities, Map<String, Amenity> amenities, LatLon point, UnitTestPayload unitTest) {
+	private void collectUnitTestSourceData(SearchService.SpatialResults spatialResponse, Map<Long, City> cities, Map<String, Amenity> amenities, UnitTestPayload unitTest) {
 		if (spatialResponse == null || spatialResponse.results() == null || spatialResponse.results().mainResults == null) {
 			return;
 		}
@@ -311,17 +350,42 @@ public interface DetectorService extends OBFService {
 			if (objects == null) {
 				return;
 			}
+			Building resultBuilding = null;
+			Street resultBuildingStreet = null;
+			if (res.getFirstRef() != null) {
+				SpatialSearchToken.NameIndexAtom atom = res.getFirstRef().getNameIndexAtom();
+				resultBuilding = atom.getBuilding();
+				if (atom.getObject() instanceof Street street) {
+					resultBuildingStreet = street;
+				}
+			}
+			if (resultBuilding == null) {
+				for (MapObject object : objects) {
+					if (object instanceof Building building) {
+						resultBuilding = building;
+						break;
+					}
+				}
+			}
+			if (resultBuilding != null) {
+				if (resultBuildingStreet == null) {
+					for (MapObject object : objects) {
+						if (object instanceof Street street) {
+							resultBuildingStreet = street;
+							break;
+						}
+					}
+				}
+				collectCompactUnitTestBuilding(resultBuilding, resultBuildingStreet, cities);
+			}
 			for (MapObject object : objects) {
 				if (object instanceof Amenity amenity) {
 					String amenityKey = amenityKey(amenity);
 					amenities.putIfAbsent(amenityKey, amenity);
 				} else if (object instanceof City city) {
-					collectUnitTestCity(city, cities);
+					collectCompactUnitTestCity(city, cities);
 				} else if (object instanceof Street street) {
-					if (!street.getCity().getStreets().contains(street)) {
-						street.getCity().getStreets().add(street);
-					}
-					collectUnitTestCity(street.getCity(), cities);
+					collectCompactUnitTestStreet(street, cities);
 				}
 			}
 		}
@@ -408,7 +472,8 @@ public interface DetectorService extends OBFService {
 			settings = results.settings();
         }
 		filterSourceData(amenities, cities, unitTest);
-		
+
+		SearchService.SpatialResults spatialResults;
 		if (spatial != null && spatial) {
 			settings = new SearchSettings(Collections.emptyList());
 			for (String q : queries) {
@@ -416,8 +481,8 @@ public interface DetectorService extends OBFService {
 						baseCtx.lat(), baseCtx.lon(), q, baseCtx.locale(),
 						baseCtx.baseSearch(), baseCtx.northWest(), baseCtx.southEast());
 				
-				SearchService.SpatialResults spatialResults = getSearchService().searchTestSpatial(ctx, options, null, false);
-				collectUnitTestSourceData(spatialResults, cities, amenities, point, unitTest);
+				spatialResults = getSearchService().searchTestSpatial(ctx, options, null, false);
+				collectUnitTestSourceData(spatialResults, cities, amenities, unitTest);
 			}
 		}
 		
