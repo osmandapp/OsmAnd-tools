@@ -162,7 +162,10 @@ public class FastSpringController {
 	public ResponseEntity<String> handleRefundEvent(@RequestBody FastSpringOrderCompletedRequest request) {
 		for (FastSpringOrderCompletedRequest.Event event : request.events) {
 			if (HANDLED_EVENTS.contains(event.type)) {
-				dispatchFastSpringEvent(event);
+				ResponseEntity<String> error = dispatchFastSpringEvent(event);
+				if (error != null) {
+					return error;
+				}
 			}
 		}
 		return ResponseEntity.ok("OK");
@@ -246,7 +249,7 @@ public class FastSpringController {
 		}
 	}
 
-	private void dispatchFastSpringEvent(FastSpringOrderCompletedRequest.Event event) {
+	private ResponseEntity<String> dispatchFastSpringEvent(FastSpringOrderCompletedRequest.Event event) {
 		if (EVENT_RETURN_CREATED.equals(event.type)) {
 			// https://developer.fastspring.com/reference/returncreated
 			handleReturnCreatedEvent(event);
@@ -255,12 +258,17 @@ public class FastSpringController {
 			handleChargebackCreatedEvent(event);
 		} else if (EVENT_ORDER_COMPLETED.equals(event.type)) {
 			// https://developer.fastspring.com/reference/ordercompleted
-			handleOrderCompletedEvent(event);
+			return handleOrderCompletedEvent(event);
 		}
+		return null;
 	}
 
 	private void revokePurchases(List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> iaps,
 	                             List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subs, String orderId, Set<Integer> affectedUserIds) {
+		if (iaps.isEmpty() && subs.isEmpty()) {
+			LOGGER.warn("FastSpring: nothing to revoke for orderId " + orderId + ", no matching purchases found");
+			return;
+		}
 		Date now = new Date();
 		for (DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase iap : iaps) {
 			iap.valid = false;
