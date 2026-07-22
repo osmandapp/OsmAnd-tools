@@ -407,6 +407,8 @@ public interface DetectorService extends OBFService {
 			collectUnitTestSourceData(results.unitTestJson(), amenities, cities, point, unitTest);
 			settings = results.settings();
         }
+		filterSourceData(amenities, cities, unitTest);
+		
 		if (spatial != null && spatial) {
 			settings = new SearchSettings(Collections.emptyList());
 			for (String q : queries) {
@@ -418,7 +420,6 @@ public interface DetectorService extends OBFService {
 				collectUnitTestSourceData(spatialResults, cities, amenities, point, unitTest);
 			}
 		}
-		filterSourceData(amenities, cities, unitTest);
 		
 		return createUnitTestJson(dirPath, unitTest.name, settings, routing, amenities, cities);
 	}
