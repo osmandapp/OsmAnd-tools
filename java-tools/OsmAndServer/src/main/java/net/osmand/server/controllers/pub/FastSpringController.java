@@ -111,7 +111,7 @@ public class FastSpringController {
 					iap.orderId = orderId;
 					iap.sku = sku;
 					iap.purchaseToken = data.reference;
-					iap.purchaseTime = new Date(event.created);
+					iap.purchaseTime = event.created != null ? new Date(event.created) : new Date();
 					iap.timestamp = new Date();
 					iap.userId = userId;
 					iap.valid = true;
@@ -226,42 +226,32 @@ public class FastSpringController {
 	@Scheduled(fixedRate = DAY)
 	public void processMissedFastSpringEvents() {
 		try {
+			String json = FastSpringHelper.getUnprocessedEvents(EVENTS_LOOKBACK_DAYS);
+			if (json == null) {
+				return;
+			}
+			FastSpringOrderCompletedRequest resp = gson.fromJson(json, FastSpringOrderCompletedRequest.class);
+			if (resp == null || resp.events == null || resp.events.isEmpty()) {
+				return;
+			}
+			resp.events.sort(Comparator.comparingLong(e -> e.created != null ? e.created : 0L));
 			TransactionTemplate txTemplate = new TransactionTemplate(transactionManager);
-			while (true) {
-				String json = FastSpringHelper.getUnprocessedEvents(EVENTS_LOOKBACK_DAYS);
-				if (json == null) {
-					return;
+			for (FastSpringOrderCompletedRequest.Event event : resp.events) {
+				if (event.id == null) {
+					continue;
 				}
-				FastSpringOrderCompletedRequest resp = gson.fromJson(json, FastSpringOrderCompletedRequest.class);
-				if (resp == null || resp.events == null || resp.events.isEmpty()) {
-					return;
-				}
-				resp.events.sort(Comparator.comparingLong(e -> e.created != null ? e.created : 0L));
-				int marked = 0;
-				for (FastSpringOrderCompletedRequest.Event event : resp.events) {
-					if (event.id == null) {
-						continue;
-					}
-					try {
-						if (HANDLED_EVENTS.contains(event.type)) {
-							ResponseEntity<String> error = txTemplate.execute(status -> dispatchFastSpringEvent(event));
-							if (error != null) {
-								LOGGER.error("FastSpring: missed event " + event.id + " (" + event.type + ") failed: " + error.getBody());
-								continue;
-							}
+				try {
+					if (HANDLED_EVENTS.contains(event.type)) {
+						ResponseEntity<String> error = txTemplate.execute(status -> dispatchFastSpringEvent(event));
+						if (error != null) {
+							LOGGER.error("FastSpring: missed event " + event.id + " (" + event.type + ") failed: " + error.getBody());
+							continue;
 						}
-						// mark unhandled event types processed too, otherwise they pile up
-						// and can fill the page so handled events are never fetched
-						if (FastSpringHelper.markEventProcessed(event.id)) {
-							marked++;
-						}
-					} catch (Exception e) {
-						LOGGER.error("FastSpring: failed to process missed event " + event.id
-								+ " (" + event.type + "): " + e.getMessage(), e);
 					}
-				}
-				if (marked == 0) {
-					return;
+					FastSpringHelper.markEventProcessed(event.id);
+				} catch (Exception e) {
+					LOGGER.error("FastSpring: failed to process missed event " + event.id
+							+ " (" + event.type + "): " + e.getMessage(), e);
 				}
 			}
 		} catch (IOException e) {
