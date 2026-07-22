@@ -69,6 +69,7 @@ import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
 import net.osmand.binary.BinaryMapIndexReaderStats;
 import net.osmand.binary.BinaryMapPoiReaderAdapter;
 import net.osmand.binary.GeocodingUtilities;
+import net.osmand.binary.NameIndexReader;
 import net.osmand.binary.ObfConstants;
 import net.osmand.data.Amenity;
 import net.osmand.data.Building;
@@ -136,6 +137,7 @@ public class SearchService {
 
 	private static final int SEARCH_RADIUS_LEVEL = 1;
 	private static final int TOTAL_LIMIT_POI = 2000;
+	private static final int SPATIAL_POI_CATEGORY_VIEW_ZOOM_SHIFT = 2;
 	private static final int TOTAL_LIMIT_SEARCH_RESULTS = 15000;
 	private static final int TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB = 1000;
 	private static final double SEARCH_POI_RADIUS_DEGREE = 0.0007;
@@ -164,12 +166,12 @@ public class SearchService {
 	private final ThreadLocal<RegionsReaderHolder> osmandRegionsLocal = ThreadLocal
 			.withInitial(() -> new RegionsReaderHolder());
 	// reused for cache
-	private SpatialPoiSearch poiSearch; 
+	private SpatialPoiSearch poiSearch;
 
 	public static class PoiSearchResult {
 
 		public PoiSearchResult(boolean useLimit, boolean mapLimitExceeded, boolean alreadyFound,
-				FeatureCollection features) {
+		                       FeatureCollection features) {
 			this.useLimit = useLimit;
 			this.mapLimitExceeded = mapLimitExceeded;
 			this.alreadyFound = alreadyFound;
@@ -232,8 +234,8 @@ public class SearchService {
 	public static class PoiSearchData {
 
 		public PoiSearchData(List<PoiSearchCategory> categories, String northWest, String southEast,
-				String savedNorthWest, String savedSouthEast, int prevCategoriesCount, String prevSearchRes,
-				String prevSearchCategory) {
+		                     String savedNorthWest, String savedSouthEast, int prevCategoriesCount, String prevSearchRes,
+		                     String prevSearchCategory) {
 			this.categories = categories;
 			this.bbox = getBboxCoords(Arrays.asList(northWest, southEast));
 			if (savedNorthWest != null && savedSouthEast != null) {
@@ -284,11 +286,11 @@ public class SearchService {
 	}
 
 	public record SearchContext(double lat, double lon, String text, String locale, boolean baseSearch,
-			String northWest, String southEast) {
+	                            String northWest, String southEast) {
 	}
 
 	public record SearchOption(boolean unlimited, SearchExportSettings exportedSettings, Double radiusToLoadMaps,
-			boolean queryIsCompleted, boolean isBatch, ObjectType... searchTypes) {
+	                           boolean queryIsCompleted, boolean isBatch, ObjectType... searchTypes) {
 		private static final double SEARCH_RADIUS_DEGREE = 1.5;
 
 		public double getRadius() {
@@ -297,7 +299,7 @@ public class SearchService {
 	}
 
 	public record SearchResults(List<SearchResult> results, SearchSettings settings, JSONObject unitTestJson,
-			SearchPhrase phrase) {
+	                            SearchPhrase phrase) {
 		public SearchResults(List<SearchResult> results) {
 			this(results, null, null, null);
 		}
@@ -347,7 +349,7 @@ public class SearchService {
 				}
 				readers = osmAndMapsService.getReaders(maps, null, true);
 			}
-			
+
 			res = searchTestSpatial(ctx, readers, printLogs);
 		} catch (RuntimeException e) {
 			LOGGER.error(String.format("Spatial search failed for '%s': %s", ctx.text, e), e);
@@ -359,7 +361,7 @@ public class SearchService {
 		}
 		return res;
 	}
-	
+
 	public synchronized SpatialPoiSearch getSpatialPoiTypeSearch() {
 		if (poiSearch == null) {
 			MapPoiTypes poiTypes = MapPoiTypes.getDefault();
@@ -379,7 +381,7 @@ public class SearchService {
 		SpatialSearchContext sscontext = new SpatialSearchContext(settings, readers, getSpatialPoiTypeSearch(), new LatLon(ctx.lat, ctx.lon));
 		SpatialSearchContext.SpatialSearchStats stats = sscontext.getStats();
 		stats.printLogs = printLogs;
-		
+
 		SpatialSearchResults results = spatialTextSearch.searchAPI(ctx.text, sscontext);
 		return new SpatialResults(results, stats);
 	}
@@ -673,7 +675,7 @@ public class SearchService {
 	}
 
 	private List<Map<String, Object>> matchedObjects(List<MapObject> objs, String locale, String timeZone,
-	                                                 String dominatedCity, int [] bbox31) {
+	                                                 String dominatedCity, int[] bbox31) {
 		List<Map<String, Object>> matched = new ArrayList<>();
 		for (MapObject o : objs) {
 			if (o.getLocation() == null) {
@@ -708,7 +710,7 @@ public class SearchService {
 	}
 
 	private Feature getSpatialFeature(LatLon loc, List<MapObject> objs, String locale, String timeZone,
-			String dominatedCity, String extraNameMatch) {
+	                                  String dominatedCity, String extraNameMatch) {
 		MapObject obj = objs.isEmpty() ? null : objs.get(0);
 		if (obj == null || loc == null) {
 			return null;
@@ -780,7 +782,7 @@ public class SearchService {
 	}
 
 	public SearchResults getImmediateSearchResults(SearchContext ctx, SearchOption option,
-			Consumer<List<SearchResult>> consumerInContext) throws IOException {
+	                                               Consumer<List<SearchResult>> consumerInContext) throws IOException {
 		if (!osmAndMapsService.validateAndInitConfig()) {
 			return new SearchResults(Collections.emptyList());
 		}
@@ -918,7 +920,7 @@ public class SearchService {
 	}
 
 	public Feature getPoiResultByShareLink(String type, LatLon loc, String name, Long osmId, Long wikidataId,
-			String timeZone) throws IOException {
+	                                       String timeZone) throws IOException {
 		Feature poiFeature = getPoi(type, name, loc, osmId, timeZone);
 
 		if (poiFeature != null && wikidataId == null) {
@@ -1005,7 +1007,7 @@ public class SearchService {
 	}
 
 	private List<SearchResult> filterBrandsOutsideBBox(List<SearchResult> res, String northWest, String southEast,
-			String locale, double lat, double lon, boolean baseSearch) throws IOException {
+	                                                   String locale, double lat, double lon, boolean baseSearch) throws IOException {
 		if (northWest != null && southEast != null) {
 			List<LatLon> bbox = getBboxCoords(Arrays.asList(northWest, southEast));
 			QuadRect searchBbox = getSearchBbox(bbox);
@@ -1052,7 +1054,7 @@ public class SearchService {
 	}
 
 	private SearchUICore prepareSearchUICoreForSearchByPoiType(List<BinaryMapIndexReader> readers, QuadRect searchBbox,
-			String locale, double lat, double lon) {
+	                                                           String locale, double lat, double lon) {
 		MapPoiTypes mapPoiTypes = getMapPoiTypes(locale);
 
 		SearchUICore searchUICore = new SearchUICore(mapPoiTypes, locale, false);
@@ -1075,7 +1077,7 @@ public class SearchService {
 	}
 
 	public PoiSearchResult searchPoi(SearchService.PoiSearchData data, String locale, LatLon center, boolean baseSearch,
-			String timeZone) throws IOException {
+	                                 boolean spatial, int zoom, String timeZone) throws IOException {
 		if (data.savedBbox != null && isContainsBbox(data) && data.prevCategoriesCount == data.categories.size()) {
 			return new PoiSearchResult(false, false, true, null);
 		}
@@ -1097,7 +1099,7 @@ public class SearchService {
 
 			if (data.categories.size() == 1) {
 				searchPoiByTypeCategory(data.categories.get(0), locale, searchBbox, usedMapList, foundFeatures,
-						timeZone);
+						spatial, zoom, timeZone);
 				useLimit = foundFeatures.size() >= TOTAL_LIMIT_POI;
 			} else {
 				PoiSearchLimit poiSearchLimit = new PoiSearchLimit(TOTAL_LIMIT_POI / data.categories.size(),
@@ -1109,7 +1111,7 @@ public class SearchService {
 					}
 					int categoryStartSize = foundFeatures.size();
 					searchPoiByTypeCategory(categoryObj, locale, searchBbox, usedMapList, foundFeatures, poiSearchLimit,
-							timeZone);
+							spatial, zoom, timeZone);
 					int categoryEndSize = foundFeatures.size();
 					poiSearchLimit.updateAfterCategory(categoryStartSize, categoryEndSize);
 					if (poiSearchLimit.useLimit) {
@@ -1131,14 +1133,19 @@ public class SearchService {
 	}
 
 	private void searchPoiByTypeCategory(PoiSearchCategory categoryObj, String locale, QuadRect searchBbox,
-			List<BinaryMapIndexReader> readers, Map<Long, Feature> foundFeatures, String timeZone) throws IOException {
-		searchPoiByTypeCategory(categoryObj, locale, searchBbox, readers, foundFeatures, null, timeZone);
+	                                     List<BinaryMapIndexReader> readers, Map<Long, Feature> foundFeatures, boolean spatial, int zoom,
+	                                     String timeZone) throws IOException {
+		searchPoiByTypeCategory(categoryObj, locale, searchBbox, readers, foundFeatures, null, spatial, zoom, timeZone);
 	}
 
 	private void searchPoiByTypeCategory(PoiSearchCategory categoryObj, String locale, QuadRect searchBbox,
-			List<BinaryMapIndexReader> readers, Map<Long, Feature> foundFeatures, PoiSearchLimit poiSearchLimit,
-			String timeZone) throws IOException {
+	                                     List<BinaryMapIndexReader> readers, Map<Long, Feature> foundFeatures, PoiSearchLimit poiSearchLimit,
+	                                     boolean spatial, int zoom, String timeZone) throws IOException {
 		if (searchBbox == null) {
+			return;
+		}
+		if (spatial && searchPoiByCategorySpatial(categoryObj, locale, searchBbox, readers, foundFeatures,
+				poiSearchLimit, zoom, timeZone)) {
 			return;
 		}
 
@@ -1219,8 +1226,49 @@ public class SearchService {
 		}
 	}
 
+	// POI-by-category via spatial name index; false = category unsupported, caller uses the old path
+	private boolean searchPoiByCategorySpatial(PoiSearchCategory categoryObj, String locale, QuadRect searchBbox,
+	                                           List<BinaryMapIndexReader> readers, Map<Long, Feature> foundFeatures, PoiSearchLimit poiSearchLimit,
+	                                           int zoom, String timeZone) throws IOException {
+		if (getSpatialPoiTypeSearch().getByKey(categoryObj.category) == null) {
+			return false;
+		}
+		int remaining = poiSearchLimit != null
+				? poiSearchLimit.getRemainingForSave(foundFeatures.size(), foundFeatures.size())
+				: TOTAL_LIMIT_POI - foundFeatures.size();
+		if (remaining <= 0) {
+			return true;
+		}
+		QuadRect bboxLatLon = new QuadRect(
+				MapUtils.get31LongitudeX((int) searchBbox.left), MapUtils.get31LatitudeY((int) searchBbox.top),
+				MapUtils.get31LongitudeX((int) searchBbox.right), MapUtils.get31LatitudeY((int) searchBbox.bottom));
+		if (zoom < 0) {
+			// no zoom from client - estimate from bbox width
+			double lonWidth = Math.abs(bboxLatLon.right - bboxLatLon.left);
+			zoom = (int) Math.round(Math.log(360 * 3 / Math.max(lonWidth, 0.001)) / Math.log(2));
+			zoom = Math.max(4, Math.min(18, zoom));
+		}
+		SpatialSearchContext sscontext = new SpatialSearchContext(
+				SpatialTextSearchSettings.searchPoiByCategorySettings(zoom + SPATIAL_POI_CATEGORY_VIEW_ZOOM_SHIFT,
+						bboxLatLon), readers, getSpatialPoiTypeSearch(), null);
+		SpatialSearchResults res = spatialTextSearch
+				.searchAPI(NameIndexReader.POI_CATEGORY_PREFIX + categoryObj.category, sscontext);
+		List<Amenity> amenities = new ArrayList<>();
+		if (res.mainResults != null) {
+			for (SpatialSearchResult r : res.mainResults) {
+				for (MapObject o : r.getObjects()) {
+					if (o instanceof Amenity amenity) {
+						amenities.add(amenity);
+					}
+				}
+			}
+		}
+		saveAmenityResults(amenities, foundFeatures, remaining, locale, timeZone);
+		return true;
+	}
+
 	private BinaryMapIndexReader.SearchRequest<Amenity> createSearchRequestByBrand(BinaryMapIndexReader reader,
-			PoiSearchCategory categoryObj, MapPoiTypes mapPoiTypes, int left31, int right31, int top31, int bottom31)
+	                                                                               PoiSearchCategory categoryObj, MapPoiTypes mapPoiTypes, int left31, int right31, int top31, int bottom31)
 			throws IOException {
 		List<BinaryMapPoiReaderAdapter.PoiSubType> brands = reader.getTopIndexSubTypes();
 		String lang = categoryObj.lang;
@@ -1309,7 +1357,7 @@ public class SearchService {
 	}
 
 	private SearchResult searchPoiByReq(BinaryMapIndexReader.SearchRequest<Amenity> req, LatLon p1, LatLon p2,
-			boolean baseSearch) throws IOException {
+	                                    boolean baseSearch) throws IOException {
 		List<LatLon> bbox = Arrays.asList(p1, p2);
 		QuadRect searchBbox = getSearchBbox(bbox);
 
@@ -1546,7 +1594,7 @@ public class SearchService {
 			}
 		});
 	}
-	
+
 	private MapPoiTypesTranslator parseGlobalTranslations() {
 		Map<String, String> enTranslations = getTranslations(DEFAULT_SEARCH_LANG);
 		MapPoiTypesTranslator translations = new MapPoiTypesTranslator(enTranslations, enTranslations);
@@ -1591,21 +1639,21 @@ public class SearchService {
 		while (eventType != XmlPullParser.END_DOCUMENT) {
 			String tagName = parser.getName();
 			switch (eventType) {
-			case XmlPullParser.START_TAG:
-				if (tagName.equals("string")) {
-					key = parser.getAttributeValue(null, "name");
-				}
-				break;
-			case XmlPullParser.TEXT:
-				value = parser.getText();
-				break;
-			case XmlPullParser.END_TAG:
-				if (tagName.equals("string") && key != null && value != null) {
-					resultMap.put(key, value);
-					key = null;
-					value = null;
-				}
-				break;
+				case XmlPullParser.START_TAG:
+					if (tagName.equals("string")) {
+						key = parser.getAttributeValue(null, "name");
+					}
+					break;
+				case XmlPullParser.TEXT:
+					value = parser.getText();
+					break;
+				case XmlPullParser.END_TAG:
+					if (tagName.equals("string") && key != null && value != null) {
+						resultMap.put(key, value);
+						key = null;
+						value = null;
+					}
+					break;
 			}
 			eventType = parser.next();
 		}
@@ -1699,7 +1747,7 @@ public class SearchService {
 		POI_TYPE("web_poi_type"), POI_SUBTYPE("web_poi_subType"), POI_OSM_URL("web_poi_osmUrl"), CITY("web_city"),
 		// names of all objects matched in a spatial-search result (street, city, ...)
 		MATCHED_OBJECTS("web_matched_objects"), VISIBLE_LEVEL("web_visible_level"),
-		COMPARE_KEY("web_compare_key"), BBOX_LAT_LON("web_bbox_lat_lon"), 
+		COMPARE_KEY("web_compare_key"), BBOX_LAT_LON("web_bbox_lat_lon"),
 		WIKIDATA_ID("web_wikidata_id"), CITY_TYPE("web_city_type");
 
 		private final String fieldName;
@@ -1720,7 +1768,7 @@ public class SearchService {
 	}
 
 	private void saveAmenityResults(List<Amenity> amenities, Map<Long, Feature> foundFeatures, int remainingLimit,
-			String locale, String timeZone) {
+	                                String locale, String timeZone) {
 		String dominatedCity = "";
 		Map<String, Integer> cityCounter = new TreeMap<>();
 		for (Amenity amenity : amenities) {
