@@ -460,7 +460,7 @@ public interface DetectorService extends OBFService {
 		String[] queries = normalizedUnitTestQueries(unitTest.queries(), baseCtx.text());
 		LinkedHashMap<String, Amenity> amenities = new LinkedHashMap<>();
 		LinkedHashMap<Long, City> cities = new LinkedHashMap<>();
-		SearchSettings settings = null;
+		SearchSettings settings = new SearchSettings(Collections.emptyList());
 		LatLon point = new LatLon(baseCtx.lat(), baseCtx.lon());
 		if (unitTest.quote != null && unitTest.quote > 0.0 && unitTest.radius != null && unitTest.radius > 0) {
 			for (String q : queries) {
@@ -477,7 +477,6 @@ public interface DetectorService extends OBFService {
 
 		SearchService.SpatialResults spatialResults;
 		if (spatial != null && spatial) {
-			settings = new SearchSettings(Collections.emptyList());
 			for (String q : queries) {
 				SearchService.SearchContext ctx = new SearchService.SearchContext(
 						baseCtx.lat(), baseCtx.lon(), q, baseCtx.locale(),
