@@ -1,4 +1,4 @@
-package net.osmand.search;
+package net.osmand.search.core.spatial;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -40,14 +40,16 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
     }
 
     @Override
-    public List<String> apply(String phrase, List<String> expectedResults) throws IOException {
+    public List<String> search(String phrase, boolean print) throws IOException {
         SpatialTextSearch.SpatialSearchResults searchResults = spatialSearch.searchAPI(phrase, searchContext);
         List<SpatialSearchResult> mainResults = searchResults.mainResults == null ? Collections.emptyList()
                 : searchResults.mainResults;
 
         List<String> result = new ArrayList<>();
         for(SpatialSearchResult res : mainResults) {
-//        	System.out.println(SpatialSearchResult.compareKeyString(res) + " " +  res);
+        	if(print) {
+        		System.out.println(SpatialSearchResult.compareKeyString(res) + " " +  res);
+        	}
             result.add(formatResult(res));
         }
         return result;
@@ -62,6 +64,7 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
         StringBuilder b = new StringBuilder();
         SpatialSearchToken.NameIndexAtom atom = r.getFirstRef().getNameIndexAtom();
         Building building = atom.getBuilding();
+        boolean poiCategory = atom.isPoiCategory();
         if (building != null && building.isInterpolation() && r.getExtraNameMatch() != null) {
             b.append(r.getExtraNameMatch()); // interpolated house number
         } else {
@@ -71,7 +74,7 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
         if (atom.getBuilding() == null && atom.getObject() == null) {
             b.append(atom.getName());
         }
-        List<MapObject> allObjs = r.getAllObjects();
+        List<MapObject> allObjs = r.getObjects();
         String subtype = "";
         for (MapObject o : allObjs) {
             if (o instanceof Street street) {
@@ -83,7 +86,11 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
                 break;
             }
             if (o instanceof Amenity am && subtype.length() == 0) {
-                subtype = " " + am.getSubType();
+				if (poiCategory) {
+            		appendName(b, am.getName(), o);
+            	} else {
+            		subtype = " " + am.getSubType();
+            	}
             }
         }
         String sorting = SpatialSearchResult.compareKeyString(r);
@@ -155,8 +162,8 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
         settings.OPTIM_DELETE_POI_SAME_AS_CITY_STREET = settingsJson.optBoolean("OPTIM_DELETE_POI_SAME_AS_CITY_STREET",
                 settings.OPTIM_DELETE_POI_SAME_AS_CITY_STREET);
         settings.DEDUPLICATE_RES = settingsJson.optBoolean("DEDUPLICATE_RES", settings.DEDUPLICATE_RES);
-//        settings.TEST_ALLOW_HOUSE_POI_TYPE_INTERSECTION = settingsJson.optBoolean("TEST_ALLOW_HOUSE_POI_TYPE_INTERSECTION",
-//                settings.TEST_ALLOW_HOUSE_POI_TYPE_INTERSECTION);
+        settings.OPTIM_READ_COMMON_WORDS_LIMIT = settingsJson.optInt("OPTIM_READ_COMMON_WORDS_LIMIT",
+                settings.OPTIM_READ_COMMON_WORDS_LIMIT);
 //        settings.ALWAYS_READ_COMMON_WORDS_ATOMS = settingsJson.optBoolean("ALWAYS_READ_COMMON_WORDS_ATOMS",
 //                settings.ALWAYS_READ_COMMON_WORDS_ATOMS);
 //        settings.ALWAYS_READ_FREQ_WORDS_ATOMS = settingsJson.optBoolean("ALWAYS_READ_FREQ_WORDS_ATOMS",

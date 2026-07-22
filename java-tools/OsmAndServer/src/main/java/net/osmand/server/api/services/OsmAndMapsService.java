@@ -34,6 +34,7 @@ import java.util.zip.ZipInputStream;
 
 import javax.annotation.Nullable;
 
+import net.osmand.search.core.spatial.SpatialTextSearch;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.json.JSONArray;
@@ -121,9 +122,6 @@ public class OsmAndMapsService {
 	// counts only files open for Java (doesn't fit for rendering / routing)
 	private static final int MAX_SAME_FILE_OPEN = 15;
 	private static final long CACHE_MAX_ROUTING_CONTEXT_SEC = Integer.MAX_VALUE; //12 * 60 * 60; // 12h
-
-	private static final double SPATIAL_SEARCH_RADIUS_KM = 400;
-	private static final double SPATIAL_SEARCH_RADIUS_KM_AUTOCOMPLETE = 100;
 
 	private static final List<String> ALWAYS_IN_MEMORY = new ArrayList<String>();
 	static {
@@ -1407,7 +1405,11 @@ public class OsmAndMapsService {
 	public List<BinaryMapIndexReaderReference> getObfReadersForSpatialSearch(double lat, double lon,
 	                                                                         boolean autocomplete) throws IOException {
 		initObfReaders();
-		double searchRadius = autocomplete ? SPATIAL_SEARCH_RADIUS_KM_AUTOCOMPLETE : SPATIAL_SEARCH_RADIUS_KM;
+
+		double searchRadius = autocomplete
+				? SpatialTextSearch.SpatialTextSearchSettings.suggestionSettings().SUGGESTED_SEARCH_RADIUS_KM
+				: SpatialTextSearch.SpatialTextSearchSettings.defaultSettings().SUGGESTED_SEARCH_RADIUS_KM;
+
 		double dLat = searchRadius / 111.0;
 		double dLon = searchRadius / (111.0 * Math.max(0.1, Math.cos(Math.toRadians(lat))));
 		QuadRect bbox = points(null, new LatLon(lat + dLat, lon - dLon), new LatLon(lat - dLat, lon + dLon));

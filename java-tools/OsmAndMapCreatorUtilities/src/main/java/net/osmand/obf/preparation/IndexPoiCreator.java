@@ -53,6 +53,7 @@ import net.osmand.osm.edit.Way;
 import net.osmand.router.RoutingContext;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
+import net.osmand.util.SearchAlgorithms;
 import net.osmand.util.TopTagValuesAnalyzer;
 import net.sf.junidecode.Junidecode;
 
@@ -390,9 +391,13 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			addAltNames(mainValue, rulType, mainValue);
 			// add all names as alternative "tag" name (alternative brand names)
 			if (mainValue.equalsIgnoreCase(tempNames.get("name"))) {
+				int mainValueParts = SearchAlgorithms.split(mainValue).size();
 				for (String k : tempNames.keySet()) {
 					if (k.startsWith("name:")) {
-						addAltNamesMix(mainValue, rulType, tempNames.get(k));
+						String v = tempNames.get(k);
+						if (SearchAlgorithms.split(v).size() == mainValueParts) {
+							addAltNamesMix(mainValue, rulType, v);
+						}
 					}
 				}
 			}

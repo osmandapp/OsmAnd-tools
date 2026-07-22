@@ -1,24 +1,33 @@
 package net.osmand.search;
 
-import net.osmand.ResultMatcher;
-import net.osmand.binary.BinaryMapAddressReaderAdapter;
-import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.binary.BinaryMapPoiReaderAdapter;
-import net.osmand.binary.BinaryMapRouteReaderAdapter;
-import net.osmand.binary.RouteDataObject;
-import net.osmand.data.Amenity;
-import net.osmand.data.City;
-import net.osmand.data.LatLon;
-import net.osmand.data.Street;
-import net.osmand.data.Building;
-import net.osmand.obf.OBFDataCreator;
-import net.osmand.obf.preparation.IndexAddressCreator;
-import net.osmand.obf.preparation.IndexCreator;
-import net.osmand.obf.preparation.IndexPoiCreator;
-import net.osmand.osm.AbstractPoiType;
-import net.osmand.osm.MapPoiTypes;
-import net.osmand.search.core.*;
-import net.osmand.util.Algorithms;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStreamWriter;
+import java.io.RandomAccessFile;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
+
 import org.apache.commons.codec.digest.DigestUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -31,13 +40,26 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.xmlpull.v1.XmlPullParserException;
 
-import java.io.*;
-import java.nio.charset.StandardCharsets;
-import java.sql.SQLException;
-import java.util.*;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
+import net.osmand.ResultMatcher;
+import net.osmand.binary.BinaryMapAddressReaderAdapter;
+import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.BinaryMapPoiReaderAdapter;
+import net.osmand.binary.BinaryMapRouteReaderAdapter;
+import net.osmand.binary.RouteDataObject;
+import net.osmand.data.Amenity;
+import net.osmand.data.Building;
+import net.osmand.data.City;
+import net.osmand.data.LatLon;
+import net.osmand.data.Street;
+import net.osmand.obf.OBFDataCreator;
+import net.osmand.obf.preparation.IndexAddressCreator;
+import net.osmand.obf.preparation.IndexCreator;
+import net.osmand.obf.preparation.IndexPoiCreator;
+import net.osmand.osm.AbstractPoiType;
+import net.osmand.osm.MapPoiTypes;
+import net.osmand.search.core.SearchCoreFactory;
+import net.osmand.search.core.spatial.SpatialTestSearchEngine;
+import net.osmand.util.Algorithms;
 
 /**
  * Unit-test class is responsible for:
@@ -68,6 +90,7 @@ public class SearchUICoreGenOBFTest {
 	private static final boolean TEST_EXTRA_RESULTS = true;
 	private static final List<Class<?>> OBF_GENERATE_CLASSES = List.of(IndexCreator.class, IndexPoiCreator.class,
 			IndexAddressCreator.class);
+	private static final String HASH_VERSION = "1";
 	private static final String OBF_HASH_FILE_NAME = ".obf.hash";
 	private static final boolean RUN_IGNORED_TESTS = false;
 	private static final boolean TEST_NUMBER_MATCHED = true;
@@ -80,7 +103,8 @@ public class SearchUICoreGenOBFTest {
     private Set<String> searchKeywords;
 
     public interface SearchTestEngine {
-        List<String> apply(String text, List<String> expectedResults) throws IOException;
+    	
+        List<String> search(String text, boolean print) throws IOException;
         
         void close();
     }
@@ -487,7 +511,7 @@ public class SearchUICoreGenOBFTest {
 			String text = phrases.get(k);
 			List<String> expectedResults = results.get(k);
 
-			List<String> actualResults = engine.apply(text, expectedResults);
+			List<String> actualResults = engine.search(text, false);
 			for (int i = 0; i < expectedResults.size(); i++) {
 				String expected = expectedResults.get(i);
 				String actual = i >= actualResults.size() ? null : actualResults.get(i);
@@ -502,6 +526,7 @@ public class SearchUICoreGenOBFTest {
 				expected = expected.replaceFirst("^@", "");
 				String present = actual == null ? ("#MISSING " + (i + 1)) : actual;
 				if (!Algorithms.stringsEqual(expected, present)) {
+					engine.search(text, true);
 					System.out.printf("Phrase: %s%n", text);
 					System.out.printf("Mismatch #%s for '%s' != '%s'. %n", i + 1, expected, present);
 					System.out.println("CURRENT RESULTS: ");
@@ -920,6 +945,7 @@ public class SearchUICoreGenOBFTest {
 		}
 
 		String allHashesCombined = String.join("\n", individualHashes);
+		allHashesCombined += HASH_VERSION;
 		return DigestUtils.sha256Hex(allHashesCombined);
 	}
 

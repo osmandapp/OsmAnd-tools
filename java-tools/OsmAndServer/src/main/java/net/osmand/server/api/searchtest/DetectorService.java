@@ -171,7 +171,9 @@ public interface DetectorService extends OBFService {
 			@JsonProperty("name") String name,
 			@JsonProperty("queries") String[] queries,
 			@JsonProperty("resultsLimit") Integer resultsLimit,
-			@JsonProperty("geocodingLimit") Integer geocodingLimit) {}
+			@JsonProperty("geocodingLimit") Integer geocodingLimit,
+			@JsonProperty("quote") Double quote,
+			@JsonProperty("radius") Integer radius) {}
 
 	record UnitTestResultsData(List<List<String>> results, JSONArray routing) {}
 	record UnitTestSourceData(String jsonFilePath, List<String> jsonFilePaths, SearchSettings settings) {
@@ -191,7 +193,8 @@ public interface DetectorService extends OBFService {
 			if (sourceData.jsonFilePath == null) {
 				return;
 			}
-			File jsonFile = dirPath.resolve(unitTest.name + ".json").toFile();
+			File configJsonFile = dirPath.resolve(unitTest.name + ".json").toFile();
+			File sourceJsonFile = gzip(new File(sourceData.jsonFilePath));
 
 			OBFDataCreator creator = new OBFDataCreator();
 			File outFile = creator.create(dirPath.resolve(unitTest.name + ".obf").toAbsolutePath().toString(),
@@ -215,24 +218,31 @@ public interface DetectorService extends OBFService {
 			rootJson.put("phrases", unitTest.queries());
 			rootJson.put("results", formattedResultsJson);
 			String unitTestJson = new JSONObject(rootJson).toString(4) + "\n";
-			Files.writeString(jsonFile.toPath(), unitTestJson, StandardCharsets.UTF_8);
+			Files.writeString(configJsonFile.toPath(), unitTestJson, StandardCharsets.UTF_8);
 			try (ZipOutputStream zipOut = new ZipOutputStream(out)) {
 				// JSON metadata entry
-				if (jsonFile.exists()) {
-					ZipEntry jsonEntry = new ZipEntry(jsonFile.getName());
-					zipOut.putNextEntry(jsonEntry);
-					try (InputStream jsonIn = new StringInputStream(unitTestJson)) {
-						Algorithms.streamCopy(jsonIn, zipOut);
+				if (configJsonFile.exists()) {
+					zipOut.putNextEntry(new ZipEntry(configJsonFile.getName()));
+					try (InputStream is = new StringInputStream(unitTestJson)) {
+						Algorithms.streamCopy(is, zipOut);
 					}
 					zipOut.closeEntry();
 				}
 
+				// JSON source entry
+				if (sourceJsonFile.exists()) {
+					zipOut.putNextEntry(new ZipEntry(sourceJsonFile.getName()));
+					try (InputStream is = new FileInputStream(sourceJsonFile)) {
+						Algorithms.streamCopy(is, zipOut);
+					}
+					zipOut.closeEntry();
+				}
+				
 				// Gzipped data archive entry
 				if (outFile.exists()) {
-					ZipEntry gzEntry = new ZipEntry(outFile.getName());
-					zipOut.putNextEntry(gzEntry);
-					try (InputStream gzIn = new FileInputStream(outFile)) {
-						Algorithms.streamCopy(gzIn, zipOut);
+					zipOut.putNextEntry(new ZipEntry(outFile.getName()));
+					try (InputStream is = new FileInputStream(outFile)) {
+						Algorithms.streamCopy(is, zipOut);
 					}
 					zipOut.closeEntry();
 				}
@@ -263,11 +273,37 @@ public interface DetectorService extends OBFService {
 		return results;
 	}
 
-	private void collectUnitTestSourceData(SearchService.SearchContext ctx, SearchService.SpatialResults spatialResponse, Map<Long, City> cities, Map<String, Amenity> amenities) {
+	private void collectUnitTestCity(City city, Map<Long, City> cities) {
+		if (city == null || city.getId() == null) {
+			return;
+		}
+		City existing = cities.get(city.getId());
+		if (existing == null) {
+			cities.put(city.getId(), city);
+		} else {
+			existing.mergeWith(city);
+		}
+	}
+
+	private String amenityKey(Amenity amenity) {
+		return amenity.getId() + "|" + amenity.getType() + "|" + amenity.getSubType();
+	}
+
+	private boolean isWithinUnitTestSourceRadius(MapObject object, LatLon point, Integer radius) {
+		if (radius == null || radius <= 0) {
+			return true;
+		}
+		return object != null && object.getLocation() != null && point != null
+				&& MapUtils.getDistance(point, object.getLocation()) < radius;
+	}
+
+	private void collectUnitTestSourceData(SearchService.SpatialResults spatialResponse, Map<Long, City> cities, Map<String, Amenity> amenities, LatLon point, UnitTestPayload unitTest) {
 		if (spatialResponse == null || spatialResponse.results() == null || spatialResponse.results().mainResults == null) {
 			return;
 		}
-		for (SpatialSearchResult res : spatialResponse.results().mainResults) {
+		List<SpatialSearchResult> mainResults = spatialResponse.results().mainResults;
+		for (int i = 0; i < Math.min(unitTest.resultsLimit(), mainResults.size()); i++) {
+			SpatialSearchResult res = mainResults.get(i);
 			if (res == null) {
 				continue;
 			}
@@ -291,20 +327,64 @@ public interface DetectorService extends OBFService {
 		}
 	}
 
-	private void collectUnitTestCity(City city, Map<Long, City> cities) {
-		if (city == null || city.getId() == null) {
-			return;
+	private void filterSourceData(Map<String, Amenity> amenities, Map<Long, City> cities, UnitTestPayload unitTest) {
+		int before = amenities.size();
+		Double quote = unitTest.quote;
+		if (quote != null && quote < 1.0) {
+			amenities.entrySet().removeIf(entry -> Math.random() >= quote);
 		}
-		City existing = cities.get(city.getId());
-		if (existing == null) {
-			cities.put(city.getId(), city);
-		} else {
-			existing.mergeWith(city);
+		getLogger().info("Amenities: before = {}, after={}", before, amenities.size());
+
+		before = cities.size();
+		if (quote != null && quote < 1.0) {
+			cities.entrySet().removeIf(e -> (e.getValue().getStreets() == null || e.getValue().getStreets().isEmpty()) && Math.random() >= quote);
 		}
+		getLogger().info("Cities: before = {}, after={}", before, cities.size());
+		
+		before = 0;
+		int after = 0;
+		for (City city : cities.values()) {
+			List<Street> streets = city.getStreets();
+			if (streets == null || streets.isEmpty()) {
+				continue;
+			}
+			before += streets.size();
+			if (quote != null && quote < 1.0) {
+				streets.removeIf(street -> Math.random() >= quote);
+			}
+			after += streets.size();
+		}
+		getLogger().info("Streets: before = {}, after={}", before, after);
 	}
 
-	private String amenityKey(Amenity amenity) {
-		return amenity.getId() + "|" + amenity.getType() + "|" + amenity.getSubType();
+	private void collectUnitTestSourceData(JSONObject sourceJson, Map<String, Amenity> amenities, Map<Long, City> cities,
+	                                       LatLon point, UnitTestPayload unitTest) {
+		JSONArray amenitiesJson = sourceJson.optJSONArray("amenities");
+		if (amenitiesJson != null) {
+			for (int i = 0; i < amenitiesJson.length(); i++) {
+				Amenity amenity = Amenity.parseJSON(amenitiesJson.getJSONObject(i));
+				if (isWithinUnitTestSourceRadius(amenity, point, unitTest.radius())) {
+					amenities.putIfAbsent(amenityKey(amenity), amenity);
+				}
+			}
+		}
+
+		JSONArray citiesJson = sourceJson.optJSONArray("cities");
+		if (citiesJson != null) {
+			for (int i = 0; i < citiesJson.length(); i++) {
+				City city = City.parseJSON(citiesJson.getJSONObject(i));
+				city.getStreets().removeIf(street -> !isWithinUnitTestSourceRadius(street, point, unitTest.radius()));
+				if (!isWithinUnitTestSourceRadius(city, point, unitTest.radius()) && city.getStreets().isEmpty()) {
+					continue;
+				}
+				City existing = cities.get(city.getId());
+				if (existing == null) {
+					cities.put(city.getId(), city);
+				} else {
+					existing.mergeWith(city);
+				}
+			}
+		}
 	}
 	
 	private UnitTestSourceData createUnitTestSourceData(UnitTestPayload unitTest, SearchService.SearchContext baseCtx,
@@ -316,21 +396,29 @@ public interface DetectorService extends OBFService {
 		String[] queries = normalizedUnitTestQueries(unitTest.queries(), baseCtx.text());
 		LinkedHashMap<String, Amenity> amenities = new LinkedHashMap<>();
 		LinkedHashMap<Long, City> cities = new LinkedHashMap<>();
-		SearchSettings settings = new SearchSettings(Collections.emptyList());
+		SearchSettings settings = null;
+		LatLon point = new LatLon(baseCtx.lat(), baseCtx.lon());
         for (String q : queries) {
             SearchService.SearchContext ctx = new SearchService.SearchContext(
                     baseCtx.lat(), baseCtx.lon(), q, baseCtx.locale(),
                     baseCtx.baseSearch(), baseCtx.northWest(), baseCtx.southEast());
-			
-			if (spatial != null && spatial) {
-				SearchService.SpatialResults spatialResults = getSearchService().searchTestSpatial(ctx, options, null, true);
-				collectUnitTestSourceData(ctx, spatialResults, cities, amenities);
-			} else {
-				SearchService.SearchResults results = getSearchService().getImmediateSearchResults(ctx, options, null);
-				settings = results.settings();
-				collectUnitTestSourceData(results.unitTestJson(), amenities, cities);
-			}
+
+			SearchService.SearchResults results = getSearchService().getImmediateSearchResults(ctx, options, null);
+			collectUnitTestSourceData(results.unitTestJson(), amenities, cities, point, unitTest);
+			settings = results.settings();
         }
+		if (spatial != null && spatial) {
+			settings = new SearchSettings(Collections.emptyList());
+			for (String q : queries) {
+				SearchService.SearchContext ctx = new SearchService.SearchContext(
+						baseCtx.lat(), baseCtx.lon(), q, baseCtx.locale(),
+						baseCtx.baseSearch(), baseCtx.northWest(), baseCtx.southEast());
+				
+				SearchService.SpatialResults spatialResults = getSearchService().searchTestSpatial(ctx, options, null, false);
+				collectUnitTestSourceData(spatialResults, cities, amenities, point, unitTest);
+			}
+		}
+		filterSourceData(amenities, cities, unitTest);
 		
 		return createUnitTestJson(dirPath, unitTest.name, settings, routing, amenities, cities);
 	}
@@ -376,29 +464,6 @@ public interface DetectorService extends OBFService {
 			normalized.add(fallbackQuery);
 		}
 		return normalized.toArray(new String[0]);
-	}
-
-	private void collectUnitTestSourceData(String unitTestJson, Map<String, Amenity> amenities, Map<Long, City> cities) {
-		JSONObject sourceJson = new JSONObject(unitTestJson);
-		JSONArray amenitiesJson = sourceJson.optJSONArray("amenities");
-		if (amenitiesJson != null) {
-			for (int i = 0; i < amenitiesJson.length(); i++) {
-				Amenity amenity = Amenity.parseJSON(amenitiesJson.getJSONObject(i));
-				amenities.putIfAbsent(amenityKey(amenity), amenity);
-			}
-		}
-		JSONArray citiesJson = sourceJson.optJSONArray("cities");
-		if (citiesJson != null) {
-			for (int i = 0; i < citiesJson.length(); i++) {
-				City city = City.parseJSON(citiesJson.getJSONObject(i));
-				City existing = cities.get(city.getId());
-				if (existing == null) {
-					cities.put(city.getId(), city);
-				} else {
-					existing.mergeWith(city);
-				}
-			}
-		}
 	}
 
 	private UnitTestResultsData buildUnitTestResults(String[] phrases, SearchService.SearchContext baseCtx, int limit, int geocodingLimit) throws IOException {

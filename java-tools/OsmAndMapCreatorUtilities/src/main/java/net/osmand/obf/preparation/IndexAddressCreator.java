@@ -148,6 +148,10 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 		LatLon l = city.getLocation();
 		city.setNames(getOtherNames(e));
+		String wikidata = e.getTag(MapObject.NAME_WIKIDATA_ATTR);
+		if (wikidata != null) {
+			city.setName(MapObject.NAME_WIKIDATA_ATTR, wikidata);
+		}
 		if (!Algorithms.isEmpty(city.getName())) {
 			cityDataStorage.registerObject(l.getLatitude(), l.getLongitude(), city, e);
 			debugCityIds.add(city.getId());
@@ -1252,12 +1256,13 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		writer.startCityBlockIndex(CityBlocks.POSTCODES_TYPE.index);
 		ArrayList<City> posts = new ArrayList<City>(postcodes.values());
 		for (City s : posts) {
-			// TODO Enable in 5.3 (5.2 version will support postcode ordinal)
-//			refs.add(writer.writeCityHeader(s, CityType.POSTCODE.ordinal(), tagRules));
-			if(s.getBbox31() == null) {
+			if (s.getBbox31() == null) {
 				s.calculateBbox31FromStreets();
 			}
+			// TODO Enable in 5.3 (since 5.2 version will support postcode ordinal)
+//			refs.add(writer.writeCityHeader(s, CityType.POSTCODE.ordinal(), tagRules));
 			refs.add(writer.writeCityHeader(s, -1, tagRules));
+			
 		}
 		for (int i = 0; i < posts.size(); i++) {
 			City postCode = posts.get(i);
