@@ -182,6 +182,8 @@ public class SearchService {
 		}
 
 		public boolean useLimit;
+		// spatial search was requested but found nothing / category unsupported - results are from the old scan
+		public boolean oldSearch;
 		public boolean mapLimitExceeded;
 		public boolean alreadyFound;
 		public FeatureCollection features;
@@ -1106,6 +1108,7 @@ public class SearchService {
 		QuadRect searchBbox = getSearchBbox(data.bbox);
 		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
 		boolean useLimit = false;
+		boolean[] spatialFallback = new boolean[1];
 		try {
 			List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = getMapsForSearch(searchBbox, baseSearch);
 			if (mapList.isEmpty()) {
@@ -1116,7 +1119,7 @@ public class SearchService {
 
 			if (data.categories.size() == 1) {
 				searchPoiByTypeCategory(data.categories.get(0), locale, searchBbox, usedMapList, foundFeatures,
-						spatial, zoom, timeZone);
+						spatial, zoom, spatialFallback, timeZone);
 				useLimit = foundFeatures.size() >= TOTAL_LIMIT_POI;
 			} else {
 				PoiSearchLimit poiSearchLimit = new PoiSearchLimit(TOTAL_LIMIT_POI / data.categories.size(),
@@ -1128,7 +1131,7 @@ public class SearchService {
 					}
 					int categoryStartSize = foundFeatures.size();
 					searchPoiByTypeCategory(categoryObj, locale, searchBbox, usedMapList, foundFeatures, poiSearchLimit,
-							spatial, zoom, timeZone);
+							spatial, zoom, spatialFallback, timeZone);
 					int categoryEndSize = foundFeatures.size();
 					poiSearchLimit.updateAfterCategory(categoryStartSize, categoryEndSize);
 					if (poiSearchLimit.useLimit) {
@@ -1143,7 +1146,10 @@ public class SearchService {
 		List<Feature> features = new ArrayList<>(foundFeatures.values());
 		if (!features.isEmpty()) {
 			sortPoiResultsByDistance(features, center);
-			return new PoiSearchResult(useLimit, false, false, new FeatureCollection(features.toArray(new Feature[0])));
+			PoiSearchResult result = new PoiSearchResult(useLimit, false, false,
+					new FeatureCollection(features.toArray(new Feature[0])));
+			result.oldSearch = spatial && spatialFallback[0];
+			return result;
 		} else {
 			return new PoiSearchResult(false, false, false, null);
 		}
@@ -1151,19 +1157,25 @@ public class SearchService {
 
 	private void searchPoiByTypeCategory(PoiSearchCategory categoryObj, String locale, QuadRect searchBbox,
 	                                     List<BinaryMapIndexReader> readers, Map<Long, Feature> foundFeatures, boolean spatial, int zoom,
-	                                     String timeZone) throws IOException {
-		searchPoiByTypeCategory(categoryObj, locale, searchBbox, readers, foundFeatures, null, spatial, zoom, timeZone);
+	                                     boolean[] spatialFallback, String timeZone) throws IOException {
+		searchPoiByTypeCategory(categoryObj, locale, searchBbox, readers, foundFeatures, null, spatial, zoom,
+				spatialFallback, timeZone);
 	}
 
 	private void searchPoiByTypeCategory(PoiSearchCategory categoryObj, String locale, QuadRect searchBbox,
 	                                     List<BinaryMapIndexReader> readers, Map<Long, Feature> foundFeatures, PoiSearchLimit poiSearchLimit,
-	                                     boolean spatial, int zoom, String timeZone) throws IOException {
+	                                     boolean spatial, int zoom, boolean[] spatialFallback, String timeZone) throws IOException {
 		if (searchBbox == null) {
 			return;
 		}
-		if (spatial && searchPoiByCategorySpatial(categoryObj, locale, searchBbox, readers, foundFeatures,
-				poiSearchLimit, zoom, timeZone)) {
-			return;
+		if (spatial) {
+			if (searchPoiByCategorySpatial(categoryObj, locale, searchBbox, readers, foundFeatures,
+					poiSearchLimit, zoom, timeZone)) {
+				return;
+			}
+			if (spatialFallback != null) {
+				spatialFallback[0] = true;
+			}
 		}
 
 		MapPoiTypes mapPoiTypes = getMapPoiTypes(locale);
@@ -1280,6 +1292,10 @@ public class SearchService {
 					}
 				}
 			}
+		}
+		if (amenities.isEmpty()) {
+			// empty may mean maps without "#^" name-index entries - let the old scan double-check
+			return false;
 		}
 		saveAmenityResults(amenities, foundFeatures, remaining, locale, timeZone);
 		return true;
