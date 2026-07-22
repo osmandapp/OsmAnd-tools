@@ -11,6 +11,7 @@ import static net.osmand.shared.gpx.GpxUtilities.OSM_PREFIX;
 import static net.osmand.util.LocationParser.parseOpenLocationCode;
 import static net.osmand.util.OpeningHoursParser.parseOpenedHours;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
@@ -32,17 +33,21 @@ import java.util.Set;
 import java.util.StringJoiner;
 import java.util.TimeZone;
 import java.util.TreeMap;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import jakarta.annotation.PreDestroy;
 
 import net.osmand.search.core.spatial.SpatialPoiSearch.SpatialPoiType;
 import org.apache.commons.logging.Log;
@@ -145,12 +150,19 @@ public class SearchService {
 
 	private final ConcurrentHashMap<String, MapPoiTypes> poiTypesByLocale = new ConcurrentHashMap<>();
 
-	private final ThreadPoolExecutor spatialSearchThreadPool = 
-			new ThreadPoolExecutor(1, 4, 30, TimeUnit.HOURS, new ArrayBlockingQueue<Runnable>(0));
-	private final ThreadLocal<SpatialTextSearch> spatialTextSearchLocal = ThreadLocal
-			.withInitial(() -> new SpatialTextSearch());
-	private final ThreadLocal<BinaryMapIndexReader> osmandRegionsLocal = ThreadLocal
-			.withInitial(() -> openRegionsReader());
+	private final AtomicInteger spatialSearchThreadNum = new AtomicInteger();
+	private final ThreadPoolExecutor spatialSearchThreadPool = new ThreadPoolExecutor(
+			1, 4, 10, TimeUnit.MINUTES, new SynchronousQueue<>(),
+			r -> {
+				Thread t = new Thread(r, "spatial-search-" + spatialSearchThreadNum.incrementAndGet());
+				t.setDaemon(true);
+				return t;
+			});
+	// shared between pool threads: SpatialSearchGlobalCache is concurrent (per-file locking),
+	// so all threads reuse one prefix cache instead of 4 independent ones
+	private final SpatialTextSearch spatialTextSearch = new SpatialTextSearch();
+	private final ThreadLocal<RegionsReaderHolder> osmandRegionsLocal = ThreadLocal
+			.withInitial(() -> new RegionsReaderHolder());
 	// reused for cache
 	private SpatialPoiSearch poiSearch; 
 
@@ -368,7 +380,6 @@ public class SearchService {
 		SpatialSearchContext.SpatialSearchStats stats = sscontext.getStats();
 		stats.printLogs = printLogs;
 		
-		SpatialTextSearch spatialTextSearch = spatialTextSearchLocal.get();
 		SpatialSearchResults results = spatialTextSearch.searchAPI(ctx.text, sscontext);
 		return new SpatialResults(results, stats);
 	}
@@ -423,9 +434,46 @@ public class SearchService {
 			}
 			return new BinaryMapIndexReader(new RandomAccessFile(regionsReader.getFile(), "r"), regionsReader);
 		} catch (Exception e) {
-			LOGGER.warn("Failed to close spatial test reader.", e);
+			LOGGER.warn("Failed to open regions reader for spatial search.", e);
 		}
-		return regionsReader;
+		return null;
+	}
+
+	private static class RegionsReaderHolder {
+		BinaryMapIndexReader reader;
+		long fileTimestamp;
+	}
+
+	/**
+	 * Regions reader owned by the current pool thread: reopened if the underlying
+	 * obf file was updated, retried if the previous attempt to open it failed.
+	 */
+	private BinaryMapIndexReader regionsReaderForThread() {
+		RegionsReaderHolder holder = osmandRegionsLocal.get();
+		BinaryMapIndexReader shared = osmandRegions == null ? null : osmandRegions.getFile();
+		File regionsFile = shared == null ? null : shared.getFile();
+		if (regionsFile == null) {
+			return holder.reader;
+		}
+		long ts = regionsFile.lastModified();
+		if (holder.reader != null && holder.fileTimestamp != ts) {
+			try {
+				holder.reader.close();
+			} catch (IOException e) {
+				LOGGER.warn("Failed to close outdated regions reader.", e);
+			}
+			holder.reader = null;
+		}
+		if (holder.reader == null) {
+			holder.reader = openRegionsReader();
+			holder.fileTimestamp = ts;
+		}
+		return holder.reader;
+	}
+
+	@PreDestroy
+	public void shutdownSpatialSearchPool() {
+		spatialSearchThreadPool.shutdownNow();
 	}
 
 	public void closeReaders(List<BinaryMapIndexReader> readers) {
@@ -441,13 +489,16 @@ public class SearchService {
 		}
 	}
 
-	public SpatialResponse searchSpatial(SearchContext ctx, String timeZone, boolean autocomplete) throws IOException, InterruptedException, ExecutionException, TimeoutException {
+	public SpatialResponse searchSpatial(SearchContext ctx, String timeZone, boolean autocomplete) throws IOException {
 		long sTime = System.currentTimeMillis();
 		SpatialResponse response = new SpatialResponse();
 		if (!osmAndMapsService.validateAndInitConfig()) {
 			return response;
 		}
 		final boolean[] cancelled = new boolean[1];
+		// suggestions must fail fast, full search gets the long budget
+		final long timeoutMs = autocomplete ? 3_000 : 15_000;
+		boolean readersOwnedByWorker = false;
 //		double radius = SearchOption.SEARCH_RADIUS_DEGREE;
 //		QuadRect points = osmAndMapsService.points(null,
 //				new LatLon(ctx.lat + radius, ctx.lon - radius),
@@ -478,12 +529,12 @@ public class SearchService {
 			SpatialTextSearchSettings settings = autocomplete
 					? SpatialTextSearchSettings.suggestionSettings()
 					: SpatialTextSearchSettings.defaultSettings();
-			List<BinaryMapIndexReader> finalUsedMapList = usedMapList;
+			final List<BinaryMapIndexReader> lockedReaders = usedMapList;
 			final ResultMatcher<SpatialSearchResult> matcher = new ResultMatcher<SpatialSearchResult>() {
 
 				@Override
 				public boolean publish(SpatialSearchResult object) {
-					return false;
+					return false; // used only as a cancellation hook, results are collected by searchAPI
 				}
 
 				@Override
@@ -492,17 +543,28 @@ public class SearchService {
 				}
 			};
 			Future<SpatialSearchResults> task = spatialSearchThreadPool.submit(new Callable<SpatialSearchResults>() {
-				
+
 				@Override
 				public SpatialSearchResults call() throws Exception {
-					SpatialSearchContext sscontext =
-							new SpatialSearchContext(settings, finalUsedMapList, getSpatialPoiTypeSearch(), new LatLon(ctx.lat, ctx.lon));
-					sscontext.resultMatcher = matcher;
-					finalUsedMapList.add(osmandRegionsLocal.get());
-					return spatialTextSearchLocal.get().searchAPI(ctx.text, sscontext);
+					try {
+						// worker owns a private copy: the caller never sees concurrent mutation
+						List<BinaryMapIndexReader> readers = new ArrayList<>(lockedReaders);
+						BinaryMapIndexReader regionsReader = regionsReaderForThread();
+						if (regionsReader != null) {
+							readers.add(regionsReader);
+						}
+						SpatialSearchContext sscontext =
+								new SpatialSearchContext(settings, readers, getSpatialPoiTypeSearch(), new LatLon(ctx.lat, ctx.lon));
+						sscontext.resultMatcher = matcher;
+						return spatialTextSearch.searchAPI(ctx.text, sscontext);
+					} finally {
+						// unlock strictly after the search has really finished (incl. timeout/cancel path)
+						osmAndMapsService.unlockReaders(lockedReaders);
+					}
 				}
-			});			
-			SpatialSearchResults res = task.get(15, TimeUnit.SECONDS);
+			});
+			readersOwnedByWorker = true;
+			SpatialSearchResults res = task.get(timeoutMs, TimeUnit.MILLISECONDS);
 			if (res.mainResults != null) {
 				String dominatedCity = calculateSpatialDominatedCity(res.mainResults, ctx.locale);
 				for (SpatialSearchResult r : res.mainResults) {
@@ -540,11 +602,25 @@ public class SearchService {
 			response.info.put("words-matched", res.combinations == null || res.combinations.size() == 0 ? 0
 					: res.combinations.get(0).getTokenCount());
 //			response.info.put("x", res.combinations == null ? 0 : res.combinations.size());
+		} catch (TimeoutException e) {
+			LOGGER.warn(String.format("Spatial search timeout %d ms for '%s'", timeoutMs, ctx.text));
+			response.info.put("timeout", true);
+		} catch (RejectedExecutionException e) {
+			LOGGER.warn(String.format("Spatial search rejected, all pool threads are busy: '%s'", ctx.text));
+			response.info.put("busy", true);
+		} catch (ExecutionException e) {
+			LOGGER.error(String.format("Spatial search failed for '%s': %s", ctx.text, e.getCause()), e.getCause());
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			LOGGER.warn(String.format("Spatial search interrupted for '%s'", ctx.text));
 		} catch (RuntimeException e) {
 			LOGGER.error(String.format("Spatial search failed for '%s': %s", ctx.text, e), e);
 		} finally {
 			cancelled[0] = true;
-			osmAndMapsService.unlockReaders(usedMapList);
+			if (!readersOwnedByWorker) {
+				// worker never started (early return / rejection / pre-submit failure)
+				osmAndMapsService.unlockReaders(usedMapList);
+			}
 		}
 		return response;
 	}
