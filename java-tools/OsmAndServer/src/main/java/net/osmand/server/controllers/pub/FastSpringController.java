@@ -63,6 +63,9 @@ public class FastSpringController {
 	@Transactional
 	@PostMapping("/order-completed")
 	public ResponseEntity<String> handleOrderCompletedEvent(@RequestBody FastSpringOrderCompletedRequest request) {
+		if (request == null || request.events == null) {
+			return ResponseEntity.badRequest().body("FastSpring: empty request");
+		}
 		for (FastSpringOrderCompletedRequest.Event event : request.events) {
 			if (EVENT_ORDER_COMPLETED.equals(event.type)) {
 				ResponseEntity<String> error = handleOrderCompletedEvent(event);
@@ -96,8 +99,8 @@ public class FastSpringController {
 					List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> existingInApps = deviceInAppPurchasesRepository.findByOrderId(orderId);
 
 					if (existingInApps != null && !existingInApps.isEmpty()) {
-						LOGGER.error("FastSpring: Purchase already recorded");
-						return ResponseEntity.badRequest().body("FastSpring: Purchase already recorded");
+						LOGGER.info("FastSpring: Purchase already recorded for orderId " + orderId + ", skipping");
+						return null;
 					}
 
 					if (sku.contains("osmand_pro_xv")) {
@@ -120,8 +123,8 @@ public class FastSpringController {
 					List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> existingSubscriptions = deviceSubscriptionsRepository.findByOrderId(orderId);
 
 					if (existingSubscriptions != null && !existingSubscriptions.isEmpty()) {
-						LOGGER.error("FastSpring: Subscription already recorded");
-						return ResponseEntity.badRequest().body("FastSpring: Subscription already recorded " + orderId + " " + sku);
+						LOGGER.info("FastSpring: Subscription already recorded for orderId " + orderId + " " + sku + ", skipping");
+						return null;
 					} else {
 						DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription = new DeviceSubscriptionsRepository.SupporterDeviceSubscription();
 						subscription.orderId = orderId;
@@ -160,6 +163,9 @@ public class FastSpringController {
 	@Transactional
 	@PostMapping("/refund")
 	public ResponseEntity<String> handleRefundEvent(@RequestBody FastSpringOrderCompletedRequest request) {
+		if (request == null || request.events == null) {
+			return ResponseEntity.badRequest().body("FastSpring: empty request");
+		}
 		for (FastSpringOrderCompletedRequest.Event event : request.events) {
 			if (HANDLED_EVENTS.contains(event.type)) {
 				ResponseEntity<String> error = dispatchFastSpringEvent(event);
@@ -228,7 +234,11 @@ public class FastSpringController {
 					}
 					try {
 						if (HANDLED_EVENTS.contains(event.type)) {
-							txTemplate.executeWithoutResult(status -> dispatchFastSpringEvent(event));
+							ResponseEntity<String> error = txTemplate.execute(status -> dispatchFastSpringEvent(event));
+							if (error != null) {
+								LOGGER.error("FastSpring: missed event " + event.id + " (" + event.type + ") failed: " + error.getBody());
+								continue;
+							}
 						}
 						// mark unhandled event types processed too, otherwise they pile up
 						// and can fill the page so handled events are never fetched
