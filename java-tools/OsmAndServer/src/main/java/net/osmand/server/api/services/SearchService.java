@@ -140,6 +140,7 @@ public class SearchService {
 	private static final int SEARCH_RADIUS_LEVEL = 1;
 	private static final int TOTAL_LIMIT_POI = 2000;
 	private static final int SPATIAL_POI_CATEGORY_VIEW_ZOOM_SHIFT = 2;
+	private static final String BRAND_TOP_INDEX = "brand";
 	private static final int TOTAL_LIMIT_SEARCH_RESULTS = 15000;
 	private static final int TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB = 1000;
 	private static final double SEARCH_POI_RADIUS_DEGREE = 0.0007;
@@ -1259,7 +1260,9 @@ public class SearchService {
 	private boolean searchPoiByCategorySpatial(PoiSearchCategory categoryObj, String locale, QuadRect searchBbox,
 	                                           List<BinaryMapIndexReader> readers, Map<Long, Feature> foundFeatures, PoiSearchLimit poiSearchLimit,
 	                                           int zoom, String timeZone) throws IOException {
-		if (getSpatialPoiTypeSearch().getByKey(categoryObj.category) == null) {
+		SpatialPoiSearch poiTypeSearch = getSpatialPoiTypeSearch();
+		SpatialPoiType spatialType = resolveSpatialPoiType(poiTypeSearch, categoryObj);
+		if (spatialType == null) {
 			return false;
 		}
 		int remaining = poiSearchLimit != null
@@ -1279,10 +1282,10 @@ public class SearchService {
 		}
 		SpatialSearchContext sscontext = new SpatialSearchContext(
 				SpatialTextSearchSettings.searchPoiByCategorySettings(zoom + SPATIAL_POI_CATEGORY_VIEW_ZOOM_SHIFT,
-						bboxLatLon), readers, getSpatialPoiTypeSearch(), null);
+						bboxLatLon), readers, poiTypeSearch, null);
 		sscontext.getStats().printLogs = false;
 		SpatialSearchResults res = spatialTextSearch
-				.searchAPI(NameIndexReader.POI_CATEGORY_PREFIX + categoryObj.category, sscontext);
+				.searchAPI(NameIndexReader.POI_CATEGORY_PREFIX + spatialType.getKey(), sscontext);
 		List<Amenity> amenities = new ArrayList<>();
 		if (res.mainResults != null) {
 			for (SpatialSearchResult r : res.mainResults) {
@@ -1299,6 +1302,22 @@ public class SearchService {
 		}
 		saveAmenityResults(amenities, foundFeatures, remaining, locale, timeZone);
 		return true;
+	}
+
+	private SpatialPoiType resolveSpatialPoiType(SpatialPoiSearch poiSearch, PoiSearchCategory categoryObj) {
+		SpatialPoiType type = poiSearch.getByKey(categoryObj.category);
+		if (type != null) {
+			return type;
+		}
+		String valueKey = TopIndexFilter.getValueKey(categoryObj.category);
+		if (Algorithms.isNotEmpty(categoryObj.lang)) {
+			type = poiSearch.getByKey(BRAND_TOP_INDEX + ":" + categoryObj.lang + "_" + valueKey);
+			if (type != null) {
+				return type;
+			}
+		}
+
+		return poiSearch.getByKey(BRAND_TOP_INDEX + "_" + valueKey);
 	}
 
 	private BinaryMapIndexReader.SearchRequest<Amenity> createSearchRequestByBrand(BinaryMapIndexReader reader,
