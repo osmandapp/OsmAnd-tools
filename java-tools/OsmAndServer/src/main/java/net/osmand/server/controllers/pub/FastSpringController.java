@@ -76,6 +76,10 @@ public class FastSpringController {
 
 	private ResponseEntity<String> handleOrderCompletedEvent(FastSpringOrderCompletedRequest.Event event) {
 		FastSpringOrderCompletedRequest.Data data = event.data;
+		if (data == null || data.tags == null || data.tags.userEmail == null || data.items == null) {
+			LOGGER.error("FastSpring: order.completed event " + event.id + " without user email or items, skipping");
+			return null;
+		}
 		String email = data.tags.userEmail;
 		CloudUsersRepository.CloudUser user = usersRepository.findByEmailIgnoreCase(email);
 		if (user != null) {
@@ -214,22 +218,26 @@ public class FastSpringController {
 				if (resp == null || resp.events == null || resp.events.isEmpty()) {
 					return;
 				}
-				int handled = 0;
+				int marked = 0;
 				for (FastSpringOrderCompletedRequest.Event event : resp.events) {
-					if (!HANDLED_EVENTS.contains(event.type)) {
+					if (event.id == null) {
 						continue;
 					}
 					try {
-						txTemplate.executeWithoutResult(status -> dispatchFastSpringEvent(event));
-						if (event.id != null && FastSpringHelper.markEventProcessed(event.id)) {
-							handled++;
+						if (HANDLED_EVENTS.contains(event.type)) {
+							txTemplate.executeWithoutResult(status -> dispatchFastSpringEvent(event));
+						}
+						// mark unhandled event types processed too, otherwise they pile up
+						// and can fill the page so handled events are never fetched
+						if (FastSpringHelper.markEventProcessed(event.id)) {
+							marked++;
 						}
 					} catch (Exception e) {
 						LOGGER.error("FastSpring: failed to process missed event " + event.id
 								+ " (" + event.type + "): " + e.getMessage(), e);
 					}
 				}
-				if (handled == 0) {
+				if (marked == 0) {
 					return;
 				}
 			}
