@@ -14,7 +14,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Controller;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
@@ -44,6 +46,9 @@ public class FastSpringController {
 
 	@Autowired
 	protected PurchasesDataLoader purchasesDataLoader;
+
+	@Autowired
+	protected PlatformTransactionManager transactionManager;
 
 	private static final Log LOGGER = PlatformUtil.getLog(FastSpringController.class);
 	private static final long DAY = 24L * 60 * 60 * 1000;
@@ -196,10 +201,10 @@ public class FastSpringController {
 	}
 
 	// https://developer.fastspring.com/reference/processed-and-unprocessed-webhook-events
-	@Transactional
 	@Scheduled(fixedRate = DAY)
 	public void processMissedFastSpringEvents() {
 		try {
+			TransactionTemplate txTemplate = new TransactionTemplate(transactionManager);
 			while (true) {
 				String json = FastSpringHelper.getUnprocessedEvents(EVENTS_LOOKBACK_DAYS);
 				if (json == null) {
@@ -214,9 +219,14 @@ public class FastSpringController {
 					if (!HANDLED_EVENTS.contains(event.type)) {
 						continue;
 					}
-					dispatchFastSpringEvent(event);
-					if (event.id != null && FastSpringHelper.markEventProcessed(event.id)) {
-						handled++;
+					try {
+						txTemplate.executeWithoutResult(status -> dispatchFastSpringEvent(event));
+						if (event.id != null && FastSpringHelper.markEventProcessed(event.id)) {
+							handled++;
+						}
+					} catch (Exception e) {
+						LOGGER.error("FastSpring: failed to process missed event " + event.id
+								+ " (" + event.type + "): " + e.getMessage(), e);
 					}
 				}
 				if (handled == 0) {
