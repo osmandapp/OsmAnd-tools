@@ -1359,26 +1359,26 @@ public class SearchService {
 		return res;
 	}
 
-	public Map<String, Object> checkTagsVisibility(Map<String, String> tags) {
+	public List<Map<String, Object>> getVisibleTags(Map<String, String> tags) {
 		if (tags == null || tags.isEmpty()) {
-			return Collections.emptyMap();
+			return Collections.emptyList();
 		}
 		AdditionalInfoBundle infoFilter = new AdditionalInfoBundle(MapPoiTypes.getDefault(), tags);
 		Map<String, Object> visible = new HashMap<>();
 		infoFilter.getFilteredLocalizedInfo().forEach((key, value) -> {
-			if (!infoFilter.shouldDisplayKey(key) && !key.equals(NAME)) {
+			if (!infoFilter.shouldDisplayKey(key)) {
 				return;
 			}
 			String vl = null;
 			if (value instanceof String str) {
-				if (infoFilter.isKeyToSkip(key)) {
+				if (infoFilter.isKeyToSkip(key) || key.equals("note")) {
 					return;
 				}
 				vl = str;
 			}
 			PoiType poiType = infoFilter.getPoiAdditionalType(key, vl);
 			if (poiType == null) {
-				poiType = infoFilter.getPoiAdditionalType(key.replaceAll(":", "_"), vl);
+				poiType = infoFilter.getPoiAdditionalType(key.replace(':', '_'), vl);
 			}
 			if (poiType == null || poiType.isFilterOnly()) {
 				return;
@@ -1390,7 +1390,58 @@ public class SearchService {
 				visible.put(key, value);
 			}
 		});
-		return visible;
+		return groupLocalizedTags(visible);
+	}
+
+	private record LocalizedValue(String key, String value, String lang) {
+	}
+
+	private List<Map<String, Object>> groupLocalizedTags(Map<String, Object> tags) {
+		List<Map<String, Object>> result = new ArrayList<>();
+		tags.forEach((key, value) -> {
+			if (value instanceof String valueStr) {
+				result.add(Map.of("key", key, "value", valueStr));
+				return;
+			}
+			if (!(value instanceof Map<?, ?> valueMap)
+					|| !(valueMap.get("localizations") instanceof Map<?, ?> localizations)) {
+				return;
+			}
+			List<LocalizedValue> entries = new ArrayList<>();
+			localizations.forEach((k, v) -> {
+				String ks = String.valueOf(k);
+				int idx = ks.indexOf(':');
+				entries.add(idx >= 0
+						? new LocalizedValue(ks.substring(0, idx), String.valueOf(v), ks.substring(idx + 1))
+						: new LocalizedValue(ks, String.valueOf(v), null));
+			});
+			LocalizedValue mainEntry = entries.stream().filter(e -> e.lang() != null).findFirst().orElse(null);
+			if (mainEntry != null) {
+				Map<String, Object> entry = new HashMap<>();
+				entry.put("key", key);
+				entry.put("value", mainEntry.value());
+				entry.put("lang", mainEntry.lang());
+				List<Map<String, Object>> otherLangs = entries.stream()
+						.filter(e -> e != mainEntry)
+						.map(e -> {
+							Map<String, Object> otherLengsMap = new HashMap<>();
+							otherLengsMap.put("key", e.key());
+							otherLengsMap.put("value", e.value());
+							if (e.lang() != null) {
+								otherLengsMap.put("lang", e.lang());
+							}
+							return otherLengsMap;
+						})
+						.collect(Collectors.toList());
+				if (!otherLangs.isEmpty()) {
+					entry.put("otherLangs", otherLangs);
+				}
+				result.add(entry);
+			} else if (!entries.isEmpty()) {
+				result.add(Map.of("key", key, "value", entries.get(0).value()));
+			}
+		});
+		return result;
 	}
 
 	private Map<String, String> getTranslations(String locale) {
