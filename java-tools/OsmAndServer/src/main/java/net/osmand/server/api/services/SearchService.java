@@ -1309,18 +1309,29 @@ public class SearchService {
 	                                                                               PoiSearchCategory categoryObj, MapPoiTypes mapPoiTypes, int left31, int right31, int top31, int bottom31)
 			throws IOException {
 		List<BinaryMapPoiReaderAdapter.PoiSubType> brands = reader.getTopIndexSubTypes();
-		String lang = categoryObj.lang;
-		BinaryMapPoiReaderAdapter.PoiSubType selectedBrand = brands.stream()
-				.filter(brand -> brand.name.contains(":") && brand.name.split(":")[1].equalsIgnoreCase(lang))
-				.findFirst()
-				.orElseGet(() -> brands.stream().filter(brand -> !brand.name.contains(":")).findFirst().orElse(null));
+		// canonical key ("top_index_<subtype>_<valueKey>") is resolved against this reader's own
+		// top-index subtypes: values differ per map and the filter needs the raw value
+		BinaryMapPoiReaderAdapter.PoiSubType selectedBrand = null;
+		String brandValueToSearch = null;
+		for (BinaryMapPoiReaderAdapter.PoiSubType subType : brands) {
+			String subTypePrefix = subType.name + "_";
+			if (!categoryObj.category.startsWith(subTypePrefix) || subType.possibleValues == null) {
+				continue;
+			}
+			String valueKey = categoryObj.category.substring(subTypePrefix.length());
+			for (String value : subType.possibleValues) {
+				if (TopIndexFilter.getValueKey(value).equals(valueKey)) {
+					selectedBrand = subType;
+					brandValueToSearch = value;
+					break;
+				}
+			}
+			if (selectedBrand != null) {
+				break;
+			}
+		}
 		if (selectedBrand == null) {
 			return null;
-		}
-		String brandValueToSearch = categoryObj.category;
-		SpatialPoiType spatialBrand = getSpatialPoiTypeSearch().getByKey(brandValueToSearch);
-		if (spatialBrand != null && spatialBrand.poiAdditional != null) {
-			brandValueToSearch = spatialBrand.poiAdditional;
 		}
 		TopIndexFilter brandFilter = new TopIndexFilter(selectedBrand, mapPoiTypes, brandValueToSearch);
 		SearchPoiTypeFilter filter = BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER;
