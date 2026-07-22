@@ -93,7 +93,6 @@ public class SearchUICoreGenOBFTest {
 	private static final String HASH_VERSION = "1";
 	private static final String OBF_HASH_FILE_NAME = ".obf.hash";
 	private static final boolean RUN_IGNORED_TESTS = false;
-	private static final boolean TEST_NUMBER_MATCHED = true;
 	
 	private static final boolean FILTER_DATA_JSON = false;
 	private static final double FILTER_REMOVE_PROBABILITY = 0.8; // means 80% probability of removal
@@ -515,18 +514,17 @@ public class SearchUICoreGenOBFTest {
 			for (int i = 0; i < expectedResults.size(); i++) {
 				String expected = expectedResults.get(i);
 				String actual = i >= actualResults.size() ? null : actualResults.get(i);
-				int shift = TEST_NUMBER_MATCHED ? 4 : 0;
 				if (expected.indexOf('[') != -1) {
-					expected = expected.substring(0, expected.indexOf('[') + shift).trim();
+					expected = expected.substring(0, expected.indexOf('[')).trim();
 				}
 				if (actual != null && actual.indexOf('[') != -1) {
-					actual = actual.substring(0, actual.indexOf('[') + shift).trim();
+					actual = actual.substring(0, actual.indexOf('[')).trim();
 				}
 				// String present = result.toString();
 				expected = expected.replaceFirst("^@", "");
 				String present = actual == null ? ("#MISSING " + (i + 1)) : actual;
 				if (!Algorithms.stringsEqual(expected, present)) {
-					engine.search(text, true);
+					engine.search(text, false);
 					System.out.printf("Phrase: %s%n", text);
 					System.out.printf("Mismatch #%s for '%s' != '%s'. %n", i + 1, expected, present);
 					System.out.println("CURRENT RESULTS: ");
