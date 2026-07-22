@@ -23,6 +23,7 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -47,6 +48,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 
 import net.osmand.search.core.spatial.SpatialPoiSearch.SpatialPoiType;
@@ -133,7 +135,7 @@ public class SearchService {
 
 	OsmandRegions osmandRegions;
 
-	private ConcurrentHashMap<String, Map<String, String>> translationsCache;
+	private final ConcurrentHashMap<String, Map<String, String>> translationsCache = new ConcurrentHashMap<>();
 
 	private static final int SEARCH_RADIUS_LEVEL = 1;
 	private static final int TOTAL_LIMIT_POI = 2000;
@@ -167,6 +169,7 @@ public class SearchService {
 			.withInitial(() -> new RegionsReaderHolder());
 	// reused for cache
 	private SpatialPoiSearch poiSearch;
+	private volatile Map<String, PoiType> poiAdditionalsByKey;
 
 	public static class PoiSearchResult {
 
@@ -360,6 +363,13 @@ public class SearchService {
 			osmAndMapsService.unlockReaders(readers);
 		}
 		return res;
+	}
+
+	@PostConstruct
+	public void warmupSpatialPoiTypeSearch() {
+		Thread t = new Thread(this::getSpatialPoiTypeSearch, "spatial-search-warmup");
+		t.setDaemon(true);
+		t.start();
 	}
 
 	public synchronized SpatialPoiSearch getSpatialPoiTypeSearch() {
@@ -569,14 +579,17 @@ public class SearchService {
 			SpatialSearchResults res = task.get(timeoutMs, TimeUnit.MILLISECONDS);
 			if (res.mainResults != null) {
 				String dominatedCity = calculateSpatialDominatedCity(res.mainResults, ctx.locale);
+				SpatialPoiSearch poiTypeSearch = getSpatialPoiTypeSearch();
+				Map<MapObject, Feature> amenityFeatureCache = new IdentityHashMap<>();
 				for (SpatialSearchResult r : res.mainResults) {
 					List<MapObject> objs = r.getObjects();
 					if (r.isPoiCategory()) {
-						SpatialPoiType type = r.getPoiCategory(getSpatialPoiTypeSearch());
+						SpatialPoiType type = r.getPoiCategory(poiTypeSearch);
 						if (type != null) {
 							Feature f = getSpatialPoiTypeFeature(type);
 							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(),
-									matchedObjects(objs, ctx.locale, timeZone, dominatedCity, r.getViewBBox31()));
+									matchedObjects(objs, ctx.locale, timeZone, dominatedCity, r.getViewBBox31(),
+											amenityFeatureCache));
 							f.prop(PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
 							f.prop(PoiTypeField.COMPARE_KEY.getFieldName(), SpatialSearchResult.compareKeyString(r));
 							response.features.add(f);
@@ -586,7 +599,8 @@ public class SearchService {
 						Feature f = getSpatialFeature(l, objs, ctx.locale, timeZone, dominatedCity, r.getExtraNameMatch());
 						if (f != null) {
 							f.prop(PoiTypeField.MATCHED_OBJECTS.getFieldName(),
-									matchedObjects(objs, ctx.locale, timeZone, dominatedCity, r.getViewBBox31()));
+									matchedObjects(objs, ctx.locale, timeZone, dominatedCity, r.getViewBBox31(),
+											amenityFeatureCache));
 							f.prop(PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
 							f.prop(PoiTypeField.COMPARE_KEY.getFieldName(), SpatialSearchResult.compareKeyString(r));
 							response.features.add(f);
@@ -615,6 +629,7 @@ public class SearchService {
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 			LOGGER.warn(String.format("Spatial search interrupted for '%s'", ctx.text));
+			response.info.put("interrupted", true);
 		} catch (RuntimeException e) {
 			LOGGER.error(String.format("Spatial search failed for '%s': %s", ctx.text, e), e);
 		} finally {
@@ -675,7 +690,8 @@ public class SearchService {
 	}
 
 	private List<Map<String, Object>> matchedObjects(List<MapObject> objs, String locale, String timeZone,
-	                                                 String dominatedCity, int[] bbox31) {
+	                                                 String dominatedCity, int[] bbox31,
+	                                                 Map<MapObject, Feature> amenityFeatureCache) {
 		List<Map<String, Object>> matched = new ArrayList<>();
 		for (MapObject o : objs) {
 			if (o.getLocation() == null) {
@@ -687,7 +703,8 @@ public class SearchService {
 			m.put("lat", roundCoord(o.getLocation().getLatitude()));
 			m.put("lon", roundCoord(o.getLocation().getLongitude()));
 			if (o instanceof Amenity amenity) {
-				Feature feature = getPoiFeature(buildPoiSearchResult(amenity, locale, dominatedCity), timeZone);
+				Feature feature = amenityFeatureCache.computeIfAbsent(amenity,
+						k -> getPoiFeature(buildPoiSearchResult((Amenity) k, locale, dominatedCity), timeZone));
 				m.putAll(feature.properties);
 			} else if (o instanceof City city) {
 				m.put(PoiTypeField.CITY_TYPE.getFieldName(), city.getType().name());
@@ -1251,6 +1268,7 @@ public class SearchService {
 		SpatialSearchContext sscontext = new SpatialSearchContext(
 				SpatialTextSearchSettings.searchPoiByCategorySettings(zoom + SPATIAL_POI_CATEGORY_VIEW_ZOOM_SHIFT,
 						bboxLatLon), readers, getSpatialPoiTypeSearch(), null);
+		sscontext.getStats().printLogs = false;
 		SpatialSearchResults res = spatialTextSearch
 				.searchAPI(NameIndexReader.POI_CATEGORY_PREFIX + categoryObj.category, sscontext);
 		List<Amenity> amenities = new ArrayList<>();
@@ -1287,11 +1305,13 @@ public class SearchService {
 	}
 
 	private void sortPoiResultsByDistance(List<Feature> features, LatLon center) {
-		features.sort(Comparator.comparingDouble(f -> {
+		Map<Feature, Double> distances = new IdentityHashMap<>(features.size());
+		for (Feature f : features) {
 			float[] coords = (float[]) f.geometry.coordinates;
-			LatLon loc = new LatLon(coords[1], coords[0]);
-			return MapUtils.getDistance(loc, center.getLatitude(), center.getLongitude());
-		}));
+			distances.put(f, MapUtils.getDistance(new LatLon(coords[1], coords[0]), center.getLatitude(),
+					center.getLongitude()));
+		}
+		features.sort(Comparator.comparingDouble(distances::get));
 	}
 
 	public Feature searchPoiByOsmId(LatLon loc, long osmid, String type, String timeZone) throws IOException {
@@ -1574,10 +1594,6 @@ public class SearchService {
 	}
 
 	private Map<String, String> getTranslations(String locale) {
-		if (translationsCache == null) {
-			translationsCache = new ConcurrentHashMap<>();
-		}
-
 		return translationsCache.computeIfAbsent(locale, loc -> {
 			try {
 				String validLoc = validateLocale(loc);
@@ -1610,6 +1626,38 @@ public class SearchService {
 			}
 		}
 		return translations;
+	}
+
+	private Map<String, PoiType> getPoiAdditionalsByKey() {
+		Map<String, PoiType> byKey = poiAdditionalsByKey;
+		if (byKey == null) {
+			synchronized (this) {
+				byKey = poiAdditionalsByKey;
+				if (byKey == null) {
+					byKey = new HashMap<>();
+					for (PoiCategory pc : MapPoiTypes.getDefault().getCategories()) {
+						collectPoiAdditionals(pc, byKey);
+						for (PoiFilter pf : pc.getPoiFilters()) {
+							collectPoiAdditionals(pf, byKey);
+						}
+						for (PoiType p : pc.getPoiTypes()) {
+							collectPoiAdditionals(p, byKey);
+						}
+					}
+					poiAdditionalsByKey = byKey;
+				}
+			}
+		}
+		return byKey;
+	}
+
+	private void collectPoiAdditionals(AbstractPoiType p, Map<String, PoiType> byKey) {
+		List<PoiType> additionals = p.getPoiAdditionals();
+		if (additionals != null) {
+			for (PoiType pt : additionals) {
+				byKey.putIfAbsent(pt.getKeyName(), pt);
+			}
+		}
 	}
 
 	private MapPoiTypes getMapPoiTypes(String locale) {
@@ -1887,7 +1935,8 @@ public class SearchService {
 		for (Map.Entry<String, String> entry : tags.entrySet()) {
 			String key = entry.getKey().startsWith(OSM_PREFIX) ? entry.getKey().substring(OSM_PREFIX.length())
 					: entry.getKey();
-			if (MapPoiTypes.getDefault().getAnyPoiAdditionalTypeByKey(key) instanceof PoiType type && type.isHidden()) {
+			PoiType additionalType = getPoiAdditionalsByKey().get(key);
+			if (additionalType != null && additionalType.isHidden()) {
 				continue;
 			}
 			String value = unzipContent(entry.getValue());
