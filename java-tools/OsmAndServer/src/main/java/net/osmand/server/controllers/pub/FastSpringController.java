@@ -177,40 +177,49 @@ public class FastSpringController {
 		return ResponseEntity.ok("OK");
 	}
 
-	private void handleReturnCreatedEvent(FastSpringOrderCompletedRequest.Event event) {
+	private ResponseEntity<String> handleReturnCreatedEvent(FastSpringOrderCompletedRequest.Event event) {
 		FastSpringOrderCompletedRequest.Data data = event.data;
 		if (data == null || data.original == null || data.original.id == null) {
 			LOGGER.error("FastSpring: return.created event without original order id, skipping");
-			return;
+			return null;
 		}
 		String orderId = data.original.id;
 		if (data.items == null || data.items.isEmpty()) {
 			LOGGER.error("FastSpring: return.created event for orderId " + orderId + " has no items, skipping");
-			return;
+			return null;
 		}
 		Set<Integer> affectedUserIds = new HashSet<>();
+		boolean revokedAny = false;
 		for (FastSpringOrderCompletedRequest.Item item : data.items) {
 			String sku = item.sku;
 			if (sku == null) {
 				continue;
 			}
-			revokePurchases(deviceInAppPurchasesRepository.findByOrderIdAndSku(orderId, sku),
+			revokedAny |= revokePurchases(deviceInAppPurchasesRepository.findByOrderIdAndSku(orderId, sku),
 					deviceSubscriptionsRepository.findByOrderIdAndSku(orderId, sku), orderId, affectedUserIds);
 		}
+		if (!revokedAny) {
+			return ResponseEntity.badRequest().body("FastSpring: nothing to revoke for orderId " + orderId);
+		}
 		refreshAffectedUsers(affectedUserIds);
+		return null;
 	}
 
-	private void handleChargebackCreatedEvent(FastSpringOrderCompletedRequest.Event event) {
+	private ResponseEntity<String> handleChargebackCreatedEvent(FastSpringOrderCompletedRequest.Event event) {
 		FastSpringOrderCompletedRequest.Data data = event.data;
 		if (data == null || data.order == null) {
 			LOGGER.error("FastSpring: chargeback.created event without order id, skipping");
-			return;
+			return null;
 		}
 		String orderId = data.order;
 		Set<Integer> affectedUserIds = new HashSet<>();
-		revokePurchases(deviceInAppPurchasesRepository.findByOrderId(orderId),
+		boolean revokedAny = revokePurchases(deviceInAppPurchasesRepository.findByOrderId(orderId),
 				deviceSubscriptionsRepository.findByOrderId(orderId), orderId, affectedUserIds);
+		if (!revokedAny) {
+			return ResponseEntity.badRequest().body("FastSpring: nothing to revoke for orderId " + orderId);
+		}
 		refreshAffectedUsers(affectedUserIds);
+		return null;
 	}
 
 	// https://developer.fastspring.com/reference/processed-and-unprocessed-webhook-events
@@ -227,6 +236,7 @@ public class FastSpringController {
 				if (resp == null || resp.events == null || resp.events.isEmpty()) {
 					return;
 				}
+				resp.events.sort(Comparator.comparingLong(e -> e.created != null ? e.created : 0L));
 				int marked = 0;
 				for (FastSpringOrderCompletedRequest.Event event : resp.events) {
 					if (event.id == null) {
@@ -262,10 +272,10 @@ public class FastSpringController {
 	private ResponseEntity<String> dispatchFastSpringEvent(FastSpringOrderCompletedRequest.Event event) {
 		if (EVENT_RETURN_CREATED.equals(event.type)) {
 			// https://developer.fastspring.com/reference/returncreated
-			handleReturnCreatedEvent(event);
+			return handleReturnCreatedEvent(event);
 		} else if (EVENT_CHARGEBACK_CREATED.equals(event.type)) {
 			// https://developer.fastspring.com/reference/order-chargeback
-			handleChargebackCreatedEvent(event);
+			return handleChargebackCreatedEvent(event);
 		} else if (EVENT_ORDER_COMPLETED.equals(event.type)) {
 			// https://developer.fastspring.com/reference/ordercompleted
 			return handleOrderCompletedEvent(event);
@@ -273,11 +283,11 @@ public class FastSpringController {
 		return null;
 	}
 
-	private void revokePurchases(List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> iaps,
-	                             List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subs, String orderId, Set<Integer> affectedUserIds) {
+	private boolean revokePurchases(List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> iaps,
+	                                List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subs, String orderId, Set<Integer> affectedUserIds) {
 		if (iaps.isEmpty() && subs.isEmpty()) {
 			LOGGER.warn("FastSpring: nothing to revoke for orderId " + orderId + ", no matching purchases found");
-			return;
+			return false;
 		}
 		Date now = new Date();
 		for (DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase iap : iaps) {
@@ -300,6 +310,7 @@ public class FastSpringController {
 			}
 			LOGGER.info(String.format("FastSpring: subscription revoked for orderId: %s, sku: %s", orderId, sub.sku));
 		}
+		return true;
 	}
 
 	private void refreshAffectedUsers(Set<Integer> affectedUserIds) {
