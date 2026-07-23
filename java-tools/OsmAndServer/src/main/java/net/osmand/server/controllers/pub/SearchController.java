@@ -121,10 +121,9 @@ public class SearchController {
 	                                        @RequestParam double lat,
 	                                        @RequestParam double lon,
 	                                        @RequestParam(required = false) Boolean baseSearch,
-	                                        @RequestParam(required = false) Boolean spatial,
 	                                        @RequestParam(required = false) Integer zoom,
 	                                        @RequestParam(required = false) String timeZone) throws IOException {
-		PoiSearchService.PoiSearchResult poiSearchResult = poiSearchService.searchPoi(searchData, locale, new LatLon(lat, lon), baseSearch != null && baseSearch, spatial != null && spatial, zoom != null ? zoom : -1, timeZone);
+		PoiSearchService.PoiSearchResult poiSearchResult = poiSearchService.searchPoi(searchData, locale, new LatLon(lat, lon), baseSearch != null && baseSearch, zoom != null ? zoom : -1, timeZone);
 		return ResponseEntity.ok(gson.toJson(poiSearchResult));
 	}
 

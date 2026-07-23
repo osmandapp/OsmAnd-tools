@@ -145,8 +145,7 @@ public class ClassicSearchService {
 
 			List<SearchResult> res = resultCollection != null ? resultCollection.getCurrentSearchResults()
 					: Collections.emptyList();
-			res = poiSearchService.filterBrandsOutsideBBox(res, ctx.northWest(), ctx.southEast(), ctx.locale(), ctx.lat(), ctx.lon(),
-					ctx.baseSearch());
+			res = poiSearchService.filterBrandsOutsideBBox(res, ctx.northWest(), ctx.southEast(), ctx.baseSearch());
 			res = res.size() > TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB ? res.subList(0, TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB)
 					: res;
 			if (consumerInContext != null) {

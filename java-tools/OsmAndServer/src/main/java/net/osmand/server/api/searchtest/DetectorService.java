@@ -33,7 +33,7 @@ import java.util.zip.ZipOutputStream;
 public interface DetectorService extends OBFService {
 	ClassicSearchService getClassicSearchService();
 
-	SpatialSpatialSearchService.SpatialResults searchTestSpatial(ClassicClassicSearchService.SearchContext ctx, ClassicClassicSearchService.SearchOption options,
+	SpatialSearchService.SpatialResults searchTestSpatial(ClassicSearchService.SearchContext ctx, ClassicSearchService.SearchOption options,
 			List<BinaryMapIndexReader> readers, boolean printLogs) throws IOException;
 
 	default ResultMetric toMetric(SearchResult r) {
