@@ -438,7 +438,7 @@ public interface DetectorService extends OBFService {
 	                                                    Path dirPath, Boolean spatial) throws IOException {
 		SearchExportSettings exportSettings = new SearchExportSettings(true, true, -1);
 		SearchService.SearchOption options = new SearchService.SearchOption(true, exportSettings,
-				null, true, false, (net.osmand.search.core.ObjectType[]) null);
+				null, true, true, (net.osmand.search.core.ObjectType[]) null);
 		
 		String[] queries = normalizedUnitTestQueries(unitTest.queries(), baseCtx.text());
 		LinkedHashMap<String, Amenity> amenities = new LinkedHashMap<>();
@@ -478,7 +478,8 @@ public interface DetectorService extends OBFService {
 				geoResults.add(phraseResults);
 
 				collectUnitTestSourceData(results.unitTestJson(), amenities, cities, point, unitTest);
-				getLogger().info("Sampling search results for query '{}': {}, cities: {}, amenities: {}", q, searchResults.size(), cities.size(), amenities.size());
+				int[] sizes = getStreetsBuildingSize(cities.values());
+				getLogger().info("Sampling search results for query '{}': {}, cities: {}, streets: {}, buildings: {}, amenities: {}", q, searchResults.size(), cities.size(), sizes[0], sizes[1], amenities.size());
 				settings = results.settings();
 			}
 			filterSourceData(amenities, cities, unitTest);
