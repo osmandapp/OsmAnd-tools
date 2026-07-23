@@ -5,8 +5,6 @@ import static net.osmand.search.SearchUICore.getMainCityName;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -14,7 +12,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
@@ -41,7 +38,6 @@ import net.osmand.data.Building;
 import net.osmand.data.City;
 import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
-import net.osmand.data.QuadRect;
 import net.osmand.data.Street;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiType;
@@ -78,20 +74,33 @@ public class SpatialSearchService {
 	@Autowired
 	private SearchResultConverter searchResultConverter;
 
-	// the engine cache is shared by all requests (engine default 1000 assumes per-client caches)
 	public static final int SPATIAL_PREFIX_CACHE_LIMIT = 4_000;
+	private static final int SPATIAL_SEARCH_THREADS = 4;
 
-	private final AtomicInteger spatialSearchThreadNum = new AtomicInteger();
+	private final AtomicInteger spatialSearchRoundRobin = new AtomicInteger();
 
-	private final ThreadPoolExecutor spatialSearchThreadPool = new ThreadPoolExecutor(
-			1, 4, 10, TimeUnit.MINUTES, new SynchronousQueue<>(),
-			r -> {
-				Thread t = new Thread(r, "spatial-search-" + spatialSearchThreadNum.incrementAndGet());
-				t.setDaemon(true);
-				return t;
-			});
+	// one single-thread executor per slot: requests are routed by client key, so a client's
+	// repeated searches always hit the thread whose engine cache is warmed
+	private final ThreadPoolExecutor[] spatialSearchExecutors = createSpatialSearchExecutors();
 
-	private final SpatialTextSearch spatialTextSearch = new SpatialTextSearch();
+	private static ThreadPoolExecutor[] createSpatialSearchExecutors() {
+		ThreadPoolExecutor[] executors = new ThreadPoolExecutor[SPATIAL_SEARCH_THREADS];
+		for (int i = 0; i < executors.length; i++) {
+			String name = "spatial-search-" + (i + 1);
+			ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 10, TimeUnit.MINUTES,
+					new SynchronousQueue<>(),
+					r -> {
+						Thread t = new Thread(r, name);
+						t.setDaemon(true);
+						return t;
+					});
+			executor.allowCoreThreadTimeOut(true);
+			executors[i] = executor;
+		}
+		return executors;
+	}
+
+	private final ThreadLocal<SpatialTextSearch> spatialTextSearchLocal = ThreadLocal.withInitial(SpatialTextSearch::new);
 
 	private final ThreadLocal<RegionsReaderHolder> osmandRegionsLocal = ThreadLocal
 			.withInitial(RegionsReaderHolder::new);
@@ -153,10 +162,13 @@ public class SpatialSearchService {
 
 	@PreDestroy
 	public void shutdownSpatialSearchPool() {
-		spatialSearchThreadPool.shutdownNow();
+		for (ThreadPoolExecutor executor : spatialSearchExecutors) {
+			executor.shutdownNow();
+		}
 	}
 
-	public SpatialResponse searchSpatial(ClassicSearchService.SearchContext ctx, String timeZone, boolean autocomplete) throws IOException {
+	public SpatialResponse searchSpatial(ClassicSearchService.SearchContext ctx, String timeZone, boolean autocomplete,
+	                                     String routingKey) throws IOException {
 		long sTime = System.currentTimeMillis();
 		SpatialResponse response = new SpatialResponse();
 		if (!osmAndMapsService.validateAndInitConfig()) {
@@ -204,25 +216,19 @@ public class SpatialSearchService {
 					return cancelled.get();
 				}
 			};
-			Future<SpatialSearchResults> task = spatialSearchThreadPool.submit(new Callable<SpatialSearchResults>() {
-
-				@Override
-				public SpatialSearchResults call() throws Exception {
-					try {
-						// worker owns a private copy: the caller never sees concurrent mutation
-						List<BinaryMapIndexReader> readers = new ArrayList<>(lockedReaders);
-						BinaryMapIndexReader regionsReader = regionsReaderForThread();
-						if (regionsReader != null) {
-							readers.add(regionsReader);
-						}
-						SpatialSearchContext sscontext =
-								new SpatialSearchContext(settings, readers, getSpatialPoiTypeSearch(), new LatLon(ctx.lat(), ctx.lon()));
-						sscontext.resultMatcher = matcher;
-						return spatialTextSearch.searchAPI(ctx.text(), sscontext);
-					} finally {
-						// unlock strictly after the search has really finished (incl. timeout/cancel path)
-						osmAndMapsService.unlockReaders(lockedReaders);
+			Future<SpatialSearchResults> task = executorForKey(routingKey).submit(() -> {
+				try {
+					List<BinaryMapIndexReader> readers = new ArrayList<>(lockedReaders);
+					BinaryMapIndexReader regionsReader = regionsReaderForThread();
+					if (regionsReader != null) {
+						readers.add(regionsReader);
 					}
+					SpatialSearchContext sscontext =
+							new SpatialSearchContext(settings, readers, getSpatialPoiTypeSearch(), new LatLon(ctx.lat(), ctx.lon()));
+					sscontext.resultMatcher = matcher;
+					return getSpatialTextSearch().searchAPI(ctx.text(), sscontext);
+				} finally {
+					osmAndMapsService.unlockReaders(lockedReaders);
 				}
 			});
 			readersOwnedByWorker = true;
@@ -467,7 +473,14 @@ public class SpatialSearchService {
 		return "";
 	}
 
+	private ThreadPoolExecutor executorForKey(String routingKey) {
+		int index = routingKey == null || routingKey.isEmpty()
+				? Math.floorMod(spatialSearchRoundRobin.getAndIncrement(), SPATIAL_SEARCH_THREADS)
+				: Math.floorMod(routingKey.hashCode(), SPATIAL_SEARCH_THREADS);
+		return spatialSearchExecutors[index];
+	}
+
 	public SpatialTextSearch getSpatialTextSearch() {
-		return spatialTextSearch;
+		return spatialTextSearchLocal.get();
 	}
 }
