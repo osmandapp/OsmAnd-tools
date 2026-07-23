@@ -141,6 +141,8 @@ public class SearchService {
 	private static final int SEARCH_RADIUS_LEVEL = 1;
 	private static final int TOTAL_LIMIT_POI = 2000;
 	private static final int SPATIAL_POI_CATEGORY_VIEW_ZOOM_SHIFT = 2;
+	// the engine cache is shared by all requests (engine default 1000 assumes per-client caches)
+	private static final int SPATIAL_PREFIX_CACHE_LIMIT = 4_000;
 	private static final int SPATIAL_POI_CATEGORY_MIN_ZOOM = 4;
 	private static final int SPATIAL_POI_CATEGORY_MAX_ZOOM = 18;
 	// viewport is ~3 tiles wide: zoom ~= log2(360 * 3 / bboxLonWidth)
@@ -548,6 +550,7 @@ public class SearchService {
 			SpatialTextSearchSettings settings = autocomplete
 					? SpatialTextSearchSettings.suggestionSettings()
 					: SpatialTextSearchSettings.defaultSettings();
+			settings.AUTO_CLEAR_PREFIX_CACHE_LIMIT = SPATIAL_PREFIX_CACHE_LIMIT;
 			final List<BinaryMapIndexReader> lockedReaders = usedMapList;
 			final ResultMatcher<SpatialSearchResult> matcher = new ResultMatcher<SpatialSearchResult>() {
 
@@ -1281,9 +1284,10 @@ public class SearchService {
 					/ Math.log(2));
 		}
 		zoom = Math.max(SPATIAL_POI_CATEGORY_MIN_ZOOM, Math.min(SPATIAL_POI_CATEGORY_MAX_ZOOM, zoom));
-		SpatialSearchContext sscontext = new SpatialSearchContext(
-				SpatialTextSearchSettings.searchPoiByCategorySettings(zoom + SPATIAL_POI_CATEGORY_VIEW_ZOOM_SHIFT,
-						bboxLatLon), readers, poiTypeSearch, null);
+		SpatialTextSearchSettings settings = SpatialTextSearchSettings
+				.searchPoiByCategorySettings(zoom + SPATIAL_POI_CATEGORY_VIEW_ZOOM_SHIFT, bboxLatLon);
+		settings.AUTO_CLEAR_PREFIX_CACHE_LIMIT = SPATIAL_PREFIX_CACHE_LIMIT;
+		SpatialSearchContext sscontext = new SpatialSearchContext(settings, readers, poiTypeSearch, null);
 		sscontext.getStats().printLogs = false;
 		SpatialSearchResults res = spatialTextSearch
 				.searchAPI(NameIndexReader.POI_CATEGORY_PREFIX + spatialType.getKey(), sscontext);
