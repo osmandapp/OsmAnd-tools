@@ -141,6 +141,10 @@ public class SearchService {
 	private static final int SEARCH_RADIUS_LEVEL = 1;
 	private static final int TOTAL_LIMIT_POI = 2000;
 	private static final int SPATIAL_POI_CATEGORY_VIEW_ZOOM_SHIFT = 2;
+	private static final int SPATIAL_POI_CATEGORY_MIN_ZOOM = 4;
+	private static final int SPATIAL_POI_CATEGORY_MAX_ZOOM = 18;
+	// viewport is ~3 tiles wide: zoom ~= log2(360 * 3 / bboxLonWidth)
+	private static final int SPATIAL_POI_CATEGORY_VIEW_TILES = 3;
 	private static final int TOTAL_LIMIT_SEARCH_RESULTS = 15000;
 	private static final int TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB = 1000;
 	private static final double SEARCH_POI_RADIUS_DEGREE = 0.0007;
@@ -1230,14 +1234,8 @@ public class SearchService {
 				request = createSearchRequestByBrand(reader, categoryObj, mapPoiTypes, left31, right31, top31,
 						bottom31);
 				if (request == null) {
-					if (categoryObj.lang == null || categoryObj.lang.isEmpty()) {
-						LOGGER.warn(String.format("Brand search skipped for category '%s': language is null or empty",
-								categoryObj.category));
-					} else {
-						LOGGER.warn(String.format(
-								"Brand search skipped for category '%s' with language '%s': no matching brand found",
-								categoryObj.category, categoryObj.lang));
-					}
+					LOGGER.debug(String.format("Brand '%s' not found in '%s'", categoryObj.category,
+							reader.getFile().getName()));
 					continue;
 				}
 			} else {
@@ -1279,9 +1277,10 @@ public class SearchService {
 		if (zoom < 0) {
 			// no zoom from client - estimate from bbox width
 			double lonWidth = Math.abs(bboxLatLon.right - bboxLatLon.left);
-			zoom = (int) Math.round(Math.log(360 * 3 / Math.max(lonWidth, 0.001)) / Math.log(2));
+			zoom = (int) Math.round(Math.log(360 * SPATIAL_POI_CATEGORY_VIEW_TILES / Math.max(lonWidth, 0.001))
+					/ Math.log(2));
 		}
-		zoom = Math.max(4, Math.min(18, zoom));
+		zoom = Math.max(SPATIAL_POI_CATEGORY_MIN_ZOOM, Math.min(SPATIAL_POI_CATEGORY_MAX_ZOOM, zoom));
 		SpatialSearchContext sscontext = new SpatialSearchContext(
 				SpatialTextSearchSettings.searchPoiByCategorySettings(zoom + SPATIAL_POI_CATEGORY_VIEW_ZOOM_SHIFT,
 						bboxLatLon), readers, poiTypeSearch, null);
