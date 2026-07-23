@@ -41,6 +41,8 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
 
     @Override
     public List<String> search(String phrase, boolean print) throws IOException {
+        searchContext.stats.printLogs = print;
+        
         SpatialTextSearch.SpatialSearchResults searchResults = spatialSearch.searchAPI(phrase, searchContext);
         List<SpatialSearchResult> mainResults = searchResults.mainResults == null ? Collections.emptyList()
                 : searchResults.mainResults;
@@ -56,7 +58,6 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
     }
 
     public String formatResult(SpatialSearchResult r) {
-        int tCount = r.getParent().getTokenCount();
         double dist = 0.0;
         if (location != null && r.getLatLon() != null) {
             dist = MapUtils.getDistance(location, r.getLatLon());
@@ -85,7 +86,7 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
                 appendName(b, r.getExtraNameMatch(), city);
                 break;
             }
-            if (o instanceof Amenity am && subtype.length() == 0) {
+            if (o instanceof Amenity am && subtype.isEmpty()) {
 				if (poiCategory) {
             		appendName(b, am.getName(), o);
             	} else {
@@ -94,8 +95,8 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
             }
         }
         String sorting = SpatialSearchResult.compareKeyString(r);
-        return String.format(Locale.US, "%s [[%d, %s, %s, %.2f km]]", b,
-                tCount, testTypeStr(atom) + subtype, sorting, dist / 1000);
+        return String.format(Locale.US, "%s [[%s, %s, %.2f km, %s]]", b,
+                testTypeStr(atom) + subtype, sorting, dist / 1000, r.toString(searchContext));
     }
 
 	private void appendName(StringBuilder b, String extraMatch, MapObject object) {
