@@ -25,7 +25,11 @@ import com.google.gson.JsonObject;
 
 import net.osmand.data.LatLon;
 import net.osmand.server.api.services.OsmAndMapsService;
-import net.osmand.server.api.services.SearchService;
+import net.osmand.server.api.services.search.ClassicSearchService;
+import net.osmand.server.api.services.search.MapReadersService;
+import net.osmand.server.api.services.search.PoiTypesService;
+import net.osmand.server.api.services.search.PoiSearchService;
+import net.osmand.server.api.services.search.SpatialSearchService;
 import net.osmand.server.api.services.WikiService;
 import net.osmand.server.controllers.pub.GeojsonClasses.FeatureCollection;
 
@@ -45,7 +49,19 @@ public class SearchController {
     WikiService wikiService;
     
     @Autowired
-    SearchService searchService;
+    ClassicSearchService classicSearchService;
+
+    @Autowired
+    PoiSearchService poiSearchService;
+
+    @Autowired
+    PoiTypesService poiTypesService;
+
+    @Autowired
+    MapReadersService mapReadersService;
+
+    @Autowired
+    SpatialSearchService spatialSearchService;
 
     @Autowired
     TransportStopsService transportStopsService;
@@ -75,22 +91,22 @@ public class SearchController {
         if (!osmAndMapsService.validateAndInitConfig()) {
             return osmAndMapsService.errorConfig();
         }
-        SearchService.SearchContext searchContext = new SearchService.SearchContext(lat, lon, text, locale,
+        ClassicSearchService.SearchContext searchContext = new ClassicSearchService.SearchContext(lat, lon, text, locale,
                 baseSearch != null && baseSearch, northWest, southEast);
         if (spatial != null && spatial) {
-            SearchService.SpatialResponse res =
-                    searchService.searchSpatial(searchContext, timeZone, autocomplete != null && autocomplete);
+            SpatialSearchService.SpatialResponse res =
+                    spatialSearchService.searchSpatial(searchContext, timeZone, autocomplete != null && autocomplete);
             JsonObject json = gson.toJsonTree(new FeatureCollection(res.features.toArray(new Feature[0]))).getAsJsonObject();
             json.add("info", gson.toJsonTree(res.info));
             return ResponseEntity.ok(gson.toJson(json));
         }
-        List<Feature> features = searchService.search(searchContext, timeZone);
+        List<Feature> features = classicSearchService.search(searchContext, timeZone);
         return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[0]))));
     }
     
     @RequestMapping(path = {"/search-poi"}, produces = "application/json")
     @ResponseBody
-    public ResponseEntity<String> searchPoi(@RequestBody SearchService.PoiSearchData searchData,
+    public ResponseEntity<String> searchPoi(@RequestBody PoiSearchService.PoiSearchData searchData,
                                             @RequestParam String locale,
                                             @RequestParam double lat,
                                             @RequestParam double lon,
@@ -98,7 +114,7 @@ public class SearchController {
                                             @RequestParam(required = false) Boolean spatial,
                                             @RequestParam(required = false) Integer zoom,
                                             @RequestParam(required = false) String timeZone) throws IOException {
-        SearchService.PoiSearchResult poiSearchResult = searchService.searchPoi(searchData, locale, new LatLon(lat, lon), baseSearch != null && baseSearch, spatial != null && spatial, zoom != null ? zoom : -1, timeZone);
+        PoiSearchService.PoiSearchResult poiSearchResult = poiSearchService.searchPoi(searchData, locale, new LatLon(lat, lon), baseSearch != null && baseSearch, spatial != null && spatial, zoom != null ? zoom : -1, timeZone);
         return ResponseEntity.ok(gson.toJson(poiSearchResult));
     }
 
@@ -128,7 +144,7 @@ public class SearchController {
             return ResponseEntity.badRequest().body("Invalid 'pin' coordinates, expected numeric values for 'lat,lon'");
         }
 
-        poiSearchResult = searchService.getPoiResultByShareLink(type, new LatLon(lat, lng), name, osmId, wikidataId, timeZone);
+        poiSearchResult = poiSearchService.getPoiResultByShareLink(type, new LatLon(lat, lng), name, osmId, wikidataId, timeZone);
 
         return ResponseEntity.ok(gson.toJson(poiSearchResult));
     }
@@ -136,7 +152,7 @@ public class SearchController {
     @GetMapping(path = {"/get-poi-categories"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> getPoiCategories(@RequestParam String locale) {
-        Map<String, List<String>> categoriesNames = searchService.searchPoiCategories(locale);
+        Map<String, List<String>> categoriesNames = poiTypesService.searchPoiCategories(locale);
         if (categoriesNames != null) {
             return ResponseEntity.ok(gson.toJson(categoriesNames));
         } else {
@@ -147,7 +163,7 @@ public class SearchController {
     @GetMapping(path = {"/get-top-filters"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> getTopFilters() {
-        List<String> filters = searchService.getTopFilters();
+        List<String> filters = poiTypesService.getTopFilters();
         if (filters != null) {
             return ResponseEntity.ok(gson.toJson(filters));
         } else {
@@ -159,14 +175,14 @@ public class SearchController {
     @ResponseBody
     public ResponseEntity<String> searchPoiCategories(@RequestParam String search,
                                                       @RequestParam String locale) {
-        Map<String, Map<String, String>> res = searchService.searchPoiCategories(search, locale);
+        Map<String, Map<String, String>> res = poiTypesService.searchPoiCategories(search, locale);
         return ResponseEntity.ok(gson.toJson(res));
     }
     
     @GetMapping(path = {"/get-poi-address"}, produces = "application/json")
     @ResponseBody
     public ResponseEntity<String> getPoiAddress(@RequestParam double lat, @RequestParam double lon) throws IOException, InterruptedException {
-        String address = searchService.getPoiAddress(new LatLon(lat, lon));
+        String address = mapReadersService.getPoiAddress(new LatLon(lat, lon));
         return ResponseEntity.ok(gson.toJson(address));
     }
 
@@ -284,7 +300,7 @@ public class SearchController {
                                                 @RequestParam long osmid,
                                                 @RequestParam String type,
                                                 @RequestParam(required = false) String timeZone) throws IOException {
-        Feature poi = searchService.searchPoiByOsmId(new LatLon(lat, lon), osmid, type, timeZone);
+        Feature poi = poiSearchService.searchPoiByOsmId(new LatLon(lat, lon), osmid, type, timeZone);
         return ResponseEntity.ok(gson.toJson(poi));
     }
 
@@ -293,7 +309,7 @@ public class SearchController {
     public ResponseEntity<String> getPoiByOsmId(@RequestParam double lat,
                                                 @RequestParam double lon,
                                                 @RequestParam String enName) throws IOException {
-        Feature poi = searchService.searchPoiByEnName(new LatLon(lat, lon), enName);
+        Feature poi = poiSearchService.searchPoiByEnName(new LatLon(lat, lon), enName);
         return ResponseEntity.ok(gson.toJson(poi));
     }
     
@@ -407,7 +423,7 @@ public class SearchController {
         if (!Algorithms.isBlank(lat) && !Algorithms.isBlank(lon)) {
             bboxCentre = new LatLon(Double.parseDouble(lat), Double.parseDouble(lon));
         }
-        LatLon coordinates = searchService.parseLocation(location, bboxCentre);
+        LatLon coordinates = mapReadersService.parseLocation(location, bboxCentre);
         if (coordinates == null) {
             return ResponseEntity.ok(gson.toJson(null));
         }

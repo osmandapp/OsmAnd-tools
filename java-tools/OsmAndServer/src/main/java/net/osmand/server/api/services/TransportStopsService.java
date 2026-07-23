@@ -4,6 +4,7 @@ import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.*;
 import net.osmand.osm.edit.Node;
 import net.osmand.router.TransportStopsRouteReader;
+import net.osmand.server.api.services.search.MapReadersService;
 import net.osmand.server.controllers.pub.GeojsonClasses;
 import net.osmand.util.MapUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,7 +17,7 @@ import java.util.*;
 public class TransportStopsService {
 
 	@Autowired
-	SearchService searchService;
+	MapReadersService mapReadersService;
 
 	@Autowired
 	OsmAndMapsService osmAndMapsService;
@@ -32,7 +33,7 @@ public class TransportStopsService {
 	}
 
 	public TransportStopsSearchResult searchTransportStops(String northWest, String southEast) throws IOException {
-		List<LatLon> bbox = searchService.getBboxCoords(Arrays.asList(northWest, southEast));
+		List<LatLon> bbox = mapReadersService.getBboxCoords(Arrays.asList(northWest, southEast));
 		if (bbox.size() != 2) {
 			return new TransportStopsSearchResult(false, new GeojsonClasses.FeatureCollection());
 		}
@@ -162,7 +163,7 @@ public class TransportStopsService {
 			return null;
 		}
 
-		QuadRect searchBbox = searchService.getSearchBbox(bbox);
+		QuadRect searchBbox = mapReadersService.getSearchBbox(bbox);
 		if (searchBbox == null) {
 			return null;
 		}
@@ -172,7 +173,7 @@ public class TransportStopsService {
 		int top31 = (int) searchBbox.top;
 		int bottom31 = (int) searchBbox.bottom;
 
-		List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = searchService.getMapsForSearch(searchBbox, false);
+		List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = mapReadersService.getMapsForSearch(searchBbox, false);
 		if (mapList.isEmpty()) {
 			return null;
 		}
