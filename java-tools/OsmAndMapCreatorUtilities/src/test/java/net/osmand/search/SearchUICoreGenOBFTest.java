@@ -40,6 +40,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.xmlpull.v1.XmlPullParserException;
 
+import net.osmand.IProgress;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryMapAddressReaderAdapter;
 import net.osmand.binary.BinaryMapIndexReader;
@@ -54,6 +55,7 @@ import net.osmand.data.Street;
 import net.osmand.obf.OBFDataCreator;
 import net.osmand.obf.preparation.IndexAddressCreator;
 import net.osmand.obf.preparation.IndexCreator;
+import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.obf.preparation.IndexPoiCreator;
 import net.osmand.osm.AbstractPoiType;
 import net.osmand.osm.MapPoiTypes;
@@ -90,10 +92,9 @@ public class SearchUICoreGenOBFTest {
 	private static final boolean TEST_EXTRA_RESULTS = true;
 	private static final List<Class<?>> OBF_GENERATE_CLASSES = List.of(IndexCreator.class, IndexPoiCreator.class,
 			IndexAddressCreator.class);
-	private static final String HASH_VERSION = "1";
+	private static final String HASH_VERSION = "2";
 	private static final String OBF_HASH_FILE_NAME = ".obf.hash";
 	private static final boolean RUN_IGNORED_TESTS = false;
-	private static final boolean TEST_NUMBER_MATCHED = true;
 	
 	private static final boolean FILTER_DATA_JSON = false;
 	private static final double FILTER_REMOVE_PROBABILITY = 0.8; // means 80% probability of removal
@@ -198,6 +199,7 @@ public class SearchUICoreGenOBFTest {
 	 * Resolves a same-basename test data chain and returns a readable generated OBF:
 	 * <li>Cached {@code *.obf.gz} in {@link #GEN_DIR} is reused when newer than the resolved source JSON; </li>
 	 * <li>otherwise cached {@code *.json.gz} is used as source when newer than the original OBF or when no original exists. </li>
+	 * <li>If no source JSON exists, a same-basename {@code *.osm} file is used to generate the OBF directly. </li>
 	 * <li>If no source cache is valid, the original OBF from {@link #SEARCH_RESOURCES_PATH} is exported to source JSON.
 	 * <li>New plain {@code *.json} and {@code *.obf} files are compressed back to {@code *.json.gz} and {@code *.obf.gz} for later runs.
 	 * <li>When {@link #REGENERATE_OBF} is {@code false}, the transformation/cache chain is skipped and only the original OBF is used.
@@ -216,11 +218,15 @@ public class SearchUICoreGenOBFTest {
 		File sourceJson = getNewestExistingFile(
 				new File(GEN_DIR, baseName + ".json"),
 				new File(GEN_DIR, baseName + ".json.gz"));
+		File sourceOsm = sourceJson == null ? new File(SEARCH_RESOURCES_PATH, baseName + ".osm") : null;
+		if (sourceOsm != null && !sourceOsm.isFile()) {
+			sourceOsm = null;
+		}
 		File preparedObf = getNewestExistingFile(
 				new File(GEN_DIR, baseName + ".obf"),
 				new File(GEN_DIR, baseName + ".obf.gz"));
-		if (originalObf == null && sourceJson == null && preparedObf == null) {
-			throw new FileNotFoundException("No OBF or source JSON found for " + fileName);
+		if (originalObf == null && sourceJson == null && sourceOsm == null && preparedObf == null) {
+			throw new FileNotFoundException("No OBF, source JSON, or source OSM found for " + fileName);
 		}
 
 		String generatedObfName = baseName + ".obf";
@@ -233,26 +239,49 @@ public class SearchUICoreGenOBFTest {
 			}
 
 			boolean alreadyGenerated = GENERATED_OBFS.contains(obfPath);
-			boolean noSourceAvailable = sourceJson == null && originalObf == null;
+			boolean noSourceAvailable = sourceJson == null && sourceOsm == null && originalObf == null;
 			boolean canUsePreparedObf = preparedObf != null
-					&& (isPreparedObfActual(preparedObf, sourceJson, originalObf) || noSourceAvailable && alreadyGenerated);
+					&& (isPreparedObfActual(preparedObf, sourceJson, sourceOsm, originalObf)
+					|| noSourceAvailable && alreadyGenerated);
 			if (canUsePreparedObf) {
 				File obfFile = prepareObfFile(preparedObf, generatedObfFile);
 				cacheObfIfNeeded(preparedObf, obfFile, baseName);
 				GENERATED_OBFS.add(obfPath);
 				return obfFile;
 			}
-			File sourceFile = getSourceFile(baseName, originalObf, sourceJson);
+			File sourceFile = sourceOsm != null ? sourceOsm : getSourceFile(baseName, originalObf, sourceJson);
 			if (!alreadyGenerated || !generatedObfFile.isFile()
 					|| generatedObfFile.lastModified() < sourceFile.lastModified()) {
-				OBFDataCreator creator = new OBFDataCreator();
-				creator.create(generatedObfFile.getAbsolutePath(), new String[] { sourceFile.getAbsolutePath() });
+				if (sourceOsm != null) {
+					createObfFromOsm(sourceOsm, generatedObfFile);
+				} else {
+					OBFDataCreator creator = new OBFDataCreator();
+					creator.create(generatedObfFile.getAbsolutePath(), new String[] { sourceFile.getAbsolutePath() });
+				}
 				writeHash();
 			}
 			cacheGzipIfNeeded(generatedObfFile, new File(GEN_DIR, baseName + ".obf.gz"));
 			GENERATED_OBFS.add(obfPath);
 		}
 		return generatedObfFile;
+	}
+
+	private void createObfFromOsm(File sourceOsm, File generatedObfFile) throws IOException, SQLException {
+		IndexCreatorSettings settings = new IndexCreatorSettings();
+		settings.indexAddress = true;
+		settings.indexPOI = true;
+		settings.indexRouting = true;
+		IndexCreator creator = new IndexCreator(generatedObfFile.getParentFile(), settings);
+		creator.setMapFileName(generatedObfFile.getName());
+		creator.setLastModifiedDate(sourceOsm.lastModified());
+		try {
+			creator.generateIndexes(sourceOsm, IProgress.EMPTY_PROGRESS, null, null, null, null);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new IOException("Interrupted while generating OBF from " + sourceOsm, e);
+		} catch (XmlPullParserException e) {
+			throw new IOException("Cannot generate OBF from " + sourceOsm, e);
+		}
 	}
 
 	private void cacheObfIfNeeded(File preparedObf, File obfFile, String baseName) throws IOException {
@@ -300,13 +329,13 @@ public class SearchUICoreGenOBFTest {
 		return obfFile;
 	}
 
-	private boolean isPreparedObfActual(File preparedObf, File sourceJson, File originalObf) {
+	private boolean isPreparedObfActual(File preparedObf, File sourceJson, File sourceOsm, File originalObf) {
 		if (preparedObf == null || !HASH_IS_ACTUAL_FOR_RUN) {
 			return false;
 		}
 		File source = sourceJson != null && (originalObf == null || sourceJson.lastModified() > originalObf.lastModified())
 				? sourceJson
-				: originalObf;
+				: sourceOsm != null ? sourceOsm : originalObf;
 		return source == null || preparedObf.lastModified() > source.lastModified();
 	}
 
@@ -361,6 +390,9 @@ public class SearchUICoreGenOBFTest {
 		}
 		if (fileName.endsWith(".json")) {
 			return fileName.substring(0, fileName.length() - ".json".length());
+		}
+		if (fileName.endsWith(".osm")) {
+			return fileName.substring(0, fileName.length() - ".osm".length());
 		}
 		return fileName;
 	}
@@ -515,18 +547,17 @@ public class SearchUICoreGenOBFTest {
 			for (int i = 0; i < expectedResults.size(); i++) {
 				String expected = expectedResults.get(i);
 				String actual = i >= actualResults.size() ? null : actualResults.get(i);
-				int shift = TEST_NUMBER_MATCHED ? 4 : 0;
 				if (expected.indexOf('[') != -1) {
-					expected = expected.substring(0, expected.indexOf('[') + shift).trim();
+					expected = expected.substring(0, expected.indexOf('[')).trim();
 				}
 				if (actual != null && actual.indexOf('[') != -1) {
-					actual = actual.substring(0, actual.indexOf('[') + shift).trim();
+					actual = actual.substring(0, actual.indexOf('[')).trim();
 				}
 				// String present = result.toString();
 				expected = expected.replaceFirst("^@", "");
 				String present = actual == null ? ("#MISSING " + (i + 1)) : actual;
 				if (!Algorithms.stringsEqual(expected, present)) {
-					engine.search(text, true);
+					engine.search(text, false);
 					System.out.printf("Phrase: %s%n", text);
 					System.out.printf("Mismatch #%s for '%s' != '%s'. %n", i + 1, expected, present);
 					System.out.println("CURRENT RESULTS: ");
@@ -582,7 +613,7 @@ public class SearchUICoreGenOBFTest {
 
 	private boolean isDataFileName(String fileName) {
 		return fileName.endsWith(".obf") || fileName.endsWith(".obf.gz")
-				|| fileName.endsWith(".json") || fileName.endsWith(".json.gz");
+				|| fileName.endsWith(".json") || fileName.endsWith(".json.gz") || fileName.endsWith(".osm");
 	}
 
 	private static void deleteGeneratedFiles(File dir, String... extensions) {
