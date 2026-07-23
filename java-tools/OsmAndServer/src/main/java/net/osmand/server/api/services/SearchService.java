@@ -43,6 +43,7 @@ import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -509,7 +510,7 @@ public class SearchService {
 		if (!osmAndMapsService.validateAndInitConfig()) {
 			return response;
 		}
-		final boolean[] cancelled = new boolean[1];
+		final AtomicBoolean cancelled = new AtomicBoolean();
 		// suggestions must fail fast, full search gets the long budget
 		final long timeoutMs = autocomplete ? 3_000 : 15_000;
 		boolean readersOwnedByWorker = false;
@@ -553,7 +554,7 @@ public class SearchService {
 
 				@Override
 				public boolean isCancelled() {
-					return cancelled[0];
+					return cancelled.get();
 				}
 			};
 			Future<SpatialSearchResults> task = spatialSearchThreadPool.submit(new Callable<SpatialSearchResults>() {
@@ -635,7 +636,7 @@ public class SearchService {
 		} catch (RuntimeException e) {
 			LOGGER.error(String.format("Spatial search failed for '%s': %s", ctx.text, e), e);
 		} finally {
-			cancelled[0] = true;
+			cancelled.set(true);
 			if (!readersOwnedByWorker) {
 				// worker never started (early return / rejection / pre-submit failure)
 				osmAndMapsService.unlockReaders(usedMapList);
@@ -1279,8 +1280,8 @@ public class SearchService {
 			// no zoom from client - estimate from bbox width
 			double lonWidth = Math.abs(bboxLatLon.right - bboxLatLon.left);
 			zoom = (int) Math.round(Math.log(360 * 3 / Math.max(lonWidth, 0.001)) / Math.log(2));
-			zoom = Math.max(4, Math.min(18, zoom));
 		}
+		zoom = Math.max(4, Math.min(18, zoom));
 		SpatialSearchContext sscontext = new SpatialSearchContext(
 				SpatialTextSearchSettings.searchPoiByCategorySettings(zoom + SPATIAL_POI_CATEGORY_VIEW_ZOOM_SHIFT,
 						bboxLatLon), readers, poiTypeSearch, null);
