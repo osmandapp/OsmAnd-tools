@@ -58,6 +58,7 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
     }
 
     public String formatResult(SpatialSearchResult r) {
+        int tCount = r.getParent().getTokenCount();
         double dist = 0.0;
         if (location != null && r.getLatLon() != null) {
             dist = MapUtils.getDistance(location, r.getLatLon());
@@ -95,8 +96,8 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
             }
         }
         String sorting = SpatialSearchResult.compareKeyString(r);
-        return String.format(Locale.US, "%s [[%s, %s, %.2f km, %s]]", b,
-                testTypeStr(atom) + subtype, sorting, dist / 1000, r.toString(searchContext));
+        return String.format(Locale.US, "%s [[%d, %s, %s, %.2f km, %s]]", b,
+                tCount, testTypeStr(atom) + subtype, sorting, dist / 1000, r.toString(searchContext).replace("\"", "'"));
     }
 
 	private void appendName(StringBuilder b, String extraMatch, MapObject object) {
