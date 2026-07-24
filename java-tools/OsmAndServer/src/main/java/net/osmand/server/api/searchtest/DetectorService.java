@@ -14,7 +14,8 @@ import net.osmand.search.core.SearchSettings;
 import net.osmand.search.core.spatial.SpatialSearchContext;
 import net.osmand.search.core.spatial.SpatialSearchResult;
 import net.osmand.search.core.spatial.SpatialSearchResultsList;
-import net.osmand.server.api.services.SearchService;
+import net.osmand.server.api.services.search.ClassicSearchService;
+import net.osmand.server.api.services.search.SpatialSearchService;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import org.json.JSONArray;
@@ -30,7 +31,10 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 public interface DetectorService extends OBFService {
-	SearchService getSearchService();
+	ClassicSearchService getClassicSearchService();
+
+	SpatialSearchService.SpatialResults searchTestSpatial(ClassicSearchService.SearchContext ctx, ClassicSearchService.SearchOption options,
+			List<BinaryMapIndexReader> readers, boolean printLogs) throws IOException;
 
 	default ResultMetric toMetric(SearchResult r) {
 		return new ResultMetric(r.file == null ? "" : r.file.getFile().getName(), r.getDepth(), r.getFoundWordCount(),
@@ -47,13 +51,13 @@ public interface DetectorService extends OBFService {
 	record AddressResult(String name, String type, String address, AddressResult parent, ResultMetric metric,
 	                     LatLon location, String mainWord) {}
 
-	default ResultsWithStats getResults(SearchService.SearchContext ctx, SearchService.SearchOption options, Boolean spatial) throws IOException {
+	default ResultsWithStats getResults(ClassicSearchService.SearchContext ctx, ClassicSearchService.SearchOption options, Boolean spatial) throws IOException {
 		long startTime = System.currentTimeMillis();
 		if (spatial != null && spatial) {
-			SearchService.SpatialResults results = getSearchService().searchTestSpatial(ctx, options, null, true);
+			SpatialSearchService.SpatialResults results = searchTestSpatial(ctx, options, null, true);
 			return toResults(ctx, results, startTime);
 		}
-		SearchService.SearchResults result = getSearchService().getImmediateSearchResults(ctx, options, null);
+		ClassicSearchService.SearchResults result = getClassicSearchService().getImmediateSearchResults(ctx, options, null);
 		String mainWord = result.phrase() == null ? "" : result.phrase().getUnknownWordToSearch();
 
 		List<AddressResult> results = new ArrayList<>();
@@ -66,7 +70,7 @@ public interface DetectorService extends OBFService {
 				result.settings().getStat().getByApis(), totalTime, null, null);
 	}
 
-	private ResultsWithStats toResults(SearchService.SearchContext ctx, SearchService.SpatialResults spatialResponse, long startTime) {
+	private ResultsWithStats toResults(ClassicSearchService.SearchContext ctx, SpatialSearchService.SpatialResults spatialResponse, long startTime) {
 		String totalTime = String.format(Locale.US, "%.1f", (System.currentTimeMillis() - startTime) / 1e3);
 		List<AddressResult> results = new ArrayList<>();
 		if (spatialResponse == null || spatialResponse.results() == null || spatialResponse.results().mainResults == null) {
@@ -82,7 +86,7 @@ public interface DetectorService extends OBFService {
 				spatialResponse.stats(), spatialCombinations(spatialResponse));
 	}
 
-	private List<String> spatialCombinations(SearchService.SpatialResults spatialResponse) {
+	private List<String> spatialCombinations(SpatialSearchService.SpatialResults spatialResponse) {
 		if (spatialResponse == null || spatialResponse.results() == null || spatialResponse.results().combinations == null) {
 			return Collections.emptyList();
 		}
@@ -95,7 +99,7 @@ public interface DetectorService extends OBFService {
 		return combinations;
 	}
 
-	private AddressResult toResult(SearchService.SearchContext ctx, SpatialSearchResult res) {
+	private AddressResult toResult(ClassicSearchService.SearchContext ctx, SpatialSearchResult res) {
 		if (res == null) {
 			return null;
 		}
@@ -110,7 +114,7 @@ public interface DetectorService extends OBFService {
 				parent, metric, location, null);
 	}
 
-	private AddressResult toParent(SearchService.SearchContext ctx, List<MapObject> objects, int index, double foundWordCount) {
+	private AddressResult toParent(ClassicSearchService.SearchContext ctx, List<MapObject> objects, int index, double foundWordCount) {
 		if (objects == null || index >= objects.size()) {
 			return null;
 		}
@@ -181,7 +185,7 @@ public interface DetectorService extends OBFService {
 		}
 	}
 
-	default void createUnitTest(UnitTestPayload unitTest, SearchService.SearchContext ctx, OutputStream out, boolean spatial) throws IOException, SQLException {
+	default void createUnitTest(UnitTestPayload unitTest, ClassicSearchService.SearchContext ctx, OutputStream out, boolean spatial) throws IOException, SQLException {
 		Path rootTmp = Path.of(System.getProperty("java.io.tmpdir"));
 		Path dirPath = Files.createTempDirectory(rootTmp, "unit-tests-");
 		try {
@@ -330,7 +334,7 @@ public interface DetectorService extends OBFService {
 				&& MapUtils.getDistance(point, object.getLocation()) < radius;
 	}
 
-	private void collectUnitTestSourceData(SearchService.SpatialResults spatialResponse, Map<Long, City> cities, Map<String, Amenity> amenities, UnitTestPayload unitTest) {
+	private void collectUnitTestSourceData(SpatialSearchService.SpatialResults spatialResponse, Map<Long, City> cities, Map<String, Amenity> amenities, UnitTestPayload unitTest) {
 		if (spatialResponse == null || spatialResponse.results() == null || spatialResponse.results().mainResults == null) {
 			return;
 		}
@@ -434,10 +438,10 @@ public interface DetectorService extends OBFService {
 		}
 	}
 	
-	private UnitTestSourceData createUnitTestSourceData(UnitTestPayload unitTest, SearchService.SearchContext baseCtx,
+	private UnitTestSourceData createUnitTestSourceData(UnitTestPayload unitTest, ClassicSearchService.SearchContext baseCtx,
 	                                                    Path dirPath, Boolean spatial) throws IOException {
 		SearchExportSettings exportSettings = new SearchExportSettings(true, true, -1);
-		SearchService.SearchOption options = new SearchService.SearchOption(true, exportSettings,
+		ClassicSearchService.SearchOption options = new ClassicSearchService.SearchOption(true, exportSettings,
 				null, true, true, (net.osmand.search.core.ObjectType[]) null);
 		
 		String[] queries = normalizedUnitTestQueries(unitTest.queries(), baseCtx.text());
@@ -454,11 +458,11 @@ public interface DetectorService extends OBFService {
 			Map<String, RoutingContext> geocodingContexts = new HashMap<>();
 			Map<String, Long> exportedRoutes = new LinkedHashMap<>();
 			for (String q : queries) {
-				SearchService.SearchContext ctx = new SearchService.SearchContext(
+				ClassicSearchService.SearchContext ctx = new ClassicSearchService.SearchContext(
 						baseCtx.lat(), baseCtx.lon(), q, baseCtx.locale(),
 						baseCtx.baseSearch(), baseCtx.northWest(), baseCtx.southEast());
 
-				SearchService.SearchResults results = getSearchService().getImmediateSearchResults(ctx, options, null);
+				ClassicSearchService.SearchResults results = getClassicSearchService().getImmediateSearchResults(ctx, options, null);
 				SearchPhrase phrase = results.phrase();
 				List<SearchResult> searchResults = results.results();
 				if (phrase == null || searchResults == null) {
@@ -486,14 +490,14 @@ public interface DetectorService extends OBFService {
 			getLogger().info("Filtered cities: {}, amenities: {}", cities, amenities);
 		}
 
-		SearchService.SpatialResults spatialResults;
+		SpatialSearchService.SpatialResults spatialResults;
 		if (spatial != null && spatial) {
 			for (String q : queries) {
-				SearchService.SearchContext ctx = new SearchService.SearchContext(
+				ClassicSearchService.SearchContext ctx = new ClassicSearchService.SearchContext(
 						baseCtx.lat(), baseCtx.lon(), q, baseCtx.locale(),
 						baseCtx.baseSearch(), baseCtx.northWest(), baseCtx.southEast());
 				
-				spatialResults = getSearchService().searchTestSpatial(ctx, options, null, false);
+				spatialResults = searchTestSpatial(ctx, options, null, false);
 				collectUnitTestSourceData(spatialResults, cities, amenities, unitTest);
 				
 				int[] sizes = getStreetsBuildingSize(cities.values());

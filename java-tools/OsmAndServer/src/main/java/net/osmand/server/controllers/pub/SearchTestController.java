@@ -1,6 +1,7 @@
 package net.osmand.server.controllers.pub;
 
 import jakarta.servlet.http.HttpServletResponse;
+import net.osmand.server.api.services.search.ClassicSearchService;
 import net.osmand.server.SearchTestRepositoryConfiguration;
 import net.osmand.server.api.searchtest.BaseService.GenParam;
 import net.osmand.server.api.searchtest.AnalystService;
@@ -8,14 +9,13 @@ import net.osmand.server.api.searchtest.DetectorService;
 import net.osmand.server.api.searchtest.OBFService;
 import net.osmand.server.api.searchtest.ReportService.RunStatus;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
-import net.osmand.server.api.services.SearchService;
-import net.osmand.server.api.services.SearchTestService.TestCaseItem;
+import net.osmand.server.api.services.search.SearchTestService.TestCaseItem;
 import net.osmand.server.api.searchtest.ReportService.TestCaseStatus;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository.Dataset;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.RunParam;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
-import net.osmand.server.api.services.SearchTestService;
+import net.osmand.server.api.services.search.SearchTestService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -47,7 +47,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @RequestMapping(path = "/admin/search-test")
 public class SearchTestController {
 
-	public record RunTestCaseRequest(RunParam payload, SearchService.SearchOption options) {}
+	public record RunTestCaseRequest(RunParam payload, ClassicSearchService.SearchOption options) {}
 	public record GenerateDbJobResponse(String jobId) {}
 	public record CreateTagsDatasourceRequest(String name, Boolean overwrite, List<String> obfs,
 											  Boolean skipObjectTags, Boolean skipNewTokens,
@@ -157,8 +157,8 @@ public class SearchTestController {
 	public CompletableFuture<ResponseEntity<Run>> runTestCase(@PathVariable Long caseId,
 															  @RequestBody RunTestCaseRequest request) {
 		RunParam payload = request == null || request.payload == null ? new RunParam() : request.payload;
-		SearchService.SearchOption options = request == null || request.options == null
-				? new SearchService.SearchOption(false, null, null, false, true, (net.osmand.search.core.ObjectType[]) null)
+		ClassicSearchService.SearchOption options = request == null || request.options == null
+				? new ClassicSearchService.SearchOption(false, null, null, false, true, (net.osmand.search.core.ObjectType[]) null)
 				: request.options;
 		return testSearchService.runTestCase(caseId, payload, options).thenApply(ResponseEntity::ok);
 	}
@@ -445,12 +445,12 @@ public class SearchTestController {
 			@RequestParam() Double lat,
 			@RequestParam() Double lon,
 			@RequestParam(required = false, defaultValue = "false") Boolean spatial,
-			@RequestBody SearchService.SearchOption options) throws IOException {
+			@RequestBody ClassicSearchService.SearchOption options) throws IOException {
 		if (query == null || lat == null || lon == null) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'query', 'lat' and 'lon' are required");
         }
 
-        SearchService.SearchContext ctx = new SearchService.SearchContext(lat, lon, query, lang, false, null, null);
+        ClassicSearchService.SearchContext ctx = new ClassicSearchService.SearchContext(lat, lon, query, lang, false, null, null);
 		return ResponseEntity.ok(testSearchService.getResults(ctx, options, spatial));
 	}
 
@@ -475,7 +475,7 @@ public class SearchTestController {
 		response.setContentType("application/zip");
 		response.setHeader("Content-Disposition", "attachment; filename=\"" + unitTest.name() + ".zip\"");
 		testSearchService.createUnitTest(unitTest,
-				new SearchService.SearchContext(lat, lon, query, null, false, null, null),
+				new ClassicSearchService.SearchContext(lat, lon, query, null, false, null, null),
 				response.getOutputStream(), spatial);
 	}
 
