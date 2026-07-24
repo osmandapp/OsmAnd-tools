@@ -1,7 +1,7 @@
 package net.osmand.server.api.services;
 
 import static net.osmand.binary.BinaryMapIndexReader.SearchRequest.ZOOM_TO_SEARCH_POI;
-import static net.osmand.data.Amenity.OPENING_HOURS;
+import static net.osmand.data.Amenity.*;
 import static net.osmand.data.MapObject.unzipContent;
 import static net.osmand.gpx.GPXUtilities.AMENITY_PREFIX;
 import static net.osmand.search.SearchUICore.createAddressString;
@@ -37,6 +37,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import net.osmand.data.*;
 import net.osmand.search.core.spatial.SpatialPoiSearch.SpatialPoiType;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -58,14 +59,7 @@ import net.osmand.binary.BinaryMapIndexReaderStats;
 import net.osmand.binary.BinaryMapPoiReaderAdapter;
 import net.osmand.binary.GeocodingUtilities;
 import net.osmand.binary.ObfConstants;
-import net.osmand.data.Amenity;
-import net.osmand.data.Building;
-import net.osmand.data.City;
 import net.osmand.data.City.CityType;
-import net.osmand.data.LatLon;
-import net.osmand.data.MapObject;
-import net.osmand.data.QuadRect;
-import net.osmand.data.Street;
 import net.osmand.map.OsmandRegions;
 import net.osmand.osm.AbstractPoiType;
 import net.osmand.osm.MapPoiTypes;
@@ -1412,6 +1406,91 @@ public class SearchService {
 
 		});
 		return res;
+	}
+
+	public List<Map<String, Object>> getVisibleTags(Map<String, String> tags) {
+		if (tags == null || tags.isEmpty()) {
+			return Collections.emptyList();
+		}
+		AdditionalInfoBundle infoFilter = new AdditionalInfoBundle(MapPoiTypes.getDefault(), tags);
+		Map<String, Object> visible = new HashMap<>();
+		infoFilter.getFilteredLocalizedInfo().forEach((key, value) -> {
+			if (!infoFilter.shouldDisplayKey(key)) {
+				return;
+			}
+			String vl = null;
+			if (value instanceof String str) {
+				if (infoFilter.isKeyToSkip(key) || key.equals("note")) {
+					return;
+				}
+				vl = str;
+			}
+			PoiType poiType = infoFilter.getPoiAdditionalType(key, vl);
+			if (poiType == null) {
+				poiType = infoFilter.getPoiAdditionalType(key.replace(':', '_'), vl);
+			}
+			if (poiType == null || poiType.isFilterOnly()) {
+				return;
+			}
+			visible.put(key, value);
+		});
+		infoFilter.getFilteredLocalizedInfo().forEach((key, value) -> {
+			if (key.startsWith(COLLAPSABLE_PREFIX)) {
+				visible.put(key, value);
+			}
+		});
+		return groupLocalizedTags(visible);
+	}
+
+	private record LocalizedValue(String key, String value, String lang) {
+	}
+
+	private List<Map<String, Object>> groupLocalizedTags(Map<String, Object> tags) {
+		List<Map<String, Object>> result = new ArrayList<>();
+		tags.forEach((key, value) -> {
+			if (value instanceof String valueStr) {
+				result.add(Map.of("key", key, "value", valueStr));
+				return;
+			}
+			if (!(value instanceof Map<?, ?> valueMap)
+					|| !(valueMap.get("localizations") instanceof Map<?, ?> localizations)) {
+				return;
+			}
+			List<LocalizedValue> entries = new ArrayList<>();
+			localizations.forEach((k, v) -> {
+				String ks = String.valueOf(k);
+				int idx = ks.indexOf(':');
+				entries.add(idx >= 0
+						? new LocalizedValue(ks.substring(0, idx), String.valueOf(v), ks.substring(idx + 1))
+						: new LocalizedValue(ks, String.valueOf(v), null));
+			});
+			LocalizedValue mainEntry = entries.stream().filter(e -> e.lang() != null).findFirst().orElse(null);
+			if (mainEntry != null) {
+				Map<String, Object> entry = new HashMap<>();
+				entry.put("key", key);
+				entry.put("value", mainEntry.value());
+				entry.put("lang", mainEntry.lang());
+				List<Map<String, Object>> otherLangs = entries.stream()
+						.filter(e -> e != mainEntry)
+						.map(e -> {
+							Map<String, Object> otherLengsMap = new HashMap<>();
+							otherLengsMap.put("key", e.key());
+							otherLengsMap.put("value", e.value());
+							if (e.lang() != null) {
+								otherLengsMap.put("lang", e.lang());
+							}
+							return otherLengsMap;
+						})
+						.collect(Collectors.toList());
+				if (!otherLangs.isEmpty()) {
+					entry.put("otherLangs", otherLangs);
+				}
+				result.add(entry);
+			} else if (!entries.isEmpty()) {
+				result.add(Map.of("key", key, "value", entries.get(0).value()));
+			}
+		});
+		return result;
 	}
 
 	private Map<String, String> getTranslations(String locale) {
