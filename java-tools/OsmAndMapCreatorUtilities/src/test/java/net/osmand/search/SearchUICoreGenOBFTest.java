@@ -539,6 +539,7 @@ public class SearchUICoreGenOBFTest {
 		}
 
 		engine = createSearchEngine(settingsJson, readers);
+		int shift = 4;
 		for (int k = 0; k < phrases.size(); k++) {
 			String text = phrases.get(k);
 			List<String> expectedResults = results.get(k);
@@ -548,17 +549,17 @@ public class SearchUICoreGenOBFTest {
 				String expected = expectedResults.get(i);
 				String actual = i >= actualResults.size() ? null : actualResults.get(i);
 				if (expected.indexOf('[') != -1) {
-					expected = expected.substring(0, expected.indexOf('[')).trim();
+					expected = expected.substring(0, expected.indexOf('[') + shift).trim();
 				}
 				if (actual != null && actual.indexOf('[') != -1) {
-					actual = actual.substring(0, actual.indexOf('[')).trim();
+					actual = actual.substring(0, actual.indexOf('[') + shift).trim();
 				}
 				// String present = result.toString();
 				expected = expected.replaceFirst("^@", "");
 				String present = actual == null ? ("#MISSING " + (i + 1)) : actual;
 				if (!Algorithms.stringsEqual(expected, present)) {
 					engine.search(text, false);
-					System.out.printf("Phrase: %s%n", text);
+					System.out.printf("Phrase #%s: %s%n", k + 1, text);
 					System.out.printf("Mismatch #%s for '%s' != '%s'. %n", i + 1, expected, present);
 					System.out.println("CURRENT RESULTS: ");
 					for (String r : actualResults) {
