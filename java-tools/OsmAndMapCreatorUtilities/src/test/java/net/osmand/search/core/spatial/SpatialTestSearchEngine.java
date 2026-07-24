@@ -97,7 +97,7 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
         }
         String sorting = SpatialSearchResult.compareKeyString(r);
         return String.format(Locale.US, "%s [[%d, %s, %s, %.2f km, %s]]", b,
-                tCount, testTypeStr(atom) + subtype, sorting, dist / 1000, r.toString(searchContext).replace("\\", "'"));
+                tCount, testTypeStr(atom) + subtype, sorting, dist / 1000, r.toString(searchContext).replace("\"", "'"));
     }
 
 	private void appendName(StringBuilder b, String extraMatch, MapObject object) {
