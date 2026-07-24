@@ -91,6 +91,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	{
 		langAttributes.add(MapObject.NAME_ADMIN_LEVEL_ATTR);
 		langAttributes.add(MapObject.NAME_PLACE_ATTR);
+		langAttributes.add(MapObject.NAME_REF_ATTR);
         langAttributes.add(MapObject.NAME_WIKIDATA_ATTR);
 	}
 	public static final String ENTRANCE_BUILDING_DELIMITER = ", ";
@@ -147,6 +148,10 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 		LatLon l = city.getLocation();
 		city.setNames(getOtherNames(e));
+		String wikidata = e.getTag(MapObject.NAME_WIKIDATA_ATTR);
+		if (wikidata != null) {
+			city.setName(MapObject.NAME_WIKIDATA_ATTR, wikidata);
+		}
 		if (!Algorithms.isEmpty(city.getName())) {
 			cityDataStorage.registerObject(l.getLatitude(), l.getLongitude(), city, e);
 			debugCityIds.add(city.getId());
@@ -442,19 +447,24 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			Boundary boundary = new Boundary(m);
 			boundary.setName(bname);
 			boundary.setAltName(e.getTag("short_name")); // Goteborg, Esslingen
-			boundary.setAdminLevel(extractBoundaryAdminLevel(e));
+			int adminLevel = extractBoundaryAdminLevel(e);
+			boundary.setAdminLevel(adminLevel);
 			boundary.setNames(getOtherNames(e));
             String wikidata = e.getTag(MapObject.NAME_WIKIDATA_ATTR);
             if (wikidata != null) {
                 boundary.addName(MapObject.NAME_WIKIDATA_ATTR, wikidata);
-            }
+			}
+			String ref = e.getTag(MapObject.NAME_REF_ATTR);
+			if (ref != null && adminLevel <= 6) {
+				boundary.addName(MapObject.NAME_REF_ATTR, ref);
+			}
 			boundary.setBoundaryId(ObfConstants.createMapObjectIdFromOsmAndEntity(e));
 			if (ct == null && census) {
 				boundary.setCityType(CityType.CENSUS);
 			} else {
 				boundary.setCityType(ct);
 			}
-			if(labelId != 0) {
+			if (labelId != 0) {
 				boundary.setLabelId(labelId);
 			}
 			if (centerId != 0) {
@@ -1246,9 +1256,13 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		writer.startCityBlockIndex(CityBlocks.POSTCODES_TYPE.index);
 		ArrayList<City> posts = new ArrayList<City>(postcodes.values());
 		for (City s : posts) {
-			// TODO Enable in 5.3 (5.2 version will support postcode ordinal)
+			if (s.getBbox31() == null) {
+				s.calculateBbox31FromStreets();
+			}
+			// TODO Enable in 5.3 (since 5.2 version will support postcode ordinal)
 //			refs.add(writer.writeCityHeader(s, CityType.POSTCODE.ordinal(), tagRules));
 			refs.add(writer.writeCityHeader(s, -1, tagRules));
+			
 		}
 		for (int i = 0; i < posts.size(); i++) {
 			City postCode = posts.get(i);

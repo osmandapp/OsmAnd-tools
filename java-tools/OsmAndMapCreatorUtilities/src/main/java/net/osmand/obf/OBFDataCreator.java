@@ -43,6 +43,9 @@ public class OBFDataCreator extends BinaryMerger {
 				File jsonFile = new File(jsonFilePath);
 				if (jsonFile.exists() && jsonFile.getName().endsWith(".json")) {
 					BinaryMapIndexReader reader = BinaryMapIndexTestReader.buildTestReader(jsonFile);
+					if (reader == null) {
+						throw new IOException("No data in JSON file " + jsonFile);
+					}
 					readers.add(reader);
 					if (reader instanceof BinaryMapIndexTestReader testReader) {
 						testReaders.add(testReader);
@@ -84,6 +87,16 @@ public class OBFDataCreator extends BinaryMerger {
 				reader.close();
 			}
 		}
+	}
+
+	@Override
+	protected boolean shouldMergeCitiesByNameDistance() {
+		return false;
+	}
+
+	@Override
+	protected boolean shouldRegenerateRelationPoiIds() {
+		return false;
 	}
 
 	private boolean hasRoutingData(List<BinaryMapIndexTestReader> readers) {

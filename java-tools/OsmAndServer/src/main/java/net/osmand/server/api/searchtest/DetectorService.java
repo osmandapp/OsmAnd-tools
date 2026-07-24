@@ -51,8 +51,7 @@ public interface DetectorService extends OBFService {
 		long startTime = System.currentTimeMillis();
 		if (spatial != null && spatial) {
 			SearchService.SpatialResults results = getSearchService().searchTestSpatial(ctx, options, null, true);
-			String timeAll = String.format(Locale.US, "%.1f", (System.currentTimeMillis() - startTime) / 1e3);
-			return toResults(ctx, results, timeAll);
+			return toResults(ctx, results, startTime);
 		}
 		SearchService.SearchResults result = getSearchService().getImmediateSearchResults(ctx, options, null);
 		String mainWord = result.phrase() == null ? "" : result.phrase().getUnknownWordToSearch();
@@ -67,7 +66,8 @@ public interface DetectorService extends OBFService {
 				result.settings().getStat().getByApis(), totalTime, null, null);
 	}
 
-	private ResultsWithStats toResults(SearchService.SearchContext ctx, SearchService.SpatialResults spatialResponse, String totalTime) {
+	private ResultsWithStats toResults(SearchService.SearchContext ctx, SearchService.SpatialResults spatialResponse, long startTime) {
+		String totalTime = String.format(Locale.US, "%.1f", (System.currentTimeMillis() - startTime) / 1e3);
 		List<AddressResult> results = new ArrayList<>();
 		if (spatialResponse == null || spatialResponse.results() == null || spatialResponse.results().mainResults == null) {
 			return new ResultsWithStats(results, Collections.emptyList(), Collections.emptyMap(), totalTime, null, null);
@@ -171,38 +171,38 @@ public interface DetectorService extends OBFService {
 			@JsonProperty("name") String name,
 			@JsonProperty("queries") String[] queries,
 			@JsonProperty("resultsLimit") Integer resultsLimit,
-			@JsonProperty("geocodingLimit") Integer geocodingLimit) {}
+			@JsonProperty("geocodingLimit") Integer geocodingLimit,
+			@JsonProperty("quote") Double quote,
+			@JsonProperty("radius") Integer radius) {}
 
-	record UnitTestResultsData(List<List<String>> results, JSONArray routing) {}
-	record UnitTestSourceData(String jsonFilePath, List<String> jsonFilePaths, SearchService.SearchResults results) {
-		UnitTestSourceData(String jsonFilePath, SearchService.SearchResults results) {
-			this(jsonFilePath, Collections.singletonList(jsonFilePath), results);
+	record UnitTestSourceData(String jsonFilePath, List<String> jsonFilePaths, SearchSettings settings, List<List<String>> geoResults) {
+		UnitTestSourceData(String jsonFilePath, SearchSettings settings, List<List<String>> geoResults) {
+			this(jsonFilePath, Collections.singletonList(jsonFilePath), settings, geoResults);
 		}
 	}
 
-	default void createUnitTest(UnitTestPayload unitTest, SearchService.SearchContext ctx, OutputStream out) throws IOException, SQLException {
+	default void createUnitTest(UnitTestPayload unitTest, SearchService.SearchContext ctx, OutputStream out, boolean spatial) throws IOException, SQLException {
 		Path rootTmp = Path.of(System.getProperty("java.io.tmpdir"));
 		Path dirPath = Files.createTempDirectory(rootTmp, "unit-tests-");
 		try {
 			int limit = unitTest.resultsLimit();
 			int geocodingLimit = unitTest.geocodingLimit();
-			UnitTestResultsData unitTestData = buildUnitTestResults(unitTest.queries(), ctx, limit, geocodingLimit);
-			UnitTestSourceData sourceData = createUnitTestSourceData(unitTest, ctx, dirPath, unitTestData.routing());
-			SearchService.SearchResults result = sourceData.results();
-			if (result == null) {
+			UnitTestSourceData sourceData = createUnitTestSourceData(unitTest, ctx, dirPath, spatial);
+			if (sourceData.jsonFilePath == null) {
 				return;
 			}
-			File jsonFile = dirPath.resolve(unitTest.name + ".json").toFile();
+			File configJsonFile = dirPath.resolve(unitTest.name + ".json").toFile();
+			File sourceJsonFile = gzip(new File(sourceData.jsonFilePath));
 
 			OBFDataCreator creator = new OBFDataCreator();
 			File outFile = creator.create(dirPath.resolve(unitTest.name + ".obf").toAbsolutePath().toString(),
 					new String[] {sourceData.jsonFilePath()});
 
 			// Build ZIP with JSON metadata and gzipped data, streaming directly to the servlet output
-			SearchSettings settings = result.settings().setOriginalLocation(new LatLon(ctx.lat(), ctx.lon()));
+			SearchSettings settings = sourceData.settings().setOriginalLocation(new LatLon(ctx.lat(), ctx.lon()));
 			JSONObject settingsJson = settings.toJSON();
 			JSONArray formattedResultsJson = new JSONArray();
-			for (List<String> phraseResults : unitTestData.results()) {
+			for (List<String> phraseResults : sourceData.geoResults()) {
 				formattedResultsJson.put(new JSONArray(phraseResults));
 			}
 			Map<String, Object> rootJson = new LinkedHashMap<>();
@@ -216,24 +216,31 @@ public interface DetectorService extends OBFService {
 			rootJson.put("phrases", unitTest.queries());
 			rootJson.put("results", formattedResultsJson);
 			String unitTestJson = new JSONObject(rootJson).toString(4) + "\n";
-			Files.writeString(jsonFile.toPath(), unitTestJson, StandardCharsets.UTF_8);
+			Files.writeString(configJsonFile.toPath(), unitTestJson, StandardCharsets.UTF_8);
 			try (ZipOutputStream zipOut = new ZipOutputStream(out)) {
 				// JSON metadata entry
-				if (jsonFile.exists()) {
-					ZipEntry jsonEntry = new ZipEntry(jsonFile.getName());
-					zipOut.putNextEntry(jsonEntry);
-					try (InputStream jsonIn = new StringInputStream(unitTestJson)) {
-						Algorithms.streamCopy(jsonIn, zipOut);
+				if (configJsonFile.exists()) {
+					zipOut.putNextEntry(new ZipEntry(configJsonFile.getName()));
+					try (InputStream is = new StringInputStream(unitTestJson)) {
+						Algorithms.streamCopy(is, zipOut);
 					}
 					zipOut.closeEntry();
 				}
 
+				// JSON source entry
+				if (sourceJsonFile.exists()) {
+					zipOut.putNextEntry(new ZipEntry(sourceJsonFile.getName()));
+					try (InputStream is = new FileInputStream(sourceJsonFile)) {
+						Algorithms.streamCopy(is, zipOut);
+					}
+					zipOut.closeEntry();
+				}
+				
 				// Gzipped data archive entry
 				if (outFile.exists()) {
-					ZipEntry gzEntry = new ZipEntry(outFile.getName());
-					zipOut.putNextEntry(gzEntry);
-					try (InputStream gzIn = new FileInputStream(outFile)) {
-						Algorithms.streamCopy(gzIn, zipOut);
+					zipOut.putNextEntry(new ZipEntry(outFile.getName()));
+					try (InputStream is = new FileInputStream(outFile)) {
+						Algorithms.streamCopy(is, zipOut);
 					}
 					zipOut.closeEntry();
 				}
@@ -255,48 +262,274 @@ public interface DetectorService extends OBFService {
 		}
 	}
 
-	private List<List<String>> emptyUnitTestResults(String[] phrases) {
-		List<List<String>> results = new ArrayList<>();
-		String[] phraseArray = phrases == null ? new String[0] : phrases;
-		for (int i = 0; i < phraseArray.length; i++) {
-			results.add(new ArrayList<>());
-		}
-		return results;
+	private String amenityKey(Amenity amenity) {
+		return amenity.getId() + "|" + amenity.getType() + "|" + amenity.getSubType();
 	}
 
+	private City compactUnitTestCity(City city) {
+		if (city.getStreets().size() <= 1) {
+			return city;
+		}
+		JSONObject json = city.toJSON(false);
+		json.remove("listOfStreets");
+		return City.parseJSON(json);
+	}
+
+	private Street compactUnitTestStreet(Street street, City city) {
+		if (street.getBuildings().size() <= 1) {
+			return street;
+		}
+		JSONObject json = street.toJSON(false);
+		json.remove("buildings");
+		json.remove("intersectedStreets");
+		return Street.parseJSON(city, json);
+	}
+
+	private City collectCompactUnitTestCity(City city, Map<Long, City> cities) {
+		if (city == null || city.getId() == null) {
+			return null;
+		}
+		City existing = cities.get(city.getId());
+		if (existing == null) {
+			existing = compactUnitTestCity(city);
+			cities.put(existing.getId(), existing);
+		}
+		return existing;
+	}
+
+	private Street collectCompactUnitTestStreet(Street street, Map<Long, City> cities) {
+		if (street == null || street.getCity() == null) {
+			return null;
+		}
+		City city = collectCompactUnitTestCity(street.getCity(), cities);
+		if (city == null) {
+			return null;
+		}
+		for (Street existing : city.getStreets()) {
+			if (existing.equals(street)) {
+				return existing;
+			}
+		}
+		Street compactStreet = compactUnitTestStreet(street, city);
+		city.registerStreet(compactStreet);
+		return compactStreet;
+	}
+
+	private void collectCompactUnitTestBuilding(Building building, Street parentStreet, Map<Long, City> cities) {
+		Street street = collectCompactUnitTestStreet(parentStreet, cities);
+		if (building != null && street != null) {
+			street.addBuildingCheckById(Building.parseJSON(building.toJSON()));
+		}
+	}
+
+	private boolean isWithinUnitTestSourceRadius(MapObject object, LatLon point, Integer radius) {
+		if (radius == null || radius <= 0) {
+			return true;
+		}
+		return object != null && object.getLocation() != null && point != null
+				&& MapUtils.getDistance(point, object.getLocation()) < radius;
+	}
+
+	private void collectUnitTestSourceData(SearchService.SpatialResults spatialResponse, Map<Long, City> cities, Map<String, Amenity> amenities, UnitTestPayload unitTest) {
+		if (spatialResponse == null || spatialResponse.results() == null || spatialResponse.results().mainResults == null) {
+			return;
+		}
+		List<SpatialSearchResult> mainResults = spatialResponse.results().mainResults;
+		for (int i = 0; i < Math.min(unitTest.resultsLimit(), mainResults.size()); i++) {
+			SpatialSearchResult res = mainResults.get(i);
+			if (res == null) {
+				continue;
+			}
+			List<MapObject> objects = res.getObjects();
+			if (objects == null) {
+				return;
+			}
+			Building resultBuilding = null;
+			Street resultBuildingStreet = null;
+            for (MapObject object : objects) {
+                if (object instanceof Building building) {
+                    resultBuilding = building;
+                    break;
+                }
+            }
+            if (resultBuilding != null) {
+                for (MapObject object : objects) {
+                    if (object instanceof Street street) {
+                        resultBuildingStreet = street;
+                        break;
+                    }
+                }
+                collectCompactUnitTestBuilding(resultBuilding, resultBuildingStreet, cities);
+			}
+			for (MapObject object : objects) {
+				if (object instanceof Amenity amenity) {
+					String amenityKey = amenityKey(amenity);
+					amenities.putIfAbsent(amenityKey, amenity);
+				} else if (object instanceof City city) {
+					collectCompactUnitTestCity(city, cities);
+				} else if (object instanceof Street street) {
+					collectCompactUnitTestStreet(street, cities);
+				}
+			}
+		}
+	}
+
+	private void filterSourceData(Map<String, Amenity> amenities, Map<Long, City> cities, UnitTestPayload unitTest) {
+		int before = amenities.size();
+		Double quote = unitTest.quote;
+		if (quote != null && quote < 1.0) {
+			amenities.entrySet().removeIf(entry -> Math.random() >= quote);
+		}
+		getLogger().info("Amenities: before = {}, after={}", before, amenities.size());
+
+		before = cities.size();
+		if (quote != null && quote < 1.0) {
+			cities.entrySet().removeIf(e -> (e.getValue().getStreets() == null || e.getValue().getStreets().isEmpty()) && Math.random() >= quote);
+		}
+		getLogger().info("Cities: before = {}, after={}", before, cities.size());
+		
+		before = 0;
+		int after = 0;
+		for (City city : cities.values()) {
+			List<Street> streets = city.getStreets();
+			if (streets == null || streets.isEmpty()) {
+				continue;
+			}
+			before += streets.size();
+			if (quote != null && quote < 1.0) {
+				streets.removeIf(street -> Math.random() >= quote);
+			}
+			after += streets.size();
+		}
+		getLogger().info("Streets: before = {}, after={}", before, after);
+	}
+
+	private void collectUnitTestSourceData(JSONObject sourceJson, Map<String, Amenity> amenities, Map<Long, City> cities,
+	                                       LatLon point, UnitTestPayload unitTest) {
+		JSONArray amenitiesJson = sourceJson.optJSONArray("amenities");
+		if (amenitiesJson != null) {
+			for (int i = 0; i < amenitiesJson.length(); i++) {
+				Amenity amenity = Amenity.parseJSON(amenitiesJson.getJSONObject(i));
+				if (isWithinUnitTestSourceRadius(amenity, point, unitTest.radius())) {
+					amenities.putIfAbsent(amenityKey(amenity), amenity);
+				}
+			}
+		}
+
+		JSONArray citiesJson = sourceJson.optJSONArray("cities");
+		if (citiesJson != null) {
+			for (int i = 0; i < citiesJson.length(); i++) {
+				City city = City.parseJSON(citiesJson.getJSONObject(i));
+				city.getStreets().removeIf(street -> !isWithinUnitTestSourceRadius(street, point, unitTest.radius()));
+				if (!isWithinUnitTestSourceRadius(city, point, unitTest.radius()) && city.getStreets().isEmpty()) {
+					continue;
+				}
+				City existing = cities.get(city.getId());
+				if (existing == null) {
+					cities.put(city.getId(), city);
+				} else {
+					existing.mergeWith(city);
+				}
+			}
+		}
+	}
+	
 	private UnitTestSourceData createUnitTestSourceData(UnitTestPayload unitTest, SearchService.SearchContext baseCtx,
-			Path dirPath, JSONArray routing) throws IOException {
+	                                                    Path dirPath, Boolean spatial) throws IOException {
 		SearchExportSettings exportSettings = new SearchExportSettings(true, true, -1);
-		SearchService.SearchResults results = null;
+		SearchService.SearchOption options = new SearchService.SearchOption(true, exportSettings,
+				null, true, true, (net.osmand.search.core.ObjectType[]) null);
+		
 		String[] queries = normalizedUnitTestQueries(unitTest.queries(), baseCtx.text());
 		LinkedHashMap<String, Amenity> amenities = new LinkedHashMap<>();
 		LinkedHashMap<Long, City> cities = new LinkedHashMap<>();
-        for (String q : queries) {
-            SearchService.SearchContext phraseCtx = new SearchService.SearchContext(
-                    baseCtx.lat(), baseCtx.lon(), q, baseCtx.locale(),
-                    baseCtx.baseSearch(), baseCtx.northWest(), baseCtx.southEast());
-            SearchService.SearchResults queryResult = getSearchService().getImmediateSearchResults(
-                    phraseCtx, new SearchService.SearchOption(true, exportSettings,
-                            null, true, false, (net.osmand.search.core.ObjectType[]) null), null);
-            if (results == null) {
-                results = queryResult;
-            }
-            String unitTestJson = queryResult == null ? null : queryResult.unitTestJson();
-            if (unitTestJson == null) {
-                continue;
-            }
-            collectUnitTestSourceData(unitTestJson, amenities, cities);
-        }
+		SearchSettings settings = new SearchSettings(Collections.emptyList());
+		LatLon point = new LatLon(baseCtx.lat(), baseCtx.lon());
 		
-		return createUnitTestJson(dirPath, unitTest.name, results, routing, amenities, cities);
+		JSONArray routing = new JSONArray();
+		long nextRouteId = 1;
+		List<List<String>> geoResults = new ArrayList<>();
+		if (unitTest.quote != null && unitTest.quote > 0.0 && unitTest.radius != null && unitTest.radius > 0) {
+			GeocodingUtilities geoUtils = new GeocodingUtilities();
+			Map<String, RoutingContext> geocodingContexts = new HashMap<>();
+			Map<String, Long> exportedRoutes = new LinkedHashMap<>();
+			for (String q : queries) {
+				SearchService.SearchContext ctx = new SearchService.SearchContext(
+						baseCtx.lat(), baseCtx.lon(), q, baseCtx.locale(),
+						baseCtx.baseSearch(), baseCtx.northWest(), baseCtx.southEast());
+
+				SearchService.SearchResults results = getSearchService().getImmediateSearchResults(ctx, options, null);
+				SearchPhrase phrase = results.phrase();
+				List<SearchResult> searchResults = results.results();
+				if (phrase == null || searchResults == null) {
+					continue;
+				}
+				List<String> phraseResults = new ArrayList<>();
+				for (int i = 0; i < Math.min(unitTest.resultsLimit, results.results().size()); i++) {
+					SearchResult searchResultItem = results.results().get(i);
+					boolean markGeocoding = i < unitTest.geocodingLimit && isReverseGeocodingCandidate(searchResultItem);
+					if (markGeocoding) {
+						nextRouteId = exportReverseGeocodingRoutes(searchResultItem, geoUtils, geocodingContexts,
+								exportedRoutes, routing, nextRouteId);
+					}
+					String formatted = SearchUICore.formatSearchResultForTest(false, searchResultItem, phrase);
+					phraseResults.add(markGeocoding ? "@" + formatted : formatted);
+				}
+				geoResults.add(phraseResults);
+
+				collectUnitTestSourceData(results.unitTestJson(), amenities, cities, point, unitTest);
+				int[] sizes = getStreetsBuildingSize(cities.values());
+				getLogger().info("Sampling search results for query '{}': {}, cities: {}, streets: {}, buildings: {}, amenities: {}", q, searchResults.size(), cities.size(), sizes[0], sizes[1], amenities.size());
+				settings = results.settings();
+			}
+			filterSourceData(amenities, cities, unitTest);
+			getLogger().info("Filtered cities: {}, amenities: {}", cities, amenities);
+		}
+
+		SearchService.SpatialResults spatialResults;
+		if (spatial != null && spatial) {
+			for (String q : queries) {
+				SearchService.SearchContext ctx = new SearchService.SearchContext(
+						baseCtx.lat(), baseCtx.lon(), q, baseCtx.locale(),
+						baseCtx.baseSearch(), baseCtx.northWest(), baseCtx.southEast());
+				
+				spatialResults = getSearchService().searchTestSpatial(ctx, options, null, false);
+				collectUnitTestSourceData(spatialResults, cities, amenities, unitTest);
+				
+				int[] sizes = getStreetsBuildingSize(cities.values());
+				getLogger().info("Spatial search results: {}, cities: {}, streets: {}, buildings: {}, amenities: {}", spatialResults.results().mainResults.size(), cities.size(), sizes[0], sizes[1], amenities.size());
+			}
+		}
+		
+		return createUnitTestJson(dirPath, unitTest.name, settings, routing, amenities, cities, geoResults);
+	}
+	
+	private int[] getStreetsBuildingSize(Collection<City> cities) {
+		int streetsSize = 0;
+		int buildingsSize = 0;
+		if (cities == null) {
+			return new int[] {streetsSize, buildingsSize};
+		}
+		for (City city : cities) {
+			if (city == null || city.getStreets() == null) {
+				continue;
+			}
+			streetsSize += city.getStreets().size();
+			for (Street street : city.getStreets()) {
+				if (street != null && street.getBuildings() != null) {
+					buildingsSize += street.getBuildings().size();
+				}
+			}
+		}
+		return new int[] {streetsSize, buildingsSize};
 	}
 
-	private UnitTestSourceData createUnitTestJson(Path dirPath, String name, SearchService.SearchResults results, JSONArray routing, Map<String, Amenity> amenities, Map<Long, City> cities) throws IOException {
-		return createUnitTestJsonFile(dirPath.resolve(name + ".json").toFile(), results, routing, amenities, cities);
+	private UnitTestSourceData createUnitTestJson(Path dirPath, String name, SearchSettings settings, JSONArray routing, Map<String, Amenity> amenities, Map<Long, City> cities, List<List<String>> geoResults) throws IOException {
+		return createUnitTestJsonFile(dirPath.resolve(name + ".json").toFile(), settings, routing, amenities, cities, geoResults);
 	}
 
-	private UnitTestSourceData createUnitTestJsonFile(File sourceJsonFile, SearchService.SearchResults results, JSONArray routing,
-			Map<String, Amenity> amenities, Map<Long, City> cities) throws IOException {
+	private UnitTestSourceData createUnitTestJsonFile(File sourceJsonFile, SearchSettings settings, JSONArray routing,
+			Map<String, Amenity> amenities, Map<Long, City> cities, List<List<String>> geoResults) throws IOException {
 		JSONObject sourceJson = new JSONObject();
 		if (!amenities.isEmpty()) {
 			JSONArray amenitiesJson = new JSONArray();
@@ -312,11 +545,11 @@ public interface DetectorService extends OBFService {
 			}
 			sourceJson.put("cities", citiesJson);
 		}
-		if (!routing.isEmpty()) {
+		if (routing != null && !routing.isEmpty()) {
 			sourceJson.put("routing", routing);
 		}
 		Files.writeString(sourceJsonFile.toPath(), sourceJson.toString(4), StandardCharsets.UTF_8);
-		return new UnitTestSourceData(sourceJsonFile.getAbsolutePath(), results);
+		return new UnitTestSourceData(sourceJsonFile.getAbsolutePath(), settings, geoResults);
 	}
 
 	private String[] normalizedUnitTestQueries(String[] queries, String fallbackQuery) {
@@ -332,68 +565,6 @@ public interface DetectorService extends OBFService {
 			normalized.add(fallbackQuery);
 		}
 		return normalized.toArray(new String[0]);
-	}
-
-	private void collectUnitTestSourceData(String unitTestJson, Map<String, Amenity> amenities, Map<Long, City> cities) {
-		JSONObject sourceJson = new JSONObject(unitTestJson);
-		JSONArray amenitiesJson = sourceJson.optJSONArray("amenities");
-		if (amenitiesJson != null) {
-			for (int i = 0; i < amenitiesJson.length(); i++) {
-				Amenity amenity = Amenity.parseJSON(amenitiesJson.getJSONObject(i));
-				String amenityKey = amenity.getId() + "|" + amenity.getType() + "|" + amenity.getSubType();
-				amenities.putIfAbsent(amenityKey, amenity);
-			}
-		}
-		JSONArray citiesJson = sourceJson.optJSONArray("cities");
-		if (citiesJson != null) {
-			for (int i = 0; i < citiesJson.length(); i++) {
-				City city = City.parseJSON(citiesJson.getJSONObject(i));
-				City existing = cities.get(city.getId());
-				if (existing == null) {
-					cities.put(city.getId(), city);
-				} else {
-					existing.mergeWith(city);
-				}
-			}
-		}
-	}
-
-	private UnitTestResultsData buildUnitTestResults(String[] phrases, SearchService.SearchContext baseCtx, int limit, int geocodingLimit) throws IOException {
-		List<List<String>> results = emptyUnitTestResults(phrases);
-		JSONArray routing = new JSONArray();
-		Map<String, RoutingContext> geocodingContexts = new HashMap<>();
-		Map<String, Long> exportedRoutes = new LinkedHashMap<>();
-		long nextRouteId = 1;
-		GeocodingUtilities geoUtils = new GeocodingUtilities();
-		String[] phraseArray = phrases == null ? new String[0] : phrases;
-		for (int phraseIndex = 0; phraseIndex < phraseArray.length; phraseIndex++) {
-			String query = phraseArray[phraseIndex];
-			SearchService.SearchContext phraseCtx = new SearchService.SearchContext(
-					baseCtx.lat(), baseCtx.lon(), query == null ? "" : query, baseCtx.locale(),
-					baseCtx.baseSearch(), baseCtx.northWest(), baseCtx.southEast());
-			SearchService.SearchResults searchResult = getSearchService().getImmediateSearchResults(
-					phraseCtx,
-					new SearchService.SearchOption(true, null, null, true, false, (net.osmand.search.core.ObjectType[]) null),
-					null);
-			SearchPhrase phrase = searchResult.phrase();
-			List<SearchResult> searchResults = searchResult.results();
-			if (phrase == null || searchResults == null) {
-				continue;
-			}
-
-			List<String> phraseResults = results.get(phraseIndex);
-			for (int i = 0; i < Math.min(limit, searchResults.size()); i++) {
-				SearchResult searchResultItem = searchResults.get(i);
-				boolean markGeocoding = i < geocodingLimit && isReverseGeocodingCandidate(searchResultItem);
-				if (markGeocoding) {
-					nextRouteId = exportReverseGeocodingRoutes(searchResultItem, geoUtils, geocodingContexts,
-							exportedRoutes, routing, nextRouteId);
-				}
-				String formatted = SearchUICore.formatSearchResultForTest(false, searchResultItem, phrase);
-				phraseResults.add(markGeocoding ? "@" + formatted : formatted);
-			}
-		}
-		return new UnitTestResultsData(results, routing);
 	}
 
 	private boolean isReverseGeocodingCandidate(SearchResult searchResult) {

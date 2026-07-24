@@ -5,6 +5,7 @@ import com.google.protobuf.WireFormat;
 import net.osmand.binary.*;
 import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
 import net.osmand.data.*;
+import net.osmand.map.WorldRegion;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiCategory;
 import net.osmand.server.api.services.OsmAndMapsService;
@@ -15,6 +16,7 @@ import java.io.*;
 import java.text.Normalizer;
 import java.util.*;
 import java.util.regex.Pattern;
+import java.util.zip.Deflater;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -92,12 +94,23 @@ public interface OBFService extends BaseService {
 	OsmAndMapsService getMapsService();
 	String getSearchTestDatasourceUrl();
 
-	default List<String> getOBFs(Double radius, Double lat, Double lon) throws IOException {
+	default List<String> getOBFs(Double radius, Double lat, Double lon, String obfPath) throws IOException {
 		synchronized (INDEX_TOKENS_CACHE) {
 			INDEX_TOKENS_CACHE.clear();
 		}
 		radius = radius == null ? 1.5 : radius;
+		File[] customObfs = null;
+		if (!Algorithms.isEmpty(obfPath)) {
+			customObfs = getCustomObfFiles(obfPath);
+		}
 		if (lat == null || lon == null) {
+			if (customObfs != null) {
+				List<String> obfList = new ArrayList<>();
+				for (File file : customObfs) {
+					obfList.add(file.getAbsolutePath());
+				}
+				return obfList;
+			}
 			return getMapsService().getOBFs();
 		}
 		double latPlusRadius = lat + radius;
@@ -109,11 +122,61 @@ public interface OBFService extends BaseService {
 				new LatLon(latMinusRadius, lonPlusRadius));
 
 		List<String> obfList = new ArrayList<>();
-		List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsService().getObfReaders(
-				points, OsmAndMapsService.ObfReason.SEARCH_TEST.value());
-		for (OsmAndMapsService.BinaryMapIndexReaderReference ref : list)
-			obfList.add(ref.getFile().getAbsolutePath());
-		return obfList;
+		if (Algorithms.isEmpty(obfPath)) {
+			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsService().getObfReaders(
+					points, OsmAndMapsService.ObfReason.SEARCH_TEST.value());
+			for (OsmAndMapsService.BinaryMapIndexReaderReference ref : list)
+				obfList.add(ref.getFile().getAbsolutePath());
+			return obfList;
+		}
+		return getMaps(points, customObfs);
+	}
+
+	private File[] getCustomObfFiles(String obfPath) {
+		File mapsFolder = new File(obfPath);
+		File[] files = Algorithms.getSortedFilesVersions(mapsFolder);
+		if (files == null || files.length == 0) {
+			return new File[0];
+		}
+		return Arrays.stream(files)
+				.filter(file -> file != null && file.isFile() && file.getName().toLowerCase(Locale.ROOT).endsWith(".obf"))
+				.toArray(File[]::new);
+	}
+
+	
+	private List<String> getMaps(QuadRect quadRect, File[] candidates) {
+		List<String> maps = new ArrayList<>();
+		if (quadRect == null || quadRect.hasInitialState() || candidates == null) {
+			return maps;
+		}
+
+		QuadRect queryLatLon = new QuadRect(
+				MapUtils.get31LongitudeX((int) Math.min(quadRect.left, quadRect.right)),
+				MapUtils.get31LatitudeY((int) Math.min(quadRect.top, quadRect.bottom)),
+				MapUtils.get31LongitudeX((int) Math.max(quadRect.left, quadRect.right)),
+				MapUtils.get31LatitudeY((int) Math.max(quadRect.top, quadRect.bottom)));
+
+		for (File file : candidates) {
+			String downloadName = getDownloadNameByFileName(file.getName());
+			WorldRegion wr = getMapsService().getOsmandRegions().getRegionDataByDownloadName(downloadName);
+			if (wr == null) {
+				continue;
+			}
+			List<QuadRect> polyBoxes = wr.getAllPolygonsBounds();
+			if (polyBoxes != null && !polyBoxes.isEmpty()
+					&& polyBoxes.stream().anyMatch(pb -> QuadRect.intersects(pb, queryLatLon))) {
+				maps.add(file.getAbsolutePath());
+			}
+		}
+		return maps;
+	}
+
+	private String getDownloadNameByFileName(String fileName) {
+		String dwName = fileName.substring(0, fileName.indexOf('.')).toLowerCase();
+		if (dwName.endsWith("_2")) {
+			dwName = dwName.substring(0, dwName.length() - 2);
+		}
+		return dwName;
 	}
 
 	record CachedIndexTokens(String cacheKey, long fileLength, long lastModified, List<IndexToken> tokens) {}
@@ -886,11 +949,18 @@ public interface OBFService extends BaseService {
 	}
 
 	default File gzip(File sourceFile) throws IOException {
+		class BestCompressionGzipStream extends GZIPOutputStream {
+			BestCompressionGzipStream(OutputStream outputStream) throws IOException {
+				super(outputStream);
+				def.setLevel(Deflater.BEST_COMPRESSION);
+			}
+		}
+
 		File gzFile = new File(sourceFile.getParentFile(), sourceFile.getName() + ".gz");
 		try (FileInputStream inputStream = new FileInputStream(sourceFile);
-		     FileOutputStream fileOutputStream = new FileOutputStream(gzFile);
-		     GZIPOutputStream gzipOutputStream = new GZIPOutputStream(fileOutputStream)) {
-			Algorithms.streamCopy(inputStream, gzipOutputStream);
+		     FileOutputStream outputStream = new FileOutputStream(gzFile);
+		     GZIPOutputStream gzipStream = new BestCompressionGzipStream(outputStream)) {
+			Algorithms.streamCopy(inputStream, gzipStream);
 		}
 		return gzFile;
 	}

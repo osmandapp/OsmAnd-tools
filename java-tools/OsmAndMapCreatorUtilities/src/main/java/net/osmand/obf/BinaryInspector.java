@@ -105,17 +105,17 @@ public class BinaryInspector {
 //					"-vtransport", "-vtransportschedule",
 //					"-vsearchinspect", // "-vsearchglobalonly", // "-vprefix=hh" // search index extended anlays 
 //					"-vaddress",   
-//					"-vcities", "-vstreetgroups", //"-vcitynames",
-//					"-vstreets", //"-vbuildings",  "-vintersections",
+//					"-vcities", "-vstreetgroups", "-vcitynames",
+//					"-vstreets", "-vbuildings",//  "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
 //					"-latlon=48.804242,9.215574,0.005",
 					//"-xyz=12071,26142,16",
 //					"-c",
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
-//					System.getProperty("maps.dir") + "Map.obf",
-					System.getProperty("maps.dir") + "Liechtenstein_europe.obf",				
-//					System.getProperty("maps.dir") + "Liechtenstein_europe_2.obf",
+//					System.getProperty("maps.dir") + "regions.ocbf",				
+//					System.getProperty("maps.dir") + "Netherlands_gelderland_europe_2.obf",
+					System.getProperty("maps.dir") + "Ukraine_kyiv-city_europe_2.obf",
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
@@ -939,7 +939,7 @@ public class BinaryInspector {
 					boolean includeEnName = verbose.lang == null || !verbose.lang.equals("en");
 					name += " " + c.getNamesMap(includeEnName).toString();
 				}
-				String bboxStr = "";
+				String bboxStr = "no bbox";
 				double bleft = 0, btop = 0, bbottom = 0,  bright = 0;
 				if (c.getBbox31() != null) {
 					bleft = MapUtils.get31LongitudeX(c.getBbox31()[0]);
@@ -1871,7 +1871,12 @@ public class BinaryInspector {
 				main.subValues = new ArrayList<ValueFreq>();
 				for (int j = 0; j < st.possibleValues.size(); j++) {
 					int f = st.possibleValuesFreqs != null && j < st.possibleValuesFreqs.size() ? st.possibleValuesFreqs.get(j) : 0;
-					main.subValues.add(new ValueFreq(st.possibleValues.get(j), f));
+					String name = st.possibleValues.get(j);
+					String wiki = st.wikidataIds != null && j < st.wikidataIds.size() ? st.wikidataIds.get(j) : "";
+					if (wiki.length() > 0) {
+						name += " {" + wiki + "}";
+					}
+					main.subValues.add(new ValueFreq(name, f));
 				}
 				ps.topMulti.put(main.value, main);
 			}
