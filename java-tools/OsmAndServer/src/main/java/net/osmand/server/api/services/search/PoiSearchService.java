@@ -246,7 +246,9 @@ public class PoiSearchService {
 		SpatialSearchContext sscontext = new SpatialSearchContext(settings, readers, poiTypeSearch, null);
 		sscontext.getStats().printLogs = false;
 
-		if (spatialType != null && !(spatialType.singleType instanceof PoiType && !spatialType.singleType.isNonIndx())) {
+		boolean indexed = spatialType == null
+				|| (spatialType.singleType instanceof PoiType poiType && !poiType.isNonIndx());
+		if (!indexed) {
 			return poiTypeSearch.loadPOIObjects(sscontext, spatialType, bboxLatLon, poiZoom, limit);
 		}
 

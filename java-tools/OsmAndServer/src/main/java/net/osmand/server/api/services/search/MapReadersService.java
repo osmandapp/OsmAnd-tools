@@ -74,10 +74,10 @@ public class MapReadersService {
 		}
 		try {
 			for (OsmAndMapsService.BinaryMapIndexReaderReference ref : maps) {
-				if (ref.file.getName().startsWith("World_")) {
+				if (ref.getFile().getName().startsWith("World_")) {
 					continue;
 				}
-				BinaryMapIndexReader reader = new BinaryMapIndexReader(new RandomAccessFile(ref.file, "r"), ref.file, true);
+				BinaryMapIndexReader reader = new BinaryMapIndexReader(new RandomAccessFile(ref.getFile(), "r"), ref.getFile(), true);
 				if (reader.containsAddressData() && reader.containsRouteData()) {
 					readers.add(reader);
 				} else {

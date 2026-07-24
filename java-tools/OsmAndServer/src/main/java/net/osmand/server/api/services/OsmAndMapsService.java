@@ -290,7 +290,7 @@ public class OsmAndMapsService {
 	}
 
 	public class BinaryMapIndexReaderReference {
-		public File file;
+		private File file;
 		private static final int WAIT_LOCK_CHECK = 10;
 		ConcurrentHashMap<BinaryMapIndexReader, Boolean> readers = new ConcurrentHashMap<>();
 		public FileIndex fileIndex;
