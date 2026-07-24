@@ -53,7 +53,6 @@ public class PoiSearchService {
 	private static final Log LOGGER = LogFactory.getLog(PoiSearchService.class);
 
 	private static final int TOTAL_LIMIT_POI = 2000;
-	private static final int SPATIAL_POI_CATEGORY_VIEW_ZOOM_SHIFT = 2;
 	private static final int SPATIAL_POI_CATEGORY_MIN_ZOOM = 4;
 	private static final int SPATIAL_POI_CATEGORY_MAX_ZOOM = 18;
 	// viewport is ~3 tiles wide: zoom ~= log2(360 * 3 / bboxLonWidth)
@@ -280,8 +279,7 @@ public class PoiSearchService {
 			zoom = (int) Math.round(Math.log(360 * SPATIAL_POI_CATEGORY_VIEW_TILES / Math.max(lonWidth, 0.001))
 					/ Math.log(2));
 		}
-		zoom = Math.max(SPATIAL_POI_CATEGORY_MIN_ZOOM, Math.min(SPATIAL_POI_CATEGORY_MAX_ZOOM, zoom));
-		return zoom + SPATIAL_POI_CATEGORY_VIEW_ZOOM_SHIFT;
+		return Math.max(SPATIAL_POI_CATEGORY_MIN_ZOOM, Math.min(SPATIAL_POI_CATEGORY_MAX_ZOOM, zoom));
 	}
 
 	private void searchPoiByTypeCategory(PoiSearchCategory categoryObj, String locale, QuadRect searchBbox,
@@ -326,7 +324,7 @@ public class PoiSearchService {
 			}
 
 			QuadRect bboxLatLon = toLatLonBbox(searchBbox);
-			int poiZoom = SPATIAL_POI_CATEGORY_MAX_ZOOM + SPATIAL_POI_CATEGORY_VIEW_ZOOM_SHIFT;
+			int poiZoom = SPATIAL_POI_CATEGORY_MAX_ZOOM;
 			List<Amenity> amenities = searchPoiAmenities(type, bboxLatLon, poiZoom, readers,
 					ClassicSearchService.TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB);
 
