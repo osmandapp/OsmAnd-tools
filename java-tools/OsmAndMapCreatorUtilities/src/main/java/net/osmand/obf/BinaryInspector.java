@@ -98,13 +98,13 @@ public class BinaryInspector {
 		// test cases show info
 		if ("test".equals(args[0])) {
 			in.inspector(new String[] {
-					"-vpoi", //"-vpoiobjects",
+					"-vpoi",// "-vpoiobjects",
 //					"-vmap", "-vmapobjects",
 //					"-vmapcoordinates",
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vsearchinspect", // "-vsearchglobalonly", // "-vprefix=hh" // search index extended anlays 
-//					"-vaddress",   
+					"-vaddress",   
 //					"-vcities", "-vstreetgroups", "-vcitynames",
 //					"-vstreets", "-vbuildings",//  "-vintersections",
 //					"-lang=ru",
@@ -115,7 +115,7 @@ public class BinaryInspector {
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
 //					System.getProperty("maps.dir") + "regions.ocbf",				
 //					System.getProperty("maps.dir") + "Netherlands_gelderland_europe_2.obf",
-					System.getProperty("maps.dir") + "Ukraine_kyiv-city_europe_2.obf",
+					System.getProperty("maps.dir") + "usa_new_york_plaza.obf",
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {

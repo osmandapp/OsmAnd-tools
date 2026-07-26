@@ -543,7 +543,6 @@ public class SearchUICoreGenOBFTest {
 		for (int k = 0; k < phrases.size(); k++) {
 			String text = phrases.get(k);
 			List<String> expectedResults = results.get(k);
-
 			List<String> actualResults = engine.search(text, false);
 			for (int i = 0; i < expectedResults.size(); i++) {
 				String expected = expectedResults.get(i);
