@@ -96,6 +96,7 @@ public class SearchController {
 	                                     @RequestParam(required = false) Boolean spatial,
 	                                     @RequestParam(required = false) Boolean autocomplete,
 	                                     @RequestParam(required = false) String timeZone,
+	                                     @RequestParam(required = false) String maps,
 	                                     HttpServletRequest request) throws IOException {
 		if (!osmAndMapsService.validateAndInitConfig()) {
 			return osmAndMapsService.errorConfig();
@@ -105,7 +106,7 @@ public class SearchController {
 		if (spatial != null && spatial) {
 			SpatialSearchService.SpatialResponse res =
 					spatialSearchService.searchSpatial(searchContext, timeZone, autocomplete != null && autocomplete,
-							sessionRoutingKey(request));
+							sessionRoutingKey(request), maps);
 			JsonObject json = gson.toJsonTree(new FeatureCollection(res.features.toArray(new Feature[0]))).getAsJsonObject();
 			json.add("info", gson.toJsonTree(res.info));
 			return ResponseEntity.ok(gson.toJson(json));
