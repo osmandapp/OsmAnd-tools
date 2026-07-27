@@ -12,10 +12,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -78,6 +79,7 @@ public class SpatialSearchService {
 	private static final int SPATIAL_SEARCH_THREADS = 4;
 
 	private final AtomicInteger spatialSearchRoundRobin = new AtomicInteger();
+	private final Map<String, AtomicBoolean> runningSearches = new ConcurrentHashMap<>();
 
 	// one single-thread executor per slot: requests are routed by client key, so a client's
 	// repeated searches always hit the thread whose engine cache is warmed
@@ -88,7 +90,7 @@ public class SpatialSearchService {
 		for (int i = 0; i < executors.length; i++) {
 			String name = "spatial-search-" + (i + 1);
 			ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 10, TimeUnit.MINUTES,
-					new SynchronousQueue<>(),
+					new ArrayBlockingQueue<>(1),
 					r -> {
 						Thread t = new Thread(r, name);
 						t.setDaemon(true);
@@ -175,6 +177,10 @@ public class SpatialSearchService {
 			return response;
 		}
 		final AtomicBoolean cancelled = new AtomicBoolean();
+		AtomicBoolean previous = routingKey == null ? null : runningSearches.put(routingKey, cancelled);
+		if (previous != null) {
+			previous.set(true); // the same client asked again, its previous search is abandoned
+		}
 		// suggestions must fail fast, full search gets the long budget
 		final long timeoutMs = autocomplete ? 3_000 : 15_000;
 		boolean readersOwnedByWorker = false;
@@ -285,6 +291,9 @@ public class SpatialSearchService {
 			LOGGER.error(String.format("Spatial search failed for '%s': %s", ctx.text(), e), e);
 		} finally {
 			cancelled.set(true);
+			if (routingKey != null) {
+				runningSearches.remove(routingKey, cancelled);
+			}
 			if (!readersOwnedByWorker) {
 				// worker never started (early return / rejection / pre-submit failure)
 				osmAndMapsService.unlockReaders(usedMapList);
