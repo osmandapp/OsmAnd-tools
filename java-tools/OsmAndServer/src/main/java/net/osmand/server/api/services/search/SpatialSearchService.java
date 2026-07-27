@@ -178,7 +178,8 @@ public class SpatialSearchService {
 			return response;
 		}
 		final AtomicBoolean cancelled = new AtomicBoolean();
-		AtomicBoolean previous = routingKey == null ? null : runningSearches.put(routingKey, cancelled);
+		String searchKey = routingKey == null ? null : routingKey + (autocomplete ? ":a" : ":s");
+		AtomicBoolean previous = searchKey == null ? null : runningSearches.put(searchKey, cancelled);
 		if (previous != null) {
 			previous.set(true); // the same client asked again, its previous search is abandoned
 		}
@@ -298,8 +299,8 @@ public class SpatialSearchService {
 			LOGGER.error(String.format("Spatial search failed for '%s': %s", ctx.text(), e), e);
 		} finally {
 			cancelled.set(true);
-			if (routingKey != null) {
-				runningSearches.remove(routingKey, cancelled);
+			if (searchKey != null) {
+				runningSearches.remove(searchKey, cancelled);
 			}
 			if (!readersOwnedByWorker) {
 				// worker never started (early return / rejection / pre-submit failure)
