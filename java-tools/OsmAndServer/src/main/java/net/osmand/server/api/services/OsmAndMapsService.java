@@ -106,6 +106,7 @@ import net.osmand.server.utils.WebGpxParser;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
+import net.osmand.util.RegionCodeUtils;
 
 @Service
 public class OsmAndMapsService {
@@ -1398,6 +1399,21 @@ public class OsmAndMapsService {
 			}
 		}
 		return files;
+	}
+
+	public List<BinaryMapIndexReaderReference> getObfReadersByCodes(String maps) throws IOException {
+		initObfReaders();
+		Map<String, BinaryMapIndexReaderReference> byDownloadName = new LinkedHashMap<>();
+		for (BinaryMapIndexReaderReference ref : obfFiles.values()) {
+			byDownloadName.put(getDownloadNameByFileName(ref.file.getName()), ref);
+		}
+		List<BinaryMapIndexReaderReference> res = new ArrayList<>();
+		for (String name : RegionCodeUtils.decode(maps, byDownloadName.keySet())) {
+			res.add(byDownloadName.get(name));
+		}
+		res.add(getBaseMap());
+		LOGGER.info(String.format("Search maps by codes '%s': %d files", maps, res.size()));
+		return res;
 	}
 
 	// all maps within ~.00 km of the point, no count limit.

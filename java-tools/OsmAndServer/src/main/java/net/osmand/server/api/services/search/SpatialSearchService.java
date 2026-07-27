@@ -168,7 +168,7 @@ public class SpatialSearchService {
 	}
 
 	public SpatialResponse searchSpatial(ClassicSearchService.SearchContext ctx, String timeZone, boolean autocomplete,
-	                                     String routingKey) throws IOException {
+	                                     String routingKey, String maps) throws IOException {
 		long sTime = System.currentTimeMillis();
 		SpatialResponse response = new SpatialResponse();
 		if (!osmAndMapsService.validateAndInitConfig()) {
@@ -180,8 +180,9 @@ public class SpatialSearchService {
 		boolean readersOwnedByWorker = false;
 		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
 		try {
-			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = osmAndMapsService
-					.getObfReadersForSpatialSearch(ctx.lat(), ctx.lon(), autocomplete);
+			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = Algorithms.isEmpty(maps)
+					? osmAndMapsService.getObfReadersForSpatialSearch(ctx.lat(), ctx.lon(), autocomplete)
+					: osmAndMapsService.getObfReadersByCodes(maps);
 			if (list.isEmpty()) {
 				return response;
 			}
