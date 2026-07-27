@@ -183,8 +183,9 @@ public class SearchController {
 	@GetMapping(path = {"/search-poi-categories"}, produces = "application/json")
 	@ResponseBody
 	public ResponseEntity<String> searchPoiCategories(@RequestParam String search,
-	                                                  @RequestParam String locale) {
-		Map<String, Map<String, String>> res = poiTypesService.searchPoiCategories(search, locale);
+	                                                  @RequestParam double lat,
+	                                                  @RequestParam double lon) throws IOException {
+		Map<String, Map<String, String>> res = poiSearchService.searchPoiCategories(search, new LatLon(lat, lon));
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 

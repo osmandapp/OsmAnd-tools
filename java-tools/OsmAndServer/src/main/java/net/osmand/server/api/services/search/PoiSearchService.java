@@ -7,6 +7,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -17,6 +18,7 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import net.osmand.CollatorStringMatcher;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapIndexReader;
@@ -240,10 +242,8 @@ public class PoiSearchService {
 			}
 			categoryKey = spatialType.getKey();
 		}
-		SpatialTextSearchSettings settings = SpatialTextSearchSettings.searchPoiByCategorySettings(poiZoom, bboxLatLon);
-		settings.AUTO_CLEAR_PREFIX_CACHE_LIMIT = SpatialSearchService.SPATIAL_PREFIX_CACHE_LIMIT;
-		SpatialSearchContext sscontext = new SpatialSearchContext(settings, readers, poiTypeSearch, null);
-		sscontext.getStats().printLogs = false;
+		SpatialSearchContext sscontext = createSpatialContext(
+				SpatialTextSearchSettings.searchPoiByCategorySettings(poiZoom, bboxLatLon), readers, poiTypeSearch, null);
 
 		boolean indexed = spatialType == null
 				|| (spatialType.singleType instanceof PoiType poiType && !poiType.isNonIndx());
@@ -265,6 +265,44 @@ public class PoiSearchService {
 			}
 		}
 		return amenities;
+	}
+
+	public Map<String, Map<String, String>> searchPoiCategories(String search, LatLon center) throws IOException {
+		Map<String, Map<String, String>> res = new LinkedHashMap<>();
+		List<BinaryMapIndexReader> readers = new ArrayList<>();
+		try {
+			readers = osmAndMapsService.getReaders(osmAndMapsService.getObfReadersForSpatialSearch(
+					center.getLatitude(), center.getLongitude(), true), null);
+			if (readers.isEmpty()) {
+				return res;
+			}
+			SpatialPoiSearch poiTypeSearch = spatialSearchService.getSpatialPoiTypeSearch();
+			SpatialSearchContext sscontext = createSpatialContext(
+					SpatialTextSearchSettings.searchPoiCategoriesSettings(0, null), readers, poiTypeSearch, center);
+			SpatialSearchResults results = spatialSearchService.getSpatialTextSearch()
+					.searchAPI(search + CollatorStringMatcher.INCOMPLETE_DOT, sscontext);
+			if (results.mainResults != null) {
+				for (SpatialSearchResult r : results.mainResults) {
+					SpatialPoiType type = r.getPoiCategory(poiTypeSearch);
+					if (type != null) {
+						Map<String, String> fields = spatialSearchService.getSpatialPoiTypeFields(type);
+						res.put(fields.get(SearchResultConverter.PoiTypeField.NAME.getFieldName()), fields);
+					}
+				}
+			}
+		} finally {
+			osmAndMapsService.unlockReaders(readers);
+		}
+		return res;
+	}
+
+	private SpatialSearchContext createSpatialContext(SpatialTextSearchSettings settings,
+	                                                  List<BinaryMapIndexReader> readers,
+	                                                  SpatialPoiSearch poiTypeSearch, LatLon center) {
+		settings.AUTO_CLEAR_PREFIX_CACHE_LIMIT = SpatialSearchService.SPATIAL_PREFIX_CACHE_LIMIT;
+		SpatialSearchContext sscontext = new SpatialSearchContext(settings, readers, poiTypeSearch, center);
+		sscontext.getStats().printLogs = false;
+		return sscontext;
 	}
 
 	private QuadRect toLatLonBbox(QuadRect searchBbox31) {

@@ -307,7 +307,7 @@ public class SpatialSearchService {
 		return feature;
 	}
 
-	private Map<String, String> getSpatialPoiTypeFields(SpatialPoiType type) {
+	public Map<String, String> getSpatialPoiTypeFields(SpatialPoiType type) {
 		if (type.singleType != null) {
 			if (type.singleType instanceof PoiType poiType && poiType.isAdditional()
 					&& type.getParentTypes() != null && type.getParentTypes().size() > 1) {

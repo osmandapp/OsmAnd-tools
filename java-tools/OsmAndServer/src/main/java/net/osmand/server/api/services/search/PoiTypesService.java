@@ -10,7 +10,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -31,9 +30,6 @@ public class PoiTypesService {
 
 	public static final String DEFAULT_SEARCH_LANG = "en";
 	private static final String AND_RES = "/androidResources/";
-
-	@Autowired
-	private SearchResultConverter searchResultConverter;
 
 	private final ConcurrentHashMap<String, Map<String, String>> translationsCache = new ConcurrentHashMap<>();
 	private final ConcurrentHashMap<String, MapPoiTypes> poiTypesByLocale = new ConcurrentHashMap<>();
@@ -137,15 +133,6 @@ public class PoiTypesService {
 		return filters;
 	}
 
-	public Map<String, Map<String, String>> searchPoiCategories(String search, String locale) {
-		Map<String, Map<String, String>> results = new HashMap<>();
-		List<SearchResult> categories = searchPoiCategoriesByName(search, locale);
-		if (categories != null && !categories.isEmpty()) {
-			results = preparePoiCategoriesResult(categories);
-		}
-		return results;
-	}
-
 	private List<SearchResult> searchPoiCategoriesByName(String search, String locale) {
 		MapPoiTypes mapPoiTypes = getMapPoiTypes(locale);
 		SearchUICore searchUICore = new SearchUICore(mapPoiTypes, locale, true);
@@ -157,12 +144,6 @@ public class PoiTypesService {
 		searchUICore.registerAPI(searchAmenityTypesAPI);
 
 		return searchUICore.immediateSearch(search, null).getCurrentSearchResults();
-	}
-
-	private Map<String, Map<String, String>> preparePoiCategoriesResult(List<SearchResult> results) {
-		Map<String, Map<String, String>> searchRes = new HashMap<>();
-		results.forEach(res -> searchRes.put(res.localeName, searchResultConverter.getPoiTypeFields(res.object)));
-		return searchRes;
 	}
 
 	public Map<String, List<String>> searchPoiCategories(String locale) {
