@@ -77,6 +77,7 @@ public class SpatialSearchService {
 
 	public static final int SPATIAL_PREFIX_CACHE_LIMIT = 4_000;
 	private static final int SPATIAL_SEARCH_THREADS = 4;
+	private static final int SPATIAL_SEARCH_QUEUE = 8;
 
 	private final AtomicInteger spatialSearchRoundRobin = new AtomicInteger();
 	private final Map<String, AtomicBoolean> runningSearches = new ConcurrentHashMap<>();
@@ -90,7 +91,7 @@ public class SpatialSearchService {
 		for (int i = 0; i < executors.length; i++) {
 			String name = "spatial-search-" + (i + 1);
 			ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 10, TimeUnit.MINUTES,
-					new ArrayBlockingQueue<>(1),
+					new ArrayBlockingQueue<>(SPATIAL_SEARCH_QUEUE),
 					r -> {
 						Thread t = new Thread(r, name);
 						t.setDaemon(true);
@@ -225,6 +226,9 @@ public class SpatialSearchService {
 			};
 			Future<SpatialSearchResults> task = executorForKey(routingKey).submit(() -> {
 				try {
+					if (cancelled.get()) {
+						return null; // a newer search of the same client replaced this one while it waited
+					}
 					List<BinaryMapIndexReader> readers = new ArrayList<>(lockedReaders);
 					BinaryMapIndexReader regionsReader = regionsReaderForThread();
 					if (regionsReader != null) {
@@ -240,6 +244,9 @@ public class SpatialSearchService {
 			});
 			readersOwnedByWorker = true;
 			SpatialSearchResults res = task.get(timeoutMs, TimeUnit.MILLISECONDS);
+			if (res == null) {
+				return response;
+			}
 			if (res.mainResults != null) {
 				String dominatedCity = calculateSpatialDominatedCity(res.mainResults, ctx.locale());
 				SpatialPoiSearch poiTypeSearch = getSpatialPoiTypeSearch();
