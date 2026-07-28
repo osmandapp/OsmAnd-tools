@@ -178,7 +178,7 @@ public class SpatialSearchService {
 			return response;
 		}
 		final AtomicBoolean cancelled = new AtomicBoolean();
-		String searchKey = routingKey == null ? null : routingKey + (autocomplete ? ":a" : ":s");
+		String searchKey = searchKey(routingKey, autocomplete);
 		AtomicBoolean previous = searchKey == null ? null : runningSearches.put(searchKey, cancelled);
 		if (previous != null) {
 			previous.set(true); // the same client asked again, its previous search is abandoned
@@ -510,6 +510,11 @@ public class SpatialSearchService {
 			}
 		}
 		return "";
+	}
+
+	// autocomplete and full search of one client run in parallel, so each stream gets its own cancellation key
+	private static String searchKey(String routingKey, boolean autocomplete) {
+		return Algorithms.isEmpty(routingKey) ? null : routingKey + (autocomplete ? ":a" : ":s");
 	}
 
 	private ThreadPoolExecutor executorForKey(String routingKey) {
