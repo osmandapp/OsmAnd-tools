@@ -79,44 +79,27 @@ public class PoiSearchService {
 
 	public static class PoiSearchResult {
 
-		public PoiSearchResult(boolean useLimit, boolean mapLimitExceeded, boolean alreadyFound,
-		                       FeatureCollection features) {
+		public PoiSearchResult(boolean useLimit, boolean mapLimitExceeded, FeatureCollection features) {
 			this.useLimit = useLimit;
 			this.mapLimitExceeded = mapLimitExceeded;
-			this.alreadyFound = alreadyFound;
 			this.features = features;
 		}
 
 		public boolean useLimit;
 		public boolean mapLimitExceeded;
-		public boolean alreadyFound;
 		public FeatureCollection features;
 		public Map<String, Object> info;
 	}
 
 	public static class PoiSearchData {
 
-		public PoiSearchData(List<PoiSearchCategory> categories, String northWest, String southEast,
-		                     String savedNorthWest, String savedSouthEast, int prevCategoriesCount, String prevSearchRes,
-		                     String prevSearchCategory) {
+		public PoiSearchData(List<PoiSearchCategory> categories, String northWest, String southEast) {
 			this.categories = categories;
 			this.bbox = getBboxCoords(Arrays.asList(northWest, southEast));
-			if (savedNorthWest != null && savedSouthEast != null) {
-				this.savedBbox = getBboxCoords(Arrays.asList(savedNorthWest, savedSouthEast));
-			}
-			this.prevCategoriesCount = prevCategoriesCount;
-			if (prevSearchRes != null && prevSearchCategory != null) {
-				this.prevSearchRes = prevSearchRes;
-				this.prevSearchCategory = prevSearchCategory;
-			}
 		}
 
 		public List<PoiSearchCategory> categories;
 		public List<LatLon> bbox;
-		public List<LatLon> savedBbox;
-		public int prevCategoriesCount;
-		public String prevSearchRes;
-		public String prevSearchCategory;
 
 		private static List<LatLon> getBboxCoords(List<String> coords) {
 			List<LatLon> bbox = new ArrayList<>();
@@ -178,13 +161,9 @@ public class PoiSearchService {
 	                                 int zoom, String timeZone) throws IOException {
 		long sTime = System.currentTimeMillis();
 		List<SpatialSearchContext.SpatialSearchStats> stats = new ArrayList<>();
-		if (data.savedBbox != null && isContainsBbox(data) && data.prevCategoriesCount == data.categories.size()) {
-			return new PoiSearchResult(false, false, true, null);
-		}
-
 		Map<Long, Feature> foundFeatures = new HashMap<>();
 		if (data.categories.isEmpty()) {
-			return new PoiSearchResult(false, false, false, null);
+			return new PoiSearchResult(false, false, null);
 		}
 		QuadRect searchBbox = mapReadersService.getSearchBbox(data.bbox);
 		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
@@ -192,7 +171,7 @@ public class PoiSearchService {
 		try {
 			List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = mapReadersService.getMapsForSearch(searchBbox, baseSearch);
 			if (mapList.isEmpty()) {
-				return new PoiSearchResult(false, true, false, null);
+				return new PoiSearchResult(false, true, null);
 			}
 
 			usedMapList = osmAndMapsService.getReaders(mapList, null);
@@ -226,12 +205,12 @@ public class PoiSearchService {
 		List<Feature> features = new ArrayList<>(foundFeatures.values());
 		if (!features.isEmpty()) {
 			sortPoiResultsByDistance(features, center);
-			PoiSearchResult res = new PoiSearchResult(useLimit, false, false,
+			PoiSearchResult res = new PoiSearchResult(useLimit, false,
 					new FeatureCollection(features.toArray(new Feature[0])));
 			res.info = spatialSearchService.getSearchStats(stats, sTime, features.size());
 			return res;
 		} else {
-			return new PoiSearchResult(false, false, false, null);
+			return new PoiSearchResult(false, false, null);
 		}
 	}
 
@@ -659,9 +638,4 @@ public class PoiSearchService {
 		features.sort(Comparator.comparingDouble(distances::get));
 	}
 
-	private boolean isContainsBbox(PoiSearchData data) {
-		QuadRect searchBbox = mapReadersService.getSearchBbox(data.bbox);
-		QuadRect oldSearchBbox = mapReadersService.getSearchBbox(data.savedBbox);
-		return oldSearchBbox.contains(searchBbox.left, searchBbox.top, searchBbox.right, searchBbox.bottom);
-	}
 }
