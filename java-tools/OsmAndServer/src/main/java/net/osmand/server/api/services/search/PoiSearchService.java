@@ -54,7 +54,7 @@ public class PoiSearchService {
 
 	private static final Log LOGGER = LogFactory.getLog(PoiSearchService.class);
 
-	private static final int TOTAL_LIMIT_POI = 2000;
+	private static final int TOTAL_LIMIT_POI = 5000;
 	private static final int SPATIAL_POI_CATEGORY_MIN_ZOOM = 4;
 	private static final int SPATIAL_POI_CATEGORY_MAX_ZOOM = 18;
 	// viewport is ~3 tiles wide: zoom ~= log2(360 * 3 / bboxLonWidth)
