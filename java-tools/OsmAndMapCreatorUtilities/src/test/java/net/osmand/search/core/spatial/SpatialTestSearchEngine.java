@@ -17,11 +17,6 @@ import net.osmand.data.MapObject;
 import net.osmand.data.Street;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.search.SearchUICoreGenOBFTest.SearchTestEngine;
-import net.osmand.search.core.spatial.SpatialPoiSearch;
-import net.osmand.search.core.spatial.SpatialSearchContext;
-import net.osmand.search.core.spatial.SpatialSearchResult;
-import net.osmand.search.core.spatial.SpatialSearchToken;
-import net.osmand.search.core.spatial.SpatialTextSearch;
 import net.osmand.search.core.spatial.SpatialTextSearch.SpatialTextSearchSettings;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -48,14 +43,14 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
                 : searchResults.mainResults;
 
         List<String> result = new ArrayList<>();
-        for(SpatialSearchResult res : mainResults) {
-        	if(print) {
-        		System.out.println(SpatialSearchResult.compareKeyString(res) + " " +  res);
-        	}
-            result.add(formatResult(res));
-        }
-        return result;
-    }
+		for (SpatialSearchResult res : mainResults) {
+			if (print) {
+				System.out.println(SpatialSearchResult.compareKeyString(res) + " " + res);
+			}
+			result.add(formatResult(res));
+		}
+		return result;
+	}
 
     public String formatResult(SpatialSearchResult r) {
         int tCount = r.getParent().getTokenCount();
