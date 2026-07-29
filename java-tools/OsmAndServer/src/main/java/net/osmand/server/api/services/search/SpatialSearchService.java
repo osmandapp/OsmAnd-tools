@@ -17,6 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -77,6 +78,7 @@ public class SpatialSearchService {
 
 	public static final int SPATIAL_PREFIX_CACHE_LIMIT = 4_000;
 	private static final int SPATIAL_SEARCH_THREADS = 4;
+	private static final int SPATIAL_AUTOCOMPLETE_THREADS = 3;
 	private static final int SPATIAL_SEARCH_QUEUE = 8;
 
 	private final AtomicInteger spatialSearchRoundRobin = new AtomicInteger();
@@ -85,6 +87,9 @@ public class SpatialSearchService {
 	// one single-thread executor per slot: requests are routed by client key, so a client's
 	// repeated searches always hit the thread whose engine cache is warmed
 	private final ThreadPoolExecutor[] spatialSearchExecutors = createSpatialSearchExecutors();
+
+	// autocomplete runs on its own small pool without client routing - any free thread takes the task
+	private final ThreadPoolExecutor autocompleteExecutor = createAutocompleteExecutor();
 
 	private static ThreadPoolExecutor[] createSpatialSearchExecutors() {
 		ThreadPoolExecutor[] executors = new ThreadPoolExecutor[SPATIAL_SEARCH_THREADS];
@@ -101,6 +106,20 @@ public class SpatialSearchService {
 			executors[i] = executor;
 		}
 		return executors;
+	}
+
+	private static ThreadPoolExecutor createAutocompleteExecutor() {
+		AtomicInteger counter = new AtomicInteger();
+		// no queue: a suggestion that has to wait is stale by the time it runs, better reject as busy
+		ThreadPoolExecutor executor = new ThreadPoolExecutor(SPATIAL_AUTOCOMPLETE_THREADS, SPATIAL_AUTOCOMPLETE_THREADS,
+				10, TimeUnit.MINUTES, new SynchronousQueue<>(),
+				r -> {
+					Thread t = new Thread(r, "spatial-autocomplete-" + counter.incrementAndGet());
+					t.setDaemon(true);
+					return t;
+				});
+		executor.allowCoreThreadTimeOut(true);
+		return executor;
 	}
 
 	private final ThreadLocal<SpatialTextSearch> spatialTextSearchLocal = ThreadLocal.withInitial(SpatialTextSearch::new);
@@ -168,6 +187,7 @@ public class SpatialSearchService {
 		for (ThreadPoolExecutor executor : spatialSearchExecutors) {
 			executor.shutdownNow();
 		}
+		autocompleteExecutor.shutdownNow();
 	}
 
 	public SpatialResponse searchSpatial(ClassicSearchService.SearchContext ctx, String timeZone, boolean autocomplete,
@@ -178,7 +198,8 @@ public class SpatialSearchService {
 			return response;
 		}
 		final AtomicBoolean cancelled = new AtomicBoolean();
-		String searchKey = searchKey(routingKey, autocomplete);
+		// only full search tracks a per-client cancellation key; autocomplete just runs on its pool
+		String searchKey = autocomplete || Algorithms.isEmpty(routingKey) ? null : routingKey;
 		AtomicBoolean previous = searchKey == null ? null : runningSearches.put(searchKey, cancelled);
 		if (previous != null) {
 			previous.set(true); // the same client asked again, its previous search is abandoned
@@ -225,7 +246,8 @@ public class SpatialSearchService {
 					return cancelled.get();
 				}
 			};
-			Future<SpatialSearchResults> task = executorForKey(routingKey).submit(() -> {
+			ThreadPoolExecutor executor = autocomplete ? autocompleteExecutor : executorForKey(routingKey);
+			Future<SpatialSearchResults> task = executor.submit(() -> {
 				try {
 					if (cancelled.get()) {
 						return null; // a newer search of the same client replaced this one while it waited
@@ -510,11 +532,6 @@ public class SpatialSearchService {
 			}
 		}
 		return "";
-	}
-
-	// autocomplete and full search of one client run in parallel, so each stream gets its own cancellation key
-	private static String searchKey(String routingKey, boolean autocomplete) {
-		return Algorithms.isEmpty(routingKey) ? null : routingKey + (autocomplete ? ":a" : ":s");
 	}
 
 	private ThreadPoolExecutor executorForKey(String routingKey) {
