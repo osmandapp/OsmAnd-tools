@@ -1422,13 +1422,11 @@ public class OsmAndMapsService {
 	                                                                         boolean autocomplete) throws IOException {
 		initObfReaders();
 
-		double searchRadius = autocomplete
+		int searchRadiusKm = autocomplete
 				? SpatialTextSearch.SpatialTextSearchSettings.suggestionSettings().SUGGESTED_SEARCH_RADIUS_KM
 				: SpatialTextSearch.SpatialTextSearchSettings.defaultSettings().SUGGESTED_SEARCH_RADIUS_KM;
-
-		double dLat = searchRadius / 111.0;
-		double dLon = searchRadius / (111.0 * Math.max(0.1, Math.cos(Math.toRadians(lat))));
-		QuadRect bbox = points(null, new LatLon(lat + dLat, lon - dLon), new LatLon(lat - dLat, lon + dLon));
+		QuadRect llBbox = MapUtils.calculateLatLonBbox(lat, lon, searchRadiusKm * 1000);
+		QuadRect bbox = points(null, new LatLon(llBbox.top, llBbox.left), new LatLon(llBbox.bottom, llBbox.right));
 		Set<File> files = new LinkedHashSet<>();
 
 		// 1. regions overlapping the area (queried from regions.ocbf by bbox) -> their combined bbox
@@ -1458,7 +1456,7 @@ public class OsmAndMapsService {
 //		}
 //		LOGGER.info("Spatial search region maps " + mapsLog(files, lat, lon));
 
-		// 3. + maps within the 500 km bbox (regular selection), then base map
+		// 3. + maps within the 400 km bbox (regular selection), then base map
 		files.addAll(getMaps(bbox));
 		files.add(getBaseMap().file);
 		LOGGER.info("Spatial search total maps " + mapsLog(files, lat, lon));
