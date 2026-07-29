@@ -54,7 +54,9 @@ public class PoiSearchService {
 
 	private static final Log LOGGER = LogFactory.getLog(PoiSearchService.class);
 
-	private static final int TOTAL_LIMIT_POI = 5000;
+	private static final int TOTAL_LIMIT_POI = 2000;
+	private static final int RARE_CATEGORY_MIN_ZOOM = 8;
+	private static final int RARE_CATEGORY_FREQ_LIMIT = 1000;
 	private static final int SPATIAL_POI_CATEGORY_MIN_ZOOM = 4;
 	private static final int SPATIAL_POI_CATEGORY_MAX_ZOOM = 18;
 	// viewport is ~3 tiles wide: zoom ~= log2(360 * 3 / bboxLonWidth)
@@ -87,6 +89,7 @@ public class PoiSearchService {
 
 		public boolean useLimit;
 		public boolean mapLimitExceeded;
+		public boolean zoomInHint;
 		public FeatureCollection features;
 		public Map<String, Object> info;
 	}
@@ -175,6 +178,12 @@ public class PoiSearchService {
 			}
 
 			usedMapList = osmAndMapsService.getReaders(mapList, null);
+
+			if (shouldHintZoomIn(data.categories, usedMapList, searchBbox, zoom)) {
+				PoiSearchResult hint = new PoiSearchResult(false, false, null);
+				hint.zoomInHint = true;
+				return hint;
+			}
 
 			if (data.categories.size() == 1) {
 				searchPoiByTypeCategory(data.categories.get(0), locale, searchBbox, usedMapList, foundFeatures,
@@ -306,6 +315,27 @@ public class PoiSearchService {
 					/ Math.log(2));
 		}
 		return Math.max(SPATIAL_POI_CATEGORY_MIN_ZOOM, Math.min(SPATIAL_POI_CATEGORY_MAX_ZOOM, zoom));
+	}
+
+	private boolean shouldHintZoomIn(List<PoiSearchCategory> categories,
+	                                 List<BinaryMapIndexReader> readers, QuadRect searchBbox,
+	                                 int zoom) throws IOException {
+		if (zoom < 0 || zoom >= RARE_CATEGORY_MIN_ZOOM) {
+			return false;
+		}
+		SpatialPoiSearch poiTypeSearch = spatialSearchService.getSpatialPoiTypeSearch();
+		QuadRect bboxLatLon = toLatLonBbox(searchBbox);
+		int poiZoom = estimatePoiZoom(bboxLatLon, zoom);
+		SpatialSearchContext freqCtx = createSpatialContext(
+				SpatialTextSearchSettings.searchPoiByCategorySettings(poiZoom, bboxLatLon), readers, poiTypeSearch, null);
+		spatialSearchService.getSpatialTextSearch().initContext(freqCtx);
+		for (PoiSearchCategory c : categories) {
+			int freq = poiTypeSearch.getCategoryFrequency(freqCtx, c.category());
+			if (freq == 0 || freq > RARE_CATEGORY_FREQ_LIMIT) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private void searchPoiByTypeCategory(PoiSearchCategory categoryObj, String locale, QuadRect searchBbox,
