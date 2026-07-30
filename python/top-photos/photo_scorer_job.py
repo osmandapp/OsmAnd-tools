@@ -106,12 +106,14 @@ def split_array(arr: List, n) -> List[List]:
 
 
 def _normalize_photo_id(value):
-    """LLM sometimes returns photo_id as a list or a string instead of an int — normalize to int or None."""
+    """LLM sometimes returns photo_id as a list, string or float instead of an int — normalize to int or None."""
     if isinstance(value, list):
         value = value[0] if len(value) > 0 else None
     if isinstance(value, str) and value.strip().isdigit():
         value = int(value.strip())
-    return value if isinstance(value, int) else None
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
 def _mix_images(place_id, is_selected: bool, non_scored_items: List[ImageItem], scored_items: List[ImageItem], selected_items: List[ImageItem]):
@@ -240,8 +242,8 @@ def process_place(run_id, place_info, is_selected, media_ids):
                     if photo_res is None or not isinstance(photo_res, dict):
                         continue
                     photo_res['photo_id'] = _normalize_photo_id(photo_res.get('photo_id'))
-                    if photo_res['photo_id'] is None:
-                        continue
+                    if photo_res['photo_id'] is None or photo_res['photo_id'] in photos:
+                        continue  # skip entries without a valid photo_id and duplicates of an already processed one
                     batched_image = None
                     for image in batch_images:
                         if image[2] == photo_res['photo_id']:
@@ -254,14 +256,15 @@ def process_place(run_id, place_info, is_selected, media_ids):
                     place_run['scored_photo_ids'].append(photo_res['photo_id'])
                     photo_res['run_id'] = run_id
                     photo_res['proc_id'] = place_id
-                    photo_res['imageTitle'] = batch_images[i][0]
+                    photo_res['imageTitle'] = batched_image[0]  # match by photo_id, not by index — LLM may reorder results
                     photo_res['score'] = get_score(photo_res, -1)  # check and calculate score
                     photo_res['version'] = SAVE_SCORE_ENV
                     photo_res['timestamp'] = datetime.now()
-                    photos[i] = photo_res
+                    photos[photo_res['photo_id']] = photo_res  # key by photo_id, not by index — no positional alignment with results
             except (KeyError, TypeError, AttributeError, ValueError, IndexError) as e:
                 # Malformed LLM data must not stop the whole run — save as a per-place error and go on
                 print(f"#{current_thread().name}. Warning: malformed LLM result for place {place_id}: {e}", flush=True)
+                place_run['scored_photo_ids'] = []  # nothing from this batch was actually saved
                 place_run['error'] = f"Malformed LLM result: {e}"
                 insert_place_batch(place_run, [])
                 return False, place_run
