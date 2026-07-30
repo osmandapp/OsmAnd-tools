@@ -100,11 +100,11 @@ public class SpatialSearchService {
 	private static ThreadPoolExecutor[] createSpatialSearchExecutors(String name, int threads) {
 		ThreadPoolExecutor[] executors = new ThreadPoolExecutor[threads];
 		for (int i = 0; i < executors.length; i++) {
-			String name = "spatial-" + name + (i + 1);
+			String threadName = "spatial-" + name + (i + 1);
 			ThreadPoolExecutor executor = new ThreadPoolExecutor(0, 1, 10, TimeUnit.MINUTES,
 					new ArrayBlockingQueue<>(SPATIAL_SEARCH_QUEUE),
 					r -> {
-						Thread t = new Thread(r, name);
+						Thread t = new Thread(r, threadName);
 						t.setDaemon(true);
 						return t;
 					});
@@ -199,7 +199,7 @@ public class SpatialSearchService {
 		final AtomicBoolean cancelled = new AtomicBoolean();
 		// only full search tracks a per-client cancellation key; autocomplete just runs on its pool
 		String searchSessionKey = autocomplete && !Algorithms.isEmpty(userSessionKey) ? userSessionKey : null;
-		AtomicBoolean previous = searchKey == null ? null : runningSearches.put(searchSessionKey, cancelled);
+		AtomicBoolean previous = searchSessionKey == null ? null : runningSearches.put(searchSessionKey, cancelled);
 		if (previous != null) {
 			previous.set(true); // the same client asked again, its previous search is abandoned
 		}
@@ -245,7 +245,7 @@ public class SpatialSearchService {
 					return cancelled.get();
 				}
 			};
-			ThreadPoolExecutor executor = autocomplete ? autocompleteExecutor : executorForKey(routingKey);
+			ThreadPoolExecutor executor = autocomplete ? autocompleteExecutor : executorForKey(userSessionKey);
 			Future<SpatialSearchResults> task = executor.submit(() -> {
 				try {
 					if (cancelled.get()) {
@@ -320,7 +320,7 @@ public class SpatialSearchService {
 			LOGGER.error(String.format("Spatial search failed for '%s': %s", ctx.text(), e), e);
 		} finally {
 			cancelled.set(true);
-			if (searchKey != null) {
+			if (searchSessionKey != null) {
 				runningSearches.remove(searchSessionKey, cancelled);
 			}
 			if (!readersOwnedByWorker) {
