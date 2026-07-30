@@ -64,6 +64,27 @@ public class SpatialSearchService {
 
 	private static final Log LOGGER = LogFactory.getLog(SpatialSearchService.class);
 
+	public static final int SPATIAL_PREFIX_CACHE_LIMIT = 4_000;
+	private static final int SPATIAL_SEARCH_THREADS = 4;
+	private static final int SPATIAL_AUTOCOMPLETE_THREADS = 3;
+	private static final int SPATIAL_SEARCH_QUEUE = 8;
+
+	// reused for cache
+	private SpatialPoiSearch poiSearch;
+
+	private final ThreadLocal<SpatialTextSearch> spatialTextSearchLocal = ThreadLocal.withInitial(SpatialTextSearch::new);
+	private final ThreadLocal<RegionsReaderHolder> osmandRegionsLocal = ThreadLocal.withInitial(RegionsReaderHolder::new);
+
+	private final AtomicInteger spatialSearchRoundRobin = new AtomicInteger();
+	private final Map<String, AtomicBoolean> runningSearches = new ConcurrentHashMap<>();
+
+	// one single-thread executor per slot: requests are routed by client key, so a client's
+	// repeated searches always hit the thread whose engine cache is warmed
+	private final ThreadPoolExecutor[] spatialSearchExecutors = createSpatialSearchExecutors("search-", SPATIAL_SEARCH_THREADS);
+
+	// autocomplete runs on its own small pool without client routing - any free thread takes the task
+	private final ThreadPoolExecutor autocompleteExecutor = createAutocompleteExecutor(); // createSpatialSearchExecutors("autocomplete-", SPATIAL_AUTOCOMPLETE_THREADS);
+
 	@Autowired
 	OsmAndMapsService osmAndMapsService;
 
@@ -75,27 +96,6 @@ public class SpatialSearchService {
 
 	@Autowired
 	private SearchResultConverter searchResultConverter;
-
-	public static final int SPATIAL_PREFIX_CACHE_LIMIT = 4_000;
-	private static final int SPATIAL_SEARCH_THREADS = 4;
-	private static final int SPATIAL_AUTOCOMPLETE_THREADS = 3;
-	private static final int SPATIAL_SEARCH_QUEUE = 8;
-
-    // reused for cache
-	private SpatialPoiSearch poiSearch;
-
-    private final ThreadLocal<SpatialTextSearch> spatialTextSearchLocal = ThreadLocal.withInitial(SpatialTextSearch::new);
-	private final ThreadLocal<RegionsReaderHolder> osmandRegionsLocal = ThreadLocal.withInitial(RegionsReaderHolder::new);
-    
-	private final AtomicInteger spatialSearchRoundRobin = new AtomicInteger();
-	private final Map<String, AtomicBoolean> runningSearches = new ConcurrentHashMap<>();
-
-	// one single-thread executor per slot: requests are routed by client key, so a client's
-	// repeated searches always hit the thread whose engine cache is warmed
-	private final ThreadPoolExecutor[] spatialSearchExecutors = createSpatialSearchExecutors("search-", SPATIAL_SEARCH_THREADS);
-
-	// autocomplete runs on its own small pool without client routing - any free thread takes the task
-	private final ThreadPoolExecutor autocompleteExecutor = createAutocompleteExecutor(); // createSpatialSearchExecutors("autocomplete-", SPATIAL_AUTOCOMPLETE_THREADS);
 
 	private static ThreadPoolExecutor[] createSpatialSearchExecutors(String name, int threads) {
 		ThreadPoolExecutor[] executors = new ThreadPoolExecutor[threads];
@@ -127,7 +127,6 @@ public class SpatialSearchService {
 		executor.allowCoreThreadTimeOut(true);
 		return executor;
 	}
-
 
 	public static class SpatialResponse {
 		public List<Feature> features = new ArrayList<>();
@@ -301,7 +300,7 @@ public class SpatialSearchService {
 				}
 			}
 			// extra info shown in the UI
-			response.info = getSearchStats(List.of(res.stats), sTime, response.features.size());
+			response.info = getSearchStats(res.stats, sTime, response.features.size());
 			response.info.put("words-matched", res.combinations == null || res.combinations.isEmpty() ? 0
 					: res.combinations.get(0).getTokenCount());
 		} catch (TimeoutException e) {
@@ -331,27 +330,13 @@ public class SpatialSearchService {
 		return response;
 	}
 
-	public Map<String, Object> getSearchStats(List<SpatialSearchContext.SpatialSearchStats> stats, long startTime,
+	public Map<String, Object> getSearchStats(SpatialSearchContext.SpatialSearchStats stats, long startTime,
 	                                          int results) {
-		double atoms = 0;
-		double compute = 0;
-		double poiByType = 0;
-		long tokenObjs = 0;
-		long combinations = 0;
-		long bboxes = 0;
-		for (SpatialSearchContext.SpatialSearchStats s : stats) {
-			atoms += s.step1Atoms.ms();
-			tokenObjs += s.tokenObjs;
-			compute += s.step2Compute.ms();
-			combinations += s.maxCombinations;
-			poiByType += s.poiByTypeTime.ms();
-			bboxes += s.poiByTypeBboxes;
-		}
 		Map<String, Object> info = new LinkedHashMap<>();
 		info.put("timeAll", String.format("%.1f", (System.currentTimeMillis() - startTime) / 1e3));
-		info.put("atoms", String.format("%.2f, %,d", atoms / 1000.0, tokenObjs));
-		info.put("compute", String.format("%.2f, %,d", compute / 1000.0, combinations));
-		info.put("poi-by-type", String.format("%.2f, %,d", poiByType / 1000.0, bboxes));
+		info.put("atoms", String.format("%.2f, %,d", stats.step1Atoms.ms() / 1000.0, stats.tokenObjs));
+		info.put("compute", String.format("%.2f, %,d", stats.step2Compute.ms() / 1000.0, stats.maxCombinations));
+		info.put("poi-by-type", String.format("%.2f, %,d", stats.poiByTypeTime.ms() / 1000.0, stats.poiByTypeBboxes));
 		info.put("results", results);
 
 		return info;
