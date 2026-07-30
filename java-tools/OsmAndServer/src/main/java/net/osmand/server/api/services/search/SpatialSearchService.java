@@ -81,6 +81,12 @@ public class SpatialSearchService {
 	private static final int SPATIAL_AUTOCOMPLETE_THREADS = 3;
 	private static final int SPATIAL_SEARCH_QUEUE = 8;
 
+    // reused for cache
+	private SpatialPoiSearch poiSearch;
+
+    private final ThreadLocal<SpatialTextSearch> spatialTextSearchLocal = ThreadLocal.withInitial(SpatialTextSearch::new);
+	private final ThreadLocal<RegionsReaderHolder> osmandRegionsLocal = ThreadLocal.withInitial(RegionsReaderHolder::new);
+    
 	private final AtomicInteger spatialSearchRoundRobin = new AtomicInteger();
 	private final Map<String, AtomicBoolean> runningSearches = new ConcurrentHashMap<>();
 
@@ -122,13 +128,6 @@ public class SpatialSearchService {
 		return executor;
 	}
 
-	private final ThreadLocal<SpatialTextSearch> spatialTextSearchLocal = ThreadLocal.withInitial(SpatialTextSearch::new);
-
-	private final ThreadLocal<RegionsReaderHolder> osmandRegionsLocal = ThreadLocal
-			.withInitial(RegionsReaderHolder::new);
-
-	// reused for cache
-	private SpatialPoiSearch poiSearch;
 
 	public static class SpatialResponse {
 		public List<Feature> features = new ArrayList<>();
@@ -191,7 +190,7 @@ public class SpatialSearchService {
 	}
 
 	public SpatialResponse searchSpatial(ClassicSearchService.SearchContext ctx, String timeZone, boolean autocomplete,
-	                                     String routingKey, String maps) throws IOException {
+	                                     String userSessionKey, String maps) throws IOException {
 		long sTime = System.currentTimeMillis();
 		SpatialResponse response = new SpatialResponse();
 		if (!osmAndMapsService.validateAndInitConfig()) {
@@ -199,8 +198,8 @@ public class SpatialSearchService {
 		}
 		final AtomicBoolean cancelled = new AtomicBoolean();
 		// only full search tracks a per-client cancellation key; autocomplete just runs on its pool
-		String searchKey = autocomplete || Algorithms.isEmpty(routingKey) ? null : routingKey;
-		AtomicBoolean previous = searchKey == null ? null : runningSearches.put(searchKey, cancelled);
+		String searchSessionKey = autocomplete && !Algorithms.isEmpty(userSessionKey) ? userSessionKey : null;
+		AtomicBoolean previous = searchKey == null ? null : runningSearches.put(searchSessionKey, cancelled);
 		if (previous != null) {
 			previous.set(true); // the same client asked again, its previous search is abandoned
 		}
@@ -322,7 +321,7 @@ public class SpatialSearchService {
 		} finally {
 			cancelled.set(true);
 			if (searchKey != null) {
-				runningSearches.remove(searchKey, cancelled);
+				runningSearches.remove(searchSessionKey, cancelled);
 			}
 			if (!readersOwnedByWorker) {
 				// worker never started (early return / rejection / pre-submit failure)
