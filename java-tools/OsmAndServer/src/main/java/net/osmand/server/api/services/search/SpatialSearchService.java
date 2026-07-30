@@ -17,7 +17,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -82,8 +81,9 @@ public class SpatialSearchService {
 	// repeated searches always hit the thread whose engine cache is warmed
 	private final ThreadPoolExecutor[] spatialSearchExecutors = createSpatialSearchExecutors("search-", SPATIAL_SEARCH_THREADS);
 
-	// autocomplete runs on its own small pool without client routing - any free thread takes the task
-	private final ThreadPoolExecutor autocompleteExecutor = createAutocompleteExecutor(); // createSpatialSearchExecutors("autocomplete-", SPATIAL_AUTOCOMPLETE_THREADS);
+	// autocomplete pool is routed by session too; unlike full search,
+	// a newer autocomplete request of the same user cancels the previous one
+	private final ThreadPoolExecutor[] autocompleteExecutors = createSpatialSearchExecutors("autocomplete-", SPATIAL_AUTOCOMPLETE_THREADS);
 
 	@Autowired
 	OsmAndMapsService osmAndMapsService;
@@ -112,20 +112,6 @@ public class SpatialSearchService {
 			executors[i] = executor;
 		}
 		return executors;
-	}
-
-	private static ThreadPoolExecutor createAutocompleteExecutor() {
-		AtomicInteger counter = new AtomicInteger();
-		// no queue: a suggestion that has to wait is stale by the time it runs, better reject as busy
-		ThreadPoolExecutor executor = new ThreadPoolExecutor(SPATIAL_AUTOCOMPLETE_THREADS, SPATIAL_AUTOCOMPLETE_THREADS,
-				10, TimeUnit.MINUTES, new SynchronousQueue<>(),
-				r -> {
-					Thread t = new Thread(r, "spatial-autocomplete-" + counter.incrementAndGet());
-					t.setDaemon(true);
-					return t;
-				});
-		executor.allowCoreThreadTimeOut(true);
-		return executor;
 	}
 
 	public static class SpatialResponse {
@@ -185,7 +171,9 @@ public class SpatialSearchService {
 		for (ThreadPoolExecutor executor : spatialSearchExecutors) {
 			executor.shutdownNow();
 		}
-		autocompleteExecutor.shutdownNow();
+		for (ThreadPoolExecutor executor : autocompleteExecutors) {
+			executor.shutdownNow();
+		}
 	}
 
 	public SpatialResponse searchSpatial(ClassicSearchService.SearchContext ctx, String timeZone, boolean autocomplete,
@@ -196,7 +184,6 @@ public class SpatialSearchService {
 			return response;
 		}
 		final AtomicBoolean cancelled = new AtomicBoolean();
-		// only full search tracks a per-client cancellation key; autocomplete just runs on its pool
 		String searchSessionKey = autocomplete && !Algorithms.isEmpty(userSessionKey) ? userSessionKey : null;
 		AtomicBoolean previous = searchSessionKey == null ? null : runningSearches.put(searchSessionKey, cancelled);
 		if (previous != null) {
@@ -244,7 +231,8 @@ public class SpatialSearchService {
 					return cancelled.get();
 				}
 			};
-			ThreadPoolExecutor executor = autocomplete ? autocompleteExecutor : executorForKey(userSessionKey);
+			ThreadPoolExecutor executor = executorForKey(autocomplete ? autocompleteExecutors : spatialSearchExecutors,
+					userSessionKey);
 			Future<SpatialSearchResults> task = executor.submit(() -> {
 				try {
 					if (cancelled.get()) {
@@ -518,11 +506,11 @@ public class SpatialSearchService {
 		return "";
 	}
 
-	private ThreadPoolExecutor executorForKey(String routingKey) {
+	private ThreadPoolExecutor executorForKey(ThreadPoolExecutor[] executors, String routingKey) {
 		int index = routingKey == null || routingKey.isEmpty()
-				? Math.floorMod(spatialSearchRoundRobin.getAndIncrement(), SPATIAL_SEARCH_THREADS)
-				: Math.floorMod(routingKey.hashCode(), SPATIAL_SEARCH_THREADS);
-		return spatialSearchExecutors[index];
+				? Math.floorMod(spatialSearchRoundRobin.getAndIncrement(), executors.length)
+				: Math.floorMod(routingKey.hashCode(), executors.length);
+		return executors[index];
 	}
 
 	public SpatialTextSearch getSpatialTextSearch() {
