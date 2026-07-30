@@ -92,16 +92,16 @@ public class SpatialSearchService {
 
 	// one single-thread executor per slot: requests are routed by client key, so a client's
 	// repeated searches always hit the thread whose engine cache is warmed
-	private final ThreadPoolExecutor[] spatialSearchExecutors = createSpatialSearchExecutors();
+	private final ThreadPoolExecutor[] spatialSearchExecutors = createSpatialSearchExecutors("search-", SPATIAL_SEARCH_THREADS);
 
 	// autocomplete runs on its own small pool without client routing - any free thread takes the task
-	private final ThreadPoolExecutor autocompleteExecutor = createAutocompleteExecutor();
+	private final ThreadPoolExecutor autocompleteExecutor = createAutocompleteExecutor(); // createSpatialSearchExecutors("autocomplete-", SPATIAL_AUTOCOMPLETE_THREADS);
 
-	private static ThreadPoolExecutor[] createSpatialSearchExecutors() {
-		ThreadPoolExecutor[] executors = new ThreadPoolExecutor[SPATIAL_SEARCH_THREADS];
+	private static ThreadPoolExecutor[] createSpatialSearchExecutors(String name, int threads) {
+		ThreadPoolExecutor[] executors = new ThreadPoolExecutor[threads];
 		for (int i = 0; i < executors.length; i++) {
-			String name = "spatial-search-" + (i + 1);
-			ThreadPoolExecutor executor = new ThreadPoolExecutor(1, 1, 10, TimeUnit.MINUTES,
+			String name = "spatial-" + name + (i + 1);
+			ThreadPoolExecutor executor = new ThreadPoolExecutor(0, 1, 10, TimeUnit.MINUTES,
 					new ArrayBlockingQueue<>(SPATIAL_SEARCH_QUEUE),
 					r -> {
 						Thread t = new Thread(r, name);
