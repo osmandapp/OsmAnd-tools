@@ -301,7 +301,7 @@ public class SpatialSearchService {
 				}
 			}
 			// extra info shown in the UI
-			response.info = getSearchStats(List.of(res.stats), sTime, response.features.size());
+			response.info = getSearchStats(res.stats, sTime, response.features.size());
 			response.info.put("words-matched", res.combinations == null || res.combinations.isEmpty() ? 0
 					: res.combinations.get(0).getTokenCount());
 		} catch (TimeoutException e) {
@@ -331,27 +331,13 @@ public class SpatialSearchService {
 		return response;
 	}
 
-	public Map<String, Object> getSearchStats(List<SpatialSearchContext.SpatialSearchStats> stats, long startTime,
+	public Map<String, Object> getSearchStats(SpatialSearchContext.SpatialSearchStats stats, long startTime,
 	                                          int results) {
-		double atoms = 0;
-		double compute = 0;
-		double poiByType = 0;
-		long tokenObjs = 0;
-		long combinations = 0;
-		long bboxes = 0;
-		for (SpatialSearchContext.SpatialSearchStats s : stats) {
-			atoms += s.step1Atoms.ms();
-			tokenObjs += s.tokenObjs;
-			compute += s.step2Compute.ms();
-			combinations += s.maxCombinations;
-			poiByType += s.poiByTypeTime.ms();
-			bboxes += s.poiByTypeBboxes;
-		}
 		Map<String, Object> info = new LinkedHashMap<>();
 		info.put("timeAll", String.format("%.1f", (System.currentTimeMillis() - startTime) / 1e3));
-		info.put("atoms", String.format("%.2f, %,d", atoms / 1000.0, tokenObjs));
-		info.put("compute", String.format("%.2f, %,d", compute / 1000.0, combinations));
-		info.put("poi-by-type", String.format("%.2f, %,d", poiByType / 1000.0, bboxes));
+		info.put("atoms", String.format("%.2f, %,d", stats.step1Atoms.ms() / 1000.0, stats.tokenObjs));
+		info.put("compute", String.format("%.2f, %,d", stats.step2Compute.ms() / 1000.0, stats.maxCombinations));
+		info.put("poi-by-type", String.format("%.2f, %,d", stats.poiByTypeTime.ms() / 1000.0, stats.poiByTypeBboxes));
 		info.put("results", results);
 
 		return info;

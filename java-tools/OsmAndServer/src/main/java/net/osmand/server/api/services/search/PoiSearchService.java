@@ -163,7 +163,7 @@ public class PoiSearchService {
 	public PoiSearchResult searchPoi(PoiSearchData data, String locale, LatLon center, boolean baseSearch,
 	                                 int zoom, String timeZone) throws IOException {
 		long sTime = System.currentTimeMillis();
-		List<SpatialSearchContext.SpatialSearchStats> stats = new ArrayList<>();
+		SpatialSearchContext.SpatialSearchStats stats = null;
 		Map<Long, Feature> foundFeatures = new HashMap<>();
 		if (data.categories.isEmpty()) {
 			return new PoiSearchResult(false, false, null);
@@ -186,8 +186,8 @@ public class PoiSearchService {
 			}
 
 			if (data.categories.size() == 1) {
-				searchPoiByTypeCategory(data.categories.get(0), locale, searchBbox, usedMapList, foundFeatures,
-						null, zoom, timeZone, stats);
+				stats = searchPoiByTypeCategory(data.categories.get(0), locale, searchBbox, usedMapList, foundFeatures,
+						null, zoom, timeZone);
 				useLimit = foundFeatures.size() >= TOTAL_LIMIT_POI;
 			} else {
 				PoiSearchLimit poiSearchLimit = new PoiSearchLimit(TOTAL_LIMIT_POI / data.categories.size(),
@@ -199,7 +199,7 @@ public class PoiSearchService {
 					}
 					int categoryStartSize = foundFeatures.size();
 					searchPoiByTypeCategory(categoryObj, locale, searchBbox, usedMapList, foundFeatures, poiSearchLimit,
-							zoom, timeZone, stats);
+							zoom, timeZone);
 					int categoryEndSize = foundFeatures.size();
 					poiSearchLimit.updateAfterCategory(categoryStartSize, categoryEndSize);
 					if (poiSearchLimit.useLimit) {
@@ -216,16 +216,17 @@ public class PoiSearchService {
 			sortPoiResultsByDistance(features, center);
 			PoiSearchResult res = new PoiSearchResult(useLimit, false,
 					new FeatureCollection(features.toArray(new Feature[0])));
-			res.info = spatialSearchService.getSearchStats(stats, sTime, features.size());
+			if (stats != null) {
+				res.info = spatialSearchService.getSearchStats(stats, sTime, features.size());
+			}
 			return res;
 		} else {
 			return new PoiSearchResult(false, false, null);
 		}
 	}
 
-	private List<Amenity> searchPoiAmenities(String categoryKey, QuadRect bboxLatLon, int poiZoom,
-	                                         List<BinaryMapIndexReader> readers, int limit,
-	                                         List<SpatialSearchContext.SpatialSearchStats> stats) throws IOException {
+	private List<Amenity> searchPoiAmenities(SpatialSearchContext sscontext, String categoryKey, QuadRect bboxLatLon,
+	                                         int poiZoom, int limit) throws IOException {
 		SpatialPoiSearch poiTypeSearch = spatialSearchService.getSpatialPoiTypeSearch();
 		SpatialPoiType spatialType = null;
 		if (!categoryKey.startsWith(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX)) {
@@ -236,12 +237,6 @@ public class PoiSearchService {
 			}
 			categoryKey = spatialType.getKey();
 		}
-		SpatialSearchContext sscontext = createSpatialContext(
-				SpatialTextSearchSettings.searchPoiByCategorySettings(poiZoom, bboxLatLon), readers, poiTypeSearch, null);
-		if (stats != null) {
-			stats.add(sscontext.getStats());
-		}
-
 		boolean indexed = spatialType == null
 				|| (spatialType.singleType instanceof PoiType poiType && !poiType.isNonIndx());
 		if (!indexed) {
@@ -293,6 +288,12 @@ public class PoiSearchService {
 		return res;
 	}
 
+	private SpatialSearchContext createPoiCategoryContext(QuadRect bboxLatLon, int poiZoom,
+	                                                      List<BinaryMapIndexReader> readers) {
+		return createSpatialContext(SpatialTextSearchSettings.searchPoiByCategorySettings(poiZoom, bboxLatLon),
+				readers, spatialSearchService.getSpatialPoiTypeSearch(), null);
+	}
+
 	private SpatialSearchContext createSpatialContext(SpatialTextSearchSettings settings,
 	                                                  List<BinaryMapIndexReader> readers,
 	                                                  SpatialPoiSearch poiTypeSearch, LatLon center) {
@@ -338,12 +339,12 @@ public class PoiSearchService {
 		return false;
 	}
 
-	private void searchPoiByTypeCategory(PoiSearchCategory categoryObj, String locale, QuadRect searchBbox,
-	                                     List<BinaryMapIndexReader> readers, Map<Long, Feature> foundFeatures, PoiSearchLimit poiSearchLimit,
-	                                     int zoom, String timeZone, List<SpatialSearchContext.SpatialSearchStats> stats)
-			throws IOException {
+	private SpatialSearchContext.SpatialSearchStats searchPoiByTypeCategory(PoiSearchCategory categoryObj, String locale,
+	                                     QuadRect searchBbox, List<BinaryMapIndexReader> readers,
+	                                     Map<Long, Feature> foundFeatures, PoiSearchLimit poiSearchLimit,
+	                                     int zoom, String timeZone) throws IOException {
 		if (searchBbox == null) {
-			return;
+			return null;
 		}
 
 		int remaining = poiSearchLimit != null
@@ -351,14 +352,16 @@ public class PoiSearchService {
 				: TOTAL_LIMIT_POI - foundFeatures.size();
 
 		if (remaining <= 0) {
-			return;
+			return null;
 		}
 
 		QuadRect bboxLatLon = toLatLonBbox(searchBbox);
 		int poiZoom = estimatePoiZoom(bboxLatLon, zoom);
-		List<Amenity> amenities = searchPoiAmenities(categoryObj.category(), bboxLatLon, poiZoom, readers, remaining, stats);
+		SpatialSearchContext sscontext = createPoiCategoryContext(bboxLatLon, poiZoom, readers);
+		List<Amenity> amenities = searchPoiAmenities(sscontext, categoryObj.category(), bboxLatLon, poiZoom, remaining);
 
 		searchResultConverter.saveAmenityResults(amenities, foundFeatures, remaining, locale, timeZone);
+		return sscontext.getStats();
 	}
 
 	private Feature getPoi(String type, String name, LatLon loc, Long osmId, String timeZone) throws IOException {
@@ -382,8 +385,8 @@ public class PoiSearchService {
 
 			QuadRect bboxLatLon = toLatLonBbox(searchBbox);
 			int poiZoom = SPATIAL_POI_CATEGORY_MAX_ZOOM;
-			List<Amenity> amenities = searchPoiAmenities(type, bboxLatLon, poiZoom, readers,
-					ClassicSearchService.TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB, null);
+			List<Amenity> amenities = searchPoiAmenities(createPoiCategoryContext(bboxLatLon, poiZoom, readers), type,
+					bboxLatLon, poiZoom, ClassicSearchService.TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB);
 
 			for (Amenity a : amenities) {
 				boolean match = name != null ? matchesName(a, name)
@@ -578,7 +581,8 @@ public class PoiSearchService {
 					return true;
 				}
 				try {
-					return !searchPoiAmenities(brandFilter.getFilterId(), bboxLatLon, poiZoom, lockedReaders, 1, null).isEmpty();
+					return !searchPoiAmenities(createPoiCategoryContext(bboxLatLon, poiZoom, lockedReaders),
+							brandFilter.getFilterId(), bboxLatLon, poiZoom, 1).isEmpty();
 				} catch (IOException e) {
 					return true;
 				}
