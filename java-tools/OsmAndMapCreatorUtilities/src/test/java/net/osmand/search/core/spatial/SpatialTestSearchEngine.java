@@ -37,6 +37,7 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
     @Override
     public List<String> search(String phrase, boolean print) throws IOException {
         searchContext.stats.printLogs = print;
+//        searchContext.stats.printLogs = true;
         
         SpatialTextSearch.SpatialSearchResults searchResults = spatialSearch.searchAPI(phrase, searchContext);
         List<SpatialSearchResult> mainResults = searchResults.mainResults == null ? Collections.emptyList()
