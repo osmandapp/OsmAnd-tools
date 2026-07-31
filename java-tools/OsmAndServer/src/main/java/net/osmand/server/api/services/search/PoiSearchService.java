@@ -22,6 +22,7 @@ import net.osmand.CollatorStringMatcher;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.BinaryMapIndexReader.SearchPoiTypeFilter;
 import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
 import net.osmand.binary.BinaryMapPoiReaderAdapter;
@@ -55,8 +56,7 @@ public class PoiSearchService {
 	private static final Log LOGGER = LogFactory.getLog(PoiSearchService.class);
 
 	private static final int TOTAL_LIMIT_POI = 2000;
-	private static final int RARE_CATEGORY_MIN_ZOOM = 8;
-	private static final int RARE_CATEGORY_FREQ_LIMIT = 1000;
+	private static final int MAX_SCAN_OBJECTS = 100_000;
 	private static final int SPATIAL_POI_CATEGORY_MIN_ZOOM = 4;
 	private static final int SPATIAL_POI_CATEGORY_MAX_ZOOM = 18;
 	// viewport is ~3 tiles wide: zoom ~= log2(360 * 3 / bboxLonWidth)
@@ -179,7 +179,7 @@ public class PoiSearchService {
 
 			usedMapList = osmAndMapsService.getReaders(mapList, null);
 
-			if (shouldHintZoomIn(data.categories, usedMapList, searchBbox, zoom)) {
+			if (shouldHintZoomIn(data.categories, usedMapList, searchBbox)) {
 				PoiSearchResult hint = new PoiSearchResult(false, false, null);
 				hint.zoomInHint = true;
 				return hint;
@@ -318,25 +318,55 @@ public class PoiSearchService {
 		return Math.max(SPATIAL_POI_CATEGORY_MIN_ZOOM, Math.min(SPATIAL_POI_CATEGORY_MAX_ZOOM, zoom));
 	}
 
+	// Every zoom step shrinks the view area (and the objects to read) by 4x, so a category becomes
+	// affordable starting from minZoom = regionZoom + log4(freq / MAX_SCAN_OBJECTS).
 	private boolean shouldHintZoomIn(List<PoiSearchCategory> categories,
-	                                 List<BinaryMapIndexReader> readers, QuadRect searchBbox,
-	                                 int zoom) throws IOException {
-		if (zoom < 0 || zoom >= RARE_CATEGORY_MIN_ZOOM) {
-			return false;
-		}
+	                                 List<BinaryMapIndexReader> readers, QuadRect searchBbox) throws IOException {
 		SpatialPoiSearch poiTypeSearch = spatialSearchService.getSpatialPoiTypeSearch();
 		QuadRect bboxLatLon = toLatLonBbox(searchBbox);
-		int poiZoom = estimatePoiZoom(bboxLatLon, zoom);
+		int viewZoom = estimatePoiZoom(bboxLatLon, -1);
 		SpatialSearchContext freqCtx = createSpatialContext(
-				SpatialTextSearchSettings.searchPoiByCategorySettings(poiZoom, bboxLatLon), readers, poiTypeSearch, null);
+				SpatialTextSearchSettings.searchPoiByCategorySettings(viewZoom, bboxLatLon), readers, poiTypeSearch, null);
 		spatialSearchService.getSpatialTextSearch().initContext(freqCtx);
+		int regionZoom = estimateLoadedMapsZoom(readers, viewZoom);
 		for (PoiSearchCategory c : categories) {
 			int freq = poiTypeSearch.getCategoryFrequency(freqCtx, c.category());
-			if (freq == 0 || freq > RARE_CATEGORY_FREQ_LIMIT) {
+			if (freq == 0) {
+				return true;
+			}
+			if (freq <= MAX_SCAN_OBJECTS) {
+				continue;
+			}
+			int minZoom = regionZoom + (int) Math.ceil(Math.log(freq / (double) MAX_SCAN_OBJECTS) / Math.log(4));
+			LOGGER.info(String.format("Poi category '%s' frequency %d: min zoom %d, view zoom %d, region zoom %d",
+					c.category(), freq, minZoom, viewZoom, regionZoom));
+			if (viewZoom < minZoom) {
 				return true;
 			}
 		}
 		return false;
+	}
+
+	// zoom at which the view would cover all loaded maps (basemap excluded), i.e. contain all freq objects
+	private int estimateLoadedMapsZoom(List<BinaryMapIndexReader> readers, int viewZoom) {
+		QuadRect bbox31 = null;
+		for (BinaryMapIndexReader reader : readers) {
+			if (reader.getFile().getName().startsWith("World_")) {
+				continue;
+			}
+			for (PoiRegion pr : reader.getPoiIndexes()) {
+				if (bbox31 == null) {
+					bbox31 = new QuadRect(pr.getLeft31(), pr.getTop31(), pr.getRight31(), pr.getBottom31());
+				} else {
+					bbox31.left = Math.min(bbox31.left, pr.getLeft31());
+					bbox31.top = Math.min(bbox31.top, pr.getTop31());
+					bbox31.right = Math.max(bbox31.right, pr.getRight31());
+					bbox31.bottom = Math.max(bbox31.bottom, pr.getBottom31());
+				}
+			}
+		}
+
+		return bbox31 == null ? viewZoom : estimatePoiZoom(toLatLonBbox(bbox31), -1);
 	}
 
 	private SpatialSearchContext.SpatialSearchStats searchPoiByTypeCategory(PoiSearchCategory categoryObj, String locale,
