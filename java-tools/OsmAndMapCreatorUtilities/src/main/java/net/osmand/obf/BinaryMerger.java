@@ -324,6 +324,14 @@ public class BinaryMerger {
 		}
 	}
 
+	protected boolean shouldMergeCitiesByNameDistance() {
+		return true;
+	}
+
+	protected boolean shouldRegenerateRelationPoiIds() {
+		return true;
+	}
+
 	private List<String> extractCountryAndRegionNames(BinaryMapIndexReader index) {
 		List<String> name = index.getRegionNames();
 		if (name.size() > 0) {
@@ -414,7 +422,7 @@ public class BinaryMerger {
 				}
 				if (nn == null) {
 					int ty = (int) MapUtils.getTileNumberY(24, is.getLocation().getLatitude());
-					int tx = (int) MapUtils.getTileNumberY(24, is.getLocation().getLongitude());
+					int tx = (int) MapUtils.getTileNumberX(24, is.getLocation().getLongitude());
 					long id = (((long) tx << 32)) | ty;
 					nn = new Node(is.getLocation().getLatitude(), is.getLocation().getLongitude(), id);
 					nn.putTag("name", is.getName());
@@ -485,7 +493,9 @@ public class BinaryMerger {
 			List<City> cities = new ArrayList<City>(cityMap.keySet());
 			Map<City, List<City>> mergeCityGroup = new HashMap<City, List<City>>();
 			Collections.sort(cities, MapObject.BY_NAME_COMPARATOR);
-			mergeCitiesByNameDistance(cities, mergeCityGroup, cityMap, cityBlockType == CityBlocks.CITY_TOWN_TYPE);
+			if (shouldMergeCitiesByNameDistance()) {
+				mergeCitiesByNameDistance(cities, mergeCityGroup, cityMap, cityBlockType == CityBlocks.CITY_TOWN_TYPE);
+			}
 			List<BinaryFileReference> refs = new ArrayList<BinaryFileReference>();
 			// 1. write cities
 			writer.startCityBlockIndex(cityBlockType.index);
@@ -549,7 +559,7 @@ public class BinaryMerger {
 						@Override
 						public boolean publish(Amenity amenity) {
 							try {
-								boolean isRelation = amenity.getId() < 0;
+								boolean isRelation = amenity.getId() < 0 && shouldRegenerateRelationPoiIds();
 								if (isRelation) {
 									long j = latlon(amenity);
 									List<Amenity> list;

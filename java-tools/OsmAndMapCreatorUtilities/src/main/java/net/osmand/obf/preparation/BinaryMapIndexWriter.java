@@ -1076,6 +1076,7 @@ public class BinaryMapIndexWriter {
 					bbox31 = cityObj.getBbox31();
 				} else if (no.object instanceof Street s) {
 					type = CityBlocks.STREET_TYPE;
+					bbox31 = s.getBbox31();
 					QuadRect bb = s.getBboxPoints();
 					if (bb != null) {
 						bbox31 = new int[] { MapUtils.get31TileNumberX(bb.left), MapUtils.get31TileNumberY(bb.top),
@@ -1739,6 +1740,13 @@ public class BinaryMapIndexWriter {
 		}
 
 	}
+	
+	public String concat(String s, Collection<String> other) {
+		for (String o : other) {
+			s += ";" + o;
+		}
+		return s;
+	}
 
 	public void writePoiSubtypesTable(PoiCreatorCategories cs, Map<String, Set<String>> topIndexAdditional) throws IOException {
 		checkPeekState(POI_INDEX_INIT);
@@ -1761,6 +1769,9 @@ public class BinaryMapIndexWriter {
 				rt.setTargetPoiId(subcatId++, 0);
 				OsmAndPoiSubtype.Builder subType = OsmandOdb.OsmAndPoiSubtype.newBuilder();
 				subType.setName(rt.getTag());
+				if (rt.getWikidataId() != null) {
+					subType.setWikidataId(concat(rt.getWikidataId(), rt.getAltNames()));
+				}
 				subType.setIsText(true);
 				subType.setFrequency(rt.getUsage());
 				builder.addSubtypes(subType);
@@ -1779,6 +1790,12 @@ public class BinaryMapIndexWriter {
 			for (PoiAdditionalType subtypeVal : list) {
 				subtypeVal.setTargetPoiId(cInd, subcInd++);
 				subType.addSubtypeValue(subtypeVal.getValue());
+				String wikidataId = subtypeVal.getWikidataId();
+				if (wikidataId != null) {
+					subType.addSubcatWikidataIds(concat(subtypeVal.getWikidataId(), subtypeVal.getAltNames()));
+				} else {
+					subType.addSubcatWikidataIds("");
+				}
 				if (addSubFreqs) {
 					subType.addSubtypeValuesFreq(subtypeVal.getUsage());
 				}

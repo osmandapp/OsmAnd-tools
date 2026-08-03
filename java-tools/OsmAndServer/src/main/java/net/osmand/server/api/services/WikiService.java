@@ -16,6 +16,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
+import net.osmand.server.api.services.search.SearchResultConverter;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiType;
 import net.osmand.shared.wiki.WikiImage;
@@ -528,9 +529,9 @@ public class WikiService {
 	private void fillPoiSubtype(String poiType, Feature f) {
 		PoiType type = MapPoiTypes.getDefault().getPoiTypeByKey(poiType);
 		if (type != null) {
-			f.properties.put(SearchService.PoiTypeField.ICON_NAME.getFieldName(), type.getIconKeyName());
-			f.properties.put(SearchService.PoiTypeField.OSM_TAG.getFieldName(), type.getOsmTag());
-			f.properties.put(SearchService.PoiTypeField.OSM_VALUE.getFieldName(), type.getOsmValue());
+			f.properties.put(SearchResultConverter.PoiTypeField.ICON_NAME.getFieldName(), type.getIconKeyName());
+			f.properties.put(SearchResultConverter.PoiTypeField.OSM_TAG.getFieldName(), type.getOsmTag());
+			f.properties.put(SearchResultConverter.PoiTypeField.OSM_VALUE.getFieldName(), type.getOsmValue());
 		}
 		f.properties.put("poisubtype", poiType);
 	}

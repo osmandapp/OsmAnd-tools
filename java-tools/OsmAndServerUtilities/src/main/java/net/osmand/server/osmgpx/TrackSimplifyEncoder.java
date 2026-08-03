@@ -45,7 +45,8 @@ public class TrackSimplifyEncoder {
 		GpxFile res = new GpxFile(null);
 		Track track = new Track();
 		res.getTracks().add(track);
-		for (Track t : gpxFile.getTracks()) {
+		// skips the general track: it merges all segments into one
+		for (Track t : gpxFile.getTracks(false)) {
 			for (TrkSegment seg : t.getSegments()) {
 				TrkSegment ns = new TrkSegment();
 				ns.getPoints().addAll(simplifyPoints(seg.getPoints(), zoom));

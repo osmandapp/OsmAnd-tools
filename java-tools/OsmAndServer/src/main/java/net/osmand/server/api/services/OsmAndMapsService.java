@@ -34,6 +34,7 @@ import java.util.zip.ZipInputStream;
 
 import javax.annotation.Nullable;
 
+import net.osmand.search.core.spatial.SpatialTextSearch;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.json.JSONArray;
@@ -63,7 +64,6 @@ import com.google.gson.JsonObject;
 import net.osmand.IndexConstants;
 import net.osmand.LocationsHolder;
 import net.osmand.NativeJavaRendering;
-import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.CachedOsmandIndexes;
 import net.osmand.binary.GeocodingUtilities;
@@ -106,6 +106,7 @@ import net.osmand.server.utils.WebGpxParser;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
+import net.osmand.util.RegionCodeUtils;
 
 @Service
 public class OsmAndMapsService {
@@ -123,8 +124,6 @@ public class OsmAndMapsService {
 	private static final int MAX_SAME_FILE_OPEN = 15;
 	private static final long CACHE_MAX_ROUTING_CONTEXT_SEC = Integer.MAX_VALUE; //12 * 60 * 60; // 12h
 
-	private static final double SPATIAL_SEARCH_RADIUS_KM = 400;
-	
 	private static final List<String> ALWAYS_IN_MEMORY = new ArrayList<String>();
 	static {
 		ALWAYS_IN_MEMORY.add("car:{}");
@@ -292,7 +291,7 @@ public class OsmAndMapsService {
 	}
 
 	public class BinaryMapIndexReaderReference {
-		File file;
+		private File file;
 		private static final int WAIT_LOCK_CHECK = 10;
 		ConcurrentHashMap<BinaryMapIndexReader, Boolean> readers = new ConcurrentHashMap<>();
 		public FileIndex fileIndex;
@@ -1402,13 +1401,32 @@ public class OsmAndMapsService {
 		return files;
 	}
 
+	public List<BinaryMapIndexReaderReference> getObfReadersByCodes(String maps) throws IOException {
+		initObfReaders();
+		Map<String, BinaryMapIndexReaderReference> byDownloadName = new LinkedHashMap<>();
+		for (BinaryMapIndexReaderReference ref : obfFiles.values()) {
+			byDownloadName.put(getDownloadNameByFileName(ref.file.getName()), ref);
+		}
+		List<BinaryMapIndexReaderReference> res = new ArrayList<>();
+		for (String name : RegionCodeUtils.decode(maps, byDownloadName.keySet())) {
+			res.add(byDownloadName.get(name));
+		}
+		res.add(getBaseMap());
+		LOGGER.info(String.format("Search maps by codes '%s': %d files", maps, res.size()));
+		return res;
+	}
+
 	// all maps within ~.00 km of the point, no count limit.
 	// Union of region-based selection (regions.ocbf) and the regular bbox-intersection selection.
-	public List<BinaryMapIndexReaderReference> getObfReadersForSpatialSearch(double lat, double lon) throws IOException {
+	public List<BinaryMapIndexReaderReference> getObfReadersForSpatialSearch(double lat, double lon,
+	                                                                         boolean autocomplete) throws IOException {
 		initObfReaders();
-		double dLat = SPATIAL_SEARCH_RADIUS_KM / 111.0;
-		double dLon = SPATIAL_SEARCH_RADIUS_KM / (111.0 * Math.max(0.1, Math.cos(Math.toRadians(lat))));
-		QuadRect bbox = points(null, new LatLon(lat + dLat, lon - dLon), new LatLon(lat - dLat, lon + dLon));
+
+		int searchRadiusKm = autocomplete
+				? SpatialTextSearch.SpatialTextSearchSettings.suggestionSettings().SUGGESTED_SEARCH_RADIUS_KM
+				: SpatialTextSearch.SpatialTextSearchSettings.defaultSettings().SUGGESTED_SEARCH_RADIUS_KM;
+		QuadRect llBbox = MapUtils.calculateLatLonBbox(lat, lon, searchRadiusKm * 1000);
+		QuadRect bbox = points(null, new LatLon(llBbox.top, llBbox.left), new LatLon(llBbox.bottom, llBbox.right));
 		Set<File> files = new LinkedHashSet<>();
 
 		// 1. regions overlapping the area (queried from regions.ocbf by bbox) -> their combined bbox
@@ -1438,7 +1456,7 @@ public class OsmAndMapsService {
 //		}
 //		LOGGER.info("Spatial search region maps " + mapsLog(files, lat, lon));
 
-		// 3. + maps within the 500 km bbox (regular selection), then base map
+		// 3. + maps within the 400 km bbox (regular selection), then base map
 		files.addAll(getMaps(bbox));
 		files.add(getBaseMap().file);
 		LOGGER.info("Spatial search total maps " + mapsLog(files, lat, lon));
