@@ -454,22 +454,44 @@ public class SearchUICoreGenOBFTest {
 		}
 	}
 
-	private List<String> parsePhrases(JSONObject sourceJson) {
+	record PhraseTuple(String query, JSONObject settings) {}
+
+	private PhraseTuple parsePhraseSettings(String phrase) {
+		if (Algorithms.isEmpty(phrase)) {
+			return null;
+		}
+		int settingsStart = phrase.lastIndexOf('{');
+		if (settingsStart < 0 || !phrase.trim().endsWith("}")) {
+			return new PhraseTuple(phrase, null);
+		}
+		JSONObject settings = new JSONObject(phrase.substring(settingsStart));
+		return new PhraseTuple(phrase.substring(0, settingsStart).trim(), settings);
+	}
+
+	private List<PhraseTuple> parsePhrases(JSONObject sourceJson) {
 		JSONArray phrasesJson = sourceJson.optJSONArray("phrases");
-		String singlePhrase = sourceJson.optString("phrase", null);
-		List<String> phrases = new ArrayList<>();
+		PhraseTuple singlePhrase = parsePhraseSettings(sourceJson.optString("phrase", null));
+		List<PhraseTuple> phrases = new ArrayList<>();
 		if (singlePhrase != null) {
 			phrases.add(singlePhrase);
 		}
 		if (phrasesJson != null) {
 			for (int i = 0; i < phrasesJson.length(); i++) {
-				String phrase = phrasesJson.optString(i, null);
-				if (!Algorithms.isEmpty(phrase)) {
+				PhraseTuple phrase = parsePhraseSettings(phrasesJson.optString(i, null));
+				if (phrase != null) {
 					phrases.add(phrase);
 				}
 			}
 		}
 		return phrases;
+	}
+
+	private JSONObject mergePhraseSettings(JSONObject settingsJson, JSONObject phraseSettings) {
+		JSONObject mergedSettings = new JSONObject(settingsJson.toString());
+		for (String key : phraseSettings.keySet()) {
+			mergedSettings.put(key, phraseSettings.get(key));
+		}
+		return mergedSettings;
 	}
 
 	private List<List<String>> parseExpectedResults(JSONObject sourceJson, int phrasesSize) {
@@ -515,11 +537,11 @@ public class SearchUICoreGenOBFTest {
 //		}
         searchKeywords = getKeywords(sourceJson);
 		JSONObject settingsJson = sourceJson.getJSONObject("settings");
-		List<String> phrases = parsePhrases(sourceJson);
+		List<PhraseTuple> phrases = parsePhrases(sourceJson);
 		boolean useData = settingsJson.optBoolean("useData", true);
 		List<BinaryMapIndexReader> readers = new ArrayList<>();
 		boolean prevDisplayDefaultPoiTypes = SearchCoreFactory.DISPLAY_DEFAULT_POI_TYPES;
-		SearchTestEngine engine = null;
+		SearchTestEngine defaultEngine = null;
 		try {
 			if (useData) {
 				loadReaders(sourceJson, readers);
@@ -538,12 +560,17 @@ public class SearchUICoreGenOBFTest {
 			return;
 		}
 
-		engine = createSearchEngine(settingsJson, readers);
+		defaultEngine = new SpatialTestSearchEngine(settingsJson, readers);
 		int shift = 4;
 		for (int k = 0; k < phrases.size(); k++) {
-			String text = phrases.get(k);
+			PhraseTuple phraseAndSettings = phrases.get(k);
+			String text = phraseAndSettings.query;
 			List<String> expectedResults = results.get(k);
-			List<String> actualResults = engine.search(text, false); 
+			boolean enginePerPhrase = phraseAndSettings.settings != null && !phraseAndSettings.settings.keySet().isEmpty();
+			SearchTestEngine engine = enginePerPhrase ?
+					new SpatialTestSearchEngine(mergePhraseSettings(settingsJson, phraseAndSettings.settings), readers)
+					: defaultEngine;
+			List<String> actualResults = engine.search(text, false);
 			for (int i = 0; i < expectedResults.size(); i++) {
 				String expected = expectedResults.get(i);
 				String actual = i >= actualResults.size() ? null : actualResults.get(i);
@@ -571,20 +598,20 @@ public class SearchUICoreGenOBFTest {
 				}
 				Assert.assertEquals(expected, present);
 			}
+
+			if (enginePerPhrase) {
+				engine.close();
+			}
 		}
 		} finally {
 			SearchCoreFactory.DISPLAY_DEFAULT_POI_TYPES = prevDisplayDefaultPoiTypes;
-			if (engine != null) {
-				engine.close();
+			if (defaultEngine != null) {
+				defaultEngine.close();
 			}
 			for (BinaryMapIndexReader reader : readers) {
 				reader.close();
 			}
         }
-	}
-
-	private SearchTestEngine createSearchEngine(JSONObject settingsJson, List<BinaryMapIndexReader> readers) {
-		return new SpatialTestSearchEngine(settingsJson, readers);
 	}
 
 	private static void deleteRecursively(File file) {
@@ -995,14 +1022,14 @@ public class SearchUICoreGenOBFTest {
 
     public Set<String> getKeywords(JSONObject sourceJson) {
         Set<String> keywords = new HashSet<>();
-        List<String> phrases = parsePhrases(sourceJson);
-        for (String phrase : phrases) {
-            extractAndAddWords(phrase, keywords);
+        List<PhraseTuple> phrases = parsePhrases(sourceJson);
+        for (PhraseTuple phraseAndSettings : phrases) {
+            extractAndAddWords(phraseAndSettings.query, keywords);
         }
 
         List<List<String>> parsedResults = new ArrayList<>();
         for (int i = 0; i < phrases.size(); i++) {
-            parsedResults.add(new ArrayList<String>());
+            parsedResults.add(new ArrayList<>());
         }
         String tag = sourceJson.has("results") ? "results" : "result";
         parseResults(sourceJson, tag, parsedResults);
