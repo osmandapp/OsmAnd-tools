@@ -535,9 +535,9 @@ public class SearchUICoreGenOBFTest {
 //		if (RUN_IGNORED_TESTS) {
 //			return;
 //		}
-        searchKeywords = getKeywords(sourceJson);
-		JSONObject settingsJson = sourceJson.getJSONObject("settings");
 		List<PhraseTuple> phrases = parsePhrases(sourceJson);
+        searchKeywords = getKeywords(sourceJson, phrases);
+		JSONObject settingsJson = sourceJson.getJSONObject("settings");
 		boolean useData = settingsJson.optBoolean("useData", true);
 		List<BinaryMapIndexReader> readers = new ArrayList<>();
 		boolean prevDisplayDefaultPoiTypes = SearchCoreFactory.DISPLAY_DEFAULT_POI_TYPES;
@@ -567,9 +567,11 @@ public class SearchUICoreGenOBFTest {
 			String text = phraseAndSettings.query;
 			List<String> expectedResults = results.get(k);
 			boolean enginePerPhrase = phraseAndSettings.settings != null && !phraseAndSettings.settings.keySet().isEmpty();
-			SearchTestEngine engine = enginePerPhrase ?
-					new SpatialTestSearchEngine(mergePhraseSettings(settingsJson, phraseAndSettings.settings), readers)
-					: defaultEngine;
+			SearchTestEngine engine = defaultEngine;
+			if (enginePerPhrase) {
+				engine = new SpatialTestSearchEngine(mergePhraseSettings(settingsJson, phraseAndSettings.settings), readers);
+			}
+			
 			List<String> actualResults = engine.search(text, false);
 			for (int i = 0; i < expectedResults.size(); i++) {
 				String expected = expectedResults.get(i);
@@ -1020,9 +1022,8 @@ public class SearchUICoreGenOBFTest {
 		}
 	}
 
-    public Set<String> getKeywords(JSONObject sourceJson) {
+    public Set<String> getKeywords(JSONObject sourceJson, List<PhraseTuple> phrases) {
         Set<String> keywords = new HashSet<>();
-        List<PhraseTuple> phrases = parsePhrases(sourceJson);
         for (PhraseTuple phraseAndSettings : phrases) {
             extractAndAddWords(phraseAndSettings.query, keywords);
         }
