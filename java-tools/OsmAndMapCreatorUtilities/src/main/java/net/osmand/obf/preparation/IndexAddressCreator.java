@@ -875,6 +875,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 						if (strt == null) {
 							strt = n.getTag(OSMTagKey.ADDR_PLACE);
 						}
+						if (strt == null) {
+							strt = n.getTag(OSMTagKey.ADDR_NEIGHBOURHOOD);
+						}
 						if (strt != null) {
 							nodesWithHno.add(n);
 						}
@@ -893,6 +896,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 						boolean place = false;
 						if (strt == null) {
 							strt = first.getTag(OSMTagKey.ADDR_PLACE);
+							if (strt == null) {
+								strt = first.getTag(OSMTagKey.ADDR_NEIGHBOURHOOD);
+							}
 							place = true;
 						}
 						Set<Long> idsOfStreet = getStreetInCity(0, first.getIsInNames(), strt, place, null, l, icc);
@@ -925,6 +931,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			streetOrPlace = e.getTag(OSMTagKey.ADDR_STREET);
 			if (streetOrPlace == null) {
 				streetOrPlace = e.getTag(OSMTagKey.ADDR_PLACE);
+				if (streetOrPlace == null) {
+					streetOrPlace = e.getTag(OSMTagKey.ADDR_NEIGHBOURHOOD);
+				}
 				place = true;
 			}
 		}
