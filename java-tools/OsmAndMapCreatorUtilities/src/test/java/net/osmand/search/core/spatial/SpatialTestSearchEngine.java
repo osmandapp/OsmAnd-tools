@@ -157,12 +157,7 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
         settings.OPTIM_FLAG_POI_SAME_AS_CITY_STREET = settingsJson.optBoolean("OPTIM_FLAG_POI_SAME_AS_CITY_STREET",
                 settings.OPTIM_FLAG_POI_SAME_AS_CITY_STREET);
         settings.DEDUPLICATE_RES = settingsJson.optBoolean("DEDUPLICATE_RES", settings.DEDUPLICATE_RES);
-        settings.OPTIM_READ_COMMON_WORDS_LIMIT = settingsJson.optInt("OPTIM_READ_COMMON_WORDS_LIMIT",
-                settings.OPTIM_READ_COMMON_WORDS_LIMIT);
-//        settings.ALWAYS_READ_COMMON_WORDS_ATOMS = settingsJson.optBoolean("ALWAYS_READ_COMMON_WORDS_ATOMS",
-//                settings.ALWAYS_READ_COMMON_WORDS_ATOMS);
-//        settings.ALWAYS_READ_FREQ_WORDS_ATOMS = settingsJson.optBoolean("ALWAYS_READ_FREQ_WORDS_ATOMS",
-//                settings.ALWAYS_READ_FREQ_WORDS_ATOMS);
+        settings.OPTIM_READ_COMMON_WORDS_LIMIT = settingsJson.optInt("OPTIM_READ_COMMON_WORDS_LIMIT", settings.OPTIM_READ_COMMON_WORDS_LIMIT);
         settings.LANG_DEDUPLICATE = settingsJson.optString("LANG_DEDUPLICATE", settings.LANG_DEDUPLICATE);
         settings.MIN_ELO_RATING = settingsJson.optInt("MIN_ELO_RATING", settings.MIN_ELO_RATING);
         settings.MIN_CHARACTERS_INCOMPLETE = settingsJson.optInt("MIN_CHARACTERS_INCOMPLETE", settings.MIN_CHARACTERS_INCOMPLETE);
@@ -172,6 +167,8 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
         settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES = settingsJson.optInt("LIMIT_STOP_OTHER_GOALS_WHEN_REACHED_UNIQUE_OBJECTS",
                 settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES);
         settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES = settingsJson.optInt("LIMIT_GOAL_LEVEL_2", settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES);
+        settings.DEV_USE_PIPELINE = settingsJson.optBoolean("DEV_USE_PIPELINE", settings.DEV_USE_PIPELINE);
+
         return settings;
     }
 
