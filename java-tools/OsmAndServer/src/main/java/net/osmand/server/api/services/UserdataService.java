@@ -132,7 +132,7 @@ public class UserdataService {
     private static final String USER_FOLDER_PREFIX = "user-";
     private static final String FILE_NAME_SUFFIX = ".gz";
     private static final int MAX_FILENAME = 220; // max basename bytes
-    private static final int SHORT_FILENAME = 100; // bytes a too-long basename is shortened to
+    private static final int SHORT_FILENAME = 200; // bytes a too-long basename is shortened to
     private static final String CR_SANITIZE = "$0D"; // \r
     private static final String LF_SANITIZE = "$0A"; // \n
 
