@@ -461,7 +461,7 @@ public class UserdataService {
         return fldName + "/" + updatetime.getTime() + "-" + name + FILE_NAME_SUFFIX;
     }
 
-	// bounded key for a too-long basename (100 bytes + name hash); null when the basename already fits
+	// bounded key for a too-long basename (SHORT_FILENAME bytes + name hash); null when the basename already fits
 	public String computeStorageName(String type, String name, Date updatetime) {
 		int nt = name.lastIndexOf('/') + 1;
 		String base = name.substring(nt);
