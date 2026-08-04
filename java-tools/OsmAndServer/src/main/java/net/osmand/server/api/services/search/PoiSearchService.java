@@ -415,6 +415,7 @@ public class PoiSearchService {
 
 			QuadRect bboxLatLon = toLatLonBbox(searchBbox);
 			int poiZoom = SPATIAL_POI_CATEGORY_MAX_ZOOM;
+			type = TopIndexFilter.getValueKey(type.trim());
 			List<Amenity> amenities = searchPoiAmenities(createPoiCategoryContext(bboxLatLon, poiZoom, readers), type,
 					bboxLatLon, poiZoom, ClassicSearchService.TOTAL_LIMIT_SEARCH_RESULTS_TO_WEB);
 
