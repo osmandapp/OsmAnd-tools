@@ -379,7 +379,7 @@ public class UserdataController {
 		// remap needs to happen to all users & temporarily service should find files by both names (download)
 		Iterable<UserFile> lst = filesRepository.findAllByUserid(dev.userid);
 		for (UserFile fl : lst) {
-			if (fl != null && fl.filesize > 0) {
+			if (fl != null && fl.filesize != null && fl.filesize > 0) {
 				storageService.remapFileNames(fl.id, fl.storage, userdataService.userFolder(fl), userdataService.oldStorageFileName(fl), userdataService.storageFileName(fl));
 			}
 		}
@@ -399,7 +399,7 @@ public class UserdataController {
 		}
 		Iterable<UserFile> lst = filesRepository.findAllByUserid(dev.userid);
 		for (UserFile fl : lst) {
-			if (fl != null && fl.filesize > 0) {
+			if (fl != null && fl.filesize != null && fl.filesize > 0) {
 				String newStorage = storageService.backupData(storageId, userdataService.userFolder(fl), userdataService.storageFileName(fl),
 						fl.storage, fl.data);
 				if (newStorage != null) {
