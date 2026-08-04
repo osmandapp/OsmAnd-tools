@@ -923,7 +923,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 		String houseName = e.getTag(OSMTagKey.ADDR_HOUSE_NAME);
 		String houseNumber = normalizeHousenumber(e.getTag(OSMTagKey.ADDR_HOUSE_NUMBER),
-				e.getTag(OSMTagKey.ADDR_UNIT));
+				e.getTag(OSMTagKey.ADDR_UNIT), e.getTag(OSMTagKey.ADDR_BLOCK_NUMBER));
 
 		String streetOrPlace = null;
 		boolean place = false;
@@ -1077,7 +1077,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		return null;
 	}
 
-	private String normalizeHousenumber(String hno, String unit) {
+	
+	private String normalizeHousenumber(String hno, String unit, String blockNumber) {
 		String suffix = Algorithms.isEmpty(unit) ? "" : ("-" + unit);
 		if (hno != null) {
 			if (hno.toLowerCase().endsWith("bis")) {
@@ -1088,6 +1089,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				hno = hno.substring(0, hno.length() - "ter".length()).trim() + suffix + " ter";
 			} else {
 				hno = hno + suffix;
+			}
+			if (blockNumber != null && blockNumber.length() > 0) {
+				hno = blockNumber + "-" + hno;
 			}
 		}
 		return hno;
