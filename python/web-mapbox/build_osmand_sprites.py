@@ -12,7 +12,7 @@ DST_DIR = '/mnt/wd_2tb/mvt/openmaptiles/style/icons/'
 WORK_DIR = '/mnt/wd_2tb/mvt/openmaptiles/'
 REPO_DIR = '/home/xmd5a/git/osmand-subst/'
 UTILITIES_SH = '/home/xmd5a/utilites/OsmAndMapCreator-main/utilities.sh'
-ADDITION_DIR = '/home/xmd5a/git/OsmAnd-resources/rendering_styles/mvt-icons-addition'
+ADDITION_DIR = '/home/xmd5a/git/OsmAnd-resources/mvt/icons-addition'
 
 PREFIXES = ['mx_', 'c_mx_', 'c_h_', 'h_']
 EXCLUDE_PATTERNS = ['seamark', "topo_"]
@@ -55,15 +55,15 @@ def main():
                 "shield" not in original_filename.lower() and 
                 "osmc" not in original_filename.lower()):
                 
-                print(f"Resizing to 70%: {f} (from shaders)")
+                print(f"Resizing: {f} (from shaders)")
                 try:
                     # Get original dimensions
                     identify_cmd = f"identify -format '%w %h' '{src}'"
                     result = subprocess.run(identify_cmd, shell=True, capture_output=True, text=True, executable='/bin/bash')
                     if result.returncode == 0:
                         width, height = map(int, result.stdout.strip().split())
-                        new_width = max(1, int(width * 0.5))
-                        new_height = max(1, int(height * 0.5))
+                        new_width = max(1, int(width * 0.2))
+                        new_height = max(1, int(height * 0.2))
                         
                         # Keep output as SVG
                         cmd = (
