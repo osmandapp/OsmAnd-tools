@@ -43,7 +43,8 @@ public class EmailSenderMain {
 		String giveawaySeries;
 		boolean updateBlockList = false;
 		String unsubscribeFileName = null;
-		String testAddressesFileName = null;
+		String userIdsFileName = null;
+		String userIds = null;
     }
 
     public static void main(String[] args) throws SQLException, IOException {
@@ -75,12 +76,12 @@ public class EmailSenderMain {
                 p.updateBlockList = true;
             } else if (arg.startsWith("--unsubscribe-from=")) {
 	            p.unsubscribeFileName = val;
-            } else if (arg.startsWith("--test_addr-from=")) {
-	            p.testAddressesFileName = val;
+            } else if (arg.startsWith("--user-ids-from=")) {
+	            p.userIdsFileName = val;
             }
         }
-        if (p.testAddressesFileName != null && !p.testAddressesFileName.isEmpty()) {
-            p.testAddresses = readTestAddressesFile(p.testAddressesFileName);
+        if (p.userIdsFileName != null && !p.userIdsFileName.isEmpty()) {
+            p.userIds = readUserIdsFile(p.userIdsFileName);
         }
 
         final String apiKey = System.getenv("SENDGRID_KEY");
@@ -371,17 +372,23 @@ public class EmailSenderMain {
 
     private static void sendTestEmails(Connection conn, EmailParams p, Set<String> unsubscribed) throws SQLException {
         LOGGER.info("Sending test messages...");
-        for (String recipient : p.testAddresses.split(",")) {
-            String address = getEmailByUserId(conn, recipient.trim());
-            if (address == null || !unsubscribed.contains(address)) {
-                sendMail(address, p);
-            } else {
-                LOGGER.info("Skip unsubscribed email: " + address.replaceFirst(".....", "....."));
+        if (p.userIds != null && !p.userIds.isEmpty()) {
+            for (String recipient : p.userIds.split(",")) {
+                String address = getEmailByUserId(conn, recipient.trim());
+                if (address == null || !unsubscribed.contains(address)) {
+                    sendMail(address, p);
+                } else {
+                    LOGGER.info("Skip unsubscribed email: " + address.replaceFirst(".....", "....."));
+                }
+            }
+        } else {
+            for (String recipient : p.testAddresses.split(",")) {
+                sendMail(recipient.trim(), p);
             }
         }
     }
 
-    private static String readTestAddressesFile(String fileName) throws IOException {
+    private static String readUserIdsFile(String fileName) throws IOException {
         InputStream is = "-".equals(fileName) ? System.in : new FileInputStream(fileName);
         Scanner sc = new Scanner(is);
         StringBuilder sb = new StringBuilder();
@@ -433,7 +440,8 @@ public class EmailSenderMain {
         	throw new RuntimeException("Giveaway series is required");
         }
         if (p.runMode.equals("send_to_test_email_group") &&
-                (p.testAddresses == null || p.testAddresses.isEmpty())) {
+                (p.testAddresses == null || p.testAddresses.isEmpty()) &&
+                (p.userIds == null || p.userIds.isEmpty())) {
             throw new RuntimeException("Test email group wasn't specified in test sending mode.");
         }
     }
