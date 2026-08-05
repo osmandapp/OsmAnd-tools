@@ -43,6 +43,7 @@ public class EmailSenderMain {
 		String giveawaySeries;
 		boolean updateBlockList = false;
 		String unsubscribeFileName = null;
+		String testAddressesFileName = null;
     }
 
     public static void main(String[] args) throws SQLException, IOException {
@@ -74,7 +75,12 @@ public class EmailSenderMain {
                 p.updateBlockList = true;
             } else if (arg.startsWith("--unsubscribe-from=")) {
 	            p.unsubscribeFileName = val;
+            } else if (arg.startsWith("--test_addr-from=")) {
+	            p.testAddressesFileName = val;
             }
+        }
+        if (p.testAddressesFileName != null && !p.testAddressesFileName.isEmpty()) {
+            p.testAddresses = readTestAddressesFile(p.testAddressesFileName);
         }
 
         final String apiKey = System.getenv("SENDGRID_KEY");
@@ -105,7 +111,7 @@ public class EmailSenderMain {
         Set<String> unsubscribedAndBlocked = getUnsubscribedAndBlocked(conn, p.topic);
         switch (p.runMode) {
             case "send_to_test_email_group":
-                sendTestEmails(p, unsubscribedAndBlocked);
+                sendTestEmails(conn, p, unsubscribedAndBlocked);
                 break;
             case "print_statistics":
                 printStats(conn, p, unsubscribedAndBlocked);
@@ -363,12 +369,56 @@ public class EmailSenderMain {
         LOGGER.info("Total Blocked: " + count);
     }
 
-    private static void sendTestEmails(EmailParams p, Set<String> unsubscribed) {
+    private static void sendTestEmails(Connection conn, EmailParams p, Set<String> unsubscribed) throws SQLException {
         LOGGER.info("Sending test messages...");
-        String[] testRecipients = p.testAddresses.split(",");
-        for (String recipient : testRecipients) {
-            sendMail(recipient.trim(), p);
+        for (String recipient : p.testAddresses.split(",")) {
+            String address = getEmailByUserId(conn, recipient.trim());
+            if (address == null || !unsubscribed.contains(address)) {
+                sendMail(address, p);
+            } else {
+                LOGGER.info("Skip unsubscribed email: " + address.replaceFirst(".....", "....."));
+            }
         }
+    }
+
+    private static String readTestAddressesFile(String fileName) throws IOException {
+        InputStream is = "-".equals(fileName) ? System.in : new FileInputStream(fileName);
+        Scanner sc = new Scanner(is);
+        StringBuilder sb = new StringBuilder();
+        while (sc.hasNextLine()) {
+            for (String token : sc.nextLine().split("[,\\s]+")) {
+                if (!token.isEmpty()) {
+                    if (sb.length() > 0) {
+                        sb.append(",");
+                    }
+                    sb.append(token);
+                }
+            }
+        }
+        if (is != System.in) {
+            is.close();
+        }
+        return sb.toString();
+    }
+
+    private static String getEmailByUserId(Connection conn, String userId) throws SQLException {
+        long id;
+        try {
+            id = Long.parseLong(userId);
+        } catch (NumberFormatException e) {
+            LOGGER.warning("Invalid user id: " + userId);
+            return null;
+        }
+        PreparedStatement ps = conn.prepareStatement("SELECT email FROM user_accounts WHERE id = ?");
+        ps.setLong(1, id);
+        ResultSet rs = ps.executeQuery();
+        String email = rs.next() ? rs.getString(1) : null;
+        rs.close();
+        ps.close();
+        if (email == null) {
+            LOGGER.warning("User id not found in user_accounts: " + userId);
+        }
+        return email;
     }
 
     private static void checkValidity(EmailParams p) {
