@@ -295,11 +295,10 @@ public class NameIndexCreator<T> {
 			}
 			boolean common = predefinedGlobalWords.isCommon(s);
 			boolean freq = predefinedGlobalWords.getFrequentlyUsed(s) >= 0;
-			// don't add all common ! for some maps they could have different meaning
-			if (e.getValue() < MIN_LIMIT_COMMON_NON_INDEXED) {
-//							System.out.println("SKIP COMMON " + s + " count " + e.getValue());
-				continue;
-			}
+			// don't add all common ! for some maps they could have different meaning (but keep it freq indexed) 
+//			if (e.getValue() < MIN_LIMIT_COMMON_NON_INDEXED) {
+//				continue;
+//			}
 			if (common || freq || topXFrequent.contains(e.getKey())) {
 				commonStrings.add(s);
 			}
@@ -312,7 +311,7 @@ public class NameIndexCreator<T> {
 		for (String c : commonStrings) {
 			Integer matched = tokenFrequencies.get(c);
 			Integer nonIndexed = commonNonIndexedFrequencies.get(c);
-			if (matched < limitForNonIndexedCommon) {
+			if (matched < limitForNonIndexedCommon || matched < MIN_LIMIT_COMMON_NON_INDEXED) {
 				nonIndexed = 0; // index common word 
 			}
 			PrepareWordIndex word = new PrepareWordIndex(ind++, c, matched, nonIndexed == null ? 0 : nonIndexed);
