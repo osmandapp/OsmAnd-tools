@@ -27,6 +27,7 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 
 import net.osmand.search.core.spatial.SpatialPoiSearch.SpatialPoiType;
+import net.osmand.search.core.spatial.SpatialTextSearchAPI;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,11 +36,9 @@ import org.springframework.stereotype.Service;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.Amenity;
-import net.osmand.data.Building;
 import net.osmand.data.City;
 import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
-import net.osmand.data.Street;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiType;
 import net.osmand.search.core.ObjectType;
@@ -219,7 +218,7 @@ public class SpatialSearchService {
 					: SpatialTextSearchSettings.defaultSettings();
 			settings.AUTO_CLEAR_PREFIX_CACHE_LIMIT = SPATIAL_PREFIX_CACHE_LIMIT;
 			final List<BinaryMapIndexReader> lockedReaders = usedMapList;
-			final ResultMatcher<SpatialSearchResult> matcher = new ResultMatcher<SpatialSearchResult>() {
+			final ResultMatcher<SpatialSearchResult> matcher = new ResultMatcher<>() {
 
 				@Override
 				public boolean publish(SpatialSearchResult object) {
@@ -261,29 +260,24 @@ public class SpatialSearchService {
 				SpatialPoiSearch poiTypeSearch = getSpatialPoiTypeSearch();
 				Map<MapObject, Feature> amenityFeatureCache = new IdentityHashMap<>();
 				for (SpatialSearchResult r : res.mainResults) {
+					Feature f = null;
 					List<MapObject> objs = r.getObjects();
 					if (r.isPoiCategory()) {
 						SpatialPoiType type = r.getPoiCategory(poiTypeSearch);
 						if (type != null) {
-							Feature f = getSpatialPoiTypeFeature(type);
-							f.prop(SearchResultConverter.PoiTypeField.MATCHED_OBJECTS.getFieldName(),
-									matchedObjects(objs, ctx.locale(), timeZone, dominatedCity, r.getViewBBox31(),
-											amenityFeatureCache));
-							f.prop(SearchResultConverter.PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
-							f.prop(SearchResultConverter.PoiTypeField.COMPARE_KEY.getFieldName(), SpatialSearchResult.compareKeyString(r));
-							response.features.add(f);
+							f = getSpatialPoiTypeFeature(type);
 						}
 					} else if (!objs.isEmpty()) {
 						LatLon l = r.getLatLon() == null ? new LatLon(ctx.lat(), ctx.lon()) : r.getLatLon();
-						Feature f = getSpatialFeature(l, objs, ctx.locale(), timeZone, dominatedCity, r.getExtraNameMatch());
-						if (f != null) {
-							f.prop(SearchResultConverter.PoiTypeField.MATCHED_OBJECTS.getFieldName(),
-									matchedObjects(objs, ctx.locale(), timeZone, dominatedCity, r.getViewBBox31(),
-											amenityFeatureCache));
-							f.prop(SearchResultConverter.PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
-							f.prop(SearchResultConverter.PoiTypeField.COMPARE_KEY.getFieldName(), SpatialSearchResult.compareKeyString(r));
-							response.features.add(f);
-						}
+						f = getSpatialFeature(l, objs, ctx.locale(), timeZone, dominatedCity, r);
+					}
+					if (f != null) {
+						f.prop(SearchResultConverter.PoiTypeField.MATCHED_OBJECTS.getFieldName(),
+								matchedObjects(objs, ctx.locale(), timeZone, dominatedCity, r.getViewBBox31(),
+										amenityFeatureCache));
+						f.prop(SearchResultConverter.PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
+						f.prop(SearchResultConverter.PoiTypeField.COMPARE_KEY.getFieldName(), SpatialSearchResult.compareKeyString(r));
+						response.features.add(f);
 					}
 				}
 			}
@@ -417,7 +411,9 @@ public class SpatialSearchService {
 	}
 
 	private Feature getSpatialFeature(LatLon loc, List<MapObject> objs, String locale, String timeZone,
-	                                  String dominatedCity, String extraNameMatch) {
+	                                  String dominatedCity, SpatialSearchResult ssr) {
+		String extraNameMatch = ssr.getExtraNameMatch();
+
 		MapObject obj = objs.isEmpty() ? null : objs.get(0);
 		if (obj == null || loc == null) {
 			return null;
@@ -431,60 +427,13 @@ public class SpatialSearchService {
 			return searchResultConverter.getFeature(result, timeZone);
 		}
 		SearchResult result = new SearchResult();
-		result.object = obj;
-		result.location = loc;
-		if (obj instanceof Building b && b.isInterpolation() && Algorithms.isNotEmpty(extraNameMatch)) {
-			result.localeName = extraNameMatch; // interpolated house number
-		} else {
-			result.localeName = obj.getName(locale);
-			if (Algorithms.isNotEmpty(extraNameMatch)) {
-				result.localeName += " [" + extraNameMatch + "]"; // ref for non-Amenity objects
-			}
-		}
-		if (obj instanceof Street) {
-			result.objectType = ObjectType.STREET;
-			City city = getSpatialCity(objs);
-			if (city != null) {
-				result.localeRelatedObjectName = city.getName(locale);
-			}
-		} else if (obj instanceof Building) {
-			result.objectType = ObjectType.HOUSE;
-			Street street = getSpatialStreet(objs);
-			if (street != null) {
-				result.localeRelatedObjectName = street.getName(locale);
-			}
-			City city = getSpatialCity(objs);
-			if (city != null) {
-				SearchResult parent = new SearchResult();
-				parent.localeRelatedObjectName = city.getName(locale);
-				result.parentSearchResult = parent;
-			}
-		} else if (obj instanceof City) {
-			result.objectType = ObjectType.CITY;
-		} else {
-			result.objectType = ObjectType.LOCATION;
-		}
-		return searchResultConverter.getFeature(result, timeZone);
-	}
 
-	private Street getSpatialStreet(List<MapObject> objs) {
-		for (MapObject obj : objs) {
-			if (obj instanceof Street street) {
-				return street;
-			}
-		}
-		return null;
-	}
+		SpatialTextSearchAPI api = new SpatialTextSearchAPI(MapPoiTypes.getDefault());
 
-	private City getSpatialCity(List<MapObject> objs) {
-		for (MapObject obj : objs) {
-			if (obj instanceof City city) {
-				return city;
-			}
-			if (obj instanceof Street street && street.getCity() != null) {
-				return street.getCity();
-			}
+		if (api.convertSpatialSearchResult(ssr, result, poiSearch, loc, locale, false) != null) {
+			return searchResultConverter.getFeature(result, timeZone); // non-Amenity objects
 		}
+
 		return null;
 	}
 
