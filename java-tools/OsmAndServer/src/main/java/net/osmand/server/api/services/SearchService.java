@@ -1408,7 +1408,7 @@ public class SearchService {
 		return res;
 	}
 
-	public List<Map<String, Object>> filterVisibleTags(Map<String, String> tags) {
+	public List<VisibleTag> filterVisibleTags(Map<String, String> tags) {
 		if (tags == null || tags.isEmpty()) {
 			return Collections.emptyList();
 		}
@@ -1418,7 +1418,10 @@ public class SearchService {
 		return groupLocalizedTags(infoRows);
 	}
 
-	private record LocalizedValue(String key, String value, String lang) {
+	public record VisibleTag(String key, String value, String lang, List<VisibleTag> otherLangs) {
+		public VisibleTag(String key, String value, String lang) {
+			this(key, value, lang, null);
+		}
 	}
 
 	private String poiTypeGroupValue(AmenityRowData row) {
@@ -1432,50 +1435,35 @@ public class SearchService {
 		return sb.toString();
 	}
 
-	private List<Map<String, Object>> groupLocalizedTags(List<AmenityRowData> rows) {
-		List<Map<String, Object>> result = new ArrayList<>();
+	private List<VisibleTag> groupLocalizedTags(List<AmenityRowData> rows) {
+		List<VisibleTag> result = new ArrayList<>();
 		for (AmenityRowData row : rows) {
 			boolean isPoiTypeGroup = row.collapsableRowType == AmenityRowData.CollapsableRowType.POI_TYPE_GROUP;
 			String valueStr = isPoiTypeGroup ? poiTypeGroupValue(row) : row.value;
 			if (valueStr != null) {
 				String key = isPoiTypeGroup ? Amenity.COLLAPSABLE_PREFIX + row.key : row.key;
-				result.add(Map.of("key", key, "value", valueStr));
+				result.add(new VisibleTag(key, valueStr, null));
 				continue;
 			}
 			if (Algorithms.isEmpty(row.collapsableRows)) {
 				continue;
 			}
-			List<LocalizedValue> entries = new ArrayList<>();
+			List<VisibleTag> entries = new ArrayList<>();
 			for (AmenityRowData child : row.collapsableRows) {
 				int idx = child.key.indexOf(':');
 				entries.add(idx >= 0
-						? new LocalizedValue(child.key.substring(0, idx), child.value, child.key.substring(idx + 1))
-						: new LocalizedValue(child.key, child.value, null));
+						? new VisibleTag(child.key.substring(0, idx), child.value, child.key.substring(idx + 1))
+						: new VisibleTag(child.key, child.value, null));
 			}
-			LocalizedValue mainEntry = entries.stream().filter(e -> e.lang() != null).findFirst().orElse(null);
+			VisibleTag mainEntry = entries.stream().filter(e -> e.lang() != null).findFirst().orElse(null);
 			if (mainEntry != null) {
-				Map<String, Object> entry = new HashMap<>();
-				entry.put("key", row.key);
-				entry.put("value", mainEntry.value());
-				entry.put("lang", mainEntry.lang());
-				List<Map<String, Object>> otherLangs = entries.stream()
+				List<VisibleTag> otherLangs = entries.stream()
 						.filter(e -> e != mainEntry)
-						.map(e -> {
-							Map<String, Object> otherLangsMap = new HashMap<>();
-							otherLangsMap.put("key", e.key());
-							otherLangsMap.put("value", e.value());
-							if (e.lang() != null) {
-								otherLangsMap.put("lang", e.lang());
-							}
-							return otherLangsMap;
-						})
 						.collect(Collectors.toList());
-				if (!otherLangs.isEmpty()) {
-					entry.put("otherLangs", otherLangs);
-				}
-				result.add(entry);
+				result.add(new VisibleTag(row.key, mainEntry.value(), mainEntry.lang(),
+						otherLangs.isEmpty() ? null : otherLangs));
 			} else if (!entries.isEmpty()) {
-				result.add(Map.of("key", row.key, "value", entries.get(0).value()));
+				result.add(new VisibleTag(row.key, entries.get(0).value(), null));
 			}
 		}
 		return result;
