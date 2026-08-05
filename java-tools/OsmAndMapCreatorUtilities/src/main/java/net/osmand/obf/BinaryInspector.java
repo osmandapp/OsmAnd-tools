@@ -104,9 +104,9 @@ public class BinaryInspector {
 //					"-vrouting",
 //					"-vtransport", "-vtransportschedule",
 //					"-vsearchinspect", // "-vsearchglobalonly", // "-vprefix=hh" // search index extended anlays 
-//					"-vaddress",   
-//					"-vcities", "-vstreetgroups", "-vcitynames",
-//					"-vstreets", "-vbuildings",//  "-vintersections",
+					"-vaddress",   
+					"-vcities", "-vstreetgroups", "-vcitynames",
+					"-vstreets", "-vbuildings",//  "-vintersections",
 //					"-lang=ru",
 //					"-zoom=15",
 //					"-latlon=48.804242,9.215574,0.005",
@@ -115,7 +115,7 @@ public class BinaryInspector {
 //					"-osm="+System.getProperty("maps.dir")+"World_lightsectors_src_0.osm",
 //					System.getProperty("maps.dir") + "regions.ocbf",				
 //					System.getProperty("maps.dir") + "Netherlands_gelderland_europe_2.obf",
-					System.getProperty("maps.dir") + "Japan_map.obf",
+					System.getProperty("maps.dir") + "turkey_sokak.obf",
 //					System.getProperty("maps.dir")+"/../repos/resources/countries-info/regions.ocbf"
 			});
 		} else {
