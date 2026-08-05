@@ -22,9 +22,11 @@ import net.osmand.server.api.services.DownloadIndexesService.ServerCommonFile;
 
 import net.osmand.server.controllers.user.MapApiController;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
+import net.osmand.server.ws.UserTranslationsService;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,6 +56,11 @@ public class UserdataController {
 	// This is a permanent token for users who can't receive email but validated identity differently
 	public static final int SPECIAL_PERMANENT_TOKEN = 8;
 
+	@Autowired
+	protected DeviceTokenCache deviceTokenCache;
+
+	@Autowired
+	protected UserTranslationsService userTranslationService;
 
 	Gson gson = new Gson();
 
@@ -106,11 +113,11 @@ public class UserdataController {
 	}
 
 	private CloudUserDevice checkToken(int deviceId, String accessToken) {
-		CloudUserDevice d = devicesRepository.findById(deviceId);
-		if (d != null && Algorithms.stringsEqual(d.accesstoken, accessToken)) {
-			return d;
+		DeviceTokenCache.CachedInfoDevice cached = deviceTokenCache.getValidatedDevice(deviceId, accessToken);
+		if (cached == null) {
+			return null;
 		}
-		return null;
+		return cached.device;
 	}
 
 	public ResponseEntity<String> invalidateUser(@RequestParam(required = true) int userId) throws IOException {
@@ -161,6 +168,49 @@ public class UserdataController {
 			logErrorWithThrow(request, ERROR_CODE_NO_VALID_SUBSCRIPTION, errorMsg);
 		}
 		return ResponseEntity.ok(gson.toJson(pu));
+	}
+
+	@RequestMapping(value = "/translation/msg")
+	public ResponseEntity<String> sendTranslationMessage(@RequestParam(name = "deviceid") int deviceId,
+	                                                     @RequestParam(name = "accessToken") String accessToken,
+	                                                     @RequestParam(name = "encryptedData") String encryptedData,
+	                                                     @RequestParam(name = "translationId") String translationId) {
+		DeviceTokenCache.CachedInfoDevice dev = validatedDeviceWithUser(deviceId, accessToken);
+		if (dev == null) {
+			return userdataService.tokenNotValidError();
+		}
+		UserTranslationsService.SendResult result = userTranslationService.sendEncryptedDeviceMessage(
+				dev.device, dev.user, encryptedData, dev.device.deviceid, dev.device.accesstoken, translationId);
+		if (result == UserTranslationsService.SendResult.DELIVERED) {
+			return ResponseEntity.status(HttpStatus.OK).build();
+		}
+		if (result == UserTranslationsService.SendResult.GONE) {
+			return ResponseEntity.status(HttpStatus.GONE).build();
+		}
+		return ResponseEntity.notFound().build();
+	}
+
+	@RequestMapping(value = "/translation/requestShare")
+	public ResponseEntity<String> requestShareTranslation(@RequestParam(name = "deviceid") int deviceId,
+	                                                      @RequestParam(name = "accessToken") String accessToken,
+	                                                      @RequestParam(name = "tid") String tid) {
+		DeviceTokenCache.CachedInfoDevice dev = validatedDeviceWithUser(deviceId, accessToken);
+		if (dev == null) {
+			return userdataService.tokenNotValidError();
+		}
+		boolean ok = userTranslationService.requestShareFromDevice(tid, dev.user);
+		return ok ? ResponseEntity.ok("OK") : ResponseEntity.notFound().build();
+	}
+
+	private DeviceTokenCache.CachedInfoDevice validatedDeviceWithUser(int deviceId, String accessToken) {
+		DeviceTokenCache.CachedInfoDevice dev = deviceTokenCache.getValidatedDevice(deviceId, accessToken);
+		if (dev == null) {
+			return null;
+		}
+		if (dev.user == null) {
+			dev.user = usersRepository.findById(dev.device.userid);
+		}
+		return dev.user != null ? dev : null;
 	}
 
 	@PostMapping(value = "/user-update-orderid")

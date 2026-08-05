@@ -10,6 +10,11 @@ import okio.Buffer;
 import static net.osmand.IndexConstants.*;
 import static net.osmand.server.api.services.WebUserdataService.*;
 import static net.osmand.server.api.services.UserdataService.*;
+import static net.osmand.server.ws.UserTranslationsService.ACCESS_TOKEN;
+import static net.osmand.server.ws.UserTranslationsService.DEVICE_ID;
+import static net.osmand.server.ws.UserTranslationsService.ENCRYPTED_DATA;
+import static net.osmand.server.ws.UserTranslationsService.SERVER_RECEIVE_TIME;
+import static net.osmand.server.ws.UserTranslationsService.TRANSLATION_ID;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 import java.io.IOException;
@@ -36,6 +41,7 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.*;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -53,7 +59,9 @@ import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
 import net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFile;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFileNoData;
+import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
 import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
+import net.osmand.server.ws.UserTranslationsService;
 import org.xmlpull.v1.XmlPullParserException;
 
 @RestController
@@ -87,6 +95,9 @@ public class MapApiController {
 
 	@Autowired
 	OsmAndMapsService osmAndMapsService;
+
+	@Autowired
+	UserTranslationsService userTranslationsService;
 
 	@Autowired
 	private EmailSenderService emailSender;
@@ -781,6 +792,41 @@ public class MapApiController {
 			return userdataService.tokenNotValidResponse();
 		}
 		return ResponseEntity.ok(gsonWithNans.toJson(trackAnalyzerService.getTracksBySegment(request, dev)));
+	}
+
+	@RequestMapping(path = {"/translation/msg"})
+	public ResponseEntity<String> sendTranslationMessage(HttpServletRequest request) {
+		CloudUserDevice dev = osmAndMapsService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidResponse();
+		}
+		CloudUser user = usersRepository.findById(dev.userid);
+		if (user == null) {
+			return userdataService.tokenNotValidResponse();
+		}
+		String encryptedData = request.getParameter(ENCRYPTED_DATA);
+		String translationId = request.getParameter(TRANSLATION_ID);
+		if (encryptedData == null || encryptedData.isEmpty() || translationId == null || translationId.isEmpty()) {
+			return ResponseEntity.badRequest().build();
+		}
+		String clientDeviceId = request.getParameter(DEVICE_ID);
+		String clientAccessToken = request.getParameter(ACCESS_TOKEN);
+		UserTranslationsService.SendResult result;
+		if (UserTranslationsService.isDevTestMode()) {
+			long serverReceiveTime = Algorithms.parseLongSilently(request.getParameter(SERVER_RECEIVE_TIME), 0);
+			result = userTranslationsService.sendEncryptedDeviceMessage(
+					dev, user, encryptedData, clientDeviceId, clientAccessToken, translationId, serverReceiveTime);
+		} else {
+			result = userTranslationsService.sendEncryptedDeviceMessage(
+					dev, user, encryptedData, clientDeviceId, clientAccessToken, translationId);
+		}
+		if (result == UserTranslationsService.SendResult.DELIVERED) {
+			return ResponseEntity.status(HttpStatus.OK).build();
+		}
+		if (result == UserTranslationsService.SendResult.GONE) {
+			return ResponseEntity.status(HttpStatus.GONE).build();
+		}
+		return ResponseEntity.notFound().build();
 	}
 
 }
