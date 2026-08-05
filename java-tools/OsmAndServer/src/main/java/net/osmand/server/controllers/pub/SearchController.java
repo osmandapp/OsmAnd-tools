@@ -142,11 +142,12 @@ public class SearchController {
         }
     }
 
-    @PostMapping(path = {"/get-visible-tags"}, produces = "application/json")
+    @PostMapping(path = {"/filter-visible-tags"}, produces = "application/json")
     @ResponseBody
-    public ResponseEntity<String> getVisibleTags(@RequestBody Map<String, String> tags) {
-        List<Map<String, Object>> visibleTags = searchService.getVisibleTags(tags);
+    public ResponseEntity<String> filterVisibleTags(@RequestBody Map<String, String> tags) {
+        List<Map<String, Object>> visibleTags = searchService.filterVisibleTags(tags);
         return ResponseEntity.ok(gson.toJson(visibleTags));
+        
     }
     
     @GetMapping(path = {"/get-top-filters"}, produces = "application/json")

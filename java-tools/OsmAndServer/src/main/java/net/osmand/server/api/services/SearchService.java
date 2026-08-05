@@ -1408,38 +1408,13 @@ public class SearchService {
 		return res;
 	}
 
-	public List<Map<String, Object>> getVisibleTags(Map<String, String> tags) {
+	public List<Map<String, Object>> filterVisibleTags(Map<String, String> tags) {
 		if (tags == null || tags.isEmpty()) {
 			return Collections.emptyList();
 		}
 		AdditionalInfoBundle infoFilter = new AdditionalInfoBundle(MapPoiTypes.getDefault(), tags);
-		Map<String, Object> visible = new HashMap<>();
-		infoFilter.getFilteredLocalizedInfo().forEach((key, value) -> {
-			if (!infoFilter.shouldDisplayKey(key)) {
-				return;
-			}
-			String vl = null;
-			if (value instanceof String str) {
-				if (infoFilter.isKeyToSkip(key) || key.equals("note")) {
-					return;
-				}
-				vl = str;
-			}
-			PoiType poiType = infoFilter.getPoiAdditionalType(key, vl);
-			if (poiType == null) {
-				poiType = infoFilter.getPoiAdditionalType(key.replace(':', '_'), vl);
-			}
-			if (poiType == null || poiType.isFilterOnly()) {
-				return;
-			}
-			visible.put(key, value);
-		});
-		infoFilter.getFilteredLocalizedInfo().forEach((key, value) -> {
-			if (key.startsWith(COLLAPSABLE_PREFIX)) {
-				visible.put(key, value);
-			}
-		});
-		return groupLocalizedTags(visible);
+		Map<String, Object> visibleTags = infoFilter.getVisibleTagsAsMap(false);
+		return groupLocalizedTags(visibleTags);
 	}
 
 	private record LocalizedValue(String key, String value, String lang) {
@@ -1473,13 +1448,13 @@ public class SearchService {
 				List<Map<String, Object>> otherLangs = entries.stream()
 						.filter(e -> e != mainEntry)
 						.map(e -> {
-							Map<String, Object> otherLengsMap = new HashMap<>();
-							otherLengsMap.put("key", e.key());
-							otherLengsMap.put("value", e.value());
+							Map<String, Object> otherLangsMap = new HashMap<>();
+							otherLangsMap.put("key", e.key());
+							otherLangsMap.put("value", e.value());
 							if (e.lang() != null) {
-								otherLengsMap.put("lang", e.lang());
+								otherLangsMap.put("lang", e.lang());
 							}
-							return otherLengsMap;
+							return otherLangsMap;
 						})
 						.collect(Collectors.toList());
 				if (!otherLangs.isEmpty()) {
