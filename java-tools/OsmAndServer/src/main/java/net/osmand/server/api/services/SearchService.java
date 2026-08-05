@@ -1413,36 +1413,49 @@ public class SearchService {
 			return Collections.emptyList();
 		}
 		AdditionalInfoBundle infoFilter = new AdditionalInfoBundle(MapPoiTypes.getDefault(), tags);
-		Map<String, Object> visibleTags = infoFilter.getVisibleTagsAsMap(false);
-		return groupLocalizedTags(visibleTags);
+		List<AmenityRowData> infoRows = infoFilter.getVisibleTags(false);
+		AmenityRowsBuilder.sortInfoRows(infoRows);
+		return groupLocalizedTags(infoRows);
 	}
 
 	private record LocalizedValue(String key, String value, String lang) {
 	}
 
-	private List<Map<String, Object>> groupLocalizedTags(Map<String, Object> tags) {
-		List<Map<String, Object>> result = new ArrayList<>();
-		tags.forEach((key, value) -> {
-			if (value instanceof String valueStr) {
-				result.add(Map.of("key", key, "value", valueStr));
-				return;
+	private String poiTypeGroupValue(AmenityRowData row) {
+		StringBuilder sb = new StringBuilder();
+		for (PoiType pt : row.collapsablePoiTypes) {
+			if (!sb.isEmpty()) {
+				sb.append(Amenity.SEPARATOR);
 			}
-			if (!(value instanceof Map<?, ?> valueMap)
-					|| !(valueMap.get("localizations") instanceof Map<?, ?> localizations)) {
-				return;
+			sb.append(pt.getKeyName());
+		}
+		return sb.toString();
+	}
+
+	private List<Map<String, Object>> groupLocalizedTags(List<AmenityRowData> rows) {
+		List<Map<String, Object>> result = new ArrayList<>();
+		for (AmenityRowData row : rows) {
+			boolean isPoiTypeGroup = row.collapsableRowType == AmenityRowData.CollapsableRowType.POI_TYPE_GROUP;
+			String valueStr = isPoiTypeGroup ? poiTypeGroupValue(row) : row.value;
+			if (valueStr != null) {
+				String key = isPoiTypeGroup ? Amenity.COLLAPSABLE_PREFIX + row.key : row.key;
+				result.add(Map.of("key", key, "value", valueStr));
+				continue;
+			}
+			if (Algorithms.isEmpty(row.collapsableRows)) {
+				continue;
 			}
 			List<LocalizedValue> entries = new ArrayList<>();
-			localizations.forEach((k, v) -> {
-				String ks = String.valueOf(k);
-				int idx = ks.indexOf(':');
+			for (AmenityRowData child : row.collapsableRows) {
+				int idx = child.key.indexOf(':');
 				entries.add(idx >= 0
-						? new LocalizedValue(ks.substring(0, idx), String.valueOf(v), ks.substring(idx + 1))
-						: new LocalizedValue(ks, String.valueOf(v), null));
-			});
+						? new LocalizedValue(child.key.substring(0, idx), child.value, child.key.substring(idx + 1))
+						: new LocalizedValue(child.key, child.value, null));
+			}
 			LocalizedValue mainEntry = entries.stream().filter(e -> e.lang() != null).findFirst().orElse(null);
 			if (mainEntry != null) {
 				Map<String, Object> entry = new HashMap<>();
-				entry.put("key", key);
+				entry.put("key", row.key);
 				entry.put("value", mainEntry.value());
 				entry.put("lang", mainEntry.lang());
 				List<Map<String, Object>> otherLangs = entries.stream()
@@ -1462,9 +1475,9 @@ public class SearchService {
 				}
 				result.add(entry);
 			} else if (!entries.isEmpty()) {
-				result.add(Map.of("key", key, "value", entries.get(0).value()));
+				result.add(Map.of("key", row.key, "value", entries.get(0).value()));
 			}
-		});
+		}
 		return result;
 	}
 
