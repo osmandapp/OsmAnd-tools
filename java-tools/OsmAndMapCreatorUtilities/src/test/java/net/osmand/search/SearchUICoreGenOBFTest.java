@@ -494,13 +494,13 @@ public class SearchUICoreGenOBFTest {
 		return mergedSettings;
 	}
 
-	private List<List<String>> parseExpectedResults(JSONObject sourceJson, int phrasesSize) {
+	protected List<List<String>> parseExpectedResults(JSONObject sourceJson, String resultsTag, int phrasesSize) {
 		List<List<String>> results = new ArrayList<>();
 		for (int i = 0; i < phrasesSize; i++) {
 			results.add(new ArrayList<String>());
 		}
-		if (sourceJson.has("results")) {
-			parseResults(sourceJson, "results", results);
+		if (sourceJson.has(resultsTag)) {
+			parseResults(sourceJson, resultsTag, results);
 		}
 		if (TEST_EXTRA_RESULTS && sourceJson.has("extra-results")) {
 			parseResults(sourceJson, "extra-results", results);
@@ -523,7 +523,15 @@ public class SearchUICoreGenOBFTest {
 		cacheGzipIfNeeded(jsonFile, new File(GEN_DIR, jsonName + ".gz"));
 		return jsonFile;
 	}
+	
+	protected List<List<String>> getExpectedResults(JSONObject sourceJson, int phrasesSize) {
+		return parseExpectedResults(sourceJson, "results", phrasesSize);
+	}
 
+	protected SearchTestEngine createSearchEngine(JSONObject settingsJson, List<BinaryMapIndexReader> readers) {
+		return new SpatialTestSearchEngine(settingsJson, readers);
+	}
+	
 	@Test
 	public void testSearch() throws IOException, JSONException, SQLException {
 		String sourceJsonText = Algorithms.getFileAsString(testFile);
@@ -553,14 +561,14 @@ public class SearchUICoreGenOBFTest {
 		if (disabled) {
 			return;
 		}
-		List<List<String>> results = parseExpectedResults(sourceJson, phrases.size());
-
+		
+		List<List<String>> results = getExpectedResults(sourceJson, phrases.size());
 		Assert.assertEquals(phrases.size(), results.size());
 		if (phrases.size() != results.size()) {
 			return;
 		}
 
-		defaultEngine = new SpatialTestSearchEngine(settingsJson, readers);
+		defaultEngine = createSearchEngine(settingsJson, readers);
 		int shift = 4;
 		for (int k = 0; k < phrases.size(); k++) {
 			PhraseTuple phraseAndSettings = phrases.get(k);
@@ -569,7 +577,7 @@ public class SearchUICoreGenOBFTest {
 			boolean enginePerPhrase = phraseAndSettings.settings != null && !phraseAndSettings.settings.keySet().isEmpty();
 			SearchTestEngine engine = defaultEngine;
 			if (enginePerPhrase) {
-				engine = new SpatialTestSearchEngine(mergePhraseSettings(settingsJson, phraseAndSettings.settings), readers);
+				engine = createSearchEngine(mergePhraseSettings(settingsJson, phraseAndSettings.settings), readers);
 			}
 			
 			List<String> actualResults = engine.search(text, false);
