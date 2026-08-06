@@ -194,48 +194,55 @@ public class PoiTypesService {
 	}
 
 	private String joinPoiTypeKeys(AmenityRowData row) {
-		StringBuilder sb = new StringBuilder();
-		for (PoiType pt : row.collapsablePoiTypes) {
-			if (!sb.isEmpty()) {
-				sb.append(Amenity.SEPARATOR);
-			}
-			sb.append(pt.getKeyName());
-		}
-		return sb.toString();
+		return row.collapsablePoiTypes.stream()
+				.map(PoiType::getKeyName)
+				.collect(Collectors.joining(Amenity.SEPARATOR));
 	}
 
 	private List<VisibleTag> toVisibleTags(List<AmenityRowData> rows) {
 		List<VisibleTag> result = new ArrayList<>();
 		for (AmenityRowData row : rows) {
-			boolean isPoiTypeGroup = row.collapsableRowType == AmenityRowData.CollapsableRowType.POI_TYPE_GROUP;
-			String valueStr = isPoiTypeGroup ? joinPoiTypeKeys(row) : row.value;
-			if (valueStr != null) {
-				String key = isPoiTypeGroup ? Amenity.COLLAPSABLE_PREFIX + row.key : row.key;
-				result.add(new VisibleTag(key, valueStr, null));
-				continue;
-			}
-			if (Algorithms.isEmpty(row.collapsableRows)) {
-				continue;
-			}
-			List<LangValue> entries = new ArrayList<>();
-			for (AmenityRowData child : row.collapsableRows) {
-				int idx = child.key.indexOf(':');
-				entries.add(idx >= 0
-						? new LangValue(child.value, child.key.substring(idx + 1))
-						: new LangValue(child.value, null));
-			}
-			LangValue mainEntry = entries.stream().filter(e -> e.lang() != null).findFirst().orElse(null);
-			if (mainEntry != null) {
-				List<LangValue> otherLangs = entries.stream()
-						.filter(e -> e != mainEntry)
-						.collect(Collectors.toList());
-				result.add(new VisibleTag(row.key, mainEntry.value(), mainEntry.lang(),
-						otherLangs.isEmpty() ? null : otherLangs));
-			} else {
-				result.add(new VisibleTag(row.key, entries.get(0).value(), null));
+			VisibleTag tag = switch (row.collapsableRowType) {
+				case POI_TYPE_GROUP -> toGroupTag(row);
+				case PLAIN -> toLocalizedTag(row);
+				default -> toPlainTag(row);
+			};
+			if (tag != null) {
+				result.add(tag);
 			}
 		}
 		return result;
+	}
+
+	private VisibleTag toGroupTag(AmenityRowData row) {
+		String key = Amenity.COLLAPSABLE_PREFIX + row.key;
+		return new VisibleTag(key, joinPoiTypeKeys(row), null);
+	}
+
+	private VisibleTag toPlainTag(AmenityRowData row) {
+		return row.value != null ? new VisibleTag(row.key, row.value, null) : null;
+	}
+
+	private VisibleTag toLocalizedTag(AmenityRowData row) {
+		if (Algorithms.isEmpty(row.collapsableRows)) {
+			return null;
+		}
+		List<LangValue> entries = new ArrayList<>();
+		for (AmenityRowData child : row.collapsableRows) {
+			int idx = child.key.indexOf(':');
+			entries.add(idx >= 0
+					? new LangValue(child.value, child.key.substring(idx + 1))
+					: new LangValue(child.value, null));
+		}
+		LangValue mainEntry = entries.stream().filter(e -> e.lang() != null).findFirst().orElse(null);
+		if (mainEntry != null) {
+			List<LangValue> otherLangs = entries.stream()
+					.filter(e -> e != mainEntry)
+					.collect(Collectors.toList());
+			return new VisibleTag(row.key, mainEntry.value(), mainEntry.lang(),
+					otherLangs.isEmpty() ? null : otherLangs);
+		}
+		return new VisibleTag(row.key, entries.get(0).value(), null);
 	}
 
 	public record VisibleTag(String key, String value, String lang, List<LangValue> otherLangs) {
