@@ -183,23 +183,17 @@ public class PoiTypesService {
 		return resultCollection;
 	}
 
-	public List<VisibleTag> filterVisibleTags(Map<String, String> tags) {
+	public List<VisibleTag> getVisibleTags(Map<String, String> tags) {
 		if (tags == null || tags.isEmpty()) {
 			return Collections.emptyList();
 		}
-		AdditionalInfoBundle infoFilter = new AdditionalInfoBundle(MapPoiTypes.getDefault(), tags);
-		List<AmenityRowData> infoRows = infoFilter.getVisibleTags(false);
-		AmenityRowsBuilder.sortInfoRows(infoRows);
-		return groupLocalizedTags(infoRows);
+		AdditionalInfoBundle infoBundle = new AdditionalInfoBundle(getMapPoiTypes(null), tags);
+		List<AmenityRowData> tagEntries = infoBundle.getVisibleTags(false); // The "note" tag is enabled only for OSM editing
+		AmenityRowsBuilder.sortInfoRows(tagEntries);
+		return toVisibleTags(tagEntries);
 	}
 
-	public record VisibleTag(String key, String value, String lang, List<VisibleTag> otherLangs) {
-		public VisibleTag(String key, String value, String lang) {
-			this(key, value, lang, null);
-		}
-	}
-
-	private String poiTypeGroupValue(AmenityRowData row) {
+	private String joinPoiTypeKeys(AmenityRowData row) {
 		StringBuilder sb = new StringBuilder();
 		for (PoiType pt : row.collapsablePoiTypes) {
 			if (!sb.isEmpty()) {
@@ -210,11 +204,11 @@ public class PoiTypesService {
 		return sb.toString();
 	}
 
-	private List<VisibleTag> groupLocalizedTags(List<AmenityRowData> rows) {
+	private List<VisibleTag> toVisibleTags(List<AmenityRowData> rows) {
 		List<VisibleTag> result = new ArrayList<>();
 		for (AmenityRowData row : rows) {
 			boolean isPoiTypeGroup = row.collapsableRowType == AmenityRowData.CollapsableRowType.POI_TYPE_GROUP;
-			String valueStr = isPoiTypeGroup ? poiTypeGroupValue(row) : row.value;
+			String valueStr = isPoiTypeGroup ? joinPoiTypeKeys(row) : row.value;
 			if (valueStr != null) {
 				String key = isPoiTypeGroup ? Amenity.COLLAPSABLE_PREFIX + row.key : row.key;
 				result.add(new VisibleTag(key, valueStr, null));
@@ -223,24 +217,33 @@ public class PoiTypesService {
 			if (Algorithms.isEmpty(row.collapsableRows)) {
 				continue;
 			}
-			List<VisibleTag> entries = new ArrayList<>();
+			List<LangValue> entries = new ArrayList<>();
 			for (AmenityRowData child : row.collapsableRows) {
 				int idx = child.key.indexOf(':');
 				entries.add(idx >= 0
-						? new VisibleTag(child.key.substring(0, idx), child.value, child.key.substring(idx + 1))
-						: new VisibleTag(child.key, child.value, null));
+						? new LangValue(child.value, child.key.substring(idx + 1))
+						: new LangValue(child.value, null));
 			}
-			VisibleTag mainEntry = entries.stream().filter(e -> e.lang() != null).findFirst().orElse(null);
+			LangValue mainEntry = entries.stream().filter(e -> e.lang() != null).findFirst().orElse(null);
 			if (mainEntry != null) {
-				List<VisibleTag> otherLangs = entries.stream()
+				List<LangValue> otherLangs = entries.stream()
 						.filter(e -> e != mainEntry)
 						.collect(Collectors.toList());
 				result.add(new VisibleTag(row.key, mainEntry.value(), mainEntry.lang(),
 						otherLangs.isEmpty() ? null : otherLangs));
-			} else if (!entries.isEmpty()) {
+			} else {
 				result.add(new VisibleTag(row.key, entries.get(0).value(), null));
 			}
 		}
 		return result;
+	}
+
+	public record VisibleTag(String key, String value, String lang, List<LangValue> otherLangs) {
+		public VisibleTag(String key, String value, String lang) {
+			this(key, value, lang, null);
+		}
+	}
+
+	public record LangValue(String value, String lang) {
 	}
 }

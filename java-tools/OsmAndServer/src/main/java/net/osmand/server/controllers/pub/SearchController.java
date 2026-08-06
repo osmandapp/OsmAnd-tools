@@ -43,6 +43,7 @@ import static net.osmand.server.controllers.pub.GeojsonClasses.*;
 public class SearchController {
 
 	protected static final Log LOGGER = LogFactory.getLog(SearchController.class);
+	private static final int MAX_TAG_ENTRIES = 500;
 	Gson gson = new Gson();
 
 	@Autowired
@@ -170,10 +171,13 @@ public class SearchController {
 		}
 	}
 
-	@PostMapping(path = {"/filter-visible-tags"}, produces = "application/json")
+	@PostMapping(path = {"/visible-tags"}, produces = "application/json")
 	@ResponseBody
-	public ResponseEntity<String> filterVisibleTags(@RequestBody Map<String, String> tags) {
-		List<PoiTypesService.VisibleTag> visibleTags = poiTypesService.filterVisibleTags(tags);
+	public ResponseEntity<String> visibleTags(@RequestBody Map<String, String> tags) {
+		if (tags != null && tags.size() > MAX_TAG_ENTRIES) {
+			return ResponseEntity.badRequest().body("Too many tags " + tags.size() + ", maximum is " + MAX_TAG_ENTRIES);
+		}
+		List<PoiTypesService.VisibleTag> visibleTags = poiTypesService.getVisibleTags(tags);
 		return ResponseEntity.ok(gson.toJson(visibleTags));
 	}
 
