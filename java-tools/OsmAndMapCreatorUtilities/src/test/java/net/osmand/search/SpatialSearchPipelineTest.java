@@ -80,7 +80,7 @@ import net.osmand.util.Algorithms;
  * while plain {@code *.orig.obf}, {@code *.json}, and {@code *.obf} files are temporary.
  */
 @RunWith(Parameterized.class)
-public class SearchUICoreGenOBFTest {
+public class SpatialSearchPipelineTest {
 	private static final String ANDROID_PATH_ENV = "ANDROID_PATH",
 			RESOURCES_PATH_ENV = "RESOURCES_PATH",
 			SEARCH_RESOURCES_PATH_ENV = "SEARCH_RESOURCES_PATH";
@@ -110,7 +110,7 @@ public class SearchUICoreGenOBFTest {
         void close();
     }
     
-	public SearchUICoreGenOBFTest(String name, File file) {
+	public SpatialSearchPipelineTest(String name, File file) {
 		this.testFile = file;
 	}
 

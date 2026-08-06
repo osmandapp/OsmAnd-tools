@@ -16,7 +16,7 @@ import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
 import net.osmand.data.Street;
 import net.osmand.osm.MapPoiTypes;
-import net.osmand.search.SearchUICoreGenOBFTest.SearchTestEngine;
+import net.osmand.search.SpatialSearchPipelineTest.SearchTestEngine;
 import net.osmand.search.core.spatial.SpatialTextSearch.SpatialTextSearchSettings;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
