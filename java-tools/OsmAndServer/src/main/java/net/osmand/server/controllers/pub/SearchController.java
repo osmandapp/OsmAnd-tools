@@ -9,7 +9,6 @@ import java.sql.SQLException;
 import java.util.*;
 
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
-import net.osmand.server.api.services.SearchService;
 import net.osmand.server.api.services.TransportStopsService;
 import net.osmand.server.utils.MultiPlatform;
 import net.osmand.shared.wiki.WikiHelper;
@@ -174,7 +173,7 @@ public class SearchController {
 	@PostMapping(path = {"/filter-visible-tags"}, produces = "application/json")
 	@ResponseBody
 	public ResponseEntity<String> filterVisibleTags(@RequestBody Map<String, String> tags) {
-		List<SearchService.VisibleTag> visibleTags = searchService.filterVisibleTags(tags);
+		List<PoiTypesService.VisibleTag> visibleTags = poiTypesService.filterVisibleTags(tags);
 		return ResponseEntity.ok(gson.toJson(visibleTags));
 	}
 

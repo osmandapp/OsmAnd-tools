@@ -2,14 +2,16 @@ package net.osmand.server.api.services.search;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import net.osmand.data.AdditionalInfoBundle;
+import net.osmand.data.Amenity;
+import net.osmand.data.AmenityRowData;
+import net.osmand.data.AmenityRowsBuilder;
+import net.osmand.util.Algorithms;
 import org.springframework.stereotype.Service;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -179,5 +181,66 @@ public class PoiTypesService {
 			}
 		}
 		return resultCollection;
+	}
+
+	public List<VisibleTag> filterVisibleTags(Map<String, String> tags) {
+		if (tags == null || tags.isEmpty()) {
+			return Collections.emptyList();
+		}
+		AdditionalInfoBundle infoFilter = new AdditionalInfoBundle(MapPoiTypes.getDefault(), tags);
+		List<AmenityRowData> infoRows = infoFilter.getVisibleTags(false);
+		AmenityRowsBuilder.sortInfoRows(infoRows);
+		return groupLocalizedTags(infoRows);
+	}
+
+	public record VisibleTag(String key, String value, String lang, List<VisibleTag> otherLangs) {
+		public VisibleTag(String key, String value, String lang) {
+			this(key, value, lang, null);
+		}
+	}
+
+	private String poiTypeGroupValue(AmenityRowData row) {
+		StringBuilder sb = new StringBuilder();
+		for (PoiType pt : row.collapsablePoiTypes) {
+			if (!sb.isEmpty()) {
+				sb.append(Amenity.SEPARATOR);
+			}
+			sb.append(pt.getKeyName());
+		}
+		return sb.toString();
+	}
+
+	private List<VisibleTag> groupLocalizedTags(List<AmenityRowData> rows) {
+		List<VisibleTag> result = new ArrayList<>();
+		for (AmenityRowData row : rows) {
+			boolean isPoiTypeGroup = row.collapsableRowType == AmenityRowData.CollapsableRowType.POI_TYPE_GROUP;
+			String valueStr = isPoiTypeGroup ? poiTypeGroupValue(row) : row.value;
+			if (valueStr != null) {
+				String key = isPoiTypeGroup ? Amenity.COLLAPSABLE_PREFIX + row.key : row.key;
+				result.add(new VisibleTag(key, valueStr, null));
+				continue;
+			}
+			if (Algorithms.isEmpty(row.collapsableRows)) {
+				continue;
+			}
+			List<VisibleTag> entries = new ArrayList<>();
+			for (AmenityRowData child : row.collapsableRows) {
+				int idx = child.key.indexOf(':');
+				entries.add(idx >= 0
+						? new VisibleTag(child.key.substring(0, idx), child.value, child.key.substring(idx + 1))
+						: new VisibleTag(child.key, child.value, null));
+			}
+			VisibleTag mainEntry = entries.stream().filter(e -> e.lang() != null).findFirst().orElse(null);
+			if (mainEntry != null) {
+				List<VisibleTag> otherLangs = entries.stream()
+						.filter(e -> e != mainEntry)
+						.collect(Collectors.toList());
+				result.add(new VisibleTag(row.key, mainEntry.value(), mainEntry.lang(),
+						otherLangs.isEmpty() ? null : otherLangs));
+			} else if (!entries.isEmpty()) {
+				result.add(new VisibleTag(row.key, entries.get(0).value(), null));
+			}
+		}
+		return result;
 	}
 }
