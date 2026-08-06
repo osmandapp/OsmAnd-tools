@@ -3,12 +3,12 @@ package net.osmand.server.api.searchtest;
 import net.osmand.binary.*;
 import net.osmand.data.*;
 import net.osmand.search.core.SearchResult;
+import net.osmand.server.api.services.search.ClassicSearchService;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository.Dataset;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
-import net.osmand.server.api.services.SearchService;
 import net.osmand.util.MapUtils;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
@@ -286,7 +286,7 @@ public interface DataService extends BaseService {
 	int FOUND_DEDUPLICATE_RADIUS = 100;
 
 	default Object[] collectRunResults(ResultActuator actuator, long genId, int count, Run run, String query,
-	                                   SearchService.SearchResults searchResult, LatLon targetPoint,
+	                                   ClassicSearchService.SearchResults searchResult, LatLon targetPoint,
 	                                   LatLon searchPoint, long duration, String bbox, String error) throws IOException {
 		if (error != null || targetPoint == null) {
 			return new Object[] {genId, count, run.datasetId, run.id, run.caseId, query, null, error, duration,

@@ -17,11 +17,6 @@ import net.osmand.data.MapObject;
 import net.osmand.data.Street;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.search.SearchUICoreGenOBFTest.SearchTestEngine;
-import net.osmand.search.core.spatial.SpatialPoiSearch;
-import net.osmand.search.core.spatial.SpatialSearchContext;
-import net.osmand.search.core.spatial.SpatialSearchResult;
-import net.osmand.search.core.spatial.SpatialSearchToken;
-import net.osmand.search.core.spatial.SpatialTextSearch;
 import net.osmand.search.core.spatial.SpatialTextSearch.SpatialTextSearchSettings;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -48,16 +43,17 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
                 : searchResults.mainResults;
 
         List<String> result = new ArrayList<>();
-        for(SpatialSearchResult res : mainResults) {
-        	if(print) {
-        		System.out.println(SpatialSearchResult.compareKeyString(res) + " " +  res);
-        	}
-            result.add(formatResult(res));
-        }
-        return result;
-    }
+		for (SpatialSearchResult res : mainResults) {
+			if (print) {
+				System.out.println(SpatialSearchResult.compareKeyString(res) + " " + res);
+			}
+			result.add(formatResult(res));
+		}
+		return result;
+	}
 
     public String formatResult(SpatialSearchResult r) {
+        int tCount = r.getParent().getTokenCount();
         double dist = 0.0;
         if (location != null && r.getLatLon() != null) {
             dist = MapUtils.getDistance(location, r.getLatLon());
@@ -95,8 +91,8 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
             }
         }
         String sorting = SpatialSearchResult.compareKeyString(r);
-        return String.format(Locale.US, "%s [[%s, %s, %.2f km, %s]]", b,
-                testTypeStr(atom) + subtype, sorting, dist / 1000, r.toString(searchContext));
+        return String.format(Locale.US, "%s [[%d, %s, %s, %.2f km, %s]]", b,
+                tCount, testTypeStr(atom) + subtype, sorting, dist / 1000, r.toString(searchContext).replace("\"", "'"));
     }
 
 	private void appendName(StringBuilder b, String extraMatch, MapObject object) {
@@ -160,15 +156,8 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
                 settings.OPTIM_DELETE_EMBEDDED_BOUNDARIES);
         settings.OPTIM_FLAG_POI_SAME_AS_CITY_STREET = settingsJson.optBoolean("OPTIM_FLAG_POI_SAME_AS_CITY_STREET",
                 settings.OPTIM_FLAG_POI_SAME_AS_CITY_STREET);
-        settings.OPTIM_DELETE_POI_SAME_AS_CITY_STREET = settingsJson.optBoolean("OPTIM_DELETE_POI_SAME_AS_CITY_STREET",
-                settings.OPTIM_DELETE_POI_SAME_AS_CITY_STREET);
         settings.DEDUPLICATE_RES = settingsJson.optBoolean("DEDUPLICATE_RES", settings.DEDUPLICATE_RES);
-        settings.OPTIM_READ_COMMON_WORDS_LIMIT = settingsJson.optInt("OPTIM_READ_COMMON_WORDS_LIMIT",
-                settings.OPTIM_READ_COMMON_WORDS_LIMIT);
-//        settings.ALWAYS_READ_COMMON_WORDS_ATOMS = settingsJson.optBoolean("ALWAYS_READ_COMMON_WORDS_ATOMS",
-//                settings.ALWAYS_READ_COMMON_WORDS_ATOMS);
-//        settings.ALWAYS_READ_FREQ_WORDS_ATOMS = settingsJson.optBoolean("ALWAYS_READ_FREQ_WORDS_ATOMS",
-//                settings.ALWAYS_READ_FREQ_WORDS_ATOMS);
+        settings.OPTIM_READ_COMMON_WORDS_LIMIT = settingsJson.optInt("OPTIM_READ_COMMON_WORDS_LIMIT", settings.OPTIM_READ_COMMON_WORDS_LIMIT);
         settings.LANG_DEDUPLICATE = settingsJson.optString("LANG_DEDUPLICATE", settings.LANG_DEDUPLICATE);
         settings.MIN_ELO_RATING = settingsJson.optInt("MIN_ELO_RATING", settings.MIN_ELO_RATING);
         settings.MIN_CHARACTERS_INCOMPLETE = settingsJson.optInt("MIN_CHARACTERS_INCOMPLETE", settings.MIN_CHARACTERS_INCOMPLETE);
@@ -178,6 +167,8 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
         settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES = settingsJson.optInt("LIMIT_STOP_OTHER_GOALS_WHEN_REACHED_UNIQUE_OBJECTS",
                 settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES);
         settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES = settingsJson.optInt("LIMIT_GOAL_LEVEL_2", settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES);
+        settings.DEV_USE_PIPELINE = settingsJson.optBoolean("DEV_USE_PIPELINE", settings.DEV_USE_PIPELINE);
+
         return settings;
     }
 

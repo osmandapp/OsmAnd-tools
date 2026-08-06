@@ -43,6 +43,8 @@ public class EmailSenderMain {
 		String giveawaySeries;
 		boolean updateBlockList = false;
 		String unsubscribeFileName = null;
+		String userIdsFileName = null;
+		String userIds = null;
     }
 
     public static void main(String[] args) throws SQLException, IOException {
@@ -74,7 +76,12 @@ public class EmailSenderMain {
                 p.updateBlockList = true;
             } else if (arg.startsWith("--unsubscribe-from=")) {
 	            p.unsubscribeFileName = val;
+            } else if (arg.startsWith("--user-ids-from=")) {
+	            p.userIdsFileName = val;
             }
+        }
+        if (p.userIdsFileName != null && !p.userIdsFileName.isEmpty()) {
+            p.userIds = readUserIdsFile(p.userIdsFileName);
         }
 
         final String apiKey = System.getenv("SENDGRID_KEY");
@@ -278,22 +285,42 @@ public class EmailSenderMain {
 	}
 
 	private static void sendProductionEmails(Connection conn, EmailParams p, Set<String> unsubscribed) throws SQLException {
-        String query = buildQuery(false, p.mailingGroups, p.daySince);
-        LOGGER.info("SQL query is " + query);
-        PreparedStatement ps = conn.prepareStatement(query);
-        ResultSet resultSet = ps.executeQuery();
-        while (resultSet.next()) {
-            String address = resultSet.getString(1);
-            if (!Algorithms.isEmpty(address)) {
-                if (!unsubscribed.contains(address)) {
-                    sendMail(address, p);
-                } else {
-                    LOGGER.info("Skip unsubscribed email: " + address.replaceFirst(".....", "....."));
-                }
-            }
-        }
-        LOGGER.warning(String.format("Sending mails finished: %d success, %d failed", p.sentSuccess, p.sentFailed));
-    }
+		if (p.userIds != null && !p.userIds.isEmpty()) {
+			sendByUserIds(conn, p, unsubscribed);
+		} else {
+			sendByGroups(conn, p, unsubscribed);
+		}
+		LOGGER.warning(String.format("Sending mails finished: %d success, %d failed", p.sentSuccess, p.sentFailed));
+	}
+
+	private static void sendByUserIds(Connection conn, EmailParams p, Set<String> unsubscribed) throws SQLException {
+		for (String userId : p.userIds.split(",")) {
+			sendFiltered(getEmailByUserId(conn, userId.trim()), p, unsubscribed);
+		}
+	}
+
+	private static void sendByGroups(Connection conn, EmailParams p, Set<String> unsubscribed) throws SQLException {
+		String query = buildQuery(false, p.mailingGroups, p.daySince);
+		LOGGER.info("SQL query is " + query);
+		PreparedStatement ps = conn.prepareStatement(query);
+		ResultSet resultSet = ps.executeQuery();
+		while (resultSet.next()) {
+			sendFiltered(resultSet.getString(1), p, unsubscribed);
+		}
+		resultSet.close();
+		ps.close();
+	}
+
+	private static void sendFiltered(String address, EmailParams p, Set<String> unsubscribed) {
+		if (Algorithms.isEmpty(address)) {
+			return;
+		}
+		if (!unsubscribed.contains(address)) {
+			sendMail(address, p);
+		} else {
+			LOGGER.info("Skip unsubscribed email: " + address.replaceFirst(".....", "....."));
+		}
+	}
 
     // 	email_free_users_android, email_free_users_ios, supporters, osm_recipients (deprecated)
 	private static String buildQuery(boolean count, String mailingGroups, int daysSince) {
@@ -363,30 +390,69 @@ public class EmailSenderMain {
         LOGGER.info("Total Blocked: " + count);
     }
 
-    private static void sendTestEmails(EmailParams p, Set<String> unsubscribed) {
-        LOGGER.info("Sending test messages...");
-        String[] testRecipients = p.testAddresses.split(",");
-        for (String recipient : testRecipients) {
-            sendMail(recipient.trim(), p);
+	private static void sendTestEmails(EmailParams p, Set<String> unsubscribed) {
+		LOGGER.info("Sending test messages...");
+		for (String recipient : p.testAddresses.split(",")) {
+			sendMail(recipient.trim(), p);
+		}
+	}
+
+    private static String readUserIdsFile(String fileName) throws IOException {
+        InputStream is = "-".equals(fileName) ? System.in : new FileInputStream(fileName);
+        Scanner sc = new Scanner(is);
+        StringBuilder sb = new StringBuilder();
+        while (sc.hasNextLine()) {
+            for (String token : sc.nextLine().split("[,\\s]+")) {
+                if (!token.isEmpty()) {
+                    if (sb.length() > 0) {
+                        sb.append(",");
+                    }
+                    sb.append(token);
+                }
+            }
         }
+        if (is != System.in) {
+            is.close();
+        }
+        return sb.toString();
     }
 
-    private static void checkValidity(EmailParams p) {
-        if (p.templateId == null || p.mailingGroups == null
-                || p.mailFrom == null || p.topic == null || p.runMode == null || p.templateId.isEmpty()
-                || p.mailFrom.isEmpty()
-                || p.topic.isEmpty() || p.runMode.isEmpty()) {
-            printUsage();
-            throw new RuntimeException("Correct arguments weren't supplied");
+    private static String getEmailByUserId(Connection conn, String userId) throws SQLException {
+        long id;
+        try {
+            id = Long.parseLong(userId);
+        } catch (NumberFormatException e) {
+            LOGGER.warning("Invalid user id: " + userId);
+            return null;
         }
-        if((p.giveawaySeries == null || p.giveawaySeries.length() == 0) && "giveaway".equals(p.topic)) {
-        	throw new RuntimeException("Giveaway series is required");
+        PreparedStatement ps = conn.prepareStatement("SELECT email FROM user_accounts WHERE id = ?");
+        ps.setLong(1, id);
+        ResultSet rs = ps.executeQuery();
+        String email = rs.next() ? rs.getString(1) : null;
+        rs.close();
+        ps.close();
+        if (email == null) {
+            LOGGER.warning("User id not found in user_accounts: " + userId);
         }
-        if (p.runMode.equals("send_to_test_email_group") &&
-                (p.testAddresses == null || p.testAddresses.isEmpty())) {
-            throw new RuntimeException("Test email group wasn't specified in test sending mode.");
-        }
+        return email;
     }
+
+	private static void checkValidity(EmailParams p) {
+		if (p.templateId == null || p.mailingGroups == null
+				|| p.mailFrom == null || p.topic == null || p.runMode == null || p.templateId.isEmpty()
+				|| p.mailFrom.isEmpty()
+				|| p.topic.isEmpty() || p.runMode.isEmpty()) {
+			printUsage();
+			throw new RuntimeException("Correct arguments weren't supplied");
+		}
+		if ((p.giveawaySeries == null || p.giveawaySeries.length() == 0) && "giveaway".equals(p.topic)) {
+			throw new RuntimeException("Giveaway series is required");
+		}
+		if (p.runMode.equals("send_to_test_email_group") &&
+				(p.testAddresses == null || p.testAddresses.isEmpty())) {
+			throw new RuntimeException("Test email group wasn't specified in test sending mode.");
+		}
+	}
 
     private static Set<String> getUnsubscribedAndBlocked(Connection conn, String topic) throws SQLException {
         PreparedStatement ps = conn.prepareStatement("SELECT email FROM email_unsubscribed WHERE channel=? OR channel='all' UNION " +

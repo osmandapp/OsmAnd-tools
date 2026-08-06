@@ -16,7 +16,7 @@ import net.osmand.data.QuadRect;
 import net.osmand.search.SearchUICore;
 import net.osmand.search.core.SearchResult;
 import net.osmand.server.api.services.OsmAndMapsService;
-import net.osmand.server.api.services.SearchService;
+import net.osmand.server.api.services.search.PoiSearchService;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,7 +44,7 @@ public class WeatherController {
 	protected static final Log LOGGER = LogFactory.getLog(WeatherController.class);
 	
 	@Autowired
-	SearchService searchService;
+	PoiSearchService poiSearchService;
 	
 	// Initial increment value for the weather data time interval
 	private static final int INITIAL_INCREMENT = 1;
@@ -165,7 +165,7 @@ public class WeatherController {
 			List<OsmAndMapsService.BinaryMapIndexReaderReference> mapList = new ArrayList<>();
 			mapList.add(osmAndMapsService.getBaseMap());
 			usedMapList = osmAndMapsService.getReaders(mapList, null);
-			nearestPlace = searchService.searchCitiesByBbox(searchBbox, lat, lon, usedMapList);
+			nearestPlace = poiSearchService.searchCitiesByBbox(searchBbox, lat, lon, usedMapList);
 		} finally {
 			osmAndMapsService.unlockReaders(usedMapList);
 		}

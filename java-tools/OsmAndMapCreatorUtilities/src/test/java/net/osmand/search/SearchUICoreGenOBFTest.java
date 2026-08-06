@@ -454,17 +454,31 @@ public class SearchUICoreGenOBFTest {
 		}
 	}
 
-	private List<String> parsePhrases(JSONObject sourceJson) {
+	record PhraseTuple(String query, JSONObject settings) {}
+
+	private PhraseTuple parsePhraseSettings(String phrase) {
+		if (Algorithms.isEmpty(phrase)) {
+			return null;
+		}
+		int settingsStart = phrase.lastIndexOf('{');
+		if (settingsStart < 0 || !phrase.trim().endsWith("}")) {
+			return new PhraseTuple(phrase, null);
+		}
+		JSONObject settings = new JSONObject(phrase.substring(settingsStart));
+		return new PhraseTuple(phrase.substring(0, settingsStart).trim(), settings);
+	}
+
+	private List<PhraseTuple> parsePhrases(JSONObject sourceJson) {
 		JSONArray phrasesJson = sourceJson.optJSONArray("phrases");
-		String singlePhrase = sourceJson.optString("phrase", null);
-		List<String> phrases = new ArrayList<>();
+		PhraseTuple singlePhrase = parsePhraseSettings(sourceJson.optString("phrase", null));
+		List<PhraseTuple> phrases = new ArrayList<>();
 		if (singlePhrase != null) {
 			phrases.add(singlePhrase);
 		}
 		if (phrasesJson != null) {
 			for (int i = 0; i < phrasesJson.length(); i++) {
-				String phrase = phrasesJson.optString(i, null);
-				if (!Algorithms.isEmpty(phrase)) {
+				PhraseTuple phrase = parsePhraseSettings(phrasesJson.optString(i, null));
+				if (phrase != null) {
 					phrases.add(phrase);
 				}
 			}
@@ -472,13 +486,21 @@ public class SearchUICoreGenOBFTest {
 		return phrases;
 	}
 
-	private List<List<String>> parseExpectedResults(JSONObject sourceJson, int phrasesSize) {
+	private JSONObject mergePhraseSettings(JSONObject settingsJson, JSONObject phraseSettings) {
+		JSONObject mergedSettings = new JSONObject(settingsJson.toString());
+		for (String key : phraseSettings.keySet()) {
+			mergedSettings.put(key, phraseSettings.get(key));
+		}
+		return mergedSettings;
+	}
+
+	protected List<List<String>> parseExpectedResults(JSONObject sourceJson, String resultsTag, int phrasesSize) {
 		List<List<String>> results = new ArrayList<>();
 		for (int i = 0; i < phrasesSize; i++) {
 			results.add(new ArrayList<String>());
 		}
-		if (sourceJson.has("results")) {
-			parseResults(sourceJson, "results", results);
+		if (sourceJson.has(resultsTag)) {
+			parseResults(sourceJson, resultsTag, results);
 		}
 		if (TEST_EXTRA_RESULTS && sourceJson.has("extra-results")) {
 			parseResults(sourceJson, "extra-results", results);
@@ -501,7 +523,15 @@ public class SearchUICoreGenOBFTest {
 		cacheGzipIfNeeded(jsonFile, new File(GEN_DIR, jsonName + ".gz"));
 		return jsonFile;
 	}
+	
+	protected List<List<String>> getExpectedResults(JSONObject sourceJson, int phrasesSize) {
+		return parseExpectedResults(sourceJson, "results", phrasesSize);
+	}
 
+	protected SearchTestEngine createSearchEngine(JSONObject settingsJson, List<BinaryMapIndexReader> readers) {
+		return new SpatialTestSearchEngine(settingsJson, readers);
+	}
+	
 	@Test
 	public void testSearch() throws IOException, JSONException, SQLException {
 		String sourceJsonText = Algorithms.getFileAsString(testFile);
@@ -513,13 +543,13 @@ public class SearchUICoreGenOBFTest {
 //		if (RUN_IGNORED_TESTS) {
 //			return;
 //		}
-        searchKeywords = getKeywords(sourceJson);
+		List<PhraseTuple> phrases = parsePhrases(sourceJson);
+        searchKeywords = getKeywords(sourceJson, phrases);
 		JSONObject settingsJson = sourceJson.getJSONObject("settings");
-		List<String> phrases = parsePhrases(sourceJson);
 		boolean useData = settingsJson.optBoolean("useData", true);
 		List<BinaryMapIndexReader> readers = new ArrayList<>();
 		boolean prevDisplayDefaultPoiTypes = SearchCoreFactory.DISPLAY_DEFAULT_POI_TYPES;
-		SearchTestEngine engine = null;
+		SearchTestEngine defaultEngine = null;
 		try {
 			if (useData) {
 				loadReaders(sourceJson, readers);
@@ -531,34 +561,41 @@ public class SearchUICoreGenOBFTest {
 		if (disabled) {
 			return;
 		}
-		List<List<String>> results = parseExpectedResults(sourceJson, phrases.size());
-
+		
+		List<List<String>> results = getExpectedResults(sourceJson, phrases.size());
 		Assert.assertEquals(phrases.size(), results.size());
 		if (phrases.size() != results.size()) {
 			return;
 		}
 
-		engine = createSearchEngine(settingsJson, readers);
+		defaultEngine = createSearchEngine(settingsJson, readers);
+		int shift = 4;
 		for (int k = 0; k < phrases.size(); k++) {
-			String text = phrases.get(k);
+			PhraseTuple phraseAndSettings = phrases.get(k);
+			String text = phraseAndSettings.query;
 			List<String> expectedResults = results.get(k);
-
+			boolean enginePerPhrase = phraseAndSettings.settings != null && !phraseAndSettings.settings.keySet().isEmpty();
+			SearchTestEngine engine = defaultEngine;
+			if (enginePerPhrase) {
+				engine = createSearchEngine(mergePhraseSettings(settingsJson, phraseAndSettings.settings), readers);
+			}
+			
 			List<String> actualResults = engine.search(text, false);
 			for (int i = 0; i < expectedResults.size(); i++) {
 				String expected = expectedResults.get(i);
 				String actual = i >= actualResults.size() ? null : actualResults.get(i);
 				if (expected.indexOf('[') != -1) {
-					expected = expected.substring(0, expected.indexOf('[')).trim();
+					expected = expected.substring(0, expected.indexOf('[') + shift).trim();
 				}
 				if (actual != null && actual.indexOf('[') != -1) {
-					actual = actual.substring(0, actual.indexOf('[')).trim();
+					actual = actual.substring(0, actual.indexOf('[') + shift).trim();
 				}
 				// String present = result.toString();
 				expected = expected.replaceFirst("^@", "");
 				String present = actual == null ? ("#MISSING " + (i + 1)) : actual;
 				if (!Algorithms.stringsEqual(expected, present)) {
-					engine.search(text, false);
-					System.out.printf("Phrase: %s%n", text);
+					engine.search(text, true);
+					System.out.printf("Phrase #%s: %s%n", k + 1, text);
 					System.out.printf("Mismatch #%s for '%s' != '%s'. %n", i + 1, expected, present);
 					System.out.println("CURRENT RESULTS: ");
 					for (String r : actualResults) {
@@ -571,20 +608,20 @@ public class SearchUICoreGenOBFTest {
 				}
 				Assert.assertEquals(expected, present);
 			}
+
+			if (enginePerPhrase) {
+				engine.close();
+			}
 		}
 		} finally {
 			SearchCoreFactory.DISPLAY_DEFAULT_POI_TYPES = prevDisplayDefaultPoiTypes;
-			if (engine != null) {
-				engine.close();
+			if (defaultEngine != null) {
+				defaultEngine.close();
 			}
 			for (BinaryMapIndexReader reader : readers) {
 				reader.close();
 			}
         }
-	}
-
-	private SearchTestEngine createSearchEngine(JSONObject settingsJson, List<BinaryMapIndexReader> readers) {
-		return new SpatialTestSearchEngine(settingsJson, readers);
 	}
 
 	private static void deleteRecursively(File file) {
@@ -993,16 +1030,15 @@ public class SearchUICoreGenOBFTest {
 		}
 	}
 
-    public Set<String> getKeywords(JSONObject sourceJson) {
+    public Set<String> getKeywords(JSONObject sourceJson, List<PhraseTuple> phrases) {
         Set<String> keywords = new HashSet<>();
-        List<String> phrases = parsePhrases(sourceJson);
-        for (String phrase : phrases) {
-            extractAndAddWords(phrase, keywords);
+        for (PhraseTuple phraseAndSettings : phrases) {
+            extractAndAddWords(phraseAndSettings.query, keywords);
         }
 
         List<List<String>> parsedResults = new ArrayList<>();
         for (int i = 0; i < phrases.size(); i++) {
-            parsedResults.add(new ArrayList<String>());
+            parsedResults.add(new ArrayList<>());
         }
         String tag = sourceJson.has("results") ? "results" : "result";
         parseResults(sourceJson, tag, parsedResults);

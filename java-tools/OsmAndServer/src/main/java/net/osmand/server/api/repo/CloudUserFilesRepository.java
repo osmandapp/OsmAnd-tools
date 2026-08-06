@@ -90,7 +90,10 @@ public interface CloudUserFilesRepository extends JpaRepository<UserFile, Long> 
         
         @Column(name = "storage")
         public String storage;
-        
+
+        @Column(name = "storagename")
+        public String storagename;
+
         @Column(name = "gendetails", columnDefinition = "jsonb")
         @Type(JsonbType.class)
         public JsonObject details;
@@ -132,15 +135,15 @@ public interface CloudUserFilesRepository extends JpaRepository<UserFile, Long> 
     
     // COALESCE(length(u.data), -1))
 	@Query("select new net.osmand.server.api.repo.CloudUserFilesRepository$UserFileNoData("
-			+ " u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize, u.storage ) "
+			+ " u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize, u.storage, u.storagename ) "
 			+ " from UserFile u "
 			+ " where u.userid = :userid  and (:name is null or u.name = :name) and (:type is null or u.type  = :type ) "
 			+ " order by updatetime desc")
 	List<UserFileNoData> listFilesByUserid(@Param(value = "userid") int userid,
 			@Param(value = "name") String name, @Param(value = "type") String type);
-	
+
 	@Query("select new net.osmand.server.api.repo.CloudUserFilesRepository$UserFileNoData("
-			+ " u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize, u.storage, u.details ) "
+			+ " u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize, u.storage, u.details, u.storagename ) "
 			+ " from UserFile u "
 			+ " where u.userid = :userid  and (:name is null or u.name = :name) and (:type is null or u.type  = :type ) "
 			+ " order by updatetime desc")
@@ -161,9 +164,10 @@ public interface CloudUserFilesRepository extends JpaRepository<UserFile, Long> 
         public long clienttimems;
 		public long zipSize;
 		public String storage;
+		public String storagename;
 		public JsonObject details;
 		public String deviceInfo;
-		
+
 		public UserFileNoData(UserFile c) {
 			this.userid = c.userid;
 			this.id = c.id;
@@ -178,16 +182,17 @@ public interface CloudUserFilesRepository extends JpaRepository<UserFile, Long> 
 			this.clienttimems = clienttime == null? 0 : clienttime.getTime();
 			this.details = c.details;
 			this.storage = c.storage;
+			this.storagename = c.storagename;
 			this.deviceInfo = null;
 		}
-		
-		public UserFileNoData(long id, int userid, int deviceid, String type, String name, 
-				Date updatetime, Date clienttime, Long filesize, Long zipSize, String storage) {
-			this(id, userid, deviceid, type, name, updatetime, clienttime, filesize, zipSize, storage, null);
+
+		public UserFileNoData(long id, int userid, int deviceid, String type, String name,
+				Date updatetime, Date clienttime, Long filesize, Long zipSize, String storage, String storagename) {
+			this(id, userid, deviceid, type, name, updatetime, clienttime, filesize, zipSize, storage, null, storagename);
 		}
-		
-		public UserFileNoData(long id, int userid, int deviceid, String type, String name, 
-				Date updatetime, Date clienttime, Long filesize, Long zipSize, String storage, JsonObject details) {
+
+		public UserFileNoData(long id, int userid, int deviceid, String type, String name,
+				Date updatetime, Date clienttime, Long filesize, Long zipSize, String storage, JsonObject details, String storagename) {
 			this.userid = userid;
 			this.id = id;
 			this.deviceid = deviceid;
@@ -201,6 +206,7 @@ public interface CloudUserFilesRepository extends JpaRepository<UserFile, Long> 
 			this.clienttimems = clienttime == null? 0 : clienttime.getTime();
 			this.details = details;
 			this.storage = storage;
+			this.storagename = storagename;
 			this.deviceInfo = null;
 		}
 	}
