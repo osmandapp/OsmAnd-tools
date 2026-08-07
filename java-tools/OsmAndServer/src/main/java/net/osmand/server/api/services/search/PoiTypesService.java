@@ -183,14 +183,61 @@ public class PoiTypesService {
 		return resultCollection;
 	}
 
-	public List<VisibleTag> getVisibleTags(Map<String, String> tags) {
+	public List<VisibleTag> getVisibleTags(Map<String, String> tags, String lang) {
 		if (tags == null || tags.isEmpty()) {
 			return Collections.emptyList();
 		}
-		AdditionalInfoBundle infoBundle = new AdditionalInfoBundle(getMapPoiTypes(null), tags);
+		AdditionalInfoBundle infoBundle = new AdditionalInfoBundle(getMapPoiTypes(lang), tags);
 		List<AmenityRowData> tagEntries = infoBundle.getVisibleTags(false); // The "note" tag is enabled only for OSM editing
-		AmenityRowsBuilder.sortInfoRows(tagEntries);
-		return toVisibleTags(tagEntries);
+		return toVisibleTags(sortInfoRows(infoBundle, tagEntries, lang), lang);
+	}
+
+	private List<AmenityRowData> sortInfoRows(AdditionalInfoBundle infoBundle, List<AmenityRowData> rows, String lang) {
+		PoiCategory category = infoBundle.getCategory();
+		List<AmenityRowData> named = new ArrayList<>(rows.size());
+		for (AmenityRowData row : rows) {
+			named.add(withSortName(row, resolveSortName(infoBundle, category, row, lang)));
+		}
+		AmenityRowsBuilder.sortInfoRows(named);
+		return named;
+	}
+
+	private String resolveSortName(AdditionalInfoBundle infoBundle, PoiCategory category, AmenityRowData row, String lang) {
+		if (row.collapsableRowType == AmenityRowData.CollapsableRowType.POI_TYPE_GROUP) {
+			return resolveGroupSortName(row);
+		}
+		String key = row.key;
+		String value = row.value;
+		if (row.collapsableRowType == AmenityRowData.CollapsableRowType.PLAIN && !Algorithms.isEmpty(row.collapsableRows)) {
+			AmenityRowData mainChild = findMainChild(row, lang);
+			key = mainChild.key;
+			value = mainChild.value;
+		}
+		PoiType pType = infoBundle.resolvePoiType(category, key, value).pType;
+		return pType != null ? pType.getKeyName() : key;
+	}
+
+	private String resolveGroupSortName(AmenityRowData row) {
+		List<PoiType> types = row.collapsablePoiTypes;
+		if (row.poiAdditional) {
+			return types.get(0).getKeyName();
+		}
+		PoiCategory groupCategory = row.collapsableCategory;
+		for (PoiType pt : types) {
+			groupCategory = pt.getCategory();
+		}
+		return groupCategory.getKeyName();
+	}
+
+	private AmenityRowData withSortName(AmenityRowData row, String name) {
+		return new AmenityRowData.Builder(row.key)
+				.setValue(row.value)
+				.setOrder(row.order)
+				.setName(name)
+				.setCollapsablePoiTypes(row.collapsablePoiTypes)
+				.setCollapsableRows(row.collapsableRows)
+				.setCollapsableRowType(row.collapsableRowType)
+				.build();
 	}
 
 	private String joinPoiTypeKeys(AmenityRowData row) {
@@ -199,12 +246,12 @@ public class PoiTypesService {
 				.collect(Collectors.joining(Amenity.SEPARATOR));
 	}
 
-	private List<VisibleTag> toVisibleTags(List<AmenityRowData> rows) {
+	private List<VisibleTag> toVisibleTags(List<AmenityRowData> rows, String lang) {
 		List<VisibleTag> result = new ArrayList<>();
 		for (AmenityRowData row : rows) {
 			VisibleTag tag = switch (row.collapsableRowType) {
 				case POI_TYPE_GROUP -> toGroupTag(row);
-				case PLAIN -> toLocalizedTag(row);
+				case PLAIN -> toLocalizedTag(row, lang);
 				default -> toPlainTag(row);
 			};
 			if (tag != null) {
@@ -223,26 +270,33 @@ public class PoiTypesService {
 		return row.value != null ? new VisibleTag(row.key, row.value, null) : null;
 	}
 
-	private VisibleTag toLocalizedTag(AmenityRowData row) {
+	private VisibleTag toLocalizedTag(AmenityRowData row, String lang) {
 		if (Algorithms.isEmpty(row.collapsableRows)) {
 			return null;
 		}
-		List<LangValue> entries = new ArrayList<>();
-		for (AmenityRowData child : row.collapsableRows) {
-			int idx = child.key.indexOf(':');
-			entries.add(idx >= 0
-					? new LangValue(child.value, child.key.substring(idx + 1))
-					: new LangValue(child.value, null));
-		}
-		LangValue mainEntry = entries.stream().filter(e -> e.lang() != null).findFirst().orElse(null);
-		if (mainEntry != null) {
-			List<LangValue> otherLangs = entries.stream()
-					.filter(e -> e != mainEntry)
-					.collect(Collectors.toList());
-			return new VisibleTag(row.key, mainEntry.value(), mainEntry.lang(),
-					otherLangs.isEmpty() ? null : otherLangs);
-		}
-		return new VisibleTag(row.key, entries.get(0).value(), null);
+		AmenityRowData mainChild = findMainChild(row, lang);
+		List<LangValue> otherLangs = row.collapsableRows.stream()
+				.filter(child -> child != mainChild)
+				.map(this::toLangValue)
+				.collect(Collectors.toList());
+		LangValue mainValue = toLangValue(mainChild);
+		return new VisibleTag(row.key, mainValue.value(), mainValue.lang(),
+				otherLangs.isEmpty() ? null : otherLangs);
+	}
+
+	private AmenityRowData findMainChild(AmenityRowData row, String lang) {
+		String headerKey = lang != null ? row.key + ":" + lang : row.key;
+		return row.collapsableRows.stream()
+				.filter(child -> child.key.equals(headerKey))
+				.findFirst()
+				.orElse(row.collapsableRows.get(0));
+	}
+
+	private LangValue toLangValue(AmenityRowData child) {
+		int idx = child.key.indexOf(':');
+		return idx >= 0
+				? new LangValue(child.value, child.key.substring(idx + 1))
+				: new LangValue(child.value, null);
 	}
 
 	public record VisibleTag(String key, String value, String lang, List<LangValue> otherLangs) {
