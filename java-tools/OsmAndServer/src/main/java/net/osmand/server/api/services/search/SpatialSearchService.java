@@ -75,6 +75,7 @@ public class SpatialSearchService {
 
 	private final AtomicInteger spatialSearchRoundRobin = new AtomicInteger();
 	private final Map<String, AtomicBoolean> runningSearches = new ConcurrentHashMap<>();
+	private final SpatialTextSearchAPI spatialTextSearchAPI = new SpatialTextSearchAPI(MapPoiTypes.getDefault());
 
 	// one single-thread executor per slot: requests are routed by client key, so a client's
 	// repeated searches always hit the thread whose engine cache is warmed
@@ -428,9 +429,7 @@ public class SpatialSearchService {
 		}
 		SearchResult result = new SearchResult();
 
-		SpatialTextSearchAPI api = new SpatialTextSearchAPI(MapPoiTypes.getDefault());
-
-		if (api.convertSpatialSearchResult(ssr, result, poiSearch, loc, locale, false) != null) {
+		if (spatialTextSearchAPI.convertSpatialSearchResult(ssr, result, poiSearch, loc, locale, false) != null) {
 			return searchResultConverter.getFeature(result, timeZone); // non-Amenity objects
 		}
 
