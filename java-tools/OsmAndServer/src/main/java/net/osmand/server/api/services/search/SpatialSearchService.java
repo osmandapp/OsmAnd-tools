@@ -429,7 +429,8 @@ public class SpatialSearchService {
 		}
 		SearchResult result = new SearchResult();
 
-		if (spatialTextSearchAPI.convertSpatialSearchResult(ssr, result, poiSearch, loc, locale, false) != null) {
+		if (spatialTextSearchAPI
+				.convertSpatialSearchResult(ssr, result, getSpatialPoiTypeSearch(), loc, locale, false) != null) {
 			return searchResultConverter.getFeature(result, timeZone); // non-Amenity objects
 		}
 
