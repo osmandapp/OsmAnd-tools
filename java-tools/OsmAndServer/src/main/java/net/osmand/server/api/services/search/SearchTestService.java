@@ -9,6 +9,7 @@ import net.osmand.data.City;
 import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
 import net.osmand.data.Street;
+import net.osmand.map.OsmandRegions;
 import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.api.searchtest.*;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
@@ -605,6 +606,10 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 					return null;
 				}
 				readers = mapsService.getReaders(maps, null, true);
+
+				if (!readers.isEmpty()) {
+					readers.add(mapsService.getOsmandRegions().getFile());
+				}
 			}
 
 			res = searchTestSpatial(ctx, readers, printLogs);
