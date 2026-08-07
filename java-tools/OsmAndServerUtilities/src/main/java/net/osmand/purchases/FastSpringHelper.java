@@ -221,6 +221,7 @@ public class FastSpringHelper {
 	public static class FastSpringSubscription {
 		public String id;
 		public Boolean active;
+		public String state; // active, overdue, canceled, deactivated, trial
 		public String sku;
 		public Long begin; //purchaseTime
 		public Long nextChargeDate; //expiretime

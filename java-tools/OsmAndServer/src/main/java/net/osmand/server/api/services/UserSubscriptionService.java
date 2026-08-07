@@ -358,7 +358,11 @@ public class UserSubscriptionService {
 		try {
 			FastSpringHelper.FastSpringSubscription fsSub = FastSpringHelper.getSubscriptionByOrderIdAndSku(s.orderId, s.sku);
 			if (fsSub != null) {
-				if (fsSub.nextChargeDate == null) {
+				if (!Boolean.TRUE.equals(fsSub.active)) {
+					// canceled/deactivated on FastSpring side (e.g. refund with subscription cancellation)
+					LOG.info(String.format("FastSpring subscription %s - %s is not active (state %s)", s.sku, s.orderId, fsSub.state));
+					s.valid = false;
+				} else if (fsSub.nextChargeDate == null) {
 					LOG.info(String.format("FastSpring subscription %s - %s has null nextChargeDate", s.sku, s.orderId));
 					s.valid = false;
 				} else {

@@ -59,6 +59,14 @@ public class FastSpringController {
 	private static final String EVENT_CHARGEBACK_CREATED = "chargeback.created";
 	private static final Set<String> HANDLED_EVENTS = Set.of(EVENT_ORDER_COMPLETED, EVENT_RETURN_CREATED, EVENT_CHARGEBACK_CREATED);
 
+	// FastSpring subscription states (https://developer.fastspring.com/reference/retrieve-a-subscription)
+	private static final String SUBSCRIPTION_STATE_CANCELED = "canceled";
+	private static final String SUBSCRIPTION_STATE_DEACTIVATED = "deactivated";
+
+	// values for the "kind" column, same convention as UpdateSubscription.deleteSubscription (expired/invalid/gone)
+	private static final String KIND_REFUND = "refund";
+	private static final String KIND_CHARGEBACK = "chargeback";
+
 
 	@Transactional
 	@PostMapping("/order-completed")
@@ -189,19 +197,65 @@ public class FastSpringController {
 			return null;
 		}
 		Set<Integer> affectedUserIds = new HashSet<>();
-		boolean revokedAny = false;
+		boolean matchedAny = false;
 		for (FastSpringOrderCompletedRequest.Item item : data.items) {
 			String sku = item.sku;
 			if (sku == null) {
 				continue;
 			}
-			revokedAny |= revokePurchases(deviceInAppPurchasesRepository.findByOrderIdAndSku(orderId, sku),
-					deviceSubscriptionsRepository.findByOrderIdAndSku(orderId, sku), orderId, affectedUserIds);
+			List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> iaps = deviceInAppPurchasesRepository.findByOrderIdAndSku(orderId, sku);
+			if (!iaps.isEmpty()) {
+				matchedAny = true;
+				revokeInAppPurchases(iaps, orderId, affectedUserIds);
+			}
+			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subs = deviceSubscriptionsRepository.findByOrderIdAndSku(orderId, sku);
+			if (!subs.isEmpty()) {
+				matchedAny = true;
+				ResponseEntity<String> error = revokeSubscriptionsIfDeactivated(subs, orderId, sku, affectedUserIds);
+				if (error != null) {
+					return error;
+				}
+			}
 		}
-		if (!revokedAny) {
+		if (!matchedAny) {
+			// Return an error so that the event is retried later: the refund may arrive before the original order is recorded
 			return ResponseEntity.badRequest().body("FastSpring: nothing to revoke for orderId " + orderId);
 		}
 		refreshAffectedUsers(affectedUserIds);
+		return null;
+	}
+
+	// A refund does not always cancel the subscription ("Cancel Related Subscriptions" checkbox in the refund dialog),
+	// and return.created does not carry that choice, so check the subscription state via API:
+	// deactivated -> revoke now, canceled -> stop autorenew only, active -> keep. https://developer.fastspring.com/docs/refund-an-order
+	private ResponseEntity<String> revokeSubscriptionsIfDeactivated(List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subs,
+	                                                                String orderId, String sku, Set<Integer> affectedUserIds) {
+		FastSpringHelper.FastSpringSubscription fsSub;
+		try {
+			fsSub = FastSpringHelper.getSubscriptionByOrderIdAndSku(orderId, sku);
+		} catch (Exception e) {
+			LOGGER.error("FastSpring: failed to check subscription state for orderId " + orderId + ", sku " + sku + ": " + e.getMessage(), e);
+			return ResponseEntity.badRequest().body("FastSpring: failed to check subscription state for orderId " + orderId);
+		}
+		if (fsSub == null) {
+			LOGGER.error("FastSpring: subscription not found for refunded orderId " + orderId + ", sku " + sku);
+			return ResponseEntity.badRequest().body("FastSpring: subscription not found for refunded orderId " + orderId);
+		}
+		if (Boolean.TRUE.equals(fsSub.active) && !SUBSCRIPTION_STATE_DEACTIVATED.equals(fsSub.state)) {
+			if (SUBSCRIPTION_STATE_CANCELED.equals(fsSub.state)) {
+				Date now = new Date();
+				for (DeviceSubscriptionsRepository.SupporterDeviceSubscription sub : subs) {
+					sub.autorenewing = false;
+					sub.checktime = now;
+					deviceSubscriptionsRepository.saveAndFlush(sub);
+					LOGGER.info(String.format("FastSpring: subscription canceled after refund, active until period end, orderId: %s, sku: %s", orderId, sub.sku));
+				}
+			} else {
+				LOGGER.info(String.format("FastSpring: refund without subscription cancellation, subscription stays active, orderId: %s, sku: %s", orderId, sku));
+			}
+			return null;
+		}
+		revokeSubscriptions(subs, orderId, affectedUserIds, KIND_REFUND);
 		return null;
 	}
 
@@ -214,7 +268,7 @@ public class FastSpringController {
 		String orderId = data.order;
 		Set<Integer> affectedUserIds = new HashSet<>();
 		boolean revokedAny = revokePurchases(deviceInAppPurchasesRepository.findByOrderId(orderId),
-				deviceSubscriptionsRepository.findByOrderId(orderId), orderId, affectedUserIds);
+				deviceSubscriptionsRepository.findByOrderId(orderId), orderId, affectedUserIds, KIND_CHARGEBACK);
 		if (!revokedAny) {
 			return ResponseEntity.badRequest().body("FastSpring: nothing to revoke for orderId " + orderId);
 		}
@@ -274,11 +328,17 @@ public class FastSpringController {
 	}
 
 	private boolean revokePurchases(List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> iaps,
-	                                List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subs, String orderId, Set<Integer> affectedUserIds) {
+	                                List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subs, String orderId, Set<Integer> affectedUserIds, String kind) {
 		if (iaps.isEmpty() && subs.isEmpty()) {
 			LOGGER.warn("FastSpring: nothing to revoke for orderId " + orderId + ", no matching purchases found");
 			return false;
 		}
+		revokeInAppPurchases(iaps, orderId, affectedUserIds);
+		revokeSubscriptions(subs, orderId, affectedUserIds, kind);
+		return true;
+	}
+
+	private void revokeInAppPurchases(List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> iaps, String orderId, Set<Integer> affectedUserIds) {
 		Date now = new Date();
 		for (DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase iap : iaps) {
 			iap.valid = false;
@@ -289,8 +349,13 @@ public class FastSpringController {
 			}
 			LOGGER.info(String.format("FastSpring: in-app revoked for orderId: %s, sku: %s", orderId, iap.sku));
 		}
+	}
+
+	private void revokeSubscriptions(List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subs, String orderId, Set<Integer> affectedUserIds, String kind) {
+		Date now = new Date();
 		for (DeviceSubscriptionsRepository.SupporterDeviceSubscription sub : subs) {
 			sub.valid = false;
+			sub.kind = kind;
 			sub.autorenewing = false;
 			sub.expiretime = now; // expire immediately
 			sub.checktime = now;
@@ -298,9 +363,8 @@ public class FastSpringController {
 			if (sub.userId != null) {
 				affectedUserIds.add(sub.userId);
 			}
-			LOGGER.info(String.format("FastSpring: subscription revoked for orderId: %s, sku: %s", orderId, sub.sku));
+			LOGGER.info(String.format("FastSpring: subscription revoked (%s) for orderId: %s, sku: %s", kind, orderId, sub.sku));
 		}
-		return true;
 	}
 
 	private void refreshAffectedUsers(Set<Integer> affectedUserIds) {
