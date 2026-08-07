@@ -431,6 +431,9 @@ public class SpatialSearchService {
 
 		if (spatialTextSearchAPI
 				.convertSpatialSearchResult(ssr, result, getSpatialPoiTypeSearch(), loc, locale, false) != null) {
+			if (result.objectType == ObjectType.BOUNDARY || result.objectType == ObjectType.POSTCODE) {
+				result.objectType = ObjectType.CITY; // Web does not handle POSTCODE/BOUNDARY
+			}
 			return searchResultConverter.getFeature(result, timeZone); // non-Amenity objects
 		}
 
