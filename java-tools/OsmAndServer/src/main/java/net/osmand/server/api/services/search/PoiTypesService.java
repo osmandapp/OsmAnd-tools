@@ -187,29 +187,30 @@ public class PoiTypesService {
 		if (tags == null || tags.isEmpty()) {
 			return Collections.emptyList();
 		}
-		AdditionalInfoBundle infoBundle = new AdditionalInfoBundle(getMapPoiTypes(lang), tags);
+		AdditionalInfoBundle infoBundle = new AdditionalInfoBundle(getMapPoiTypes(null), tags);
 		List<AmenityRowData> tagEntries = infoBundle.getVisibleTags(false); // The "note" tag is enabled only for OSM editing
-		return toVisibleTags(sortInfoRows(infoBundle, tagEntries, lang), lang);
+		List<AmenityRowData> sortedTagEntries = sortTagEntries(infoBundle, tagEntries, lang);
+		return toVisibleTags(sortedTagEntries, lang);
 	}
 
-	private List<AmenityRowData> sortInfoRows(AdditionalInfoBundle infoBundle, List<AmenityRowData> rows, String lang) {
+	private List<AmenityRowData> sortTagEntries(AdditionalInfoBundle infoBundle, List<AmenityRowData> tagEntries, String lang) {
 		PoiCategory category = infoBundle.getCategory();
-		List<AmenityRowData> named = new ArrayList<>(rows.size());
-		for (AmenityRowData row : rows) {
-			named.add(withSortName(row, resolveSortName(infoBundle, category, row, lang)));
+		List<AmenityRowData> namedTagEntries = new ArrayList<>();
+		for (AmenityRowData tagEntry : tagEntries) {
+			namedTagEntries.add(buildWithName(tagEntry, resolveSortName(infoBundle, category, tagEntry, lang)));
 		}
-		AmenityRowsBuilder.sortInfoRows(named);
-		return named;
+		AmenityRowsBuilder.sortInfoRows(namedTagEntries);
+		return namedTagEntries;
 	}
 
-	private String resolveSortName(AdditionalInfoBundle infoBundle, PoiCategory category, AmenityRowData row, String lang) {
-		if (row.collapsableRowType == AmenityRowData.CollapsableRowType.POI_TYPE_GROUP) {
-			return resolveGroupSortName(row);
+	private String resolveSortName(AdditionalInfoBundle infoBundle, PoiCategory category, AmenityRowData tagEntry, String lang) {
+		if (tagEntry.collapsableRowType == AmenityRowData.CollapsableRowType.POI_TYPE_GROUP) {
+			return resolveGroupSortName(tagEntry);
 		}
-		String key = row.key;
-		String value = row.value;
-		if (row.collapsableRowType == AmenityRowData.CollapsableRowType.PLAIN && !Algorithms.isEmpty(row.collapsableRows)) {
-			AmenityRowData mainChild = findMainChild(row, lang);
+		String key = tagEntry.key;
+		String value = tagEntry.value;
+		if (tagEntry.collapsableRowType == AmenityRowData.CollapsableRowType.PLAIN && !Algorithms.isEmpty(tagEntry.collapsableRows)) {
+			AmenityRowData mainChild = findMainChild(tagEntry, lang);
 			key = mainChild.key;
 			value = mainChild.value;
 		}
@@ -217,42 +218,42 @@ public class PoiTypesService {
 		return pType != null ? pType.getKeyName() : key;
 	}
 
-	private String resolveGroupSortName(AmenityRowData row) {
-		List<PoiType> types = row.collapsablePoiTypes;
-		if (row.poiAdditional) {
+	private String resolveGroupSortName(AmenityRowData tagEntry) {
+		List<PoiType> types = tagEntry.collapsablePoiTypes;
+		if (tagEntry.poiAdditional) {
 			return types.get(0).getKeyName();
 		}
-		PoiCategory groupCategory = row.collapsableCategory;
+		PoiCategory groupCategory = tagEntry.collapsableCategory;
 		for (PoiType pt : types) {
 			groupCategory = pt.getCategory();
 		}
 		return groupCategory.getKeyName();
 	}
 
-	private AmenityRowData withSortName(AmenityRowData row, String name) {
-		return new AmenityRowData.Builder(row.key)
-				.setValue(row.value)
-				.setOrder(row.order)
+	private AmenityRowData buildWithName(AmenityRowData tagEntry, String name) {
+		return new AmenityRowData.Builder(tagEntry.key)
+				.setValue(tagEntry.value)
+				.setOrder(tagEntry.order)
 				.setName(name)
-				.setCollapsablePoiTypes(row.collapsablePoiTypes)
-				.setCollapsableRows(row.collapsableRows)
-				.setCollapsableRowType(row.collapsableRowType)
+				.setCollapsablePoiTypes(tagEntry.collapsablePoiTypes)
+				.setCollapsableRows(tagEntry.collapsableRows)
+				.setCollapsableRowType(tagEntry.collapsableRowType)
 				.build();
 	}
 
-	private String joinPoiTypeKeys(AmenityRowData row) {
-		return row.collapsablePoiTypes.stream()
+	private String joinPoiTypeKeys(AmenityRowData tagEntry) {
+		return tagEntry.collapsablePoiTypes.stream()
 				.map(PoiType::getKeyName)
 				.collect(Collectors.joining(Amenity.SEPARATOR));
 	}
 
-	private List<VisibleTag> toVisibleTags(List<AmenityRowData> rows, String lang) {
+	private List<VisibleTag> toVisibleTags(List<AmenityRowData> tagEntries, String lang) {
 		List<VisibleTag> result = new ArrayList<>();
-		for (AmenityRowData row : rows) {
-			VisibleTag tag = switch (row.collapsableRowType) {
-				case POI_TYPE_GROUP -> toGroupTag(row);
-				case PLAIN -> toLocalizedTag(row, lang);
-				default -> toPlainTag(row);
+		for (AmenityRowData tagEntry : tagEntries) {
+			VisibleTag tag = switch (tagEntry.collapsableRowType) {
+				case POI_TYPE_GROUP -> toGroupTag(tagEntry);
+				case PLAIN -> toLocalizedTag(tagEntry, lang);
+				default -> toPlainTag(tagEntry);
 			};
 			if (tag != null) {
 				result.add(tag);
@@ -261,35 +262,35 @@ public class PoiTypesService {
 		return result;
 	}
 
-	private VisibleTag toGroupTag(AmenityRowData row) {
-		String key = Amenity.COLLAPSABLE_PREFIX + row.key;
-		return new VisibleTag(key, joinPoiTypeKeys(row), null);
+	private VisibleTag toGroupTag(AmenityRowData tagEntry) {
+		String key = Amenity.COLLAPSABLE_PREFIX + tagEntry.key;
+		return new VisibleTag(key, joinPoiTypeKeys(tagEntry), null);
 	}
 
-	private VisibleTag toPlainTag(AmenityRowData row) {
-		return row.value != null ? new VisibleTag(row.key, row.value, null) : null;
+	private VisibleTag toPlainTag(AmenityRowData tagEntry) {
+		return tagEntry.value != null ? new VisibleTag(tagEntry.key, tagEntry.value, null) : null;
 	}
 
-	private VisibleTag toLocalizedTag(AmenityRowData row, String lang) {
-		if (Algorithms.isEmpty(row.collapsableRows)) {
+	private VisibleTag toLocalizedTag(AmenityRowData tagEntry, String lang) {
+		if (Algorithms.isEmpty(tagEntry.collapsableRows)) {
 			return null;
 		}
-		AmenityRowData mainChild = findMainChild(row, lang);
-		List<LangValue> otherLangs = row.collapsableRows.stream()
+		AmenityRowData mainChild = findMainChild(tagEntry, lang);
+		List<LangValue> otherLangs = tagEntry.collapsableRows.stream()
 				.filter(child -> child != mainChild)
 				.map(this::toLangValue)
 				.collect(Collectors.toList());
 		LangValue mainValue = toLangValue(mainChild);
-		return new VisibleTag(row.key, mainValue.value(), mainValue.lang(),
+		return new VisibleTag(tagEntry.key, mainValue.value(), mainValue.lang(),
 				otherLangs.isEmpty() ? null : otherLangs);
 	}
 
-	private AmenityRowData findMainChild(AmenityRowData row, String lang) {
-		String headerKey = lang != null ? row.key + ":" + lang : row.key;
-		return row.collapsableRows.stream()
+	private AmenityRowData findMainChild(AmenityRowData tagEntry, String lang) {
+		String headerKey = lang != null ? tagEntry.key + ":" + lang : tagEntry.key;
+		return tagEntry.collapsableRows.stream()
 				.filter(child -> child.key.equals(headerKey))
 				.findFirst()
-				.orElse(row.collapsableRows.get(0));
+				.orElse(tagEntry.collapsableRows.get(0));
 	}
 
 	private LangValue toLangValue(AmenityRowData child) {
