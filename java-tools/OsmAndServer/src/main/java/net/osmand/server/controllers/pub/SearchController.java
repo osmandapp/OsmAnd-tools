@@ -392,6 +392,7 @@ public class SearchController {
 		String wikiCategory = wikiTagData.getWikiCategory();
 		String wikiTitle = wikiTagData.getWikiTitle();
 		List<WikiImage> wikiImages = wikiTagData.getWikiImages();
+		wikiService.fillWikiTagImagesMetadata(wikiImages);
 
 		return getPhotos(wikidataId, wikiCategory, wikiTitle, wikiImages);
 	}
