@@ -45,7 +45,7 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
         List<String> result = new ArrayList<>();
 		for (SpatialSearchResult res : mainResults) {
 			if (print) {
-				System.out.println(SpatialSearchResult.compareKeyString(res) + " " + res);
+//				System.out.println(SpatialSearchResult.compareKeyString(res) + " " + res);
 			}
 			result.add(formatResult(res));
 		}
