@@ -187,10 +187,52 @@ public class PoiTypesService {
 		if (tags == null || tags.isEmpty()) {
 			return Collections.emptyList();
 		}
-		AdditionalInfoBundle infoBundle = new AdditionalInfoBundle(getMapPoiTypes(null), tags);
+		AdditionalInfoBundle infoBundle = new AdditionalInfoBundle(getMapPoiTypes(lang), tags);
 		List<AmenityRowData> tagEntries = infoBundle.getVisibleTags(false); // The "note" tag is enabled only for OSM editing
-		List<AmenityRowData> sortedTagEntries = sortTagEntries(infoBundle, tagEntries, lang);
+
+		List<AmenityRowData> infoTagEntries = new ArrayList<>();
+		List<AmenityRowData> descriptionTagEntries = new ArrayList<>();
+		for (AmenityRowData tagEntry : tagEntries) {
+			if (tagEntry.isDescription) {
+				descriptionTagEntries.add(tagEntry);
+			} else {
+				infoTagEntries.add(tagEntry);
+			}
+		}
+		sortDescriptionRows(descriptionTagEntries, lang);
+
+		List<AmenityRowData> sortedTagEntries = sortTagEntries(infoBundle, infoTagEntries, lang);
+		sortedTagEntries.addAll(descriptionTagEntries);
 		return toVisibleTags(sortedTagEntries, lang);
+	}
+
+	private String effectiveKey(AmenityRowData tagEntry, String lang) {
+		if (tagEntry.collapsableRowType == AmenityRowData.CollapsableRowType.PLAIN && !Algorithms.isEmpty(tagEntry.collapsableRows)) {
+			return findMainChild(tagEntry, lang).key;
+		}
+		return tagEntry.key;
+	}
+
+	// Mirrors AmenityRowsBuilder.sortDescriptionRows, but matches against the resolved header key
+	// (findMainChild) rather than row.key: our PLAIN entries keep the bare base key on the outer entry,
+	// unlike Android's header AmenityRowData, whose key already carries the picked ":lang" suffix.
+	private void sortDescriptionRows(List<AmenityRowData> tagEntries, String lang) {
+		if (Algorithms.isEmpty(lang)) {
+			return;
+		}
+		String langSuffix = ":" + lang;
+		AmenityRowData preferred = null;
+		for (AmenityRowData tagEntry : tagEntries) {
+			String key = effectiveKey(tagEntry, lang);
+			if (key.length() > langSuffix.length() && key.endsWith(langSuffix)) {
+				preferred = tagEntry;
+				break;
+			}
+		}
+		if (preferred != null) {
+			tagEntries.remove(preferred);
+			tagEntries.add(0, preferred);
+		}
 	}
 
 	private List<AmenityRowData> sortTagEntries(AdditionalInfoBundle infoBundle, List<AmenityRowData> tagEntries, String lang) {
