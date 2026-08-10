@@ -317,8 +317,10 @@ public class SpatialSearchService {
 	                                          int results) {
 		Map<String, Object> info = new LinkedHashMap<>();
 		info.put("timeAll", String.format("%.1f", (System.currentTimeMillis() - startTime) / 1e3));
-		info.put("atoms", String.format("%.2f, %,d", stats.step1Atoms.ms() / 1000.0, stats.tokenObjs));
-		info.put("compute", String.format("%.2f, %,d", stats.step2Compute.ms() / 1000.0, stats.maxCombinations));
+		info.put("req", String.format("%.1f", stats.requestTime.ms() / 1000.0));
+		info.put("atoms", String.format("%.2f", stats.step1Atoms.ms() / 1000.0));
+		info.put("compute", String.format("%.2f", (stats.step2Compute.ms() - stats.sub2ReadObjTime.ms()) / 1000.0));
+		info.put("readObj", String.format("%.2f", stats.sub2ReadObjTime.ms() / 1000.0));
 		info.put("poi-by-type", String.format("%.2f, %,d", stats.poiByTypeTime.ms() / 1000.0, stats.poiByTypeBboxes));
 		info.put("results", results);
 
