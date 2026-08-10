@@ -880,7 +880,7 @@ public class IndexCreator {
 		MapZooms zooms = MapZooms.getDefault(); // MapZooms.parseZooms("15-");
 
 		
-		String file = rootFolder + "../temp/japan_map.osm";
+		String file = rootFolder + "../temp/map.osm";
 //		String file = rootFolder + "../temp/makby.osm";
 //		String file = rootFolder + "../temp/liechtenstein_europe.pbf";
 //		String file = rootFolder + "../temp/Routing_test_76.osm";

@@ -1130,7 +1130,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	private boolean isStreetTag(String highwayValue) {
 		// exclude cycleways as we don't have houses related with them
-		return !"platform".equals(highwayValue) && !"cycleway".equals(highwayValue);
+		return !"platform".equals(highwayValue) && !"cycleway".equals(highwayValue) && !"services".equals(highwayValue) && !"service".equals(highwayValue);
 	}
 
 
