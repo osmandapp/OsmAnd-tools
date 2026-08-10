@@ -579,6 +579,9 @@ public class SpatialSearchPipelineTest {
 			boolean enginePerPhrase = phraseAndSettings.settings != null && !phraseAndSettings.settings.keySet().isEmpty();
 			SearchTestEngine engine = defaultEngine;
 			if (enginePerPhrase) {
+				if (!RUN_IGNORED_TESTS && phraseAndSettings.settings.optBoolean("ignore")) {
+					continue;
+				}
 				engine = createSearchEngine(mergePhraseSettings(settingsJson, phraseAndSettings.settings), readers);
 			}
 			
