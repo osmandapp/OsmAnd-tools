@@ -114,7 +114,7 @@ public class TopTagValuesAnalyzer {
 				consolidate = true;
 			}
 		}
-		System.out.printf("Run (%s) %s consolidate=%s", Arrays.toString(args), fl.getName(), consolidate);
+		System.out.printf("Run (%s) %s consolidate=%s\n", Arrays.toString(args), fl.getName(), consolidate);
 		new TopTagValuesAnalyzer().analyzeTopTagValues(fl, consolidate);
 	}
 
@@ -342,6 +342,13 @@ public class TopTagValuesAnalyzer {
 		Iterator<Entry<String, Integer>> it = reg.tagValuesSorted.entrySet().iterator();
 		while (it.hasNext()) {
 			Entry<String, Integer> e = it.next();
+			if (!planet.tagValues.containsKey(e.getKey())) {
+				System.err.printf("Skip %s in %s: missing in planet, regionCount=%d\n",
+						e.getKey(), reg.name, e.getValue());
+				reg.tagValues.remove(e.getKey());
+				it.remove();
+				continue;
+			}
 			Integer globalCount = planet.tagValuesSorted.get(e.getKey());
 			float percent = ((float) e.getValue()) / globalCount;
 			if (percent > BRAND_OWNERSHIP) {
