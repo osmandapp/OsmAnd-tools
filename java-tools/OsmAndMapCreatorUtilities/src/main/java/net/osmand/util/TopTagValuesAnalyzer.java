@@ -342,7 +342,14 @@ public class TopTagValuesAnalyzer {
 		Iterator<Entry<String, Integer>> it = reg.tagValuesSorted.entrySet().iterator();
 		while (it.hasNext()) {
 			Entry<String, Integer> e = it.next();
-			Integer globalCount = planet.tagValuesSorted.get(e.getKey());
+			Integer globalCount;
+			try {
+				globalCount = planet.tagValuesSorted.get(e.getKey());
+			} catch (NullPointerException ex) {
+				System.err.printf("Missing planet count for %s in %s, regionCount=%d\n",
+						e.getKey(), reg.name, e.getValue());
+				throw ex;
+			}
 			float percent = ((float) e.getValue()) / globalCount;
 			if (percent > BRAND_OWNERSHIP) {
 				TagValueInfo info = new TagValueInfo();
