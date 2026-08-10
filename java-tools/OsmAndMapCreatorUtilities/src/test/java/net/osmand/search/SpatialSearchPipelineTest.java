@@ -28,6 +28,9 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
+import net.osmand.data.*;
+import net.osmand.search.core.spatial.SpatialTextSearch;
+import net.osmand.util.MapUtils;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -47,11 +50,6 @@ import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapPoiReaderAdapter;
 import net.osmand.binary.BinaryMapRouteReaderAdapter;
 import net.osmand.binary.RouteDataObject;
-import net.osmand.data.Amenity;
-import net.osmand.data.Building;
-import net.osmand.data.City;
-import net.osmand.data.LatLon;
-import net.osmand.data.Street;
 import net.osmand.obf.OBFDataCreator;
 import net.osmand.obf.preparation.IndexAddressCreator;
 import net.osmand.obf.preparation.IndexCreator;
@@ -77,17 +75,21 @@ import net.osmand.util.Algorithms;
  * provide mandatory settings, phrases, and expected results; same-basename OBFs in that directory are original
  * transformation inputs unless files are listed explicitly.
  * <p>
- * Generated source JSON and OBF artifacts are cached as {@code *.json.gz} and {@code *.obf.gz} in {@link #GEN_DIR},
- * while plain {@code *.orig.obf}, {@code *.json}, and {@code *.obf} files are temporary.
+ * Generated source JSON is cached as {@code *.json.gz} in {@link #GEN_DIR}, while plain
+ * {@code *.orig.obf}, {@code *.json}, and generated {@code *.gen.obf} files are temporary. OBF files in
+ * {@link #GEN_DIR} without a same-basename source JSON are treated as source OBFs.
  */
 @RunWith(Parameterized.class)
 public class SpatialSearchPipelineTest {
 	private static final String ANDROID_PATH_ENV = "ANDROID_PATH",
 			RESOURCES_PATH_ENV = "RESOURCES_PATH",
-			SEARCH_RESOURCES_PATH_ENV = "SEARCH_RESOURCES_PATH";
+			SEARCH_RESOURCES_PATH_ENV = "SEARCH_RESOURCES_PATH",
+			LIVE_TESTING_DIR_ENV = "LIVE_TESTING_DIR";
 	private static final String RESOURCES_PATH = getResourcesPath();
 	private static final String SEARCH_RESOURCES_PATH = getSearchResourcesPath();
-	private static final File GEN_DIR = new File(SEARCH_RESOURCES_PATH, "gen-source");
+	private static final boolean LIVE_TESTING = !Algorithms.isEmpty(System.getenv(LIVE_TESTING_DIR_ENV));
+	private static final File GEN_DIR = getGenSourceDir();
+	private static final String GENERATED_OBF_SUFFIX = ".gen.obf";
 	private static final Set<String> GENERATED_OBFS = Collections.synchronizedSet(new HashSet<>());
 	private static final boolean REGENERATE_OBF = true;
 	private static final boolean TEST_EXTRA_RESULTS = true;
@@ -114,6 +116,14 @@ public class SpatialSearchPipelineTest {
 	public SpatialSearchPipelineTest(String name, File file) {
 		this.testFile = file;
 		NameIndexCreator.MIN_LIMIT_COMMON_NON_INDEXED = 0;
+	}
+
+	private static File getGenSourceDir() {
+		String path = System.getenv(LIVE_TESTING_DIR_ENV);
+		if (Algorithms.isEmpty(path)) {
+			return new File(SEARCH_RESOURCES_PATH, "gen-source");
+		}
+		return new File(path.endsWith("/") || path.endsWith("\\") ? path : path + File.separator);
 	}
 
 	private static String getResourcesPath() {
@@ -168,16 +178,24 @@ public class SpatialSearchPipelineTest {
 	@BeforeClass
 	public static void setUp() {
 		GENERATED_OBFS.clear();
+		if (LIVE_TESTING) {
+			defaultSetup();
+			return;
+		}
 		HASH_IS_ACTUAL_FOR_RUN = isHashActual();
 		if (!HASH_IS_ACTUAL_FOR_RUN) {
-			deleteGeneratedFiles(GEN_DIR, ".obf", ".obf.gz");
+			deleteGeneratedObfFiles(GEN_DIR);
 		}
 		defaultSetup();
 	}
 
 	@AfterClass
 	public static void tearDown() {
-		deleteGeneratedFiles(GEN_DIR, ".obf", ".json");
+		if (LIVE_TESTING) {
+			return;
+		}
+		deleteGeneratedObfFiles(GEN_DIR);
+		deleteGeneratedFiles(GEN_DIR, ".orig.obf", ".json");
 		GENERATED_OBFS.clear();
 	}
 
@@ -199,11 +217,13 @@ public class SpatialSearchPipelineTest {
 
 	/**
 	 * Resolves a same-basename test data chain and returns a readable generated OBF:
-	 * <li>Cached {@code *.obf.gz} in {@link #GEN_DIR} is reused when newer than the resolved source JSON; </li>
+	 * <li>An OBF in {@link #GEN_DIR} without a same-basename source JSON is used as a source OBF; </li>
+	 * <li>Cached legacy {@code *.obf.gz} in {@link #GEN_DIR} is reused when newer than the resolved source JSON; </li>
 	 * <li>otherwise cached {@code *.json.gz} is used as source when newer than the original OBF or when no original exists. </li>
 	 * <li>If no source JSON exists, a same-basename {@code *.osm} file is used to generate the OBF directly. </li>
 	 * <li>If no source cache is valid, the original OBF from {@link #SEARCH_RESOURCES_PATH} is exported to source JSON.
-	 * <li>New plain {@code *.json} and {@code *.obf} files are compressed back to {@code *.json.gz} and {@code *.obf.gz} for later runs.
+	 * <li>Generated OBFs use the distinct {@code *.gen.obf} suffix and are deleted after the run.
+	 * <li>New plain source JSON files are compressed back to {@code *.json.gz} for later runs.
 	 * <li>When {@link #REGENERATE_OBF} is {@code false}, the transformation/cache chain is skipped and only the original OBF is used.
 	 */
 	private File createOBFIfNeeded(String fileName) throws IOException, SQLException {
@@ -220,19 +240,22 @@ public class SpatialSearchPipelineTest {
 		File sourceJson = getNewestExistingFile(
 				new File(GEN_DIR, baseName + ".json"),
 				new File(GEN_DIR, baseName + ".json.gz"));
+		if (originalObf == null && sourceJson == null) {
+			originalObf = getNewestExistingFile(
+					new File(GEN_DIR, baseName + ".obf"),
+					new File(GEN_DIR, baseName + ".obf.gz"));
+		}
 		File sourceOsm = sourceJson == null ? new File(SEARCH_RESOURCES_PATH, baseName + ".osm") : null;
 		if (sourceOsm != null && !sourceOsm.isFile()) {
 			sourceOsm = null;
 		}
-		File preparedObf = getNewestExistingFile(
-				new File(GEN_DIR, baseName + ".obf"),
-				new File(GEN_DIR, baseName + ".obf.gz"));
+		String generatedObfName = baseName + GENERATED_OBF_SUFFIX;
+		File generatedObfFile = new File(GEN_DIR, generatedObfName);
+		File preparedObf = getNewestExistingFile(generatedObfFile);
 		if (originalObf == null && sourceJson == null && sourceOsm == null && preparedObf == null) {
 			throw new FileNotFoundException("No OBF, source JSON, or source OSM found for " + fileName);
 		}
 
-		String generatedObfName = baseName + ".obf";
-		File generatedObfFile = new File(GEN_DIR, generatedObfName);
 		String obfPath = generatedObfFile.getAbsolutePath();
 		synchronized (GENERATED_OBFS) {
 			File parent = generatedObfFile.getParentFile();
@@ -247,7 +270,6 @@ public class SpatialSearchPipelineTest {
 					|| noSourceAvailable && alreadyGenerated);
 			if (canUsePreparedObf) {
 				File obfFile = prepareObfFile(preparedObf, generatedObfFile);
-				cacheObfIfNeeded(preparedObf, obfFile, baseName);
 				GENERATED_OBFS.add(obfPath);
 				return obfFile;
 			}
@@ -262,7 +284,6 @@ public class SpatialSearchPipelineTest {
 				}
 				writeHash();
 			}
-			cacheGzipIfNeeded(generatedObfFile, new File(GEN_DIR, baseName + ".obf.gz"));
 			GENERATED_OBFS.add(obfPath);
 		}
 		return generatedObfFile;
@@ -284,13 +305,6 @@ public class SpatialSearchPipelineTest {
 		} catch (XmlPullParserException e) {
 			throw new IOException("Cannot generate OBF from " + sourceOsm, e);
 		}
-	}
-
-	private void cacheObfIfNeeded(File preparedObf, File obfFile, String baseName) throws IOException {
-		if (preparedObf != null && preparedObf.getName().endsWith(".obf.gz")) {
-			return;
-		}
-		cacheGzipIfNeeded(obfFile, new File(GEN_DIR, baseName + ".obf.gz"));
 	}
 
 	private File getSourceFile(String baseName, File originalObf, File sourceJson) throws IOException {
@@ -380,7 +394,7 @@ public class SpatialSearchPipelineTest {
 		return newest;
 	}
 
-	private String getBaseName(String fileName) {
+	private static String getBaseName(String fileName) {
 		if (fileName.endsWith(".obf.gz")) {
 			return fileName.substring(0, fileName.length() - ".obf.gz".length());
 		}
@@ -437,22 +451,30 @@ public class SpatialSearchPipelineTest {
 		}
 	}
 
-	private void loadReaders(JSONObject sourceJson, List<BinaryMapIndexReader> readers) throws IOException, SQLException {
+	private void loadReaders(JSONObject sourceJson, LatLon point, List<BinaryMapIndexReader> readers) throws IOException, SQLException {
 		if (!GEN_DIR.isDirectory() && !GEN_DIR.mkdirs()) {
 			throw new IOException("Cannot create generated OBF directory " + GEN_DIR);
 		}
-		JSONArray filesJson = sourceJson.optJSONArray("files");
-		if (filesJson != null) {
-			for (int i = 0; i < filesJson.length(); i++) {
-				String file = filesJson.optString(i, null);
-				if (!Algorithms.isEmpty(file) && isDataFileName(file)) {
-					File obfFile = createOBFIfNeeded(file);
-					readers.add(openReader(obfFile));
-				}
-			}
+
+		if (LIVE_TESTING) {
+			int limit = SpatialTextSearch.SpatialTextSearchSettings.defaultSettings().SUGGESTED_SEARCH_RADIUS_KM;
+			QuadRect box = MapUtils.calculateLatLonBbox(point.getLatitude(), point.getLongitude(), limit * 1000);
+			readers.addAll(getMaps(box, GEN_DIR.listFiles(f -> f.isFile()
+					&& f.getName().endsWith(".obf") && !f.getName().endsWith(GENERATED_OBF_SUFFIX))));
 		} else {
-			File obfFile = createOBFIfNeeded(testFile.getName());
-			readers.add(openReader(obfFile));
+			JSONArray filesJson = sourceJson.optJSONArray("files");
+			if (filesJson != null) {
+				for (int i = 0; i < filesJson.length(); i++) {
+					String file = filesJson.optString(i, null);
+					if (!Algorithms.isEmpty(file) && isDataFileName(file)) {
+						File obfFile = createOBFIfNeeded(file);
+						readers.add(openReader(obfFile));
+					}
+				}
+			} else {
+				File obfFile = createOBFIfNeeded(testFile.getName());
+				readers.add(openReader(obfFile));
+			}
 		}
 	}
 
@@ -530,8 +552,8 @@ public class SpatialSearchPipelineTest {
 		return parseExpectedResults(sourceJson, "results", phrasesSize);
 	}
 
-	protected SearchTestEngine createSearchEngine(JSONObject settingsJson, List<BinaryMapIndexReader> readers) {
-		return new SpatialTestSearchEngine(settingsJson, readers);
+	protected SearchTestEngine createSearchEngine(SpatialTextSearch.SpatialTextSearchSettings spatialSettings, LatLon point, List<BinaryMapIndexReader> readers) {
+		return new SpatialTestSearchEngine(spatialSettings, point, readers);
 	}
 	
 	@Test
@@ -545,32 +567,35 @@ public class SpatialSearchPipelineTest {
 //		if (RUN_IGNORED_TESTS) {
 //			return;
 //		}
-		List<PhraseTuple> phrases = parsePhrases(sourceJson);
-        searchKeywords = getKeywords(sourceJson, phrases);
 		JSONObject settingsJson = sourceJson.getJSONObject("settings");
-		boolean useData = settingsJson.optBoolean("useData", true);
-		List<BinaryMapIndexReader> readers = new ArrayList<>();
-		boolean prevDisplayDefaultPoiTypes = SearchCoreFactory.DISPLAY_DEFAULT_POI_TYPES;
-		SearchTestEngine defaultEngine = null;
-		try {
-			if (useData) {
-				loadReaders(sourceJson, readers);
-				if (readers.isEmpty()) {
-					throw new IllegalStateException("useData=true but no OBF indexes were loaded for " + testFile.getName());
-				}
-			}
 		boolean disabled = settingsJson.optBoolean("disabled", false);
 		if (disabled) {
 			return;
 		}
 		
+		List<BinaryMapIndexReader> readers = new ArrayList<>();
+		boolean prevDisplayDefaultPoiTypes = SearchCoreFactory.DISPLAY_DEFAULT_POI_TYPES;
+		LatLon point = parseLocation(settingsJson);
+		List<PhraseTuple> phrases = parsePhrases(sourceJson);
+		searchKeywords = getKeywords(sourceJson, phrases);
 		List<List<String>> results = getExpectedResults(sourceJson, phrases.size());
 		Assert.assertEquals(phrases.size(), results.size());
 		if (phrases.size() != results.size()) {
 			return;
 		}
 
-		defaultEngine = createSearchEngine(settingsJson, readers);
+		SearchTestEngine defaultEngine = null;
+		try {
+			boolean useData = settingsJson.optBoolean("useData", true);
+			if (useData) {
+				loadReaders(sourceJson, point, readers);
+				if (readers.isEmpty()) {
+					throw new IllegalStateException("useData=true but no OBF indexes were loaded for " + testFile.getName());
+				}
+			}
+
+		SpatialTextSearch.SpatialTextSearchSettings settings = parseSpatialSettings(settingsJson);
+		defaultEngine = createSearchEngine(settings, point, readers);
 		int shift = 4;
 		for (int k = 0; k < phrases.size(); k++) {
 			PhraseTuple phraseAndSettings = phrases.get(k);
@@ -582,7 +607,8 @@ public class SpatialSearchPipelineTest {
 				if (!RUN_IGNORED_TESTS && phraseAndSettings.settings.optBoolean("ignore")) {
 					continue;
 				}
-				engine = createSearchEngine(mergePhraseSettings(settingsJson, phraseAndSettings.settings), readers);
+				JSONObject mergedJson = mergePhraseSettings(settingsJson, phraseAndSettings.settings);
+				engine = createSearchEngine(parseSpatialSettings(mergedJson), parseLocation(mergedJson), readers);
 			}
 			
 			List<String> actualResults = engine.search(text, false);
@@ -670,6 +696,23 @@ public class SpatialSearchPipelineTest {
 			if (file.isDirectory()) {
 				deleteGeneratedFiles(file, extensions);
 			} else if (hasAnyExtension(file, extensions)) {
+				deleteRecursively(file);
+			}
+		}
+	}
+
+	private static void deleteGeneratedObfFiles(File dir) {
+		if (LIVE_TESTING || dir == null || !dir.isDirectory()) {
+			return;
+		}
+		File[] files = dir.listFiles();
+		if (files == null) {
+			return;
+		}
+		for (File file : files) {
+			if (file.isDirectory()) {
+				deleteGeneratedObfFiles(file);
+			} else if (file.getName().endsWith(GENERATED_OBF_SUFFIX)) {
 				deleteRecursively(file);
 			}
 		}
@@ -1086,13 +1129,8 @@ public class SpatialSearchPipelineTest {
         Iterator<City> cityIterator = cities.iterator();
         while (cityIterator.hasNext()) {
             City c = cityIterator.next();
-            boolean match = false;
-            if (match(c.getName()) || match(c.getNamesMap(true).values())) {
-                match = true;
-            }
-            Iterator<Street> streetIterator = c.getStreets().iterator();
-            while (streetIterator.hasNext()) {
-                Street s = streetIterator.next();
+            boolean match = match(c.getName()) || match(c.getNamesMap(true).values());
+            for (Street s : c.getStreets()) {
                 if (match(s.getName()) || match(s.getNamesMap(true).values())) {
                     match = true;
                 } else {
@@ -1123,4 +1161,86 @@ public class SpatialSearchPipelineTest {
         }
         return false;
     }
+
+	private LatLon parseLocation(JSONObject settingsJson) {
+		JSONObject locationJson = settingsJson.optJSONObject("location");
+		if (locationJson != null) {
+			return new LatLon(locationJson.getDouble("lat"), locationJson.getDouble("lon"));
+		}
+		if (settingsJson.has("lat") && settingsJson.has("lon")) {
+			return new LatLon(settingsJson.getDouble("lat"), settingsJson.getDouble("lon"));
+		}
+		return null;
+	}
+
+	private SpatialTextSearch.SpatialTextSearchSettings parseSpatialSettings(JSONObject settingsJson) {
+		SpatialTextSearch.SpatialTextSearchSettings settings = SpatialTextSearch.SpatialTextSearchSettings.defaultSettings();
+		settings.SEARCH_ADDR = settingsJson.optBoolean("SEARCH_ADDR", settings.SEARCH_ADDR);
+		settings.SEARCH_POI = settingsJson.optBoolean("SEARCH_POI", settings.SEARCH_POI);
+		settings.SEARCH_BUILDINGS = settingsJson.optBoolean("SEARCH_BUILDINGS", settings.SEARCH_BUILDINGS);
+		settings.SEARCH_STREET_INTERSECTIONS = settingsJson.optBoolean("SEARCH_STREET_INTERSECTIONS", settings.SEARCH_STREET_INTERSECTIONS);
+		settings.SEARCH_POI_INTERSECTIONS = settingsJson.optBoolean("SEARCH_POI_INTERSECTIONS", settings.SEARCH_POI_INTERSECTIONS);
+		settings.SEARCH_POI_CATEGORIES = settingsJson.optBoolean("SEARCH_POI_CATEGORIES", settings.SEARCH_POI_CATEGORIES);
+		settings.ALLOW_VIRTUAL_STREET_INTERSECTIONS = settingsJson.optBoolean("ALLOW_VIRTUAL_STREET_INTERSECTIONS",
+				settings.ALLOW_VIRTUAL_STREET_INTERSECTIONS);
+		settings.OPTIM_DELETE_EMBEDDED_BOUNDARIES = settingsJson.optBoolean("OPTIM_DELETE_EMBEDDED_BOUNDARIES",
+				settings.OPTIM_DELETE_EMBEDDED_BOUNDARIES);
+		settings.OPTIM_FLAG_POI_SAME_AS_CITY_STREET = settingsJson.optBoolean("OPTIM_FLAG_POI_SAME_AS_CITY_STREET",
+				settings.OPTIM_FLAG_POI_SAME_AS_CITY_STREET);
+		settings.DEDUPLICATE_RES = settingsJson.optBoolean("DEDUPLICATE_RES", settings.DEDUPLICATE_RES);
+		settings.OPTIM_READ_COMMON_WORDS_LIMIT = settingsJson.optInt("OPTIM_READ_COMMON_WORDS_LIMIT", settings.OPTIM_READ_COMMON_WORDS_LIMIT);
+		settings.LANG_DEDUPLICATE = settingsJson.optString("LANG_DEDUPLICATE", settings.LANG_DEDUPLICATE);
+		settings.MIN_ELO_RATING = settingsJson.optInt("MIN_ELO_RATING", settings.MIN_ELO_RATING);
+		settings.MIN_CHARACTERS_INCOMPLETE = settingsJson.optInt("MIN_CHARACTERS_INCOMPLETE", settings.MIN_CHARACTERS_INCOMPLETE);
+		settings.LIMIT_ATOMIC_OBJECTS = settingsJson.optInt("LIMIT_ATOMIC_OBJECTS", settings.LIMIT_ATOMIC_OBJECTS);
+		settings.LIMIT_STOP_GOALS_ANY_LEVEL_WHEN_REACHED_RES = settingsJson.optInt("LIMIT_ALL_GOALS_MAX_UNIQUE_OBJECTS",
+				settings.LIMIT_STOP_GOALS_ANY_LEVEL_WHEN_REACHED_RES);
+		settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES = settingsJson.optInt("LIMIT_STOP_OTHER_GOALS_WHEN_REACHED_UNIQUE_OBJECTS",
+				settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES);
+		settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES = settingsJson.optInt("LIMIT_GOAL_LEVEL_2", settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES);
+		settings.DEV_USE_PIPELINE = settingsJson.optBoolean("DEV_USE_PIPELINE", settings.DEV_USE_PIPELINE);
+
+		return settings;
+	}
+
+	private List<BinaryMapIndexReader> getMaps(QuadRect quadRect, File[] candidates) throws IOException {
+		List<BinaryMapIndexReader> maps = new ArrayList<>();
+		if (quadRect == null || quadRect.hasInitialState() || candidates == null) {
+			return maps;
+		}
+
+		int left31 = MapUtils.get31TileNumberX(Math.min(quadRect.left, quadRect.right));
+		int right31 = MapUtils.get31TileNumberX(Math.max(quadRect.left, quadRect.right));
+		int top31 = MapUtils.get31TileNumberY(Math.max(quadRect.top, quadRect.bottom));
+		int bottom31 = MapUtils.get31TileNumberY(Math.min(quadRect.top, quadRect.bottom));
+
+		try {
+			for (File file : candidates) {
+				BinaryMapIndexReader reader = openReader(file);
+				boolean selected = false;
+				try {
+					selected = reader.containsPoiData(left31, top31, right31, bottom31)
+							|| reader.containsRouteData(left31, top31, right31, bottom31, 15)
+							|| reader.containsMapData(left31, top31, right31, bottom31, 15);
+					if (selected) {
+						maps.add(reader);
+					}
+				} finally {
+					if (!selected) {
+						reader.close();
+					}
+				}
+			}
+		} catch (IOException | RuntimeException e) {
+			for (BinaryMapIndexReader reader : maps) {
+				try {
+					reader.close();
+				} catch (IOException closeError) {
+					e.addSuppressed(closeError);
+				}
+			}
+			throw e;
+		}
+		return maps;
+	}
 }
