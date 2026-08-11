@@ -176,7 +176,8 @@ public class SearchController {
 	public ResponseEntity<String> visibleTags(@RequestBody Map<String, String> tags,
 	                                          @RequestParam(required = false) String lang) {
 		if (tags != null && tags.size() > MAX_TAG_ENTRIES) {
-			return ResponseEntity.badRequest().body("Too many tags " + tags.size() + ", maximum is " + MAX_TAG_ENTRIES);
+			return ResponseEntity.badRequest().body(gson.toJson(Map.of(
+					"error", "Too many tags " + tags.size() + ", maximum is " + MAX_TAG_ENTRIES)));
 		}
 		List<PoiTypesService.VisibleTag> visibleTags = poiTypesService.getVisibleTags(tags, lang);
 		return ResponseEntity.ok(gson.toJson(visibleTags));
