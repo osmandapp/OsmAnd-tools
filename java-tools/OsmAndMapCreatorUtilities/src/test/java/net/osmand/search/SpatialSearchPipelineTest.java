@@ -190,11 +190,14 @@ public class SpatialSearchPipelineTest {
 	public static void setUp() throws IOException {
 		GENERATED_OBFS.clear();
 		if (LIVE_TESTING) {
+			System.out.println("LIVE_TESTING is ON (" + GEN_DIR + ")");
 			File regionsFile = new File(getAndroidPath(), "OsmAnd-java" + File.separator + OsmandRegions.REGIONS_OCBF);
 			REGIONS = new OsmandRegions(regionsFile.getAbsolutePath());
 			REGIONS.close();
 			defaultSetup();
 			return;
+		} else {
+			System.out.println("LIVE_TESTING is OFF");
 		}
 		HASH_IS_ACTUAL_FOR_RUN = isHashActual();
 		if (!HASH_IS_ACTUAL_FOR_RUN) {
@@ -575,10 +578,6 @@ public class SpatialSearchPipelineTest {
 		Assert.assertEquals(phrases.size(), results.size());
 		if (phrases.size() != results.size()) {
 			return;
-		}
-
-		if (LIVE_TESTING) {
-			System.out.println("LIVE_TESTING is on: " + GEN_DIR);
 		}
 
 		SearchTestEngine defaultEngine = null;
