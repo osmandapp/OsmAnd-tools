@@ -26,7 +26,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
 
 import net.osmand.data.*;
 import net.osmand.map.OsmandRegions;
@@ -77,9 +76,18 @@ import net.osmand.util.Algorithms;
  * provide mandatory settings, phrases, and expected results; same-basename OBFs in that directory are original
  * transformation inputs unless files are listed explicitly.
  * <p>
- * Generated source JSON is cached as {@code *.json.gz} in {@link #GEN_DIR}, while plain
- * {@code *.orig.obf}, {@code *.json}, and generated {@code *.gen.obf} files are temporary. OBF files in
- * {@link #GEN_DIR} without a same-basename source JSON are treated as source OBFs.
+ * Generated source JSON and OBF files are cached as {@code *.json.gz} and {@code *.gen.obf} in {@link #GEN_DIR};
+ * only plain {@code *.json} files are removed after a normal test run. A generated OBF is reused when its
+ * generator hash is current and it is at least as new as its source. OBF files in {@link #GEN_DIR} without a
+ * same-basename source JSON are treated as source OBFs.
+ * <p>
+ * Execution modes, in precedence order:
+ * <li>{@link #LIVE_TESTING} reads matching OBFs directly from {@link #GEN_DIR}; it bypasses conversion,
+ * generation hashes, generated OBFs, and all setup/teardown cleanup in that directory.</li>
+ * <li>{@link #REGENERATE_OBF} enables the source JSON/OSM conversion and generated-OBF cache pipeline.
+ * When disabled, tests use the original OBF directly (or a temporary unpacked copy).</li>
+ * <li>{@link #HASH_IS_ACTUAL_FOR_RUN} records whether cached generated OBFs are compatible with the current
+ * generator classes. A stale hash removes only {@code *.gen.obf} files during setup.</li>
  */
 @RunWith(Parameterized.class)
 public class SpatialSearchPipelineTest {
@@ -93,7 +101,7 @@ public class SpatialSearchPipelineTest {
 	private static final File GEN_DIR = getGenSourceDir();
 	private static final String GENERATED_OBF_SUFFIX = ".gen.obf";
 	private static final Set<String> GENERATED_OBFS = Collections.synchronizedSet(new HashSet<>());
-	private static final boolean REGENERATE_OBF = true;
+	private static final boolean REGENERATE_OBF = true; // bypassed by LIVE_TESTING
 	private static final boolean TEST_EXTRA_RESULTS = true;
 	private static final List<Class<?>> OBF_GENERATE_CLASSES = List.of(IndexCreator.class, IndexPoiCreator.class,
 			IndexAddressCreator.class);
@@ -103,7 +111,7 @@ public class SpatialSearchPipelineTest {
 	
 	private static final boolean FILTER_DATA_JSON = false;
 	private static final double FILTER_REMOVE_PROBABILITY = 0.8; // means 80% probability of removal
-	private static boolean HASH_IS_ACTUAL_FOR_RUN;
+	private static boolean HASH_IS_ACTUAL_FOR_RUN; // evaluated once during non-LIVE setup
 	private static OsmandRegions REGIONS;
 
 	private final File testFile;
@@ -190,7 +198,7 @@ public class SpatialSearchPipelineTest {
 		}
 		HASH_IS_ACTUAL_FOR_RUN = isHashActual();
 		if (!HASH_IS_ACTUAL_FOR_RUN) {
-			deleteGeneratedObfFiles(GEN_DIR);
+			deleteGeneratedFiles(GEN_DIR, GENERATED_OBF_SUFFIX, GENERATED_OBF_SUFFIX + ".gz");
 		}
 		defaultSetup();
 	}
@@ -200,12 +208,12 @@ public class SpatialSearchPipelineTest {
 		if (LIVE_TESTING) {
 			return;
 		}
-		deleteGeneratedObfFiles(GEN_DIR);
-		deleteGeneratedFiles(GEN_DIR, ".orig.obf", ".json");
+
+		deleteGeneratedFiles(GEN_DIR, ".json", GENERATED_OBF_SUFFIX + ".gz");
 		GENERATED_OBFS.clear();
 	}
 
-	static void defaultSetup() {
+	private static void defaultSetup() {
 		MapPoiTypes.setDefault(new MapPoiTypes(RESOURCES_PATH + "poi/poi_types.xml"));
 		MapPoiTypes poiTypes = MapPoiTypes.getDefault();
 		Map<String, String> enPhrases = new HashMap<>();
@@ -223,12 +231,14 @@ public class SpatialSearchPipelineTest {
 
 	/**
 	 * Resolves a same-basename test data chain and returns a readable generated OBF:
-	 * <li>An OBF in {@link #GEN_DIR} without a same-basename source JSON is used as a source OBF; </li>
-	 * <li>Cached legacy {@code *.obf.gz} in {@link #GEN_DIR} is reused when newer than the resolved source JSON; </li>
-	 * <li>otherwise cached {@code *.json.gz} is used as source when newer than the original OBF or when no original exists. </li>
+	 * <li>A cached {@code *.gen.obf} is reused when its generator hash is current and it is not older than
+	 * the selected source.</li>
+	 * <li>An OBF in {@link #GEN_DIR} without a same-basename source JSON is used as a source OBF.</li>
+	 * <li>A cached {@code *.json.gz} is used as source when newer than the original OBF or when no original exists.</li>
 	 * <li>If no source JSON exists, a same-basename {@code *.osm} file is used to generate the OBF directly. </li>
 	 * <li>If no source cache is valid, the original OBF from {@link #SEARCH_RESOURCES_PATH} is exported to source JSON.
-	 * <li>Generated OBFs use the distinct {@code *.gen.obf} suffix and are deleted after the run.
+	 * <li>Generated OBFs use the distinct {@code *.gen.obf} suffix and remain cached between runs.
+	 * They are removed during setup only when the generator hash is stale.
 	 * <li>New plain source JSON files are compressed back to {@code *.json.gz} for later runs.
 	 * <li>When {@link #REGENERATE_OBF} is {@code false}, the transformation/cache chain is skipped and only the original OBF is used.
 	 */
@@ -241,7 +251,7 @@ public class SpatialSearchPipelineTest {
 			if (originalObf == null) {
 				throw new FileNotFoundException("Original OBF does not exist for " + fileName);
 			}
-			return prepareOriginalObfFile(originalObf, new File(GEN_DIR, baseName + ".orig.obf"));
+			return prepareOriginalObfFile(originalObf, new File(GEN_DIR, baseName + GENERATED_OBF_SUFFIX));
 		}
 		File sourceJson = getNewestExistingFile(
 				new File(GEN_DIR, baseName + ".json"),
@@ -275,7 +285,7 @@ public class SpatialSearchPipelineTest {
 					&& (isPreparedObfActual(preparedObf, sourceJson, sourceOsm, originalObf)
 					|| noSourceAvailable && alreadyGenerated);
 			if (canUsePreparedObf) {
-				File obfFile = prepareObfFile(preparedObf, generatedObfFile);
+				File obfFile = prepareFile(preparedObf, generatedObfFile);
 				GENERATED_OBFS.add(obfPath);
 				return obfFile;
 			}
@@ -315,14 +325,12 @@ public class SpatialSearchPipelineTest {
 
 	private File getSourceFile(String baseName, File originalObf, File sourceJson) throws IOException {
 		if (sourceJson != null && (originalObf == null || sourceJson.lastModified() > originalObf.lastModified())) {
-			File sourceFile = prepareJsonFile(sourceJson, new File(GEN_DIR, baseName + ".json"));
-			cacheGzipIfNeeded(sourceFile, new File(GEN_DIR, baseName + ".json.gz"));
-			return sourceFile;
+            return prepareFile(sourceJson, new File(GEN_DIR, baseName + ".json"));
 		}
 		if (originalObf == null) {
 			throw new FileNotFoundException("No original OBF or prepared source JSON found for " + baseName);
 		}
-		File sourceObfFile = prepareOriginalObfFile(originalObf, new File(GEN_DIR, baseName + ".orig.obf"));
+		File sourceObfFile = prepareOriginalObfFile(originalObf, new File(GEN_DIR, baseName + GENERATED_OBF_SUFFIX));
 		sourceObfFile.deleteOnExit();
 		return exportSourceJson(sourceObfFile, baseName + ".obf");
 	}
@@ -335,20 +343,12 @@ public class SpatialSearchPipelineTest {
 		return originalObf;
 	}
 
-	private File prepareJsonFile(File jsonFile, File targetFile) throws IOException {
-		if (jsonFile.getName().endsWith(".gz")) {
-			unzipIfNeeded(jsonFile, targetFile);
+	private File prepareFile(File file, File targetFile) throws IOException {
+		if (file.getName().endsWith(".gz")) {
+			unzipIfNeeded(file, targetFile);
 			return targetFile;
 		}
-		return jsonFile;
-	}
-
-	private File prepareObfFile(File obfFile, File targetFile) throws IOException {
-		if (obfFile.getName().endsWith(".gz")) {
-			unzipIfNeeded(obfFile, targetFile);
-			return targetFile;
-		}
-		return obfFile;
+		return file;
 	}
 
 	private boolean isPreparedObfActual(File preparedObf, File sourceJson, File sourceOsm, File originalObf) {
@@ -428,20 +428,6 @@ public class SpatialSearchPipelineTest {
 			Algorithms.streamCopy(inputStream, outputStream);
 		}
 		file.setLastModified(gzFile.lastModified());
-	}
-
-	private void cacheGzipIfNeeded(File sourceFile, File gzFile) throws IOException {
-		if (sourceFile == null || !sourceFile.isFile() || sourceFile.equals(gzFile)) {
-			return;
-		}
-		if (gzFile.isFile() && gzFile.lastModified() >= sourceFile.lastModified()) {
-			return;
-		}
-		try (FileInputStream inputStream = new FileInputStream(sourceFile);
-		     GZIPOutputStream outputStream = new GZIPOutputStream(new FileOutputStream(gzFile))) {
-			Algorithms.streamCopy(inputStream, outputStream);
-		}
-		gzFile.setLastModified(sourceFile.lastModified());
 	}
 
 	private BinaryMapIndexReader openReader(File obfFile) throws IOException {
@@ -552,7 +538,6 @@ public class SpatialSearchPipelineTest {
 				: generatedObfName + ".json";
 		File jsonFile = new File(GEN_DIR, jsonName);
 		createJsonFile(jsonFile, amenities, cities, routes);
-		cacheGzipIfNeeded(jsonFile, new File(GEN_DIR, jsonName + ".gz"));
 		return jsonFile;
 	}
 	
@@ -708,23 +693,6 @@ public class SpatialSearchPipelineTest {
 			if (file.isDirectory()) {
 				deleteGeneratedFiles(file, extensions);
 			} else if (hasAnyExtension(file, extensions)) {
-				deleteRecursively(file);
-			}
-		}
-	}
-
-	private static void deleteGeneratedObfFiles(File dir) {
-		if (LIVE_TESTING || dir == null || !dir.isDirectory()) {
-			return;
-		}
-		File[] files = dir.listFiles();
-		if (files == null) {
-			return;
-		}
-		for (File file : files) {
-			if (file.isDirectory()) {
-				deleteGeneratedObfFiles(file);
-			} else if (file.getName().endsWith(GENERATED_OBF_SUFFIX)) {
 				deleteRecursively(file);
 			}
 		}
