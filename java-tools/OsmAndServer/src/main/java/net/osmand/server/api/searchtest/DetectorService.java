@@ -105,13 +105,73 @@ public interface DetectorService extends OBFService {
 		}
 		LatLon location = res.getLatLon();
 		List<MapObject> objects = res.getObjects();
-		MapObject object = objects == null || objects.isEmpty() ? null : objects.get(0);
 		Double distance = location == null ? null : MapUtils.getDistance(new LatLon(ctx.lat(), ctx.lon()), location) / 1000.0;
 		ResultMetric metric = new ResultMetric("", res.visibleLevel(), res.matchedTokens(), res.sumOther(),
 				Collections.emptyList(), distance, true, true);
+		List<Street> streets = spatialStreets(objects, ctx.locale());
+		if (streets.size() > 1) {
+			City city = spatialCity(objects, streets);
+			String name = String.join(" - ", streets.stream()
+					.map(street -> spatialName(street, ctx.locale()))
+					.toList());
+			AddressResult parent = city == null ? null : toParent(ctx, city, 1, res.matchedTokens());
+			return new AddressResult(name, "street_intersection", spatialName(city, ctx.locale()),
+					parent, metric, location, null);
+		}
+
+		MapObject object = res.getMainObject();
+		if (object == null && objects != null && !objects.isEmpty()) {
+			object = objects.get(0);
+		}
 		AddressResult parent = toParent(ctx, objects, 1, res.matchedTokens());
 		return new AddressResult(spatialName(object, ctx.locale()), spatialType(object), spatialAddress(object, ctx.locale()),
 				parent, metric, location, null);
+	}
+
+	private List<Street> spatialStreets(List<MapObject> objects, String locale) {
+		if (objects == null || objects.isEmpty()) {
+			return Collections.emptyList();
+		}
+		List<Street> streets = new ArrayList<>();
+		for (MapObject object : objects) {
+			if (object instanceof Street street && !streets.contains(street)) {
+				streets.add(street);
+			}
+		}
+		streets.sort(Comparator.comparing((Street street) -> normalizedSpatialName(street, locale))
+				.thenComparing(Street::getId, Comparator.nullsLast(Long::compareTo)));
+		return streets;
+	}
+
+	private String normalizedSpatialName(MapObject object, String locale) {
+		return spatialName(object, locale).trim().toLowerCase(Locale.ROOT);
+	}
+
+	private City spatialCity(List<MapObject> objects, List<Street> streets) {
+		for (Street street : streets) {
+			if (street.getCity() != null) {
+				return street.getCity();
+			}
+		}
+		if (objects != null) {
+			for (MapObject object : objects) {
+				if (object instanceof City city) {
+					return city;
+				}
+			}
+		}
+		return null;
+	}
+
+	private AddressResult toParent(ClassicSearchService.SearchContext ctx, MapObject object, int depth,
+	                               double foundWordCount) {
+		LatLon location = object == null ? null : object.getLocation();
+		Double distance = location == null ? null
+				: MapUtils.getDistance(new LatLon(ctx.lat(), ctx.lon()), location) / 1000.0;
+		ResultMetric metric = new ResultMetric("", depth, foundWordCount, 0,
+				Collections.emptyList(), distance, true, true);
+		return new AddressResult(spatialName(object, ctx.locale()), spatialType(object),
+				spatialAddress(object, ctx.locale()), null, metric, location, null);
 	}
 
 	private AddressResult toParent(ClassicSearchService.SearchContext ctx, List<MapObject> objects, int index, double foundWordCount) {
