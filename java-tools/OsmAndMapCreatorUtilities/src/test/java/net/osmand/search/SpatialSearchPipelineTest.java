@@ -29,6 +29,8 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import net.osmand.data.*;
+import net.osmand.map.OsmandRegions;
+import net.osmand.map.WorldRegion;
 import net.osmand.search.core.spatial.SpatialTextSearch;
 import net.osmand.util.MapUtils;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -102,6 +104,7 @@ public class SpatialSearchPipelineTest {
 	private static final boolean FILTER_DATA_JSON = false;
 	private static final double FILTER_REMOVE_PROBABILITY = 0.8; // means 80% probability of removal
 	private static boolean HASH_IS_ACTUAL_FOR_RUN;
+	private static OsmandRegions REGIONS;
 
 	private final File testFile;
     private Set<String> searchKeywords;
@@ -176,9 +179,12 @@ public class SpatialSearchPipelineTest {
 	}
 
 	@BeforeClass
-	public static void setUp() {
+	public static void setUp() throws IOException {
 		GENERATED_OBFS.clear();
 		if (LIVE_TESTING) {
+			File regionsFile = new File(getAndroidPath(), "OsmAnd-java" + File.separator + OsmandRegions.REGIONS_OCBF);
+			REGIONS = new OsmandRegions(regionsFile.getAbsolutePath());
+			REGIONS.close();
 			defaultSetup();
 			return;
 		}
@@ -457,10 +463,12 @@ public class SpatialSearchPipelineTest {
 		}
 
 		if (LIVE_TESTING) {
+			//QuadRect box = new QuadRect(point.getLongitude() - 1, point.getLatitude() + 1, point.getLongitude() + 1, point.getLatitude() - 1);
 			int limit = SpatialTextSearch.SpatialTextSearchSettings.defaultSettings().SUGGESTED_SEARCH_RADIUS_KM;
 			QuadRect box = MapUtils.calculateLatLonBbox(point.getLatitude(), point.getLongitude(), limit * 1000);
-			readers.addAll(getMaps(box, GEN_DIR.listFiles(f -> f.isFile()
-					&& f.getName().endsWith(".obf") && !f.getName().endsWith(GENERATED_OBF_SUFFIX))));
+			List<BinaryMapIndexReader> maps = getMaps(box, GEN_DIR.listFiles(f -> f.isFile()
+					&& f.getName().endsWith(".obf")));
+			readers.addAll(maps);
 		} else {
 			JSONArray filesJson = sourceJson.optJSONArray("files");
 			if (filesJson != null) {
@@ -582,6 +590,10 @@ public class SpatialSearchPipelineTest {
 		Assert.assertEquals(phrases.size(), results.size());
 		if (phrases.size() != results.size()) {
 			return;
+		}
+
+		if (LIVE_TESTING) {
+			System.out.println("LIVE_TESTING is on: " + GEN_DIR);
 		}
 
 		SearchTestEngine defaultEngine = null;
@@ -1208,27 +1220,21 @@ public class SpatialSearchPipelineTest {
 		if (quadRect == null || quadRect.hasInitialState() || candidates == null) {
 			return maps;
 		}
-
-		int left31 = MapUtils.get31TileNumberX(Math.min(quadRect.left, quadRect.right));
-		int right31 = MapUtils.get31TileNumberX(Math.max(quadRect.left, quadRect.right));
-		int top31 = MapUtils.get31TileNumberY(Math.max(quadRect.top, quadRect.bottom));
-		int bottom31 = MapUtils.get31TileNumberY(Math.min(quadRect.top, quadRect.bottom));
+		if (REGIONS == null) {
+			throw new IllegalStateException("Regions metadata is not initialized");
+		}
 
 		try {
 			for (File file : candidates) {
-				BinaryMapIndexReader reader = openReader(file);
-				boolean selected = false;
-				try {
-					selected = reader.containsPoiData(left31, top31, right31, bottom31)
-							|| reader.containsRouteData(left31, top31, right31, bottom31, 15)
-							|| reader.containsMapData(left31, top31, right31, bottom31, 15);
-					if (selected) {
-						maps.add(reader);
-					}
-				} finally {
-					if (!selected) {
-						reader.close();
-					}
+				String downloadName = getDownloadNameByFileName(file.getName());
+				WorldRegion region = REGIONS.getRegionDataByDownloadName(downloadName);
+				if (region == null) {
+					continue;
+				}
+				List<QuadRect> polygonBounds = region.getAllPolygonsBounds();
+				if (polygonBounds != null && !polygonBounds.isEmpty()
+						&& polygonBounds.stream().anyMatch(bounds -> QuadRect.intersects(bounds, quadRect))) {
+					maps.add(openReader(file));
 				}
 			}
 		} catch (IOException | RuntimeException e) {
@@ -1242,5 +1248,13 @@ public class SpatialSearchPipelineTest {
 			throw e;
 		}
 		return maps;
+	}
+
+	private String getDownloadNameByFileName(String fileName) {
+		String downloadName = fileName.substring(0, fileName.indexOf('.')).toLowerCase();
+		if (downloadName.endsWith("_2")) {
+			downloadName = downloadName.substring(0, downloadName.length() - 2);
+		}
+		return downloadName;
 	}
 }
