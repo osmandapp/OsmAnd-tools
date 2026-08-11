@@ -3,6 +3,7 @@ package net.osmand.search.core.spatial;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
@@ -68,10 +69,16 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
             b.append(atom.getName());
         }
         List<MapObject> allObjs = r.getObjects();
-        String subtype = "";
+        List<Street> streets = getStreets(allObjs);
+        String subtype = "", resultType = null;
         for (MapObject o : allObjs) {
             if (o instanceof Street street) {
-                appendName(b, r.getExtraNameMatch(), street.getCity());
+                if (streets.size() > 1) {
+                    appendIntersection(b, streets);
+                    resultType = "STREET_INTERSECTION";
+                } else {
+                    appendName(b, r.getExtraNameMatch(), street.getCity());
+                }
                 break;
             }
             if (o instanceof City city) {
@@ -88,7 +95,32 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
         }
         String sorting = SpatialSearchResult.compareKeyString(r);
         return String.format(Locale.US, "%s [[%d, %s, %s, %.2f km, %s]]", b,
-                tCount, testTypeStr(atom) + subtype, sorting, dist / 1000, r.toString(searchContext).replace("\"", "'"));
+                tCount, resultType != null ? resultType : (testTypeStr(atom) + subtype), sorting, dist / 1000, r.toString(searchContext).replace("\"", "'"));
+    }
+
+    private List<Street> getStreets(List<MapObject> objects) {
+        List<Street> streets = new ArrayList<>();
+        for (MapObject object : objects) {
+            if (object instanceof Street street && !streets.contains(street)) {
+                streets.add(street);
+            }
+        }
+        streets.sort(Comparator.comparing((Street street) -> normalizedName(street.getName()))
+                .thenComparingLong(Street::getId));
+        return streets;
+    }
+
+    private void appendIntersection(StringBuilder b, List<Street> streets) {
+        for (Street street : streets) {
+            if (!b.isEmpty()) {
+                b.append(" - ");
+            }
+            b.append(street.getName());
+        }
+    }
+
+    private String normalizedName(String name) {
+        return name == null ? "" : name.trim().toLowerCase(Locale.ROOT);
     }
 
 	private void appendName(StringBuilder b, String extraMatch, MapObject object) {
