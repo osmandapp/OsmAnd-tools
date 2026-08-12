@@ -54,7 +54,19 @@ subprojects {
 	}
 
 	test {
-			ignoreFailures = true
+		ignoreFailures = true
+
+		def configuredTestMaxHeapSize = System.getenv('TEST_MAX_HEAP_SIZE')
+		if (!configuredTestMaxHeapSize) {
+			def javaOpts = System.getenv('JAVA_OPTS') ?: ''
+			def maxHeapMatcher = javaOpts =~ /(?:^|\s)-Xmx([^\s]+)/
+			if (maxHeapMatcher.find()) {
+				configuredTestMaxHeapSize = maxHeapMatcher.group(1)
+			}
+		}
+		if (configuredTestMaxHeapSize) {
+			maxHeapSize = configuredTestMaxHeapSize
+		}
 
 		reports {
 			junitXml {
