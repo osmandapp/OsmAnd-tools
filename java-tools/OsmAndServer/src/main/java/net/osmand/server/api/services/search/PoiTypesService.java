@@ -230,22 +230,11 @@ public class PoiTypesService {
 		if (tagEntry.poiAdditional) {
 			return types.get(0).getKeyName();
 		}
-		PoiCategory groupCategory = tagEntry.collapsableCategory;
-		for (PoiType pt : types) {
-			groupCategory = pt.getCategory();
-		}
-		return groupCategory.getKeyName();
+		return types.get(0).getCategory().getKeyName();
 	}
 
 	private AmenityRowData buildWithName(AmenityRowData tagEntry, String name) {
-		return new AmenityRowData.Builder(tagEntry.key)
-				.setValue(tagEntry.value)
-				.setOrder(tagEntry.order)
-				.setName(name)
-				.setCollapsablePoiTypes(tagEntry.collapsablePoiTypes)
-				.setCollapsableRows(tagEntry.collapsableRows)
-				.setCollapsableRowType(tagEntry.collapsableRowType)
-				.build();
+		return AmenityRowData.Builder.from(tagEntry).setName(name).build();
 	}
 
 	private String joinPoiTypeKeys(AmenityRowData tagEntry) {
