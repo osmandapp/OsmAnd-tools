@@ -69,13 +69,14 @@ public class SpatialSearchService {
 
 	// reused for cache
 	private SpatialPoiSearch poiSearch;
+	private MapPoiTypes poiTypesWithTranslations;
 
 	private final ThreadLocal<SpatialTextSearch> spatialTextSearchLocal = ThreadLocal.withInitial(SpatialTextSearch::new);
 	private final ThreadLocal<RegionsReaderHolder> osmandRegionsLocal = ThreadLocal.withInitial(RegionsReaderHolder::new);
 
 	private final AtomicInteger spatialSearchRoundRobin = new AtomicInteger();
 	private final Map<String, AtomicBoolean> runningSearches = new ConcurrentHashMap<>();
-	private final SpatialTextSearchAPI spatialTextSearchAPI = new SpatialTextSearchAPI(MapPoiTypes.getDefault());
+	private final SpatialTextSearchAPI spatialTextSearchAPI = new SpatialTextSearchAPI(getPoiTypesWithTranslations());
 
 	// one single-thread executor per slot: requests are routed by client key, so a client's
 	// repeated searches always hit the thread whose engine cache is warmed
@@ -90,9 +91,6 @@ public class SpatialSearchService {
 
 	@Autowired
 	private MapReadersService mapReadersService;
-
-	@Autowired
-	private PoiTypesService poiTypesService;
 
 	@Autowired
 	private SearchResultConverter searchResultConverter;
@@ -129,11 +127,19 @@ public class SpatialSearchService {
 		t.start();
 	}
 
-	public synchronized SpatialPoiSearch getSpatialPoiTypeSearch() {
-		if (poiSearch == null) {
+	private synchronized MapPoiTypes getPoiTypesWithTranslations() {
+		if (poiTypesWithTranslations == null) {
 			MapPoiTypes poiTypes = MapPoiTypes.getDefault();
+			PoiTypesService poiTypesService = new PoiTypesService();
 			poiTypes.setPoiTranslator(poiTypesService.parseGlobalTranslations());
-			poiSearch = new SpatialPoiSearch(poiTypes);
+			poiTypesWithTranslations = poiTypes;
+		}
+		return poiTypesWithTranslations;
+	}
+
+	public SpatialPoiSearch getSpatialPoiTypeSearch() {
+		if (poiSearch == null) {
+			poiSearch = new SpatialPoiSearch(getPoiTypesWithTranslations());
 		}
 		return poiSearch;
 	}
