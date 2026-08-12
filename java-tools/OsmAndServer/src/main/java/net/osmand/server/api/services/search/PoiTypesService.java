@@ -9,8 +9,8 @@ import java.util.stream.Collectors;
 
 import net.osmand.data.AdditionalInfoBundle;
 import net.osmand.data.Amenity;
-import net.osmand.data.AmenityRowData;
-import net.osmand.data.AmenityRowsBuilder;
+import net.osmand.data.AmenityTagEntry;
+import net.osmand.data.AmenityTagEntriesBuilder;
 import org.springframework.stereotype.Service;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -189,43 +189,43 @@ public class PoiTypesService {
 		AdditionalInfoBundle infoBundle = new AdditionalInfoBundle(getMapPoiTypes(lang), tags);
 		List<String> preferredLangs = lang != null ? List.of(lang) : List.of();
 		boolean allowNoteTag = false; // The "note" tag is enabled only for OSM editing.
-		List<AmenityRowData> tagEntries = infoBundle.getVisibleTags(allowNoteTag, preferredLangs);
+		List<AmenityTagEntry> tagEntries = infoBundle.getVisibleTags(allowNoteTag, preferredLangs);
 
-		List<AmenityRowData> infoTagEntries = new ArrayList<>();
-		List<AmenityRowData> descriptionTagEntries = new ArrayList<>();
-		for (AmenityRowData tagEntry : tagEntries) {
+		List<AmenityTagEntry> infoTagEntries = new ArrayList<>();
+		List<AmenityTagEntry> descriptionTagEntries = new ArrayList<>();
+		for (AmenityTagEntry tagEntry : tagEntries) {
 			if (tagEntry.isDescription) {
 				descriptionTagEntries.add(tagEntry);
 			} else {
 				infoTagEntries.add(tagEntry);
 			}
 		}
-		AmenityRowsBuilder.sortDescriptionRows(descriptionTagEntries, lang);
+		AmenityTagEntriesBuilder.sortDescriptionEntries(descriptionTagEntries, lang);
 
-		List<AmenityRowData> sortedTagEntries = sortTagEntries(infoBundle, infoTagEntries);
+		List<AmenityTagEntry> sortedTagEntries = sortTagEntries(infoBundle, infoTagEntries);
 		sortedTagEntries.addAll(descriptionTagEntries);
 		return toVisibleTags(sortedTagEntries);
 	}
 
-	private List<AmenityRowData> sortTagEntries(AdditionalInfoBundle infoBundle, List<AmenityRowData> tagEntries) {
+	private List<AmenityTagEntry> sortTagEntries(AdditionalInfoBundle infoBundle, List<AmenityTagEntry> tagEntries) {
 		PoiCategory category = infoBundle.getCategory();
-		List<AmenityRowData> namedTagEntries = new ArrayList<>();
-		for (AmenityRowData tagEntry : tagEntries) {
+		List<AmenityTagEntry> namedTagEntries = new ArrayList<>();
+		for (AmenityTagEntry tagEntry : tagEntries) {
 			namedTagEntries.add(buildWithName(tagEntry, resolveSortName(infoBundle, category, tagEntry)));
 		}
-		AmenityRowsBuilder.sortInfoRows(namedTagEntries);
+		AmenityTagEntriesBuilder.sortInfoEntries(namedTagEntries);
 		return namedTagEntries;
 	}
 
-	private String resolveSortName(AdditionalInfoBundle infoBundle, PoiCategory category, AmenityRowData tagEntry) {
-		if (tagEntry.collapsableRowType == AmenityRowData.CollapsableRowType.POI_TYPE_GROUP) {
+	private String resolveSortName(AdditionalInfoBundle infoBundle, PoiCategory category, AmenityTagEntry tagEntry) {
+		if (tagEntry.collapsableEntryType == AmenityTagEntry.CollapsableEntryType.POI_TYPE_GROUP) {
 			return resolveGroupSortName(tagEntry);
 		}
 		PoiType pType = infoBundle.resolvePoiType(category, tagEntry.key, tagEntry.value).pType;
 		return pType != null ? pType.getKeyName() : tagEntry.key;
 	}
 
-	private String resolveGroupSortName(AmenityRowData tagEntry) {
+	private String resolveGroupSortName(AmenityTagEntry tagEntry) {
 		List<PoiType> types = tagEntry.collapsablePoiTypes;
 		if (tagEntry.poiAdditional) {
 			return types.get(0).getKeyName();
@@ -233,20 +233,20 @@ public class PoiTypesService {
 		return types.get(0).getCategory().getKeyName();
 	}
 
-	private AmenityRowData buildWithName(AmenityRowData tagEntry, String name) {
-		return AmenityRowData.Builder.from(tagEntry).setName(name).build();
+	private AmenityTagEntry buildWithName(AmenityTagEntry tagEntry, String name) {
+		return AmenityTagEntry.Builder.from(tagEntry).setName(name).build();
 	}
 
-	private String joinPoiTypeKeys(AmenityRowData tagEntry) {
+	private String joinPoiTypeKeys(AmenityTagEntry tagEntry) {
 		return tagEntry.collapsablePoiTypes.stream()
 				.map(PoiType::getKeyName)
 				.collect(Collectors.joining(Amenity.SEPARATOR));
 	}
 
-	private List<VisibleTag> toVisibleTags(List<AmenityRowData> tagEntries) {
+	private List<VisibleTag> toVisibleTags(List<AmenityTagEntry> tagEntries) {
 		List<VisibleTag> result = new ArrayList<>();
-		for (AmenityRowData tagEntry : tagEntries) {
-			VisibleTag tag = switch (tagEntry.collapsableRowType) {
+		for (AmenityTagEntry tagEntry : tagEntries) {
+			VisibleTag tag = switch (tagEntry.collapsableEntryType) {
 				case POI_TYPE_GROUP -> toGroupTag(tagEntry);
 				case PLAIN -> toLocalizedTag(tagEntry);
 				default -> toPlainTag(tagEntry);
@@ -258,18 +258,18 @@ public class PoiTypesService {
 		return result;
 	}
 
-	private VisibleTag toGroupTag(AmenityRowData tagEntry) {
+	private VisibleTag toGroupTag(AmenityTagEntry tagEntry) {
 		String key = Amenity.COLLAPSABLE_PREFIX + tagEntry.key;
 		return new VisibleTag(key, joinPoiTypeKeys(tagEntry), null);
 	}
 
-	private VisibleTag toPlainTag(AmenityRowData tagEntry) {
+	private VisibleTag toPlainTag(AmenityTagEntry tagEntry) {
 		return tagEntry.value != null ? new VisibleTag(tagEntry.key, tagEntry.value, null) : null;
 	}
 
-	private VisibleTag toLocalizedTag(AmenityRowData tagEntry) {
+	private VisibleTag toLocalizedTag(AmenityTagEntry tagEntry) {
 		LangValue mainValue = toLangValue(tagEntry);
-		List<LangValue> otherLangs = tagEntry.collapsableRows.stream()
+		List<LangValue> otherLangs = tagEntry.collapsableEntries.stream()
 				.map(this::toLangValue)
 				.collect(Collectors.toList());
 		int idx = tagEntry.key.indexOf(':');
@@ -278,7 +278,7 @@ public class PoiTypesService {
 				otherLangs.isEmpty() ? null : otherLangs);
 	}
 
-	private LangValue toLangValue(AmenityRowData child) {
+	private LangValue toLangValue(AmenityTagEntry child) {
 		int idx = child.key.indexOf(':');
 		return idx >= 0
 				? new LangValue(child.value, child.key.substring(idx + 1))
