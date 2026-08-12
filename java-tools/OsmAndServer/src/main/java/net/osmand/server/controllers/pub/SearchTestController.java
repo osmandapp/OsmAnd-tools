@@ -461,6 +461,7 @@ public class SearchTestController {
 			@RequestParam() Double lat,
 			@RequestParam() Double lon,
 			@RequestParam() Boolean spatial,
+			@RequestParam() Double radius,
 			@RequestBody(required = false) DetectorService.UnitTestPayload unitTest,
 			HttpServletResponse response) throws IOException, SQLException {
 		if (unitTest == null || unitTest.name() == null || query == null || lat == null || lon == null) {
@@ -472,11 +473,14 @@ public class SearchTestController {
 		if (unitTest.radius() != null && unitTest.radius() < 0) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Radius must be 0 or greater");
 		}
+		if (radius == null) {
+			radius = 7.0;
+		}
 		response.setContentType("application/zip");
 		response.setHeader("Content-Disposition", "attachment; filename=\"" + unitTest.name() + ".zip\"");
 		testSearchService.createUnitTest(unitTest,
 				new ClassicSearchService.SearchContext(lat, lon, query, null, false, null, null),
-				response.getOutputStream(), spatial);
+				radius, response.getOutputStream(), spatial);
 	}
 
 	@GetMapping(value = "/index", produces = MediaType.APPLICATION_JSON_VALUE)

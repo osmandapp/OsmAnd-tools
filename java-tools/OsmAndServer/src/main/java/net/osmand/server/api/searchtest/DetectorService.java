@@ -245,13 +245,13 @@ public interface DetectorService extends OBFService {
 		}
 	}
 
-	default void createUnitTest(UnitTestPayload unitTest, ClassicSearchService.SearchContext ctx, OutputStream out, boolean spatial) throws IOException, SQLException {
+	default void createUnitTest(UnitTestPayload unitTest, ClassicSearchService.SearchContext ctx, double radius, OutputStream out, boolean spatial) throws IOException, SQLException {
 		Path rootTmp = Path.of(System.getProperty("java.io.tmpdir"));
 		Path dirPath = Files.createTempDirectory(rootTmp, "unit-tests-");
 		try {
 			int limit = unitTest.resultsLimit();
 			int geocodingLimit = unitTest.geocodingLimit();
-			UnitTestSourceData sourceData = createUnitTestSourceData(unitTest, ctx, dirPath, spatial);
+			UnitTestSourceData sourceData = createUnitTestSourceData(unitTest, ctx, radius, dirPath, spatial);
 			if (sourceData.jsonFilePath == null) {
 				return;
 			}
@@ -499,10 +499,10 @@ public interface DetectorService extends OBFService {
 	}
 	
 	private UnitTestSourceData createUnitTestSourceData(UnitTestPayload unitTest, ClassicSearchService.SearchContext baseCtx,
-	                                                    Path dirPath, Boolean spatial) throws IOException {
+	                                                    double radius, Path dirPath, Boolean spatial) throws IOException {
 		SearchExportSettings exportSettings = new SearchExportSettings(true, true, -1);
 		ClassicSearchService.SearchOption options = new ClassicSearchService.SearchOption(true, exportSettings,
-				null, true, true, (net.osmand.search.core.ObjectType[]) null);
+				radius, true, true, (net.osmand.search.core.ObjectType[]) null);
 		
 		String[] queries = normalizedUnitTestQueries(unitTest.queries(), baseCtx.text());
 		LinkedHashMap<String, Amenity> amenities = new LinkedHashMap<>();
