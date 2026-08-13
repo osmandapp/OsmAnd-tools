@@ -7,6 +7,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
+import net.osmand.osm.AbstractPoiType;
+
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.Amenity;
 import net.osmand.data.Building;
@@ -24,10 +26,15 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
     private final SpatialSearchContext searchContext;
     private final LatLon location;
 
-    public SpatialTestSearchEngine(SpatialTextSearch.SpatialTextSearchSettings spatialSettings, LatLon location, List<BinaryMapIndexReader> readers) {
+    public SpatialTestSearchEngine(SpatialTextSearch.SpatialTextSearchSettings spatialSettings, LatLon location, 
+                                   List<BinaryMapIndexReader> readers, boolean translation) {
         this.location = location;
         spatialSearch = new SpatialTextSearch();
-        SpatialPoiSearch poiSearch = new SpatialPoiSearch(MapPoiTypes.getDefault());
+        MapPoiTypes poiTypes = MapPoiTypes.getDefault();
+        if (translation) {
+            poiTypes.setPoiTranslator(new TestPoiTranslator());
+        }
+        SpatialPoiSearch poiSearch = new SpatialPoiSearch(poiTypes);
         searchContext = new SpatialSearchContext(spatialSettings, readers, poiSearch, location);
     }
 
@@ -158,4 +165,48 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
 
     @Override
     public void close() {}
+
+    private static class TestPoiTranslator implements MapPoiTypes.PoiTranslator {
+
+        @Override
+        public String getTranslation(String keyName) {
+            if (keyName.equals("hotel")) {
+                return "отель";
+            }
+            return null;
+        }
+
+        @Override
+        public String getTranslation(AbstractPoiType type) {
+            return getTranslation(type.getKeyName());
+        }
+
+        @Override
+        public String getSynonyms(String keyName) {
+            if (keyName.equals("hotel")) {
+                return "отель;готель;гатэль";
+            }
+            return null;
+        }
+
+        @Override
+        public String getSynonyms(AbstractPoiType type) {
+            return getSynonyms(type.getKeyName());
+        }
+
+        @Override
+        public String getEnTranslation(String keyName) {
+            return null;
+        }
+
+        @Override
+        public String getEnTranslation(AbstractPoiType type) {
+            return null;
+        }
+
+        @Override
+        public String getAllLanguagesTranslationSuffix() {
+            return "";
+        }
+    }
 }

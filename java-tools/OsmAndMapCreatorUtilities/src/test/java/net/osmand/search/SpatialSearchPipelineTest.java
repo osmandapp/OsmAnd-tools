@@ -548,8 +548,9 @@ public class SpatialSearchPipelineTest {
 		return parseExpectedResults(sourceJson, "results", phrasesSize);
 	}
 
-	protected SearchTestEngine createSearchEngine(SpatialTextSearch.SpatialTextSearchSettings spatialSettings, LatLon point, List<BinaryMapIndexReader> readers) {
-		return new SpatialTestSearchEngine(spatialSettings, point, readers);
+	protected SearchTestEngine createSearchEngine(SpatialTextSearch.SpatialTextSearchSettings spatialSettings, 
+												  LatLon point, List<BinaryMapIndexReader> readers, boolean translation) {
+		return new SpatialTestSearchEngine(spatialSettings, point, readers, translation);
 	}
 	
 	@Test
@@ -564,6 +565,7 @@ public class SpatialSearchPipelineTest {
 //			return;
 //		}
 		JSONObject settingsJson = sourceJson.getJSONObject("settings");
+		boolean translation = settingsJson.optBoolean("translation");
 		boolean disabled = settingsJson.optBoolean("disabled", false);
 		if (disabled) {
 			return;
@@ -591,7 +593,7 @@ public class SpatialSearchPipelineTest {
 			}
 
 		SpatialTextSearch.SpatialTextSearchSettings settings = parseSpatialSettings(settingsJson);
-		defaultEngine = createSearchEngine(settings, point, readers);
+		defaultEngine = createSearchEngine(settings, point, readers, translation);
 		int shift = 4;
 		for (int k = 0; k < phrases.size(); k++) {
 			PhraseTuple phraseAndSettings = phrases.get(k);
@@ -604,18 +606,20 @@ public class SpatialSearchPipelineTest {
 					continue;
 				}
 				JSONObject mergedJson = mergePhraseSettings(settingsJson, phraseAndSettings.settings);
-				engine = createSearchEngine(parseSpatialSettings(mergedJson), parseLocation(mergedJson), readers);
+				engine = createSearchEngine(parseSpatialSettings(mergedJson), parseLocation(mergedJson), readers, translation);
 			}
 			
 			List<String> actualResults = engine.search(text, false);
 			for (int i = 0; i < expectedResults.size(); i++) {
 				String expected = expectedResults.get(i);
 				String actual = i >= actualResults.size() ? null : actualResults.get(i);
-				if (expected.indexOf('[') != -1) {
-					expected = expected.substring(0, expected.indexOf('[') + shift).trim();
-				}
-				if (actual != null && actual.indexOf('[') != -1) {
-					actual = actual.substring(0, actual.indexOf('[') + shift).trim();
+				if (!translation) {
+					if (expected.indexOf('[') != -1) {
+						expected = expected.substring(0, expected.indexOf('[') + shift).trim();
+					}
+					if (actual != null && actual.indexOf('[') != -1) {
+						actual = actual.substring(0, actual.indexOf('[') + shift).trim();
+					}
 				}
 				// String present = result.toString();
 				expected = expected.replaceFirst("^@", "");
