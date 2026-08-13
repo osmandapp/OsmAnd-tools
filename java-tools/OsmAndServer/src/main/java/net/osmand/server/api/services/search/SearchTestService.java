@@ -619,7 +619,9 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 			e.printStackTrace(new PrintWriter(stackTrace));
 			LOGGER.error("RuntimeException stacktrace:\n" + stackTrace);
 		} finally {
-			mapsService.unlockReaders(readers);
+			if (readers != null) {
+				mapsService.unlockReaders(readers);
+			}
 		}
 		return res;
 	}
