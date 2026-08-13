@@ -560,17 +560,16 @@ public class SpatialSearchPipelineTest {
         Assert.assertFalse(sourceJsonText.isEmpty());
 
 		JSONObject sourceJson = new JSONObject(sourceJsonText);
-//		boolean ignore = sourceJson.optBoolean("ignore");
-//		if (RUN_IGNORED_TESTS) {
-//			return;
-//		}
 		JSONObject settingsJson = sourceJson.getJSONObject("settings");
-		boolean translation = settingsJson.optBoolean("translation");
-		boolean disabled = settingsJson.optBoolean("disabled", false);
-		if (disabled) {
+		if (settingsJson.optBoolean("disabled", false)) {
 			return;
 		}
-		
+
+		if (!RUN_IGNORED_TESTS && settingsJson.optBoolean("ignore", false)) {
+			return;
+		}
+
+		boolean translation = settingsJson.optBoolean("translation");
 		List<BinaryMapIndexReader> readers = new ArrayList<>();
 		boolean prevDisplayDefaultPoiTypes = SearchCoreFactory.DISPLAY_DEFAULT_POI_TYPES;
 		LatLon point = parseLocation(settingsJson);

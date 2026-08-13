@@ -22,18 +22,25 @@ import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 public class SpatialTestSearchEngine implements SearchTestEngine {
+    private static MapPoiTypes.PoiTranslator defaultPoiTranslator;
+
     private final SpatialTextSearch spatialSearch;
     private final SpatialSearchContext searchContext;
     private final LatLon location;
+    private final MapPoiTypes poiTypes;
 
     public SpatialTestSearchEngine(SpatialTextSearch.SpatialTextSearchSettings spatialSettings, LatLon location, 
                                    List<BinaryMapIndexReader> readers, boolean translation) {
         this.location = location;
         spatialSearch = new SpatialTextSearch();
-        MapPoiTypes poiTypes = MapPoiTypes.getDefault();
-        if (translation) {
-            poiTypes.setPoiTranslator(new TestPoiTranslator());
+        MapPoiTypes.PoiTranslator currentPoiTranslator = MapPoiTypes.getDefault().getPoiTranslator();
+        if (!(currentPoiTranslator instanceof TestPoiTranslator)) {
+            defaultPoiTranslator = currentPoiTranslator;
         }
+        poiTypes = new MapPoiTypes(null);
+        poiTypes.setPoiTranslator(translation ? new TestPoiTranslator() : defaultPoiTranslator);
+        MapPoiTypes.setDefault(poiTypes);
+        
         SpatialPoiSearch poiSearch = new SpatialPoiSearch(poiTypes);
         searchContext = new SpatialSearchContext(spatialSettings, readers, poiSearch, location);
     }
@@ -76,6 +83,11 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
             b.append(atom.getName());
         }
         List<MapObject> allObjs = r.getObjects();
+        for (MapObject object : allObjs) {
+            if (object instanceof Amenity amenity && amenity.getType() != null) {
+                amenity.setType(poiTypes.getPoiCategoryByName(amenity.getType().getKeyName()));
+            }
+        }
         List<Street> streets = getStreets(allObjs);
         String subtype = "", resultType = null;
         for (MapObject o : allObjs) {
