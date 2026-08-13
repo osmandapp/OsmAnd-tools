@@ -7,8 +7,8 @@ import org.json.JSONObject;
 import java.io.File;
 import java.util.List;
 
-public class SearchUICoreGenOBFPrePipelineTest extends SearchUICoreGenOBFTest {
-    public SearchUICoreGenOBFPrePipelineTest(String name, File file) {
+public class SpatialSearchCombinationsTest extends SpatialSearchPipelineTest {
+    public SpatialSearchCombinationsTest(String name, File file) {
         super(name, file);
     }
 

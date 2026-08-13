@@ -27,6 +27,7 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 
 import net.osmand.search.core.spatial.SpatialPoiSearch.SpatialPoiType;
+import net.osmand.search.core.spatial.SpatialTextSearchAPI;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,11 +36,9 @@ import org.springframework.stereotype.Service;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.Amenity;
-import net.osmand.data.Building;
 import net.osmand.data.City;
 import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
-import net.osmand.data.Street;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiType;
 import net.osmand.search.core.ObjectType;
@@ -70,12 +69,14 @@ public class SpatialSearchService {
 
 	// reused for cache
 	private SpatialPoiSearch poiSearch;
+	private MapPoiTypes poiTypesWithTranslations;
 
 	private final ThreadLocal<SpatialTextSearch> spatialTextSearchLocal = ThreadLocal.withInitial(SpatialTextSearch::new);
 	private final ThreadLocal<RegionsReaderHolder> osmandRegionsLocal = ThreadLocal.withInitial(RegionsReaderHolder::new);
 
 	private final AtomicInteger spatialSearchRoundRobin = new AtomicInteger();
 	private final Map<String, AtomicBoolean> runningSearches = new ConcurrentHashMap<>();
+	private final SpatialTextSearchAPI spatialTextSearchAPI = new SpatialTextSearchAPI(getPoiTypesWithTranslations());
 
 	// one single-thread executor per slot: requests are routed by client key, so a client's
 	// repeated searches always hit the thread whose engine cache is warmed
@@ -90,9 +91,6 @@ public class SpatialSearchService {
 
 	@Autowired
 	private MapReadersService mapReadersService;
-
-	@Autowired
-	private PoiTypesService poiTypesService;
 
 	@Autowired
 	private SearchResultConverter searchResultConverter;
@@ -129,11 +127,19 @@ public class SpatialSearchService {
 		t.start();
 	}
 
-	public synchronized SpatialPoiSearch getSpatialPoiTypeSearch() {
-		if (poiSearch == null) {
+	private synchronized MapPoiTypes getPoiTypesWithTranslations() {
+		if (poiTypesWithTranslations == null) {
 			MapPoiTypes poiTypes = MapPoiTypes.getDefault();
+			PoiTypesService poiTypesService = new PoiTypesService();
 			poiTypes.setPoiTranslator(poiTypesService.parseGlobalTranslations());
-			poiSearch = new SpatialPoiSearch(poiTypes);
+			poiTypesWithTranslations = poiTypes;
+		}
+		return poiTypesWithTranslations;
+	}
+
+	public SpatialPoiSearch getSpatialPoiTypeSearch() {
+		if (poiSearch == null) {
+			poiSearch = new SpatialPoiSearch(getPoiTypesWithTranslations());
 		}
 		return poiSearch;
 	}
@@ -219,7 +225,7 @@ public class SpatialSearchService {
 					: SpatialTextSearchSettings.defaultSettings();
 			settings.AUTO_CLEAR_PREFIX_CACHE_LIMIT = SPATIAL_PREFIX_CACHE_LIMIT;
 			final List<BinaryMapIndexReader> lockedReaders = usedMapList;
-			final ResultMatcher<SpatialSearchResult> matcher = new ResultMatcher<SpatialSearchResult>() {
+			final ResultMatcher<SpatialSearchResult> matcher = new ResultMatcher<>() {
 
 				@Override
 				public boolean publish(SpatialSearchResult object) {
@@ -261,29 +267,24 @@ public class SpatialSearchService {
 				SpatialPoiSearch poiTypeSearch = getSpatialPoiTypeSearch();
 				Map<MapObject, Feature> amenityFeatureCache = new IdentityHashMap<>();
 				for (SpatialSearchResult r : res.mainResults) {
+					Feature f = null;
 					List<MapObject> objs = r.getObjects();
 					if (r.isPoiCategory()) {
 						SpatialPoiType type = r.getPoiCategory(poiTypeSearch);
 						if (type != null) {
-							Feature f = getSpatialPoiTypeFeature(type);
-							f.prop(SearchResultConverter.PoiTypeField.MATCHED_OBJECTS.getFieldName(),
-									matchedObjects(objs, ctx.locale(), timeZone, dominatedCity, r.getViewBBox31(),
-											amenityFeatureCache));
-							f.prop(SearchResultConverter.PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
-							f.prop(SearchResultConverter.PoiTypeField.COMPARE_KEY.getFieldName(), SpatialSearchResult.compareKeyString(r));
-							response.features.add(f);
+							f = getSpatialPoiTypeFeature(type);
 						}
 					} else if (!objs.isEmpty()) {
 						LatLon l = r.getLatLon() == null ? new LatLon(ctx.lat(), ctx.lon()) : r.getLatLon();
-						Feature f = getSpatialFeature(l, objs, ctx.locale(), timeZone, dominatedCity, r.getExtraNameMatch());
-						if (f != null) {
-							f.prop(SearchResultConverter.PoiTypeField.MATCHED_OBJECTS.getFieldName(),
-									matchedObjects(objs, ctx.locale(), timeZone, dominatedCity, r.getViewBBox31(),
-											amenityFeatureCache));
-							f.prop(SearchResultConverter.PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
-							f.prop(SearchResultConverter.PoiTypeField.COMPARE_KEY.getFieldName(), SpatialSearchResult.compareKeyString(r));
-							response.features.add(f);
-						}
+						f = getSpatialFeature(l, objs, ctx.locale(), timeZone, dominatedCity, r);
+					}
+					if (f != null) {
+						f.prop(SearchResultConverter.PoiTypeField.MATCHED_OBJECTS.getFieldName(),
+								matchedObjects(objs, ctx.locale(), timeZone, dominatedCity, r.getViewBBox31(),
+										amenityFeatureCache));
+						f.prop(SearchResultConverter.PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
+						f.prop(SearchResultConverter.PoiTypeField.COMPARE_KEY.getFieldName(), SpatialSearchResult.compareKeyString(r));
+						response.features.add(f);
 					}
 				}
 			}
@@ -322,8 +323,10 @@ public class SpatialSearchService {
 	                                          int results) {
 		Map<String, Object> info = new LinkedHashMap<>();
 		info.put("timeAll", String.format("%.1f", (System.currentTimeMillis() - startTime) / 1e3));
-		info.put("atoms", String.format("%.2f, %,d", stats.step1Atoms.ms() / 1000.0, stats.tokenObjs));
-		info.put("compute", String.format("%.2f, %,d", stats.step2Compute.ms() / 1000.0, stats.maxCombinations));
+		info.put("req", String.format("%.1f", stats.requestTime.ms() / 1000.0));
+		info.put("atoms", String.format("%.2f", stats.step1Atoms.ms() / 1000.0));
+		info.put("compute", String.format("%.2f", (stats.step2Compute.ms() - stats.sub2ReadObjTime.ms()) / 1000.0));
+		info.put("readObj", String.format("%.2f", stats.sub2ReadObjTime.ms() / 1000.0));
 		info.put("poi-by-type", String.format("%.2f, %,d", stats.poiByTypeTime.ms() / 1000.0, stats.poiByTypeBboxes));
 		info.put("results", results);
 
@@ -417,7 +420,9 @@ public class SpatialSearchService {
 	}
 
 	private Feature getSpatialFeature(LatLon loc, List<MapObject> objs, String locale, String timeZone,
-	                                  String dominatedCity, String extraNameMatch) {
+	                                  String dominatedCity, SpatialSearchResult ssr) {
+		String extraNameMatch = ssr.getExtraNameMatch();
+
 		MapObject obj = objs.isEmpty() ? null : objs.get(0);
 		if (obj == null || loc == null) {
 			return null;
@@ -431,60 +436,15 @@ public class SpatialSearchService {
 			return searchResultConverter.getFeature(result, timeZone);
 		}
 		SearchResult result = new SearchResult();
-		result.object = obj;
-		result.location = loc;
-		if (obj instanceof Building b && b.isInterpolation() && Algorithms.isNotEmpty(extraNameMatch)) {
-			result.localeName = extraNameMatch; // interpolated house number
-		} else {
-			result.localeName = obj.getName(locale);
-			if (Algorithms.isNotEmpty(extraNameMatch)) {
-				result.localeName += " [" + extraNameMatch + "]"; // ref for non-Amenity objects
-			}
-		}
-		if (obj instanceof Street) {
-			result.objectType = ObjectType.STREET;
-			City city = getSpatialCity(objs);
-			if (city != null) {
-				result.localeRelatedObjectName = city.getName(locale);
-			}
-		} else if (obj instanceof Building) {
-			result.objectType = ObjectType.HOUSE;
-			Street street = getSpatialStreet(objs);
-			if (street != null) {
-				result.localeRelatedObjectName = street.getName(locale);
-			}
-			City city = getSpatialCity(objs);
-			if (city != null) {
-				SearchResult parent = new SearchResult();
-				parent.localeRelatedObjectName = city.getName(locale);
-				result.parentSearchResult = parent;
-			}
-		} else if (obj instanceof City) {
-			result.objectType = ObjectType.CITY;
-		} else {
-			result.objectType = ObjectType.LOCATION;
-		}
-		return searchResultConverter.getFeature(result, timeZone);
-	}
 
-	private Street getSpatialStreet(List<MapObject> objs) {
-		for (MapObject obj : objs) {
-			if (obj instanceof Street street) {
-				return street;
+		if (spatialTextSearchAPI
+				.convertSpatialSearchResult(ssr, result, getSpatialPoiTypeSearch(), loc, locale, false) != null) {
+			if (result.objectType == ObjectType.BOUNDARY || result.objectType == ObjectType.POSTCODE) {
+				result.objectType = ObjectType.CITY; // Web does not handle POSTCODE/BOUNDARY
 			}
+			return searchResultConverter.getFeature(result, timeZone); // non-Amenity objects
 		}
-		return null;
-	}
 
-	private City getSpatialCity(List<MapObject> objs) {
-		for (MapObject obj : objs) {
-			if (obj instanceof City city) {
-				return city;
-			}
-			if (obj instanceof Street street && street.getCity() != null) {
-				return street.getCity();
-			}
-		}
 		return null;
 	}
 

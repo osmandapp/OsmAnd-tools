@@ -57,6 +57,7 @@ import net.osmand.obf.preparation.IndexAddressCreator;
 import net.osmand.obf.preparation.IndexCreator;
 import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.obf.preparation.IndexPoiCreator;
+import net.osmand.obf.preparation.NameIndexCreator;
 import net.osmand.osm.AbstractPoiType;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.search.core.SearchCoreFactory;
@@ -80,7 +81,7 @@ import net.osmand.util.Algorithms;
  * while plain {@code *.orig.obf}, {@code *.json}, and {@code *.obf} files are temporary.
  */
 @RunWith(Parameterized.class)
-public class SearchUICoreGenOBFTest {
+public class SpatialSearchPipelineTest {
 	private static final String ANDROID_PATH_ENV = "ANDROID_PATH",
 			RESOURCES_PATH_ENV = "RESOURCES_PATH",
 			SEARCH_RESOURCES_PATH_ENV = "SEARCH_RESOURCES_PATH";
@@ -110,8 +111,9 @@ public class SearchUICoreGenOBFTest {
         void close();
     }
     
-	public SearchUICoreGenOBFTest(String name, File file) {
+	public SpatialSearchPipelineTest(String name, File file) {
 		this.testFile = file;
+		NameIndexCreator.MIN_LIMIT_COMMON_NON_INDEXED = 0;
 	}
 
 	private static String getResourcesPath() {
@@ -599,11 +601,11 @@ public class SearchUICoreGenOBFTest {
 					System.out.printf("Mismatch #%s for '%s' != '%s'. %n", i + 1, expected, present);
 					System.out.println("CURRENT RESULTS: ");
 					for (String r : actualResults) {
-						System.out.printf("\t\t\"%s\",%n", r);
+						System.out.printf("\t\t\t\"%s\",%n", r);
 					}
 					System.out.println("EXPECTED : ");
 					for (String r : expectedResults) {
-						System.out.printf("\t\t\"%s\",%n", r);
+						System.out.printf("\t\t\t\"%s\",%n", r);
 					}
 				}
 				Assert.assertEquals(expected, present);

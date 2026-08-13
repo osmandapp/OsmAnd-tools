@@ -37,7 +37,9 @@ import net.osmand.util.SearchAlgorithms;
 public class NameIndexCreator<T> {
 
 	private static final int NAMED_WORDS_SEPARATOR = 0;
-	public static int MIN_LIMIT_COMMON_NON_INDEXED = 10; // Minimum required to be common non-indexed (otherwise just rare)
+	// Minimum required to be common non-indexed -> (otherwise just frequent) - rare doesn't work as non-consistent tests
+	public static int MIN_LIMIT_COMMON_NON_INDEXED = 10; 
+	
 	// Large ADD_TOP_X_FREQ_WORDS many will cause to add many common words to index !
 	public static int ADD_TOP_X_FREQ_WORDS = 10; // Add top 10 words automatically to Frequent (Common words indexed)
 	// If common non-indexed < TOP X common-indexed -> convert it to common-indexed instead (word good to be searched by)
@@ -312,7 +314,7 @@ public class NameIndexCreator<T> {
 			Integer matched = tokenFrequencies.get(c);
 			Integer nonIndexed = commonNonIndexedFrequencies.get(c);
 			if (matched < limitForNonIndexedCommon || matched < MIN_LIMIT_COMMON_NON_INDEXED) {
-				nonIndexed = 0; // index common word 
+				nonIndexed = 0; // frequent - indexed common word 
 			}
 			PrepareWordIndex word = new PrepareWordIndex(ind++, c, matched, nonIndexed == null ? 0 : nonIndexed);
 			words.put(c, word);
