@@ -223,8 +223,8 @@ public class PoiTypesService {
 		if (tagEntry.collapsableEntryType == AmenityTagEntry.CollapsableEntryType.POI_TYPE_GROUP) {
 			return resolveGroupSortName(tagEntry);
 		}
-		PoiType pType = infoBundle.resolvePoiType(category, tagEntry.key, tagEntry.value).pType;
-		return pType != null ? pType.getKeyName() : tagEntry.key;
+		PoiType additionalType = infoBundle.resolvePoiType(category, tagEntry.key, tagEntry.value).additionalType;
+		return additionalType != null ? additionalType.getKeyName() : tagEntry.key;
 	}
 
 	private String resolveGroupSortName(AmenityTagEntry tagEntry) {

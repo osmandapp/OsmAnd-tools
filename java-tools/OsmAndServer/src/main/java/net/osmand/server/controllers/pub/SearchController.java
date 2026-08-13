@@ -181,6 +181,7 @@ public class SearchController {
 			if (tags.size() > MAX_TAG_ENTRIES) {
 				return ResponseEntity.badRequest().body(gson.toJson(Map.of(
 						"error", "Too many tags " + tags.size() + ", maximum is " + MAX_TAG_ENTRIES)));
+			}
 			for (Map.Entry<String, String> entry : tags.entrySet()) {
 				String value = entry.getValue();
 				if (value == null) {
