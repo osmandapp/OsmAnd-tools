@@ -16,6 +16,8 @@ import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlPullParserFactory;
 
+import net.osmand.util.Algorithms;
+
 import net.osmand.osm.AbstractPoiType;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypes;
@@ -227,6 +229,9 @@ public class PoiTypesService {
 
 	private String resolveGroupSortName(AmenityTagEntry tagEntry) {
 		List<PoiType> types = tagEntry.collapsablePoiTypes;
+		if (Algorithms.isEmpty(types)) {
+			return tagEntry.key;
+		}
 		if (tagEntry.poiAdditional) {
 			return types.get(0).getKeyName();
 		}
@@ -249,7 +254,10 @@ public class PoiTypesService {
 			VisibleTag tag = switch (tagEntry.collapsableEntryType) {
 				case POI_TYPE_GROUP -> toGroupTag(tagEntry);
 				case PLAIN -> toLocalizedTag(tagEntry);
-				default -> toPlainTag(tagEntry);
+				case NONE -> toPlainTag(tagEntry);
+				case ELEVATION_PILLS, OPENING_HOURS -> throw new UnsupportedOperationException(
+						"AmenityTagEntry.CollapsableEntryType." + tagEntry.collapsableEntryType
+								+ " is a UI-only rendering hint with no server-side tag representation");
 			};
 			if (tag != null) {
 				result.add(tag);

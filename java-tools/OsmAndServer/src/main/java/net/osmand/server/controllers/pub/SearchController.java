@@ -27,6 +27,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
 import net.osmand.data.LatLon;
+import net.osmand.data.MapObject;
 import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.api.services.search.ClassicSearchService;
 import net.osmand.server.api.services.search.MapReadersService;
@@ -44,6 +45,7 @@ public class SearchController {
 
 	protected static final Log LOGGER = LogFactory.getLog(SearchController.class);
 	private static final int MAX_TAG_ENTRIES = 500;
+	private static final int MAX_TAG_VALUE_LENGTH = 4096;
 	Gson gson = new Gson();
 
 	@Autowired
@@ -175,9 +177,25 @@ public class SearchController {
 	@ResponseBody
 	public ResponseEntity<String> visibleTags(@RequestBody Map<String, String> tags,
 	                                          @RequestParam(required = false) String lang) {
-		if (tags != null && tags.size() > MAX_TAG_ENTRIES) {
-			return ResponseEntity.badRequest().body(gson.toJson(Map.of(
-					"error", "Too many tags " + tags.size() + ", maximum is " + MAX_TAG_ENTRIES)));
+		if (tags != null) {
+			if (tags.size() > MAX_TAG_ENTRIES) {
+				return ResponseEntity.badRequest().body(gson.toJson(Map.of(
+						"error", "Too many tags " + tags.size() + ", maximum is " + MAX_TAG_ENTRIES)));
+			for (Map.Entry<String, String> entry : tags.entrySet()) {
+				String value = entry.getValue();
+				if (value == null) {
+					continue;
+				}
+				if (value.length() > MAX_TAG_VALUE_LENGTH) {
+					return ResponseEntity.badRequest().body(gson.toJson(Map.of(
+							"error", "Tag '" + entry.getKey() + "' value is too long, maximum is "
+									+ MAX_TAG_VALUE_LENGTH + " characters")));
+				}
+				if (MapObject.isContentZipped(value)) {
+					return ResponseEntity.badRequest().body(gson.toJson(Map.of(
+							"error", "Tag '" + entry.getKey() + "' has an unsupported value encoding")));
+				}
+			}
 		}
 		List<PoiTypesService.VisibleTag> visibleTags = poiTypesService.getVisibleTags(tags, lang);
 		return ResponseEntity.ok(gson.toJson(visibleTags));
