@@ -1,7 +1,9 @@
 package net.osmand.search;
 
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.data.LatLon;
 import net.osmand.search.core.spatial.SpatialTestSearchEngine;
+import net.osmand.search.core.spatial.SpatialTextSearch;
 import org.json.JSONObject;
 
 import java.io.File;
@@ -28,8 +30,9 @@ public class SpatialSearchCombinationsTest extends SpatialSearchPipelineTest {
     }
 
     @Override
-    protected SearchTestEngine createSearchEngine(JSONObject settingsJson, List<BinaryMapIndexReader> readers) {
-        settingsJson.put("DEV_USE_PIPELINE", false);
-        return new SpatialTestSearchEngine(settingsJson, readers);
+    protected SearchTestEngine createSearchEngine(SpatialTextSearch.SpatialTextSearchSettings spatialSettings, 
+                                                  LatLon point, List<BinaryMapIndexReader> readers, boolean translation) {
+        spatialSettings.DEV_USE_PIPELINE = false;
+        return new SpatialTestSearchEngine(spatialSettings, point, readers, translation);
     }
 }

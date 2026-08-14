@@ -619,7 +619,9 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 			e.printStackTrace(new PrintWriter(stackTrace));
 			LOGGER.error("RuntimeException stacktrace:\n" + stackTrace);
 		} finally {
-			mapsService.unlockReaders(readers);
+			if (readers != null) {
+				mapsService.unlockReaders(readers);
+			}
 		}
 		return res;
 	}
@@ -689,7 +691,12 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 			return null;
 		}
 		List<MapObject> objects = res.getObjects();
-		MapObject object = objects == null || objects.isEmpty() ? null : objects.get(0);
+		MapObject object = res.getMainObject();
+		List<Street> streets = spatialStreets(objects, locale);
+		boolean streetIntersection = streets.size() > 1;
+		if (streetIntersection) {
+			object = streets.get(0);
+		}
 		LatLon location = res.getLatLon();
 		if (location == null && object != null) {
 			location = object.getLocation();
@@ -700,16 +707,66 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 		SearchResult result = new SearchResult();
 		result.object = object;
 		result.location = location;
+		result.spatialResult = res;
+		if (streetIntersection) {
+			result.objectType = ObjectType.STREET_INTERSECTION;
+			result.localeName = streets.stream()
+					.map(street -> spatialName(street, locale))
+					.collect(java.util.stream.Collectors.joining(" - "));
+			City city = spatialCity(objects, streets);
+			if (city != null) {
+				result.relatedObject = city;
+				result.localeRelatedObjectName = city.getName(locale);
+				result.addressName = result.localeRelatedObjectName;
+			}
+			return result;
+		}
+
 		result.localeName = spatialName(object, locale);
 		result.objectType = spatialObjectType(object);
 		if (object instanceof Street street) {
 			City city = street.getCity();
 			if (city != null) {
-				result.localeRelatedObjectName = city.getName(locale);
+				result.localeRelatedObjectName = spatialName(city, locale);
 				result.addressName = result.localeRelatedObjectName;
 			}
 		}
 		return result;
+	}
+
+	private List<Street> spatialStreets(List<MapObject> objects, String locale) {
+		if (objects == null || objects.isEmpty()) {
+			return Collections.emptyList();
+		}
+		List<Street> streets = new ArrayList<>();
+		for (MapObject object : objects) {
+			if (object instanceof Street street && !streets.contains(street)) {
+				streets.add(street);
+			}
+		}
+		streets.sort(Comparator.comparing((Street street) -> normalizedSpatialName(street, locale))
+				.thenComparingLong(Street::getId));
+		return streets;
+	}
+
+	private String normalizedSpatialName(MapObject object, String locale) {
+		return spatialName(object, locale).trim().toLowerCase(Locale.ROOT);
+	}
+
+	private City spatialCity(List<MapObject> objects, List<Street> streets) {
+		for (Street street : streets) {
+			if (street.getCity() != null) {
+				return street.getCity();
+			}
+		}
+		if (objects != null) {
+			for (MapObject object : objects) {
+				if (object instanceof City city) {
+					return city;
+				}
+			}
+		}
+		return null;
 	}
 
 	private ObjectType spatialObjectType(MapObject object) {

@@ -3,10 +3,11 @@ package net.osmand.search.core.spatial;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
-import org.json.JSONObject;
+import net.osmand.osm.AbstractPoiType;
 
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.Amenity;
@@ -17,20 +18,30 @@ import net.osmand.data.MapObject;
 import net.osmand.data.Street;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.search.SpatialSearchPipelineTest.SearchTestEngine;
-import net.osmand.search.core.spatial.SpatialTextSearch.SpatialTextSearchSettings;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 public class SpatialTestSearchEngine implements SearchTestEngine {
+    private static MapPoiTypes.PoiTranslator defaultPoiTranslator;
+
     private final SpatialTextSearch spatialSearch;
     private final SpatialSearchContext searchContext;
     private final LatLon location;
+    private final MapPoiTypes poiTypes;
 
-    public SpatialTestSearchEngine(JSONObject settingsJson, List<BinaryMapIndexReader> readers) {
+    public SpatialTestSearchEngine(SpatialTextSearch.SpatialTextSearchSettings spatialSettings, LatLon location, 
+                                   List<BinaryMapIndexReader> readers, boolean translation) {
+        this.location = location;
         spatialSearch = new SpatialTextSearch();
-        SpatialPoiSearch poiSearch = new SpatialPoiSearch(MapPoiTypes.getDefault());
-        SpatialTextSearch.SpatialTextSearchSettings spatialSettings = parseSpatialSettings(settingsJson);
-        location = parseLocation(settingsJson);
+        MapPoiTypes.PoiTranslator currentPoiTranslator = MapPoiTypes.getDefault().getPoiTranslator();
+        if (!(currentPoiTranslator instanceof TestPoiTranslator)) {
+            defaultPoiTranslator = currentPoiTranslator;
+        }
+        poiTypes = new MapPoiTypes(null);
+        poiTypes.setPoiTranslator(translation ? new TestPoiTranslator() : defaultPoiTranslator);
+        MapPoiTypes.setDefault(poiTypes);
+        
+        SpatialPoiSearch poiSearch = new SpatialPoiSearch(poiTypes);
         searchContext = new SpatialSearchContext(spatialSettings, readers, poiSearch, location);
     }
 
@@ -72,10 +83,21 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
             b.append(atom.getName());
         }
         List<MapObject> allObjs = r.getObjects();
-        String subtype = "";
+        for (MapObject object : allObjs) {
+            if (object instanceof Amenity amenity && amenity.getType() != null) {
+                amenity.setType(poiTypes.getPoiCategoryByName(amenity.getType().getKeyName()));
+            }
+        }
+        List<Street> streets = getStreets(allObjs);
+        String subtype = "", resultType = null;
         for (MapObject o : allObjs) {
             if (o instanceof Street street) {
-                appendName(b, r.getExtraNameMatch(), street.getCity());
+                if (streets.size() > 1) {
+                    appendIntersection(b, streets);
+                    resultType = "STREET_INTERSECTION";
+                } else {
+                    appendName(b, r.getExtraNameMatch(), street.getCity());
+                }
                 break;
             }
             if (o instanceof City city) {
@@ -92,7 +114,32 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
         }
         String sorting = SpatialSearchResult.compareKeyString(r);
         return String.format(Locale.US, "%s [[%d, %s, %s, %.2f km, %s]]", b,
-                tCount, testTypeStr(atom) + subtype, sorting, dist / 1000, r.toString(searchContext).replace("\"", "'"));
+                tCount, resultType != null ? resultType : (testTypeStr(atom) + subtype), sorting, dist / 1000, r.toString(searchContext).replace("\"", "'"));
+    }
+
+    private List<Street> getStreets(List<MapObject> objects) {
+        List<Street> streets = new ArrayList<>();
+        for (MapObject object : objects) {
+            if (object instanceof Street street && !streets.contains(street)) {
+                streets.add(street);
+            }
+        }
+        streets.sort(Comparator.comparing((Street street) -> normalizedName(street.getName()))
+                .thenComparingLong(Street::getId));
+        return streets;
+    }
+
+    private void appendIntersection(StringBuilder b, List<Street> streets) {
+        for (Street street : streets) {
+            if (!b.isEmpty()) {
+                b.append(" - ");
+            }
+            b.append(street.getName());
+        }
+    }
+
+    private String normalizedName(String name) {
+        return name == null ? "" : name.trim().toLowerCase(Locale.ROOT);
     }
 
 	private void appendName(StringBuilder b, String extraMatch, MapObject object) {
@@ -131,46 +178,47 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
     @Override
     public void close() {}
 
-    private LatLon parseLocation(JSONObject settingsJson) {
-        JSONObject locationJson = settingsJson.optJSONObject("location");
-        if (locationJson != null) {
-            return new LatLon(locationJson.getDouble("lat"), locationJson.getDouble("lon"));
+    private static class TestPoiTranslator implements MapPoiTypes.PoiTranslator {
+
+        @Override
+        public String getTranslation(String keyName) {
+            if (keyName.equals("hotel")) {
+                return "отель";
+            }
+            return null;
         }
-        if (settingsJson.has("lat") && settingsJson.has("lon")) {
-            return new LatLon(settingsJson.getDouble("lat"), settingsJson.getDouble("lon"));
+
+        @Override
+        public String getTranslation(AbstractPoiType type) {
+            return getTranslation(type.getKeyName());
         }
-        return null;
+
+        @Override
+        public String getSynonyms(String keyName) {
+            if (keyName.equals("hotel")) {
+                return "отель;готель;гатэль";
+            }
+            return null;
+        }
+
+        @Override
+        public String getSynonyms(AbstractPoiType type) {
+            return getSynonyms(type.getKeyName());
+        }
+
+        @Override
+        public String getEnTranslation(String keyName) {
+            return null;
+        }
+
+        @Override
+        public String getEnTranslation(AbstractPoiType type) {
+            return null;
+        }
+
+        @Override
+        public String getAllLanguagesTranslationSuffix() {
+            return "";
+        }
     }
-
-    private SpatialTextSearch.SpatialTextSearchSettings parseSpatialSettings(JSONObject settingsJson) {
-        SpatialTextSearch.SpatialTextSearchSettings settings = SpatialTextSearchSettings.defaultSettings();
-        settings.SEARCH_ADDR = settingsJson.optBoolean("SEARCH_ADDR", settings.SEARCH_ADDR);
-        settings.SEARCH_POI = settingsJson.optBoolean("SEARCH_POI", settings.SEARCH_POI);
-        settings.SEARCH_BUILDINGS = settingsJson.optBoolean("SEARCH_BUILDINGS", settings.SEARCH_BUILDINGS);
-        settings.SEARCH_STREET_INTERSECTIONS = settingsJson.optBoolean("SEARCH_STREET_INTERSECTIONS", settings.SEARCH_STREET_INTERSECTIONS);
-        settings.SEARCH_POI_INTERSECTIONS = settingsJson.optBoolean("SEARCH_POI_INTERSECTIONS", settings.SEARCH_POI_INTERSECTIONS);
-        settings.SEARCH_POI_CATEGORIES = settingsJson.optBoolean("SEARCH_POI_CATEGORIES", settings.SEARCH_POI_CATEGORIES);
-        settings.ALLOW_VIRTUAL_STREET_INTERSECTIONS = settingsJson.optBoolean("ALLOW_VIRTUAL_STREET_INTERSECTIONS",
-                settings.ALLOW_VIRTUAL_STREET_INTERSECTIONS);
-        settings.OPTIM_DELETE_EMBEDDED_BOUNDARIES = settingsJson.optBoolean("OPTIM_DELETE_EMBEDDED_BOUNDARIES",
-                settings.OPTIM_DELETE_EMBEDDED_BOUNDARIES);
-        settings.OPTIM_FLAG_POI_SAME_AS_CITY_STREET = settingsJson.optBoolean("OPTIM_FLAG_POI_SAME_AS_CITY_STREET",
-                settings.OPTIM_FLAG_POI_SAME_AS_CITY_STREET);
-        settings.DEDUPLICATE_RES = settingsJson.optBoolean("DEDUPLICATE_RES", settings.DEDUPLICATE_RES);
-        settings.OPTIM_READ_COMMON_WORDS_LIMIT = settingsJson.optInt("OPTIM_READ_COMMON_WORDS_LIMIT", settings.OPTIM_READ_COMMON_WORDS_LIMIT);
-        settings.LANG_DEDUPLICATE = settingsJson.optString("LANG_DEDUPLICATE", settings.LANG_DEDUPLICATE);
-        settings.MIN_ELO_RATING = settingsJson.optInt("MIN_ELO_RATING", settings.MIN_ELO_RATING);
-        settings.MIN_CHARACTERS_INCOMPLETE = settingsJson.optInt("MIN_CHARACTERS_INCOMPLETE", settings.MIN_CHARACTERS_INCOMPLETE);
-        settings.LIMIT_ATOMIC_OBJECTS = settingsJson.optInt("LIMIT_ATOMIC_OBJECTS", settings.LIMIT_ATOMIC_OBJECTS);
-        settings.LIMIT_STOP_GOALS_ANY_LEVEL_WHEN_REACHED_RES = settingsJson.optInt("LIMIT_ALL_GOALS_MAX_UNIQUE_OBJECTS",
-                settings.LIMIT_STOP_GOALS_ANY_LEVEL_WHEN_REACHED_RES);
-        settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES = settingsJson.optInt("LIMIT_STOP_OTHER_GOALS_WHEN_REACHED_UNIQUE_OBJECTS",
-                settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES);
-        settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES = settingsJson.optInt("LIMIT_GOAL_LEVEL_2", settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES);
-        settings.DEV_USE_PIPELINE = settingsJson.optBoolean("DEV_USE_PIPELINE", settings.DEV_USE_PIPELINE);
-
-        return settings;
-    }
-
-
 }
