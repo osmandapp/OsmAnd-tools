@@ -52,6 +52,7 @@ public class WikipediaByCountryDivider {
 		String[] testLatLon = null; 
 		public double testLat;
 		public double testLon;
+        public String country;
 	}
 
 	public static void main(String[] args) throws Exception {
@@ -71,7 +72,9 @@ public class WikipediaByCountryDivider {
 				in.database = val;
 			} else if (arg.startsWith("--ranking=")) {
 				in.wikiRankingDB = val;
-			}
+			} else if (arg.startsWith("--country=")) {
+                in.country = val.toLowerCase();
+            }
 		}
 
 		if (in.mode.isEmpty()) {
@@ -146,6 +149,9 @@ public class WikipediaByCountryDivider {
 			if(lcRegionName == null) {
 				continue;
 			}
+            if (args.country != null && !lcRegionName.startsWith(args.country)) {
+                continue;
+            }
 			String regionName = Algorithms.capitalizeFirstLetterAndLowercase(lcRegionName);
 			String preferredLang = preferredRegionLanguages.get(lcRegionName);
 			if(preferredLang == null) {
@@ -362,6 +368,7 @@ public class WikipediaByCountryDivider {
 		settings.indexTransport = false;
 		settings.indexRouting = false;
 		settings.poiZipLongStrings = true;
+		settings.wikiQrankFilter = true;
 		
 		IndexCreator creator = new IndexCreator(obf.getParentFile(), settings); //$NON-NLS-1$
 		new File(obf.getParentFile(), IndexCreator.TEMP_NODES_DB).delete();
