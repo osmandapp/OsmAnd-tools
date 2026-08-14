@@ -17,6 +17,8 @@ public class IndexCreatorSettings {
 
 	// use Sqlite in RAM instead of normal Sqlite (speeds up process but takes a lot of RAM)
 	public boolean processInRam;
+	
+	public boolean wikiQrankFilter = false;
 
 	// maximum tiles to use in RAM
 	public int maxHeightTilesInRam = -1;

@@ -368,6 +368,7 @@ public class WikipediaByCountryDivider {
 		settings.indexTransport = false;
 		settings.indexRouting = false;
 		settings.poiZipLongStrings = true;
+		settings.wikiQrankFilter = true;
 		
 		IndexCreator creator = new IndexCreator(obf.getParentFile(), settings); //$NON-NLS-1$
 		new File(obf.getParentFile(), IndexCreator.TEMP_NODES_DB).delete();
