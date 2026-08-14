@@ -944,7 +944,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		PoiAdditionalType streetRuleType = getOrCreate(Amenity.ADDR_STREET, null, true);
 		PoiAdditionalType hnoRuleType = getOrCreate(Amenity.ADDR_HOUSENUMBER, null, true);
 		PoiAdditionalType wikidataType = getOrCreate(Amenity.WIKIDATA, null, true);
-        PoiAdditionalType qrankType = getOrCreate(Amenity.QRANK, null, true);
+        PoiAdditionalType qrankType = getOrCreate("qrank", null, true);
 		Set<String> duplicateWikiWids = new HashSet<String>();
 
 		while (rs.next()) {
