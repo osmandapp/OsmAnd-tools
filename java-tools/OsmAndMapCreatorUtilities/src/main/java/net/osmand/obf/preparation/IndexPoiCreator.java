@@ -96,6 +96,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private int maxTagGroupId = 0;
 	private Map<Integer, PoiCreatorTagGroup> tagGroupsFromDB;
 
+    // avoid add to name index a low rating wiki objects
+    private static final int MIN_NAME_INDEX_QRANK = 1000;
 
 	// Actual list of brands is constantly regenerated from BrandAnalyzer utlitity
 	private static final String ENV_POI_TOP_INDEXES_URL = "POI_TOP_INDEXES_URL";
@@ -942,6 +944,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		PoiAdditionalType streetRuleType = getOrCreate(Amenity.ADDR_STREET, null, true);
 		PoiAdditionalType hnoRuleType = getOrCreate(Amenity.ADDR_HOUSENUMBER, null, true);
 		PoiAdditionalType wikidataType = getOrCreate(Amenity.WIKIDATA, null, true);
+        PoiAdditionalType qrankType = getOrCreate(Amenity.QRANK, null, true);
 		Set<String> duplicateWikiWids = new HashSet<String>();
 
 		while (rs.next()) {
@@ -1125,7 +1128,14 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 						encoded.add(a);
 					}
 				}
- 				
+
+                if (additionalTags.get(qrankType) != null) {
+                    int qrank = Integer.parseInt(additionalTags.get(qrankType));
+                    if (qrank < MIN_NAME_INDEX_QRANK) {
+                        continue;
+                    }
+                }
+
 				PoiNameObject obj = new PoiNameObject(prevTree.getNode(), poiIndInBlock, elo, type, subtype,
 						encoded);
 				putPoiObjectPrefix(namesIndex, obj, additionalTags.get(nameRuleType),
