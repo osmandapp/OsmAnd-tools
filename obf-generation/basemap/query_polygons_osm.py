@@ -95,9 +95,9 @@ def process_polygons(tags, filename):
 			queryFields += ", tags->'faa' as \"faa\""
 			conditions += " or tags->'faa' <> ''"
 		elif tag == "place" :
-            array.append("place")
-            queryFields += ", \"place\""
-            conditions += " or \"place\" in ('state', 'county')"
+			array.append("place")
+			queryFields += ", \"place\""
+			conditions += " or \"place\" in ('state', 'county')"
 		else :
 			array.append(tag)
 			queryFields += ", " + tag
