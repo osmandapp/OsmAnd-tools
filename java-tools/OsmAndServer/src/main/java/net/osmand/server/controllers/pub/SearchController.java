@@ -46,7 +46,7 @@ public class SearchController {
 
 	protected static final Log LOGGER = LogFactory.getLog(SearchController.class);
 	private static final int MAX_TAG_ENTRIES = 1000;
-	private static final int MAX_TAG_VALUE_LENGTH = 4096;
+	private static final int MAX_TAG_VALUE_LENGTH = 250 * 1024; // wiki content
 	Gson gson = new Gson();
 
 	@Autowired
