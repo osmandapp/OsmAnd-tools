@@ -29,6 +29,7 @@ import com.google.gson.JsonObject;
 import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
 import net.osmand.server.api.services.OsmAndMapsService;
+import net.osmand.server.api.services.search.AmenityTagsService;
 import net.osmand.server.api.services.search.ClassicSearchService;
 import net.osmand.server.api.services.search.MapReadersService;
 import net.osmand.server.api.services.search.PoiTypesService;
@@ -44,7 +45,7 @@ import static net.osmand.server.controllers.pub.GeojsonClasses.*;
 public class SearchController {
 
 	protected static final Log LOGGER = LogFactory.getLog(SearchController.class);
-	private static final int MAX_TAG_ENTRIES = 500;
+	private static final int MAX_TAG_ENTRIES = 1000;
 	private static final int MAX_TAG_VALUE_LENGTH = 4096;
 	Gson gson = new Gson();
 
@@ -62,6 +63,9 @@ public class SearchController {
 
 	@Autowired
 	PoiTypesService poiTypesService;
+
+	@Autowired
+	AmenityTagsService amenityTagsService;
 
 	@Autowired
 	MapReadersService mapReadersService;
@@ -198,7 +202,7 @@ public class SearchController {
 				}
 			}
 		}
-		List<PoiTypesService.VisibleTag> visibleTags = poiTypesService.getVisibleTags(tags, lang);
+		List<AmenityTagsService.VisibleTag> visibleTags = amenityTagsService.convertToVisibleTags(tags, lang);
 		return ResponseEntity.ok(gson.toJson(visibleTags));
 	}
 
