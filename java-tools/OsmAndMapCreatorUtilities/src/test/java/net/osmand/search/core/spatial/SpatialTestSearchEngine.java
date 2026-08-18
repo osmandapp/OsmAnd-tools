@@ -83,8 +83,10 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
             b.append(atom.getName());
         }
         List<MapObject> allObjs = r.getObjects();
+        Amenity poi = null;
         for (MapObject object : allObjs) {
             if (object instanceof Amenity amenity && amenity.getType() != null) {
+                poi = amenity;
                 amenity.setType(poiTypes.getPoiCategoryByName(amenity.getType().getKeyName()));
             }
         }
@@ -93,6 +95,9 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
         for (MapObject o : allObjs) {
             if (o instanceof Street street) {
                 if (streets.size() > 1) {
+                    if (poi == null && building == null) {
+                        b.setLength(0);
+                    }
                     appendIntersection(b, streets);
                     resultType = "STREET_INTERSECTION";
                 } else {
@@ -125,7 +130,7 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
             }
         }
         streets.sort(Comparator.comparing((Street street) -> normalizedName(street.getName()))
-                .thenComparingLong(Street::getId));
+                .thenComparing(Street::getId, Comparator.nullsLast(Long::compareTo)));
         return streets;
     }
 
