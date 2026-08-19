@@ -1913,6 +1913,20 @@ public class BinaryMapIndexWriter {
 				bs.setX(box.getX());
 				bs.setY(box.getY());
 				bs.setZoom(box.getZoom());
+				int[] bbox31 = no.object.bbox31();
+				if (bbox31 != null) {
+					int[] bytes = SearchAlgorithms.encodeBboxForNameAtoms(ZOOM_ENCODE_BBOX_NAME_ATOMS, bbox31);
+					if (bytes[2] > 0 && bytes[4] > 0) {
+						bytes[2] += 1;
+						bytes[4] += 1;
+						mapDataBuf.clear();
+						for (int i = 0; i < bytes.length; i++) {
+							writeRawVarint32(mapDataBuf, bytes[i]);
+						}
+						bs.setBbox(ByteString.copyFrom(mapDataBuf.toArray()));
+					}
+				}
+			
 				for (int bitsetWord : no.bitsetIndex.toArray()) {
 					bs.addSuffixesBitsetIndex(bitsetWord);
 				}
