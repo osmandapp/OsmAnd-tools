@@ -3,6 +3,7 @@ package net.osmand.obf;
 
 import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.WireFormat;
+import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
@@ -370,6 +371,17 @@ public class BinaryMerger {
 	}
 
 	private static City mergeCities(City city, City namesake, Map<City, Map<Street, List<Node>>> namesakesStreetNodes) {
+		for (Street s1 : namesake.getStreets()) {
+			int streetIndex = city.getStreets().indexOf(s1);
+			if (streetIndex >= 0) {
+				Street s2 = city.getStreets().get(streetIndex);
+				Long id2 = s2.getId();
+				Long id1 = s1.getId();
+				if (id1 != null && id2 != null) {
+					s2.setId(Math.min(id2, id1));
+				}
+			}
+		}
 		Map<Street, Street> smap = city.mergeWith(namesake);
 		Map<Street, List<Node>> wayNodes = namesakesStreetNodes.get(city);
 		Map<Street, List<Node>> owayNodes = namesakesStreetNodes.get(namesake);
@@ -513,7 +525,13 @@ public class BinaryMerger {
 				}
 				BinaryFileReference ref = writer.writeCityHeader(city, city.getType().ordinal(), tagRules);
 				refs.add(ref);
-				writer.writeCityIndex(city, city.getStreets(), namesakesStreetNodes.get(city), ref, tagRules, null);
+				TLongObjectHashMap<Long> streetIds = new TLongObjectHashMap<>();
+				for (Street street : city.getStreets()) {
+					if (street.getId() != null && street.getId() > 0) {
+						streetIds.put(street.getId(), street.getId());
+					}
+				}
+				writer.writeCityIndex(city, city.getStreets(), namesakesStreetNodes.get(city), ref, tagRules, streetIds);
 				NameIndexCreator.putAddrNamedMapObject(namesIndex, city, ref.getStartPointer(), settings);
 				if (!city.isPostcode()) {
 					for (Street s : city.getStreets()) {
