@@ -27,7 +27,9 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
 import net.osmand.data.LatLon;
+import net.osmand.data.MapObject;
 import net.osmand.server.api.services.OsmAndMapsService;
+import net.osmand.server.api.services.search.AmenityTagsService;
 import net.osmand.server.api.services.search.ClassicSearchService;
 import net.osmand.server.api.services.search.MapReadersService;
 import net.osmand.server.api.services.search.PoiTypesService;
@@ -43,6 +45,8 @@ import static net.osmand.server.controllers.pub.GeojsonClasses.*;
 public class SearchController {
 
 	protected static final Log LOGGER = LogFactory.getLog(SearchController.class);
+	private static final int MAX_TAG_ENTRIES = 1000;
+	private static final int MAX_TAG_VALUE_LENGTH = 250 * 1024; // wiki content
 	Gson gson = new Gson();
 
 	@Autowired
@@ -59,6 +63,9 @@ public class SearchController {
 
 	@Autowired
 	PoiTypesService poiTypesService;
+
+	@Autowired
+	AmenityTagsService amenityTagsService;
 
 	@Autowired
 	MapReadersService mapReadersService;
@@ -168,6 +175,35 @@ public class SearchController {
 		} else {
 			return ResponseEntity.badRequest().body("Error get poi categories!");
 		}
+	}
+
+	@PostMapping(path = {"/visible-tags"}, produces = "application/json")
+	@ResponseBody
+	public ResponseEntity<String> visibleTags(@RequestBody Map<String, String> tags,
+	                                          @RequestParam(required = false) String lang) {
+		if (tags != null) {
+			if (tags.size() > MAX_TAG_ENTRIES) {
+				return ResponseEntity.badRequest().body(gson.toJson(Map.of(
+						"error", "Too many tags " + tags.size() + ", maximum is " + MAX_TAG_ENTRIES)));
+			}
+			for (Map.Entry<String, String> entry : tags.entrySet()) {
+				String value = entry.getValue();
+				if (value == null) {
+					continue;
+				}
+				if (value.length() > MAX_TAG_VALUE_LENGTH) {
+					return ResponseEntity.badRequest().body(gson.toJson(Map.of(
+							"error", "Tag '" + entry.getKey() + "' value is too long, maximum is "
+									+ MAX_TAG_VALUE_LENGTH + " characters")));
+				}
+				if (MapObject.isContentZipped(value)) {
+					return ResponseEntity.badRequest().body(gson.toJson(Map.of(
+							"error", "Tag '" + entry.getKey() + "' has an unsupported value encoding")));
+				}
+			}
+		}
+		List<AmenityTagsService.VisibleTag> visibleTags = amenityTagsService.convertToVisibleTags(tags, lang);
+		return ResponseEntity.ok(gson.toJson(visibleTags));
 	}
 
 	@GetMapping(path = {"/get-top-filters"}, produces = "application/json")
