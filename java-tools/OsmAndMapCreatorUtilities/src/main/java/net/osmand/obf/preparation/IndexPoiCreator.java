@@ -203,7 +203,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			
 			List<LatLon> relationCenters = Collections.singletonList(null); // [null] means single amenity point
 			StringBuilder memberIds = new StringBuilder();
-			relationCenters = collectRelationCenters(e, ctx, tags, relationCenters, memberIds);
+			QuadRect indexedBbox = OsmMapUtils.requireIndexBbox(tags) ? new QuadRect() : null;
+			relationCenters = collectRelationCenters(e, ctx, tags, relationCenters, memberIds, indexedBbox);
 			long id = e.getId();
 			if (icc.basemap && id < 0) {
 				id = GENERATE_OBJ_ID--;
@@ -251,6 +252,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 						icc.bboxFilter.logEntityWithAmenity(e, a);
 						continue;
 					}
+					if (indexedBbox != null && !indexedBbox.hasInitialState()) {
+						a.setBbox31(indexedBbox);
+					}
    					try {
    						insertAmenityIntoPoi(a);
    					} catch (Exception excpt) {
@@ -264,7 +268,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 
 	private List<LatLon> collectRelationCenters(Entity e, OsmDbAccessorContext ctx, Map<String, String> tags,
-			List<LatLon> centers, StringBuilder memberIds) throws SQLException {
+			List<LatLon> centers, StringBuilder memberIds, QuadRect indexedBbox) throws SQLException {
 		if (e instanceof Relation relation) {
 			ctx.loadEntityRelation(relation);
 			boolean isAdministrative = tags.get(OSMSettings.OSMTagKey.ADMIN_LEVEL.getValue()) != null;
@@ -296,6 +300,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 						// don't index this
 						continue;
 					}
+					if (indexedBbox != null) {
+						QuadRect q = m.getLatLonBbox();
+						indexedBbox.expand(q.left, q.top, q.right, q.bottom);
+					}
 		            List<List<Node>> innerWays = new ArrayList<>();
 		            for (Ring r : m.getInnerRings()) {
 		                innerWays.add(r.getBorder());
@@ -318,6 +326,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					}
 				}
 			}
+		}
+		if (indexedBbox != null && indexedBbox.hasInitialState() && e instanceof Way way) {
+			indexedBbox = way.getLatLonBBox();
 		}
 		return centers;
 	}
