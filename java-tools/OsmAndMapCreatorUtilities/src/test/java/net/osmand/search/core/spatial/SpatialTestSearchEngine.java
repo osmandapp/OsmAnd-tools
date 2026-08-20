@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 
 import net.osmand.osm.AbstractPoiType;
 
@@ -83,17 +84,22 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
             b.append(atom.getName());
         }
         List<MapObject> allObjs = r.getObjects();
+        Amenity poi = null;
         for (MapObject object : allObjs) {
             if (object instanceof Amenity amenity && amenity.getType() != null) {
+                poi = amenity;
                 amenity.setType(poiTypes.getPoiCategoryByName(amenity.getType().getKeyName()));
             }
         }
-        List<Street> streets = getStreets(allObjs);
+        List<Street> intersectionStreets = getIntersectionStreets(r);
         String subtype = "", resultType = null;
         for (MapObject o : allObjs) {
             if (o instanceof Street street) {
-                if (streets.size() > 1) {
-                    appendIntersection(b, streets);
+                if (intersectionStreets.size() == 2) {
+                    if (poi == null && building == null) {
+                        b.setLength(0);
+                    }
+                    appendIntersection(b, intersectionStreets);
                     resultType = "STREET_INTERSECTION";
                 } else {
                     appendName(b, r.getExtraNameMatch(), street.getCity());
@@ -117,15 +123,29 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
                 tCount, resultType != null ? resultType : (testTypeStr(atom) + subtype), sorting, dist / 1000, r.toString(searchContext).replace("\"", "'"));
     }
 
-    private List<Street> getStreets(List<MapObject> objects) {
-        List<Street> streets = new ArrayList<>();
-        for (MapObject object : objects) {
-            if (object instanceof Street street && !streets.contains(street)) {
-                streets.add(street);
+    private List<Street> getIntersectionStreets(SpatialSearchResult result) {
+        SpatialSearchToken.NameIndexAtom first = null, second = null;
+        SpatialSearchResultsList parent = result.getParent();
+        for (int i = 0; i < parent.tCount; i++) {
+            SpatialSearchToken.NameIndexAtom atom = parent.linearResults.get(result.parentInd * parent.tCount + i);
+            if (atom.getObject() instanceof Street && !atom.isCityStreetName()) {
+                if (first == null || Objects.equals(first.getObject().getId(), atom.getObject().getId())) {
+                    first = atom;
+                } else {
+                    second = atom;
+                }
             }
         }
+
+        if (first == null || second == null
+                || !(first.getObject() instanceof Street firstStreet)
+                || !(second.getObject() instanceof Street secondStreet)) {
+            return Collections.emptyList();
+        }
+
+        List<Street> streets = new ArrayList<>(List.of(firstStreet, secondStreet));
         streets.sort(Comparator.comparing((Street street) -> normalizedName(street.getName()))
-                .thenComparingLong(Street::getId));
+                .thenComparing(Street::getId, Comparator.nullsLast(Long::compareTo)));
         return streets;
     }
 
@@ -185,6 +205,9 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
             if (keyName.equals("hotel")) {
                 return "отель";
             }
+            if (keyName.equals("island")) {
+                return "остров";
+            }
             return null;
         }
 
@@ -197,6 +220,9 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
         public String getSynonyms(String keyName) {
             if (keyName.equals("hotel")) {
                 return "отель;готель;гатэль";
+            }
+            if (keyName.equals("island")) {
+                return "остров";
             }
             return null;
         }
