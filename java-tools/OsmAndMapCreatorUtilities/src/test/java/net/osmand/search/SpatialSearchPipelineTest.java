@@ -189,11 +189,10 @@ public class SpatialSearchPipelineTest {
 	@BeforeClass
 	public static void setUp() throws IOException {
 		GENERATED_OBFS.clear();
+		REGIONS = new OsmandRegions(new File(getAndroidPath(), "OsmAnd-java" + File.separator + OsmandRegions.REGIONS_OCBF).getAbsolutePath());
+		
 		if (LIVE_TESTING) {
 			System.out.println("LIVE_TESTING is ON (" + GEN_DIR + ")");
-			File regionsFile = new File(getAndroidPath(), "OsmAnd-java" + File.separator + OsmandRegions.REGIONS_OCBF);
-			REGIONS = new OsmandRegions(regionsFile.getAbsolutePath());
-			REGIONS.close();
 			defaultSetup();
 			return;
 		} else {
@@ -570,6 +569,7 @@ public class SpatialSearchPipelineTest {
 		}
 
 		boolean translation = settingsJson.optBoolean("translation");
+		boolean world = settingsJson.optBoolean("world");
 		List<BinaryMapIndexReader> readers = new ArrayList<>();
 		boolean prevDisplayDefaultPoiTypes = SearchCoreFactory.DISPLAY_DEFAULT_POI_TYPES;
 		LatLon point = parseLocation(settingsJson);
@@ -588,6 +588,9 @@ public class SpatialSearchPipelineTest {
 				loadReaders(sourceJson, point, readers);
 				if (readers.isEmpty()) {
 					throw new IllegalStateException("useData=true but no OBF indexes were loaded for " + testFile.getName());
+				}
+				if (world) {
+					readers.add(REGIONS.getFile());
 				}
 			}
 
