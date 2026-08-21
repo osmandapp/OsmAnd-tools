@@ -317,9 +317,6 @@ public interface OBFService extends BaseService {
 	default List<ObfFileInfo> getObfFileInfos() throws IOException {
 		List<ObfFileInfo> result = new ArrayList<>();
 		for (String obf : getMapsService().getOBFs()) {
-			if (OBFService.getObfFileName(obf).startsWith("World_base")) {
-				continue;
-			}
 			result.add(parseObfFileInfo(obf));
 		}
 		result.sort(Comparator.comparing(ObfFileInfo::name, String.CASE_INSENSITIVE_ORDER));
