@@ -728,7 +728,7 @@ public class IndexCreator {
 
 	private void iterateMainEntities(OsmDbAccessor accessor, IProgress progress, IndexCreationContext icc)
 			throws SQLException, InterruptedException {
-        Map<String, Way> foundedFerryWays = new LinkedHashMap<String, Way>();
+        Map<String, Way> collectedFerryWays = new LinkedHashMap<String, Way>();
 		
 		setGeneralProgress(progress, "[50 / 100]");
 		progress.startTask(settings.getString("IndexCreator.PROCESS_OSM_NODES"), accessor.getAllNodes());
@@ -744,7 +744,7 @@ public class IndexCreator {
 			@Override
 			public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 				Way w = (Way) e;
-				IndexFerryHelper.saveFoundedFerryWay(w, foundedFerryWays);
+				IndexFerryHelper.collectFoundedFerryWays(w, collectedFerryWays);
 				propagateToNodes.calculateBorderPoints(w);
 				iterateMainEntity(e, ctx, icc);
 			}
@@ -757,14 +757,14 @@ public class IndexCreator {
                 Relation r = (Relation) e;
                 if (IndexFerryHelper.hasFerryTags(r)) {
                     iterateMainEntity(e, ctx, icc); //create ferry road from real good-tagged relation.
-					IndexFerryHelper.removeDuplicatedFerryWays(r, foundedFerryWays);
+					IndexFerryHelper.removeDuplicatedFerryWays(r, collectedFerryWays); //remove way if we have relation
                 } else {
                     iterateMainEntity(e, ctx, icc);
                 }
 			}
 		});
 
-        for (Way way : foundedFerryWays.values()) {
+        for (Way way : collectedFerryWays.values()) {
 			// for all rest ferry-ways without real osm-relation we need to create it manually.
             Relation syntethicFerryRelation = IndexFerryHelper.createSyntheticFerryRelation(way);
             iterateMainEntity(syntethicFerryRelation, accessor, icc);
