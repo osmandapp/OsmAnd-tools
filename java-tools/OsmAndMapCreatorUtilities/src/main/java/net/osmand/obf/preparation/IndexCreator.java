@@ -8,12 +8,10 @@ import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.obf.preparation.OsmDbAccessor.OsmDbVisitor;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypesEncoder;
-import net.osmand.osm.edit.Entity;
+import net.osmand.osm.edit.OSMSettings.OSMTagKey;
+import net.osmand.osm.edit.*;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
-import net.osmand.osm.edit.Node;
-import net.osmand.osm.edit.Relation;
-import net.osmand.osm.edit.Way;
 import net.osmand.osm.io.IOsmStorageFilter;
 import net.osmand.osm.io.OsmBaseStorage;
 import net.osmand.osm.io.OsmBaseStoragePbf;
@@ -29,7 +27,7 @@ import javax.imageio.ImageReader;
 import java.io.*;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.Iterator;
+import java.util.*;
 import java.util.zip.GZIPInputStream;
 
 /**
@@ -726,6 +724,7 @@ public class IndexCreator {
 
 	private void iterateMainEntities(OsmDbAccessor accessor, IProgress progress, IndexCreationContext icc)
 			throws SQLException, InterruptedException {
+        Map<String, Way> foundFerryWays = new LinkedHashMap<String, Way>();
 		setGeneralProgress(progress, "[50 / 100]");
 		progress.startTask(settings.getString("IndexCreator.PROCESS_OSM_NODES"), accessor.getAllNodes());
 		accessor.iterateOverEntities(progress, EntityType.NODE, new OsmDbVisitor() {
@@ -740,6 +739,7 @@ public class IndexCreator {
 			@Override
 			public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
 				Way w = (Way) e;
+                saveFoundedFerry(w, foundFerryWays);
 				propagateToNodes.calculateBorderPoints(w);
 				iterateMainEntity(e, ctx, icc);
 			}
@@ -749,10 +749,67 @@ public class IndexCreator {
 		accessor.iterateOverEntities(progress, EntityType.RELATION, new OsmDbVisitor() {
 			@Override
 			public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
-				iterateMainEntity(e, ctx, icc);
+                Relation r = (Relation) e;
+                if (hasFerryTags(r)) {
+//                    r.putTag(OSMTagKey.ROUTE.getValue(), OSMTagKey.FERRY.getValue());
+                    iterateMainEntity(e, ctx, icc);
+                    removeDuplicatedFerry(r, foundFerryWays);
+                } else {
+                    iterateMainEntity(e, ctx, icc);
+                }
 			}
 		});
+
+        for (Way way : foundFerryWays.values()) {
+            Relation syntethicFerryRelation = createSyntheticFerryRelation(way);
+            iterateMainEntity(syntethicFerryRelation, accessor, icc);
+        }
 	}
+
+    private void saveFoundedFerry(Way way, Map<String, Way> foundFerryWays) {
+        if (hasFerryTags(way)) {
+            String key = way.getFirstNodeId() + " " + way.getLastNodeId();
+            foundFerryWays.put(key, way);
+        }
+    }
+
+    private void removeDuplicatedFerry(Relation rel, Map<String, Way> foundFerryWays) {
+        if (hasFerryTags(rel)) {
+            long startStopId = rel.getMembers().get(0).getEntity().getId();
+            long endStopId = rel.getMembers().get(1).getEntity().getId();
+            foundFerryWays.remove(startStopId + " " + endStopId);
+            foundFerryWays.remove(endStopId + " " + startStopId);
+        }
+    }
+
+    private boolean hasFerryTags(Entity e) {
+        // "ferry=*" or "route=ferry"
+        return e.getTag(OSMTagKey.FERRY.getValue()) != null || (e.getTag(OSMTagKey.ROUTE.getValue()) != null && e.getTag(OSMTagKey.ROUTE.getValue()).equals(OSMTagKey.FERRY.getValue()));
+    }
+
+    private Relation createSyntheticFerryRelation(Way way) {
+        Relation syntethicRelation = new Relation(way.getId());
+        if (way.getTag(OSMTagKey.NAME.getValue()) != null) {
+            syntethicRelation.putTag(OSMTagKey.NAME.getValue(), way.getTag(OSMTagKey.NAME.getValue()));
+        }
+        if (way.getTag(OSMTagKey.REF.getValue()) != null) {
+            syntethicRelation.putTag(OSMTagKey.REF.getValue(), way.getTag(OSMTagKey.REF.getValue()));
+        }
+        if (way.getTag(OSMTagKey.DURATION.getValue()) != null) {
+            syntethicRelation.putTag(OSMTagKey.DURATION.getValue(), way.getTag(OSMTagKey.DURATION.getValue()));
+        }
+        if (way.getTag(OSMTagKey.OPERATOR.getValue()) != null) {
+            syntethicRelation.putTag(OSMTagKey.OPERATOR.getValue(), way.getTag(OSMTagKey.OPERATOR.getValue()));
+        }
+        syntethicRelation.putTag(OSMTagKey.PT_VERSION.getValue(), "1");
+        syntethicRelation.putTag(OSMTagKey.TYPE.getValue(), OSMTagKey.ROUTE.getValue());
+        syntethicRelation.putTag(OSMTagKey.ROUTE.getValue(), OSMTagKey.FERRY.getValue());
+
+        syntethicRelation.addMember(way.getFirstNodeId(), Entity.EntityType.NODE, OSMTagKey.STOP.getValue());
+        syntethicRelation.addMember(way.getLastNodeId(), Entity.EntityType.NODE, OSMTagKey.STOP.getValue());
+        syntethicRelation.addMember(way.getId(), Entity.EntityType.WAY, "");
+        return syntethicRelation;
+    }
 
 	private void indexRelations(OsmDbAccessor accessor, IProgress progress, IndexCreationContext icc)
 			throws SQLException, InterruptedException {
