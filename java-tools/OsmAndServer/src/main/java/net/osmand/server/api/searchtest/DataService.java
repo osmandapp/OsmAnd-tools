@@ -1,5 +1,6 @@
 package net.osmand.server.api.searchtest;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import net.osmand.binary.*;
 import net.osmand.data.*;
 import net.osmand.search.core.SearchResult;
@@ -27,11 +28,15 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static net.osmand.search.core.ObjectType.POI_TYPE;
 
 public interface DataService extends BaseService {
+	Pattern UNIT_TEST_OSM_ID = Pattern.compile("\\bosmId=(-?\\d+)\\b");
+	Pattern UNIT_TEST_LAT_LON = Pattern.compile("\\(lat=(-?\\d+(?:\\.\\d+)?),\\s*lon=(-?\\d+(?:\\.\\d+)?)\\)");
 
 	SearchTestDatasetRepository getDatasetRepo();
 
@@ -56,6 +61,9 @@ public interface DataService extends BaseService {
 			if (dataset.type == Dataset.Source.Overpass) {
 				fullPath = Files.createTempFile(Path.of(getCsvDownloadingDir()), "overpass_", ".csv");
 				rowCount = queryOverpass(fullPath, dataset.source);
+			} else if (dataset.type == Dataset.Source.UnitTest) {
+				fullPath = Files.createTempFile(Path.of(getCsvDownloadingDir()), "unit_test_", ".csv");
+				rowCount = convertUnitTestsToCsv(fullPath, dataset.source);
 			} else {
 				fullPath = Path.of(getCsvDownloadingDir(), dataset.source);
 			}
@@ -149,7 +157,7 @@ public interface DataService extends BaseService {
 			getLogger().error("Failed to process and insert data from CSV file: {}", fullPath, e);
 			return dataset;
 		} finally {
-			if (dataset.type == Dataset.Source.Overpass) {
+			if (dataset.type == Dataset.Source.Overpass || dataset.type == Dataset.Source.UnitTest) {
 				try {
 					if (fullPath != null && !Files.deleteIfExists(fullPath)) {
 						getLogger().warn("Could not delete temporary file: {}", fullPath);
@@ -159,6 +167,73 @@ public interface DataService extends BaseService {
 				}
 			}
 		}
+	}
+
+	private int convertUnitTestsToCsv(Path outputPath, String source) throws IOException {
+		Path dir = Path.of(source);
+		if (!Files.isDirectory(dir)) {
+			throw new IOException("UnitTest source is not a directory: " + source);
+		}
+
+		int rowCount = 0;
+		CSVFormat format = CSVFormat.DEFAULT.builder().setHeader("id", "lat", "lon", "query", "result").build();
+		try (BufferedWriter writer = Files.newBufferedWriter(outputPath);
+			 CSVPrinter printer = new CSVPrinter(writer, format);
+			 Stream<Path> paths = Files.list(dir)) {
+			List<Path> jsonFiles = paths
+					.filter(Files::isRegularFile)
+					.filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".json"))
+					.sorted()
+					.toList();
+			for (Path jsonFile : jsonFiles) {
+				try (BufferedReader reader = Files.newBufferedReader(jsonFile)) {
+					JsonNode unitTest = getObjectMapper().readTree(reader);
+					rowCount += writeUnitTestRows(printer, unitTest, jsonFile.getFileName().toString());
+				} catch (Exception e) {
+					getLogger().warn("Skipping invalid unit-test file {}: {}", jsonFile, e.getMessage());
+				}
+			}
+		}
+		return rowCount;
+	}
+
+	private int writeUnitTestRows(CSVPrinter printer, JsonNode unitTest, String fileName) throws IOException {
+		if (unitTest.path("ignore").asBoolean(false)) {
+			return 0;
+		}
+		JsonNode phrases = unitTest.path("phrases");
+		JsonNode results = unitTest.path("results");
+		if (!phrases.isArray() || !results.isArray()) {
+			throw new IOException("Missing phrases or results array");
+		}
+
+		int count = 0;
+		for (int i = 0; i < phrases.size(); i++) {
+			JsonNode indexedResults = results.path(i);
+			if (!indexedResults.isArray() || indexedResults.isEmpty()) {
+				getLogger().warn("Skipping {} phrase {}: top result is missing", fileName, i);
+				continue;
+			}
+			String rawResult = indexedResults.path(0).asText();
+			String id, lat, lon;
+			Matcher idMatcher = UNIT_TEST_OSM_ID.matcher(rawResult);
+			if (idMatcher.find()) {
+				Matcher pointMatcher = UNIT_TEST_LAT_LON.matcher(rawResult);
+				pointMatcher.region(idMatcher.end(), rawResult.length());
+				if (!pointMatcher.find()) {
+					getLogger().warn("Skipping {} phrase {}: coordinates are missing after osmId", fileName, i);
+					continue;
+				}
+				id = idMatcher.group(1);
+				lat = pointMatcher.group(1);
+				lon = pointMatcher.group(2);
+			} else {
+				continue;
+			}
+			printer.printRecord(id, lat, lon, phrases.path(i).asText(), rawResult);
+			count++;
+		}
+		return count;
 	}
 
 	default TestCase generate(Dataset dataset, TestCase test) {
