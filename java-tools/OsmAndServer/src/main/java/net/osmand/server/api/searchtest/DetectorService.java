@@ -501,8 +501,18 @@ public interface DetectorService extends OBFService {
 	private UnitTestSourceData createUnitTestSourceData(UnitTestPayload unitTest, ClassicSearchService.SearchContext baseCtx,
 	                                                    double radius, Path dirPath, Boolean spatial) throws IOException {
 		SearchExportSettings exportSettings = new SearchExportSettings(true, true, -1);
-		ClassicSearchService.SearchOption options = new ClassicSearchService.SearchOption(true, exportSettings,
+		ClassicSearchService.SearchOption spatialOptions = new ClassicSearchService.SearchOption(true, exportSettings,
 				radius, true, true, (net.osmand.search.core.ObjectType[]) null);
+		double classicRadius = radius;
+		if (Boolean.TRUE.equals(spatial)) {
+			int radiusMeters = Math.toIntExact(Math.round(radius * 1000));
+			QuadRect bbox = MapUtils.calculateLatLonBbox(baseCtx.lat(), baseCtx.lon(), radiusMeters);
+			classicRadius = Math.max(
+					Math.max(Math.abs(bbox.top - baseCtx.lat()), Math.abs(baseCtx.lat() - bbox.bottom)),
+					Math.max(Math.abs(baseCtx.lon() - bbox.left), Math.abs(bbox.right - baseCtx.lon())));
+		}
+		ClassicSearchService.SearchOption classicOptions = new ClassicSearchService.SearchOption(true, exportSettings,
+				classicRadius, true, true, (net.osmand.search.core.ObjectType[]) null);
 		
 		String[] queries = normalizedUnitTestQueries(unitTest.queries(), baseCtx.text());
 		LinkedHashMap<String, Amenity> amenities = new LinkedHashMap<>();
@@ -522,7 +532,7 @@ public interface DetectorService extends OBFService {
 						baseCtx.lat(), baseCtx.lon(), q, baseCtx.locale(),
 						baseCtx.baseSearch(), baseCtx.northWest(), baseCtx.southEast());
 
-				ClassicSearchService.SearchResults results = getClassicSearchService().getImmediateSearchResults(ctx, options, null);
+				ClassicSearchService.SearchResults results = getClassicSearchService().getImmediateSearchResults(ctx, classicOptions, null);
 				SearchPhrase phrase = results.phrase();
 				List<SearchResult> searchResults = results.results();
 				if (phrase == null || searchResults == null) {
@@ -557,7 +567,7 @@ public interface DetectorService extends OBFService {
 						baseCtx.lat(), baseCtx.lon(), q, baseCtx.locale(),
 						baseCtx.baseSearch(), baseCtx.northWest(), baseCtx.southEast());
 				
-				spatialResults = searchTestSpatial(ctx, options, null, false);
+				spatialResults = searchTestSpatial(ctx, spatialOptions, null, false);
 				collectUnitTestSourceData(spatialResults, cities, amenities, unitTest);
 				
 				int[] sizes = getStreetsBuildingSize(cities.values());
