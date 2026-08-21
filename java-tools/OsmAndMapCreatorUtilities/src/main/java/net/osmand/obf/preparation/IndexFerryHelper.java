@@ -14,19 +14,19 @@ public class IndexFerryHelper {
         return e.getTag(FERRY) != null || (e.getTag(ROUTE) != null && e.getTag(ROUTE).equals(FERRY));
     }
 
-    public static void saveFoundedFerryWay(Way way, Map<String, Way> foundFerryWays) {
+    public static void collectFoundedFerryWays(Way way, Map<String, Way> collectedFerryWays) {
         if (hasFerryTags(way)) {
             String key = way.getFirstNodeId() + " " + way.getLastNodeId();
-            foundFerryWays.put(key, way);
+            collectedFerryWays.put(key, way);
         }
     }
 
-    public static void removeDuplicatedFerryWays(Relation rel, Map<String, Way> foundFerryWays) {
+    public static void removeDuplicatedFerryWays(Relation rel, Map<String, Way> collectedFerryWays) {
         if (hasFerryTags(rel)) {
             long startStopId = rel.getMembers().get(0).getEntity().getId();
             long endStopId = rel.getMembers().get(1).getEntity().getId();
-            foundFerryWays.remove(startStopId + " " + endStopId);
-            foundFerryWays.remove(endStopId + " " + startStopId);
+            collectedFerryWays.remove(startStopId + " " + endStopId);
+            collectedFerryWays.remove(endStopId + " " + startStopId);
         }
     }
 

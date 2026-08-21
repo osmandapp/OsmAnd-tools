@@ -756,8 +756,9 @@ public class IndexCreator {
 			public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
                 Relation r = (Relation) e;
                 if (IndexFerryHelper.hasFerryTags(r)) {
-                    iterateMainEntity(e, ctx, icc); //create ferry road from real good-tagged relation.
-					IndexFerryHelper.removeDuplicatedFerryWays(r, collectedFerryWays); //remove way if we have relation
+					//if we have real good-tagged relation, then remove way and create road from relation.
+                    iterateMainEntity(e, ctx, icc); 
+					IndexFerryHelper.removeDuplicatedFerryWays(r, collectedFerryWays);
                 } else {
                     iterateMainEntity(e, ctx, icc);
                 }
