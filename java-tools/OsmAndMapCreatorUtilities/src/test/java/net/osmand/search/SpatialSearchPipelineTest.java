@@ -600,6 +600,7 @@ public class SpatialSearchPipelineTest {
 				}
 				if (world) {
 					readers.add(REGIONS.getFile());
+					readers.add(openReader(createOBFIfNeeded("world_basemap.json.gz")));
 				}
 			}
 
