@@ -2,6 +2,7 @@ package net.osmand.server.api.searchtest;
 
 import com.google.protobuf.CodedInputStream;
 import com.google.protobuf.WireFormat;
+import net.osmand.PlatformUtil;
 import net.osmand.binary.*;
 import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
 import net.osmand.data.*;
@@ -103,15 +104,17 @@ public interface OBFService extends BaseService {
 		if (!Algorithms.isEmpty(obfPath)) {
 			customObfs = getCustomObfFiles(obfPath);
 		}
+		List<String> obfList = new ArrayList<>();
+		addRegionsObf(obfList);
 		if (lat == null || lon == null) {
 			if (customObfs != null) {
-				List<String> obfList = new ArrayList<>();
 				for (File file : customObfs) {
 					obfList.add(file.getAbsolutePath());
 				}
 				return obfList;
 			}
-			return getMapsService().getOBFs();
+			obfList.addAll(getMapsService().getOBFs());
+			return obfList;
 		}
 		double latPlusRadius = lat + radius;
 		double lonMinusRadius = lon - radius;
@@ -121,7 +124,6 @@ public interface OBFService extends BaseService {
 				new LatLon(latPlusRadius, lonMinusRadius),
 				new LatLon(latMinusRadius, lonPlusRadius));
 
-		List<String> obfList = new ArrayList<>();
 		if (Algorithms.isEmpty(obfPath)) {
 			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsService().getObfReaders(
 					points, OsmAndMapsService.ObfReason.SEARCH_TEST.value());
@@ -129,7 +131,19 @@ public interface OBFService extends BaseService {
 				obfList.add(ref.getFile().getAbsolutePath());
 			return obfList;
 		}
-		return getMaps(points, customObfs);
+		obfList.addAll(getMaps(points, customObfs));
+		return obfList;
+	}
+
+	private void addRegionsObf(List<String> obfList) throws IOException {
+		BinaryMapIndexReader regionsReader = PlatformUtil.getOsmandRegions().getFile();
+		File regionsFile = regionsReader == null ? null : regionsReader.getFile();
+		if (regionsFile != null) {
+			String path = regionsFile.getAbsolutePath();
+			if (!obfList.contains(path)) {
+				obfList.add(path);
+			}
+		}
 	}
 
 	private File[] getCustomObfFiles(String obfPath) {
