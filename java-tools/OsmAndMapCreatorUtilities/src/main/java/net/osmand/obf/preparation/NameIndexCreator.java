@@ -64,7 +64,7 @@ public class NameIndexCreator<T> {
 	}
 	
 	public record PoiNameObject(PoiTileBox tileBox, int ind, int eloRating, 
-			String type, String subtype, Set<PoiAdditionalType> additionalTags) {
+			String type, String subtype, Set<PoiAdditionalType> additionalTags, int[] bbox31) {
 	}
 	
 	// common words
