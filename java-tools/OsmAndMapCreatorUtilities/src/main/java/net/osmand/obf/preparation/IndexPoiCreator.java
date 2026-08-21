@@ -108,6 +108,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	// some multipolygons have > 38K islands (tongass)
 	private static final int MAX_POI_OUTER_MULTIPOLYGON_SIZE = 256;
+	private static final double LATITUDE_IN_1_KM = 0.008990676;
+	private static final double MIN_BBOX_INDEX_SIZE_KM = 2; // min width / height in km
 
 	public IndexPoiCreator(IndexCreatorSettings settings, MapRenderingTypesEncoder renderingTypes) {
 		this.settings = settings;
@@ -252,7 +254,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 						icc.bboxFilter.logEntityWithAmenity(e, a);
 						continue;
 					}
-					if (indexedBbox != null && !indexedBbox.hasInitialState()) {
+					if (indexedBbox != null && !indexedBbox.hasInitialState() 
+							&& indexedBbox.height() >= MIN_BBOX_INDEX_SIZE_KM * LATITUDE_IN_1_KM) {
 						a.setBbox31(indexedBbox);
 					}
    					try {
