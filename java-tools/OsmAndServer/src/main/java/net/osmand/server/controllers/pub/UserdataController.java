@@ -343,6 +343,17 @@ public class UserdataController {
 		}
 	}
 
+	@PostMapping(value = "/empty-trash")
+	public ResponseEntity<String> emptyTrash(@RequestBody List<MapApiController.FileData> files,
+	                                        @RequestParam(name = "deviceid", required = true) int deviceId,
+	                                        @RequestParam(name = "accessToken", required = true) String accessToken) {
+		CloudUserDevice dev = checkToken(deviceId, accessToken);
+		if (dev == null) {
+			return userdataService.tokenNotValidError();
+		}
+		return userdataService.emptyTrash(files, dev);
+	}
+
 	@PostMapping(value = "/upload-file", consumes = MULTIPART_FORM_DATA_VALUE)
 	public ResponseEntity<String> upload(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
 			@RequestParam(name = "name", required = true) String name,
