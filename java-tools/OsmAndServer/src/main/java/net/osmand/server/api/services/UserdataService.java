@@ -800,8 +800,24 @@ public class UserdataService {
     
     @Transactional
     public ResponseEntity<String> emptyTrash(List<MapApiController.FileData> files, CloudUserDevicesRepository.CloudUserDevice dev) {
+        if (files == null) {
+            return ResponseEntity.badRequest().body("Invalid trash file data");
+        }
+        List<List<UserFile>> fileVersions = new ArrayList<>();
         for (MapApiController.FileData file : files) {
-            deleteFileAllVersions(dev.userid, file.name, file.type, file.updatetime, true);
+            if (file == null || Algorithms.isEmpty(file.name) || Algorithms.isEmpty(file.type) || file.updatetime == null) {
+                return ResponseEntity.badRequest().body("Invalid trash file data");
+            }
+            List<UserFile> versions = filesRepository.findAllByUseridAndNameAndTypeOrderByUpdatetimeDesc(
+                    dev.userid, file.name, file.type);
+            String error = validateFileVersionsDeletion(versions, file.updatetime, true);
+            if (error != null) {
+                return ResponseEntity.badRequest().body(error);
+            }
+            fileVersions.add(versions);
+        }
+        for (List<UserFile> versions : fileVersions) {
+            deleteFileVersions(versions);
         }
         return ok();
     }
@@ -923,20 +939,32 @@ public class UserdataService {
     @Transactional
     public ResponseEntity<String> deleteFileAllVersions(int userid, String fileName, String fileType, Long updatetime, boolean isTrash) {
         List<UserFile> files = filesRepository.findAllByUseridAndNameAndTypeOrderByUpdatetimeDesc(userid, fileName, fileType);
+        String error = validateFileVersionsDeletion(files, updatetime, isTrash);
+        if (error != null) {
+            return ResponseEntity.badRequest().body(error);
+        }
+        deleteFileVersions(files);
+        return ok();
+    }
+
+    private String validateFileVersionsDeletion(List<UserFile> files, Long updatetime, boolean isTrash) {
         if (files.isEmpty()) {
-            return ResponseEntity.badRequest().body("File not found");
+            return "File not found";
         }
         if (isTrash && files.get(0).zipfilesize > 0) {
-            return ResponseEntity.badRequest().body("This is not trash, the file is not deleted");
+            return "This is not trash, the file is not deleted";
         }
-        if (files.get(0).updatetime.getTime() != updatetime) {
-            return ResponseEntity.badRequest().body("File version was changed");
+        if (updatetime == null || files.get(0).updatetime.getTime() != updatetime) {
+            return "File version was changed";
         }
+        return null;
+    }
+
+    private void deleteFileVersions(List<UserFile> files) {
         for (UserFile file : files) {
             storageService.deleteFile(file.storage, userFolder(file), storageFileName(file));
             filesRepository.delete(file);
         }
-        return ok();
     }
 
     @Transactional
