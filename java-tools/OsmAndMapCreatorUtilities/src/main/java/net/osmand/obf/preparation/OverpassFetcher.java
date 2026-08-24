@@ -22,8 +22,10 @@ import org.json.JSONObject;
 
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
+import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Relation;
+import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
 
 public class OverpassFetcher {
@@ -51,31 +53,11 @@ public class OverpassFetcher {
 	public boolean isOverpassConfigured() {
 		return overpassUrl != null && !overpassUrl.isEmpty();
 	}
-
-	public void fetchCompleteGeometryRelation(Relation relation, OsmDbAccessorContext ctx, Long lastModifiedDate) {
-		List<Long> wayIdsToFetch = getIncompleteWayIdsForRelation(relation);
-		if (wayIdsToFetch.isEmpty()) {
-			return;
-		}
+	private JSONArray executeOverpassQuery(String query) {
 		if (!isOverpassConfigured()) {
-//            log.error("Overpass URL is not configured to fetch incomplete data.");
-			return;
-		}
-
-		long startTime = System.currentTimeMillis();
-		String wayIds = String.join(",", wayIdsToFetch.stream().map(String::valueOf).toArray(String[]::new));
-
-		// Construct the Overpass QL query
-		String query = "[out:json];way(id:" + wayIds + "); out geom;";
-		String formattedDate = "";
-		if (lastModifiedDate != null) {
-			Instant instant = Instant.ofEpochMilli(lastModifiedDate);
-			DateTimeFormatter formatter = DateTimeFormatter.ISO_INSTANT;
-			formattedDate = formatter.format(instant);
-			query = "[out:json][date:\"" + formattedDate + "\"];way(id:" + wayIds + "); out geom;";
+			return null;
 		}
 		String urlString = overpassUrl + "/api/interpreter";
-
 		try {
 			URL url = new URL(urlString);
 			HttpURLConnection connection = (HttpURLConnection) url.openConnection();
@@ -83,7 +65,6 @@ public class OverpassFetcher {
 			connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
 			connection.setDoOutput(true);
 
-			// Write the query to the request body
 			String body = "data=" + URLEncoder.encode(query, StandardCharsets.UTF_8.toString());
 			try (OutputStream os = connection.getOutputStream()) {
 				byte[] input = body.getBytes(StandardCharsets.UTF_8);
@@ -96,89 +77,189 @@ public class OverpassFetcher {
 						new InputStreamReader(new GZIPInputStream(connection.getInputStream())));
 				String inputLine;
 				StringBuilder response = new StringBuilder();
-
 				while ((inputLine = in.readLine()) != null) {
 					response.append(inputLine);
 				}
 				in.close();
 
-				// Parse the JSON response
 				JSONObject jsonResponse = new JSONObject(response.toString());
-				JSONArray elements = jsonResponse.getJSONArray("elements");
-
-				// Map to store fetched entities (ways and nodes)
-				Map<EntityId, Entity> fetchedEntities = new HashMap<>();
-
-				// First, parse all nodes and add them to the map
-				for (int i = 0; i < elements.length(); i++) {
-					JSONObject element = elements.getJSONObject(i);
-					if (element.getString("type").equals("node")) {
-						long nodeId = element.getLong("id");
-						double lat = element.getDouble("lat");
-						double lon = element.getDouble("lon");
-						Node node = new Node(lat, lon, nodeId);
-						fetchedEntities.put(new EntityId(Entity.EntityType.NODE, nodeId), node);
-					}
-				}
-
-				// Then, parse all ways and add them to the map
-				for (int i = 0; i < elements.length(); i++) {
-					JSONObject element = elements.getJSONObject(i);
-					if (element.getString("type").equals("way")) {
-						long wayId = element.getLong("id");
-						JSONArray nodeIds = element.getJSONArray("nodes");
-						JSONArray geoms = element.getJSONArray("geometry");
-
-						// Create a new Way object
-						Way way = new Way(wayId);
-
-						// Fetch nodes for the way
-						for (int j = 0; j < nodeIds.length(); j++) {
-							long nodeId = nodeIds.getLong(j);
-							Node node = (Node) fetchedEntities.get(new EntityId(Entity.EntityType.NODE, nodeId));
-							if (node == null) {
-								double lat = geoms.getJSONObject(j).getDouble("lat");
-								double lon = geoms.getJSONObject(j).getDouble("lon");
-								node = new Node(lat, lon, nodeId);
-							}
-							if (ctx != null) {
-								long nid = ctx.convertId(node);
-								node = new Node(node.getLatitude(), node.getLongitude(), nid);
-							}
-							way.addNode(node);
-						}
-						fetchedEntities.put(new EntityId(Entity.EntityType.WAY, wayId), way);
-					}
-				}
-
-				// Update the relation with the fetched ways and nodes
-				relation.initializeLinks(fetchedEntities);
-
-				log.info(String.format("Fetched members on date \"%s\" for relation %d (%.2f sec)", formattedDate, relation.getId(),
-						(System.currentTimeMillis() - startTime) / 1e3, wayIds));
+				return jsonResponse.optJSONArray("elements");
 			} else {
 				log.error("Failed to fetch data from Overpass API. Response code: " + responseCode);
 			}
 		} catch (Exception e) {
 			log.error("Error fetching data from Overpass API", e);
 		}
+		return null;
+	}
+
+	private String buildDateHeader(Long lastModifiedDate) {
+		if (lastModifiedDate != null && lastModifiedDate > 0) {
+			Instant instant = Instant.ofEpochMilli(lastModifiedDate);
+			return "[date:\"" + DateTimeFormatter.ISO_INSTANT.format(instant) + "\"]";
+		}
+		return "";
+	}
+
+	private Map<EntityId, Entity> parseEntities(JSONArray elements, OsmDbAccessorContext ctx) {
+		Map<EntityId, Entity> fetchedEntities = new HashMap<>();
+		if (elements == null) {
+			return fetchedEntities;
+		}
+
+		for (int i = 0; i < elements.length(); i++) {
+			JSONObject element = elements.getJSONObject(i);
+			if ("node".equals(element.optString("type"))) {
+				long nodeId = element.getLong("id");
+				double lat = element.getDouble("lat");
+				double lon = element.getDouble("lon");
+				Node node = new Node(lat, lon, nodeId);
+				if (ctx != null) {
+					long nid = ctx.convertId(node);
+					node = new Node(node.getLatitude(), node.getLongitude(), nid);
+				}
+				fetchedEntities.put(new EntityId(Entity.EntityType.NODE, nodeId), node);
+			}
+		}
+
+		for (int i = 0; i < elements.length(); i++) {
+			JSONObject element = elements.getJSONObject(i);
+			if ("way".equals(element.optString("type"))) {
+				long wayId = element.getLong("id");
+				JSONArray nodeIds = element.optJSONArray("nodes");
+				JSONArray geoms = element.optJSONArray("geometry");
+
+				Way way = new Way(wayId);
+				if (nodeIds != null) {
+					for (int j = 0; j < nodeIds.length(); j++) {
+						long nodeId = nodeIds.getLong(j);
+						Node node = (Node) fetchedEntities.get(new EntityId(Entity.EntityType.NODE, nodeId));
+						if (node == null && geoms != null && j < geoms.length()) {
+							double lat = geoms.getJSONObject(j).getDouble("lat");
+							double lon = geoms.getJSONObject(j).getDouble("lon");
+							node = new Node(lat, lon, nodeId);
+							if (ctx != null) {
+								long nid = ctx.convertId(node);
+								node = new Node(node.getLatitude(), node.getLongitude(), nid);
+							}
+						}
+						if (node != null) {
+							way.addNode(node);
+						}
+					}
+				}
+				fetchedEntities.put(new EntityId(Entity.EntityType.WAY, wayId), way);
+			}
+		}
+		return fetchedEntities;
+	}
+
+	public void fetchRelationMembers(Relation relation, OsmDbAccessorContext ctx, Long lastModifiedDate) {
+		if (relation == null) {
+			return;
+		}
+		long startTime = System.currentTimeMillis();
+		String dateHeader = buildDateHeader(lastModifiedDate);
+		String query = "[out:json]" + dateHeader + ";relation(" + relation.getId() + "); out body;";
+
+		JSONArray elements = executeOverpassQuery(query);
+		if (elements == null) {
+			return;
+		}
+
+		for (int i = 0; i < elements.length(); i++) {
+			JSONObject el = elements.getJSONObject(i);
+			if ("relation".equals(el.optString("type")) && el.getLong("id") == relation.getId()) {
+				JSONArray members = el.optJSONArray("members");
+				if (members != null) {
+					for (int j = 0; j < members.length(); j++) {
+						JSONObject m = members.getJSONObject(j);
+						String type = m.getString("type");
+						long ref = m.getLong("ref");
+						String role = m.optString("role", "");
+
+						Entity memberEntity = null;
+						if ("way".equals(type)) {
+							memberEntity = new Way(ref);
+						} else if ("node".equals(type)) {
+							memberEntity = new Node(0, 0, ref);
+						} else if ("relation".equals(type)) {
+							memberEntity = new Relation(ref);
+						}
+
+						if (memberEntity != null) {
+							relation.addMember(memberEntity.getId(), EntityType.valueOf(memberEntity), role);
+						}
+					}
+				}
+				break;
+			}
+		}
+		log.info(String.format("Fetched %d members for relation %d (%.2f sec)",
+				relation.getMembers().size(), relation.getId(), (System.currentTimeMillis() - startTime) / 1e3));
+	}
+
+	public void fetchCompleteGeometry(Way w, OsmDbAccessorContext ctx, Long lastModifiedDate) {
+		if (w == null) {
+			return;
+		}
+		long startTime = System.currentTimeMillis();
+		String dateHeader = buildDateHeader(lastModifiedDate);
+		String query = "[out:json]" + dateHeader + ";way(" + w.getId() + "); out geom;";
+
+		JSONArray elements = executeOverpassQuery(query);
+		Map<EntityId, Entity> entities = parseEntities(elements, ctx);
+		Way fetchedWay = (Way) entities.get(new EntityId(Entity.EntityType.WAY, w.getId()));
+		if (fetchedWay != null) {
+			for (Node n : fetchedWay.getNodes()) {
+				w.addNode(n);
+			}
+		}
+		log.info(String.format("Fetched geometry for way %d (%.2f sec)", w.getId(),
+				(System.currentTimeMillis() - startTime) / 1e3));
+	}
+
+	public void fetchCompleteGeometry(Way w) {
+		fetchCompleteGeometry(w, null, null);
+	}
+
+	public void fetchCompleteGeometryRelation(Relation relation, OsmDbAccessorContext ctx, Long lastModifiedDate) {
+		if (relation == null) {
+			return;
+		}
+		if (relation.getMembers() == null || relation.getMembers().isEmpty()) {
+			fetchRelationMembers(relation, ctx, lastModifiedDate);
+		}
+
+		List<Long> wayIdsToFetch = getIncompleteWayIdsForRelation(relation);
+		if (wayIdsToFetch.isEmpty()) {
+			return;
+		}
+
+		long startTime = System.currentTimeMillis();
+		String wayIds = String.join(",", wayIdsToFetch.stream().map(String::valueOf).toArray(String[]::new));
+		String dateHeader = buildDateHeader(lastModifiedDate);
+		String query = "[out:json]" + dateHeader + ";way(id:" + wayIds + "); out geom;";
+
+		JSONArray elements = executeOverpassQuery(query);
+		Map<EntityId, Entity> fetchedEntities = parseEntities(elements, ctx);
+
+		relation.initializeLinks(fetchedEntities);
+
+		log.info(String.format("Fetched %d member ways for relation %d (%.2f sec)",
+				wayIdsToFetch.size(), relation.getId(), (System.currentTimeMillis() - startTime) / 1e3));
 	}
 
 	public List<Long> getIncompleteWayIdsForRelation(Relation relation) {
-		// Collect way IDs with missing nodes
 		List<Long> wayIdsToFetch = new ArrayList<>();
-		for (Relation.RelationMember member : relation.getMembers()) {
-			// Check if the member is a Way
-			if (member.getEntity() instanceof Way) {
-				long wayId = ((Way) member.getEntity()).getId();
-				// Find the corresponding Way object in the relation
-				Way way = null;
-				for (Relation.RelationMember m : relation.getMembers()) {
-					if (m.getEntity() instanceof Way && ((Way) m.getEntity()).getId() == wayId) {
-						way = (Way) m.getEntity();
-						break;
-					}
-				}
+		if (relation == null || relation.getMembers() == null) {
+			return wayIdsToFetch;
+		}
+		for (RelationMember member : relation.getMembers()) {
+			if (member.getEntity() instanceof Way || member.getEntityId().getType() == Entity.EntityType.WAY) {
+				long wayId = member.getEntity() != null ? member.getEntity().getId() : member.getEntityId().getId();
+				Way way = member.getEntity() instanceof Way ? (Way) member.getEntity() : null;
+
 				boolean hasNullNodes = false;
 				if (way == null || way.getNodeIds().isEmpty() || way.getNodes().size() != way.getNodeIds().size()) {
 					hasNullNodes = true;
