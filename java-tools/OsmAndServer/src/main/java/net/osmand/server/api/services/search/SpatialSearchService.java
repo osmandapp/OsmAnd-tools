@@ -149,7 +149,7 @@ public class SpatialSearchService {
 		long fileTimestamp;
 	}
 
-	private BinaryMapIndexReader regionsReaderForThread() {
+	public BinaryMapIndexReader regionsReaderForThread() {
 		RegionsReaderHolder holder = osmandRegionsLocal.get();
 		BinaryMapIndexReader shared = mapReadersService.getOsmandRegions() == null ? null : mapReadersService.getOsmandRegions().getFile();
 		File regionsFile = shared == null ? null : shared.getFile();

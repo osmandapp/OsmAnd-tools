@@ -598,17 +598,25 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 		SpatialSearchService.SpatialResults res = null;
 		try {
 			if (readers == null) {
+				int radiusMeters = Math.toIntExact(Math.round(options.getRadius() * 1000));
+				QuadRect llBbox = MapUtils.calculateLatLonBbox(
+						ctx.lat(), ctx.lon(), radiusMeters);
 				QuadRect points = mapsService.points(null,
-						new LatLon(ctx.lat() + options.getRadius(), ctx.lon() - options.getRadius()),
-						new LatLon(ctx.lat() - options.getRadius(), ctx.lon() + options.getRadius()));
+						new LatLon(llBbox.top, llBbox.left),
+						new LatLon(llBbox.bottom, llBbox.right));
 				List<OsmAndMapsService.BinaryMapIndexReaderReference> maps = mapReadersService.getMapsForSearch(points, false);
 				if (maps.isEmpty()) {
-					return null;
+					throw new IOException(String.format(Locale.US,
+							"No OBF maps found for spatial search at %.6f, %.6f within %.3f km",
+							ctx.lat(), ctx.lon(), options.getRadius()));
 				}
-				readers = mapsService.getReaders(maps, null, true);
+				readers = mapsService.getReaders(maps, null);
 
 				if (!readers.isEmpty()) {
-					readers.add(mapsService.getOsmandRegions().getFile());
+					BinaryMapIndexReader regionsReader = spatialSearchService.regionsReaderForThread();
+					if (regionsReader != null) {
+						readers.add(regionsReader);
+					}
 				}
 			}
 

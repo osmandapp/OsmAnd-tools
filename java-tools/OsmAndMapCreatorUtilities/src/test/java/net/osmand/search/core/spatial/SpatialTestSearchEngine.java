@@ -100,7 +100,9 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
                         b.setLength(0);
                     }
                     appendIntersection(b, intersectionStreets);
-                    resultType = "STREET_INTERSECTION";
+                    if (!poiCategory) {
+                        resultType = "STREET_INTERSECTION";
+                    }
                 } else {
                     appendName(b, r.getExtraNameMatch(), street.getCity());
                 }
