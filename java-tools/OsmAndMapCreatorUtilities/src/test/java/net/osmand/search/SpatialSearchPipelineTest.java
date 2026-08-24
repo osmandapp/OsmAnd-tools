@@ -45,6 +45,7 @@ import org.junit.runners.Parameterized;
 import org.xmlpull.v1.XmlPullParserException;
 
 import net.osmand.IProgress;
+import net.osmand.PlatformUtil;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryMapAddressReaderAdapter;
 import net.osmand.binary.BinaryMapIndexReader;
@@ -113,7 +114,6 @@ public class SpatialSearchPipelineTest {
 	private static final boolean FILTER_DATA_JSON = false;
 	private static final double FILTER_REMOVE_PROBABILITY = 0.8; // means 80% probability of removal
 	private static boolean HASH_IS_ACTUAL_FOR_RUN; // evaluated once during non-LIVE setup
-	private static OsmandRegions REGIONS;
 
 	private final File testFile;
     private Set<String> searchKeywords;
@@ -198,8 +198,6 @@ public class SpatialSearchPipelineTest {
 	@BeforeClass
 	public static void setUp() throws IOException {
 		GENERATED_OBFS.clear();
-		REGIONS = new OsmandRegions(new File(getAndroidPath(), "OsmAnd-java" + File.separator + OsmandRegions.REGIONS_OCBF).getAbsolutePath());
-		
 		if (LIVE_TESTING) {
 			System.out.println("LIVE_TESTING is ON (" + GEN_DIR + ")");
 			defaultSetup();
@@ -598,8 +596,9 @@ public class SpatialSearchPipelineTest {
 				if (readers.isEmpty()) {
 					throw new IllegalStateException("useData=true but no OBF indexes were loaded for " + testFile.getName());
 				}
+				System.out.printf("TEST %s - %s\n ", testFile.getName(), world);
 				if (world) {
-					readers.add(REGIONS.getFile());
+					readers.add(openReader(getOsmAndRegions()));
 					readers.add(openReader(createOBFIfNeeded("world_basemap.json.gz")));
 				}
 			}
@@ -665,6 +664,10 @@ public class SpatialSearchPipelineTest {
 				reader.close();
 			}
         }
+	}
+
+	private File getOsmAndRegions() {
+		return new File(getAndroidPath(), "OsmAnd-java" + File.separator + OsmandRegions.REGIONS_OCBF);
 	}
 
 	private static void deleteRecursively(File file) {
@@ -1203,6 +1206,7 @@ public class SpatialSearchPipelineTest {
 		if (quadRect == null || quadRect.hasInitialState() || candidates == null) {
 			return maps;
 		}
+		OsmandRegions REGIONS = PlatformUtil.getOsmandRegions();
 		if (REGIONS == null) {
 			throw new IllegalStateException("Regions metadata is not initialized");
 		}
