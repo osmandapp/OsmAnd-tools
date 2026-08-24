@@ -6,9 +6,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.sql.*;
 import java.util.*;
 import java.util.Map.Entry;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -56,6 +62,8 @@ import net.osmand.util.MapUtils;
 import net.osmand.util.SearchAlgorithms;
 import net.osmand.util.TopTagValuesAnalyzer;
 import net.sf.junidecode.Junidecode;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 
 public class IndexPoiCreator extends AbstractIndexPartCreator {
@@ -1555,4 +1563,101 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
         }
     }
 
+	public static void updateSourceJsonBbox(Path directory) throws IOException {
+		if (!Files.isDirectory(directory)) {
+			throw new IllegalArgumentException("Spatial search JSON directory doesn't exist: " + directory);
+		}
+
+		OverpassFetcher fetcher = OverpassFetcher.getInstance();
+		if (!fetcher.isOverpassConfigured()) {
+			throw new IllegalStateException("OVERPASS_URL is not configured");
+		}
+
+		List<Path> jsonFiles;
+		try (var files = Files.walk(directory)) {
+			jsonFiles = files.filter(Files::isRegularFile)
+					.filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".json.gz"))
+					.sorted()
+					.toList();
+		}
+
+		int amenitiesFound = 0;
+		int eligibleAmenities = 0;
+		int bboxAdded = 0;
+		int failed = 0;
+		int changedFiles = 0;
+		for (Path jsonFile : jsonFiles) {
+			JSONObject root;
+			try {
+				try (GZIPInputStream gzip = new GZIPInputStream(Files.newInputStream(jsonFile))) {
+					root = new JSONObject(new String(gzip.readAllBytes(), StandardCharsets.UTF_8));
+				}
+			} catch (Exception e) {
+				failed++;
+				System.err.println("Failed to parse " + jsonFile + ": " + e.getMessage());
+				continue;
+			}
+			JSONArray amenities = root.optJSONArray("amenities");
+			if (amenities == null) {
+				continue;
+			}
+
+			boolean changed = false;
+			for (int i = 0; i < amenities.length(); i++) {
+				JSONObject amenity = amenities.optJSONObject(i);
+				if (amenity == null || !amenity.has("id")) {
+					continue;
+				}
+				amenitiesFound++;
+				long mapObjectId;
+				try {
+					mapObjectId = amenity.getLong("id");
+				} catch (Exception e) {
+					failed++;
+					System.err.println("Invalid amenity id in " + jsonFile + " at index " + i);
+					continue;
+				}
+				Entity.EntityType entityType = ObfConstants.getOsmEntityType(mapObjectId);
+				if (entityType != Entity.EntityType.WAY && entityType != Entity.EntityType.RELATION) {
+					continue;
+				}
+				eligibleAmenities++;
+				JSONArray existingBbox = amenity.optJSONArray("bbox31");
+				if (existingBbox != null && existingBbox.length() == 4) {
+					continue;
+				}
+
+				QuadRect bbox = fetcher.fetchBoundaryBox(mapObjectId);
+				if (bbox == null) {
+					failed++;
+					continue;
+				}
+				JSONArray bbox31 = new JSONArray();
+				bbox31.put(MapUtils.get31TileNumberX(bbox.left));
+				bbox31.put(MapUtils.get31TileNumberY(bbox.top));
+				bbox31.put(MapUtils.get31TileNumberX(bbox.right));
+				bbox31.put(MapUtils.get31TileNumberY(bbox.bottom));
+				amenity.put("bbox31", bbox31);
+				bboxAdded++;
+				changed = true;
+			}
+			if (changed) {
+				Path tempFile = Files.createTempFile(jsonFile.getParent(), jsonFile.getFileName().toString(), ".tmp");
+				try {
+					try (GZIPOutputStream gzip = new GZIPOutputStream(Files.newOutputStream(tempFile))) {
+						gzip.write(root.toString(4).getBytes(StandardCharsets.UTF_8));
+					}
+					Files.move(tempFile, jsonFile, StandardCopyOption.REPLACE_EXISTING);
+				} finally {
+					Files.deleteIfExists(tempFile);
+				}
+				changedFiles++;
+				System.out.println("Updated " + jsonFile);
+			}
+		}
+
+		System.out.printf(Locale.ROOT,
+				"Processed %d JSON files: amenities=%d, eligible=%d, bbox31_added=%d, changed_files=%d, failures=%d%n",
+				jsonFiles.size(), amenitiesFound, eligibleAmenities, bboxAdded, changedFiles, failed);
+	}
 }
