@@ -212,7 +212,7 @@ public class OverpassFetcher {
 		Entity.EntityType entityType = ObfConstants.getOsmEntityType(mapObjectId);
 		if (entityType != Entity.EntityType.NODE && entityType != Entity.EntityType.WAY
 				&& entityType != Entity.EntityType.RELATION) {
-			log.warn("Unsupported OSM entity type for map object " + mapObjectId + ": " + entityType);
+			log.error("Unsupported OSM entity type for map object " + mapObjectId + ": " + entityType);
 			return null;
 		}
 		long osmId = ObfConstants.getOsmIdFromMapObjectId(mapObjectId);
@@ -271,7 +271,8 @@ public class OverpassFetcher {
 				if (entityType == Entity.EntityType.NODE) {
 					Node node = nodes.get(osmId);
 					if (node == null) {
-						log.warn("Overpass returned no node for OSM node " + osmId);
+						log.error("Overpass returned no node for OSM node " + osmId);
+						log.error(response);
 						return null;
 					}
 					return new QuadRect(node.getLongitude(), node.getLatitude(),
@@ -339,8 +340,7 @@ public class OverpassFetcher {
 					}
 				}
 				if (builder.getOuterWays().isEmpty()) {
-					log.warn("Overpass returned no complete outer ways for OSM "
-							+ entityType.name().toLowerCase() + " " + osmId);
+					log.warn("Overpass returned empty ways for OSM " + entityType.name() + " " + osmId);
 					return null;
 				}
 				QuadRect bbox = builder.build().getLatLonBbox();
@@ -349,6 +349,7 @@ public class OverpassFetcher {
 						(System.currentTimeMillis() - startTime) / 1e3));
 				return bbox;
 			} else {
+				log.error("Object Id:" + mapObjectId + ", Query: " + query);
 				log.error("Failed to fetch data from Overpass API. Response code: " + responseCode);
 			}
 		} catch (Exception e) {
