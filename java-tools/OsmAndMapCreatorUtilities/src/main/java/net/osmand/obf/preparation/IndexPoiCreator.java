@@ -108,6 +108,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	// some multipolygons have > 38K islands (tongass)
 	private static final int MAX_POI_OUTER_MULTIPOLYGON_SIZE = 256;
+	private static final double LATITUDE_IN_1_KM = 0.008990676;
+	private static final double MIN_BBOX_INDEX_SIZE_KM = 2; // min width / height in km
 
 	public IndexPoiCreator(IndexCreatorSettings settings, MapRenderingTypesEncoder renderingTypes) {
 		this.settings = settings;
@@ -203,7 +205,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			
 			List<LatLon> relationCenters = Collections.singletonList(null); // [null] means single amenity point
 			StringBuilder memberIds = new StringBuilder();
-			relationCenters = collectRelationCenters(e, ctx, tags, relationCenters, memberIds);
+			QuadRect indexedBbox = OsmMapUtils.requireIndexBbox(tags) ? new QuadRect() : null;
+			relationCenters = collectRelationCenters(e, ctx, tags, relationCenters, memberIds, indexedBbox);
 			long id = e.getId();
 			if (icc.basemap && id < 0) {
 				id = GENERATE_OBJ_ID--;
@@ -251,6 +254,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 						icc.bboxFilter.logEntityWithAmenity(e, a);
 						continue;
 					}
+					if (indexedBbox != null && !indexedBbox.hasInitialState() 
+							&& indexedBbox.height() >= MIN_BBOX_INDEX_SIZE_KM * LATITUDE_IN_1_KM) {
+						a.setBbox31(indexedBbox);
+					}
    					try {
    						insertAmenityIntoPoi(a);
    					} catch (Exception excpt) {
@@ -264,7 +271,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 
 	private List<LatLon> collectRelationCenters(Entity e, OsmDbAccessorContext ctx, Map<String, String> tags,
-			List<LatLon> centers, StringBuilder memberIds) throws SQLException {
+			List<LatLon> centers, StringBuilder memberIds, QuadRect indexedBbox) throws SQLException {
 		if (e instanceof Relation relation) {
 			ctx.loadEntityRelation(relation);
 			boolean isAdministrative = tags.get(OSMSettings.OSMTagKey.ADMIN_LEVEL.getValue()) != null;
@@ -296,6 +303,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 						// don't index this
 						continue;
 					}
+					if (indexedBbox != null) {
+						QuadRect q = m.getLatLonBbox();
+						indexedBbox.expand(q.left, q.top, q.right, q.bottom);
+					}
 		            List<List<Node>> innerWays = new ArrayList<>();
 		            for (Ring r : m.getInnerRings()) {
 		                innerWays.add(r.getBorder());
@@ -318,6 +329,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					}
 				}
 			}
+		}
+		if (indexedBbox != null && indexedBbox.hasInitialState() && e instanceof Way way) {
+			indexedBbox = way.getLatLonBBox();
 		}
 		return centers;
 	}
@@ -356,7 +370,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		poiPreparedStatement.setInt(7, amenity.getOrder());
 		String tagGroups = insertMergedTaggroups(amenity);
 		poiPreparedStatement.setString(8, tagGroups);
-		int topIndex = 9;
+		poiPreparedStatement.setString(9, encodeBbox(amenity.getBbox31()));
+		int topIndex = 10;
 		for (Map.Entry<String, PoiType> entry : poiTypes.topIndexPoiAdditional.entrySet()) {
 			String val = amenity.getAdditionalInfo(entry.getKey().replace(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX, ""));
 			poiPreparedStatement.setString(topIndex, val);
@@ -472,7 +487,26 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 		return b.toString();
 	}
-
+	
+	private String encodeBbox(int[] bbox) {
+		String r = "";
+		if (bbox != null) {
+			r = Arrays.toString(bbox).replace("[", "").replace("]", "");
+		}
+		return r;
+	}
+	
+	private int[] decodeBbox(String input) {
+		if (Algorithms.isNotEmpty(input)) {
+			String[] items = input.split(", ");
+			int[] decodedArray = new int[items.length];
+			for (int i = 0; i < items.length; i++) {
+				decodedArray[i] = Integer.parseInt(items[i]);
+			}
+			return decodedArray;
+		}
+		return null;
+	}
 
 	private Map<PoiAdditionalType, String> decodeAdditionalInfo(String name,
 			Map<PoiAdditionalType, String> tempNames) {
@@ -525,7 +559,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		Statement stat = poiConnection.createStatement();
 		stat.executeUpdate("create table " + IndexConstants.POI_TABLE + //$NON-NLS-1$
 				" (id bigint, x int, y int,"
-				+ "type varchar(1024), subtype varchar(1024), additionalTags varchar(8096), priority int, taggroups varchar(1024), " + getCreateColumnsTopIndexAdditionals()
+				+ "type varchar(1024), subtype varchar(1024), additionalTags varchar(8096), priority int, taggroups varchar(1024), bbox varchar(1024), " + getCreateColumnsTopIndexAdditionals()
 				+ "primary key(id, type, subtype))");
 		stat.executeUpdate("create table taggroups (id int, tagvalues varchar(8096), primary key(id))");
 		stat.executeUpdate("create index poi_loc on poi (x, y, type, subtype)");
@@ -535,8 +569,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 		// create prepared statment
 		poiPreparedStatement = poiConnection.prepareStatement("INSERT INTO " + IndexConstants.POI_TABLE
-				+ "(id, x, y, type, subtype, additionalTags, priority, taggroups" + getInsertColumnsTopIndexAdditionals() + ") " + //$NON-NLS-2$ //$NON-NLS-2$
-				"VALUES (?, ?, ?, ?, ?, ?, ?, ?" + getInsertValuesTopIndexAdditionals() + ")");
+				+ "(id, x, y, type, subtype, additionalTags, priority, taggroups, bbox " + getInsertColumnsTopIndexAdditionals() + ") " + //$NON-NLS-2$ //$NON-NLS-2$
+				"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ? " + getInsertValuesTopIndexAdditionals() + ")");
 		tagGroupsPreparedStatement = poiConnection.prepareStatement("INSERT INTO taggroups (id, tagvalues) VALUES (?, ?)");
 		pStatements.put(poiPreparedStatement, 0);
 		pStatements.put(tagGroupsPreparedStatement, 0);
@@ -915,7 +949,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private int processPOIIntoTree(File poiGeocoding, NameIndexCreator<PoiNameObject> namesIndex, int zoomToStart, IntBbox bbox,
 			Tree<PoiTileBox> rootZoomsTree) throws SQLException, IOException {
 		ResultSet rs = poiConnection.createStatement().executeQuery(
-				"SELECT x,y,type,subtype,id,additionalTags,taggroups from poi ORDER BY id, priority");
+				"SELECT x,y,type,subtype,id,additionalTags,taggroups, bbox from poi ORDER BY id, priority");
 		rootZoomsTree.setNode(new PoiTileBox());
 		long geocodingTime = 0, geocodingCnt = 0, geocodingSuccess = 0, geoCitySuccess = 0, geoCityCnt = 0, geoCityTime = 0;
 		RoutingContext geocodingCtx = null;
@@ -1136,8 +1170,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
                     }
                 }
 
+				int[] bboxObj = decodeBbox(rs.getString(8));
 				PoiNameObject obj = new PoiNameObject(prevTree.getNode(), poiIndInBlock, elo, type, subtype,
-						encoded);
+						encoded, bboxObj);
 				putPoiObjectPrefix(namesIndex, obj, additionalTags.get(nameRuleType),
 						additionalTags.get(nameEnRuleType), otherNames, idNames, settings);
 			} else {
