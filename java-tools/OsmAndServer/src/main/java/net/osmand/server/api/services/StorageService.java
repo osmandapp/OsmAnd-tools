@@ -272,8 +272,13 @@ public class StorageService {
 					try {
 						st.s3Conn.deleteObject(st.bucket, fld + FILE_SEPARATOR + filename);
 					} catch (com.amazonaws.SdkClientException e) {
-						handleException(st, "delete", fld, filename, e);
-						throw e;
+						if (e instanceof AmazonS3Exception s3Exception
+								&& "NoSuchKey".equals(s3Exception.getErrorCode())) {
+							LOGGER.info(String.format("Storage delete skipped for missing file %s/%s", fld, filename));
+						} else {
+							handleException(st, "delete", fld, filename, e);
+							throw e;
+						}
 					}
 				}
 			}
