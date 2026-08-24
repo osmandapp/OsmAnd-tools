@@ -19,6 +19,7 @@ import com.google.gson.reflect.TypeToken;
 import net.osmand.server.api.services.search.SearchResultConverter;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiType;
+import net.osmand.shared.wiki.WikiHelper;
 import net.osmand.shared.wiki.WikiImage;
 import net.osmand.shared.wiki.WikiMetadata;
 import net.osmand.util.MapUtils;
@@ -686,6 +687,67 @@ public class WikiService {
 						img.put(DESCRIPTION_KEY, rs.getString(DESCRIPTION_KEY));
 					}
 				});
+	}
+
+	public void fillWikiTagImagesMetadata(List<WikiImage> wikiImages) {
+		if (!config.wikiInitialized() || wikiImages.isEmpty()) {
+			return;
+		}
+		Map<String, WikiImage> imagesByName = new LinkedHashMap<>();
+		for (WikiImage wikiImage : wikiImages) {
+			String imageName = wikiImage.getImageName();
+			if (!Algorithms.isEmpty(imageName)) {
+				imagesByName.put(imageName.replace(' ', '_'), wikiImage);
+			}
+		}
+		if (imagesByName.isEmpty()) {
+			return;
+		}
+		List<String> names = new ArrayList<>(imagesByName.keySet());
+		String placeholders = String.join(",", Collections.nCopies(names.size(), "?"));
+		jdbcTemplate.query(
+				"SELECT name, id, COALESCE(date, '') AS date, COALESCE(author, '') AS author, " +
+						"COALESCE(license, '') AS license, COALESCE(description, '') AS description " +
+						"FROM wiki.common_meta WHERE name IN (" + placeholders + ")",
+				ps -> {
+					for (int i = 0; i < names.size(); i++) {
+						ps.setString(i + 1, names.get(i));
+					}
+				},
+				rs -> {
+					WikiImage wikiImage = imagesByName.get(rs.getString("name"));
+					if (wikiImage != null) {
+						WikiMetadata.Metadata metadata = wikiImage.getMetadata();
+						metadata.setDate(rs.getString(DATE_KEY));
+						metadata.setAuthor(rs.getString(AUTHOR_KEY));
+						metadata.setLicense(getLicense(rs.getString(LICENSE_KEY)));
+						metadata.setDescription(rs.getString(DESCRIPTION_KEY));
+						wikiImage.setMediaId(rs.getLong("id"));
+					}
+				});
+	}
+
+	public Set<Map<String, Object>> getTagImagesWithDetails(String fileName) {
+		if (fileName.startsWith("File:")) {
+			fileName = fileName.substring("File:".length());
+		}
+		List<WikiImage> wikiImages = new ArrayList<>();
+		WikiHelper.INSTANCE.addFile(wikiImages, fileName);
+		fillWikiTagImagesMetadata(wikiImages);
+
+		Set<Map<String, Object>> imagesWithDetails = new LinkedHashSet<>();
+		for (WikiImage wikiImage : wikiImages) {
+			WikiMetadata.Metadata metadata = wikiImage.getMetadata();
+			Map<String, Object> imageDetails = new HashMap<>();
+			imageDetails.put(MEDIA_ID_KEY, wikiImage.getMediaId());
+			imageDetails.put("image", createImageUrl(wikiImage.getImageName().replace(' ', '_')));
+			imageDetails.put(DATE_KEY, metadata.getDate());
+			imageDetails.put(AUTHOR_KEY, metadata.getAuthor());
+			imageDetails.put(LICENSE_KEY, metadata.getLicense());
+			imageDetails.put(DESCRIPTION_KEY, metadata.getDescription());
+			imagesWithDetails.add(imageDetails);
+		}
+		return imagesWithDetails;
 	}
 
 	private static String stripWikidataPrefix(String wikidataId) {
