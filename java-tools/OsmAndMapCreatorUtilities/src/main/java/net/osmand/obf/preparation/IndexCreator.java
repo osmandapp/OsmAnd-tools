@@ -29,9 +29,11 @@ import javax.imageio.ImageReader;
 import java.io.*;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.zip.GZIPInputStream;
 
 /**
@@ -729,6 +731,7 @@ public class IndexCreator {
 	private void iterateMainEntities(OsmDbAccessor accessor, IProgress progress, IndexCreationContext icc)
 			throws SQLException, InterruptedException {
         Map<String, Way> collectedFerryWays = new LinkedHashMap<String, Way>();
+		Set<Long> usedRelationIds = new HashSet<>();
 		
 		setGeneralProgress(progress, "[50 / 100]");
 		progress.startTask(settings.getString("IndexCreator.PROCESS_OSM_NODES"), accessor.getAllNodes());
@@ -755,6 +758,7 @@ public class IndexCreator {
 			@Override
 			public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
                 Relation r = (Relation) e;
+				IndexFerryHelper.collectUsedRelationId(r, usedRelationIds);
                 if (IndexFerryHelper.hasFerryTags(r)) {
 					//if we have real good-tagged relation, then remove way and create road from relation.
                     iterateMainEntity(e, ctx, icc); 
@@ -767,7 +771,7 @@ public class IndexCreator {
 
         for (Way way : collectedFerryWays.values()) {
 			// for all rest ferry-ways without real osm-relation we need to create it manually.
-            Relation syntethicFerryRelation = IndexFerryHelper.createSyntheticFerryRelation(way);
+            Relation syntethicFerryRelation = IndexFerryHelper.createSyntheticFerryRelation(way, usedRelationIds);
             iterateMainEntity(syntethicFerryRelation, accessor, icc);
         }
 	}
