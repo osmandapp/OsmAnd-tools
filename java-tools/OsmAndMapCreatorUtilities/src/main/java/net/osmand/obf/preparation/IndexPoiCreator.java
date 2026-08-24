@@ -108,8 +108,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 	// some multipolygons have > 38K islands (tongass)
 	private static final int MAX_POI_OUTER_MULTIPOLYGON_SIZE = 256;
-	private static final double LATITUDE_IN_1_KM = 0.008990676;
-	private static final double MIN_BBOX_INDEX_SIZE_KM = 2; // min width / height in km
+	private static final double BBOX_INDEX_MIN_SIZE_KM = 2; // min width / height in km
 
 	public IndexPoiCreator(IndexCreatorSettings settings, MapRenderingTypesEncoder renderingTypes) {
 		this.settings = settings;
@@ -187,7 +186,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			iterateEntityInternal(e, ctx, icc);
 		}
 	}
-
+	
 	void iterateEntityInternal(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
 		tempAmenityList.clear();
 		Map<String, String> tags = tagsTransform.addPropogatedTags(renderingTypes, EntityConvertApplyType.POI, e, e.getTags());
@@ -205,8 +204,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			
 			List<LatLon> relationCenters = Collections.singletonList(null); // [null] means single amenity point
 			StringBuilder memberIds = new StringBuilder();
-			QuadRect indexedBbox = OsmMapUtils.requireIndexBbox(tags) ? new QuadRect() : null;
-			relationCenters = collectRelationCenters(e, ctx, tags, relationCenters, memberIds, indexedBbox);
+			QuadRect latLonBbox = OsmMapUtils.indexPoiBboxForSearch(tags) ? new QuadRect() : null;
+			relationCenters = collectRelationCenters(e, ctx, tags, relationCenters, memberIds, latLonBbox);
 			long id = e.getId();
 			if (icc.basemap && id < 0) {
 				id = GENERATE_OBJ_ID--;
@@ -254,11 +253,14 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 						icc.bboxFilter.logEntityWithAmenity(e, a);
 						continue;
 					}
-					if (indexedBbox != null && !indexedBbox.hasInitialState() 
-							&& indexedBbox.height() >= MIN_BBOX_INDEX_SIZE_KM * LATITUDE_IN_1_KM) {
-						a.setBbox31(indexedBbox);
+					if (latLonBbox != null && latLonBbox.height() > 0 && latLonBbox.width() > 0
+							&& MapUtils.getDistance(latLonBbox.top, latLonBbox.left, latLonBbox.bottom, latLonBbox.right) >= BBOX_INDEX_MIN_SIZE_KM) {
+						a.setBbox31(new int[] { 
+								MapUtils.get31TileNumberX(latLonBbox.left), MapUtils.get31TileNumberY(latLonBbox.top), 
+								MapUtils.get31TileNumberX(latLonBbox.right), MapUtils.get31TileNumberY(latLonBbox.bottom) 
+						});
 					}
-   					try {
+					try {
    						insertAmenityIntoPoi(a);
    					} catch (Exception excpt) {
    						System.out.println("TODO FIX " + a.getId() + " " + excpt);
@@ -271,7 +273,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 
 	private List<LatLon> collectRelationCenters(Entity e, OsmDbAccessorContext ctx, Map<String, String> tags,
-			List<LatLon> centers, StringBuilder memberIds, QuadRect indexedBbox) throws SQLException {
+			List<LatLon> centers, StringBuilder memberIds, QuadRect latLonBbox) throws SQLException {
 		if (e instanceof Relation relation) {
 			ctx.loadEntityRelation(relation);
 			boolean isAdministrative = tags.get(OSMSettings.OSMTagKey.ADMIN_LEVEL.getValue()) != null;
@@ -303,9 +305,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 						// don't index this
 						continue;
 					}
-					if (indexedBbox != null) {
+					if (latLonBbox != null) {
 						QuadRect q = m.getLatLonBbox();
-						indexedBbox.expand(q.left, q.top, q.right, q.bottom);
+						latLonBbox.expand(q.left, q.top, q.right, q.bottom);
 					}
 		            List<List<Node>> innerWays = new ArrayList<>();
 		            for (Ring r : m.getInnerRings()) {
@@ -330,8 +332,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				}
 			}
 		}
-		if (indexedBbox != null && indexedBbox.hasInitialState() && e instanceof Way way) {
-			indexedBbox = way.getLatLonBBox();
+		if (latLonBbox != null && latLonBbox.hasInitialState() && e instanceof Way way) {
+			latLonBbox = way.getLatLonBBox();
 		}
 		return centers;
 	}
