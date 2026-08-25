@@ -357,6 +357,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		tags = transformAddMultipleNetwoksTag(tags);
 		tags = transformRouteLimitationTags(tags);
 		tags = transformTurnLanesTags(tags);
+		tags = transformStepsRampTags(tags);
 		tags = addEleFeetTags(tags);
 		List<EntityConvert> listToTransform = getApplicableConverts(tags, entity, EntityConvertType.TAG_TRANSFORM, appType);
 		List<EntityConvert> listToCombine = getApplicableConverts(tags, entity, EntityConvertType.TAG_COMBINE, appType);
@@ -456,6 +457,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		return null;
 	}
+
 
 	private String filterValues(String val, TIntArrayList limits) {
 		String standard = val.toLowerCase().replaceAll(" ", "");
@@ -684,6 +686,14 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		} else if (bothWayValue.equals("right")) {
 			tags.put(tag, tags.get(tag) + "|" + bothWayValue);
 		}
+	}
+
+	private Map<String, String> transformStepsRampTags(Map<String, String> tags) {
+		if ("steps".equals(tags.get("highway")) && "no".equals(tags.get("ramp"))) {
+			tags = new LinkedHashMap<>(tags);
+			tags.put("steps_ramp", "no");
+		}
+		return tags;
 	}
 
 	protected MapRulType getRuleType(String tag, String val, EntityConvertApplyType appType) {

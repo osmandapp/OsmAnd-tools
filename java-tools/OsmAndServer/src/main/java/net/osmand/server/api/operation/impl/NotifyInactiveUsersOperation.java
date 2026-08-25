@@ -27,7 +27,6 @@ import net.osmand.server.api.services.StorageService;
 import net.osmand.server.api.services.UserSubscriptionService;
 import net.osmand.server.api.services.UserdataService;
 import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
-import net.osmand.util.Algorithms;
 
 /**
  * Two mailing lists of free-inactive users (had-pro / never-pro) for a support warning mail. State is kept across
@@ -132,8 +131,7 @@ public class NotifyInactiveUsersOperation extends AbstractFileFixOperation imple
 			}
 			String category = hadPro ? InactiveUserNoticeRepository.CATEGORY_HAD_PRO
 					: InactiveUserNoticeRepository.CATEGORY_NEVER_PRO;
-			String username = username(user);
-			(hadPro ? result.notifiedHadPro : result.notifiedNeverPro).add(username);
+			(hadPro ? result.notifiedHadPro : result.notifiedNeverPro).add(String.valueOf(userId));
 			if (!isTest(params)) {
 				synchronized (dbLock) {
 					noticeRepository.insertNotified(userId, user.email, category);
@@ -217,10 +215,6 @@ public class NotifyInactiveUsersOperation extends AbstractFileFixOperation imple
 		return last;
 	}
 
-	private static String username(CloudUser user) {
-		return Algorithms.isEmpty(user.email) ? "id:" + user.id : user.email;
-	}
-
 	@Override
 	protected boolean fix(UserFile file, Params params) {
 		throw new UnsupportedOperationException("notify-inactive-users scans in run()");
@@ -252,9 +246,8 @@ public class NotifyInactiveUsersOperation extends AbstractFileFixOperation imple
 			r.put("failed", failed.get());
 			r.put("users", users.get());
 			r.put("testRun", testRun);
-			// arrays -> UI renders each as a downloadable list (mailHadPro.txt / mailNeverPro.txt), one username per line
-			r.put("mailHadPro", new ArrayList<>(notifiedHadPro));
-			r.put("mailNeverPro", new ArrayList<>(notifiedNeverPro));
+			r.put("mailHadPro", String.join(",", new ArrayList<>(notifiedHadPro)));
+			r.put("mailNeverPro", String.join(",", new ArrayList<>(notifiedNeverPro)));
 			r.put("deleted", new ArrayList<>(deleted));
 			r.put("failedUsers", new ArrayList<>(failedUsers));
 			return r;

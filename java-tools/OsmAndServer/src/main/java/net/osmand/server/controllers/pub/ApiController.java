@@ -16,6 +16,7 @@ import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -326,9 +327,14 @@ public class ApiController {
     public String geWikiPlace(@RequestParam(required = false) String article,
                               @RequestParam(required = false) String category,
                               @RequestParam(required = false) String wiki,
+                              @RequestParam(required = false) String file,
                               @RequestParam(required = false, defaultValue = "false") boolean addMetaData) {
 	    if (addMetaData) {
-		    Set<Map<String, Object>> imagesWithDetails = wikiService.processWikiImagesWithDetails(article, category, wiki);
+		    Set<Map<String, Object>> imagesWithDetails = new LinkedHashSet<>();
+		    if (!Algorithms.isEmpty(file)) {
+			    imagesWithDetails.addAll(wikiService.getTagImagesWithDetails(file));
+		    }
+		    imagesWithDetails.addAll(wikiService.processWikiImagesWithDetails(article, category, wiki));
 		    return gson.toJson(Collections.singletonMap("features-v2", imagesWithDetails));
 	    }
 	    Set<String> images = wikiService.processWikiImages(article, category, wiki);

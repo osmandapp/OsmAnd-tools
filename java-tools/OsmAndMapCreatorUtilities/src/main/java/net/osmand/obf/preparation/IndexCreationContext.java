@@ -140,8 +140,13 @@ public class IndexCreationContext {
 
 	public void translitJapaneseNames(Entity e) {
 		if (needTranslitName(e, e.getTags(), translitJapaneseNames, JAPAN)) {
-			e.putTag(OSMTagKey.NAME_EN.getValue(),
-					JapaneseTranslitHelper.getEnglishTransliteration(e.getTag(OSMTagKey.NAME.getValue())));
+			String ltn = e.getTag("name:ja-latn");
+			if (!Algorithms.isEmpty(ltn)) {
+				e.putTag(OSMTagKey.NAME_EN.getValue(), ltn);
+			} else {
+				e.putTag(OSMTagKey.NAME_EN.getValue(),
+						JapaneseTranslitHelper.getEnglishTransliteration(e.getTag(OSMTagKey.NAME.getValue())));
+			}
 		}
 	}
 

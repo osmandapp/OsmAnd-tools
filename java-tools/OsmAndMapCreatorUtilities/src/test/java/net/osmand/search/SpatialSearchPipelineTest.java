@@ -1,24 +1,37 @@
 package net.osmand.search;
 
-import net.osmand.ResultMatcher;
-import net.osmand.binary.BinaryMapAddressReaderAdapter;
-import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.binary.BinaryMapPoiReaderAdapter;
-import net.osmand.binary.BinaryMapRouteReaderAdapter;
-import net.osmand.binary.RouteDataObject;
-import net.osmand.data.Amenity;
-import net.osmand.data.City;
-import net.osmand.data.LatLon;
-import net.osmand.data.Street;
-import net.osmand.data.Building;
-import net.osmand.obf.OBFDataCreator;
-import net.osmand.obf.preparation.IndexAddressCreator;
-import net.osmand.obf.preparation.IndexCreator;
-import net.osmand.obf.preparation.IndexPoiCreator;
-import net.osmand.osm.AbstractPoiType;
-import net.osmand.osm.MapPoiTypes;
-import net.osmand.search.core.*;
-import net.osmand.util.Algorithms;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStreamWriter;
+import java.io.RandomAccessFile;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.zip.GZIPInputStream;
+
+import net.osmand.data.*;
+import net.osmand.map.OsmandRegions;
+import net.osmand.map.WorldRegion;
+import net.osmand.search.core.spatial.SpatialTextSearch;
+import net.osmand.util.MapUtils;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -31,13 +44,25 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.xmlpull.v1.XmlPullParserException;
 
-import java.io.*;
-import java.nio.charset.StandardCharsets;
-import java.sql.SQLException;
-import java.util.*;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
+import net.osmand.IProgress;
+import net.osmand.PlatformUtil;
+import net.osmand.ResultMatcher;
+import net.osmand.binary.BinaryMapAddressReaderAdapter;
+import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.BinaryMapPoiReaderAdapter;
+import net.osmand.binary.BinaryMapRouteReaderAdapter;
+import net.osmand.binary.RouteDataObject;
+import net.osmand.obf.OBFDataCreator;
+import net.osmand.obf.preparation.IndexAddressCreator;
+import net.osmand.obf.preparation.IndexCreator;
+import net.osmand.obf.preparation.IndexCreatorSettings;
+import net.osmand.obf.preparation.IndexPoiCreator;
+import net.osmand.obf.preparation.NameIndexCreator;
+import net.osmand.osm.AbstractPoiType;
+import net.osmand.osm.MapPoiTypes;
+import net.osmand.search.core.SearchCoreFactory;
+import net.osmand.search.core.spatial.SpatialTestSearchEngine;
+import net.osmand.util.Algorithms;
 
 /**
  * Unit-test class is responsible for:
@@ -52,30 +77,43 @@ import java.util.zip.GZIPOutputStream;
  * provide mandatory settings, phrases, and expected results; same-basename OBFs in that directory are original
  * transformation inputs unless files are listed explicitly.
  * <p>
- * Generated source JSON and OBF artifacts are cached as {@code *.json.gz} and {@code *.obf.gz} in {@link #GEN_DIR},
- * while plain {@code *.orig.obf}, {@code *.json}, and {@code *.obf} files are temporary.
+ * Generated source JSON and OBF files are cached as {@code *.json.gz} and {@code *.gen.obf} in {@link #GEN_DIR};
+ * only plain {@code *.json} files are removed after a normal test run. A generated OBF is reused when its
+ * generator hash is current and it is at least as new as its source. OBF files in {@link #GEN_DIR} without a
+ * same-basename source JSON are treated as source OBFs.
+ * <p>
+ * Execution modes, in precedence order:
+ * <li>{@link #LIVE_TESTING} reads matching OBFs directly from {@link #GEN_DIR}; it bypasses conversion,
+ * generation hashes, generated OBFs, and all setup/teardown cleanup in that directory.</li>
+ * <li>{@link #REGENERATE_OBF} enables the source JSON/OSM conversion and generated-OBF cache pipeline.
+ * When disabled, tests use the original OBF directly (or a temporary unpacked copy).</li>
+ * <li>{@link #HASH_IS_ACTUAL_FOR_RUN} records whether cached generated OBFs are compatible with the current
+ * generator classes. A stale hash removes only {@code *.gen.obf} files during setup.</li>
  */
 @RunWith(Parameterized.class)
-public class SearchUICoreGenOBFTest {
+public class SpatialSearchPipelineTest {
 	private static final String ANDROID_PATH_ENV = "ANDROID_PATH",
 			RESOURCES_PATH_ENV = "RESOURCES_PATH",
-			SEARCH_RESOURCES_PATH_ENV = "SEARCH_RESOURCES_PATH";
+			SEARCH_RESOURCES_PATH_ENV = "SEARCH_RESOURCES_PATH",
+			LIVE_TESTING_DIR_ENV = "LIVE_TESTING_DIR";
 	private static final String RESOURCES_PATH = getResourcesPath();
 	private static final String SEARCH_RESOURCES_PATH = getSearchResourcesPath();
-	private static final File GEN_DIR = new File(SEARCH_RESOURCES_PATH, "gen-source");
+	private static final boolean LIVE_TESTING = !Algorithms.isEmpty(System.getenv(LIVE_TESTING_DIR_ENV));
+	private static final File GEN_DIR = getGenDir();
+	private static final File SRC_DIR = getSourceDir();
+	private static final String GENERATED_OBF_SUFFIX = ".gen.obf";
 	private static final Set<String> GENERATED_OBFS = Collections.synchronizedSet(new HashSet<>());
-	private static final boolean REGENERATE_OBF = true;
+	private static final boolean REGENERATE_OBF = true; // bypassed by LIVE_TESTING
 	private static final boolean TEST_EXTRA_RESULTS = true;
 	private static final List<Class<?>> OBF_GENERATE_CLASSES = List.of(IndexCreator.class, IndexPoiCreator.class,
 			IndexAddressCreator.class);
-	private static final String HASH_VERSION = "1";
+	private static final String HASH_VERSION = "2";
 	private static final String OBF_HASH_FILE_NAME = ".obf.hash";
 	private static final boolean RUN_IGNORED_TESTS = false;
-	private static final boolean TEST_NUMBER_MATCHED = true;
 	
 	private static final boolean FILTER_DATA_JSON = false;
 	private static final double FILTER_REMOVE_PROBABILITY = 0.8; // means 80% probability of removal
-	private static boolean HASH_IS_ACTUAL_FOR_RUN;
+	private static boolean HASH_IS_ACTUAL_FOR_RUN; // evaluated once during non-LIVE setup
 
 	private final File testFile;
     private Set<String> searchKeywords;
@@ -87,8 +125,25 @@ public class SearchUICoreGenOBFTest {
         void close();
     }
     
-	public SearchUICoreGenOBFTest(String name, File file) {
+	public SpatialSearchPipelineTest(String name, File file) {
 		this.testFile = file;
+		NameIndexCreator.MIN_LIMIT_COMMON_NON_INDEXED = 0;
+	}
+
+	private static File getSourceDir() {
+		String path = System.getenv(LIVE_TESTING_DIR_ENV);
+		if (Algorithms.isEmpty(path)) {
+			return new File(SEARCH_RESOURCES_PATH, "src");
+		}
+		return new File(path.endsWith("/") || path.endsWith("\\") ? path : path + File.separator);
+	}
+	
+	private static File getGenDir() {
+		String path = System.getenv(LIVE_TESTING_DIR_ENV);
+		if (Algorithms.isEmpty(path)) {
+			return new File(SEARCH_RESOURCES_PATH, "gen");
+		}
+		return new File(path.endsWith("/") || path.endsWith("\\") ? path : path + File.separator);
 	}
 
 	private static String getResourcesPath() {
@@ -141,22 +196,33 @@ public class SearchUICoreGenOBFTest {
 	}
 
 	@BeforeClass
-	public static void setUp() {
+	public static void setUp() throws IOException {
 		GENERATED_OBFS.clear();
+		if (LIVE_TESTING) {
+			System.out.println("LIVE_TESTING is ON (" + GEN_DIR + ")");
+			defaultSetup();
+			return;
+		} else {
+			System.out.println("LIVE_TESTING is OFF");
+		}
 		HASH_IS_ACTUAL_FOR_RUN = isHashActual();
 		if (!HASH_IS_ACTUAL_FOR_RUN) {
-			deleteGeneratedFiles(GEN_DIR, ".obf", ".obf.gz");
+			deleteGeneratedFiles(GEN_DIR, GENERATED_OBF_SUFFIX, GENERATED_OBF_SUFFIX + ".gz");
 		}
 		defaultSetup();
 	}
 
 	@AfterClass
 	public static void tearDown() {
-		deleteGeneratedFiles(GEN_DIR, ".obf", ".json");
+		if (LIVE_TESTING) {
+			return;
+		}
+
+		deleteGeneratedFiles(GEN_DIR, ".json", GENERATED_OBF_SUFFIX + ".gz");
 		GENERATED_OBFS.clear();
 	}
 
-	static void defaultSetup() {
+	private static void defaultSetup() {
 		MapPoiTypes.setDefault(new MapPoiTypes(RESOURCES_PATH + "poi/poi_types.xml"));
 		MapPoiTypes poiTypes = MapPoiTypes.getDefault();
 		Map<String, String> enPhrases = new HashMap<>();
@@ -174,10 +240,15 @@ public class SearchUICoreGenOBFTest {
 
 	/**
 	 * Resolves a same-basename test data chain and returns a readable generated OBF:
-	 * <li>Cached {@code *.obf.gz} in {@link #GEN_DIR} is reused when newer than the resolved source JSON; </li>
-	 * <li>otherwise cached {@code *.json.gz} is used as source when newer than the original OBF or when no original exists. </li>
+	 * <li>A cached {@code *.gen.obf} is reused when its generator hash is current and it is not older than
+	 * the selected source.</li>
+	 * <li>An OBF in {@link #GEN_DIR} without a same-basename source JSON is used as a source OBF.</li>
+	 * <li>A cached {@code *.json.gz} is used as source when newer than the original OBF or when no original exists.</li>
+	 * <li>If no source JSON exists, a same-basename {@code *.osm} file is used to generate the OBF directly. </li>
 	 * <li>If no source cache is valid, the original OBF from {@link #SEARCH_RESOURCES_PATH} is exported to source JSON.
-	 * <li>New plain {@code *.json} and {@code *.obf} files are compressed back to {@code *.json.gz} and {@code *.obf.gz} for later runs.
+	 * <li>Generated OBFs use the distinct {@code *.gen.obf} suffix and remain cached between runs.
+	 * They are removed during setup only when the generator hash is stale.
+	 * <li>New plain source JSON files are compressed back to {@code *.json.gz} for later runs.
 	 * <li>When {@link #REGENERATE_OBF} is {@code false}, the transformation/cache chain is skipped and only the original OBF is used.
 	 */
 	private File createOBFIfNeeded(String fileName) throws IOException, SQLException {
@@ -189,20 +260,27 @@ public class SearchUICoreGenOBFTest {
 			if (originalObf == null) {
 				throw new FileNotFoundException("Original OBF does not exist for " + fileName);
 			}
-			return prepareOriginalObfFile(originalObf, new File(GEN_DIR, baseName + ".orig.obf"));
+			return prepareOriginalObfFile(originalObf, new File(GEN_DIR, baseName + GENERATED_OBF_SUFFIX));
 		}
 		File sourceJson = getNewestExistingFile(
-				new File(GEN_DIR, baseName + ".json"),
-				new File(GEN_DIR, baseName + ".json.gz"));
-		File preparedObf = getNewestExistingFile(
-				new File(GEN_DIR, baseName + ".obf"),
-				new File(GEN_DIR, baseName + ".obf.gz"));
-		if (originalObf == null && sourceJson == null && preparedObf == null) {
-			throw new FileNotFoundException("No OBF or source JSON found for " + fileName);
+				new File(SRC_DIR, baseName + ".json"),
+				new File(SRC_DIR, baseName + ".json.gz"));
+		if (originalObf == null && sourceJson == null) {
+			originalObf = getNewestExistingFile(
+					new File(GEN_DIR, baseName + ".obf"),
+					new File(GEN_DIR, baseName + ".obf.gz"));
+		}
+		File sourceOsm = sourceJson == null ? new File(SRC_DIR, baseName + ".osm.gz") : null;
+		if (sourceOsm != null && !sourceOsm.isFile()) {
+			sourceOsm = null;
+		}
+		String generatedObfName = baseName + GENERATED_OBF_SUFFIX;
+		File generatedObfFile = new File(GEN_DIR, generatedObfName);
+		File preparedObf = getNewestExistingFile(generatedObfFile);
+		if (originalObf == null && sourceJson == null && sourceOsm == null && preparedObf == null) {
+			throw new FileNotFoundException("No OBF, source JSON, or source OSM found for " + fileName);
 		}
 
-		String generatedObfName = baseName + ".obf";
-		File generatedObfFile = new File(GEN_DIR, generatedObfName);
 		String obfPath = generatedObfFile.getAbsolutePath();
 		synchronized (GENERATED_OBFS) {
 			File parent = generatedObfFile.getParentFile();
@@ -211,45 +289,57 @@ public class SearchUICoreGenOBFTest {
 			}
 
 			boolean alreadyGenerated = GENERATED_OBFS.contains(obfPath);
-			boolean noSourceAvailable = sourceJson == null && originalObf == null;
+			boolean noSourceAvailable = sourceJson == null && sourceOsm == null && originalObf == null;
 			boolean canUsePreparedObf = preparedObf != null
-					&& (isPreparedObfActual(preparedObf, sourceJson, originalObf) || noSourceAvailable && alreadyGenerated);
+					&& (isPreparedObfActual(preparedObf, sourceJson, sourceOsm, originalObf)
+					|| noSourceAvailable && alreadyGenerated);
 			if (canUsePreparedObf) {
-				File obfFile = prepareObfFile(preparedObf, generatedObfFile);
-				cacheObfIfNeeded(preparedObf, obfFile, baseName);
+				File obfFile = prepareFile(preparedObf, generatedObfFile);
 				GENERATED_OBFS.add(obfPath);
 				return obfFile;
 			}
-			File sourceFile = getSourceFile(baseName, originalObf, sourceJson);
+			File sourceFile = sourceOsm != null ? sourceOsm : getSourceFile(baseName, originalObf, sourceJson);
 			if (!alreadyGenerated || !generatedObfFile.isFile()
 					|| generatedObfFile.lastModified() < sourceFile.lastModified()) {
-				OBFDataCreator creator = new OBFDataCreator();
-				creator.create(generatedObfFile.getAbsolutePath(), new String[] { sourceFile.getAbsolutePath() });
+				if (sourceOsm != null) {
+					createObfFromOsm(sourceOsm, generatedObfFile);
+				} else {
+					OBFDataCreator creator = new OBFDataCreator();
+					creator.create(generatedObfFile.getAbsolutePath(), new String[] { sourceFile.getAbsolutePath() });
+				}
 				writeHash();
 			}
-			cacheGzipIfNeeded(generatedObfFile, new File(GEN_DIR, baseName + ".obf.gz"));
 			GENERATED_OBFS.add(obfPath);
 		}
 		return generatedObfFile;
 	}
 
-	private void cacheObfIfNeeded(File preparedObf, File obfFile, String baseName) throws IOException {
-		if (preparedObf != null && preparedObf.getName().endsWith(".obf.gz")) {
-			return;
+	private void createObfFromOsm(File sourceOsm, File generatedObfFile) throws IOException, SQLException {
+		IndexCreatorSettings settings = new IndexCreatorSettings();
+		settings.indexAddress = true;
+		settings.indexPOI = true;
+		settings.indexRouting = true;
+		IndexCreator creator = new IndexCreator(generatedObfFile.getParentFile(), settings);
+		creator.setMapFileName(generatedObfFile.getName());
+		creator.setLastModifiedDate(sourceOsm.lastModified());
+		try {
+			creator.generateIndexes(sourceOsm, IProgress.EMPTY_PROGRESS, null, null, null, null);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new IOException("Interrupted while generating OBF from " + sourceOsm, e);
+		} catch (XmlPullParserException e) {
+			throw new IOException("Cannot generate OBF from " + sourceOsm, e);
 		}
-		cacheGzipIfNeeded(obfFile, new File(GEN_DIR, baseName + ".obf.gz"));
 	}
 
 	private File getSourceFile(String baseName, File originalObf, File sourceJson) throws IOException {
 		if (sourceJson != null && (originalObf == null || sourceJson.lastModified() > originalObf.lastModified())) {
-			File sourceFile = prepareJsonFile(sourceJson, new File(GEN_DIR, baseName + ".json"));
-			cacheGzipIfNeeded(sourceFile, new File(GEN_DIR, baseName + ".json.gz"));
-			return sourceFile;
+            return prepareFile(sourceJson, new File(GEN_DIR, baseName + ".json"));
 		}
 		if (originalObf == null) {
 			throw new FileNotFoundException("No original OBF or prepared source JSON found for " + baseName);
 		}
-		File sourceObfFile = prepareOriginalObfFile(originalObf, new File(GEN_DIR, baseName + ".orig.obf"));
+		File sourceObfFile = prepareOriginalObfFile(originalObf, new File(GEN_DIR, baseName + GENERATED_OBF_SUFFIX));
 		sourceObfFile.deleteOnExit();
 		return exportSourceJson(sourceObfFile, baseName + ".obf");
 	}
@@ -262,29 +352,21 @@ public class SearchUICoreGenOBFTest {
 		return originalObf;
 	}
 
-	private File prepareJsonFile(File jsonFile, File targetFile) throws IOException {
-		if (jsonFile.getName().endsWith(".gz")) {
-			unzipIfNeeded(jsonFile, targetFile);
+	private File prepareFile(File file, File targetFile) throws IOException {
+		if (file.getName().endsWith(".gz")) {
+			unzipIfNeeded(file, targetFile);
 			return targetFile;
 		}
-		return jsonFile;
+		return file;
 	}
 
-	private File prepareObfFile(File obfFile, File targetFile) throws IOException {
-		if (obfFile.getName().endsWith(".gz")) {
-			unzipIfNeeded(obfFile, targetFile);
-			return targetFile;
-		}
-		return obfFile;
-	}
-
-	private boolean isPreparedObfActual(File preparedObf, File sourceJson, File originalObf) {
+	private boolean isPreparedObfActual(File preparedObf, File sourceJson, File sourceOsm, File originalObf) {
 		if (preparedObf == null || !HASH_IS_ACTUAL_FOR_RUN) {
 			return false;
 		}
 		File source = sourceJson != null && (originalObf == null || sourceJson.lastModified() > originalObf.lastModified())
 				? sourceJson
-				: originalObf;
+				: sourceOsm != null ? sourceOsm : originalObf;
 		return source == null || preparedObf.lastModified() > source.lastModified();
 	}
 
@@ -327,7 +409,7 @@ public class SearchUICoreGenOBFTest {
 		return newest;
 	}
 
-	private String getBaseName(String fileName) {
+	private static String getBaseName(String fileName) {
 		if (fileName.endsWith(".obf.gz")) {
 			return fileName.substring(0, fileName.length() - ".obf.gz".length());
 		}
@@ -339,6 +421,9 @@ public class SearchUICoreGenOBFTest {
 		}
 		if (fileName.endsWith(".json")) {
 			return fileName.substring(0, fileName.length() - ".json".length());
+		}
+		if (fileName.endsWith(".osm.gz")) {
+			return fileName.substring(0, fileName.length() - ".osm.gz".length());
 		}
 		return fileName;
 	}
@@ -354,20 +439,6 @@ public class SearchUICoreGenOBFTest {
 		file.setLastModified(gzFile.lastModified());
 	}
 
-	private void cacheGzipIfNeeded(File sourceFile, File gzFile) throws IOException {
-		if (sourceFile == null || !sourceFile.isFile() || sourceFile.equals(gzFile)) {
-			return;
-		}
-		if (gzFile.isFile() && gzFile.lastModified() >= sourceFile.lastModified()) {
-			return;
-		}
-		try (FileInputStream inputStream = new FileInputStream(sourceFile);
-		     GZIPOutputStream outputStream = new GZIPOutputStream(new FileOutputStream(gzFile))) {
-			Algorithms.streamCopy(inputStream, outputStream);
-		}
-		gzFile.setLastModified(sourceFile.lastModified());
-	}
-
 	private BinaryMapIndexReader openReader(File obfFile) throws IOException {
 		RandomAccessFile raf = new RandomAccessFile(obfFile.getPath(), "r");
 		try {
@@ -381,36 +452,60 @@ public class SearchUICoreGenOBFTest {
 		}
 	}
 
-	private void loadReaders(JSONObject sourceJson, List<BinaryMapIndexReader> readers) throws IOException, SQLException {
+	private void loadReaders(JSONObject sourceJson, LatLon point, List<BinaryMapIndexReader> readers) throws IOException, SQLException {
 		if (!GEN_DIR.isDirectory() && !GEN_DIR.mkdirs()) {
 			throw new IOException("Cannot create generated OBF directory " + GEN_DIR);
 		}
-		JSONArray filesJson = sourceJson.optJSONArray("files");
-		if (filesJson != null) {
-			for (int i = 0; i < filesJson.length(); i++) {
-				String file = filesJson.optString(i, null);
-				if (!Algorithms.isEmpty(file) && isDataFileName(file)) {
-					File obfFile = createOBFIfNeeded(file);
-					readers.add(openReader(obfFile));
-				}
-			}
+
+		if (LIVE_TESTING) {
+			//QuadRect box = new QuadRect(point.getLongitude() - 1, point.getLatitude() + 1, point.getLongitude() + 1, point.getLatitude() - 1);
+			int limit = SpatialTextSearch.SpatialTextSearchSettings.defaultSettings().SUGGESTED_SEARCH_RADIUS_KM;
+			QuadRect box = MapUtils.calculateLatLonBbox(point.getLatitude(), point.getLongitude(), limit * 1000);
+			List<BinaryMapIndexReader> maps = getMaps(box, GEN_DIR.listFiles(f -> f.isFile()
+					&& f.getName().endsWith(".obf")));
+			readers.addAll(maps);
 		} else {
-			File obfFile = createOBFIfNeeded(testFile.getName());
-			readers.add(openReader(obfFile));
+			JSONArray filesJson = sourceJson.optJSONArray("files");
+			if (filesJson != null) {
+				for (int i = 0; i < filesJson.length(); i++) {
+					String file = filesJson.optString(i, null);
+					if (!Algorithms.isEmpty(file) && isDataFileName(file)) {
+						File obfFile = createOBFIfNeeded(file);
+						readers.add(openReader(obfFile));
+					}
+				}
+			} else {
+				File obfFile = createOBFIfNeeded(testFile.getName());
+				readers.add(openReader(obfFile));
+			}
 		}
 	}
 
-	private List<String> parsePhrases(JSONObject sourceJson) {
+	record PhraseTuple(String query, JSONObject settings) {}
+
+	private PhraseTuple parsePhraseSettings(String phrase) {
+		if (Algorithms.isEmpty(phrase)) {
+			return null;
+		}
+		int settingsStart = phrase.lastIndexOf('{');
+		if (settingsStart < 0 || !phrase.trim().endsWith("}")) {
+			return new PhraseTuple(phrase, null);
+		}
+		JSONObject settings = new JSONObject(phrase.substring(settingsStart));
+		return new PhraseTuple(phrase.substring(0, settingsStart).trim(), settings);
+	}
+
+	private List<PhraseTuple> parsePhrases(JSONObject sourceJson) {
 		JSONArray phrasesJson = sourceJson.optJSONArray("phrases");
-		String singlePhrase = sourceJson.optString("phrase", null);
-		List<String> phrases = new ArrayList<>();
+		PhraseTuple singlePhrase = parsePhraseSettings(sourceJson.optString("phrase", null));
+		List<PhraseTuple> phrases = new ArrayList<>();
 		if (singlePhrase != null) {
 			phrases.add(singlePhrase);
 		}
 		if (phrasesJson != null) {
 			for (int i = 0; i < phrasesJson.length(); i++) {
-				String phrase = phrasesJson.optString(i, null);
-				if (!Algorithms.isEmpty(phrase)) {
+				PhraseTuple phrase = parsePhraseSettings(phrasesJson.optString(i, null));
+				if (phrase != null) {
 					phrases.add(phrase);
 				}
 			}
@@ -418,13 +513,21 @@ public class SearchUICoreGenOBFTest {
 		return phrases;
 	}
 
-	private List<List<String>> parseExpectedResults(JSONObject sourceJson, int phrasesSize) {
+	private JSONObject mergePhraseSettings(JSONObject settingsJson, JSONObject phraseSettings) {
+		JSONObject mergedSettings = new JSONObject(settingsJson.toString());
+		for (String key : phraseSettings.keySet()) {
+			mergedSettings.put(key, phraseSettings.get(key));
+		}
+		return mergedSettings;
+	}
+
+	protected List<List<String>> parseExpectedResults(JSONObject sourceJson, String resultsTag, int phrasesSize) {
 		List<List<String>> results = new ArrayList<>();
 		for (int i = 0; i < phrasesSize; i++) {
 			results.add(new ArrayList<String>());
 		}
-		if (sourceJson.has("results")) {
-			parseResults(sourceJson, "results", results);
+		if (sourceJson.has(resultsTag)) {
+			parseResults(sourceJson, resultsTag, results);
 		}
 		if (TEST_EXTRA_RESULTS && sourceJson.has("extra-results")) {
 			parseResults(sourceJson, "extra-results", results);
@@ -442,12 +545,20 @@ public class SearchUICoreGenOBFTest {
 		String jsonName = generatedObfName.endsWith(".obf")
 				? generatedObfName.substring(0, generatedObfName.length() - ".obf".length()) + ".json"
 				: generatedObfName + ".json";
-		File jsonFile = new File(GEN_DIR, jsonName);
+		File jsonFile = new File(SRC_DIR, jsonName);
 		createJsonFile(jsonFile, amenities, cities, routes);
-		cacheGzipIfNeeded(jsonFile, new File(GEN_DIR, jsonName + ".gz"));
 		return jsonFile;
 	}
+	
+	protected List<List<String>> getExpectedResults(JSONObject sourceJson, int phrasesSize) {
+		return parseExpectedResults(sourceJson, "results", phrasesSize);
+	}
 
+	protected SearchTestEngine createSearchEngine(SpatialTextSearch.SpatialTextSearchSettings spatialSettings, 
+												  LatLon point, List<BinaryMapIndexReader> readers, boolean translation) {
+		return new SpatialTestSearchEngine(spatialSettings, point, readers, translation);
+	}
+	
 	@Test
 	public void testSearch() throws IOException, JSONException, SQLException {
 		String sourceJsonText = Algorithms.getFileAsString(testFile);
@@ -455,74 +566,99 @@ public class SearchUICoreGenOBFTest {
         Assert.assertFalse(sourceJsonText.isEmpty());
 
 		JSONObject sourceJson = new JSONObject(sourceJsonText);
-//		boolean ignore = sourceJson.optBoolean("ignore");
-//		if (RUN_IGNORED_TESTS) {
-//			return;
-//		}
-        searchKeywords = getKeywords(sourceJson);
 		JSONObject settingsJson = sourceJson.getJSONObject("settings");
-		List<String> phrases = parsePhrases(sourceJson);
-		boolean useData = settingsJson.optBoolean("useData", true);
-		List<BinaryMapIndexReader> readers = new ArrayList<>();
-		boolean prevDisplayDefaultPoiTypes = SearchCoreFactory.DISPLAY_DEFAULT_POI_TYPES;
-		SearchTestEngine engine = null;
-		try {
-			if (useData) {
-				loadReaders(sourceJson, readers);
-				if (readers.isEmpty()) {
-					throw new IllegalStateException("useData=true but no OBF indexes were loaded for " + testFile.getName());
-				}
-			}
-		boolean disabled = settingsJson.optBoolean("disabled", false);
-		if (disabled) {
+		if (settingsJson.optBoolean("disabled", false)) {
 			return;
 		}
-		List<List<String>> results = parseExpectedResults(sourceJson, phrases.size());
 
+		if (!RUN_IGNORED_TESTS && settingsJson.optBoolean("ignore", false)) {
+			return;
+		}
+
+		boolean translation = settingsJson.optBoolean("translation");
+		boolean world = settingsJson.optBoolean("world");
+		List<BinaryMapIndexReader> readers = new ArrayList<>();
+		boolean prevDisplayDefaultPoiTypes = SearchCoreFactory.DISPLAY_DEFAULT_POI_TYPES;
+		LatLon point = parseLocation(settingsJson);
+		List<PhraseTuple> phrases = parsePhrases(sourceJson);
+		searchKeywords = getKeywords(sourceJson, phrases);
+		List<List<String>> results = getExpectedResults(sourceJson, phrases.size());
 		Assert.assertEquals(phrases.size(), results.size());
 		if (phrases.size() != results.size()) {
 			return;
 		}
 
-		engine = createSearchEngine(settingsJson, readers);
-		for (int k = 0; k < phrases.size(); k++) {
-			String text = phrases.get(k);
-			List<String> expectedResults = results.get(k);
+		SearchTestEngine defaultEngine = null;
+		try {
+			boolean useData = settingsJson.optBoolean("useData", true);
+			if (useData) {
+				loadReaders(sourceJson, point, readers);
+				if (readers.isEmpty()) {
+					throw new IllegalStateException("useData=true but no OBF indexes were loaded for " + testFile.getName());
+				}
+				System.out.printf("TEST %s - %s\n ", testFile.getName(), world);
+				if (world) {
+					readers.add(openReader(getOsmAndRegions()));
+					readers.add(openReader(createOBFIfNeeded("world_basemap.json.gz")));
+				}
+			}
 
+		SpatialTextSearch.SpatialTextSearchSettings settings = parseSpatialSettings(settingsJson);
+		defaultEngine = createSearchEngine(settings, point, readers, translation);
+		int shift = 4;
+		for (int k = 0; k < phrases.size(); k++) {
+			PhraseTuple phraseAndSettings = phrases.get(k);
+			String text = phraseAndSettings.query;
+			List<String> expectedResults = results.get(k);
+			boolean enginePerPhrase = phraseAndSettings.settings != null && !phraseAndSettings.settings.keySet().isEmpty();
+			SearchTestEngine engine = defaultEngine;
+			if (enginePerPhrase) {
+				if (!RUN_IGNORED_TESTS && phraseAndSettings.settings.optBoolean("ignore")) {
+					continue;
+				}
+				JSONObject mergedJson = mergePhraseSettings(settingsJson, phraseAndSettings.settings);
+				engine = createSearchEngine(parseSpatialSettings(mergedJson), parseLocation(mergedJson), readers, translation);
+			}
+			
 			List<String> actualResults = engine.search(text, false);
 			for (int i = 0; i < expectedResults.size(); i++) {
 				String expected = expectedResults.get(i);
 				String actual = i >= actualResults.size() ? null : actualResults.get(i);
-				int shift = TEST_NUMBER_MATCHED ? 4 : 0;
-				if (expected.indexOf('[') != -1) {
-					expected = expected.substring(0, expected.indexOf('[') + shift).trim();
-				}
-				if (actual != null && actual.indexOf('[') != -1) {
-					actual = actual.substring(0, actual.indexOf('[') + shift).trim();
+				if (!translation) {
+					if (expected.indexOf('[') != -1) {
+						expected = expected.substring(0, expected.indexOf('[') + shift).trim();
+					}
+					if (actual != null && actual.indexOf('[') != -1) {
+						actual = actual.substring(0, actual.indexOf('[') + shift).trim();
+					}
 				}
 				// String present = result.toString();
 				expected = expected.replaceFirst("^@", "");
 				String present = actual == null ? ("#MISSING " + (i + 1)) : actual;
 				if (!Algorithms.stringsEqual(expected, present)) {
-					System.out.printf("Phrase: %s%n", text);
 					engine.search(text, true);
+					System.out.printf("Phrase #%s: %s%n", k + 1, text);
 					System.out.printf("Mismatch #%s for '%s' != '%s'. %n", i + 1, expected, present);
 					System.out.println("CURRENT RESULTS: ");
 					for (String r : actualResults) {
-						System.out.printf("\t\t\"%s\",%n", r);
+						System.out.printf("\t\t\t\"%s\",%n", r);
 					}
 					System.out.println("EXPECTED : ");
 					for (String r : expectedResults) {
-						System.out.printf("\t\t\"%s\",%n", r);
+						System.out.printf("\t\t\t\"%s\",%n", r);
 					}
 				}
 				Assert.assertEquals(expected, present);
 			}
+
+			if (enginePerPhrase) {
+				engine.close();
+			}
 		}
 		} finally {
 			SearchCoreFactory.DISPLAY_DEFAULT_POI_TYPES = prevDisplayDefaultPoiTypes;
-			if (engine != null) {
-				engine.close();
+			if (defaultEngine != null) {
+				defaultEngine.close();
 			}
 			for (BinaryMapIndexReader reader : readers) {
 				reader.close();
@@ -530,8 +666,8 @@ public class SearchUICoreGenOBFTest {
         }
 	}
 
-	private SearchTestEngine createSearchEngine(JSONObject settingsJson, List<BinaryMapIndexReader> readers) {
-		return new SpatialTestSearchEngine(settingsJson, readers);
+	private File getOsmAndRegions() {
+		return new File(getAndroidPath(), "OsmAnd-java" + File.separator + OsmandRegions.REGIONS_OCBF);
 	}
 
 	private static void deleteRecursively(File file) {
@@ -560,7 +696,7 @@ public class SearchUICoreGenOBFTest {
 
 	private boolean isDataFileName(String fileName) {
 		return fileName.endsWith(".obf") || fileName.endsWith(".obf.gz")
-				|| fileName.endsWith(".json") || fileName.endsWith(".json.gz");
+				|| fileName.endsWith(".json") || fileName.endsWith(".json.gz") || fileName.endsWith(".osm.gz");
 	}
 
 	private static void deleteGeneratedFiles(File dir, String... extensions) {
@@ -940,16 +1076,15 @@ public class SearchUICoreGenOBFTest {
 		}
 	}
 
-    public Set<String> getKeywords(JSONObject sourceJson) {
+    public Set<String> getKeywords(JSONObject sourceJson, List<PhraseTuple> phrases) {
         Set<String> keywords = new HashSet<>();
-        List<String> phrases = parsePhrases(sourceJson);
-        for (String phrase : phrases) {
-            extractAndAddWords(phrase, keywords);
+        for (PhraseTuple phraseAndSettings : phrases) {
+            extractAndAddWords(phraseAndSettings.query, keywords);
         }
 
         List<List<String>> parsedResults = new ArrayList<>();
         for (int i = 0; i < phrases.size(); i++) {
-            parsedResults.add(new ArrayList<String>());
+            parsedResults.add(new ArrayList<>());
         }
         String tag = sourceJson.has("results") ? "results" : "result";
         parseResults(sourceJson, tag, parsedResults);
@@ -992,13 +1127,8 @@ public class SearchUICoreGenOBFTest {
         Iterator<City> cityIterator = cities.iterator();
         while (cityIterator.hasNext()) {
             City c = cityIterator.next();
-            boolean match = false;
-            if (match(c.getName()) || match(c.getNamesMap(true).values())) {
-                match = true;
-            }
-            Iterator<Street> streetIterator = c.getStreets().iterator();
-            while (streetIterator.hasNext()) {
-                Street s = streetIterator.next();
+            boolean match = match(c.getName()) || match(c.getNamesMap(true).values());
+            for (Street s : c.getStreets()) {
                 if (match(s.getName()) || match(s.getNamesMap(true).values())) {
                     match = true;
                 } else {
@@ -1029,4 +1159,89 @@ public class SearchUICoreGenOBFTest {
         }
         return false;
     }
+
+	private LatLon parseLocation(JSONObject settingsJson) {
+		JSONObject locationJson = settingsJson.optJSONObject("location");
+		if (locationJson != null) {
+			return new LatLon(locationJson.getDouble("lat"), locationJson.getDouble("lon"));
+		}
+		if (settingsJson.has("lat") && settingsJson.has("lon")) {
+			return new LatLon(settingsJson.getDouble("lat"), settingsJson.getDouble("lon"));
+		}
+		return null;
+	}
+
+	private SpatialTextSearch.SpatialTextSearchSettings parseSpatialSettings(JSONObject settingsJson) {
+		SpatialTextSearch.SpatialTextSearchSettings settings = SpatialTextSearch.SpatialTextSearchSettings.defaultSettings();
+		settings.SEARCH_ADDR = settingsJson.optBoolean("SEARCH_ADDR", settings.SEARCH_ADDR);
+		settings.SEARCH_POI = settingsJson.optBoolean("SEARCH_POI", settings.SEARCH_POI);
+		settings.SEARCH_BUILDINGS = settingsJson.optBoolean("SEARCH_BUILDINGS", settings.SEARCH_BUILDINGS);
+		settings.SEARCH_STREET_INTERSECTIONS = settingsJson.optBoolean("SEARCH_STREET_INTERSECTIONS", settings.SEARCH_STREET_INTERSECTIONS);
+		settings.SEARCH_POI_INTERSECTIONS = settingsJson.optBoolean("SEARCH_POI_INTERSECTIONS", settings.SEARCH_POI_INTERSECTIONS);
+		settings.SEARCH_POI_CATEGORIES = settingsJson.optBoolean("SEARCH_POI_CATEGORIES", settings.SEARCH_POI_CATEGORIES);
+		settings.ALLOW_VIRTUAL_STREET_INTERSECTIONS = settingsJson.optBoolean("ALLOW_VIRTUAL_STREET_INTERSECTIONS",
+				settings.ALLOW_VIRTUAL_STREET_INTERSECTIONS);
+		settings.OPTIM_DELETE_EMBEDDED_BOUNDARIES = settingsJson.optBoolean("OPTIM_DELETE_EMBEDDED_BOUNDARIES",
+				settings.OPTIM_DELETE_EMBEDDED_BOUNDARIES);
+		settings.OPTIM_FLAG_POI_SAME_AS_CITY_STREET = settingsJson.optBoolean("OPTIM_FLAG_POI_SAME_AS_CITY_STREET",
+				settings.OPTIM_FLAG_POI_SAME_AS_CITY_STREET);
+		settings.DEDUPLICATE_RES = settingsJson.optBoolean("DEDUPLICATE_RES", settings.DEDUPLICATE_RES);
+		settings.OPTIM_READ_COMMON_WORDS_LIMIT = settingsJson.optInt("OPTIM_READ_COMMON_WORDS_LIMIT", settings.OPTIM_READ_COMMON_WORDS_LIMIT);
+		settings.LANG_DEDUPLICATE = settingsJson.optString("LANG_DEDUPLICATE", settings.LANG_DEDUPLICATE);
+		settings.MIN_ELO_RATING = settingsJson.optInt("MIN_ELO_RATING", settings.MIN_ELO_RATING);
+		settings.MIN_CHARACTERS_INCOMPLETE = settingsJson.optInt("MIN_CHARACTERS_INCOMPLETE", settings.MIN_CHARACTERS_INCOMPLETE);
+		settings.LIMIT_ATOMIC_OBJECTS = settingsJson.optInt("LIMIT_ATOMIC_OBJECTS", settings.LIMIT_ATOMIC_OBJECTS);
+		settings.LIMIT_STOP_GOALS_ANY_LEVEL_WHEN_REACHED_RES = settingsJson.optInt("LIMIT_ALL_GOALS_MAX_UNIQUE_OBJECTS",
+				settings.LIMIT_STOP_GOALS_ANY_LEVEL_WHEN_REACHED_RES);
+		settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES = settingsJson.optInt("LIMIT_STOP_OTHER_GOALS_WHEN_REACHED_UNIQUE_OBJECTS",
+				settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES);
+		settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES = settingsJson.optInt("LIMIT_GOAL_LEVEL_2", settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES);
+		settings.DEV_USE_PIPELINE = settingsJson.optBoolean("DEV_USE_PIPELINE", settings.DEV_USE_PIPELINE);
+
+		return settings;
+	}
+
+	private List<BinaryMapIndexReader> getMaps(QuadRect quadRect, File[] candidates) throws IOException {
+		List<BinaryMapIndexReader> maps = new ArrayList<>();
+		if (quadRect == null || quadRect.hasInitialState() || candidates == null) {
+			return maps;
+		}
+		OsmandRegions REGIONS = PlatformUtil.getOsmandRegions();
+		if (REGIONS == null) {
+			throw new IllegalStateException("Regions metadata is not initialized");
+		}
+
+		try {
+			for (File file : candidates) {
+				String downloadName = getDownloadNameByFileName(file.getName());
+				WorldRegion region = REGIONS.getRegionDataByDownloadName(downloadName);
+				if (region == null) {
+					continue;
+				}
+				List<QuadRect> polygonBounds = region.getAllPolygonsBounds();
+				if (polygonBounds != null && !polygonBounds.isEmpty()
+						&& polygonBounds.stream().anyMatch(bounds -> QuadRect.intersects(bounds, quadRect))) {
+					maps.add(openReader(file));
+				}
+			}
+		} catch (IOException | RuntimeException e) {
+			for (BinaryMapIndexReader reader : maps) {
+				try {
+					reader.close();
+				} catch (IOException closeError) {
+					e.addSuppressed(closeError);
+				}
+			}
+			throw e;
+		}
+		return maps;
+	}
+
+	private String getDownloadNameByFileName(String fileName) {
+		String downloadName = fileName.substring(0, fileName.indexOf('.')).toLowerCase();
+		if (downloadName.endsWith("_2")) {
+			downloadName = downloadName.substring(0, downloadName.length() - 2);
+		}
+		return downloadName;
+	}
 }

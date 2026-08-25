@@ -1076,6 +1076,7 @@ public class BinaryMapIndexWriter {
 					bbox31 = cityObj.getBbox31();
 				} else if (no.object instanceof Street s) {
 					type = CityBlocks.STREET_TYPE;
+					bbox31 = s.getBbox31();
 					QuadRect bb = s.getBboxPoints();
 					if (bb != null) {
 						bbox31 = new int[] { MapUtils.get31TileNumberX(bb.left), MapUtils.get31TileNumberY(bb.top),
@@ -1909,9 +1910,29 @@ public class BinaryMapIndexWriter {
 				PoiTileBox box = no.object.tileBox();
 				tileBoxes.add(box);
 				OsmandOdb.OsmAndPoiNameIndexDataAtom.Builder bs = OsmandOdb.OsmAndPoiNameIndexDataAtom.newBuilder();
-				bs.setX(box.getX());
-				bs.setY(box.getY());
+				int x = box.getX();
+				int y = box.getY();
+				bs.setX(x);
+				bs.setY(y);
 				bs.setZoom(box.getZoom());
+				int[] bbox31 = no.object.bbox31();
+				if (bbox31 != null) {
+					int[] bytes = SearchAlgorithms.encodeBboxForNameAtoms(ZOOM_ENCODE_BBOX_NAME_ATOMS, bbox31);
+					if (bytes[2] > 0 && bytes[4] > 0) {
+						mapDataBuf.clear();
+						writeRawVarint32(mapDataBuf, bytes[0]);
+						for (int k = 1; k < bytes.length; k += 4) {
+							int shiftX = -Math.min(0, x / 2 - bytes[k]);
+							int shiftY = -Math.min(0, y / 2 - bytes[k + 2]);
+							writeRawVarint32(mapDataBuf, Math.max(0, x / 2 - bytes[k]));
+							writeRawVarint32(mapDataBuf, bytes[k + 1] + shiftX);
+							writeRawVarint32(mapDataBuf, Math.max(0, y / 2 - bytes[k + 2]));
+							writeRawVarint32(mapDataBuf, bytes[k + 3] + shiftY);
+						}
+						bs.setBbox(ByteString.copyFrom(mapDataBuf.toArray()));
+					}
+				}
+			
 				for (int bitsetWord : no.bitsetIndex.toArray()) {
 					bs.addSuffixesBitsetIndex(bitsetWord);
 				}

@@ -3,6 +3,7 @@ import os
 import shutil
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 
 SRC_DIRS = [
     '/home/xmd5a/git/OsmAnd-resources/rendering_styles/style-icons/map-icons-svg',
@@ -12,10 +13,103 @@ DST_DIR = '/mnt/wd_2tb/mvt/openmaptiles/style/icons/'
 WORK_DIR = '/mnt/wd_2tb/mvt/openmaptiles/'
 REPO_DIR = '/home/xmd5a/git/osmand-subst/'
 UTILITIES_SH = '/home/xmd5a/utilites/OsmAndMapCreator-main/utilities.sh'
-ADDITION_DIR = '/home/xmd5a/git/OsmAnd-resources/rendering_styles/mvt-icons-addition'
+ADDITION_DIR = '/home/xmd5a/git/OsmAnd-resources/mvt/icons-addition'
 
 PREFIXES = ['mx_', 'c_mx_', 'c_h_', 'h_']
 EXCLUDE_PATTERNS = ['seamark', "topo_"]
+SCALE_FACTOR = 0.7
+
+def get_svg_dimensions(svg_path):
+    """Получить размеры SVG из XML, без ImageMagick."""
+    try:
+        tree = ET.parse(svg_path)
+        root = tree.getroot()
+        ns = {'svg': 'http://www.w3.org/2000/svg'}
+        
+        width = root.get('width')
+        height = root.get('height')
+        viewBox = root.get('viewBox')
+        
+        if width and height:
+            # Убираем единицы измерения (px, pt и т.д.)
+            w = float(''.join(c for c in width if c.isdigit() or c == '.'))
+            h = float(''.join(c for c in height if c.isdigit() or c == '.'))
+            return w, h
+        elif viewBox:
+            parts = viewBox.split()
+            if len(parts) == 4:
+                return float(parts[2]), float(parts[3])
+    except Exception as e:
+        print(f"Warning: Could not parse SVG dimensions for {svg_path}: {e}")
+    
+    return None, None
+
+
+def scale_svg_with_rsvg(src, dst, scale):
+    """Масштабировать SVG через rsvg-convert с --zoom."""
+    try:
+        cmd = [
+            'rsvg-convert',
+            '--format=svg',
+            f'--zoom={scale}',
+            src,
+            '-o', dst
+        ]
+        subprocess.run(cmd, check=True, capture_output=True, text=True)
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"Warning: rsvg-convert failed: {e.stderr}")
+        return False
+
+
+def scale_svg_with_inkscape(src, dst, scale):
+    """Масштабировать SVG через Inkscape actions (fallback)."""
+    try:
+        # Используем actions для масштабирования
+        cmd = [
+            'inkscape',
+            '--batch-process',
+            '--actions',
+            f'transform-scale:{scale};FileSave;FileClose',
+            src,
+            '-o', dst
+        ]
+        subprocess.run(cmd, check=True, capture_output=True, text=True)
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"Warning: Inkscape scale failed: {e.stderr}")
+        return False
+
+
+def scale_svg_manually(src, dst, scale):
+    """Масштабировать SVG вручную через XML (last resort)."""
+    try:
+        tree = ET.parse(src)
+        root = tree.getroot()
+        
+        # Добавляем/изменяем viewBox и убираем width/height
+        # или масштабируем через transform
+        ns = {'svg': 'http://www.w3.org/2000/svg'}
+        
+        # Создаём группу с масштабированием
+        g = ET.Element('{http://www.w3.org/2000/svg}g')
+        g.set('transform', f'scale({scale})')
+        
+        # Перемещаем все дочерние элементы в группу
+        for child in list(root):
+            if child.tag not in ('{http://www.w3.org/2000/svg}defs',
+                                '{http://www.w3.org/2000/svg}metadata',
+                                '{http://www.w3.org/2000/svg}namedview',
+                                '{http://www.sodipodi.org/2000/sodipodi}namedview'):
+                g.append(child)
+                root.remove(child)
+        
+        root.append(g)
+        tree.write(dst, encoding='utf-8', xml_declaration=True)
+        return True
+    except Exception as e:
+        print(f"Warning: Manual scale failed: {e}")
+        return False
 
 
 def main():
@@ -55,28 +149,19 @@ def main():
                 "shield" not in original_filename.lower() and 
                 "osmc" not in original_filename.lower()):
                 
-                print(f"Resizing to 70%: {f} (from shaders)")
-                try:
-                    # Get original dimensions
-                    identify_cmd = f"identify -format '%w %h' '{src}'"
-                    result = subprocess.run(identify_cmd, shell=True, capture_output=True, text=True, executable='/bin/bash')
-                    if result.returncode == 0:
-                        width, height = map(int, result.stdout.strip().split())
-                        new_width = max(1, int(width * 0.5))
-                        new_height = max(1, int(height * 0.5))
-                        
-                        # Keep output as SVG
-                        cmd = (
-                            f"inkscape '{src}' --export-type=svg --export-filename='{dst_path}' "
-                            f"--export-width={new_width} --export-height={new_height} --export-area-page 2>/dev/null || "
-                            f"rsvg-convert -w {new_width} -h {new_height} --format=svg '{src}' -o '{dst_path}' || "
-                            f"cp '{src}' '{dst_path}'"
-                        )
-                        subprocess.run(cmd, shell=True, check=True, executable='/bin/bash')
-                    else:
-                        raise ValueError("Could not get dimensions")
-                except Exception as e:
-                    print(f"Warning: Resize failed for {f}, copying original. Error: {e}")
+                print(f"Resizing: {f} (from shaders, scale={SCALE_FACTOR})")
+                
+                # Пробуем rsvg-convert (лучший вариант)
+                if scale_svg_with_rsvg(src, dst_path, SCALE_FACTOR):
+                    print(f"  -> Scaled with rsvg-convert")
+                # Fallback на Inkscape
+                elif scale_svg_with_inkscape(src, dst_path, SCALE_FACTOR):
+                    print(f"  -> Scaled with Inkscape")
+                # Fallback на ручное масштабирование
+                elif scale_svg_manually(src, dst_path, SCALE_FACTOR):
+                    print(f"  -> Scaled manually via XML")
+                else:
+                    print(f"Warning: All scaling methods failed for {f}, copying original")
                     shutil.copy2(src, dst_path)
             else:
                 shutil.copy2(src, dst_path)

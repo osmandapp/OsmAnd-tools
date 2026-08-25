@@ -148,6 +148,10 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 		LatLon l = city.getLocation();
 		city.setNames(getOtherNames(e));
+		String wikidata = e.getTag(MapObject.NAME_WIKIDATA_ATTR);
+		if (wikidata != null) {
+			city.setName(MapObject.NAME_WIKIDATA_ATTR, wikidata);
+		}
 		if (!Algorithms.isEmpty(city.getName())) {
 			cityDataStorage.registerObject(l.getLatitude(), l.getLongitude(), city, e);
 			debugCityIds.add(city.getId());
@@ -871,6 +875,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 						if (strt == null) {
 							strt = n.getTag(OSMTagKey.ADDR_PLACE);
 						}
+						if (strt == null) {
+							strt = n.getTag(OSMTagKey.ADDR_NEIGHBOURHOOD);
+						}
 						if (strt != null) {
 							nodesWithHno.add(n);
 						}
@@ -889,6 +896,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 						boolean place = false;
 						if (strt == null) {
 							strt = first.getTag(OSMTagKey.ADDR_PLACE);
+							if (strt == null) {
+								strt = first.getTag(OSMTagKey.ADDR_NEIGHBOURHOOD);
+							}
 							place = true;
 						}
 						Set<Long> idsOfStreet = getStreetInCity(0, first.getIsInNames(), strt, place, null, l, icc);
@@ -913,7 +923,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 		String houseName = e.getTag(OSMTagKey.ADDR_HOUSE_NAME);
 		String houseNumber = normalizeHousenumber(e.getTag(OSMTagKey.ADDR_HOUSE_NUMBER),
-				e.getTag(OSMTagKey.ADDR_UNIT));
+				e.getTag(OSMTagKey.ADDR_UNIT), e.getTag(OSMTagKey.ADDR_BLOCK_NUMBER));
 
 		String streetOrPlace = null;
 		boolean place = false;
@@ -921,6 +931,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			streetOrPlace = e.getTag(OSMTagKey.ADDR_STREET);
 			if (streetOrPlace == null) {
 				streetOrPlace = e.getTag(OSMTagKey.ADDR_PLACE);
+				if (streetOrPlace == null) {
+					streetOrPlace = e.getTag(OSMTagKey.ADDR_NEIGHBOURHOOD);
+				}
 				place = true;
 			}
 		}
@@ -1064,7 +1077,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		return null;
 	}
 
-	private String normalizeHousenumber(String hno, String unit) {
+	
+	private String normalizeHousenumber(String hno, String unit, String blockNumber) {
 		String suffix = Algorithms.isEmpty(unit) ? "" : ("-" + unit);
 		if (hno != null) {
 			if (hno.toLowerCase().endsWith("bis")) {
@@ -1075,6 +1089,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				hno = hno.substring(0, hno.length() - "ter".length()).trim() + suffix + " ter";
 			} else {
 				hno = hno + suffix;
+			}
+			if (blockNumber != null && blockNumber.length() > 0) {
+				hno = blockNumber + "-" + hno;
 			}
 		}
 		return hno;
@@ -1113,7 +1130,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	private boolean isStreetTag(String highwayValue) {
 		// exclude cycleways as we don't have houses related with them
-		return !"platform".equals(highwayValue) && !"cycleway".equals(highwayValue);
+		return !"platform".equals(highwayValue) && !"cycleway".equals(highwayValue) && !"services".equals(highwayValue) && !"service".equals(highwayValue);
 	}
 
 

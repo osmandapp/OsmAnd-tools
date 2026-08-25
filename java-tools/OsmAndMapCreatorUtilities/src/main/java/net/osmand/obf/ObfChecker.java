@@ -42,6 +42,7 @@ public class ObfChecker {
 
 	private static final int MAX_BUILDING_DISTANCE = 100;
 
+	private static final int MIN_MAP_SECTION = 15000; // Australia-oceania_ashmore-and-cartier-islands_australia-oceania 17443
 	private static final int MAX_MAP_RULES = 13800; // Germany_mecklenburg-vorpommern_europe 2025-12-05 +20%
 	private static final int MAX_ROUTE_RULES = 17500; // Chile_southamerica 2025-12-05 +20%
 	private static final int MAX_POI_TYPES = 6400; // Gb 2025-12-05 +20%
@@ -110,6 +111,7 @@ public class ObfChecker {
 				calcMaxMapBboxArea(that);
 				int mapRulesSize = calcMapIndexRulesSize(index, that);
 				ok &= checkSizeLimit(that.getName(), "map rules", mapRulesSize, MAX_MAP_RULES);
+				ok &= checkSizeLimit(that.getName(), "map section (min bytes)", MIN_MAP_SECTION, (int)that.getLength());
 			} else if (p instanceof HHRouteRegion hr) {
 				if (hr.profile.equals("car")) {
 					car = hr;

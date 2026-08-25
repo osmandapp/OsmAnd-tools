@@ -37,17 +37,22 @@ import net.osmand.util.SearchAlgorithms;
 public class NameIndexCreator<T> {
 
 	private static final int NAMED_WORDS_SEPARATOR = 0;
-	private static final int MIN_LIMIT_COMMON_NON_INDEXED = 10; // Minimum required to be common non-indexed (otherwise just rare)
+	// Minimum required to be common non-indexed -> (otherwise just frequent) - rare doesn't work as non-consistent tests
+	public static int MIN_LIMIT_COMMON_NON_INDEXED = 10; 
+	
 	// Large ADD_TOP_X_FREQ_WORDS many will cause to add many common words to index !
-	private static final int ADD_TOP_X_FREQ_WORDS = 10; // Add top 10 words automatically to Frequent (Common words indexed)
+	public static int ADD_TOP_X_FREQ_WORDS = 10; // Add top 10 words automatically to Frequent (Common words indexed)
 	// If common non-indexed < TOP X common-indexed -> convert it to common-indexed instead (word good to be searched by)
-	private static final int COMMON_CONVERT_NONINDX_TO_INDX_TOP_X = 100;
+	public static int COMMON_CONVERT_NONINDX_TO_INDX_TOP_X = 100;
 	
 	private static final int POI_CATEGORY_PREFIX_LENGTH = 5;
 	public static boolean NOT_INDEX_COMMON_IF_THERE_ARE_RARE = true;
 	public static boolean INDEX_RARE_WORDS_FOR_COMMON = false;
 	public static boolean INDEX_RARE_WORDS_FOR_NON_COMMON = false;
-	
+
+	private static final int TOP_INDEX_BRAND_PREFIX_LENGTH =
+			MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX.length() + "brand_".length() + POI_CATEGORY_PREFIX_LENGTH;
+
 	Map<String, NamedObjectsByPrefix<T>> namesIndex = new TreeMap<>(Collator.getInstance());
 	
 	PrepareWordsIndex commonWords;
@@ -62,7 +67,7 @@ public class NameIndexCreator<T> {
 	}
 	
 	public record PoiNameObject(PoiTileBox tileBox, int ind, int eloRating, 
-			String type, String subtype, Set<PoiAdditionalType> additionalTags) {
+			String type, String subtype, Set<PoiAdditionalType> additionalTags, int[] bbox31) {
 	}
 	
 	// common words
@@ -293,12 +298,12 @@ public class NameIndexCreator<T> {
 				commonStrings.add(s);
 				continue;
 			}
-			// don't add all common ! for some maps they could have different meaning
-			if (e.getValue() < MIN_LIMIT_COMMON_NON_INDEXED) {
-				continue;
-			}
 			boolean common = predefinedGlobalWords.isCommon(s);
 			boolean freq = predefinedGlobalWords.getFrequentlyUsed(s) >= 0;
+			// don't add all common ! for some maps they could have different meaning (but keep it freq indexed) 
+//			if (e.getValue() < MIN_LIMIT_COMMON_NON_INDEXED) {
+//				continue;
+//			}
 			if (common || freq || topXFrequent.contains(e.getKey())) {
 				commonStrings.add(s);
 			}
@@ -311,8 +316,8 @@ public class NameIndexCreator<T> {
 		for (String c : commonStrings) {
 			Integer matched = tokenFrequencies.get(c);
 			Integer nonIndexed = commonNonIndexedFrequencies.get(c);
-			if (matched < limitForNonIndexedCommon) {
-				nonIndexed = 0; // index common word 
+			if (matched < limitForNonIndexedCommon || matched < MIN_LIMIT_COMMON_NON_INDEXED) {
+				nonIndexed = 0; // frequent - indexed common word 
 			}
 			PrepareWordIndex word = new PrepareWordIndex(ind++, c, matched, nonIndexed == null ? 0 : nonIndexed);
 			words.put(c, word);
@@ -379,8 +384,10 @@ public class NameIndexCreator<T> {
 		if (pt != null && pt.isNonIndx()) {
 			return;
 		}
-		token = NameIndexReader.POI_CATEGORY_PREFIX + token;
-		String prefix = token.substring(0, Math.min(token.length(), POI_CATEGORY_PREFIX_LENGTH));
+		int maxPrefixLength = token.startsWith(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX)
+				? TOP_INDEX_BRAND_PREFIX_LENGTH : POI_CATEGORY_PREFIX_LENGTH;
+		token = NameIndexReader.POI_CATEGORY_PREFIX + token; // add marker #^
+		String prefix = token.substring(0, Math.min(token.length(), maxPrefixLength));
 		NamedObjectsByPrefix<PoiNameObject> entry = th.namesIndex.get(prefix);
 		if (entry == null) {
 			entry = new NamedObjectsByPrefix<PoiNameObject>();
