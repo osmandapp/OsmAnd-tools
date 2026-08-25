@@ -35,6 +35,8 @@ public class FastSpringHelper {
 	public static final long MINIMUM_VALIDATION_DELAY_MILLIS = 15 * 60 * 1000;
 
 	private static final String API_BASE = "https://api.fastspring.com";
+	private static final int CONNECT_TIMEOUT_MILLIS = 15 * 1000;
+	private static final int READ_TIMEOUT_MILLIS = 30 * 1000;
 	protected static final Log LOG = LogFactory.getLog(FastSpringHelper.class);
 
 	/**
@@ -199,6 +201,8 @@ public class FastSpringHelper {
 
 		URL url = new URL(API_BASE + path);
 		HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+		connection.setConnectTimeout(CONNECT_TIMEOUT_MILLIS);
+		connection.setReadTimeout(READ_TIMEOUT_MILLIS);
 		connection.setRequestMethod("GET");
 		connection.setRequestProperty("Authorization", "Basic " + encodedAuth);
 		connection.setRequestProperty("Accept", "application/json");
