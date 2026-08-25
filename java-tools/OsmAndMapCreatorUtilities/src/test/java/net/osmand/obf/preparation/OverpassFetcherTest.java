@@ -34,8 +34,8 @@ public class OverpassFetcherTest {
 	
 	public static void main(String[] args) throws IOException {
 		String base = "/Users/victorshcherb/osmand/maps/";
-		File f = new File(base + "France_occitania_haute-garonne_europe_2.obf");
-//		File f = new File(base + "Ukraine_kyiv_europe_2.obf");
+//		File f = new File(base + "France_occitania_haute-garonne_europe_2.obf");
+		File f = new File(base + "Slovakia_europe_2.obf");
 		BinaryMapIndexReader bmir = new BinaryMapIndexReader(new RandomAccessFile(f, "r"), f);
 		for (AddressRegion a : bmir.getAddressIndexes()) {
 //			processAddress(bmir, new NameIndexReader(a));

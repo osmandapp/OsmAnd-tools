@@ -206,8 +206,9 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
         public String getTranslation(String keyName) {
             if (keyName.equals("hotel")) {
                 return "отель";
-            }
-            if (keyName.equals("island")) {
+            } else if (keyName.equals("school")) {
+            	return "школа";
+            } else if (keyName.equals("island")) {
                 return "остров";
             }
             return null;
@@ -222,8 +223,9 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
         public String getSynonyms(String keyName) {
             if (keyName.equals("hotel")) {
                 return "отель;готель;гатэль";
-            }
-            if (keyName.equals("island")) {
+            } else if (keyName.equals("school")) {
+            	return "школа";
+            } else if (keyName.equals("island")) {
                 return "остров";
             }
             return null;

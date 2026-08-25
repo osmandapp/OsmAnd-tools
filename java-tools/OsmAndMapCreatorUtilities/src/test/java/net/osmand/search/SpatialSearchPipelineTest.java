@@ -128,6 +128,8 @@ public class SpatialSearchPipelineTest {
 	public SpatialSearchPipelineTest(String name, File file) {
 		this.testFile = file;
 		NameIndexCreator.MIN_LIMIT_COMMON_NON_INDEXED = 0;
+		NameIndexCreator.ADD_TOP_X_FREQ_WORDS = 0;
+		NameIndexCreator.COMMON_CONVERT_NONINDX_TO_INDX_TOP_X = 0;
 	}
 
 	private static File getSourceDir() {
