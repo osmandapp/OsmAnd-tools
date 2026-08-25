@@ -1,6 +1,7 @@
 package net.osmand.server.controllers.pub;
 
 import jakarta.servlet.http.HttpServletResponse;
+import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.server.api.services.search.ClassicSearchService;
 import net.osmand.server.SearchTestRepositoryConfiguration;
 import net.osmand.server.api.searchtest.BaseService.GenParam;
@@ -49,6 +50,8 @@ public class SearchTestController {
 
 	public record RunTestCaseRequest(RunParam payload, ClassicSearchService.SearchOption options) {}
 	public record ObfSelection(String obfPath, List<String> obfs) {}
+	public record DetectorSearchRequest(ObfSelection selection, ClassicSearchService.SearchOption options) {}
+	public record DetectorUnitTestRequest(ObfSelection selection, DetectorService.UnitTestPayload unitTest) {}
 	public record IndexSuffixPayload(ObfSelection selection, OBFService.IndexSuffixRequest request) {}
 	public record ObjectsPayload(ObfSelection selection, OBFService.IndexToken token) {}
 	public record GenerateDbJobResponse(String jobId) {}
@@ -440,19 +443,20 @@ public class SearchTestController {
 
 	@PostMapping(value = "/search", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<DetectorService.ResultsWithStats> getResults(
+	public ResponseEntity<DetectorService.ResultsWithStats> getSearchResults(
 			@RequestParam String query,
 			@RequestParam(required = false) String lang,
 			@RequestParam() Double lat,
 			@RequestParam() Double lon,
 			@RequestParam(required = false, defaultValue = "false") Boolean spatial,
-			@RequestBody ClassicSearchService.SearchOption options) throws IOException {
+			@RequestBody DetectorSearchRequest request) throws IOException {
 		if (query == null || lat == null || lon == null) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'query', 'lat' and 'lon' are required");
         }
 
-        ClassicSearchService.SearchContext ctx = new ClassicSearchService.SearchContext(lat, lon, query, lang, false, null, null);
-		return ResponseEntity.ok(testSearchService.getResults(ctx, options, spatial));
+		ClassicSearchService.SearchContext ctx = new ClassicSearchService.SearchContext(lat, lon, query, lang, false, null, null);
+		return ResponseEntity.ok(testSearchService.getSearchResults(ctx, request.options(), spatial,
+				openCustomObfReaders(request.selection(), request.options().getRadius(), lat, lon, Boolean.TRUE.equals(spatial))));
 	}
 
 	@PostMapping(value = "/unit-test", produces = "application/zip")
@@ -462,9 +466,10 @@ public class SearchTestController {
 			@RequestParam() Double lat,
 			@RequestParam() Double lon,
 			@RequestParam() Boolean spatial,
-			@RequestParam() Double radius,
-			@RequestBody(required = false) DetectorService.UnitTestPayload unitTest,
+			@RequestParam(required = false) Double radius,
+			@RequestBody(required = false) DetectorUnitTestRequest request,
 			HttpServletResponse response) throws IOException, SQLException {
+		DetectorService.UnitTestPayload unitTest = request == null ? null : request.unitTest();
 		if (unitTest == null || unitTest.name() == null || query == null || lat == null || lon == null) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'unit-test name', 'query', 'lat' and 'lon' are required");
 		}
@@ -475,13 +480,14 @@ public class SearchTestController {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Radius must be 0 or greater");
 		}
 		if (radius == null) {
-			radius = 7.0;
+			radius = Boolean.TRUE.equals(spatial) ? 400.0 : 1.5;
 		}
 		response.setContentType("application/zip");
 		response.setHeader("Content-Disposition", "attachment; filename=\"" + unitTest.name() + ".zip\"");
 		testSearchService.createUnitTest(unitTest,
 				new ClassicSearchService.SearchContext(lat, lon, query, null, false, null, null),
-				radius, response.getOutputStream(), spatial);
+				radius, response.getOutputStream(), spatial,
+				openCustomObfReaders(request.selection(), radius, lat, lon, Boolean.TRUE.equals(spatial)));
 	}
 
 	@PostMapping(value = "/index", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -568,6 +574,27 @@ public class SearchTestController {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OBF selection is required");
 		}
 		return selected;
+	}
+
+	private List<BinaryMapIndexReader> openCustomObfReaders(ObfSelection selection, double radius, double lat, double lon,
+	                                                       boolean spatial) throws IOException {
+		if (selection == null || selection.obfPath() == null || selection.obfPath().isBlank()) {
+			return null;
+		}
+		Path directory;
+		try {
+			directory = Path.of(selection.obfPath()).toAbsolutePath().normalize();
+		} catch (InvalidPathException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OBF Custom Dir is not a valid path");
+		}
+		if (!Files.isDirectory(directory)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OBF Custom Dir is not a valid directory: " + directory);
+		}
+		List<String> obfs = testSearchService.getCustomOBFs(radius, lat, lon, spatial, directory.toString());
+		if (obfs.isEmpty()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OBF Custom Dir contains no OBF files: " + directory);
+		}
+		return testSearchService.openObfReaders(obfs);
 	}
 
 	@PostMapping(value = "/generate", produces = "application/zip")
