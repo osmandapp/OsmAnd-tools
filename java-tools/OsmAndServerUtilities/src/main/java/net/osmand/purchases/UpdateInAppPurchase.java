@@ -217,8 +217,9 @@ public class UpdateInAppPurchase {
                     continue;
                 }
 
-                if (validBool != null && validBool && !pms.verifyAll) {
-                    continue; // Skip check if already valid
+                // Skip already-valid purchases, but always validate a purchase at least once (checktime == null)
+                if (validBool != null && validBool && checkTimeTs != null && !pms.verifyAll) {
+                    continue; // Skip check if already valid and validated at least once
                 }
 
                 boolean isGoogleApp = sku.equals("osmand_full_version_price") && platform.equals(PLATFORM_GOOGLE);
