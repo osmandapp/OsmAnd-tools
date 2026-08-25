@@ -35,7 +35,7 @@ public class OverpassFetcherTest {
 	public static void main(String[] args) throws IOException {
 		String base = "/Users/victorshcherb/osmand/maps/";
 //		File f = new File(base + "France_occitania_haute-garonne_europe_2.obf");
-		File f = new File(base + "Slovakia_europe_2.obf");
+		File f = new File(base + "Netherlands_noord-holland_europe_2.obf");
 		BinaryMapIndexReader bmir = new BinaryMapIndexReader(new RandomAccessFile(f, "r"), f);
 		for (AddressRegion a : bmir.getAddressIndexes()) {
 //			processAddress(bmir, new NameIndexReader(a));
@@ -167,9 +167,12 @@ public class OverpassFetcherTest {
 //					&& paramMinY <= calcMinY && paramMaxY >= calcMaxY;
 
 			System.out.printf(
-					"BBox: outside %.2f%%, inside %.2f%% | Atom [%d, %d, %d, %d] vs Actual [%d, %d, %d, %d] \n",
-					outsidePercent, insidePercent, bbox[0], bbox[1], bbox[2], bbox[3], actualBbox[0],
-					actualBbox[1], actualBbox[2], actualBbox[3]);
+					"BBox: outside %.2f%%, inside %.2f%% | Atom [%.5f, %.5f, %.5f, %.5f] vs Actual [%.5f, %.5f, %.5f, %.5f]\n",
+					outsidePercent, insidePercent,
+					MapUtils.get31LatitudeY(bbox[1]), MapUtils.get31LongitudeX(bbox[0]),
+					MapUtils.get31LatitudeY(bbox[3]), MapUtils.get31LongitudeX(bbox[2]),
+					MapUtils.get31LatitudeY(actualBbox[1]), MapUtils.get31LongitudeX(actualBbox[0]),
+					MapUtils.get31LatitudeY(actualBbox[3]), MapUtils.get31LongitudeX(actualBbox[2]));
 		}
 	}
 }
