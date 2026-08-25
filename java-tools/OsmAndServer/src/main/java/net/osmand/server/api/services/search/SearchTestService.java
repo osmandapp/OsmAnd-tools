@@ -612,11 +612,9 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 				}
 				readers = mapsService.getReaders(maps, null);
 			}
-			if (!readers.isEmpty()) {
-				BinaryMapIndexReader regionsReader = spatialSearchService.regionsReaderForThread();
-				if (regionsReader != null) {
-					readers.add(regionsReader);
-				}
+			BinaryMapIndexReader regionsReader = spatialSearchService.regionsReaderForThread();
+			if (regionsReader != null) {
+				readers.add(regionsReader);
 			}
 
 			res = searchTestSpatial(ctx, readers, printLogs);

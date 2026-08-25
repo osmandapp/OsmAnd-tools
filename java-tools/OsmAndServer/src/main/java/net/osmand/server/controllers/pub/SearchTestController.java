@@ -47,6 +47,14 @@ import java.util.concurrent.ConcurrentHashMap;
 @Controller
 @RequestMapping(path = "/admin/search-test")
 public class SearchTestController {
+	@ExceptionHandler(ResponseStatusException.class)
+	@ResponseBody
+	public ResponseEntity<Map<String, String>> handleResponseStatusException(ResponseStatusException e) {
+        if (e.getReason() != null) {
+            return ResponseEntity.status(e.getStatusCode()).body(Map.of("message", e.getReason()));
+        }
+        return null;
+    }
 
 	public record RunTestCaseRequest(RunParam payload, ClassicSearchService.SearchOption options) {}
 	public record ObfSelection(String obfPath, List<String> obfs) {}
@@ -588,12 +596,9 @@ public class SearchTestController {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OBF Custom Dir is not a valid path");
 		}
 		if (!Files.isDirectory(directory)) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OBF Custom Dir is not a valid directory: " + directory);
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OBF Custom Dir is not a valid directory!");
 		}
 		List<String> obfs = testSearchService.getCustomOBFs(radius, lat, lon, spatial, directory.toString());
-		if (obfs.isEmpty()) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OBF Custom Dir contains no OBF files: " + directory);
-		}
 		return testSearchService.openObfReaders(obfs);
 	}
 
