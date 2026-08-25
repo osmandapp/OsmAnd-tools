@@ -72,9 +72,9 @@ public class ClassicSearchService {
 	}
 
 	public record SearchResults(List<SearchResult> results, SearchSettings settings, JSONObject unitTestJson,
-	                            SearchPhrase phrase) {
+	                            SearchPhrase phrase, int obfCount) {
 		public SearchResults(List<SearchResult> results) {
-			this(results, null, null, null);
+			this(results, null, null, null, 0);
 		}
 	}
 
@@ -164,7 +164,7 @@ public class ClassicSearchService {
 						settings.getExportedCities());
 			}
 			return new SearchResults(res, settings, unitTestJson,
-					resultCollection == null ? null : resultCollection.getPhrase());
+					resultCollection == null ? null : resultCollection.getPhrase(), usedMapList.size());
 		} finally {
 			if (suppliedReaders == null) osmAndMapsService.unlockReaders(usedMapList);
 		}

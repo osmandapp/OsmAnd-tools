@@ -463,8 +463,8 @@ public class SearchTestController {
         }
 
 		ClassicSearchService.SearchContext ctx = new ClassicSearchService.SearchContext(lat, lon, query, lang, false, null, null);
-		return ResponseEntity.ok(testSearchService.getSearchResults(ctx, request.options(), spatial,
-				openCustomObfReaders(request.selection(), request.options().getRadius(), lat, lon, Boolean.TRUE.equals(spatial))));
+		List<BinaryMapIndexReader> readers = openCustomObfReaders(request.selection(), request.options().getRadius(), lat, lon, Boolean.TRUE.equals(spatial));
+		return ResponseEntity.ok(testSearchService.getSearchResults(ctx, request.options(), spatial, readers));
 	}
 
 	@PostMapping(value = "/unit-test", produces = "application/zip")
