@@ -107,6 +107,7 @@ public class FastSpringHelper {
 		return null;
 	}
 
+	// https://developer.fastspring.com/reference/list-all-unprocessed-events
 	public static String getUnprocessedEvents(int days) throws IOException {
 		HttpURLConnection connection = openConnection("/events/unprocessed?days=" + days);
 		if (connection.getResponseCode() != 200) {
@@ -127,6 +128,7 @@ public class FastSpringHelper {
 		}
 	}
 
+	// https://developer.fastspring.com/reference/update-an-event
 	public static boolean markEventProcessed(String eventId) throws IOException {
 		HttpURLConnection connection = openConnection("/events/" + eventId);
 		connection.setRequestMethod("POST");
@@ -221,7 +223,7 @@ public class FastSpringHelper {
 	public static class FastSpringSubscription {
 		public String id;
 		public Boolean active;
-		public String state; // active, overdue, canceled, deactivated, trial
+		public String state; // active, overdue, canceled, deactivated, trial (https://developer.fastspring.com/reference/retrieve-a-subscription)
 		public String sku;
 		public Long begin; //purchaseTime
 		public Long nextChargeDate; //expiretime

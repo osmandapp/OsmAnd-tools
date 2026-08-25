@@ -72,17 +72,9 @@ public class FastSpringController {
 	@PostMapping("/order-completed")
 	public ResponseEntity<String> handleOrderCompletedEvent(@RequestBody FastSpringOrderCompletedRequest request) {
 		if (request == null || request.events == null) {
-			return ResponseEntity.badRequest().body("FastSpring: empty request");
+			return ResponseEntity.internalServerError().body("FastSpring: empty request");
 		}
-		for (FastSpringOrderCompletedRequest.Event event : request.events) {
-			if (EVENT_ORDER_COMPLETED.equals(event.type)) {
-				ResponseEntity<String> error = handleOrderCompletedEvent(event);
-				if (error != null) {
-					return error;
-				}
-			}
-		}
-		return ResponseEntity.ok("OK");
+		return processEventsBatch(request.events, Set.of(EVENT_ORDER_COMPLETED));
 	}
 
 	private ResponseEntity<String> handleOrderCompletedEvent(FastSpringOrderCompletedRequest.Event event) {
@@ -149,7 +141,7 @@ public class FastSpringController {
 					}
 				} else {
 					LOGGER.error("FastSpring: Unknown product " + sku);
-					return ResponseEntity.badRequest().body("FastSpring: Unknown product " + sku);
+					return ResponseEntity.internalServerError().body("FastSpring: Unknown product " + sku);
 				}
 			}
 			purchases.forEach(purchase -> deviceInAppPurchasesRepository.saveAndFlush(purchase));
@@ -172,17 +164,34 @@ public class FastSpringController {
 	@PostMapping("/refund")
 	public ResponseEntity<String> handleRefundEvent(@RequestBody FastSpringOrderCompletedRequest request) {
 		if (request == null || request.events == null) {
-			return ResponseEntity.badRequest().body("FastSpring: empty request");
+			return ResponseEntity.internalServerError().body("FastSpring: empty request");
 		}
-		for (FastSpringOrderCompletedRequest.Event event : request.events) {
-			if (HANDLED_EVENTS.contains(event.type)) {
+		return processEventsBatch(request.events, HANDLED_EVENTS);
+	}
+
+	// https://developer.fastspring.com/reference/processed-and-unprocessed-webhook-events
+	// 200 acknowledges the whole batch; on partial failure return 202 with the ids of the processed events
+	// (one per line) so that FastSpring retries only the failed ones.
+	private ResponseEntity<String> processEventsBatch(List<FastSpringOrderCompletedRequest.Event> events, Set<String> handledTypes) {
+		List<String> processedIds = new ArrayList<>();
+		boolean anyFailed = false;
+		for (FastSpringOrderCompletedRequest.Event event : events) {
+			if (handledTypes.contains(event.type)) {
 				ResponseEntity<String> error = dispatchFastSpringEvent(event);
 				if (error != null) {
-					return error;
+					anyFailed = true;
+					LOGGER.error("FastSpring: event " + event.id + " (" + event.type + ") failed: " + error.getBody());
+					continue;
 				}
 			}
+			if (event.id != null) {
+				processedIds.add(event.id);
+			}
 		}
-		return ResponseEntity.ok("OK");
+		if (!anyFailed) {
+			return ResponseEntity.ok("OK");
+		}
+		return ResponseEntity.accepted().body(String.join("\n", processedIds));
 	}
 
 	private ResponseEntity<String> handleReturnCreatedEvent(FastSpringOrderCompletedRequest.Event event) {
@@ -219,7 +228,7 @@ public class FastSpringController {
 		}
 		if (!matchedAny) {
 			// Return an error so that the event is retried later: the refund may arrive before the original order is recorded
-			return ResponseEntity.badRequest().body("FastSpring: nothing to revoke for orderId " + orderId);
+			return ResponseEntity.internalServerError().body("FastSpring: nothing to revoke for orderId " + orderId);
 		}
 		refreshAffectedUsers(affectedUserIds);
 		return null;
@@ -235,11 +244,11 @@ public class FastSpringController {
 			fsSub = FastSpringHelper.getSubscriptionByOrderIdAndSku(orderId, sku);
 		} catch (Exception e) {
 			LOGGER.error("FastSpring: failed to check subscription state for orderId " + orderId + ", sku " + sku + ": " + e.getMessage(), e);
-			return ResponseEntity.badRequest().body("FastSpring: failed to check subscription state for orderId " + orderId);
+			return ResponseEntity.internalServerError().body("FastSpring: failed to check subscription state for orderId " + orderId);
 		}
 		if (fsSub == null) {
 			LOGGER.error("FastSpring: subscription not found for refunded orderId " + orderId + ", sku " + sku);
-			return ResponseEntity.badRequest().body("FastSpring: subscription not found for refunded orderId " + orderId);
+			return ResponseEntity.internalServerError().body("FastSpring: subscription not found for refunded orderId " + orderId);
 		}
 		if (Boolean.TRUE.equals(fsSub.active) && !SUBSCRIPTION_STATE_DEACTIVATED.equals(fsSub.state)) {
 			if (SUBSCRIPTION_STATE_CANCELED.equals(fsSub.state)) {
@@ -270,7 +279,7 @@ public class FastSpringController {
 		boolean revokedAny = revokePurchases(deviceInAppPurchasesRepository.findByOrderId(orderId),
 				deviceSubscriptionsRepository.findByOrderId(orderId), orderId, affectedUserIds, KIND_CHARGEBACK);
 		if (!revokedAny) {
-			return ResponseEntity.badRequest().body("FastSpring: nothing to revoke for orderId " + orderId);
+			return ResponseEntity.internalServerError().body("FastSpring: nothing to revoke for orderId " + orderId);
 		}
 		refreshAffectedUsers(affectedUserIds);
 		return null;
