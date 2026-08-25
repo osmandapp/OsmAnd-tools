@@ -6,6 +6,7 @@ import net.osmand.PlatformUtil;
 import net.osmand.binary.*;
 import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
 import net.osmand.data.*;
+import net.osmand.map.OsmandRegions;
 import net.osmand.map.WorldRegion;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiCategory;
@@ -95,6 +96,20 @@ public interface OBFService extends BaseService {
 	OsmAndMapsService getMapsService();
 	String getSearchTestDatasourceUrl();
 
+	default List<BinaryMapIndexReader> openObfReaders(List<String> obfs) throws IOException {
+		List<BinaryMapIndexReader> readers = new ArrayList<>();
+		try {
+			for (String path : obfs) {
+				File file = new File(path);
+				readers.add(new BinaryMapIndexReader(new RandomAccessFile(file, "r"), file, true));
+			}
+			return readers;
+		} catch (IOException | RuntimeException e) {
+			for (BinaryMapIndexReader reader : readers) reader.close();
+			throw e;
+		}
+	}
+
 	default List<String> getOBFs(Double radius, Double lat, Double lon, String obfPath) throws IOException {
 		synchronized (INDEX_TOKENS_CACHE) {
 			INDEX_TOKENS_CACHE.clear();
@@ -131,8 +146,20 @@ public interface OBFService extends BaseService {
 				obfList.add(ref.getFile().getAbsolutePath());
 			return obfList;
 		}
-		obfList.addAll(getMaps(points, customObfs));
+		obfList.addAll(getOBFs(points, customObfs));
 		return obfList;
+	}
+
+	default List<String> getCustomOBFs(double radius, double lat, double lon, boolean spatial, String obfPath) throws IOException {
+		QuadRect points;
+		if (spatial) {
+			QuadRect bbox = MapUtils.calculateLatLonBbox(lat, lon, Math.toIntExact(Math.round(radius * 1000)));
+			points = getMapsService().points(null, new LatLon(bbox.top, bbox.left), new LatLon(bbox.bottom, bbox.right));
+		} else {
+			points = getMapsService().points(null,
+					new LatLon(lat + radius, lon - radius), new LatLon(lat - radius, lon + radius));
+		}
+		return getOBFs(points, getCustomObfFiles(obfPath));
 	}
 
 	private void addRegionsObf(List<String> obfList) throws IOException {
@@ -158,7 +185,7 @@ public interface OBFService extends BaseService {
 	}
 
 	
-	private List<String> getMaps(QuadRect quadRect, File[] candidates) {
+	private List<String> getOBFs(QuadRect quadRect, File[] candidates) throws IOException {
 		List<String> maps = new ArrayList<>();
 		if (quadRect == null || quadRect.hasInitialState() || candidates == null) {
 			return maps;
@@ -169,10 +196,11 @@ public interface OBFService extends BaseService {
 				MapUtils.get31LatitudeY((int) Math.min(quadRect.top, quadRect.bottom)),
 				MapUtils.get31LongitudeX((int) Math.max(quadRect.left, quadRect.right)),
 				MapUtils.get31LatitudeY((int) Math.max(quadRect.top, quadRect.bottom)));
+		OsmandRegions regions = PlatformUtil.getOsmandRegions();
 
 		for (File file : candidates) {
 			String downloadName = getDownloadNameByFileName(file.getName());
-			WorldRegion wr = getMapsService().getOsmandRegions().getRegionDataByDownloadName(downloadName);
+			WorldRegion wr = regions.getRegionDataByDownloadName(downloadName);
 			if (wr == null) {
 				continue;
 			}
