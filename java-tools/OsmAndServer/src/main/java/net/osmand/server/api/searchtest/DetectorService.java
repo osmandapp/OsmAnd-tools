@@ -45,7 +45,7 @@ public interface DetectorService extends OBFService {
 
 	record ResultsWithStats(List<AddressResult> results, Collection<BinaryMapIndexReaderStats.WordSearchStat> wordStats,
 	                        Map<BinaryMapIndexReaderStats.BinaryMapIndexReaderApiName, BinaryMapIndexReaderStats.StatByAPI> statsByApi,
-	                        String timeAll, SpatialSearchContext.SpatialSearchStats spatialStats, List<String> spatialCombinations) {}
+	                        String timeAll, SpatialSearchContext.SpatialSearchStats spatialStats, List<String> spatialCombinations, int obfCount) {}
 	record ResultMetric(String obf, int depth, double foundWordCount, double unknownPhraseMatchWeight,
 	                    Collection<String> otherWordsMatch, Double distance, boolean isEqual, boolean inResult) {}
 	record AddressResult(String name, String type, String address, AddressResult parent, ResultMetric metric,
@@ -69,7 +69,7 @@ public interface DetectorService extends OBFService {
 			}
 			String totalTime = String.format(Locale.US, "%.1f", (System.currentTimeMillis() - startTime) / 1e3);
 			return new ResultsWithStats(results, result.settings().getStat().getWordStats().values(),
-					result.settings().getStat().getByApis(), totalTime, null, null);
+					result.settings().getStat().getByApis(), totalTime, null, null, result.obfCount());
 		} finally {
 			if (readers != null) for (BinaryMapIndexReader reader : readers) reader.close();
 		}
@@ -79,7 +79,8 @@ public interface DetectorService extends OBFService {
 		String totalTime = String.format(Locale.US, "%.1f", (System.currentTimeMillis() - startTime) / 1e3);
 		List<AddressResult> results = new ArrayList<>();
 		if (spatialResponse == null || spatialResponse.results() == null || spatialResponse.results().mainResults == null) {
-			return new ResultsWithStats(results, Collections.emptyList(), Collections.emptyMap(), totalTime, null, null);
+			return new ResultsWithStats(results, Collections.emptyList(), Collections.emptyMap(), totalTime, null, null,
+					spatialResponse == null ? 0 : spatialResponse.obfCount());
 		}
 		for (SpatialSearchResult res : spatialResponse.results().mainResults) {
 			AddressResult result = toResult(ctx, res);
@@ -88,7 +89,7 @@ public interface DetectorService extends OBFService {
 			}
 		}
 		return new ResultsWithStats(results, Collections.emptyList(), Collections.emptyMap(), totalTime,
-				spatialResponse.stats(), spatialCombinations(spatialResponse));
+				spatialResponse.stats(), spatialCombinations(spatialResponse), spatialResponse.obfCount());
 	}
 
 	private List<String> spatialCombinations(SpatialSearchService.SpatialResults spatialResponse) {

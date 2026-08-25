@@ -117,7 +117,7 @@ public class SpatialSearchService {
 		public Map<String, Object> info = new LinkedHashMap<>();
 	}
 
-	public record SpatialResults(SpatialSearchResults results, SpatialSearchContext.SpatialSearchStats stats) {
+	public record SpatialResults(SpatialSearchResults results, SpatialSearchContext.SpatialSearchStats stats, int obfCount) {
 	}
 
 	@PostConstruct

@@ -612,14 +612,14 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 				}
 				readers = mapsService.getReaders(maps, null);
 			}
-			if (!readers.isEmpty()) {
-				BinaryMapIndexReader regionsReader = spatialSearchService.regionsReaderForThread();
-				if (regionsReader != null) {
-					readers.add(regionsReader);
-				}
+			int obfCount = readers.size();
+			readers = new ArrayList<>(readers);
+			BinaryMapIndexReader regionsReader = spatialSearchService.regionsReaderForThread();
+			if (regionsReader != null) {
+				readers.add(regionsReader);
 			}
 
-			res = searchTestSpatial(ctx, readers, printLogs);
+			res = searchTestSpatial(ctx, readers, printLogs, obfCount);
 		} catch (RuntimeException e) {
 			LOGGER.error(String.format("Spatial search failed for '%s': %s", ctx.text(), e), e);
 			StringWriter stackTrace = new StringWriter();
@@ -633,7 +633,8 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 		return res;
 	}
 
-	private SpatialSearchService.SpatialResults searchTestSpatial(ClassicSearchService.SearchContext ctx, List<BinaryMapIndexReader> readers, boolean printLogs)
+	private SpatialSearchService.SpatialResults searchTestSpatial(ClassicSearchService.SearchContext ctx, List<BinaryMapIndexReader> readers,
+	                                                            boolean printLogs, int obfCount)
 			throws IOException {
 		if (readers == null || readers.isEmpty()) {
 			return null;
@@ -645,7 +646,7 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 		stats.printLogs = printLogs;
 
 		SpatialSearchResults results = spatialSearchService.getSpatialTextSearch().searchAPI(ctx.text(), sscontext);
-		return new SpatialSearchService.SpatialResults(results, stats);
+		return new SpatialSearchService.SpatialResults(results, stats, obfCount);
 	}
 
 	private ClassicSearchService.SearchResults fromSpatialResults(SpatialSearchService.SpatialResults spatialResult,
