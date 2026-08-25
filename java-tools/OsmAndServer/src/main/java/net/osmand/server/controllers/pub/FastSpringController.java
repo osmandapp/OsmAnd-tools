@@ -68,6 +68,7 @@ public class FastSpringController {
 	private static final String KIND_CHARGEBACK = "chargeback";
 
 
+	// https://developer.fastspring.com/reference/webhooks-overview
 	@Transactional
 	@PostMapping("/order-completed")
 	public ResponseEntity<String> handleOrderCompletedEvent(@RequestBody FastSpringOrderCompletedRequest request) {
@@ -160,6 +161,7 @@ public class FastSpringController {
 		return null;
 	}
 
+	// https://developer.fastspring.com/reference/webhooks-overview
 	@Transactional
 	@PostMapping("/refund")
 	public ResponseEntity<String> handleRefundEvent(@RequestBody FastSpringOrderCompletedRequest request) {
