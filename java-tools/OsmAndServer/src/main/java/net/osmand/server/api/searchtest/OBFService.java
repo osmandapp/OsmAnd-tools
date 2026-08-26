@@ -151,6 +151,7 @@ public interface OBFService extends BaseService {
 	}
 
 	default List<String> getCustomOBFs(double radius, double lat, double lon, boolean spatial, String obfPath) throws IOException {
+		File[] candidates = getCustomObfFiles(obfPath);
 		QuadRect points;
 		if (spatial) {
 			QuadRect bbox = MapUtils.calculateLatLonBbox(lat, lon, Math.toIntExact(Math.round(radius * 1000)));
@@ -159,7 +160,7 @@ public interface OBFService extends BaseService {
 			points = getMapsService().points(null,
 					new LatLon(lat + radius, lon - radius), new LatLon(lat - radius, lon + radius));
 		}
-		return getOBFs(points, getCustomObfFiles(obfPath));
+        return getOBFs(points, candidates);
 	}
 
 	private void addRegionsObf(List<String> obfList) throws IOException {

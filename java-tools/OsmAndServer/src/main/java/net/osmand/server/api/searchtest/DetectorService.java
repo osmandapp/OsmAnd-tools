@@ -129,8 +129,15 @@ public interface DetectorService extends OBFService {
 		if (object == null && objects != null && !objects.isEmpty()) {
 			object = objects.get(0);
 		}
+		String name = spatialName(object, ctx.locale());
+		String extraName = res.getExtraNameMatch();
+		if (object instanceof Building building && building.isInterpolation() && Algorithms.isNotEmpty(extraName)) {
+			name = extraName;
+		} else if (Algorithms.isNotEmpty(extraName)) {
+			name += " (" + extraName + ")";
+		}
 		AddressResult parent = toParent(ctx, objects, 1, res.matchedTokens());
-		return new AddressResult(spatialName(object, ctx.locale()), spatialType(object), spatialAddress(object, ctx.locale()),
+		return new AddressResult(name, spatialType(object), spatialAddress(object, ctx.locale()),
 				parent, metric, location, null);
 	}
 
@@ -205,6 +212,8 @@ public interface DetectorService extends OBFService {
 			return "poi";
 		} else if (object instanceof Street) {
 			return "street";
+		} else if (object instanceof Building) {
+			return "house";
 		} else if (object instanceof City city) {
 			return city.getType() == null ? "city" : city.getType().name().toLowerCase(Locale.ROOT);
 		} else if (object == null) {
