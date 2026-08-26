@@ -184,7 +184,8 @@ public class UserdataController {
 		if (result == UserTranslationsService.SendResult.DELIVERED) {
 			return ResponseEntity.status(HttpStatus.OK).build();
 		}
-		if (result == UserTranslationsService.SendResult.GONE) {
+		if (result == UserTranslationsService.SendResult.GONE
+				|| result == UserTranslationsService.SendResult.EXPIRED) {
 			return ResponseEntity.status(HttpStatus.GONE).build();
 		}
 		return ResponseEntity.notFound().build();

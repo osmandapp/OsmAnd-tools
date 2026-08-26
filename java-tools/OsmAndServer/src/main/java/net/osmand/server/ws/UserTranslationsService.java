@@ -8,7 +8,6 @@ import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -318,6 +317,9 @@ public class UserTranslationsService {
 							&& (toTime <= 0 || m.serverReceiveTime <= toTime))
 					.toList();
 		}
+		if (removeExpiredSharers(ust)) {
+			broadcastMetadata(ust);
+		}
 		obj.setShareLocations(ust, user != null ? user.id : 0);
 		obj.viewers = currentViewers(ust.getId());
 		sendHistoryChunks(headers.getSessionId(), obj, messages);
@@ -347,6 +349,7 @@ public class UserTranslationsService {
 			sendError("Not allowed to share in this translation", headers);
 			return;
 		}
+		removeExpiredSharers(ust);
 		UserTranslationPlainObject obj = addSharer(ust, user.id, getNickname(user));
 		sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_TRANSLATION, obj);
 		template.convertAndSend(TOPIC_TRANSLATION + ust.getId(),
@@ -355,6 +358,50 @@ public class UserTranslationsService {
 
 	private boolean isAllowedToShare(UserTranslation ust, int userId) {
 		return ust.getOwner() == userId || ust.getAllowedSharers().contains(userId);
+	}
+
+	private boolean isSharing(UserTranslation ust, int userId) {
+		for (TranslationSharingOptions o : ust.getSharingOptions()) {
+			if (o.userId == userId) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	// Drops every sharer whose expireTime has passed (sharing duration is over).
+	// Returns true when at least one sharer was removed — the caller decides whether to broadcast METADATA.
+	private boolean removeExpiredSharers(UserTranslation ust) {
+		long now = System.currentTimeMillis();
+		boolean removed = false;
+		for (TranslationSharingOptions o : ust.getSharingOptions()) {
+			if (now >= o.expireTime) {
+				removeSharer(ust, o.userId);
+				removed = true;
+			}
+		}
+		return removed;
+	}
+
+	// Removes userId from the sharers and drops the routing index entry (in-memory and Redis).
+	private void removeSharer(UserTranslation ust, int userId) {
+		ust.getSharingOptions().removeIf(o -> o.userId == userId);
+		Deque<UserTranslation> deque = shareLocTranslationsByUser.get(userId);
+		if (deque != null) {
+			deque.remove(ust);
+		}
+		if (redisTemplate != null) {
+			redisTemplate.opsForSet().remove(REDIS_USER_SHARES_PREFIX + userId, ust.getId());
+		}
+		saveTranslationToRedis(ust);
+	}
+
+	// Announces the current sharer list to the room. METADATA is broadcast only, not persisted to history.
+	private void broadcastMetadata(UserTranslation ust) {
+		UserTranslationPlainObject obj = new UserTranslationPlainObject(ust.getId());
+		obj.setShareLocations(ust);
+		template.convertAndSend(TOPIC_TRANSLATION + ust.getId(),
+				prepareMessageSystem().setType(TranslationMessageType.METADATA).setContent(obj));
 	}
 
 	// Registers (or refreshes) userId as a sharer of the translation with a room-unique nickname.
@@ -490,29 +537,10 @@ public class UserTranslationsService {
 
 	// Stops the user's own broadcast in this translation and announces the updated sharer list.
 	public void stopSharing(UserTranslation ust, CloudUser user, SimpMessageHeaderAccessor headers) {
-		Deque<TranslationSharingOptions> opts = ust.getSharingOptions();
-		Iterator<TranslationSharingOptions> it = opts.iterator();
-		int userId = user.id;
-		while (it.hasNext()) {
-			TranslationSharingOptions opt = it.next();
-			if (opt.userId == userId) {
-				it.remove();
-			}
-		}
+		removeExpiredSharers(ust);
 		// User no longer shares here — drop the routing index entry (in-memory and Redis).
-		Deque<UserTranslation> deque = shareLocTranslationsByUser.get(userId);
-		if (deque != null) {
-			deque.remove(ust);
-		}
-		if (redisTemplate != null) {
-			redisTemplate.opsForSet().remove(REDIS_USER_SHARES_PREFIX + userId, ust.getId());
-		}
-		saveTranslationToRedis(ust);
-		UserTranslationPlainObject obj = new UserTranslationPlainObject(ust.getId());
-		obj.setShareLocations(ust);
-		// METADATA is broadcast only, not persisted to history
-		template.convertAndSend(TOPIC_TRANSLATION + ust.getId(),
-				prepareMessageSystem().setType(TranslationMessageType.METADATA).setContent(obj));
+		removeSharer(ust, user.id);
+		broadcastMetadata(ust);
 	}
 
 	public String sendError(String error, SimpMessageHeaderAccessor headers) {
@@ -524,9 +552,10 @@ public class UserTranslationsService {
 
 	// DELIVERED — point sent
 	// NOT_SHARED — translation exists but isn't actively shared (e.g. paused)
-	// GONE — translation no longer exists (deleted/expired), so the broadcaster should drop its key
+	// EXPIRED — the sender's sharing duration is over; the broadcaster should stop sending
+	// GONE — translation no longer exists (deleted), so the broadcaster should drop its key
 	public enum SendResult {
-		DELIVERED, NOT_SHARED, GONE
+		DELIVERED, NOT_SHARED, EXPIRED, GONE
 	}
 
 	// Normal live broadcast: server stamps the receive time (no client-supplied serverReceiveTime).
@@ -561,9 +590,12 @@ public class UserTranslationsService {
 			}
 		}
 		if (ust != null) {
-			long timeMillis = System.currentTimeMillis();
+			boolean wasSharing = isSharing(ust, userId);
+			if (removeExpiredSharers(ust)) {
+				broadcastMetadata(ust);
+			}
 			for (TranslationSharingOptions o : ust.getSharingOptions()) {
-				if (o.userId == userId && timeMillis < o.expireTime) {
+				if (o.userId == userId) {
 					TranslationMessage msg = prepareMessageAuthor(dev, pu);
 					msg.content = Map.of(ENCRYPTED_DATA, encData);
 					msg.type = TranslationMessageType.LOCATION;
@@ -576,6 +608,10 @@ public class UserTranslationsService {
 					rawSendMessage(ust, msg);
 					return SendResult.DELIVERED;
 				}
+			}
+			if (wasSharing) {
+				// The sender's entry was just dropped as expired — tell the broadcaster to stop.
+				return SendResult.EXPIRED;
 			}
 		}
 
