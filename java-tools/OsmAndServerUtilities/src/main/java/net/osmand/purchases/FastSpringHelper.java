@@ -37,6 +37,7 @@ public class FastSpringHelper {
 	private static final String API_BASE = "https://api.fastspring.com";
 	private static final int CONNECT_TIMEOUT_MILLIS = 15 * 1000;
 	private static final int READ_TIMEOUT_MILLIS = 30 * 1000;
+	private static final Gson GSON = new Gson();
 	protected static final Log LOG = LogFactory.getLog(FastSpringHelper.class);
 
 	/**
@@ -117,16 +118,8 @@ public class FastSpringHelper {
 					+ connection.getResponseCode() + " " + connection.getResponseMessage());
 			return null;
 		}
-		try (InputStream is = connection.getInputStream();
-		     InputStreamReader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
-			StringBuilder sb = new StringBuilder();
-			char[] buf = new char[4096];
-			int n;
-			while ((n = reader.read(buf)) != -1) {
-				sb.append(buf, 0, n);
-			}
-
-			return sb.toString();
+		try (InputStream is = connection.getInputStream()) {
+			return new String(is.readAllBytes(), StandardCharsets.UTF_8);
 		}
 	}
 
@@ -158,7 +151,7 @@ public class FastSpringHelper {
 						connection.getResponseCode() + " " + connection.getResponseMessage());
 				return null;
 			}
-			FastSpringOrder order = new Gson().fromJson(reader, FastSpringOrder.class);
+			FastSpringOrder order = GSON.fromJson(reader, FastSpringOrder.class);
 			if (order == null) {
 				LOG.warn("Failed to get FastSpring order: " + connection.getResponseCode() + " " + connection.getResponseMessage());
 				return null;
@@ -177,7 +170,7 @@ public class FastSpringHelper {
 						connection.getResponseCode() + " " + connection.getResponseMessage());
 				return null;
 			}
-			FastSpringSubscription subscription = new Gson().fromJson(reader, FastSpringSubscription.class);
+			FastSpringSubscription subscription = GSON.fromJson(reader, FastSpringSubscription.class);
 			if (subscription == null) {
 				LOG.warn("Failed to get FastSpring subscription: " + connection.getResponseCode() + " " + connection.getResponseMessage());
 				return null;

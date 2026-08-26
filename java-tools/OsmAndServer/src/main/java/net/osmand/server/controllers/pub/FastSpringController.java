@@ -71,15 +71,15 @@ public class FastSpringController {
 	// https://developer.fastspring.com/reference/webhooks-overview
 	@Transactional
 	@PostMapping("/order-completed")
-	public ResponseEntity<String> handleOrderCompletedEvent(@RequestBody FastSpringOrderCompletedRequest request) {
+	public ResponseEntity<String> handleOrderCompletedEvent(@RequestBody FastSpringWebhookRequest request) {
 		if (request == null || request.events == null) {
 			return ResponseEntity.internalServerError().body("FastSpring: empty request");
 		}
 		return processEventsBatch(request.events, Set.of(EVENT_ORDER_COMPLETED));
 	}
 
-	private ResponseEntity<String> handleOrderCompletedEvent(FastSpringOrderCompletedRequest.Event event) {
-		FastSpringOrderCompletedRequest.Data data = event.data;
+	private ResponseEntity<String> handleOrderCompletedEvent(FastSpringWebhookRequest.Event event) {
+		FastSpringWebhookRequest.Data data = event.data;
 		if (data == null || data.tags == null || data.tags.userEmail == null || data.items == null) {
 			LOGGER.error("FastSpring: order.completed event " + event.id + " without user email or items, skipping");
 			return null;
@@ -92,7 +92,7 @@ public class FastSpringController {
 			String orderId = data.order;
 			int userId = user.id;
 			boolean sendOsmAndAndSpecialGiftEmail = false;
-			for (FastSpringOrderCompletedRequest.Item item : data.items) {
+			for (FastSpringWebhookRequest.Item item : data.items) {
 				String sku = item.sku;
 				LOGGER.info(String.format("FastSpring: hook recorded for user %s %d with orderId: %s, sku: %s, purchaseToken: %s", email, userId, orderId, sku, data.reference));
 				if (FastSpringHelper.productSkuMap.contains(sku)) {
@@ -164,7 +164,7 @@ public class FastSpringController {
 	// https://developer.fastspring.com/reference/webhooks-overview
 	@Transactional
 	@PostMapping("/refund")
-	public ResponseEntity<String> handleRefundEvent(@RequestBody FastSpringOrderCompletedRequest request) {
+	public ResponseEntity<String> handleRefundEvent(@RequestBody FastSpringWebhookRequest request) {
 		if (request == null || request.events == null) {
 			return ResponseEntity.internalServerError().body("FastSpring: empty request");
 		}
@@ -174,10 +174,10 @@ public class FastSpringController {
 	// https://developer.fastspring.com/reference/processed-and-unprocessed-webhook-events
 	// 200 acknowledges the whole batch; on partial failure return 202 with the ids of the processed events
 	// (one per line) so that FastSpring retries only the failed ones.
-	private ResponseEntity<String> processEventsBatch(List<FastSpringOrderCompletedRequest.Event> events, Set<String> handledTypes) {
+	private ResponseEntity<String> processEventsBatch(List<FastSpringWebhookRequest.Event> events, Set<String> handledTypes) {
 		List<String> processedIds = new ArrayList<>();
 		boolean anyFailed = false;
-		for (FastSpringOrderCompletedRequest.Event event : events) {
+		for (FastSpringWebhookRequest.Event event : events) {
 			if (handledTypes.contains(event.type)) {
 				ResponseEntity<String> error = dispatchFastSpringEvent(event);
 				if (error != null) {
@@ -196,8 +196,8 @@ public class FastSpringController {
 		return ResponseEntity.accepted().body(String.join("\n", processedIds));
 	}
 
-	private ResponseEntity<String> handleReturnCreatedEvent(FastSpringOrderCompletedRequest.Event event) {
-		FastSpringOrderCompletedRequest.Data data = event.data;
+	private ResponseEntity<String> handleReturnCreatedEvent(FastSpringWebhookRequest.Event event) {
+		FastSpringWebhookRequest.Data data = event.data;
 		if (data == null || data.original == null || data.original.id == null) {
 			LOGGER.error("FastSpring: return.created event without original order id, skipping");
 			return null;
@@ -209,7 +209,7 @@ public class FastSpringController {
 		}
 		Set<Integer> affectedUserIds = new HashSet<>();
 		boolean matchedAny = false;
-		for (FastSpringOrderCompletedRequest.Item item : data.items) {
+		for (FastSpringWebhookRequest.Item item : data.items) {
 			String sku = item.sku;
 			if (sku == null) {
 				continue;
@@ -270,8 +270,8 @@ public class FastSpringController {
 		return null;
 	}
 
-	private ResponseEntity<String> handleChargebackCreatedEvent(FastSpringOrderCompletedRequest.Event event) {
-		FastSpringOrderCompletedRequest.Data data = event.data;
+	private ResponseEntity<String> handleChargebackCreatedEvent(FastSpringWebhookRequest.Event event) {
+		FastSpringWebhookRequest.Data data = event.data;
 		if (data == null || data.order == null) {
 			LOGGER.error("FastSpring: chargeback.created event without order id, skipping");
 			return null;
@@ -295,13 +295,13 @@ public class FastSpringController {
 			if (json == null) {
 				return;
 			}
-			FastSpringOrderCompletedRequest resp = gson.fromJson(json, FastSpringOrderCompletedRequest.class);
+			FastSpringWebhookRequest resp = gson.fromJson(json, FastSpringWebhookRequest.class);
 			if (resp == null || resp.events == null || resp.events.isEmpty()) {
 				return;
 			}
 			resp.events.sort(Comparator.comparingLong(e -> e.created != null ? e.created : 0L));
 			TransactionTemplate txTemplate = new TransactionTemplate(transactionManager);
-			for (FastSpringOrderCompletedRequest.Event event : resp.events) {
+			for (FastSpringWebhookRequest.Event event : resp.events) {
 				if (event.id == null) {
 					continue;
 				}
@@ -324,7 +324,7 @@ public class FastSpringController {
 		}
 	}
 
-	private ResponseEntity<String> dispatchFastSpringEvent(FastSpringOrderCompletedRequest.Event event) {
+	private ResponseEntity<String> dispatchFastSpringEvent(FastSpringWebhookRequest.Event event) {
 		if (EVENT_RETURN_CREATED.equals(event.type)) {
 			// https://developer.fastspring.com/reference/returncreated
 			return handleReturnCreatedEvent(event);
@@ -408,7 +408,7 @@ public class FastSpringController {
 		}
 	}
 
-	public static class FastSpringOrderCompletedRequest {
+	public static class FastSpringWebhookRequest {
 
 		public List<Event> events;
 
