@@ -136,6 +136,17 @@ public interface DetectorService extends OBFService {
 			object = objects.get(0);
 		}
 		String name = spatialName(object, ctx.locale());
+		if (Algorithms.isEmpty(name) && object instanceof Amenity amenity) {
+			String subtype = amenity.getSubType();
+			if (Algorithms.isNotEmpty(subtype)) {
+				subtype = subtype.split(";", 2)[0];
+				var poiType = amenity.getType() == null ? null : amenity.getType().getPoiTypeByKeyName(subtype);
+				name = poiType == null ? "" : poiType.getTranslation();
+				if (Algorithms.isEmpty(name)) {
+					name = Algorithms.capitalizeFirstLetter(subtype.replace('_', ' '));
+				}
+			}
+		}
 		String extraName = res.getExtraNameMatch();
 		if (object instanceof Building building && building.isInterpolation() && Algorithms.isNotEmpty(extraName)) {
 			name = extraName;
