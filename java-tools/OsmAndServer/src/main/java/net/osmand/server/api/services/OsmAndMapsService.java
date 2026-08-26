@@ -21,8 +21,10 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Map.Entry;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
@@ -32,6 +34,7 @@ import java.util.zip.ZipInputStream;
 
 import javax.annotation.Nullable;
 
+import net.osmand.search.core.spatial.SpatialTextSearch;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.json.JSONArray;
@@ -103,6 +106,7 @@ import net.osmand.server.utils.WebGpxParser;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
+import net.osmand.util.RegionCodeUtils;
 
 @Service
 public class OsmAndMapsService {
@@ -287,7 +291,7 @@ public class OsmAndMapsService {
 	}
 
 	public class BinaryMapIndexReaderReference {
-		File file;
+		private File file;
 		private static final int WAIT_LOCK_CHECK = 10;
 		ConcurrentHashMap<BinaryMapIndexReader, Boolean> readers = new ConcurrentHashMap<>();
 		public FileIndex fileIndex;
@@ -1397,6 +1401,97 @@ public class OsmAndMapsService {
 		return files;
 	}
 
+	public List<BinaryMapIndexReaderReference> getObfReadersByCodes(String maps) throws IOException {
+		initObfReaders();
+		Map<String, BinaryMapIndexReaderReference> byDownloadName = new LinkedHashMap<>();
+		for (BinaryMapIndexReaderReference ref : obfFiles.values()) {
+			byDownloadName.put(getDownloadNameByFileName(ref.file.getName()), ref);
+		}
+		List<BinaryMapIndexReaderReference> res = new ArrayList<>();
+		for (String name : RegionCodeUtils.decode(maps, byDownloadName.keySet())) {
+			res.add(byDownloadName.get(name));
+		}
+		res.add(getBaseMap());
+		LOGGER.info(String.format("Search maps by codes '%s': %d files", maps, res.size()));
+		return res;
+	}
+
+	// all maps within ~.00 km of the point, no count limit.
+	// Union of region-based selection (regions.ocbf) and the regular bbox-intersection selection.
+	public List<BinaryMapIndexReaderReference> getObfReadersForSpatialSearch(double lat, double lon,
+	                                                                         boolean autocomplete) throws IOException {
+		initObfReaders();
+
+		int searchRadiusKm = autocomplete
+				? SpatialTextSearch.SpatialTextSearchSettings.suggestionSettings().SUGGESTED_SEARCH_RADIUS_KM
+				: SpatialTextSearch.SpatialTextSearchSettings.defaultSettings().SUGGESTED_SEARCH_RADIUS_KM;
+		QuadRect llBbox = MapUtils.calculateLatLonBbox(lat, lon, searchRadiusKm * 1000);
+		QuadRect bbox = points(null, new LatLon(llBbox.top, llBbox.left), new LatLon(llBbox.bottom, llBbox.right));
+		Set<File> files = new LinkedHashSet<>();
+
+		// 1. regions overlapping the area (queried from regions.ocbf by bbox) -> their combined bbox
+//		List<String> regionNames = new ArrayList<>();
+//		QuadRect regionBbox = null;
+//		synchronized (osmandRegions) {
+//			for (BinaryMapDataObject o : osmandRegions.query((int) bbox.left, (int) bbox.right, (int) bbox.top, (int) bbox.bottom)) {
+//				regionNames.add(osmandRegions.getDownloadName(o));
+//				for (int i = 0; i < o.getPointsLength(); i++) {
+//					int x = o.getPoint31XTile(i), y = o.getPoint31YTile(i);
+//					if (regionBbox == null) {
+//						regionBbox = new QuadRect(x, y, x, y);
+//					} else {
+//						regionBbox.left = Math.min(regionBbox.left, x);
+//						regionBbox.top = Math.min(regionBbox.top, y);
+//						regionBbox.right = Math.max(regionBbox.right, x);
+//						regionBbox.bottom = Math.max(regionBbox.bottom, y);
+//					}
+//				}
+//			}
+//		}
+//		LOGGER.info("Spatial search regions (" + regionNames.size() + "): " + regionNames);
+
+		// 2. maps covering those regions, selected by bbox intersection
+//		if (regionBbox != null) {
+//			files.addAll(getMaps(bbox));
+//		}
+//		LOGGER.info("Spatial search region maps " + mapsLog(files, lat, lon));
+
+		// 3. + maps within the 400 km bbox (regular selection), then base map
+		files.addAll(getMaps(bbox));
+		files.add(getBaseMap().file);
+		LOGGER.info("Spatial search total maps " + mapsLog(files, lat, lon));
+
+		List<BinaryMapIndexReaderReference> res = new ArrayList<>();
+		for (File f : files) {
+			BinaryMapIndexReaderReference ref = obfFiles.get(f.getAbsolutePath());
+			if (ref != null) {
+				res.add(ref);
+			}
+		}
+		return res;
+	}
+
+	private String mapsLog(Set<File> files, double lat, double lon) {
+		List<String> names = files.stream()
+				.sorted(Comparator.comparingDouble(f -> regionDistance(f, lat, lon)))
+				.map(File::getName).toList();
+		int n = names.size();
+		if (n <= 8) {
+			return n + ": " + names;
+		}
+		return n + ": " + names.subList(0, 5) + " ... " + names.subList(n - 3, n);
+	}
+
+	private double regionDistance(File f, double lat, double lon) {
+		WorldRegion wr = osmandRegions.getRegionDataByDownloadName(getDownloadNameByFileName(f.getName()));
+		List<QuadRect> bounds = wr == null ? null : wr.getAllPolygonsBounds();
+		if (bounds == null || bounds.isEmpty()) {
+			return Double.MAX_VALUE;
+		}
+		QuadRect b = bounds.get(0);
+		return MapUtils.getDistance(lat, lon, (b.top + b.bottom) / 2, (b.left + b.right) / 2);
+	}
+
 	public BinaryMapIndexReaderReference getBaseMap() throws IOException {
 		initObfReaders();
 		for (BinaryMapIndexReaderReference ref : obfFiles.values()) {
@@ -1494,6 +1589,10 @@ public class OsmAndMapsService {
 	}
 
 	public JsonObject getTileInfo(JsonObject tileInfo, int x, int y, int z) {
+		if (tileInfo == null) {
+			return null;
+		}
+
 		JsonObject subInfo = new JsonObject();
 		JsonArray featuresArray = tileInfo.getAsJsonArray("features");
 		JsonArray newFeaturesArray = new JsonArray();

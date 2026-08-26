@@ -3,6 +3,7 @@ package net.osmand.obf;
 
 import com.google.protobuf.CodedOutputStream;
 import com.google.protobuf.WireFormat;
+import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
@@ -11,6 +12,7 @@ import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.CityBlocks;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.CommonWords;
 import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.OsmandOdb;
 import net.osmand.data.*;
@@ -28,7 +30,6 @@ import rtree.RTreeException;
 
 import java.io.*;
 import java.sql.SQLException;
-import java.text.Collator;
 import java.text.MessageFormat;
 import java.util.*;
 import java.util.zip.ZipEntry;
@@ -324,6 +325,14 @@ public class BinaryMerger {
 		}
 	}
 
+	protected boolean shouldMergeCitiesByNameDistance() {
+		return true;
+	}
+
+	protected boolean shouldRegenerateRelationPoiIds() {
+		return true;
+	}
+
 	private List<String> extractCountryAndRegionNames(BinaryMapIndexReader index) {
 		List<String> name = index.getRegionNames();
 		if (name.size() > 0) {
@@ -362,6 +371,17 @@ public class BinaryMerger {
 	}
 
 	private static City mergeCities(City city, City namesake, Map<City, Map<Street, List<Node>>> namesakesStreetNodes) {
+		for (Street s1 : namesake.getStreets()) {
+			int streetIndex = city.getStreets().indexOf(s1);
+			if (streetIndex >= 0) {
+				Street s2 = city.getStreets().get(streetIndex);
+				Long id2 = s2.getId();
+				Long id1 = s1.getId();
+				if (id1 != null && id2 != null) {
+					s2.setId(Math.min(id2, id1));
+				}
+			}
+		}
 		Map<Street, Street> smap = city.mergeWith(namesake);
 		Map<Street, List<Node>> wayNodes = namesakesStreetNodes.get(city);
 		Map<Street, List<Node>> owayNodes = namesakesStreetNodes.get(namesake);
@@ -414,7 +434,7 @@ public class BinaryMerger {
 				}
 				if (nn == null) {
 					int ty = (int) MapUtils.getTileNumberY(24, is.getLocation().getLatitude());
-					int tx = (int) MapUtils.getTileNumberY(24, is.getLocation().getLongitude());
+					int tx = (int) MapUtils.getTileNumberX(24, is.getLocation().getLongitude());
 					long id = (((long) tx << 32)) | ty;
 					nn = new Node(is.getLocation().getLatitude(), is.getLocation().getLongitude(), id);
 					nn.putTag("name", is.getName());
@@ -446,7 +466,7 @@ public class BinaryMerger {
 		List<String> attributeTagsTable = new ArrayList<String>();
 		attributeTagsTable.addAll(attributeTagsTableSet);
 		Map<String, Integer> tagRules = new HashMap<String, Integer>();
-		Map<String, IndexAddressCreator.MapObjectIndex> namesIndex = new TreeMap<String, IndexAddressCreator.MapObjectIndex>(Collator.getInstance());
+		NameIndexCreator<MapObject> namesIndex = new NameIndexCreator<>(CommonWords.getAddrInstance());
 		ListIterator<String> it = attributeTagsTable.listIterator();
 		while (it.hasNext()) {
 			tagRules.put(it.next(), it.previousIndex());
@@ -485,7 +505,9 @@ public class BinaryMerger {
 			List<City> cities = new ArrayList<City>(cityMap.keySet());
 			Map<City, List<City>> mergeCityGroup = new HashMap<City, List<City>>();
 			Collections.sort(cities, MapObject.BY_NAME_COMPARATOR);
-			mergeCitiesByNameDistance(cities, mergeCityGroup, cityMap, cityBlockType == CityBlocks.CITY_TOWN_TYPE);
+			if (shouldMergeCitiesByNameDistance()) {
+				mergeCitiesByNameDistance(cities, mergeCityGroup, cityMap, cityBlockType == CityBlocks.CITY_TOWN_TYPE);
+			}
 			List<BinaryFileReference> refs = new ArrayList<BinaryFileReference>();
 			// 1. write cities
 			writer.startCityBlockIndex(cityBlockType.index);
@@ -503,11 +525,17 @@ public class BinaryMerger {
 				}
 				BinaryFileReference ref = writer.writeCityHeader(city, city.getType().ordinal(), tagRules);
 				refs.add(ref);
-				writer.writeCityIndex(city, city.getStreets(), namesakesStreetNodes.get(city), ref, tagRules);
-				IndexAddressCreator.putNamedMapObject(namesIndex, city, ref.getStartPointer(), settings);
+				TLongObjectHashMap<Long> streetIds = new TLongObjectHashMap<>();
+				for (Street street : city.getStreets()) {
+					if (street.getId() != null && street.getId() > 0) {
+						streetIds.put(street.getId(), street.getId());
+					}
+				}
+				writer.writeCityIndex(city, city.getStreets(), namesakesStreetNodes.get(city), ref, tagRules, streetIds);
+				NameIndexCreator.putAddrNamedMapObject(namesIndex, city, ref.getStartPointer(), settings);
 				if (!city.isPostcode()) {
 					for (Street s : city.getStreets()) {
-						IndexAddressCreator.putNamedMapObject(namesIndex, s, s.getFileOffset(), settings);
+						NameIndexCreator.putAddrNamedMapObject(namesIndex, s, s.getFileOffset(), settings);
 					}
 				}
 
@@ -549,7 +577,7 @@ public class BinaryMerger {
 						@Override
 						public boolean publish(Amenity amenity) {
 							try {
-								boolean isRelation = amenity.getId() < 0;
+								boolean isRelation = amenity.getId() < 0 && shouldRegenerateRelationPoiIds();
 								if (isRelation) {
 									long j = latlon(amenity);
 									List<Amenity> list;

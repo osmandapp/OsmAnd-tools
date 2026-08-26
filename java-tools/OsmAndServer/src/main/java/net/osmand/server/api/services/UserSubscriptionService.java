@@ -43,7 +43,7 @@ public class UserSubscriptionService {
 
 	public static final String OSMAND_PRO_ANDROID_SUBSCRIPTION = UpdateSubscription.OSMAND_PRO_ANDROID_SUBSCRIPTION_PREFIX;
 	public static final String OSMAND_PROMO_SUBSCRIPTION = "promo_";
-	
+
 	private static final String GOOGLE_PACKAGE_NAME = UpdateSubscription.GOOGLE_PACKAGE_NAME;
 	private static final String GOOGLE_PACKAGE_NAME_FREE = UpdateSubscription.GOOGLE_PACKAGE_NAME_FREE;
 	public static final String OSMAND_PRO_IOS_SUBSCRIPTION = UpdateSubscription.OSMAND_PRO_IOS_SUBSCRIPTION_PREFIX;
@@ -187,6 +187,26 @@ public class UserSubscriptionService {
 		}
 	}
 
+	public long latestProExpiry(int userId) {
+		long last = 0;
+		Map<String, PurchasesDataLoader.Subscription> subMap = purchasesDataLoader.getSubscriptions();
+		for (SupporterDeviceSubscription s : subscriptionsRepo.findAllByUserId(userId)) {
+			boolean isPro = s.sku != null && (s.sku.contains(OSMAND_PROMO_SUBSCRIPTION)
+					|| (subMap.get(s.sku) != null && subMap.get(s.sku).isPro()));
+			if (isPro && s.expiretime != null) {
+				last = Math.max(last, s.expiretime.getTime());
+			}
+		}
+		Map<String, PurchasesDataLoader.InApp> inappMap = purchasesDataLoader.getInApps();
+		for (SupporterDeviceInAppPurchase p : inAppPurchasesRepo.findByUserId(userId)) {
+			Date expire = getInappExpireTime(p, inappMap);
+			if (expire != null) {
+				last = Math.max(last, expire.getTime());
+			}
+		}
+		return last;
+	}
+
 	public Date getInappExpireTime(SupporterDeviceInAppPurchase p, Map<String, PurchasesDataLoader.InApp> inappMap) {
 		PurchasesDataLoader.InApp inAppBaseData = inappMap.get(p.sku);
 		if (inAppBaseData == null) {
@@ -215,7 +235,7 @@ public class UserSubscriptionService {
 	}
 
 	private SupporterDeviceSubscription revalidateGoogleSubscription(SupporterDeviceSubscription s) {
-		if (!Algorithms.isEmpty(clientSecretFile) ) {
+		if (!Algorithms.isEmpty(clientSecretFile)) {
 			if (androidPublisher == null) {
 				try {
 					// watch first time you need to open special url on web server
@@ -330,11 +350,11 @@ public class UserSubscriptionService {
 		// Don't validate if subscription is less than 15 minutes old
 		if (s.timestamp != null && FastSpringHelper.isTooEarlyToValidate(s.timestamp.getTime())) {
 			long timeSincePurchase = System.currentTimeMillis() - s.timestamp.getTime();
-			LOG.info(String.format("FastSpring subscription %s - %s is too recent (%d minutes old), skipping validation", 
-				s.sku, s.orderId, timeSincePurchase / (60 * 1000)));
+			LOG.info(String.format("FastSpring subscription %s - %s is too recent (%d minutes old), skipping validation",
+					s.sku, s.orderId, timeSincePurchase / (60 * 1000)));
 			return s;
 		}
-		
+
 		try {
 			FastSpringHelper.FastSpringSubscription fsSub = FastSpringHelper.getSubscriptionByOrderIdAndSku(s.orderId, s.sku);
 			if (fsSub != null) {

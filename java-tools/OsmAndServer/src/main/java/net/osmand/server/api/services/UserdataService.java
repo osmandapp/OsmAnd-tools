@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -49,6 +50,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.google.common.cache.Cache;
@@ -112,6 +116,9 @@ public class UserdataService {
 	@Autowired
 	JdbcTemplate jdbcTemplate;
 
+	@Autowired
+	PlatformTransactionManager transactionManager;
+
     @Autowired
     WebGpxParser webGpxParser;
 
@@ -133,6 +140,8 @@ public class UserdataService {
     public static final long MAXIMUM_ACCOUNT_SIZE = 3000 * MB; // 3 (5 GB - std, 50 GB - ext, 1000 GB - pro)
     private static final String USER_FOLDER_PREFIX = "user-";
     private static final String FILE_NAME_SUFFIX = ".gz";
+    private static final int MAX_FILENAME = 220; // max basename bytes
+    private static final int SHORT_FILENAME = 200; // bytes a too-long basename is shortened to
     private static final String CR_SANITIZE = "$0D"; // \r
     private static final String LF_SANITIZE = "$0A"; // \n
 
@@ -425,6 +434,7 @@ public class UserdataService {
 		usf.deviceid = dev.id;
 		usf.filesize = zipfile.getContentSize();
 		usf.zipfilesize = zipfile.getSize();
+		usf.storagename = computeStorageName(usf.type, usf.name, usf.updatetime);
 		usf.storage = storageService.save(userFolder(usf), storageFileName(usf), zipfile);
 		if (storageService.storeLocally()) {
 			usf.data = zipfile.getBytes();
@@ -443,7 +453,11 @@ public class UserdataService {
     }
 
     public String storageFileName(UserFile uf) {
-        return storageFileName(uf.type, uf.name, uf.updatetime);
+        return Algorithms.isEmpty(uf.storagename) ? storageFileName(uf.type, uf.name, uf.updatetime) : uf.storagename;
+    }
+
+    public String storageFileName(CloudUserFilesRepository.UserFileNoData nd) {
+        return Algorithms.isEmpty(nd.storagename) ? storageFileName(nd.type, nd.name, nd.updatetime) : nd.storagename;
     }
 
     public String storageFileName(String type, String name, Date updatetime) {
@@ -454,6 +468,43 @@ public class UserdataService {
             name = name.substring(nt + 1);
         }
         return fldName + "/" + updatetime.getTime() + "-" + name + FILE_NAME_SUFFIX;
+    }
+
+	// bounded key for a too-long basename (SHORT_FILENAME bytes + name hash); null when the basename already fits
+	public String computeStorageName(String type, String name, Date updatetime) {
+		int nt = name.lastIndexOf('/') + 1;
+		String base = name.substring(nt);
+		if (base.getBytes(StandardCharsets.UTF_8).length <= MAX_FILENAME) {
+			return null;
+		}
+		String shortName = name.substring(0, nt) + shortBasename(base) + "-" + Integer.toHexString(name.hashCode());
+		return storageFileName(type, shortName, updatetime);
+	}
+
+	private static String shortBasename(String base) {
+		byte[] b = base.getBytes(StandardCharsets.UTF_8);
+		if (b.length <= SHORT_FILENAME) {
+			return base;
+		}
+		int end = SHORT_FILENAME;
+		while (end > 0 && (b[end] & 0xC0) == 0x80) {
+			end--;
+		}
+		return new String(b, 0, end, StandardCharsets.UTF_8);
+	}
+
+    // remap an existing file's S3 object to the bounded key and persist storagename; no-op if not needed
+    public void migrateStorageName(UserFile fl) {
+        String bounded = Algorithms.isEmpty(fl.storagename) ? computeStorageName(fl.type, fl.name, fl.updatetime) : null;
+        if (bounded == null) {
+            return;
+        }
+        boolean remapped = storageService.remapFileNames(fl.id, fl.storage, userFolder(fl), storageFileName(fl.type, fl.name, fl.updatetime), bounded);
+        if (!remapped) {
+            return;
+        }
+        fl.storagename = bounded;
+        filesRepository.save(fl);
     }
 
     public ResponseEntity<String> webUserActivate(String email, String token, String password, String lang) {
@@ -743,6 +794,7 @@ public class UserdataService {
         usf.deviceid = dev.id;
         usf.filesize = zipFile.getContentSize();
         usf.zipfilesize = zipFile.getSize();
+        usf.storagename = computeStorageName(usf.type, usf.name, usf.updatetime);
         usf.storage = storageService.save(userFolder(usf), storageFileName(usf), zipFile);
         if (storageService.storeLocally()) {
             usf.data = zipFile.getBytes();
@@ -756,12 +808,44 @@ public class UserdataService {
         return file != null;
     }
     
-    @Transactional
-    public ResponseEntity<String> emptyTrash(List<MapApiController.FileData> files, CloudUserDevicesRepository.CloudUserDevice dev) {
-        for (MapApiController.FileData file : files) {
-            deleteFileAllVersions(dev.userid, file.name, file.type, file.updatetime, true);
+    public ResponseEntity<String> emptyTrash(List<MapApiController.FileData> files,
+                                             CloudUserDevicesRepository.CloudUserDevice dev) {
+        if (files == null) {
+            return ResponseEntity.badRequest().body("Invalid trash file data");
         }
-        return ok();
+        for (MapApiController.FileData file : files) {
+            if (file == null || Algorithms.isEmpty(file.name) || Algorithms.isEmpty(file.type)
+                    || file.updatetime == null) {
+                return ResponseEntity.badRequest().body("Invalid trash file data");
+            }
+        }
+
+        EmptyTrashResponse response = new EmptyTrashResponse(files.size());
+        Map<TrashFileKey, TrashFileResult> processedFiles = new LinkedHashMap<>();
+        // Isolate every logical file so a stale item or a storage failure cannot roll back the whole batch.
+        TransactionTemplate transaction = deletionTransaction();
+        for (MapApiController.FileData file : files) {
+            TrashFileKey key = new TrashFileKey(file.name, file.type);
+            TrashFileResult previousResult = processedFiles.get(key);
+            TrashFileResult result;
+            if (previousResult != null) {
+                result = duplicateTrashFileResult(file, previousResult);
+            } else {
+                try {
+                    result = transaction.execute(status -> deleteTrashFile(dev.userid, file));
+                    if (result == null) {
+                        result = TrashFileResult.failed(file, "Could not delete file versions");
+                    }
+                } catch (RuntimeException e) {
+                    LOG.warn(String.format("Failed to empty Trash for user %d, file %s/%s: %s",
+                            dev.userid, file.type, file.name, e.getMessage()), e);
+                    result = TrashFileResult.failed(file, "Could not delete file versions");
+                }
+                processedFiles.put(key, result);
+            }
+            response.addResult(result);
+        }
+        return ResponseEntity.ok(gson.toJson(response));
     }
 
     private InputStream getGzipInputStreamFromFile(File fp, String ext) throws IOException {
@@ -830,7 +914,11 @@ public class UserdataService {
     }
 
     public InputStream getInputStream(CloudUserFilesRepository.UserFileNoData userFile) {
-        return storageService.getFileInputStream(userFile.storage, userFolder(userFile.userid), storageFileName(userFile.type, userFile.name, userFile.updatetime));
+        return storageService.getFileInputStream(userFile.storage, userFolder(userFile.userid), storageFileName(userFile));
+    }
+
+    public boolean fileExists(CloudUserFilesRepository.UserFile userFile) {
+        return storageService.fileExists(userFile.storage, userFolder(userFile), storageFileName(userFile));
     }
 
     public ResponseEntity<String> tokenNotValidError() {
@@ -874,24 +962,177 @@ public class UserdataService {
         return ok();
     }
     
-    @Transactional
-    public ResponseEntity<String> deleteFileAllVersions(int userid, String fileName, String fileType, Long updatetime, boolean isTrash) {
-        List<UserFile> files = filesRepository.findAllByUseridAndNameAndTypeOrderByUpdatetimeDesc(userid, fileName, fileType);
-        if (files.isEmpty()) {
-            return ResponseEntity.badRequest().body("File not found");
-        }
-        if (isTrash && files.get(0).zipfilesize > 0) {
-            return ResponseEntity.badRequest().body("This is not trash, the file is not deleted");
-        }
-        if (files.get(0).updatetime.getTime() != updatetime) {
-            return ResponseEntity.badRequest().body("File version was changed");
-        }
-        for (UserFile file : files) {
-            storageService.deleteFile(file.storage, userFolder(file), storageFileName(file));
-            filesRepository.delete(file);
-        }
-        return ok();
-    }
+	public ResponseEntity<String> deleteFileAllVersions(int userid, String fileName, String fileType,
+	                                                    Long updatetime, boolean isTrash) {
+		String error = deletionTransaction().execute(status -> {
+			FileVersionsForDeletion versions = prepareVersionsForDeletion(userid, fileName, fileType);
+			String validationError = validateVersionsForDeletion(
+					versions.primaryVersions(), updatetime, isTrash, fileName, fileType);
+			if (validationError == null) {
+				deleteFileVersions(versions.allVersions());
+			}
+			return validationError;
+		});
+		return error == null ? ok() : ResponseEntity.badRequest().body(error);
+	}
+
+	private TrashFileResult deleteTrashFile(int userid, MapApiController.FileData file) {
+		FileVersionsForDeletion versions = prepareVersionsForDeletion(userid, file.name, file.type);
+		if (versions.primaryVersions().isEmpty()) {
+			return TrashFileResult.alreadyMissing(file, "File is already absent");
+		}
+		UserFile latestVersion = versions.primaryVersions().get(0);
+		if (!isDeletedVersion(latestVersion)) {
+			return TrashFileResult.skippedNotTrash(file, "The latest file version is not in Trash");
+		}
+		// A newer tombstone still expresses the same deletion intent, so a timestamp mismatch is not fatal here.
+		deleteFileVersions(versions.allVersions());
+		if (!Objects.equals(file.updatetime, latestVersion.updatetime == null
+				? null : latestVersion.updatetime.getTime())) {
+			return TrashFileResult.deleted(file,
+					"Deleted the current Trash version; the requested version had changed");
+		}
+		return TrashFileResult.deleted(file, null);
+	}
+
+	private FileVersionsForDeletion prepareVersionsForDeletion(int userid, String fileName, String fileType) {
+		List<UserFile> primaryVersions = filesRepository.findAllByUseridAndNameAndTypeOrderByUpdatetimeDesc(
+				userid, fileName, fileType);
+		Map<Long, UserFile> allVersions = new LinkedHashMap<>();
+		for (UserFile file : primaryVersions) {
+			allVersions.put(file.id, file);
+		}
+		// GPX analysis is stored as a separate companion file and must not survive the source GPX.
+		if (FILE_TYPE_GPX.equals(fileType) && !fileName.endsWith(INFO_EXT)) {
+			List<UserFile> infoVersions = filesRepository.findAllByUseridAndNameAndTypeOrderByUpdatetimeDesc(
+					userid, fileName + INFO_EXT, fileType);
+			for (UserFile file : infoVersions) {
+				allVersions.put(file.id, file);
+			}
+		}
+		return new FileVersionsForDeletion(primaryVersions, new ArrayList<>(allVersions.values()));
+	}
+
+	private String validateVersionsForDeletion(List<UserFile> files, Long updatetime, boolean isTrash,
+	                                           String fileName, String fileType) {
+		String fileDescription = fileType + "/" + fileName;
+		if (files.isEmpty()) {
+			return "File not found: " + fileDescription;
+		}
+		UserFile latestVersion = files.get(0);
+		if (isTrash && !isDeletedVersion(latestVersion)) {
+			return "This is not trash, the file is not deleted: " + fileDescription;
+		}
+		if (updatetime == null || latestVersion.updatetime == null
+				|| latestVersion.updatetime.getTime() != updatetime) {
+			return "File version was changed: " + fileDescription;
+		}
+		return null;
+	}
+
+	private boolean isDeletedVersion(UserFile file) {
+		return file.zipfilesize != null && file.zipfilesize <= 0;
+	}
+
+	private void deleteFileVersions(List<UserFile> files) {
+		for (UserFile file : files) {
+			storageService.deleteFile(file.storage, userFolder(file), storageFileName(file));
+			filesRepository.delete(file);
+		}
+	}
+
+	private TransactionTemplate deletionTransaction() {
+		TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+		transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+		return transaction;
+	}
+
+	private TrashFileResult duplicateTrashFileResult(MapApiController.FileData file, TrashFileResult previousResult) {
+		return switch (previousResult.status) {
+			case TrashFileResult.DELETED, TrashFileResult.ALREADY_MISSING ->
+					TrashFileResult.alreadyMissing(file,
+							"Duplicate request item; no additional deletion was needed");
+			case TrashFileResult.SKIPPED_NOT_TRASH ->
+					TrashFileResult.skippedNotTrash(file,
+							"Duplicate request item; the latest file version is not in Trash");
+			default -> TrashFileResult.failed(file, "Duplicate request item; deletion failed");
+		};
+	}
+
+	private record TrashFileKey(String name, String type) {
+	}
+
+	private record FileVersionsForDeletion(List<UserFile> primaryVersions, List<UserFile> allVersions) {
+	}
+
+	private static class EmptyTrashResponse {
+		public final String status = "ok";
+		public final EmptyTrashSummary summary;
+		public final List<TrashFileResult> results = new ArrayList<>();
+
+		private EmptyTrashResponse(int requested) {
+			summary = new EmptyTrashSummary(requested);
+		}
+
+		private void addResult(TrashFileResult result) {
+			results.add(result);
+			switch (result.status) {
+				case TrashFileResult.DELETED -> summary.deleted++;
+				case TrashFileResult.ALREADY_MISSING -> summary.alreadyMissing++;
+				case TrashFileResult.SKIPPED_NOT_TRASH -> summary.skipped++;
+				default -> summary.failed++;
+			}
+		}
+	}
+
+	private static class EmptyTrashSummary {
+		public final int requested;
+		public int deleted;
+		public int alreadyMissing;
+		public int skipped;
+		public int failed;
+
+		private EmptyTrashSummary(int requested) {
+			this.requested = requested;
+		}
+	}
+
+	private static class TrashFileResult {
+		private static final String DELETED = "deleted";
+		private static final String ALREADY_MISSING = "already_missing";
+		private static final String SKIPPED_NOT_TRASH = "skipped_not_trash";
+		private static final String FAILED = "failed";
+
+		public final String name;
+		public final String type;
+		public final Long updatetime;
+		public final String status;
+		public final String message;
+
+		private TrashFileResult(MapApiController.FileData file, String status, String message) {
+			this.name = file.name;
+			this.type = file.type;
+			this.updatetime = file.updatetime;
+			this.status = status;
+			this.message = message;
+		}
+
+		private static TrashFileResult deleted(MapApiController.FileData file, String message) {
+			return new TrashFileResult(file, DELETED, message);
+		}
+
+		private static TrashFileResult alreadyMissing(MapApiController.FileData file, String message) {
+			return new TrashFileResult(file, ALREADY_MISSING, message);
+		}
+
+		private static TrashFileResult skippedNotTrash(MapApiController.FileData file, String message) {
+			return new TrashFileResult(file, SKIPPED_NOT_TRASH, message);
+		}
+
+		private static TrashFileResult failed(MapApiController.FileData file, String message) {
+			return new TrashFileResult(file, FAILED, message);
+		}
+	}
 
     @Transactional
     public ResponseEntity<String> renameFile(String oldName, String newName, String type, CloudUserDevicesRepository.CloudUserDevice dev, boolean saveCopy) throws IOException {
@@ -947,19 +1188,6 @@ public class UserdataService {
             }
         }
         return zipFile;
-    }
-
-    @Transactional
-    public ResponseEntity<String> renameFolder(String folderName, String newFolderName, String type, CloudUserDevicesRepository.CloudUserDevice dev) throws IOException {
-        Iterable<UserFile> files = filesRepository.findLatestFilesByFolderName(dev.userid, folderName + "/", type);
-        for (UserFile file : files) {
-            String newName = file.name.replaceFirst(Pattern.quote(folderName), newFolderName);
-            ResponseEntity<String> response = renameFile(file.name, newName, type, dev, false);
-            if (!response.getStatusCode().is2xxSuccessful()) {
-                return response;
-            }
-        }
-        return ok();
     }
 
     @Transactional
@@ -1392,7 +1620,7 @@ public class UserdataService {
 	}
 
 	public UserdataController.UserFilesResults generateGpxFilesByQuadTiles(int userId, boolean allVersions, String[] tiles) {
-		String query = "SELECT u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize, u.storage " +
+		String query = "SELECT u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize, u.storage, u.storagename " +
 				"FROM user_files u " +
 				"WHERE u.userid = ? " +
 				"AND u.type = 'GPX' " +
@@ -1414,8 +1642,9 @@ public class UserdataService {
 			Long fileSize = (Long) row.get("filesize");
 			Long zipFileSize = (Long) row.get("zipfilesize");
 			String storage = (String) row.get("storage");
+			String storagename = (String) row.get("storagename");
 
-			userFileNoDataList.add(new UserFileNoData(id, uId, deviceId, type, name, updateTime, clientTime, fileSize, zipFileSize, storage, null));
+			userFileNoDataList.add(new UserFileNoData(id, uId, deviceId, type, name, updateTime, clientTime, fileSize, zipFileSize, storage, null, storagename));
 		}
 
 		sanitizeFileNames(userFileNoDataList);

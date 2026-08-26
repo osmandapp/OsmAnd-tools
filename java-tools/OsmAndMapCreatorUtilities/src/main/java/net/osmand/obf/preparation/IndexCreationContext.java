@@ -43,8 +43,11 @@ public class IndexCreationContext {
 
 	IndexCreationContext(IndexCreator indexCreator, String regionName, boolean basemap) {
 		this.indexCreator = indexCreator;
-		this.allRegions = prepareRegions();
 		this.basemap = basemap;
+        if (indexCreator.getSettings().indexCountryRegions) {
+            return;
+        }
+        this.allRegions = prepareRegions();
 		if (regionName != null) {
 			this.translitJapaneseNames = regionName.toLowerCase().startsWith(JAPAN);
 			this.translitChineseNames = regionName.toLowerCase().startsWith(CHINA);
@@ -137,8 +140,13 @@ public class IndexCreationContext {
 
 	public void translitJapaneseNames(Entity e) {
 		if (needTranslitName(e, e.getTags(), translitJapaneseNames, JAPAN)) {
-			e.putTag(OSMTagKey.NAME_EN.getValue(),
-					JapaneseTranslitHelper.getEnglishTransliteration(e.getTag(OSMTagKey.NAME.getValue())));
+			String ltn = e.getTag("name:ja-latn");
+			if (!Algorithms.isEmpty(ltn)) {
+				e.putTag(OSMTagKey.NAME_EN.getValue(), ltn);
+			} else {
+				e.putTag(OSMTagKey.NAME_EN.getValue(),
+						JapaneseTranslitHelper.getEnglishTransliteration(e.getTag(OSMTagKey.NAME.getValue())));
+			}
 		}
 	}
 

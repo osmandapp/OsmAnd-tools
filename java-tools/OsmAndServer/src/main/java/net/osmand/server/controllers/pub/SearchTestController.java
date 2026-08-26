@@ -1,19 +1,22 @@
 package net.osmand.server.controllers.pub;
 
 import jakarta.servlet.http.HttpServletResponse;
+import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.server.api.services.search.ClassicSearchService;
 import net.osmand.server.SearchTestRepositoryConfiguration;
 import net.osmand.server.api.searchtest.BaseService.GenParam;
+import net.osmand.server.api.searchtest.AnalystService;
+import net.osmand.server.api.searchtest.DetectorService;
 import net.osmand.server.api.searchtest.OBFService;
 import net.osmand.server.api.searchtest.ReportService.RunStatus;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
-import net.osmand.server.api.services.SearchService;
-import net.osmand.server.api.services.SearchTestService.TestCaseItem;
+import net.osmand.server.api.services.search.SearchTestService.TestCaseItem;
 import net.osmand.server.api.searchtest.ReportService.TestCaseStatus;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository.Dataset;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.RunParam;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.TestCase;
-import net.osmand.server.api.services.SearchTestService;
+import net.osmand.server.api.services.search.SearchTestService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -28,17 +31,63 @@ import org.springframework.web.server.ResponseStatusException;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Controller
 @RequestMapping(path = "/admin/search-test")
 public class SearchTestController {
+	@ExceptionHandler(ResponseStatusException.class)
+	@ResponseBody
+	public ResponseEntity<Map<String, String>> handleResponseStatusException(ResponseStatusException e) {
+        if (e.getReason() != null) {
+            return ResponseEntity.status(e.getStatusCode()).body(Map.of("message", e.getReason()));
+        }
+        return null;
+    }
 
-	public record RunTestCaseRequest(RunParam payload, SearchService.SearchOption options) {}
+	public record RunTestCaseRequest(RunParam payload, ClassicSearchService.SearchOption options) {}
+	public record ObfSelection(String obfPath, List<String> obfs) {}
+	public record DetectorSearchRequest(ObfSelection selection, ClassicSearchService.SearchOption options) {}
+	public record DetectorUnitTestRequest(ObfSelection selection, DetectorService.UnitTestPayload unitTest) {}
+	public record IndexSuffixPayload(ObfSelection selection, OBFService.IndexSuffixRequest request) {}
+	public record ObjectsPayload(ObfSelection selection, OBFService.IndexToken token) {}
+	public record GenerateDbJobResponse(String jobId) {}
+	public record CreateTagsDatasourceRequest(String name, Boolean overwrite, List<String> obfs,
+											  Boolean skipObjectTags, Boolean skipNewTokens,
+											  Boolean skipTokenInTagValue) {}
+	public record GenerateDbJobStatus(String jobId, String status, String obfName, int obfIndex, int totalObfs,
+									  int processedTokens, int totalTokens, long elapsedMs, long estimatedMs,
+									  boolean downloadReady, String error, List<OBFService.GenerateDbObfProgress> obfs) {}
+
+	private static final ConcurrentHashMap<String, GenerateDbJob> GENERATE_DB_JOBS = new ConcurrentHashMap<>();
+
+	private static class GenerateDbJob {
+		volatile String status = "PENDING";
+		volatile String obfName = "";
+		volatile int obfIndex = 0;
+		volatile int totalObfs = 0;
+		volatile int processedTokens = 0;
+		volatile int totalTokens = 0;
+		volatile long elapsedMs = 0;
+		volatile long estimatedMs = -1;
+		volatile String error = null;
+		volatile List<OBFService.GenerateDbObfProgress> obfs = Collections.emptyList();
+		volatile Path zipFile = null;
+		volatile String datasourceName = null;
+		volatile boolean cancelRequested = false;
+		volatile CompletableFuture<Void> future = null;
+	}
 
 	@Autowired
 	private SearchTestRepositoryConfiguration dbCfg;
@@ -122,8 +171,8 @@ public class SearchTestController {
 	public CompletableFuture<ResponseEntity<Run>> runTestCase(@PathVariable Long caseId,
 															  @RequestBody RunTestCaseRequest request) {
 		RunParam payload = request == null || request.payload == null ? new RunParam() : request.payload;
-		SearchService.SearchOption options = request == null || request.options == null
-				? new SearchService.SearchOption(false, null, null, false,(net.osmand.search.core.ObjectType[]) null)
+		ClassicSearchService.SearchOption options = request == null || request.options == null
+				? new ClassicSearchService.SearchOption(false, null, null, false, true, (net.osmand.search.core.ObjectType[]) null)
 				: request.options;
 		return testSearchService.runTestCase(caseId, payload, options).thenApply(ResponseEntity::ok);
 	}
@@ -348,45 +397,74 @@ public class SearchTestController {
 	public ResponseEntity<List<String>> getOBFs(
 			@RequestParam(required = false) Double radius,
 			@RequestParam(required = false) Double lat,
-			@RequestParam(required = false) Double lon) throws IOException {
-		return ResponseEntity.ok(testSearchService.getOBFs(radius, lat, lon));
+			@RequestParam(required = false) Double lon,
+			@RequestParam(required = false) String obfPath) throws IOException {
+		String normalizedObfPath = obfPath == null ? null : obfPath.trim();
+		if (normalizedObfPath != null && !normalizedObfPath.isBlank()) {
+			try {
+				if (!Files.isDirectory(Path.of(normalizedObfPath))) {
+					throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OBF Location Dir is not a valid directory: " + normalizedObfPath);
+				}
+			} catch (InvalidPathException e) {
+				throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OBF Location Dir is not a valid path: " + normalizedObfPath);
+			}
+		}
+		return ResponseEntity.ok(testSearchService.getOBFs(radius, lat, lon, normalizedObfPath));
 	}
 
-	@GetMapping(value = "/addresses", produces = MediaType.APPLICATION_JSON_VALUE)
+	@GetMapping(value = "/obf-tags", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<List<Record>> getAddresses(@RequestParam String obf,
+	public ResponseEntity<List<OBFService.ObfFileInfo>> getObfTags() throws IOException {
+		return ResponseEntity.ok(testSearchService.getObfFileInfos());
+	}
+
+	@PostMapping(value = "/addresses", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<List<Record>> getAddresses(@RequestBody ObfSelection selection,
 	                 @RequestParam(required = false, defaultValue = "false") Boolean includesBoundaryAndPostcode,
 	                 @RequestParam(required = false) String lang,
 	                 @RequestParam(required = false) String cityRegExp,
 	                 @RequestParam(required = false) String streetRegExp,
 	                 @RequestParam(required = false) String houseRegExp,
 	                 @RequestParam(required = false) String poiRegExp) {
-		return ResponseEntity.ok(testSearchService.getAddresses(obf, lang == null ? "en" : lang,
+		List<String> selectedObfs = resolveObfs(selection);
+		if (selectedObfs.size() == 1) {
+			return ResponseEntity.ok(testSearchService.getAddresses(selectedObfs.get(0), lang == null ? "en" : lang,
+					includesBoundaryAndPostcode != null && includesBoundaryAndPostcode,
+					cityRegExp, streetRegExp, houseRegExp, poiRegExp));
+		}
+		return ResponseEntity.ok(testSearchService.getAddresses(selectedObfs, lang == null ? "en" : lang,
 				includesBoundaryAndPostcode != null && includesBoundaryAndPostcode,
 				cityRegExp, streetRegExp, houseRegExp, poiRegExp));
 	}
 
-	@GetMapping(value = "/sections", produces = MediaType.APPLICATION_JSON_VALUE)
+	@PostMapping(value = "/sections", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<Map<String, long[]>> getSectionSizes(@RequestParam String obf,
+	public ResponseEntity<Map<String, long[]>> getSectionSizes(@RequestBody ObfSelection selection,
 	                                                        @RequestParam(required = false) String fieldPath) {
-		return ResponseEntity.ok(testSearchService.getSectionSizes(obf, fieldPath));
+		List<String> selectedObfs = resolveObfs(selection);
+		if (selectedObfs.size() == 1) {
+			return ResponseEntity.ok(testSearchService.getSectionSizes(selectedObfs.get(0), fieldPath));
+		}
+		return ResponseEntity.ok(testSearchService.getSectionSizes(selectedObfs, fieldPath));
 	}
 
 	@PostMapping(value = "/search", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<OBFService.ResultsWithStats> getResults(
+	public ResponseEntity<DetectorService.ResultsWithStats> getSearchResults(
 			@RequestParam String query,
 			@RequestParam(required = false) String lang,
 			@RequestParam() Double lat,
 			@RequestParam() Double lon,
-			@RequestBody SearchService.SearchOption options) throws IOException {
+			@RequestParam(required = false, defaultValue = "false") Boolean spatial,
+			@RequestBody DetectorSearchRequest request) throws IOException {
 		if (query == null || lat == null || lon == null) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'query', 'lat' and 'lon' are required");
-		}
+        }
 
-        SearchService.SearchContext ctx = new SearchService.SearchContext(lat, lon, query, lang, false, null, null);
-		return ResponseEntity.ok(testSearchService.getResults(ctx, options));
+		ClassicSearchService.SearchContext ctx = new ClassicSearchService.SearchContext(lat, lon, query, lang, false, null, null);
+		List<BinaryMapIndexReader> readers = openCustomObfReaders(request.selection(), request.options().getRadius(), lat, lon, Boolean.TRUE.equals(spatial));
+		return ResponseEntity.ok(testSearchService.getSearchResults(ctx, request.options(), spatial, readers));
 	}
 
 	@PostMapping(value = "/unit-test", produces = "application/zip")
@@ -395,32 +473,76 @@ public class SearchTestController {
 			@RequestParam String query,
 			@RequestParam() Double lat,
 			@RequestParam() Double lon,
-			@RequestBody(required = false) OBFService.UnitTestPayload unitTest,
+			@RequestParam() Boolean spatial,
+			@RequestParam(required = false) Double radius,
+			@RequestBody(required = false) DetectorUnitTestRequest request,
 			HttpServletResponse response) throws IOException, SQLException {
+		DetectorService.UnitTestPayload unitTest = request == null ? null : request.unitTest();
 		if (unitTest == null || unitTest.name() == null || query == null || lat == null || lon == null) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'unit-test name', 'query', 'lat' and 'lon' are required");
+		}
+		if (unitTest.quote() != null && !(unitTest.quote() >= 0.0 && unitTest.quote() <= 1.0)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Quote must be between 0.0 and 1.0");
+		}
+		if (unitTest.radius() != null && unitTest.radius() < 0) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Radius must be 0 or greater");
+		}
+		if (radius == null) {
+			radius = Boolean.TRUE.equals(spatial) ? 400.0 : 1.5;
 		}
 		response.setContentType("application/zip");
 		response.setHeader("Content-Disposition", "attachment; filename=\"" + unitTest.name() + ".zip\"");
 		testSearchService.createUnitTest(unitTest,
-				new SearchService.SearchContext(lat, lon, query, null, false, null, null),
-				response.getOutputStream());
+				new ClassicSearchService.SearchContext(lat, lon, query, null, false, null, null),
+				radius, response.getOutputStream(), spatial,
+				openCustomObfReaders(request.selection(), radius, lat, lon, Boolean.TRUE.equals(spatial)));
 	}
 
-	@GetMapping(value = "/index", produces = MediaType.APPLICATION_JSON_VALUE)
+	@PostMapping(value = "/index", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<OBFService.IndexTokenPage> getIndex(@RequestParam String obf,
+	public ResponseEntity<OBFService.IndexTokenPage> getIndex(@RequestBody ObfSelection selection,
 															  @RequestParam(required = false) String prefix,
 															  @RequestParam(defaultValue = "0") int pageToShow,
 															  @RequestParam(defaultValue = "100") int pageSizeLimit,
 															  @RequestParam(required = false) String sortBy,
-															  @RequestParam(required = false) String sortOrder) {
-		return ResponseEntity.ok(testSearchService.getIndex(obf, prefix, pageToShow, pageSizeLimit, sortBy, sortOrder));
+															  @RequestParam(required = false) String sortOrder,
+															  @RequestParam(required = false) String objectType) {
+		List<String> selectedObfs = resolveObfs(selection);
+		if (selectedObfs.size() == 1) {
+			return ResponseEntity.ok(testSearchService.getIndex(selectedObfs.get(0), prefix, pageToShow, pageSizeLimit, sortBy, sortOrder, objectType));
+		}
+		return ResponseEntity.ok(testSearchService.getIndex(selectedObfs, prefix, pageToShow, pageSizeLimit, sortBy, sortOrder, objectType));
 	}
 
-	@PostMapping(value = "/objects", produces = MediaType.APPLICATION_JSON_VALUE)
+	@PostMapping(value = "/index/suffix", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<OBFService.ObjectAddressPage> getObjects(@RequestParam String obf,
+	public ResponseEntity<OBFService.IndexSuffixResponse> getIndexSuffix(@RequestBody IndexSuffixPayload payload) {
+		List<String> selectedObfs = resolveObfs(payload.selection());
+		OBFService.IndexSuffixResponse suffixes = selectedObfs.size() == 1
+				? testSearchService.getIndexSuffix(selectedObfs.get(0), payload.request())
+				: testSearchService.getIndexSuffix(selectedObfs, payload.request());
+		return ResponseEntity.ok(suffixes);
+	}
+
+	@PostMapping(value = "/index/suffix-sort", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<OBFService.IndexTokenPage> getIndexSuffixSort(@RequestBody ObfSelection selection,
+																		@RequestParam(required = false) String prefix,
+																		@RequestParam(defaultValue = "0") int pageToShow,
+																		@RequestParam(defaultValue = "100") int pageSizeLimit,
+																		@RequestParam(required = false) String sortBy,
+																		@RequestParam(required = false) String sortOrder,
+																		@RequestParam(required = false) String objectType) {
+		List<String> selectedObfs = resolveObfs(selection);
+		if (selectedObfs.size() == 1) {
+			return ResponseEntity.ok(testSearchService.getIndexSuffixSort(selectedObfs.get(0), prefix, pageToShow, pageSizeLimit, sortBy, sortOrder, objectType));
+		}
+		return ResponseEntity.ok(testSearchService.getIndexSuffixSort(selectedObfs, prefix, pageToShow, pageSizeLimit, sortBy, sortOrder, objectType));
+	}
+
+	@PostMapping(value = "/objects", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<OBFService.ObjectAddressPage> getObjects(@RequestBody ObjectsPayload payload,
 																 @RequestParam(required = false) String lang,
 																 @RequestParam(required = false) String regExp,
 																 @RequestParam(defaultValue = "0") int pageToShow,
@@ -429,9 +551,372 @@ public class SearchTestController {
 																 @RequestParam(required = false) String sortOrder,
 																 @RequestParam(defaultValue = "true") boolean isFiltered,
 																 @RequestParam(defaultValue = "false") boolean invalidOnly,
-																 @RequestParam(required = false) String objectType,
-																 @RequestBody OBFService.IndexToken token) {
-		OBFService.ObjectAddressPage objects = testSearchService.getObjects(obf, lang == null ? "en" : lang, token, regExp, pageToShow, pageSizeLimit, sortBy, sortOrder, isFiltered, invalidOnly, objectType);
+																 @RequestParam(required = false) String objectType) {
+		List<String> selectedObfs = resolveObfs(payload.selection());
+		OBFService.ObjectAddressPage objects = selectedObfs.size() == 1
+				? testSearchService.getObjects(selectedObfs.get(0), lang == null ? "en" : lang, payload.token(), regExp, pageToShow, pageSizeLimit, sortBy, sortOrder, isFiltered, invalidOnly, objectType)
+				: testSearchService.getObjects(selectedObfs, lang == null ? "en" : lang, payload.token(), regExp, pageToShow, pageSizeLimit, sortBy, sortOrder, isFiltered, invalidOnly, objectType);
 		return ResponseEntity.ok(objects);
+	}
+
+	private List<String> resolveObfs(ObfSelection selection) {
+		List<String> selected = new ArrayList<>();
+		if (selection != null && selection.obfs() != null) {
+			Path directory = selection.obfPath() == null || selection.obfPath().isBlank()
+					? null : Path.of(selection.obfPath()).toAbsolutePath().normalize();
+			for (String item : selection.obfs()) {
+				if (item != null && !item.isBlank()) {
+					if (directory == null) {
+						selected.add(item);
+					} else {
+						Path file = directory.resolve(item).normalize();
+						if (!file.getParent().equals(directory) || !Files.isRegularFile(file) || !file.getFileName().toString().toLowerCase().endsWith(".obf")) {
+							throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid OBF selection: " + item);
+						}
+						selected.add(file.toString());
+					}
+				}
+			}
+		}
+		if (selected.isEmpty()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OBF selection is required");
+		}
+		return selected;
+	}
+
+	private List<BinaryMapIndexReader> openCustomObfReaders(ObfSelection selection, double radius, double lat, double lon,
+	                                                       boolean spatial) throws IOException {
+		if (selection == null || selection.obfPath() == null || selection.obfPath().isBlank()) {
+			return null;
+		}
+		Path directory;
+		try {
+			directory = Path.of(selection.obfPath()).toAbsolutePath().normalize();
+		} catch (InvalidPathException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OBF Custom Dir is not a valid path");
+		}
+		if (!Files.isDirectory(directory)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OBF Custom Dir is not a valid directory!");
+		}
+		List<String> obfs = testSearchService.getCustomOBFs(radius, lat, lon, spatial, directory.toString());
+		return testSearchService.openObfReaders(obfs);
+	}
+
+	@PostMapping(value = "/generate", produces = "application/zip")
+	@ResponseBody
+	public void generateDb(
+			@RequestBody(required = false) List<String> OBFs,
+			HttpServletResponse response) throws IOException, SQLException {
+		if (OBFs == null || OBFs.isEmpty()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'OBF file list' is required");
+		}
+		response.setContentType("application/zip");
+		response.setHeader("Content-Disposition", "attachment; filename=\"db.zip\"");
+		testSearchService.generateDb(OBFs, response.getOutputStream());
+	}
+
+	@PostMapping(value = "/generate/start", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<GenerateDbJobResponse> startGenerateDb(@RequestBody(required = false) List<String> OBFs) {
+		if (OBFs == null || OBFs.isEmpty()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'OBF file list' is required");
+		}
+		String jobId = UUID.randomUUID().toString();
+		GenerateDbJob job = new GenerateDbJob();
+		job.totalObfs = OBFs.size();
+		GENERATE_DB_JOBS.put(jobId, job);
+		CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+			try {
+				Path zipFile = Files.createTempFile("search-test-db-", ".zip");
+				job.zipFile = zipFile;
+				job.status = "RUNNING";
+				try (java.io.OutputStream outputStream = Files.newOutputStream(zipFile)) {
+					testSearchService.generateDb(OBFs, outputStream, progress -> {
+						if (job.cancelRequested) {
+							throw new CancellationException("Generate DB job was canceled");
+						}
+						job.status = progress.status();
+						job.obfName = progress.obfName();
+						job.obfIndex = progress.obfIndex();
+						job.totalObfs = progress.totalObfs();
+						job.processedTokens = progress.processedTokens();
+						job.totalTokens = progress.totalTokens();
+						job.elapsedMs = progress.elapsedMs();
+						job.estimatedMs = progress.estimatedMs();
+						job.error = progress.error();
+						job.obfs = progress.obfs() == null ? Collections.emptyList() : progress.obfs();
+					});
+				}
+				if (job.cancelRequested) {
+					job.status = "CANCELED";
+				} else {
+					job.status = "DONE";
+					job.estimatedMs = 0;
+				}
+			} catch (CancellationException e) {
+				job.status = "CANCELED";
+				job.error = null;
+			} catch (Exception e) {
+				if (job.cancelRequested) {
+					job.status = "CANCELED";
+					job.error = null;
+				} else {
+					job.status = "FAILED";
+					job.error = e.getMessage();
+				}
+			} finally {
+				if ("CANCELED".equals(job.status) && job.zipFile != null) {
+					try {
+						Files.deleteIfExists(job.zipFile);
+						job.zipFile = null;
+					} catch (IOException ignored) {
+					}
+				}
+			}
+		});
+		job.future = future;
+		return ResponseEntity.ok(new GenerateDbJobResponse(jobId));
+	}
+
+	@GetMapping(value = "/tags-datasources", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<List<OBFService.Datasource>> getTagsDatasources() throws IOException {
+		return ResponseEntity.ok(testSearchService.getTagsDatasources());
+	}
+
+	@PostMapping(value = "/tags-datasources/start", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<GenerateDbJobResponse> startTagsDatasource(@RequestBody CreateTagsDatasourceRequest request) {
+		if (request == null || request.obfs() == null || request.obfs().isEmpty()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'OBF file list' is required");
+		}
+		if (request.name() == null || request.name().trim().isEmpty()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Datasource name is required");
+		}
+		String jobId = UUID.randomUUID().toString();
+		GenerateDbJob job = new GenerateDbJob();
+		job.totalObfs = request.obfs().size();
+		job.datasourceName = request.name();
+		GENERATE_DB_JOBS.put(jobId, job);
+		CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+			try {
+				job.status = "RUNNING";
+				AnalystService.GenerateDbOptions options = new AnalystService.GenerateDbOptions(
+						Boolean.TRUE.equals(request.skipObjectTags()), Boolean.TRUE.equals(request.skipNewTokens()),
+						Boolean.TRUE.equals(request.skipTokenInTagValue()));
+				testSearchService.createTagsDatasource(request.name(), request.obfs(), Boolean.TRUE.equals(request.overwrite()), progress -> {
+					if (job.cancelRequested) {
+						throw new CancellationException("Generate DB job was canceled");
+					}
+					job.status = progress.status();
+					job.obfName = progress.obfName();
+					job.obfIndex = progress.obfIndex();
+					job.totalObfs = progress.totalObfs();
+					job.processedTokens = progress.processedTokens();
+					job.totalTokens = progress.totalTokens();
+					job.elapsedMs = progress.elapsedMs();
+					job.estimatedMs = progress.estimatedMs();
+					job.error = progress.error();
+					job.obfs = progress.obfs() == null ? Collections.emptyList() : progress.obfs();
+				}, options);
+				job.status = job.cancelRequested ? "CANCELED" : "DONE";
+				job.estimatedMs = 0;
+			} catch (CancellationException e) {
+				job.status = "CANCELED";
+				job.error = null;
+			} catch (Exception e) {
+				job.status = job.cancelRequested ? "CANCELED" : "FAILED";
+				job.error = job.cancelRequested ? null : e.getMessage();
+			}
+		});
+		job.future = future;
+		return ResponseEntity.ok(new GenerateDbJobResponse(jobId));
+	}
+
+	@DeleteMapping(value = "/tags-datasources/{name}")
+	@ResponseBody
+	public ResponseEntity<Void> deleteTagsDatasource(@PathVariable String name) throws IOException {
+		return testSearchService.deleteTagsDatasource(name) ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
+	}
+
+	@GetMapping(value = "/tags-datasources/{name}/download", produces = "application/zip")
+	@ResponseBody
+	public void downloadTagsDatasource(@PathVariable String name, HttpServletResponse response) throws IOException {
+		response.setContentType("application/zip");
+		response.setHeader("Content-Disposition", "attachment; filename=\"" + name + ".zip\"");
+		testSearchService.downloadTagsDatasource(name, response.getOutputStream());
+	}
+
+	@GetMapping(value = "/tags-datasources/{name}/tokens", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<OBFService.DbTokenPage> getTagsDbTokens(@PathVariable String name,
+	                                                              @RequestParam(required = false) String prefix,
+	                                                              @RequestParam(defaultValue = "all") String objectType,
+	                                                              @RequestParam(defaultValue = "false") boolean perObf,
+	                                                              @RequestParam(required = false) String tag,
+	                                                              @RequestParam(required = false) List<String> values,
+	                                                              @RequestParam(defaultValue = "0") int pageToShow,
+	                                                              @RequestParam(defaultValue = "100") int pageSizeLimit,
+	                                                              @RequestParam(required = false) String sortBy,
+	                                                              @RequestParam(required = false) String sortOrder) throws IOException, SQLException {
+		try {
+			return ResponseEntity.ok(testSearchService.getTagsDbTokens(name, prefix, objectType, perObf, tag, values, pageToShow, pageSizeLimit, sortBy, sortOrder));
+		} catch (SQLException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
+		}
+	}
+
+	@GetMapping(value = "/tags-datasources/{name}/tags", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<List<OBFService.DbTagName>> getTagsDbTagNames(@PathVariable String name) throws IOException, SQLException {
+		try {
+			return ResponseEntity.ok(testSearchService.getTagsDbTagNames(name));
+		} catch (SQLException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
+		}
+	}
+
+	@GetMapping(value = "/tags-datasources/{name}/tag-values", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<List<OBFService.DbTagValue>> getTagsDbTagValues(@PathVariable String name,
+	                                                                      @RequestParam String tag) throws IOException, SQLException {
+		try {
+			return ResponseEntity.ok(testSearchService.getTagsDbTagValues(name, tag));
+		} catch (SQLException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
+		}
+	}
+
+	@GetMapping(value = "/tags-datasources/{name}/objects", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<OBFService.DbObjectPage> getTagsDbObjects(@PathVariable String name,
+	                                                                @RequestParam long tokenId,
+	                                                                @RequestParam(defaultValue = "all") String objectType,
+	                                                                @RequestParam(defaultValue = "false") boolean perObf,
+	                                                                @RequestParam(required = false) String regExp,
+	                                                                @RequestParam(required = false) String tag,
+	                                                                @RequestParam(required = false) List<String> values,
+	                                                                @RequestParam(defaultValue = "0") int pageToShow,
+	                                                                @RequestParam(defaultValue = "100") int pageSizeLimit,
+	                                                                @RequestParam(required = false) String sortBy,
+	                                                                @RequestParam(required = false) String sortOrder) throws IOException, SQLException {
+		try {
+			return ResponseEntity.ok(testSearchService.getTagsDbObjects(name, tokenId, objectType, perObf, regExp, tag, values, pageToShow, pageSizeLimit, sortBy, sortOrder));
+		} catch (SQLException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
+		}
+	}
+
+	@GetMapping(value = "/tags-datasources/{name}/address-poi-objects", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<OBFService.DbObjectPage> getTagsDbAddressPoiObjects(@PathVariable String name,
+	                                                                          @RequestParam String objectType,
+	                                                                          @RequestParam(required = false) String regExp,
+	                                                                          @RequestParam(required = false) String tokenFind,
+	                                                                          @RequestParam(required = false) String tag,
+	                                                                          @RequestParam(required = false) List<String> values,
+	                                                                          @RequestParam(defaultValue = "false") boolean perObf,
+	                                                                          @RequestParam(defaultValue = "0") int pageToShow,
+	                                                                          @RequestParam(defaultValue = "100") int pageSizeLimit,
+	                                                                          @RequestParam(required = false) String sortBy,
+	                                                                          @RequestParam(required = false) String sortOrder) throws IOException, SQLException {
+		try {
+			return ResponseEntity.ok(testSearchService.getTagsDbAddressPoiObjects(name, objectType, regExp, tokenFind, tag, values, perObf, pageToShow, pageSizeLimit, sortBy, sortOrder));
+		} catch (SQLException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
+		}
+	}
+
+	@GetMapping(value = "/tags-datasources/{name}/object-tokens", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<OBFService.DbObjectTokenPage> getTagsDbObjectTokens(@PathVariable String name,
+	                                                                          @RequestParam long objectId,
+	                                                                          @RequestParam(required = false) String find,
+	                                                                          @RequestParam(defaultValue = "0") int pageToShow,
+	                                                                          @RequestParam(defaultValue = "100") int pageSizeLimit,
+	                                                                          @RequestParam(required = false) String sortBy,
+	                                                                          @RequestParam(required = false) String sortOrder) throws IOException, SQLException {
+		try {
+			return ResponseEntity.ok(testSearchService.getTagsDbObjectTokens(name, objectId, find, pageToShow, pageSizeLimit, sortBy, sortOrder));
+		} catch (SQLException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
+		}
+	}
+
+	@GetMapping(value = "/tags-datasources/{name}/report", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<OBFService.DbReport> getReport(@PathVariable String name,
+	                                                     @RequestParam(defaultValue = "all") String objectType,
+	                                                     @RequestParam(defaultValue = "all") String pruneGenerated,
+	                                                     @RequestParam(defaultValue = "desc") String pruneSort,
+	                                                     @RequestParam(defaultValue = "-1") long bucketMin,
+	                                                     @RequestParam(defaultValue = "-1") long bucketMax) throws IOException, SQLException {
+		try {
+			return ResponseEntity.ok(testSearchService.getReport(name, objectType, pruneGenerated, pruneSort, bucketMin, bucketMax));
+		} catch (SQLException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
+		}
+	}
+
+	@GetMapping(value = "/tags-datasources/{name}/test-cases", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<List<OBFService.TestCaseObject>> getTestCases(@PathVariable String name,
+	                                                                    @RequestParam(defaultValue = "all") String objectType) throws IOException, SQLException {
+		try {
+			return ResponseEntity.ok(testSearchService.getTestCases(name, objectType));
+		} catch (SQLException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
+		}
+	}
+
+	@GetMapping(value = "/generate/{jobId}/progress", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<GenerateDbJobStatus> getGenerateDbProgress(@PathVariable String jobId) {
+		GenerateDbJob job = GENERATE_DB_JOBS.get(jobId);
+		if (job == null) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Generate DB job not found");
+		}
+		return ResponseEntity.ok(new GenerateDbJobStatus(jobId, job.status, job.obfName, job.obfIndex, job.totalObfs,
+				job.processedTokens, job.totalTokens, job.elapsedMs, job.estimatedMs,
+				"DONE".equals(job.status) && job.zipFile != null, job.error, job.obfs));
+	}
+
+	@PostMapping(value = "/generate/{jobId}/cancel", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<GenerateDbJobStatus> cancelGenerateDb(@PathVariable String jobId) throws IOException {
+		GenerateDbJob job = GENERATE_DB_JOBS.get(jobId);
+		if (job == null) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Generate DB job not found");
+		}
+		if (!"DONE".equals(job.status) && !"FAILED".equals(job.status) && !"CANCELED".equals(job.status)) {
+			job.cancelRequested = true;
+			job.status = "CANCELED";
+		}
+		if (job.zipFile != null && !"DONE".equals(job.status) && (job.future == null || job.future.isDone())) {
+			Files.deleteIfExists(job.zipFile);
+			job.zipFile = null;
+		}
+		return ResponseEntity.ok(new GenerateDbJobStatus(jobId, job.status, job.obfName, job.obfIndex, job.totalObfs,
+				job.processedTokens, job.totalTokens, job.elapsedMs, job.estimatedMs, false, job.error, job.obfs));
+	}
+
+	@GetMapping(value = "/generate/{jobId}/download", produces = "application/zip")
+	@ResponseBody
+	public void downloadGeneratedDb(@PathVariable String jobId, HttpServletResponse response) throws IOException {
+		GenerateDbJob job = GENERATE_DB_JOBS.get(jobId);
+		if (job == null) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Generate DB job not found");
+		}
+		if (!"DONE".equals(job.status) || job.zipFile == null) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT, "Generate DB job is not ready");
+		}
+		response.setContentType("application/zip");
+		response.setHeader("Content-Disposition", "attachment; filename=\"db.zip\"");
+		try {
+			Files.copy(job.zipFile, response.getOutputStream());
+		} finally {
+			GENERATE_DB_JOBS.remove(jobId);
+			Files.deleteIfExists(job.zipFile);
+		}
 	}
 }

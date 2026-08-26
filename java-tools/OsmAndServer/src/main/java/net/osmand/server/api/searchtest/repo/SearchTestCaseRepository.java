@@ -25,7 +25,7 @@ public interface SearchTestCaseRepository extends JpaRepository<TestCase, Long> 
 
 		// if 'Search Around' = 'Global'        then average = true, (lat, lon) == null, shift == null
 		// if 'Search Around' = 'Custom'        then average = null, (lat, lon) != null, shift == null
-		// if 'Search Around' = 'Individual'    then average = null, (lat, lon) == null, shift >= 0
+		// if 'Search Around' = 'Individual'    then average = false, (lat, lon) == null, shift >= 0
 		@Column()
 		public Boolean average;
 		
@@ -50,6 +50,9 @@ public interface SearchTestCaseRepository extends JpaRepository<TestCase, Long> 
 		@Column(name = "skip_found")
 		public Boolean skipFound;
 
+		@Column()
+		public Boolean spatial;
+		
 		// branch
 		@Column()
 		public String name;

@@ -393,6 +393,17 @@ public class UserdataController {
 		}
 	}
 
+	@PostMapping(value = "/empty-trash")
+	public ResponseEntity<String> emptyTrash(@RequestBody List<MapApiController.FileData> files,
+	                                        @RequestParam(name = "deviceid", required = true) int deviceId,
+	                                        @RequestParam(name = "accessToken", required = true) String accessToken) {
+		CloudUserDevice dev = checkToken(deviceId, accessToken);
+		if (dev == null) {
+			return userdataService.tokenNotValidError();
+		}
+		return userdataService.emptyTrash(files, dev);
+	}
+
 	@PostMapping(value = "/upload-file", consumes = MULTIPART_FORM_DATA_VALUE)
 	public ResponseEntity<String> upload(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
 			@RequestParam(name = "name", required = true) String name,
@@ -420,8 +431,8 @@ public class UserdataController {
 	}
 
 	@PostMapping(value = "/remap-filenames")
-	public ResponseEntity<String> remapFilenames(@RequestParam(name = "deviceid", required = true) int deviceId,
-			@RequestParam(name = "accessToken", required = true) String accessToken) throws IOException, SQLException {
+	public ResponseEntity<String> remapFilenames(@RequestParam(name = "deviceid") int deviceId,
+	                                             @RequestParam(name = "accessToken") String accessToken) {
 		CloudUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
 			return userdataService.tokenNotValidError();
@@ -429,8 +440,8 @@ public class UserdataController {
 		// remap needs to happen to all users & temporarily service should find files by both names (download)
 		Iterable<UserFile> lst = filesRepository.findAllByUserid(dev.userid);
 		for (UserFile fl : lst) {
-			if (fl != null && fl.filesize > 0) {
-				storageService.remapFileNames(fl.storage, userdataService.userFolder(fl), userdataService.oldStorageFileName(fl), userdataService.storageFileName(fl));
+			if (fl != null && fl.filesize != null && fl.filesize > 0) {
+				storageService.remapFileNames(fl.id, fl.storage, userdataService.userFolder(fl), userdataService.oldStorageFileName(fl), userdataService.storageFileName(fl));
 			}
 		}
 		return userdataService.ok();
@@ -449,7 +460,7 @@ public class UserdataController {
 		}
 		Iterable<UserFile> lst = filesRepository.findAllByUserid(dev.userid);
 		for (UserFile fl : lst) {
-			if (fl != null && fl.filesize > 0) {
+			if (fl != null && fl.filesize != null && fl.filesize > 0) {
 				String newStorage = storageService.backupData(storageId, userdataService.userFolder(fl), userdataService.storageFileName(fl),
 						fl.storage, fl.data);
 				if (newStorage != null) {

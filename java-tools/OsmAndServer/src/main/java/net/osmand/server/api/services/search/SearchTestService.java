@@ -1,8 +1,16 @@
-package net.osmand.server.api.services;
+package net.osmand.server.api.services.search;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
+import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.data.Amenity;
+import net.osmand.data.Building;
+import net.osmand.data.City;
 import net.osmand.data.LatLon;
+import net.osmand.data.MapObject;
+import net.osmand.data.Street;
+import net.osmand.map.OsmandRegions;
+import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.api.searchtest.*;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository.RunParam;
@@ -11,6 +19,17 @@ import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestDatasetRepository.Dataset;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
+import net.osmand.search.core.ObjectType;
+import net.osmand.search.core.SearchResult;
+import net.osmand.search.core.spatial.SpatialSearchContext;
+
+import java.io.PrintWriter;
+import java.io.StringWriter;
+
+import net.osmand.data.QuadRect;
+import net.osmand.search.core.spatial.SpatialTextSearch.SpatialSearchResults;
+import net.osmand.search.core.spatial.SpatialTextSearch.SpatialTextSearchSettings;
+import net.osmand.search.core.spatial.SpatialSearchResult;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import org.slf4j.Logger;
@@ -30,9 +49,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -41,29 +57,30 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Service
-public class SearchTestService implements ReportService, DataService, OBFService {
-    /**
-     * Lightweight DTO for listing test-cases with parent dataset name.
-     */
-    public record TestCaseItem(Long id, String name, String labels, Long datasetId, String datasetName,
-                                Long lastRunId, String status, LocalDateTime updated, String error,
-                                long total, long failed, long duration) {}
+public class SearchTestService implements ReportService, DataService, DetectorService, InspectorService, AnalystService, TokenAnalystService, AddressPOIAnalystService {
+	/**
+	 * Lightweight DTO for listing test-cases with parent dataset name.
+	 */
+	public record TestCaseItem(Long id, String name, String labels, Long datasetId, String datasetName,
+	                           Long lastRunId, String status, LocalDateTime updated, String error,
+	                           long total, long failed, long duration) {
+	}
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(SearchTestService.class);
-    private static volatile ExecutorService EXECUTOR, SAVE_EXECUTOR;
-    private final ConcurrentHashMap<Long, AtomicReference<Run.Status>> runStatusFlags = new ConcurrentHashMap<>();
+	private static final Logger LOGGER = LoggerFactory.getLogger(SearchTestService.class);
+	private static volatile ExecutorService EXECUTOR, SAVE_EXECUTOR;
+	private final ConcurrentHashMap<Long, AtomicReference<Run.Status>> runStatusFlags = new ConcurrentHashMap<>();
 
-    // Batch insert support for run_result
-    private static final int RUN_RESULT_BATCH_SIZE = 10;
+	// Batch insert support for run_result
+	private static final int RUN_RESULT_BATCH_SIZE = 10;
 
-    private final ConcurrentHashMap<Long, List<Object[]>> runResultBatches = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<Long, List<CompletableFuture<Void>>> runResultBatchTasks = new ConcurrentHashMap<>();
-    private final Set<Long> loggedStoppedRuns = ConcurrentHashMap.newKeySet();
+	private final ConcurrentHashMap<Long, List<Object[]>> runResultBatches = new ConcurrentHashMap<>();
+	private final ConcurrentHashMap<Long, List<CompletableFuture<Void>>> runResultBatchTasks = new ConcurrentHashMap<>();
+	private final Set<Long> loggedStoppedRuns = ConcurrentHashMap.newKeySet();
 
-    @Autowired
-    private ObjectMapper objectMapper;
-    @Autowired
-    private WebClient.Builder webClientBuilder;
+	@Autowired
+	private ObjectMapper objectMapper;
+	@Autowired
+	private WebClient.Builder webClientBuilder;
 	private WebClient webClient;
 
 	@Autowired
@@ -78,6 +95,8 @@ public class SearchTestService implements ReportService, DataService, OBFService
 
 	@Value("${searchtest.csv.dir}")
 	private String csvDownloadingDir;
+	@Value("${spring.searchtestdatasource.url:}")
+	private String searchTestDatasourceUrl;
 	@Value("${osmand.web.location}")
 	private String webServerConfigDir;
 	@Value("${overpass.url}")
@@ -93,14 +112,14 @@ public class SearchTestService implements ReportService, DataService, OBFService
 				webClientBuilder.baseUrl(overpassApiUrl + "api/interpreter").exchangeStrategies(ExchangeStrategies
 						.builder().codecs(configurer
 								-> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024)).build()).build();
-        // Cleanup in-memory status flag
-        runStatusFlags.clear();
+		// Cleanup in-memory status flag
+		runStatusFlags.clear();
 
-        EXECUTOR = createExecutor();
-        SAVE_EXECUTOR = createBatchSaveExecutor();
+		EXECUTOR = createExecutor();
+		SAVE_EXECUTOR = createBatchSaveExecutor();
 
-        if (System.getenv("SKIP_DB_INTEGRITY") != null)
-            return;
+		if (System.getenv("SKIP_DB_INTEGRITY") != null)
+			return;
 
 		// Ensure DB integrity
 		try {
@@ -133,19 +152,19 @@ public class SearchTestService implements ReportService, DataService, OBFService
 		return new ThreadPoolExecutor(maxCount, maxCount, 60L, TimeUnit.SECONDS, new LinkedBlockingQueue<>(), tf);
 	}
 
-    private ExecutorService createBatchSaveExecutor() {
-        int maxCount = Algorithms.parseIntSilently(System.getenv("MAX_BATCH_SAVE_THREAD_NUMBER"), 1);
-        maxCount = Math.max(1, maxCount);
-        ThreadFactory tf = r -> {
-            Thread t = new Thread(r);
-            t.setName("search-test-batch-save-" + t.getId());
-            t.setDaemon(true);
-            return t;
-        };
-        LOGGER.info("Search-test batch-save executor created with pool size = {}", maxCount);
-        return new ThreadPoolExecutor(maxCount, maxCount, 60L, TimeUnit.SECONDS,
-                new LinkedBlockingQueue<>(), tf);
-    }
+	private ExecutorService createBatchSaveExecutor() {
+		int maxCount = Algorithms.parseIntSilently(System.getenv("MAX_BATCH_SAVE_THREAD_NUMBER"), 1);
+		maxCount = Math.max(1, maxCount);
+		ThreadFactory tf = r -> {
+			Thread t = new Thread(r);
+			t.setName("search-test-batch-save-" + t.getId());
+			t.setDaemon(true);
+			return t;
+		};
+		LOGGER.info("Search-test batch-save executor created with pool size = {}", maxCount);
+		return new ThreadPoolExecutor(maxCount, maxCount, 60L, TimeUnit.SECONDS,
+				new LinkedBlockingQueue<>(), tf);
+	}
 
 	@Override
 	public OsmAndMapsService getMapsService() {
@@ -153,8 +172,13 @@ public class SearchTestService implements ReportService, DataService, OBFService
 	}
 
 	@Override
-	public SearchService getSearchService() {
-		return searchService;
+	public String getSearchTestDatasourceUrl() {
+		return searchTestDatasourceUrl;
+	}
+
+	@Override
+	public ClassicSearchService getClassicSearchService() {
+		return classicSearchService;
 	}
 
 	public String getWebServerConfigDir() {
@@ -237,7 +261,7 @@ public class SearchTestService implements ReportService, DataService, OBFService
 		}, EXECUTOR);
 	}
 
-	public CompletableFuture<Run> runTestCase(Long caseId, RunParam payload, SearchService.SearchOption options) {
+	public CompletableFuture<Run> runTestCase(Long caseId, RunParam payload, ClassicSearchService.SearchOption options) {
 		TestCase test = testCaseRepo.findById(caseId)
 				.orElseThrow(() -> new RuntimeException("Test-case not found with id: " + caseId));
 
@@ -253,6 +277,9 @@ public class SearchTestService implements ReportService, DataService, OBFService
 			LOGGER.info("TestCase {} is not in GENERATED state ({})", caseId, test.status);
 			throw new RuntimeException(String.format("TestCase %s is not in GENERATED state (%s)", caseId,
 					test.status));
+		}
+		if (test.getNorthWest() == null || test.getSouthEast() == null) {
+			calculateAndSaveTestCaseBbox(test);
 		}
 
 		Run run = new Run();
@@ -272,6 +299,8 @@ public class SearchTestService implements ReportService, DataService, OBFService
 		test.average = payload.average;
 		run.skipFound = payload.skipFound;
 		test.skipFound = payload.skipFound;
+		run.spatial = payload.spatial;
+		test.spatial = payload.spatial;
 		run.shift = payload.shift;
 		test.shift = payload.shift;
 		run.setNorthWest(payload.getNorthWest());
@@ -283,8 +312,6 @@ public class SearchTestService implements ReportService, DataService, OBFService
 		run = runRepo.save(run);
 
 		test.locale = run.locale;
-		test.setNorthWest(run.getNorthWest());
-		test.setSouthEast(run.getSouthEast());
 		test.lat = run.lat;
 		test.lon = run.lon;
 		test.threadsCount = payload.threadsCount;
@@ -292,20 +319,61 @@ public class SearchTestService implements ReportService, DataService, OBFService
 		testCaseRepo.save(test);
 
 		Run finalRun = run;
-		CompletableFuture.runAsync(() -> doMainRun(finalRun, payload.threadsCount == null ? 1 : payload.threadsCount, options));
+		CompletableFuture.runAsync(() -> doMainRun(test, finalRun, payload.threadsCount == null ? 1 : payload.threadsCount, options));
 		return CompletableFuture.completedFuture(finalRun);
+	}
+
+	private void calculateAndSaveTestCaseBbox(TestCase test) {
+		Map<String, Object> bbox = jdbcTemplate.queryForMap(
+				"SELECT MAX(lat) AS north, MIN(lat) AS south, MIN(lon) AS west, MAX(lon) AS east " +
+						"FROM gen_result WHERE case_id = ? AND lat IS NOT NULL AND lon IS NOT NULL",
+				test.id);
+		Double north = toDouble(bbox.get("north"));
+		Double south = toDouble(bbox.get("south"));
+		Double west = toDouble(bbox.get("west"));
+		Double east = toDouble(bbox.get("east"));
+		if (north == null || south == null || west == null || east == null) {
+			LOGGER.info("TestCase {} has no generated points to calculate bbox.", test.id);
+			return;
+		}
+		test.setNorthWest(String.format(Locale.US, "%.5f, %.5f", north, west));
+		test.setSouthEast(String.format(Locale.US, "%.5f, %.5f", south, east));
+		testCaseRepo.save(test);
+	}
+
+	private Double toDouble(Object value) {
+		if (value instanceof Number number) {
+			return number.doubleValue();
+		}
+		return null;
 	}
 
 	private static final int CHUNK_SIZE = 100;
 
-	private void doMainRun(Run run, int threadsCount, SearchService.SearchOption options) {
+	private record RunReaderContext(List<List<BinaryMapIndexReader>> readerPool) {
+		List<BinaryMapIndexReader> readersForWorker(int workerIndex) {
+			if (readerPool == null || readerPool.isEmpty()) {
+				return null;
+			}
+			return readerPool.get(workerIndex % readerPool.size());
+		}
+
+		int openMapsCount() {
+			return readerPool == null || readerPool.isEmpty() ? 0 : readerPool.get(0).size();
+		}
+	}
+
+	private void doMainRun(TestCase test, Run run, int threadsCount, ClassicSearchService.SearchOption options) {
 		List<CompletableFuture<Void>> runTasks = new ArrayList<>();
 		AtomicReference<Run.Status> statusRef = runStatusFlags.computeIfAbsent(run.id, id ->
 				new AtomicReference<>(Run.Status.RUNNING));
 		final int maxParallel = threadsCount > 0 ? threadsCount : 1;
+		RunReaderContext spatialContext = null;
 
 		try {
-			if (threadsCount > 1) {
+			spatialContext = createContext(test, maxParallel, options);
+			run.mapsCount = spatialContext == null ? 0 : spatialContext.openMapsCount();
+			if (maxParallel > 1) {
 				String sql = "SELECT count(*) FROM gen_result WHERE case_id = ? ORDER BY id";
 				final long count;
 				if (run.rerunId != null) {
@@ -324,19 +392,23 @@ public class SearchTestService implements ReportService, DataService, OBFService
 				final int chunkSize = Math.min((int) (count / maxParallel) + 1, CHUNK_SIZE);
 				final AtomicInteger nextOffset = new AtomicInteger(0);
 				for (int workerIndex = 0; workerIndex < maxParallel; workerIndex++) {
+					final List<BinaryMapIndexReader> spatialReaders =
+							spatialContext == null ? null : spatialContext.readersForWorker(workerIndex);
 					runTasks.add(CompletableFuture.runAsync(() -> {
 						while (statusRef.get() == Run.Status.RUNNING) {
 							int currentOffset = nextOffset.getAndAdd(chunkSize);
 							if (currentOffset >= count) {
 								break;
 							}
-							runChunk(run, chunkSize, currentOffset, statusRef, options);
+							runChunk(run, chunkSize, currentOffset, statusRef, options, spatialReaders);
 						}
 					}, EXECUTOR));
 				}
 			} else {
+				final List<BinaryMapIndexReader> spatialReaders =
+						spatialContext == null ? null : spatialContext.readersForWorker(0);
 				runTasks.add(CompletableFuture.runAsync(() ->
-						runChunk(run, -1, 0, statusRef, options), EXECUTOR));
+						runChunk(run, -1, 0, statusRef, options, spatialReaders), EXECUTOR));
 			}
 
 			CompletableFuture.allOf(runTasks.toArray(new CompletableFuture[0])).join();
@@ -356,27 +428,29 @@ public class SearchTestService implements ReportService, DataService, OBFService
 			run.setError(ex.getMessage());
 			run.status = Run.Status.FAILED;
 		} finally {
+			closeContext(spatialContext);
 			run.finish = LocalDateTime.now();
 
 			runRepo.save(run);
- 			// Cleanup in-memory status flag
- 			runStatusFlags.remove(run.id);
+			// Cleanup in-memory status flag
+			runStatusFlags.remove(run.id);
 			loggedStoppedRuns.remove(run.id);
 			runResultBatches.remove(run.id);
 			runResultBatchTasks.remove(run.id);
 		}
 	}
 
-	private void runChunk(Run run, int limit, int offset, AtomicReference<Run.Status> statusRef, SearchService.SearchOption options) {
+	private void runChunk(Run run, int limit, int offset, AtomicReference<Run.Status> statusRef,
+	                      ClassicSearchService.SearchOption options, List<BinaryMapIndexReader> spatialReaders) {
 		String sql = "SELECT id, lat, lon, row, query, gen_count FROM gen_result WHERE case_id = ? ORDER BY id";
 		if (run.rerunId != null) {
 			// Re-run uses items from a previous run's results by joining gen_result with run_result
 			if (run.skipFound == null || !run.skipFound) {
 				sql = "SELECT g.id, g.lat, g.lon, g.row, g.query, g.gen_count FROM gen_result g " +
-					"JOIN run_result r ON g.id = r.gen_id WHERE r.run_id = ? ORDER BY g.id";
+						"JOIN run_result r ON g.id = r.gen_id WHERE r.run_id = ? ORDER BY g.id";
 			} else {
 				sql = "SELECT g.id, g.lat, g.lon, g.row, g.query, g.gen_count FROM gen_result g " +
-					"JOIN run_result r ON g.id = r.gen_id WHERE r.run_id = ? AND NOT COALESCE(r.found, r.res_distance <= 50) ORDER BY g.id";
+						"JOIN run_result r ON g.id = r.gen_id WHERE r.run_id = ? AND NOT COALESCE(r.found, r.res_distance <= 50) ORDER BY g.id";
 			}
 		}
 
@@ -441,22 +515,28 @@ public class SearchTestService implements ReportService, DataService, OBFService
 					datasetId = -1;
 				}
 
-				final MapDataObjectFinder finder = new MapDataObjectFinder(targetPoint, newRow, datasetId);
+				ResultActuator actuator = new ResultActuator(targetPoint, newRow, datasetId);
 				Object[] args = null;
 				try {
-					SearchService.SearchResults searchResult = null;
+					ClassicSearchService.SearchResults searchResult = null;
 					if (query != null && !query.trim().isEmpty()) {
-						searchResult = searchService.getImmediateSearchResults(
-								new SearchService.SearchContext(searchPoint.getLatitude(), searchPoint.getLongitude(),
-								query, run.locale, false, bbox[0], bbox[1]),
-								options, finder);
+						ClassicSearchService.SearchContext ctx = new ClassicSearchService.SearchContext(searchPoint.getLatitude(), searchPoint.getLongitude(),
+								query, run.locale, false, bbox[0], bbox[1]);
+						if (Boolean.TRUE.equals(run.spatial)) {
+							SpatialSearchService.SpatialResults spatialResult = searchTestSpatial(ctx, options, spatialReaders, false);
+							searchResult = fromSpatialResults(spatialResult, newRow, run.locale);
+							actuator.accept(searchResult.results());
+						} else {
+							actuator = new MapDataObjectFinder(targetPoint, newRow, datasetId);
+							searchResult = classicSearchService.getImmediateSearchResults(ctx, options, actuator);
+						}
 					}
 
-					args = collectRunResults(finder, genId, count, run, query, searchResult,
+					args = collectRunResults(actuator, genId, count, run, query, searchResult,
 							targetPoint, searchPoint, System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1], null);
 				} catch (Exception e) {
 					LOGGER.warn("Failed to process row for run {}.", run.id, e);
-					args = collectRunResults(finder, genId, count, run, query, null,
+					args = collectRunResults(actuator, genId, count, run, query, null,
 							targetPoint, searchPoint, System.currentTimeMillis() - startTime, bbox[0] + "; " + bbox[1],
 							e.getMessage() == null ? e.toString() : e.getMessage());
 				} finally {
@@ -471,18 +551,273 @@ public class SearchTestService implements ReportService, DataService, OBFService
 		}
 	}
 
- 	private void enqueueRunResult(Run run, Object[] args) {
- 		List<Object[]> buffer = runResultBatches.computeIfAbsent(run.id, k -> Collections.synchronizedList(new ArrayList<>()));
- 		buffer.add(args);
- 		if (buffer.size() >= RUN_RESULT_BATCH_SIZE) {
- 			List<Object[]> toSave;
- 			synchronized (buffer) {
- 				toSave = new ArrayList<>(buffer);
- 				buffer.clear();
- 			}
- 			submitBatchSave(run, toSave);
- 		}
- 	}
+	private RunReaderContext createContext(TestCase test, int maxParallel, ClassicSearchService.SearchOption options) throws IOException {
+		if (test.getNorthWest() == null || test.getSouthEast() == null) {
+			LOGGER.info("Test-case {} has no bbox; falling back to per-query map readers.", test.id);
+			return null;
+		}
+		List<OsmAndMapsService.BinaryMapIndexReaderReference> maps =
+				mapReadersService.getMapRefs(test.getNorthWest(), test.getSouthEast(), options.getRadius(), false);
+		if (maps.isEmpty()) {
+			LOGGER.info("Test-case {} bbox returned no maps; falling back to per-query map readers.", test.id);
+			return null;
+		}
+		List<List<BinaryMapIndexReader>> readerPool = new ArrayList<>();
+		try {
+			for (int i = 0; i < maxParallel; i++) {
+				List<BinaryMapIndexReader> readers = mapReadersService.openReaders(maps);
+				if (!readers.isEmpty()) {
+					readerPool.add(readers);
+				}
+			}
+		} catch (IOException | RuntimeException e) {
+			closeContext(new RunReaderContext(readerPool));
+			throw e;
+		}
+		if (readerPool.isEmpty()) {
+			LOGGER.info("Test-case {} opened no readers; falling back to per-query map readers.", test.id);
+			return null;
+		}
+		LOGGER.info("Test-case {} opened {} reader sets from {} map refs.", test.id, readerPool.size(), maps.size());
+		return new RunReaderContext(readerPool);
+	}
+
+	private void closeContext(RunReaderContext spatialContext) {
+		if (spatialContext == null || spatialContext.readerPool() == null) {
+			return;
+		}
+		for (List<BinaryMapIndexReader> readers : spatialContext.readerPool()) {
+			mapReadersService.closeReaders(readers);
+		}
+	}
+
+	private static final int TEST_CACHE_PREFIX_LIMIT = 1_000; // 8_000 too much
+
+	public SpatialSearchService.SpatialResults searchTestSpatial(ClassicSearchService.SearchContext ctx, ClassicSearchService.SearchOption options, List<BinaryMapIndexReader> readers, boolean printLogs)
+			throws IOException {
+		SpatialSearchService.SpatialResults res = null;
+		try {
+			if (readers == null) {
+				int radiusMeters = Math.toIntExact(Math.round(options.getRadius() * 1000));
+				QuadRect llBbox = MapUtils.calculateLatLonBbox(
+						ctx.lat(), ctx.lon(), radiusMeters);
+				QuadRect points = mapsService.points(null,
+						new LatLon(llBbox.top, llBbox.left),
+						new LatLon(llBbox.bottom, llBbox.right));
+				List<OsmAndMapsService.BinaryMapIndexReaderReference> maps = mapReadersService.getMapsForSearch(points, false);
+				if (maps.isEmpty()) {
+					throw new IOException(String.format(Locale.US,
+							"No OBF maps found for spatial search at %.6f, %.6f within %.3f km",
+							ctx.lat(), ctx.lon(), options.getRadius()));
+				}
+				readers = mapsService.getReaders(maps, null);
+			}
+			int obfCount = readers.size();
+			readers = new ArrayList<>(readers);
+			BinaryMapIndexReader regionsReader = spatialSearchService.regionsReaderForThread();
+			if (regionsReader != null) {
+				readers.add(regionsReader);
+			}
+
+			res = searchTestSpatial(ctx, readers, printLogs, obfCount);
+		} catch (RuntimeException e) {
+			LOGGER.error(String.format("Spatial search failed for '%s': %s", ctx.text(), e), e);
+			StringWriter stackTrace = new StringWriter();
+			e.printStackTrace(new PrintWriter(stackTrace));
+			LOGGER.error("RuntimeException stacktrace:\n" + stackTrace);
+		} finally {
+			if (readers != null) {
+				mapsService.unlockReaders(readers);
+			}
+		}
+		return res;
+	}
+
+	private SpatialSearchService.SpatialResults searchTestSpatial(ClassicSearchService.SearchContext ctx, List<BinaryMapIndexReader> readers,
+	                                                            boolean printLogs, int obfCount)
+			throws IOException {
+		if (readers == null || readers.isEmpty()) {
+			return null;
+		}
+		SpatialTextSearchSettings settings = SpatialTextSearchSettings.defaultSettings();
+		settings.AUTO_CLEAR_PREFIX_CACHE_LIMIT = TEST_CACHE_PREFIX_LIMIT;
+		SpatialSearchContext sscontext = new SpatialSearchContext(settings, readers, spatialSearchService.getSpatialPoiTypeSearch(), new LatLon(ctx.lat(), ctx.lon()));
+		SpatialSearchContext.SpatialSearchStats stats = sscontext.getStats();
+		stats.printLogs = printLogs;
+
+		SpatialSearchResults results = spatialSearchService.getSpatialTextSearch().searchAPI(ctx.text(), sscontext);
+		return new SpatialSearchService.SpatialResults(results, stats, obfCount);
+	}
+
+	private ClassicSearchService.SearchResults fromSpatialResults(SpatialSearchService.SpatialResults spatialResult,
+	                                                              Map<String, Object> row, String locale) {
+		List<SearchResult> results = new ArrayList<>();
+		if (spatialResult == null || spatialResult.results() == null) {
+			return new ClassicSearchService.SearchResults(results);
+		}
+
+		SpatialSearchContext.SpatialSearchStats stats = spatialResult.stats();
+		row.put("stat_time", stats.requestTime.time);
+		row.put("stat_bytes", stats.readTableBytes + stats.readAtomsBytes + stats.readObjsBytes);
+		row.put("stat_table_bytes", stats.readTableBytes);
+		row.put("stat_atoms_bytes", stats.readAtomsBytes);
+		row.put("stat_objs_bytes", stats.readObjsBytes);
+
+		row.put("spatial_step1_atoms_time", stats.step1Atoms.time);
+		row.put("spatial_match_time", stats.sub1MatchTime.time);
+		row.put("spatial_file_atoms_time", stats.sub1FileAtomsTime.time);
+
+		row.put("spatial_step2_compute_time", stats.step2Compute.time);
+		row.put("spatial_load_objects_bld_time", stats.sub2LoadObjectsBldTime.time);
+		row.put("spatial_read_obj_time", stats.sub2ReadObjTime.time);
+		row.put("spatial_max_combinations", stats.maxCombinations);
+		row.put("spatial_tokens_obj", stats.tokenObjs);
+
+		row.put("spatial_step3_sort_time", stats.step3Sort.time);
+
+		List<SpatialSearchResult> spatialResults = spatialResult.results().mainResults;
+		if (spatialResults == null) {
+			return new ClassicSearchService.SearchResults(results);
+		}
+		int place = 1;
+		for (SpatialSearchResult spatial : spatialResults) {
+			SearchResult result = fromSpatialResult(spatial, locale);
+			if (result != null) {
+				if (place == 1) {
+					row.put("spatial_matched_tokens", spatial.matchedTokens());
+					row.put("spatial_visible_level", spatial.visibleLevel());
+				}
+				results.add(result);
+				place++;
+			}
+		}
+		return new ClassicSearchService.SearchResults(results);
+	}
+
+	private SearchResult fromSpatialResult(SpatialSearchResult res, String locale) {
+		if (res == null) {
+			return null;
+		}
+		List<MapObject> objects = res.getObjects();
+		MapObject object = res.getMainObject();
+		List<Street> streets = spatialStreets(objects, locale);
+		boolean streetIntersection = streets.size() > 1;
+		if (streetIntersection) {
+			object = streets.get(0);
+		}
+		LatLon location = res.getLatLon();
+		if (location == null && object != null) {
+			location = object.getLocation();
+		}
+		if (location == null) {
+			return null;
+		}
+		SearchResult result = new SearchResult();
+		result.object = object;
+		result.location = location;
+		result.spatialResult = res;
+		if (streetIntersection) {
+			result.objectType = ObjectType.STREET_INTERSECTION;
+			result.localeName = streets.stream()
+					.map(street -> spatialName(street, locale))
+					.collect(java.util.stream.Collectors.joining(" - "));
+			City city = spatialCity(objects, streets);
+			if (city != null) {
+				result.relatedObject = city;
+				result.localeRelatedObjectName = city.getName(locale);
+				result.addressName = result.localeRelatedObjectName;
+			}
+			return result;
+		}
+
+		result.localeName = spatialName(object, locale);
+		result.objectType = spatialObjectType(object);
+		if (object instanceof Street street) {
+			City city = street.getCity();
+			if (city != null) {
+				result.localeRelatedObjectName = spatialName(city, locale);
+				result.addressName = result.localeRelatedObjectName;
+			}
+		}
+		return result;
+	}
+
+	private List<Street> spatialStreets(List<MapObject> objects, String locale) {
+		if (objects == null || objects.isEmpty()) {
+			return Collections.emptyList();
+		}
+		List<Street> streets = new ArrayList<>();
+		for (MapObject object : objects) {
+			if (object instanceof Street street && !streets.contains(street)) {
+				streets.add(street);
+			}
+		}
+		streets.sort(Comparator.comparing((Street street) -> normalizedSpatialName(street, locale))
+				.thenComparingLong(Street::getId));
+		return streets;
+	}
+
+	private String normalizedSpatialName(MapObject object, String locale) {
+		return spatialName(object, locale).trim().toLowerCase(Locale.ROOT);
+	}
+
+	private City spatialCity(List<MapObject> objects, List<Street> streets) {
+		for (Street street : streets) {
+			if (street.getCity() != null) {
+				return street.getCity();
+			}
+		}
+		if (objects != null) {
+			for (MapObject object : objects) {
+				if (object instanceof City city) {
+					return city;
+				}
+			}
+		}
+		return null;
+	}
+
+	private ObjectType spatialObjectType(MapObject object) {
+		if (object instanceof Amenity) {
+			return ObjectType.POI;
+		}
+		if (object instanceof Building) {
+			return ObjectType.HOUSE;
+		}
+		if (object instanceof Street) {
+			return ObjectType.STREET;
+		}
+		if (object instanceof City city) {
+			return switch (city.getType()) {
+				case VILLAGE, HAMLET, SUBURB -> ObjectType.VILLAGE;
+				case BOUNDARY -> ObjectType.BOUNDARY;
+				case POSTCODE -> ObjectType.POSTCODE;
+				default -> ObjectType.CITY;
+			};
+		}
+		return ObjectType.LOCATION;
+	}
+
+	private String spatialName(MapObject object, String locale) {
+		if (object == null) {
+			return "";
+		}
+		String name = object.getName(locale);
+		return Algorithms.isEmpty(name) ? object.getName() : name;
+	}
+
+	private void enqueueRunResult(Run run, Object[] args) {
+		List<Object[]> buffer = runResultBatches.computeIfAbsent(run.id, k -> Collections.synchronizedList(new ArrayList<>()));
+		buffer.add(args);
+		if (buffer.size() >= RUN_RESULT_BATCH_SIZE) {
+			List<Object[]> toSave;
+			synchronized (buffer) {
+				toSave = new ArrayList<>(buffer);
+				buffer.clear();
+			}
+			submitBatchSave(run, toSave);
+		}
+	}
 
 	private void submitBatchSave(Run run, List<Object[]> batchArgs) {
 		String sql = "INSERT OR IGNORE INTO run_result (gen_id, gen_count, dataset_id, run_id, case_id, query, row, error, " +
@@ -606,11 +941,18 @@ public class SearchTestService implements ReportService, DataService, OBFService
 	public Optional<Run> getRun(Long id) {
 		return runRepo.findById(id);
 	}
-	private final SearchService searchService;
+
+	private final ClassicSearchService classicSearchService;
 
 	@Autowired
-	public SearchTestService(SearchService searchService) {
-		this.searchService = searchService;
+	SpatialSearchService spatialSearchService;
+
+	@Autowired
+	MapReadersService mapReadersService;
+
+	@Autowired
+	public SearchTestService(ClassicSearchService classicSearchService) {
+		this.classicSearchService = classicSearchService;
 	}
 
 	private static LatLon getAveragePoint(List<Map<String, Object>> rows) {
@@ -628,88 +970,5 @@ public class SearchTestService implements ReportService, DataService, OBFService
 		double roundedLon = BigDecimal.valueOf(sumLon /
 				rows.size()).setScale(7, RoundingMode.HALF_UP).doubleValue();
 		return new LatLon(roundedLat, roundedLon);
-	}
-
-	public static void main(String[] args) {
-		OBFService svc = new SearchTestService(null);
-		
-		String mapDir = System.getenv("MAP_DIR");
-		if (mapDir == null || mapDir.trim().isEmpty()) {
-			System.err.println("MAP_DIR env is required");
-			return;
-		}
-		String fieldPathEnv = System.getenv("FIELD_PATH");
-		String fieldName = System.getenv("FIELD_NAME");
-		String filter = System.getenv("MAP_FILTER");
-        if (filter != null)
-            filter = filter.toLowerCase(Locale.ROOT);
-		String fieldPath = fieldPathEnv == null || fieldPathEnv.trim().isEmpty() ? null : fieldPathEnv.trim();
-		String statsFieldPath;
-		if (fieldPath == null) {
-			statsFieldPath = fieldName == null || fieldName.trim().isEmpty() ? null : fieldName.trim();
-		} else if (fieldName == null || fieldName.trim().isEmpty()) {
-			statsFieldPath = fieldPath;
-		} else {
-			statsFieldPath = fieldPath + "." + fieldName.trim();
-		}
-		String jsonFieldPath;
-		if (fieldPath == null) {
-			jsonFieldPath = (fieldName == null || fieldName.trim().isEmpty()) ? null : fieldName.trim();
-		} else if (fieldName == null || fieldName.trim().isEmpty()) {
-			jsonFieldPath = fieldPath;
-		} else {
-			jsonFieldPath = fieldPath + "." + fieldName.trim();
-		}
-		
-		Path root = Path.of(mapDir);
-		if (!Files.exists(root)) {
-			System.err.println("MAP_DIR doesn't exist: " + root);
-			return;
-		}
-
-		List<Path> obfFiles = new ArrayList<>();
-		try {
-			try (java.util.stream.Stream<Path> s = Files.walk(root)) {
-				s.filter(p -> Files.isRegularFile(p) && p.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".obf"))
-						.forEach(obfFiles::add);
-			}
-		} catch (IOException e) {
-			System.err.println("Failed to list OBF files in MAP_DIR: " + e.getMessage());
-			return;
-		}
-
-		obfFiles.sort(Comparator.comparing(p -> p.toString().toLowerCase(Locale.ROOT)));
-		System.out.println("MAP_DIR=" + root.toAbsolutePath());
-		System.out.println("MAP_FILTER=" + (filter == null ? "" : filter));
-		System.out.println("FIELD_PATH=" + (statsFieldPath == null ? "" : statsFieldPath));
-        System.out.println("OBFs count:" + obfFiles.size());
-
-		long totalSize = 0;
-		for (Path p : obfFiles) {
-			String obfName = p.getFileName().toString().toLowerCase(Locale.ROOT);
-			if (filter != null && !obfName.startsWith(filter))
-				continue;
-
-			try {
-				String obf = p.toAbsolutePath().toString();
-				Map<String, long[]> m = svc.getSectionSizes(obf, statsFieldPath);
-				long[] s = m == null || statsFieldPath == null ? null : m.get(statsFieldPath);
-				long sum = s == null ? 0 : s[0];
-				totalSize += sum;
-				System.out.println(obf + ", " + sum);
-
-				String json = svc.getSectionJson(obf, jsonFieldPath);
-				String obfBaseName = obfName.endsWith(".obf")
-						? obfName.substring(0, obfName.length() - 4)
-						: obfName;
-
-				Path jsonOutPath = root.resolve(obfBaseName + ".json");
-				Files.writeString(jsonOutPath, json, StandardCharsets.UTF_8);
-				System.out.println("JSON file: " + jsonOutPath);
-			} catch (Exception e) {
-				System.err.println(obfName + "\tERROR\t" + (e.getMessage() == null ? e.toString() : e.getMessage()));
-			}
-		}
-		System.out.println("TOTAL: " + totalSize);
 	}
 }

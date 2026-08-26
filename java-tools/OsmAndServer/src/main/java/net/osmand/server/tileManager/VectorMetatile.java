@@ -29,9 +29,11 @@ public class VectorMetatile implements TileCacheProvider, Comparable<VectorMetat
 	private final TileServerConfig cfg;
 	private JsonObject info;
 	private final String interactiveKey;
+	private final String renderingProps;
+	private final String cacheKey;
 
 	public VectorMetatile(TileServerConfig cfg, String tileId, VectorStyle style, int z, int x, int y,
-	                      int metaSizeLog, int tileSizeLog, String interactiveKey) {
+	                      int metaSizeLog, int tileSizeLog, String interactiveKey, String renderingProps, String cacheKey) {
 		this.cfg = cfg;
 		this.style = style;
 		this.metaSizeLog = metaSizeLog;
@@ -41,6 +43,8 @@ public class VectorMetatile implements TileCacheProvider, Comparable<VectorMetat
 		this.top = getTop(y, z, metaSizeLog);
 		this.z = z;
 		this.interactiveKey = interactiveKey;
+		this.renderingProps = renderingProps;
+		this.cacheKey = cacheKey;
 		touch();
 	}
 
@@ -123,7 +127,7 @@ public class VectorMetatile implements TileCacheProvider, Comparable<VectorMetat
 				cfg.cacheLocation, ext, z,
 				left >> (31 - z), top >> (31 - z),
 				metaSizeLog, tileSizeLog,
-				style.key, interactiveKey, 16
+				cacheKey, null, 16
 		);
 	}
 
@@ -176,6 +180,9 @@ public class VectorMetatile implements TileCacheProvider, Comparable<VectorMetat
 
 			if (this.z < ZOOM_EN_PREFERRED_LANG) {
 				props += ",lang=en";
+			}
+			if (renderingProps != null && !renderingProps.isEmpty()) {
+				props += "," + renderingProps;
 			}
 			if (nativelib == null) {
 				return null;

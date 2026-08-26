@@ -7,15 +7,30 @@ import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.CloudUsersRepository;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.util.Algorithms;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 
 @Service
 public class AdminService {
+
+	private static final Log LOG = LogFactory.getLog(AdminService.class);
+
+	private static final String BACKUP_USERS_SQL =
+			"SELECT DISTINCT 'user-' || userid || '/' FROM user_files "
+					+ "WHERE updatetime > NOW() - INTERVAL '2 hours'";
+	private static final int BACKUP_SCHEDULED_INTERVAL_1_HOUR = 60 * 60 * 1000;
 
     @Autowired
     private EmailSenderService emailSender;
@@ -32,7 +47,36 @@ public class AdminService {
     @Autowired
     UserdataService userdataService;
 
+	@Autowired
+	JdbcTemplate jdbcTemplate;
+
     private final Gson gson = new Gson();
+
+	private final String backupUserFile = System.getenv("INCREMENTAL_CLOUD_USERS_FILE");
+
+	// Hourly: writes user ids with recent file changes to INCREMENTAL_CLOUD_USERS_FILE
+	@Scheduled(fixedRate = BACKUP_SCHEDULED_INTERVAL_1_HOUR)
+	public void backupUserListScheduledTask() {
+		if (backupUserFile == null) {
+			return;
+		}
+		try {
+			List<String> users = jdbcTemplate.queryForList(BACKUP_USERS_SQL, String.class);
+			Path target = Path.of(backupUserFile);
+			Files.createDirectories(target.getParent());
+			String content = users.isEmpty() ? "" : String.join("\n", users) + "\n";
+			Path tmp = Files.createTempFile(target.getParent(), target.getFileName().toString(), "");
+			try {
+				Files.writeString(tmp, content, StandardCharsets.UTF_8);
+				Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+				LOG.info("Updated backup users : " + users.size());
+			} finally {
+				Files.deleteIfExists(tmp);
+			}
+		} catch (Exception e) {
+			LOG.error("Failed to update backup users file: " + backupUserFile, e);
+		}
+	}
 
 	// by orderId from pro user or email
     public DeviceSubscriptionsRepository.SupporterDeviceSubscription getSubscriptionDetailsByIdentifier(String identifier) {

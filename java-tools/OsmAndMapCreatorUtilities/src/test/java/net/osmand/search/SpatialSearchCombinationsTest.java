@@ -1,0 +1,38 @@
+package net.osmand.search;
+
+import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.data.LatLon;
+import net.osmand.search.core.spatial.SpatialTestSearchEngine;
+import net.osmand.search.core.spatial.SpatialTextSearch;
+import org.json.JSONObject;
+
+import java.io.File;
+import java.util.List;
+
+public class SpatialSearchCombinationsTest extends SpatialSearchPipelineTest {
+    public SpatialSearchCombinationsTest(String name, File file) {
+        super(name, file);
+    }
+
+    @Override
+    protected List<List<String>> getExpectedResults(JSONObject sourceJson, int phrasesSize) {
+        List<List<String>> mainResults = parseExpectedResults(sourceJson, "results", phrasesSize);
+        if (sourceJson.has("pre-pipeline-results")) {
+            List<List<String>> overriddenResults = parseExpectedResults(sourceJson, "pre-pipeline-results", phrasesSize);
+            for (int i = 0; i < overriddenResults.size(); i++) {
+                List<String> overriddenResult = overriddenResults.get(i);
+                if (overriddenResult != null && !overriddenResult.isEmpty()) {
+                    mainResults.set(i, overriddenResult);
+                }
+            }
+        }
+        return mainResults;
+    }
+
+    @Override
+    protected SearchTestEngine createSearchEngine(SpatialTextSearch.SpatialTextSearchSettings spatialSettings, 
+                                                  LatLon point, List<BinaryMapIndexReader> readers, boolean translation) {
+        spatialSettings.DEV_USE_PIPELINE = false;
+        return new SpatialTestSearchEngine(spatialSettings, point, readers, translation);
+    }
+}

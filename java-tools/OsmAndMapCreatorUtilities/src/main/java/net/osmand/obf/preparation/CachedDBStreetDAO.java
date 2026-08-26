@@ -14,8 +14,8 @@ import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
 
-public class CachedDBStreetDAO extends DBStreetDAO
-{
+public class CachedDBStreetDAO extends DBStreetDAO {
+	
 	private Map<String, SimpleStreet> addressStreetLocalMap = new HashMap<String, SimpleStreet>();
 	private TLongHashSet addressBuildingLocalSet = new TLongHashSet();
 	private TLongHashSet addressStreetNodeLocalSet = new TLongHashSet();
@@ -53,12 +53,12 @@ public class CachedDBStreetDAO extends DBStreetDAO
 	}
 
 	@Override
-	public long insertStreet(String name, Map<String, String> names, LatLon location, City city, String cityPart) throws SQLException {
+	public long insertStreet(long osmId, String name, Map<String, String> names, LatLon location, City city, String cityPart) throws SQLException {
 		String langs = constructLangs(names);
 		//batch the insert
-		long streetId = fillInsertStreetStatement(name, names, location, city, cityPart, langs);
-		addBatch(addressStreetStat);
-		SimpleStreet ss = new SimpleStreet(streetId, name, city.getId(), cityPart,location, langs, Algorithms.encodeMap(names));
+		long streetId = fillInsertStreetStatement(osmId, name, names, location, city, cityPart, langs);
+		addBatch(addressStreetStat); 
+		SimpleStreet ss = new SimpleStreet(streetId, osmId, name, city.getId(), cityPart,location, langs, Algorithms.encodeMap(names));
 		addressStreetLocalMap.put(createStreetUniqueName(name, city.getId(), cityPart), ss);
 		addressStreetLocalMap.put(createStreetUniqueName(name, city.getId()), ss);
 		return streetId;

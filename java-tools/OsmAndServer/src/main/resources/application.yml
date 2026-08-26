@@ -116,6 +116,9 @@ spring:
   searchtestdatasource:
     url:
     driverClassname:
+  operationdatasource:
+    url: jdbc:sqlite:${osmand.files.location}/operation.db
+    driverClassname: org.sqlite.JDBC
   monitordatasource:
     url:
     username:
@@ -187,3 +190,5 @@ spring:
       on-profile: production
   resources.static-locations: file:${osmand.web.location}
   thymeleaf.prefix: file:${osmand.web.location}/templates/
+
+

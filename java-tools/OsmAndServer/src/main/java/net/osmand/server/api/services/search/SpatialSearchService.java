@@ -1,0 +1,479 @@
+package net.osmand.server.api.services.search;
+
+import static net.osmand.search.SearchUICore.getDominatedCity;
+import static net.osmand.search.SearchUICore.getMainCityName;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+
+import net.osmand.search.core.spatial.SpatialPoiSearch.SpatialPoiType;
+import net.osmand.search.core.spatial.SpatialTextSearchAPI;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import net.osmand.ResultMatcher;
+import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.data.Amenity;
+import net.osmand.data.City;
+import net.osmand.data.LatLon;
+import net.osmand.data.MapObject;
+import net.osmand.osm.MapPoiTypes;
+import net.osmand.osm.PoiType;
+import net.osmand.search.core.ObjectType;
+import net.osmand.search.core.SearchCoreFactory;
+import net.osmand.search.core.SearchResult;
+import net.osmand.search.core.TopIndexFilter;
+import net.osmand.search.core.spatial.SpatialPoiSearch;
+import net.osmand.search.core.spatial.SpatialSearchContext;
+import net.osmand.search.core.spatial.SpatialSearchResult;
+import net.osmand.search.core.spatial.SpatialTextSearch;
+import net.osmand.search.core.spatial.SpatialTextSearch.SpatialSearchResults;
+import net.osmand.search.core.spatial.SpatialTextSearch.SpatialTextSearchSettings;
+import net.osmand.server.api.services.OsmAndMapsService;
+import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
+import net.osmand.server.controllers.pub.GeojsonClasses.Geometry;
+import net.osmand.util.Algorithms;
+import net.osmand.util.MapUtils;
+
+@Service
+public class SpatialSearchService {
+
+	private static final Log LOGGER = LogFactory.getLog(SpatialSearchService.class);
+
+	public static final int SPATIAL_PREFIX_CACHE_LIMIT = 4_000;
+	private static final int SPATIAL_SEARCH_THREADS = 4;
+	private static final int SPATIAL_AUTOCOMPLETE_THREADS = 3;
+	private static final int SPATIAL_SEARCH_QUEUE = 8;
+
+	// reused for cache
+	private SpatialPoiSearch poiSearch;
+	private MapPoiTypes poiTypesWithTranslations;
+
+	private final ThreadLocal<SpatialTextSearch> spatialTextSearchLocal = ThreadLocal.withInitial(SpatialTextSearch::new);
+	private final ThreadLocal<RegionsReaderHolder> osmandRegionsLocal = ThreadLocal.withInitial(RegionsReaderHolder::new);
+
+	private final AtomicInteger spatialSearchRoundRobin = new AtomicInteger();
+	private final Map<String, AtomicBoolean> runningSearches = new ConcurrentHashMap<>();
+	private final SpatialTextSearchAPI spatialTextSearchAPI = new SpatialTextSearchAPI(getPoiTypesWithTranslations());
+
+	// one single-thread executor per slot: requests are routed by client key, so a client's
+	// repeated searches always hit the thread whose engine cache is warmed
+	private final ThreadPoolExecutor[] spatialSearchExecutors = createSpatialSearchExecutors("search-", SPATIAL_SEARCH_THREADS);
+
+	// autocomplete pool is routed by session too; unlike full search,
+	// a newer autocomplete request of the same user cancels the previous one
+	private final ThreadPoolExecutor[] autocompleteExecutors = createSpatialSearchExecutors("autocomplete-", SPATIAL_AUTOCOMPLETE_THREADS);
+
+	@Autowired
+	OsmAndMapsService osmAndMapsService;
+
+	@Autowired
+	private MapReadersService mapReadersService;
+
+	@Autowired
+	private SearchResultConverter searchResultConverter;
+
+	private static ThreadPoolExecutor[] createSpatialSearchExecutors(String name, int threads) {
+		ThreadPoolExecutor[] executors = new ThreadPoolExecutor[threads];
+		for (int i = 0; i < executors.length; i++) {
+			String threadName = "spatial-" + name + (i + 1);
+			ThreadPoolExecutor executor = new ThreadPoolExecutor(0, 1, 10, TimeUnit.MINUTES,
+					new ArrayBlockingQueue<>(SPATIAL_SEARCH_QUEUE),
+					r -> {
+						Thread t = new Thread(r, threadName);
+						t.setDaemon(true);
+						return t;
+					});
+			executor.allowCoreThreadTimeOut(true);
+			executors[i] = executor;
+		}
+		return executors;
+	}
+
+	public static class SpatialResponse {
+		public List<Feature> features = new ArrayList<>();
+		public Map<String, Object> info = new LinkedHashMap<>();
+	}
+
+	public record SpatialResults(SpatialSearchResults results, SpatialSearchContext.SpatialSearchStats stats, int obfCount) {
+	}
+
+	@PostConstruct
+	public void warmupSpatialPoiTypeSearch() {
+		Thread t = new Thread(this::getSpatialPoiTypeSearch, "spatial-search-warmup");
+		t.setDaemon(true);
+		t.start();
+	}
+
+	private synchronized MapPoiTypes getPoiTypesWithTranslations() {
+		if (poiTypesWithTranslations == null) {
+			MapPoiTypes poiTypes = MapPoiTypes.getDefault();
+			PoiTypesService poiTypesService = new PoiTypesService();
+			poiTypes.setPoiTranslator(poiTypesService.parseGlobalTranslations());
+			poiTypesWithTranslations = poiTypes;
+		}
+		return poiTypesWithTranslations;
+	}
+
+	public SpatialPoiSearch getSpatialPoiTypeSearch() {
+		if (poiSearch == null) {
+			poiSearch = new SpatialPoiSearch(getPoiTypesWithTranslations());
+		}
+		return poiSearch;
+	}
+
+	private static class RegionsReaderHolder {
+		BinaryMapIndexReader reader;
+		long fileTimestamp;
+	}
+
+	public BinaryMapIndexReader regionsReaderForThread() {
+		RegionsReaderHolder holder = osmandRegionsLocal.get();
+		BinaryMapIndexReader shared = mapReadersService.getOsmandRegions() == null ? null : mapReadersService.getOsmandRegions().getFile();
+		File regionsFile = shared == null ? null : shared.getFile();
+		if (regionsFile == null) {
+			return holder.reader;
+		}
+		long ts = regionsFile.lastModified();
+		if (holder.reader != null && holder.fileTimestamp != ts) {
+			try {
+				holder.reader.close();
+			} catch (IOException e) {
+				LOGGER.warn("Failed to close outdated regions reader.", e);
+			}
+			holder.reader = null;
+		}
+		if (holder.reader == null) {
+			holder.reader = mapReadersService.openRegionsReader();
+			holder.fileTimestamp = ts;
+		}
+		return holder.reader;
+	}
+
+	@PreDestroy
+	public void shutdownSpatialSearchPool() {
+		for (ThreadPoolExecutor executor : spatialSearchExecutors) {
+			executor.shutdownNow();
+		}
+		for (ThreadPoolExecutor executor : autocompleteExecutors) {
+			executor.shutdownNow();
+		}
+	}
+
+	public SpatialResponse searchSpatial(ClassicSearchService.SearchContext ctx, String timeZone, boolean autocomplete,
+	                                     String userSessionKey, String maps) throws IOException {
+		long sTime = System.currentTimeMillis();
+		SpatialResponse response = new SpatialResponse();
+		if (!osmAndMapsService.validateAndInitConfig()) {
+			return response;
+		}
+		final AtomicBoolean cancelled = new AtomicBoolean();
+		String searchSessionKey = autocomplete && !Algorithms.isEmpty(userSessionKey) ? userSessionKey : null;
+		AtomicBoolean previous = searchSessionKey == null ? null : runningSearches.put(searchSessionKey, cancelled);
+		if (previous != null) {
+			previous.set(true); // the same client asked again, its previous search is abandoned
+		}
+		// suggestions must fail fast, full search gets the long budget
+		final long timeoutMs = autocomplete ? 3_000 : 15_000;
+		boolean readersOwnedByWorker = false;
+		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
+		try {
+			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = Algorithms.isEmpty(maps)
+					? osmAndMapsService.getObfReadersForSpatialSearch(ctx.lat(), ctx.lon(), autocomplete)
+					: osmAndMapsService.getObfReadersByCodes(maps);
+			if (list.isEmpty()) {
+				return response;
+			}
+			usedMapList = osmAndMapsService.getReaders(list, null);
+			if (usedMapList.isEmpty()) {
+				return response;
+			}
+			LatLon coord = mapReadersService.parseLocation(ctx.text(), new LatLon(ctx.lat(), ctx.lon()));
+			if (coord != null) {
+				SearchResult sr = new SearchResult();
+				sr.object = coord;
+				sr.location = coord;
+				sr.objectType = ObjectType.LOCATION;
+				sr.localeName = ((float) coord.getLatitude()) + ", " + ((float) coord.getLongitude());
+				response.features.add(searchResultConverter.getFeature(sr, timeZone));
+			}
+			// In future multiple spatialTextSearch & multiple osmand regions
+			SpatialTextSearchSettings settings = autocomplete
+					? SpatialTextSearchSettings.suggestionSettings()
+					: SpatialTextSearchSettings.defaultSettings();
+			settings.AUTO_CLEAR_PREFIX_CACHE_LIMIT = SPATIAL_PREFIX_CACHE_LIMIT;
+			final List<BinaryMapIndexReader> lockedReaders = usedMapList;
+			final ResultMatcher<SpatialSearchResult> matcher = new ResultMatcher<>() {
+
+				@Override
+				public boolean publish(SpatialSearchResult object) {
+					return false; // used only as a cancellation hook, results are collected by searchAPI
+				}
+
+				@Override
+				public boolean isCancelled() {
+					return cancelled.get();
+				}
+			};
+			ThreadPoolExecutor executor = executorForKey(autocomplete ? autocompleteExecutors : spatialSearchExecutors,
+					userSessionKey);
+			Future<SpatialSearchResults> task = executor.submit(() -> {
+				try {
+					if (cancelled.get()) {
+						return null; // a newer search of the same client replaced this one while it waited
+					}
+					List<BinaryMapIndexReader> readers = new ArrayList<>(lockedReaders);
+					BinaryMapIndexReader regionsReader = regionsReaderForThread();
+					if (regionsReader != null) {
+						readers.add(regionsReader);
+					}
+					SpatialSearchContext sscontext =
+							new SpatialSearchContext(settings, readers, getSpatialPoiTypeSearch(), new LatLon(ctx.lat(), ctx.lon()));
+					sscontext.resultMatcher = matcher;
+					return getSpatialTextSearch().searchAPI(ctx.text(), sscontext);
+				} finally {
+					osmAndMapsService.unlockReaders(lockedReaders);
+				}
+			});
+			readersOwnedByWorker = true;
+			SpatialSearchResults res = task.get(timeoutMs, TimeUnit.MILLISECONDS);
+			if (res == null) {
+				return response;
+			}
+			if (res.mainResults != null) {
+				String dominatedCity = calculateSpatialDominatedCity(res.mainResults, ctx.locale());
+				SpatialPoiSearch poiTypeSearch = getSpatialPoiTypeSearch();
+				Map<MapObject, Feature> amenityFeatureCache = new IdentityHashMap<>();
+				for (SpatialSearchResult r : res.mainResults) {
+					Feature f = null;
+					List<MapObject> objs = r.getObjects();
+					if (r.isPoiCategory()) {
+						SpatialPoiType type = r.getPoiCategory(poiTypeSearch);
+						if (type != null) {
+							f = getSpatialPoiTypeFeature(type);
+						}
+					} else if (!objs.isEmpty()) {
+						LatLon l = r.getLatLon() == null ? new LatLon(ctx.lat(), ctx.lon()) : r.getLatLon();
+						f = getSpatialFeature(l, objs, ctx.locale(), timeZone, dominatedCity, r);
+					}
+					if (f != null) {
+						f.prop(SearchResultConverter.PoiTypeField.MATCHED_OBJECTS.getFieldName(),
+								matchedObjects(objs, ctx.locale(), timeZone, dominatedCity, r.getViewBBox31(),
+										amenityFeatureCache));
+						f.prop(SearchResultConverter.PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
+						f.prop(SearchResultConverter.PoiTypeField.COMPARE_KEY.getFieldName(), SpatialSearchResult.compareKeyString(r));
+						response.features.add(f);
+					}
+				}
+			}
+			// extra info shown in the UI
+			response.info = getSearchStats(res.stats, sTime, response.features.size());
+			response.info.put("words-matched", res.combinations == null || res.combinations.isEmpty() ? 0
+					: res.combinations.get(0).getTokenCount());
+		} catch (TimeoutException e) {
+			LOGGER.warn(String.format("Spatial search timeout %d ms for '%s'", timeoutMs, ctx.text()));
+			response.info.put("timeout", true);
+		} catch (RejectedExecutionException e) {
+			LOGGER.warn(String.format("Spatial search rejected, all pool threads are busy: '%s'", ctx.text()));
+			response.info.put("busy", true);
+		} catch (ExecutionException e) {
+			LOGGER.error(String.format("Spatial search failed for '%s': %s", ctx.text(), e.getCause()), e.getCause());
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			LOGGER.warn(String.format("Spatial search interrupted for '%s'", ctx.text()));
+			response.info.put("interrupted", true);
+		} catch (RuntimeException e) {
+			LOGGER.error(String.format("Spatial search failed for '%s': %s", ctx.text(), e), e);
+		} finally {
+			cancelled.set(true);
+			if (searchSessionKey != null) {
+				runningSearches.remove(searchSessionKey, cancelled);
+			}
+			if (!readersOwnedByWorker) {
+				// worker never started (early return / rejection / pre-submit failure)
+				osmAndMapsService.unlockReaders(usedMapList);
+			}
+		}
+		return response;
+	}
+
+	public Map<String, Object> getSearchStats(SpatialSearchContext.SpatialSearchStats stats, long startTime,
+	                                          int results) {
+		Map<String, Object> info = new LinkedHashMap<>();
+		info.put("timeAll", String.format("%.1f", (System.currentTimeMillis() - startTime) / 1e3));
+		info.put("req", String.format("%.1f", stats.requestTime.ms() / 1000.0));
+		info.put("atoms", String.format("%.2f", stats.step1Atoms.ms() / 1000.0));
+		info.put("compute", String.format("%.2f", (stats.step2Compute.ms() - stats.sub2ReadObjTime.ms()) / 1000.0));
+		info.put("readObj", String.format("%.2f", stats.sub2ReadObjTime.ms() / 1000.0));
+		info.put("poi-by-type", String.format("%.2f, %,d", stats.poiByTypeTime.ms() / 1000.0, stats.poiByTypeBboxes));
+		info.put("results", results);
+
+		return info;
+	}
+
+	private Feature getSpatialPoiTypeFeature(SpatialPoiType type) {
+		Feature feature = new Feature(Geometry.point(new LatLon(0, 0)))
+				.prop(SearchResultConverter.PoiTypeField.TYPE.getFieldName(), ObjectType.POI_TYPE);
+		Map<String, String> tags = getSpatialPoiTypeFields(type);
+		for (Map.Entry<String, String> entry : tags.entrySet()) {
+			feature.prop(entry.getKey(), entry.getValue());
+		}
+		return feature;
+	}
+
+	public Map<String, String> getSpatialPoiTypeFields(SpatialPoiType type) {
+		if (type.singleType != null) {
+			if (type.singleType instanceof PoiType poiType && poiType.isAdditional()
+					&& type.getParentTypes() != null && type.getParentTypes().size() > 1) {
+				SearchCoreFactory.PoiAdditionalCustomFilter filter =
+						new SearchCoreFactory.PoiAdditionalCustomFilter(MapPoiTypes.getDefault(), poiType);
+				Map<String, String> tags = searchResultConverter.getPoiTypeFields(filter);
+				tags.put(SearchResultConverter.PoiTypeField.NAME.getFieldName(), filter.getTranslation());
+				return tags;
+			}
+			Map<String, String> tags = searchResultConverter.getPoiTypeFields(type.singleType);
+			tags.put(SearchResultConverter.PoiTypeField.NAME.getFieldName(), type.singleType.getTranslation());
+			if (type.getWikidataId() != null) {
+				tags.put(SearchResultConverter.PoiTypeField.WIKIDATA_ID.getFieldName(), type.getWikidataId());
+			}
+			return tags;
+		}
+		Map<String, String> tags = new HashMap<>();
+		if (type.poiAdditional != null) {
+			String valueKey = TopIndexFilter.getValueKey(type.poiAdditional);
+			String tag = type.getKey();
+			if (tag.endsWith("_" + valueKey)) {
+				tag = tag.substring(0, tag.length() - valueKey.length() - 1);
+			}
+			if (tag.startsWith(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX)) {
+				tag = tag.substring(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX.length());
+			}
+			tags.put(SearchResultConverter.PoiTypeField.CATEGORY_KEY_NAME.getFieldName(), tag);
+			tags.put(SearchResultConverter.PoiTypeField.CATEGORY_ICON.getFieldName(), tag);
+			// canonical key ("top_index_brand_<valueKey>"): web uses it as the search type in the URL
+			tags.put(SearchResultConverter.PoiTypeField.KEY_NAME.getFieldName(), type.getKey());
+			tags.put(SearchResultConverter.PoiTypeField.NAME.getFieldName(), type.poiAdditional);
+			if (type.getWikidataId() != null) {
+				tags.put(SearchResultConverter.PoiTypeField.WIKIDATA_ID.getFieldName(), type.getWikidataId());
+			}
+		}
+		return tags;
+	}
+
+	private List<Map<String, Object>> matchedObjects(List<MapObject> objs, String locale, String timeZone,
+	                                                 String dominatedCity, int[] bbox31,
+	                                                 Map<MapObject, Feature> amenityFeatureCache) {
+		List<Map<String, Object>> matched = new ArrayList<>();
+		for (MapObject o : objs) {
+			if (o.getLocation() == null) {
+				continue;
+			}
+			Map<String, Object> m = new LinkedHashMap<>();
+			m.put("name", o.getName(locale));
+			m.put("type", o.getClass().getSimpleName());
+			m.put("lat", roundCoord(o.getLocation().getLatitude()));
+			m.put("lon", roundCoord(o.getLocation().getLongitude()));
+			if (o instanceof Amenity amenity) {
+				Feature feature = amenityFeatureCache.computeIfAbsent(amenity,
+						k -> searchResultConverter.getPoiFeature(searchResultConverter.buildPoiSearchResult((Amenity) k, locale, dominatedCity), timeZone));
+				m.putAll(feature.properties);
+			} else if (o instanceof City city) {
+				m.put(SearchResultConverter.PoiTypeField.CITY_TYPE.getFieldName(), city.getType().name());
+			}
+			if (bbox31 != null && bbox31.length >= 4) {
+				Map<String, Object> bbox = new LinkedHashMap<>();
+				bbox.put("top", roundCoord(MapUtils.get31LatitudeY(bbox31[1])));
+				bbox.put("left", roundCoord(MapUtils.get31LongitudeX(bbox31[0])));
+				bbox.put("bottom", roundCoord(MapUtils.get31LatitudeY(bbox31[3])));
+				bbox.put("right", roundCoord(MapUtils.get31LongitudeX(bbox31[2])));
+				m.put(SearchResultConverter.PoiTypeField.BBOX_LAT_LON.getFieldName(), bbox);
+			}
+			matched.add(m);
+		}
+		return matched;
+	}
+
+	private double roundCoord(double value) {
+		return Math.round(value * 1000000d) / 1000000d;
+	}
+
+	private Feature getSpatialFeature(LatLon loc, List<MapObject> objs, String locale, String timeZone,
+	                                  String dominatedCity, SpatialSearchResult ssr) {
+		String extraNameMatch = ssr.getExtraNameMatch();
+
+		MapObject obj = objs.isEmpty() ? null : objs.get(0);
+		if (obj == null || loc == null) {
+			return null;
+		}
+		if (obj instanceof Amenity amenity) {
+			SearchResult result = searchResultConverter.buildPoiSearchResult(amenity, locale, dominatedCity);
+			result.localeName = amenity.getName(locale);
+			if (Algorithms.isNotEmpty(extraNameMatch)) {
+				result.localeName += " (" + extraNameMatch + ")"; // ref
+			}
+			return searchResultConverter.getFeature(result, timeZone);
+		}
+		SearchResult result = new SearchResult();
+
+		if (spatialTextSearchAPI
+				.convertSpatialSearchResult(ssr, result, getSpatialPoiTypeSearch(), loc, locale, false) != null) {
+			if (result.objectType == ObjectType.BOUNDARY || result.objectType == ObjectType.POSTCODE) {
+				result.objectType = ObjectType.CITY; // Web does not handle POSTCODE/BOUNDARY
+			}
+			return searchResultConverter.getFeature(result, timeZone); // non-Amenity objects
+		}
+
+		return null;
+	}
+
+	private String calculateSpatialDominatedCity(List<SpatialSearchResult> results, String locale) {
+		Map<String, Integer> cityCounter = new TreeMap<>();
+		for (SpatialSearchResult r : results) {
+			for (MapObject obj : r.getObjects()) {
+				if (obj instanceof Amenity amenity) {
+					String cityName = amenity.getCityFromTagGroups(locale);
+					if (!Algorithms.isEmpty(cityName)) {
+						String domCity = getDominatedCity(cityCounter, getMainCityName(cityName));
+						if (domCity != null) {
+							return domCity;
+						}
+					}
+				}
+			}
+		}
+		return "";
+	}
+
+	private ThreadPoolExecutor executorForKey(ThreadPoolExecutor[] executors, String routingKey) {
+		int index = routingKey == null || routingKey.isEmpty()
+				? Math.floorMod(spatialSearchRoundRobin.getAndIncrement(), executors.length)
+				: Math.floorMod(routingKey.hashCode(), executors.length);
+		return executors[index];
+	}
+
+	public SpatialTextSearch getSpatialTextSearch() {
+		return spatialTextSearchLocal.get();
+	}
+}
