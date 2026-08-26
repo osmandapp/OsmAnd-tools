@@ -67,6 +67,8 @@ public class FastSpringController {
 	private static final String KIND_REFUND = "refund";
 	private static final String KIND_CHARGEBACK = "chargeback";
 
+	private static final String SKU_OSMAND_PRO_XV = "osmand_pro_xv";
+
 
 	// https://developer.fastspring.com/reference/webhooks-overview
 	@Transactional
@@ -104,7 +106,7 @@ public class FastSpringController {
 						return null;
 					}
 
-					if (sku.contains("osmand_pro_xv")) {
+					if (sku.contains(SKU_OSMAND_PRO_XV)) {
 						sendOsmAndAndSpecialGiftEmail = true;
 					}
 
