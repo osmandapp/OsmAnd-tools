@@ -718,6 +718,7 @@ public class UpdateInAppPurchase {
         }
 
         FastSpringHelper.FastSpringPurchase purchase = null;
+        boolean ioError = false;
 
         try {
             purchase = FastSpringHelper.getInAppPurchaseByOrderIdAndSku(orderId, sku);
@@ -725,7 +726,13 @@ public class UpdateInAppPurchase {
                 System.out.println("Fastspring API Result: " + purchase);
             }
         } catch (IOException e) {
+            ioError = true;
             System.err.println("WARN: IOException verifying Fastspring IAP " + sku + " (OrderId: " + orderId + "): " + e.getMessage());
+        }
+
+        if (ioError) {
+            updateCheckTimeOnly(orderId, sku, currentTime);
+            return true;
         }
 
         if (purchase == null) {
