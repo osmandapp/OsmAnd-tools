@@ -180,6 +180,11 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 		return classicSearchService;
 	}
 
+	@Override
+	public SpatialSearchService getSpatialSearchService() {
+		return spatialSearchService;
+	}
+
 	public String getWebServerConfigDir() {
 		return webServerConfigDir;
 	}

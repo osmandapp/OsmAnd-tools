@@ -32,6 +32,7 @@ import java.util.zip.ZipOutputStream;
 
 public interface DetectorService extends OBFService {
 	ClassicSearchService getClassicSearchService();
+	SpatialSearchService getSpatialSearchService();
 
 	SpatialSearchService.SpatialResults searchTestSpatial(ClassicSearchService.SearchContext ctx, ClassicSearchService.SearchOption options,
 			List<BinaryMapIndexReader> readers, boolean printLogs) throws IOException;
@@ -114,6 +115,11 @@ public interface DetectorService extends OBFService {
 		Double distance = location == null ? null : MapUtils.getDistance(new LatLon(ctx.lat(), ctx.lon()), location) / 1000.0;
 		ResultMetric metric = new ResultMetric("", res.visibleLevel(), res.matchedTokens(), res.sumOther(),
 				Collections.emptyList(), distance, true, true);
+		if (res.isPoiCategory()) {
+			var type = res.getPoiCategory(getSpatialSearchService().getSpatialPoiTypeSearch());
+			String name = type == null ? "" : getSpatialSearchService().getSpatialPoiTypeFields(type).getOrDefault("name", type.toString());
+			return new AddressResult(name, "poi_type", "", null, metric, location, null);
+		}
 		List<Street> streets = spatialStreets(objects, ctx.locale());
 		if (streets.size() > 1) {
 			City city = spatialCity(objects, streets);
@@ -135,6 +141,10 @@ public interface DetectorService extends OBFService {
 			name = extraName;
 		} else if (Algorithms.isNotEmpty(extraName)) {
 			name += " (" + extraName + ")";
+		}
+		if (object instanceof Amenity amenity) {
+			SearchResult poi = getSpatialSearchService().buildSpatialPoiSearchResult(amenity, ctx.locale());
+			return new AddressResult(name, "poi", poi.addressName, null, metric, location, null);
 		}
 		AddressResult parent = toParent(ctx, objects, 1, res.matchedTokens());
 		return new AddressResult(name, spatialType(object), spatialAddress(object, ctx.locale()),
