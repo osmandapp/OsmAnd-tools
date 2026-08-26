@@ -414,11 +414,11 @@ public class UserSubscriptionService {
 		}
 		if (subOrderId != null) {
 			pu.orderid = subOrderId;
-			LOG.info("Updated orderId for user " + pu.email + " " + pu.orderid);
+			LOG.info("Updated orderId for user " + EmailSenderService.shorten(pu.email) + " " + pu.orderid);
 			usersRepository.saveAndFlush(pu);
 			return true;
 		}
-		LOG.info("Empty update orderId for user " + pu.email);
+		LOG.info("Empty update orderId for user " + EmailSenderService.shorten(pu.email));
 		return false;
 	}
 
