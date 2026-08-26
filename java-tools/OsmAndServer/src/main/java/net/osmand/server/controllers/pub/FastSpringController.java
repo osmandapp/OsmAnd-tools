@@ -292,6 +292,9 @@ public class FastSpringController {
 	// https://developer.fastspring.com/reference/processed-and-unprocessed-webhook-events
 	@Scheduled(fixedRate = DAY)
 	public void processMissedFastSpringEvents() {
+		if (!FastSpringHelper.isConfigured()) {
+			return;
+		}
 		try {
 			String json = FastSpringHelper.getUnprocessedEvents(EVENTS_LOOKBACK_DAYS);
 			if (json == null) {

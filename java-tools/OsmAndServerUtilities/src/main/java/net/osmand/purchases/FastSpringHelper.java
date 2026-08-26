@@ -42,6 +42,7 @@ public class FastSpringHelper {
 
 	/**
 	 * Check if the purchase/subscription is too recent to validate
+	 *
 	 * @param recordTimestampMillis timestamp when the record was created in our database
 	 * @return true if it's too early to validate (less than 15 minutes old), false if validation can proceed
 	 */
@@ -180,6 +181,9 @@ public class FastSpringHelper {
 		}
 	}
 
+	public static boolean isConfigured() {
+		return System.getenv("FASTSPRING_USERNAME") != null && System.getenv("FASTSPRING_PASSWORD") != null;
+	}
 
 	public static HttpURLConnection openConnection(String path) throws IOException {
 		String username = System.getenv("FASTSPRING_USERNAME");
