@@ -73,6 +73,7 @@ public class UserTranslationsService {
     static final String USER_UPD_TYPE_SHARE_DENIED = "SHARE_DENIED";
     
     static final String TRANSLATION_MISSING = "Translation doesn't exist";
+    static final String TRANSLATION_EXPIRED = "Translation has expired";
 
     private static final String REDIS_MSG_KEY_PREFIX = "livetrack:msg:";
     private static final Duration MESSAGES_TTL = Duration.ofDays(7);
@@ -349,6 +350,10 @@ public class UserTranslationsService {
 			sendError("Not allowed to share in this translation", headers);
 			return;
 		}
+		if (isExpired(ust)) {
+			sendError(TRANSLATION_EXPIRED, headers);
+			return;
+		}
 		removeExpiredSharers(ust);
 		UserTranslationPlainObject obj = addSharer(ust, user.id, getNickname(user));
 		sendPrivateMessage(headers.getSessionId(), USER_UPD_TYPE_TRANSLATION, obj);
@@ -358,6 +363,10 @@ public class UserTranslationsService {
 
 	private boolean isAllowedToShare(UserTranslation ust, int userId) {
 		return ust.getOwner() == userId || ust.getAllowedSharers().contains(userId);
+	}
+
+	private boolean isExpired(UserTranslation ust) {
+		return System.currentTimeMillis() >= ust.getCreationDate() + ust.getDurationMs();
 	}
 
 	private boolean isSharing(UserTranslation ust, int userId) {
@@ -409,7 +418,7 @@ public class UserTranslationsService {
 		ust.getSharingOptions().removeIf(o -> o.userId == userId);
 		TranslationSharingOptions opts = new TranslationSharingOptions();
 		opts.startTime = System.currentTimeMillis();
-		opts.expireTime = opts.startTime + ust.getDurationMs();
+		opts.expireTime = ust.getCreationDate() + ust.getDurationMs();
 		opts.userId = userId;
 		opts.nickname = uniqueNickname(ust, userId, baseNickname);
 		ust.getSharingOptions().add(opts);
@@ -468,6 +477,10 @@ public class UserTranslationsService {
 	public void approveShare(UserTranslation ust, CloudUser owner, int targetUserId, SimpMessageHeaderAccessor headers) {
 		if (ust.getOwner() != owner.id) {
 			sendError("Only the owner can approve sharing", headers);
+			return;
+		}
+		if (isExpired(ust)) {
+			sendError(TRANSLATION_EXPIRED, headers);
 			return;
 		}
 		ust.getPendingShareRequests().remove(targetUserId);
