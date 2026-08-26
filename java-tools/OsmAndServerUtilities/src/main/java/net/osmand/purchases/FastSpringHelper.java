@@ -35,8 +35,8 @@ public class FastSpringHelper {
 	public static final long MINIMUM_VALIDATION_DELAY_MILLIS = 15 * 60 * 1000;
 
 	private static final String API_BASE = "https://api.fastspring.com";
-	private static final int CONNECT_TIMEOUT_MILLIS = 15 * 1000;
-	private static final int READ_TIMEOUT_MILLIS = 30 * 1000;
+	private static final int CONNECT_TIMEOUT_MILLIS = 30 * 1000;
+	private static final int READ_TIMEOUT_MILLIS = 60 * 1000;
 	private static final Gson GSON = new Gson();
 	protected static final Log LOG = LogFactory.getLog(FastSpringHelper.class);
 
