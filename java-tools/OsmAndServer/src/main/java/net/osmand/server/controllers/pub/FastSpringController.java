@@ -370,7 +370,6 @@ public class FastSpringController {
 			sub.valid = false;
 			sub.kind = kind;
 			sub.autorenewing = false;
-			sub.expiretime = now; // expire immediately
 			sub.checktime = now;
 			deviceSubscriptionsRepository.saveAndFlush(sub);
 			if (sub.userId != null) {
