@@ -364,8 +364,10 @@ public interface DetectorService extends OBFService {
 		}
 	}
 
-	private String amenityKey(Amenity amenity) {
-		return amenity.getId() + "|" + amenity.getType() + "|" + amenity.getSubType();
+	private void collectUnitTestAmenity(Amenity amenity, Map<String, Amenity> amenities) {
+		if (amenity != null && amenity.getId() != null) {
+			amenities.putIfAbsent(amenity.getId() + "|" + amenity.getType() + "|" + amenity.getSubType(), amenity);
+		}
 	}
 
 	private City compactUnitTestCity(City city) {
@@ -465,8 +467,7 @@ public interface DetectorService extends OBFService {
 			}
 			for (MapObject object : objects) {
 				if (object instanceof Amenity amenity) {
-					String amenityKey = amenityKey(amenity);
-					amenities.putIfAbsent(amenityKey, amenity);
+					collectUnitTestAmenity(amenity, amenities);
 				} else if (object instanceof City city) {
 					collectCompactUnitTestCity(city, cities);
 				} else if (object instanceof Street street) {
@@ -513,7 +514,7 @@ public interface DetectorService extends OBFService {
 			for (int i = 0; i < amenitiesJson.length(); i++) {
 				Amenity amenity = Amenity.parseJSON(amenitiesJson.getJSONObject(i));
 				if (isWithinUnitTestSourceRadius(amenity, point, unitTest.radius())) {
-					amenities.putIfAbsent(amenityKey(amenity), amenity);
+					collectUnitTestAmenity(amenity, amenities);
 				}
 			}
 		}
