@@ -293,37 +293,56 @@ public class FastSpringController {
 	@Scheduled(fixedRate = DAY)
 	public void processMissedFastSpringEvents() {
 		if (!FastSpringHelper.isConfigured()) {
+			LOGGER.info("FastSpring: missed events check skipped, credentials are not configured");
 			return;
 		}
+		LOGGER.info("FastSpring: missed events check started (last " + EVENTS_LOOKBACK_DAYS + " days)");
 		try {
 			String json = FastSpringHelper.getUnprocessedEvents(EVENTS_LOOKBACK_DAYS);
 			if (json == null) {
+				LOGGER.warn("FastSpring: missed events check finished, unprocessed events are not available");
 				return;
 			}
 			FastSpringWebhookRequest resp = gson.fromJson(json, FastSpringWebhookRequest.class);
 			if (resp == null || resp.events == null || resp.events.isEmpty()) {
+				LOGGER.info("FastSpring: missed events check finished, no unprocessed events");
 				return;
 			}
+			LOGGER.info("FastSpring: " + resp.events.size() + " unprocessed events to check");
 			resp.events.sort(Comparator.comparingLong(e -> e.created != null ? e.created : 0L));
 			TransactionTemplate txTemplate = new TransactionTemplate(transactionManager);
+			int handled = 0;
+			int skipped = 0;
+			int failed = 0;
 			for (FastSpringWebhookRequest.Event event : resp.events) {
 				if (event.id == null) {
 					continue;
 				}
 				try {
-					if (HANDLED_EVENTS.contains(event.type)) {
+					boolean handledType = HANDLED_EVENTS.contains(event.type);
+					if (handledType) {
 						ResponseEntity<String> error = txTemplate.execute(status -> dispatchFastSpringEvent(event));
 						if (error != null) {
+							failed++;
 							LOGGER.error("FastSpring: missed event " + event.id + " (" + event.type + ") failed: " + error.getBody());
 							continue;
 						}
 					}
 					FastSpringHelper.markEventProcessed(event.id);
+					if (handledType) {
+						handled++;
+						LOGGER.info("FastSpring: missed event " + event.id + " (" + event.type + ") processed");
+					} else {
+						skipped++;
+					}
 				} catch (Exception e) {
+					failed++;
 					LOGGER.error("FastSpring: failed to process missed event " + event.id
 							+ " (" + event.type + "): " + e.getMessage(), e);
 				}
 			}
+			LOGGER.info(String.format("FastSpring: missed events check finished, processed: %d, skipped (not handled type): %d, failed: %d",
+					handled, skipped, failed));
 		} catch (IOException e) {
 			LOGGER.error("FastSpring missed events check failed: " + e.getMessage(), e);
 		}
