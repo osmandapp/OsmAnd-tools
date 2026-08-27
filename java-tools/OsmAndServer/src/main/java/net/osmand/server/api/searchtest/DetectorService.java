@@ -50,7 +50,7 @@ public interface DetectorService extends OBFService {
 	record ResultMetric(String obf, int depth, double foundWordCount, double unknownPhraseMatchWeight,
 	                    Collection<String> otherWordsMatch, Double distance, boolean isEqual, boolean inResult) {}
 	record AddressResult(String name, String type, String address, AddressResult parent, ResultMetric metric,
-	                     LatLon location, String mainWord) {}
+	                     LatLon location, String mainWord, Long osmId) {}
 
 	default ResultsWithStats getSearchResults(ClassicSearchService.SearchContext ctx, ClassicSearchService.SearchOption options, Boolean spatial,
 	                                         List<BinaryMapIndexReader> readers) throws IOException {
@@ -118,7 +118,7 @@ public interface DetectorService extends OBFService {
 		if (res.isPoiCategory()) {
 			var type = res.getPoiCategory(getSpatialSearchService().getSpatialPoiTypeSearch());
 			String name = type == null ? "" : getSpatialSearchService().getSpatialPoiTypeFields(type).getOrDefault("name", type.toString());
-			return new AddressResult(name, "poi_type", "", null, metric, location, null);
+			return new AddressResult(name, "poi_type", "", null, metric, location, null, null);
 		}
 		List<Street> streets = spatialStreets(objects, ctx.locale());
 		if (streets.size() > 1) {
@@ -128,7 +128,7 @@ public interface DetectorService extends OBFService {
 					.toList());
 			AddressResult parent = city == null ? null : toParent(ctx, city, 1, res.matchedTokens());
 			return new AddressResult(name, "street_intersection", spatialName(city, ctx.locale()),
-					parent, metric, location, null);
+					parent, metric, location, null, null);
 		}
 
 		MapObject object = res.getMainObject();
@@ -155,11 +155,11 @@ public interface DetectorService extends OBFService {
 		}
 		if (object instanceof Amenity amenity) {
 			SearchResult poi = getSpatialSearchService().buildSpatialPoiSearchResult(amenity, ctx.locale());
-			return new AddressResult(name, "poi", poi.addressName, null, metric, location, null);
+			return new AddressResult(name, "poi", poi.addressName, null, metric, location, null, osmId(object));
 		}
 		AddressResult parent = toParent(ctx, objects, 1, res.matchedTokens());
 		return new AddressResult(name, spatialType(object), spatialAddress(object, ctx.locale()),
-				parent, metric, location, null);
+				parent, metric, location, null, osmId(object));
 	}
 
 	private List<Street> spatialStreets(List<MapObject> objects, String locale) {
@@ -205,7 +205,7 @@ public interface DetectorService extends OBFService {
 		ResultMetric metric = new ResultMetric("", depth, foundWordCount, 0,
 				Collections.emptyList(), distance, true, true);
 		return new AddressResult(spatialName(object, ctx.locale()), spatialType(object),
-				spatialAddress(object, ctx.locale()), null, metric, location, null);
+				spatialAddress(object, ctx.locale()), null, metric, location, null, osmId(object));
 	}
 
 	private AddressResult toParent(ClassicSearchService.SearchContext ctx, List<MapObject> objects, int index, double foundWordCount) {
@@ -217,7 +217,17 @@ public interface DetectorService extends OBFService {
 		Double distance = location == null ? null : MapUtils.getDistance(new LatLon(ctx.lat(), ctx.lon()), location) / 1000.0;
 		ResultMetric metric = new ResultMetric("", index, foundWordCount, 0, Collections.emptyList(), distance, true, true);
 		return new AddressResult(spatialName(object, ctx.locale()), spatialType(object), spatialAddress(object, ctx.locale()),
-				toParent(ctx, objects, index + 1, foundWordCount), metric, location, null);
+				toParent(ctx, objects, index + 1, foundWordCount), metric, location, null, osmId(object));
+	}
+
+	private Long osmId(Object object) {
+		if (object instanceof Amenity amenity) {
+			return amenity.getId() == null || amenity.getId() < 0 ? null : amenity.getOsmId();
+		}
+		if (object instanceof MapObject mapObject && mapObject.getId() != null) {
+			return ObfConstants.getOsmObjectId(mapObject);
+		}
+		return null;
 	}
 
 	private String spatialName(MapObject object, String locale) {
@@ -261,10 +271,10 @@ public interface DetectorService extends OBFService {
 
 		// If we've already visited this node, break the cycle by not traversing further
 		if (!seen.add(r))
-			return new AddressResult(r.toString(), type, r.addressName, null, metric, r.location, mainWord);
+			return new AddressResult(r.toString(), type, r.addressName, null, metric, r.location, mainWord, osmId(r.object));
 
 		AddressResult parent = toResult(r.parentSearchResult, mainWord, seen);
-		return new AddressResult(r.toString(), type, r.addressName, parent, metric, r.location, mainWord);
+		return new AddressResult(r.toString(), type, r.addressName, parent, metric, r.location, mainWord, osmId(r.object));
 	}
 
 	record UnitTestPayload(
@@ -365,9 +375,27 @@ public interface DetectorService extends OBFService {
 	}
 
 	private void collectUnitTestAmenity(Amenity amenity, Map<String, Amenity> amenities) {
-		if (amenity != null && amenity.getId() != null) {
-			amenities.putIfAbsent(amenity.getId() + "|" + amenity.getType() + "|" + amenity.getSubType(), amenity);
+		if (amenity == null) {
+			return;
 		}
+		if (amenity.getId() == null) {
+			amenity = Amenity.parseJSON(amenity.toJSON());
+			long id = -1;
+			while (containsAmenityId(amenities, id)) {
+				id--;
+			}
+			amenity.setId(id);
+		}
+		amenities.putIfAbsent(amenity.getId() + "|" + amenity.getType() + "|" + amenity.getSubType(), amenity);
+	}
+
+	private boolean containsAmenityId(Map<String, Amenity> amenities, long id) {
+		for (Amenity amenity : amenities.values()) {
+			if (Objects.equals(amenity.getId(), id)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private City compactUnitTestCity(City city) {
