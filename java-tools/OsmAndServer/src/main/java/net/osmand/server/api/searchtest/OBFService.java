@@ -96,6 +96,13 @@ public interface OBFService extends BaseService {
 	OsmAndMapsService getMapsService();
 	String getSearchTestDatasourceUrl();
 
+	default Long getOsmId(Object object) {
+		if (object instanceof MapObject mapObject && mapObject.getId() != null && mapObject.getId() >= 0) {
+			return ObfConstants.getOsmObjectId(mapObject);
+		}
+		return null;
+	}
+
 	default List<BinaryMapIndexReader> openObfReaders(List<String> obfs) throws IOException {
 		List<BinaryMapIndexReader> readers = new ArrayList<>();
 		try {

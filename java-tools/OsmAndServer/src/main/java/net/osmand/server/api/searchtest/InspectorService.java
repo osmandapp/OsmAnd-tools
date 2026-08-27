@@ -3449,7 +3449,7 @@ public interface InspectorService extends OBFService {
 								
 								index.preloadStreets(c, null, null);
 								if (isStreetEmpty && isHouseEmpty) {
-									results.add(new CityAddress(cityName, c.getLocation(), streets, c.getStreets().size(), c.getType().name().toLowerCase(), addressOsmId(c)));
+									results.add(new CityAddress(cityName, c.getLocation(), streets, c.getStreets().size(), c.getType().name().toLowerCase(), getOsmId(c)));
 									continue;
 								}
 
@@ -3461,7 +3461,7 @@ public interface InspectorService extends OBFService {
 
 									index.preloadBuildings(s, null, null);
 									if (isHouseEmpty) {
-										streets.add(new StreetAddress(streetName, s.getLocation(), buildings, s.getBuildings().size(), addressOsmId(s)));
+										streets.add(new StreetAddress(streetName, s.getLocation(), buildings, s.getBuildings().size(), getOsmId(s)));
 										continue;
 									}
 
@@ -3470,16 +3470,16 @@ public interface InspectorService extends OBFService {
 										for (Building b : bs) {
 											final String houseName = b.getName(lang);
 											if (houseName != null && housePattern.matcher(houseName).find())
-												buildings.add(new HouseAddress(houseName, b.getLocation(), addressOsmId(b)));
+												buildings.add(new HouseAddress(houseName, b.getLocation(), getOsmId(b)));
 										}
 									}
 									if (!buildings.isEmpty()) {
-										StreetAddress street = new StreetAddress(streetName, s.getLocation(), buildings, s.getBuildings().size(), addressOsmId(s));
+										StreetAddress street = new StreetAddress(streetName, s.getLocation(), buildings, s.getBuildings().size(), getOsmId(s));
 										streets.add(street);
 									}
 								}
 								if (!streets.isEmpty())
-									results.add(new CityAddress(cityName, c.getLocation(), streets, c.getStreets().size(), c.getType().name().toLowerCase(), addressOsmId(c)));
+									results.add(new CityAddress(cityName, c.getLocation(), streets, c.getStreets().size(), c.getType().name().toLowerCase(), getOsmId(c)));
 							}
 						}
 					} else if (poiPattern != null && p instanceof BinaryMapPoiReaderAdapter.PoiRegion poi) {
@@ -3503,10 +3503,6 @@ public interface InspectorService extends OBFService {
 			getLogger().error("Failed to read OBF {}", file, e);
 			throw new RuntimeException("Failed to read OBF:BinaryMapIndexReader.buildSearchPoiRequest( " + e.getMessage(), e);
 		}
-	}
-
-	private Long addressOsmId(MapObject object) {
-		return object == null || object.getId() == null || object.getId() < 0 ? null : ObfConstants.getOsmObjectId(object);
 	}
 
 	default List<Record> getAddresses(List<String> obfs, String lang, boolean includesBoundaryPostcode, String cityRegExp, String streetRegExp, String houseRegExp, String poiRegExp) {
