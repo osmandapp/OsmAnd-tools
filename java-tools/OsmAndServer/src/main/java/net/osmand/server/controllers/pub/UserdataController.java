@@ -276,7 +276,7 @@ public class UserdataController {
                 LOG.warn("Supporter not found during cloud registration for supporterId: " + userId);
             }
         } else {
-            LOG.info("No supporter context provided during cloud registration for email: " + email);
+            LOG.info("No supporter context provided during cloud registration for email: " + EmailSenderService.shorten(email));
         }
         // --- End Linking Logic ---
 
@@ -501,6 +501,9 @@ public class UserdataController {
 		String m = "";
 		for (Map.Entry<String, String[]> e : params.entrySet()) {
 			String v = e.getValue().length > 0 ? e.getValue()[0] : "EMPTY";
+			if (e.getKey().toLowerCase().contains("email") || emailSender.isEmail(v)) {
+				v = EmailSenderService.shorten(v); // hide full email from logs
+			}
 			m += ", " + e.getKey() + ":" + v;
 		}
 		LOG.error("URL:" + url + ", ip:" + ipAddress +  ", code:" + code + ", message:" + msg + m);

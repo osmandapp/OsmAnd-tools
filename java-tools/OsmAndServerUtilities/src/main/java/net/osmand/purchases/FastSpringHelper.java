@@ -7,6 +7,7 @@ import org.apache.commons.logging.LogFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -34,10 +35,14 @@ public class FastSpringHelper {
 	public static final long MINIMUM_VALIDATION_DELAY_MILLIS = 15 * 60 * 1000;
 
 	private static final String API_BASE = "https://api.fastspring.com";
+	private static final int CONNECT_TIMEOUT_MILLIS = 30 * 1000;
+	private static final int READ_TIMEOUT_MILLIS = 60 * 1000;
+	private static final Gson GSON = new Gson();
 	protected static final Log LOG = LogFactory.getLog(FastSpringHelper.class);
 
 	/**
 	 * Check if the purchase/subscription is too recent to validate
+	 *
 	 * @param recordTimestampMillis timestamp when the record was created in our database
 	 * @return true if it's too early to validate (less than 15 minutes old), false if validation can proceed
 	 */
@@ -106,6 +111,38 @@ public class FastSpringHelper {
 		return null;
 	}
 
+	// https://developer.fastspring.com/reference/list-all-unprocessed-events
+	public static String getUnprocessedEvents(int days) throws IOException {
+		HttpURLConnection connection = openConnection("/events/unprocessed?days=" + days);
+		if (connection.getResponseCode() != 200) {
+			LOG.warn("Failed to get unprocessed FastSpring events: "
+					+ connection.getResponseCode() + " " + connection.getResponseMessage());
+			return null;
+		}
+		try (InputStream is = connection.getInputStream()) {
+			return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+		}
+	}
+
+	// https://developer.fastspring.com/reference/update-an-event
+	public static boolean markEventProcessed(String eventId) throws IOException {
+		HttpURLConnection connection = openConnection("/events/" + eventId);
+		connection.setRequestMethod("POST");
+		connection.setDoOutput(true);
+		connection.setRequestProperty("Content-Type", "application/json");
+		try (OutputStream os = connection.getOutputStream()) {
+			os.write("{\"processed\":true}".getBytes(StandardCharsets.UTF_8));
+		}
+		int code = connection.getResponseCode();
+		if (code != 200) {
+			LOG.warn("Failed to mark FastSpring event processed " + eventId + ": "
+					+ code + " " + connection.getResponseMessage());
+			return false;
+		}
+
+		return true;
+	}
+
 	private static FastSpringOrder getOrder(String orderId) throws IOException {
 		HttpURLConnection connection = openConnection("/orders/" + orderId);
 		try (InputStream is = connection.getInputStream();
@@ -115,7 +152,7 @@ public class FastSpringHelper {
 						connection.getResponseCode() + " " + connection.getResponseMessage());
 				return null;
 			}
-			FastSpringOrder order = new Gson().fromJson(reader, FastSpringOrder.class);
+			FastSpringOrder order = GSON.fromJson(reader, FastSpringOrder.class);
 			if (order == null) {
 				LOG.warn("Failed to get FastSpring order: " + connection.getResponseCode() + " " + connection.getResponseMessage());
 				return null;
@@ -134,7 +171,7 @@ public class FastSpringHelper {
 						connection.getResponseCode() + " " + connection.getResponseMessage());
 				return null;
 			}
-			FastSpringSubscription subscription = new Gson().fromJson(reader, FastSpringSubscription.class);
+			FastSpringSubscription subscription = GSON.fromJson(reader, FastSpringSubscription.class);
 			if (subscription == null) {
 				LOG.warn("Failed to get FastSpring subscription: " + connection.getResponseCode() + " " + connection.getResponseMessage());
 				return null;
@@ -144,6 +181,9 @@ public class FastSpringHelper {
 		}
 	}
 
+	public static boolean isConfigured() {
+		return System.getenv("FASTSPRING_USERNAME") != null && System.getenv("FASTSPRING_PASSWORD") != null;
+	}
 
 	public static HttpURLConnection openConnection(String path) throws IOException {
 		String username = System.getenv("FASTSPRING_USERNAME");
@@ -158,6 +198,8 @@ public class FastSpringHelper {
 
 		URL url = new URL(API_BASE + path);
 		HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+		connection.setConnectTimeout(CONNECT_TIMEOUT_MILLIS);
+		connection.setReadTimeout(READ_TIMEOUT_MILLIS);
 		connection.setRequestMethod("GET");
 		connection.setRequestProperty("Authorization", "Basic " + encodedAuth);
 		connection.setRequestProperty("Accept", "application/json");
@@ -182,6 +224,7 @@ public class FastSpringHelper {
 	public static class FastSpringSubscription {
 		public String id;
 		public Boolean active;
+		public String state; // active, overdue, canceled, deactivated, trial (https://developer.fastspring.com/reference/retrieve-a-subscription)
 		public String sku;
 		public Long begin; //purchaseTime
 		public Long nextChargeDate; //expiretime
