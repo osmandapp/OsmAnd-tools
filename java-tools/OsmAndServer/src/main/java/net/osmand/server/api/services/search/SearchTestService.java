@@ -26,7 +26,6 @@ import net.osmand.search.core.spatial.SpatialSearchContext;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 
-import net.osmand.data.QuadRect;
 import net.osmand.search.core.spatial.SpatialTextSearch.SpatialSearchResults;
 import net.osmand.search.core.spatial.SpatialTextSearch.SpatialTextSearchSettings;
 import net.osmand.search.core.spatial.SpatialSearchResult;
@@ -179,6 +178,11 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 	@Override
 	public ClassicSearchService getClassicSearchService() {
 		return classicSearchService;
+	}
+
+	@Override
+	public SpatialSearchService getSpatialSearchService() {
+		return spatialSearchService;
 	}
 
 	public String getWebServerConfigDir() {
@@ -598,13 +602,9 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 		SpatialSearchService.SpatialResults res = null;
 		try {
 			if (readers == null) {
-				int radiusMeters = Math.toIntExact(Math.round(options.getRadius() * 1000));
-				QuadRect llBbox = MapUtils.calculateLatLonBbox(
-						ctx.lat(), ctx.lon(), radiusMeters);
-				QuadRect points = mapsService.points(null,
-						new LatLon(llBbox.top, llBbox.left),
-						new LatLon(llBbox.bottom, llBbox.right));
-				List<OsmAndMapsService.BinaryMapIndexReaderReference> maps = mapReadersService.getMapsForSearch(points, false);
+				int radiusKm = Math.toIntExact(Math.round(options.getRadius()));
+				List<OsmAndMapsService.BinaryMapIndexReaderReference> maps =
+						mapsService.getObfReadersForSpatialSearch(ctx.lat(), ctx.lon(), radiusKm);
 				if (maps.isEmpty()) {
 					throw new IOException(String.format(Locale.US,
 							"No OBF maps found for spatial search at %.6f, %.6f within %.3f km",
@@ -619,7 +619,7 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 				readers.add(regionsReader);
 			}
 
-			res = searchTestSpatial(ctx, readers, printLogs, obfCount);
+			res = searchTestSpatial(ctx, readers, printLogs, obfCount, !options.queryIsCompleted());
 		} catch (RuntimeException e) {
 			LOGGER.error(String.format("Spatial search failed for '%s': %s", ctx.text(), e), e);
 			StringWriter stackTrace = new StringWriter();
@@ -634,12 +634,14 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 	}
 
 	private SpatialSearchService.SpatialResults searchTestSpatial(ClassicSearchService.SearchContext ctx, List<BinaryMapIndexReader> readers,
-	                                                            boolean printLogs, int obfCount)
+	                                                            boolean printLogs, int obfCount, boolean autocomplete)
 			throws IOException {
 		if (readers == null || readers.isEmpty()) {
 			return null;
 		}
-		SpatialTextSearchSettings settings = SpatialTextSearchSettings.defaultSettings();
+		SpatialTextSearchSettings settings = autocomplete
+				? SpatialTextSearchSettings.suggestionSettings()
+				: SpatialTextSearchSettings.defaultSettings();
 		settings.AUTO_CLEAR_PREFIX_CACHE_LIMIT = TEST_CACHE_PREFIX_LIMIT;
 		SpatialSearchContext sscontext = new SpatialSearchContext(settings, readers, spatialSearchService.getSpatialPoiTypeSearch(), new LatLon(ctx.lat(), ctx.lon()));
 		SpatialSearchContext.SpatialSearchStats stats = sscontext.getStats();

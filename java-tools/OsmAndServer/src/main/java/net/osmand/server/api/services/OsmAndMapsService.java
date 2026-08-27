@@ -1420,11 +1420,16 @@ public class OsmAndMapsService {
 	// Union of region-based selection (regions.ocbf) and the regular bbox-intersection selection.
 	public List<BinaryMapIndexReaderReference> getObfReadersForSpatialSearch(double lat, double lon,
 	                                                                         boolean autocomplete) throws IOException {
-		initObfReaders();
-
 		int searchRadiusKm = autocomplete
 				? SpatialTextSearch.SpatialTextSearchSettings.suggestionSettings().SUGGESTED_SEARCH_RADIUS_KM
 				: SpatialTextSearch.SpatialTextSearchSettings.defaultSettings().SUGGESTED_SEARCH_RADIUS_KM;
+		return getObfReadersForSpatialSearch(lat, lon, searchRadiusKm);
+	}
+
+	public List<BinaryMapIndexReaderReference> getObfReadersForSpatialSearch(double lat, double lon,
+	                                                                         int searchRadiusKm) throws IOException {
+		initObfReaders();
+
 		QuadRect llBbox = MapUtils.calculateLatLonBbox(lat, lon, searchRadiusKm * 1000);
 		QuadRect bbox = points(null, new LatLon(llBbox.top, llBbox.left), new LatLon(llBbox.bottom, llBbox.right));
 		Set<File> files = new LinkedHashSet<>();
