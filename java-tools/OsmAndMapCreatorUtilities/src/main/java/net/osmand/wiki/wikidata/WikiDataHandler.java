@@ -142,7 +142,7 @@ public class WikiDataHandler extends DefaultHandler {
 				ON CONFLICT(id) DO UPDATE SET
 				page = excluded.page;
 				""");
-		for (String table : List.of("wiki_coords", "wiki_mapping", "wiki_region", "wikidata_properties")) {
+		for (String table : List.of("wiki_coords", "wiki_mapping", "wiki_region", "wikidata_properties", "wikidata_blobs")) {
 			deleteByIdPreps.add(conn.prepareStatement("DELETE FROM " + table + " WHERE id = ?"));
 		}
 		gson = new GsonBuilder().registerTypeAdapter(ArticleMapper.Article.class, new ArticleMapper()).create();
