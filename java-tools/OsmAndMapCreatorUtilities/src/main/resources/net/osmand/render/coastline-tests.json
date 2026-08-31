@@ -1,0 +1,103 @@
+{
+  "referenceUrl": "https://tile.osmand.net/hd/{z}/{x}/{y}.png",
+  "downloadUrl": "https://download.osmand.net/download?standard=yes&file={name}.zip",
+  "comment": [
+    "Known coastline problems of https://github.com/osmandapp/OsmAnd-Issues/issues/3291.",
+    "Every case renders the tiles around lat/lon (radius tiles in every direction) for every zoom",
+    "of 'zooms' or of the 'minzoom'..'maxzoom' range and compares the water mask with the",
+    "reference raster tile. 'maps' are the obf files the case needs - they are downloaded from",
+    "https://download.osmand.net/list into -maps.dir when they are missing.",
+    "check: 'water' compares the water masks, 'seamarksInland' renders the maps of 'maps' alone",
+    "and requires the tile to stay empty."
+  ],
+  "cases": [
+    {
+      "issue": 24376,
+      "title": "Gray squares in the ocean",
+      "url": "https://github.com/osmandapp/OsmAnd/issues/24376",
+      "lat": 18.42826,
+      "lon": -65.08499,
+      "minzoom": 9,
+      "maxzoom": 13,
+      "radius": 1,
+      "maps": ["Virgin-islands-us_centralamerica_2.obf"]
+    },
+    {
+      "issue": 24925,
+      "title": "Rendering artefacts Shanghai coast line",
+      "url": "https://github.com/osmandapp/OsmAnd/issues/24925",
+      "lat": 30.95709,
+      "lon": 121.97073,
+      "minzoom": 12,
+      "maxzoom": 14,
+      "radius": 1,
+      "maps": ["China_shanghai_asia_2.obf"]
+    },
+    {
+      "issue": 24925,
+      "title": "Shanghai coastline self intersection after simplification",
+      "url": "https://github.com/osmandapp/OsmAnd/issues/24925#issuecomment-coastline-self-intersection",
+      "lat": 31.037767,
+      "lon": 121.987225,
+      "minzoom": 13,
+      "maxzoom": 15,
+      "radius": 1,
+      "maps": ["China_shanghai_asia_2.obf"]
+    },
+    {
+      "issue": 25119,
+      "title": "Coastline broken: water flooding the land in Goa region",
+      "url": "https://github.com/osmandapp/OsmAnd/issues/25119",
+      "lat": 15.01040,
+      "lon": 74.01293,
+      "minzoom": 10,
+      "maxzoom": 16,
+      "radius": 1,
+      "maps": ["India_goa_asia_2.obf"]
+    },
+    {
+      "issue": 23353,
+      "title": "Map flooding - San Francisco",
+      "url": "https://github.com/osmandapp/OsmAnd/issues/23353",
+      "lat": 37.447065,
+      "lon": -122.124206,
+      "minzoom": 11,
+      "maxzoom": 15,
+      "radius": 1,
+      "maps": ["Us_california_san-francisco_northamerica_2.obf"]
+    },
+    {
+      "issue": 25618,
+      "title": "St. Lawrence River is rendered as land northeast of Trois-Pistoles",
+      "url": "https://github.com/osmandapp/OsmAnd/issues/25618",
+      "lat": 49.2209550,
+      "lon": -68.1521445,
+      "minzoom": 8,
+      "maxzoom": 12,
+      "radius": 1,
+      "maps": ["Canada_quebec_cote-nord_northamerica_2.obf"]
+    },
+    {
+      "issue": 18187,
+      "title": "World_seamarks contains objects deep inside continents (Attiki)",
+      "url": "https://github.com/osmandapp/OsmAnd/issues/18187",
+      "lat": 38.14246,
+      "lon": 23.95187,
+      "zooms": [14],
+      "radius": 1,
+      "check": "seamarksInland",
+      "maps": ["World_seamarks_2.obf"]
+    },
+    {
+      "issue": 18187,
+      "title": "World_seamarks contains objects deep inside continents (Evia)",
+      "url": "https://github.com/osmandapp/OsmAnd/issues/18187",
+      "lat": 38.38044,
+      "lon": 24.20120,
+      "zooms": [14],
+      "radius": 1,
+      "check": "seamarksInland",
+      "maps": ["World_seamarks_2.obf"]
+    }
+  ]
+}
