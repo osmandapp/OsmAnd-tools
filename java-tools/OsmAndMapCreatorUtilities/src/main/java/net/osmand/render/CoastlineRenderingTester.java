@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.io.RandomAccessFile;
 import java.io.Reader;
 import java.io.Writer;
 import java.net.HttpURLConnection;
@@ -22,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -34,6 +36,7 @@ import com.google.gson.Gson;
 
 import net.osmand.NativeJavaRendering;
 import net.osmand.NativeJavaRendering.RenderingImageContext;
+import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.CachedOsmandIndexes;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -139,9 +142,6 @@ public class CoastlineRenderingTester {
 
 	/** Without it the ocean is not rendered at all outside of the detailed maps. */
 	private static final String DEFAULT_BASEMAP = "World_basemap_2.obf";
-
-	/** Obf index cache, written into the folder the job runs in - never into the maps folder. */
-	private static final String INDEXES_CACHE = "indexes.cache";
 
 	// ----------------------------------------------------------------- json model
 
@@ -473,14 +473,6 @@ public class CoastlineRenderingTester {
 			System.err.println("Maps folder " + mapsDir.getAbsolutePath() + " does not exist");
 			return;
 		}
-		// the cache lives in the folder the job runs in (the Jenkins workspace), so that it is
-		// wiped together with it and never written into the shared maps folder
-		File cacheFile = new File(System.getProperty("user.dir"), INDEXES_CACHE);
-		boolean existed = cacheFile.isFile();
-		CachedOsmandIndexes cache = new CachedOsmandIndexes();
-		if (existed) {
-			cache.readFromFile(cacheFile);
-		}
 		// keeps the newest version of every region only
 		MapsCollection collection = new MapsCollection(true);
 		for (File obf : Algorithms.getSortedFilesVersions(mapsDir)) {
@@ -488,20 +480,10 @@ public class CoastlineRenderingTester {
 				collection.add(obf);
 			}
 		}
-		List<File> obfFiles = collection.getFilesToUse();
-		for (File f : obfFiles) {
-			// a corrupt obf throws here on purpose - the map has to be fixed, not skipped
-			cache.getFileIndex(f, true);
-		}
-		cache.writeToFile(cacheFile);
-		renderer.initCacheMapFile(cacheFile.getAbsolutePath());
-		System.out.println("Indexes cache : " + cacheFile.getAbsolutePath()
-				+ (existed ? " (reused)" : " (created)"));
-
 		String[] excluded = opt("exclude", DEFAULT_EXCLUDED_MAPS).split(",");
 		List<File> maps = new ArrayList<>();
 		List<String> skipped = new ArrayList<>();
-		for (File f : obfFiles) {
+		for (File f : collection.getFilesToUse()) {
 			String n = f.getName();
 			if (!f.isFile() || !n.endsWith(".obf") || n.endsWith(".road.obf") || n.endsWith(".srtm.obf")
 					|| n.endsWith(".srtmf.obf") || n.endsWith(".wiki.obf") || n.endsWith(".depth.obf")) {
@@ -521,6 +503,61 @@ public class CoastlineRenderingTester {
 			}
 		}
 		Collections.sort(maps);
+
+		// The cache lives in the folder the job runs in (the Jenkins workspace), so that it is wiped
+		// together with it and is never written into the shared maps folder. Building it costs about
+		// 20 ms per map; a run that finds the cache already there skips that entirely.
+		long cacheStart = System.currentTimeMillis();
+		File cacheFile = new File(System.getProperty("user.dir"), CachedOsmandIndexes.INDEXES_DEFAULT_FILENAME);
+		boolean existed = cacheFile.isFile();
+		CachedOsmandIndexes cache = new CachedOsmandIndexes();
+		if (existed) {
+			cache.readFromFile(cacheFile);
+		}
+		// A cache hit is a lookup by name and size, microseconds. A miss parses the whole obf index
+		// and costs ~40 ms, so the misses are built in parallel - that is the only part worth
+		// speeding up, and it disappears completely once the cache is warm.
+		List<File> missing = new ArrayList<>();
+		for (File f : maps) {
+			if (cache.getFileIndex(f, false) == null) {
+				missing.add(f);
+			}
+		}
+		if (!missing.isEmpty()) {
+			ExecutorService pool = Executors.newFixedThreadPool(Math.min(threads, missing.size()));
+			List<Future<?>> futures = new ArrayList<>();
+			for (File f : missing) {
+				futures.add(pool.submit((Callable<Void>) () -> {
+					try (RandomAccessFile raf = new RandomAccessFile(f.getPath(), "r")) {
+						BinaryMapIndexReader reader = new BinaryMapIndexReader(raf, f);
+						synchronized (cache) {
+							cache.addToCache(reader, f);
+						}
+						reader.close();
+					}
+					return null;
+				}));
+			}
+			pool.shutdown();
+			for (int i = 0; i < futures.size(); i++) {
+				try {
+					futures.get(i).get();
+				} catch (ExecutionException e) {
+					// a corrupt obf fails here on purpose - the map has to be fixed, not skipped
+					throw new IOException("Can't read " + missing.get(i).getAbsolutePath() + ": "
+							+ e.getCause().getMessage(), e.getCause());
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+					throw new IOException(e);
+				}
+			}
+		}
+		cache.writeToFile(cacheFile);
+		renderer.initCacheMapFile(cacheFile.getAbsolutePath());
+		System.out.printf("Indexes cache : %s (%s, %d of %d maps indexed in %d ms)%n",
+				cacheFile.getAbsolutePath(), existed ? "reused" : "created", missing.size(),
+				maps.size(), System.currentTimeMillis() - cacheStart);
+
 		for (File f : maps) {
 			renderer.initMapFile(f.getAbsolutePath(), true);
 			initializedMaps.add(f.getName());
