@@ -15,8 +15,10 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -169,8 +171,8 @@ public class CoastlineRenderingTester {
 	private static final String BUNDLED_CASES = "/net/osmand/render/coastline-tests.json";
 	private static final String CHECK_SEAMARKS_INLAND = "seamarksInland";
 
-	/** Tiles are downloaded and compared in chunks of that size. */
-	private static final int CHUNK = 256;
+	/** How many reference tiles are kept downloading ahead of the tile being compared. */
+	private static final int PREFETCH = 512;
 
 	/** How many failed tiles at most are kept for the html report. */
 	private static final int MAX_REPORTED_TILES = 3000;
@@ -869,20 +871,19 @@ public class CoastlineRenderingTester {
 		}
 		File dir = caseDir(def);
 		int totalOfCase = countTiles(def);
-		// the reference tiles of the next chunk are downloaded while this one is being rendered -
-		// rendering is single threaded and the tile server is slow, so waiting for a whole chunk
-		// before starting to render leaves either the net or the cpu idle all of the time
-		Iterator<List<int[]>> it = chunks(def).iterator();
-		List<int[]> chunk = it.hasNext() ? it.next() : null;
-		prefetchReferences(chunk);
-		while (chunk != null) {
-			List<int[]> next = it.hasNext() ? it.next() : null;
-			prefetchReferences(next);
-			for (int[] t : chunk) {
-				compareTile(def, stats, dir, t[0], t[1], t[2]);
-				flush(stats, totalOfCase);
+		// rendering is single threaded and the tile server is slow, so the reference tiles are kept
+		// downloading PREFETCH tiles ahead of the one being compared - neither side ever waits idle
+		Iterator<int[]> it = tiles(def);
+		Deque<int[]> ahead = new ArrayDeque<>();
+		while (it.hasNext() || !ahead.isEmpty()) {
+			while (ahead.size() < PREFETCH && it.hasNext()) {
+				int[] t = it.next();
+				prefetchReference(t[0], t[1], t[2]);
+				ahead.add(t);
 			}
-			chunk = next;
+			int[] t = ahead.poll();
+			compareTile(def, stats, dir, t[0], t[1], t[2]);
+			flush(stats, totalOfCase);
 		}
 		System.out.printf("  %d tiles, %d compared, %d skipped, %d failed%n", stats.tiles,
 				stats.comparedTiles, stats.skippedTiles, stats.failedTiles);
@@ -974,49 +975,48 @@ public class CoastlineRenderingTester {
 		CaseStats stats = newStats(def);
 		File dir = caseDir(def);
 		closeAllMaps();
-		for (List<int[]> chunk : chunks(def)) {
-			for (int[] t : chunk) {
-				int zoom = t[0], x = t[1], y = t[2];
-				stats.tiles++;
-				closeAllMaps();
-				BufferedImage empty = render(zoom, x, y);
-				for (String map : def.maps) {
-					if (!initMap(map)) {
-						throw new IllegalStateException("Map " + map + " of " + def + " is not available");
-					}
+		for (Iterator<int[]> it = tiles(def); it.hasNext(); ) {
+			int[] t = it.next();
+			int zoom = t[0], x = t[1], y = t[2];
+			stats.tiles++;
+			closeAllMaps();
+			BufferedImage empty = render(zoom, x, y);
+			for (String map : def.maps) {
+				if (!initMap(map)) {
+					throw new IllegalStateException("Map " + map + " of " + def + " is not available");
 				}
-				BufferedImage drawnImg = render(zoom, x, y);
-				closeAllMaps();
-
-				int background = dominantColor(empty);
-				double ratio = countDrawnOverBackground(empty, drawnImg, background) * 1.0
-						/ (empty.getWidth() * empty.getHeight());
-				stats.comparedTiles++;
-				stats.sumExtraWater += ratio;
-				if (ratio > stats.worstExtraWater) {
-					stats.worstTile = zoom + "/" + x + "/" + y;
-				}
-				stats.worstExtraWater = Math.max(stats.worstExtraWater, ratio);
-
-				TileResult res = new TileResult(def, zoom, x, y);
-				res.severity = ratio;
-				res.metrics.put("drawn by the map", pct(ratio));
-				if (ratio > def.maxDrawn) {
-					stats.failedTiles++;
-					res.problems.add(String.format("%s alone draws %.3f%% of an inland tile (limit %.3f%%)",
-							String.join(", ", def.maps), ratio * 100, def.maxDrawn * 100));
-					System.out.printf("  FAILED %d/%d/%d - %s%n", zoom, x, y, res.problems.get(0));
-				}
-				if (saveTile(res.ok())) {
-					dir.mkdirs();
-					ImageIO.write(empty, "png", new File(dir, tileName(zoom, x, y, "empty")));
-					ImageIO.write(drawnImg, "png", new File(dir, tileName(zoom, x, y, "map-only")));
-					res.images.put("no maps at all", tileName(zoom, x, y, "empty"));
-					res.images.put(String.join(", ", def.maps) + " only", tileName(zoom, x, y, "map-only"));
-				}
-				keepForReport(res);
-				flush(stats, countTiles(def));
 			}
+			BufferedImage drawnImg = render(zoom, x, y);
+			closeAllMaps();
+
+			int background = dominantColor(empty);
+			double ratio = countDrawnOverBackground(empty, drawnImg, background) * 1.0
+					/ (empty.getWidth() * empty.getHeight());
+			stats.comparedTiles++;
+			stats.sumExtraWater += ratio;
+			if (ratio > stats.worstExtraWater) {
+				stats.worstTile = zoom + "/" + x + "/" + y;
+			}
+			stats.worstExtraWater = Math.max(stats.worstExtraWater, ratio);
+
+			TileResult res = new TileResult(def, zoom, x, y);
+			res.severity = ratio;
+			res.metrics.put("drawn by the map", pct(ratio));
+			if (ratio > def.maxDrawn) {
+				stats.failedTiles++;
+				res.problems.add(String.format("%s alone draws %.3f%% of an inland tile (limit %.3f%%)",
+						String.join(", ", def.maps), ratio * 100, def.maxDrawn * 100));
+				System.out.printf("  FAILED %d/%d/%d - %s%n", zoom, x, y, res.problems.get(0));
+			}
+			if (saveTile(res.ok())) {
+				dir.mkdirs();
+				ImageIO.write(empty, "png", new File(dir, tileName(zoom, x, y, "empty")));
+				ImageIO.write(drawnImg, "png", new File(dir, tileName(zoom, x, y, "map-only")));
+				res.images.put("no maps at all", tileName(zoom, x, y, "empty"));
+				res.images.put(String.join(", ", def.maps) + " only", tileName(zoom, x, y, "map-only"));
+			}
+			keepForReport(res);
+			flush(stats, countTiles(def));
 		}
 		System.out.printf("  %d tiles, %d failed%n", stats.tiles, stats.failedTiles);
 		if (loadAllMaps) {
@@ -1028,24 +1028,20 @@ public class CoastlineRenderingTester {
 	// ----------------------------------------------------------------- tiles
 
 	/**
-	 * Walks the tiles of a case in chunks. A world wide z1-10 scan is more than a million tiles,
-	 * so the chunks are generated lazily instead of being collected into one list.
+	 * Walks the tiles of a case one by one. A world wide z1-10 scan is more than a million tiles,
+	 * so they are generated lazily instead of being collected into a list.
 	 */
-	private Iterable<List<int[]>> chunks(CaseDef def) {
+	private Iterator<int[]> tiles(CaseDef def) {
 		if (def.tiles != null) {
-			List<List<int[]>> res = new ArrayList<>();
-			for (int i = 0; i < def.tiles.size(); i += CHUNK) {
-				res.add(new ArrayList<>(def.tiles.subList(i, Math.min(i + CHUNK, def.tiles.size()))));
-			}
-			return res;
+			return def.tiles.iterator();
 		}
 		int[] zoomList = def.zoomList();
-		return () -> new Iterator<List<int[]>>() {
-			int zi = 0, x, y, leftX, rightX, topY, bottomY;
-			boolean started = false;
+		return new Iterator<int[]>() {
+			int zi = -1, x, y, leftX, rightX, topY, bottomY;
 
+			/** Moves to the first zoom of the list that has any tile in it. */
 			private boolean startZoom() {
-				while (zi < zoomList.length) {
+				while (++zi < zoomList.length) {
 					int zoom = zoomList[zi];
 					int max = 1 << zoom;
 					if (def.bbox != null) {
@@ -1066,35 +1062,25 @@ public class CoastlineRenderingTester {
 					if (leftX <= rightX && topY <= bottomY) {
 						return true;
 					}
-					zi++;
 				}
 				return false;
 			}
 
 			@Override
 			public boolean hasNext() {
-				if (!started) {
-					started = startZoom();
-				}
-				return zi < zoomList.length;
+				return zi < 0 ? startZoom() : zi < zoomList.length;
 			}
 
 			@Override
-			public List<int[]> next() {
-				List<int[]> chunk = new ArrayList<>(CHUNK);
-				while (chunk.size() < CHUNK && zi < zoomList.length) {
-					chunk.add(new int[] { zoomList[zi], x, y });
-					if (++y > bottomY) {
-						y = topY;
-						if (++x > rightX) {
-							zi++;
-							if (!startZoom()) {
-								break;
-							}
-						}
+			public int[] next() {
+				int[] tile = { zoomList[zi], x, y };
+				if (++y > bottomY) {
+					y = topY;
+					if (++x > rightX) {
+						startZoom();
 					}
 				}
-				return chunk;
+				return tile;
 			}
 		};
 	}
@@ -1154,25 +1140,18 @@ public class CoastlineRenderingTester {
 	}
 
 	/**
-	 * Hands the reference tiles of a chunk to the download pool and returns at once - the tile is
-	 * awaited by {@link #awaitReference} right before it is needed, so the downloads of the next
-	 * chunk overlap the rendering of the current one.
+	 * Hands one reference tile to the download pool and returns at once - it is awaited by
+	 * {@link #awaitReference} right before it is compared.
 	 */
-	private void prefetchReferences(List<int[]> chunk) {
-		if (chunk == null) {
+	private void prefetchReference(int zoom, int x, int y) {
+		String key = zoom + "/" + x + "/" + y;
+		if (referenceFile(zoom, x, y).isFile() || pendingReferences.containsKey(key)) {
 			return;
 		}
-		for (int[] t : chunk) {
-			final int zoom = t[0], x = t[1], y = t[2];
-			String key = zoom + "/" + x + "/" + y;
-			if (referenceFile(zoom, x, y).isFile() || pendingReferences.containsKey(key)) {
-				continue;
-			}
-			pendingReferences.put(key, downloadPool.submit((Callable<Void>) () -> {
-				downloadReference(zoom, x, y);
-				return null;
-			}));
-		}
+		pendingReferences.put(key, downloadPool.submit((Callable<Void>) () -> {
+			downloadReference(zoom, x, y);
+			return null;
+		}));
 	}
 
 	/** Waits for the prefetch of one tile, measuring how much of the run is spent waiting for the net. */
