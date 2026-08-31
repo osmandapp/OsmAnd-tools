@@ -49,7 +49,10 @@ public class NameIndexCreator<T> {
 	public static boolean NOT_INDEX_COMMON_IF_THERE_ARE_RARE = true;
 	public static boolean INDEX_RARE_WORDS_FOR_COMMON = false;
 	public static boolean INDEX_RARE_WORDS_FOR_NON_COMMON = false;
-	
+
+	private static final int TOP_INDEX_BRAND_PREFIX_LENGTH =
+			MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX.length() + "brand_".length() + POI_CATEGORY_PREFIX_LENGTH;
+
 	Map<String, NamedObjectsByPrefix<T>> namesIndex = new TreeMap<>(Collator.getInstance());
 	
 	PrepareWordsIndex commonWords;
@@ -64,7 +67,7 @@ public class NameIndexCreator<T> {
 	}
 	
 	public record PoiNameObject(PoiTileBox tileBox, int ind, int eloRating, 
-			String type, String subtype, Set<PoiAdditionalType> additionalTags) {
+			String type, String subtype, Set<PoiAdditionalType> additionalTags, int[] bbox31) {
 	}
 	
 	// common words
@@ -381,8 +384,10 @@ public class NameIndexCreator<T> {
 		if (pt != null && pt.isNonIndx()) {
 			return;
 		}
-		token = NameIndexReader.POI_CATEGORY_PREFIX + token;
-		String prefix = token.substring(0, Math.min(token.length(), POI_CATEGORY_PREFIX_LENGTH));
+		int maxPrefixLength = token.startsWith(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX)
+				? TOP_INDEX_BRAND_PREFIX_LENGTH : POI_CATEGORY_PREFIX_LENGTH;
+		token = NameIndexReader.POI_CATEGORY_PREFIX + token; // add marker #^
+		String prefix = token.substring(0, Math.min(token.length(), maxPrefixLength));
 		NamedObjectsByPrefix<PoiNameObject> entry = th.namesIndex.get(prefix);
 		if (entry == null) {
 			entry = new NamedObjectsByPrefix<PoiNameObject>();

@@ -1,6 +1,7 @@
 package net.osmand.server.controllers.pub;
 
 import jakarta.servlet.http.HttpServletResponse;
+import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.server.api.services.search.ClassicSearchService;
 import net.osmand.server.SearchTestRepositoryConfiguration;
 import net.osmand.server.api.searchtest.BaseService.GenParam;
@@ -46,8 +47,21 @@ import java.util.concurrent.ConcurrentHashMap;
 @Controller
 @RequestMapping(path = "/admin/search-test")
 public class SearchTestController {
+	@ExceptionHandler(ResponseStatusException.class)
+	@ResponseBody
+	public ResponseEntity<Map<String, String>> handleResponseStatusException(ResponseStatusException e) {
+        if (e.getReason() != null) {
+            return ResponseEntity.status(e.getStatusCode()).body(Map.of("message", e.getReason()));
+        }
+        return null;
+    }
 
 	public record RunTestCaseRequest(RunParam payload, ClassicSearchService.SearchOption options) {}
+	public record ObfSelection(String obfPath, List<String> obfs) {}
+	public record DetectorSearchRequest(ObfSelection selection, ClassicSearchService.SearchOption options) {}
+	public record DetectorUnitTestRequest(ObfSelection selection, DetectorService.UnitTestPayload unitTest) {}
+	public record IndexSuffixPayload(ObfSelection selection, OBFService.IndexSuffixRequest request) {}
+	public record ObjectsPayload(ObfSelection selection, OBFService.IndexToken token) {}
 	public record GenerateDbJobResponse(String jobId) {}
 	public record CreateTagsDatasourceRequest(String name, Boolean overwrite, List<String> obfs,
 											  Boolean skipObjectTags, Boolean skipNewTokens,
@@ -404,17 +418,16 @@ public class SearchTestController {
 		return ResponseEntity.ok(testSearchService.getObfFileInfos());
 	}
 
-	@GetMapping(value = "/addresses", produces = MediaType.APPLICATION_JSON_VALUE)
+	@PostMapping(value = "/addresses", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<List<Record>> getAddresses(@RequestParam(required = false) String obf,
-	                 @RequestParam(required = false) List<String> obfs,
+	public ResponseEntity<List<Record>> getAddresses(@RequestBody ObfSelection selection,
 	                 @RequestParam(required = false, defaultValue = "false") Boolean includesBoundaryAndPostcode,
 	                 @RequestParam(required = false) String lang,
 	                 @RequestParam(required = false) String cityRegExp,
 	                 @RequestParam(required = false) String streetRegExp,
 	                 @RequestParam(required = false) String houseRegExp,
 	                 @RequestParam(required = false) String poiRegExp) {
-		List<String> selectedObfs = normalizeObfs(obf, obfs);
+		List<String> selectedObfs = resolveObfs(selection);
 		if (selectedObfs.size() == 1) {
 			return ResponseEntity.ok(testSearchService.getAddresses(selectedObfs.get(0), lang == null ? "en" : lang,
 					includesBoundaryAndPostcode != null && includesBoundaryAndPostcode,
@@ -425,12 +438,11 @@ public class SearchTestController {
 				cityRegExp, streetRegExp, houseRegExp, poiRegExp));
 	}
 
-	@GetMapping(value = "/sections", produces = MediaType.APPLICATION_JSON_VALUE)
+	@PostMapping(value = "/sections", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<Map<String, long[]>> getSectionSizes(@RequestParam(required = false) String obf,
-	                                                        @RequestParam(required = false) List<String> obfs,
+	public ResponseEntity<Map<String, long[]>> getSectionSizes(@RequestBody ObfSelection selection,
 	                                                        @RequestParam(required = false) String fieldPath) {
-		List<String> selectedObfs = normalizeObfs(obf, obfs);
+		List<String> selectedObfs = resolveObfs(selection);
 		if (selectedObfs.size() == 1) {
 			return ResponseEntity.ok(testSearchService.getSectionSizes(selectedObfs.get(0), fieldPath));
 		}
@@ -439,19 +451,20 @@ public class SearchTestController {
 
 	@PostMapping(value = "/search", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<DetectorService.ResultsWithStats> getResults(
+	public ResponseEntity<DetectorService.ResultsWithStats> getSearchResults(
 			@RequestParam String query,
 			@RequestParam(required = false) String lang,
 			@RequestParam() Double lat,
 			@RequestParam() Double lon,
 			@RequestParam(required = false, defaultValue = "false") Boolean spatial,
-			@RequestBody ClassicSearchService.SearchOption options) throws IOException {
+			@RequestBody DetectorSearchRequest request) throws IOException {
 		if (query == null || lat == null || lon == null) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'query', 'lat' and 'lon' are required");
         }
 
-        ClassicSearchService.SearchContext ctx = new ClassicSearchService.SearchContext(lat, lon, query, lang, false, null, null);
-		return ResponseEntity.ok(testSearchService.getResults(ctx, options, spatial));
+		ClassicSearchService.SearchContext ctx = new ClassicSearchService.SearchContext(lat, lon, query, lang, false, null, null);
+		List<BinaryMapIndexReader> readers = openCustomObfReaders(request.selection(), request.options().getRadius(), lat, lon, Boolean.TRUE.equals(spatial));
+		return ResponseEntity.ok(testSearchService.getSearchResults(ctx, request.options(), spatial, readers));
 	}
 
 	@PostMapping(value = "/unit-test", produces = "application/zip")
@@ -461,9 +474,10 @@ public class SearchTestController {
 			@RequestParam() Double lat,
 			@RequestParam() Double lon,
 			@RequestParam() Boolean spatial,
-			@RequestParam() Double radius,
-			@RequestBody(required = false) DetectorService.UnitTestPayload unitTest,
+			@RequestParam(required = false) Double radius,
+			@RequestBody(required = false) DetectorUnitTestRequest request,
 			HttpServletResponse response) throws IOException, SQLException {
+		DetectorService.UnitTestPayload unitTest = request == null ? null : request.unitTest();
 		if (unitTest == null || unitTest.name() == null || query == null || lat == null || lon == null) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameters 'unit-test name', 'query', 'lat' and 'lon' are required");
 		}
@@ -474,65 +488,61 @@ public class SearchTestController {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Radius must be 0 or greater");
 		}
 		if (radius == null) {
-			radius = 7.0;
+			radius = Boolean.TRUE.equals(spatial) ? 400.0 : 1.5;
 		}
 		response.setContentType("application/zip");
 		response.setHeader("Content-Disposition", "attachment; filename=\"" + unitTest.name() + ".zip\"");
 		testSearchService.createUnitTest(unitTest,
 				new ClassicSearchService.SearchContext(lat, lon, query, null, false, null, null),
-				radius, response.getOutputStream(), spatial);
+				radius, response.getOutputStream(), spatial,
+				openCustomObfReaders(request.selection(), radius, lat, lon, Boolean.TRUE.equals(spatial)));
 	}
 
-	@GetMapping(value = "/index", produces = MediaType.APPLICATION_JSON_VALUE)
+	@PostMapping(value = "/index", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<OBFService.IndexTokenPage> getIndex(@RequestParam(required = false) String obf,
-															  @RequestParam(required = false) List<String> obfs,
+	public ResponseEntity<OBFService.IndexTokenPage> getIndex(@RequestBody ObfSelection selection,
 															  @RequestParam(required = false) String prefix,
 															  @RequestParam(defaultValue = "0") int pageToShow,
 															  @RequestParam(defaultValue = "100") int pageSizeLimit,
 															  @RequestParam(required = false) String sortBy,
 															  @RequestParam(required = false) String sortOrder,
 															  @RequestParam(required = false) String objectType) {
-		List<String> selectedObfs = normalizeObfs(obf, obfs);
+		List<String> selectedObfs = resolveObfs(selection);
 		if (selectedObfs.size() == 1) {
 			return ResponseEntity.ok(testSearchService.getIndex(selectedObfs.get(0), prefix, pageToShow, pageSizeLimit, sortBy, sortOrder, objectType));
 		}
 		return ResponseEntity.ok(testSearchService.getIndex(selectedObfs, prefix, pageToShow, pageSizeLimit, sortBy, sortOrder, objectType));
 	}
 
-	@PostMapping(value = "/index/suffix", produces = MediaType.APPLICATION_JSON_VALUE)
+	@PostMapping(value = "/index/suffix", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<OBFService.IndexSuffixResponse> getIndexSuffix(@RequestParam(required = false) String obf,
-																	 @RequestParam(required = false) List<String> obfs,
-																	 @RequestBody OBFService.IndexSuffixRequest request) {
-		List<String> selectedObfs = normalizeObfs(obf, obfs);
+	public ResponseEntity<OBFService.IndexSuffixResponse> getIndexSuffix(@RequestBody IndexSuffixPayload payload) {
+		List<String> selectedObfs = resolveObfs(payload.selection());
 		OBFService.IndexSuffixResponse suffixes = selectedObfs.size() == 1
-				? testSearchService.getIndexSuffix(selectedObfs.get(0), request)
-				: testSearchService.getIndexSuffix(selectedObfs, request);
+				? testSearchService.getIndexSuffix(selectedObfs.get(0), payload.request())
+				: testSearchService.getIndexSuffix(selectedObfs, payload.request());
 		return ResponseEntity.ok(suffixes);
 	}
 
-	@GetMapping(value = "/index/suffix-sort", produces = MediaType.APPLICATION_JSON_VALUE)
+	@PostMapping(value = "/index/suffix-sort", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<OBFService.IndexTokenPage> getIndexSuffixSort(@RequestParam(required = false) String obf,
-																		@RequestParam(required = false) List<String> obfs,
+	public ResponseEntity<OBFService.IndexTokenPage> getIndexSuffixSort(@RequestBody ObfSelection selection,
 																		@RequestParam(required = false) String prefix,
 																		@RequestParam(defaultValue = "0") int pageToShow,
 																		@RequestParam(defaultValue = "100") int pageSizeLimit,
 																		@RequestParam(required = false) String sortBy,
 																		@RequestParam(required = false) String sortOrder,
 																		@RequestParam(required = false) String objectType) {
-		List<String> selectedObfs = normalizeObfs(obf, obfs);
+		List<String> selectedObfs = resolveObfs(selection);
 		if (selectedObfs.size() == 1) {
 			return ResponseEntity.ok(testSearchService.getIndexSuffixSort(selectedObfs.get(0), prefix, pageToShow, pageSizeLimit, sortBy, sortOrder, objectType));
 		}
 		return ResponseEntity.ok(testSearchService.getIndexSuffixSort(selectedObfs, prefix, pageToShow, pageSizeLimit, sortBy, sortOrder, objectType));
 	}
 
-	@PostMapping(value = "/objects", produces = MediaType.APPLICATION_JSON_VALUE)
+	@PostMapping(value = "/objects", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<OBFService.ObjectAddressPage> getObjects(@RequestParam(required = false) String obf,
-																 @RequestParam(required = false) List<String> obfs,
+	public ResponseEntity<OBFService.ObjectAddressPage> getObjects(@RequestBody ObjectsPayload payload,
 																 @RequestParam(required = false) String lang,
 																 @RequestParam(required = false) String regExp,
 																 @RequestParam(defaultValue = "0") int pageToShow,
@@ -541,31 +551,55 @@ public class SearchTestController {
 																 @RequestParam(required = false) String sortOrder,
 																 @RequestParam(defaultValue = "true") boolean isFiltered,
 																 @RequestParam(defaultValue = "false") boolean invalidOnly,
-																 @RequestParam(required = false) String objectType,
-																 @RequestBody OBFService.IndexToken token) {
-		List<String> selectedObfs = normalizeObfs(obf, obfs);
+																 @RequestParam(required = false) String objectType) {
+		List<String> selectedObfs = resolveObfs(payload.selection());
 		OBFService.ObjectAddressPage objects = selectedObfs.size() == 1
-				? testSearchService.getObjects(selectedObfs.get(0), lang == null ? "en" : lang, token, regExp, pageToShow, pageSizeLimit, sortBy, sortOrder, isFiltered, invalidOnly, objectType)
-				: testSearchService.getObjects(selectedObfs, lang == null ? "en" : lang, token, regExp, pageToShow, pageSizeLimit, sortBy, sortOrder, isFiltered, invalidOnly, objectType);
+				? testSearchService.getObjects(selectedObfs.get(0), lang == null ? "en" : lang, payload.token(), regExp, pageToShow, pageSizeLimit, sortBy, sortOrder, isFiltered, invalidOnly, objectType)
+				: testSearchService.getObjects(selectedObfs, lang == null ? "en" : lang, payload.token(), regExp, pageToShow, pageSizeLimit, sortBy, sortOrder, isFiltered, invalidOnly, objectType);
 		return ResponseEntity.ok(objects);
 	}
 
-	private List<String> normalizeObfs(String obf, List<String> obfs) {
+	private List<String> resolveObfs(ObfSelection selection) {
 		List<String> selected = new ArrayList<>();
-		if (obfs != null) {
-			for (String item : obfs) {
+		if (selection != null && selection.obfs() != null) {
+			Path directory = selection.obfPath() == null || selection.obfPath().isBlank()
+					? null : Path.of(selection.obfPath()).toAbsolutePath().normalize();
+			for (String item : selection.obfs()) {
 				if (item != null && !item.isBlank()) {
-					selected.add(item);
+					if (directory == null) {
+						selected.add(item);
+					} else {
+						Path file = directory.resolve(item).normalize();
+						if (!file.getParent().equals(directory) || !Files.isRegularFile(file) || !file.getFileName().toString().toLowerCase().endsWith(".obf")) {
+							throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid OBF selection: " + item);
+						}
+						selected.add(file.toString());
+					}
 				}
 			}
 		}
-		if (selected.isEmpty() && obf != null && !obf.isBlank()) {
-			selected.add(obf);
-		}
 		if (selected.isEmpty()) {
-			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parameter 'obf' or 'obfs' is required");
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OBF selection is required");
 		}
 		return selected;
+	}
+
+	private List<BinaryMapIndexReader> openCustomObfReaders(ObfSelection selection, double radius, double lat, double lon,
+	                                                       boolean spatial) throws IOException {
+		if (selection == null || selection.obfPath() == null || selection.obfPath().isBlank()) {
+			return null;
+		}
+		Path directory;
+		try {
+			directory = Path.of(selection.obfPath()).toAbsolutePath().normalize();
+		} catch (InvalidPathException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OBF Custom Dir is not a valid path");
+		}
+		if (!Files.isDirectory(directory)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "OBF Custom Dir is not a valid directory!");
+		}
+		List<String> obfs = testSearchService.getCustomOBFs(radius, lat, lon, spatial, directory.toString());
+		return testSearchService.openObfReaders(obfs);
 	}
 
 	@PostMapping(value = "/generate", produces = "application/zip")

@@ -117,7 +117,7 @@ public class SpatialSearchService {
 		public Map<String, Object> info = new LinkedHashMap<>();
 	}
 
-	public record SpatialResults(SpatialSearchResults results, SpatialSearchContext.SpatialSearchStats stats) {
+	public record SpatialResults(SpatialSearchResults results, SpatialSearchContext.SpatialSearchStats stats, int obfCount) {
 	}
 
 	@PostConstruct
@@ -149,7 +149,7 @@ public class SpatialSearchService {
 		long fileTimestamp;
 	}
 
-	private BinaryMapIndexReader regionsReaderForThread() {
+	public BinaryMapIndexReader regionsReaderForThread() {
 		RegionsReaderHolder holder = osmandRegionsLocal.get();
 		BinaryMapIndexReader shared = mapReadersService.getOsmandRegions() == null ? null : mapReadersService.getOsmandRegions().getFile();
 		File regionsFile = shared == null ? null : shared.getFile();
@@ -380,6 +380,10 @@ public class SpatialSearchService {
 			}
 		}
 		return tags;
+	}
+
+	public SearchResult buildSpatialPoiSearchResult(Amenity amenity, String locale) {
+		return searchResultConverter.buildPoiSearchResult(amenity, locale, "");
 	}
 
 	private List<Map<String, Object>> matchedObjects(List<MapObject> objs, String locale, String timeZone,

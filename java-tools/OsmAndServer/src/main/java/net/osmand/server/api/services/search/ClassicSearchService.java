@@ -72,9 +72,9 @@ public class ClassicSearchService {
 	}
 
 	public record SearchResults(List<SearchResult> results, SearchSettings settings, JSONObject unitTestJson,
-	                            SearchPhrase phrase) {
+	                            SearchPhrase phrase, int obfCount) {
 		public SearchResults(List<SearchResult> results) {
-			this(results, null, null, null);
+			this(results, null, null, null, 0);
 		}
 	}
 
@@ -101,6 +101,12 @@ public class ClassicSearchService {
 
 	public SearchResults getImmediateSearchResults(SearchContext ctx, SearchOption option,
 	                                               Consumer<List<SearchResult>> consumerInContext) throws IOException {
+		return getImmediateSearchResults(ctx, option, consumerInContext, null);
+	}
+
+	public SearchResults getImmediateSearchResults(SearchContext ctx, SearchOption option,
+	                                               Consumer<List<SearchResult>> consumerInContext,
+	                                               List<BinaryMapIndexReader> suppliedReaders) throws IOException {
 		if (!osmAndMapsService.validateAndInitConfig()) {
 			return new SearchResults(Collections.emptyList());
 		}
@@ -116,13 +122,13 @@ public class ClassicSearchService {
 		QuadRect points = osmAndMapsService.points(null,
 				new LatLon(ctx.lat() + option.getRadius(), ctx.lon() - option.getRadius()),
 				new LatLon(ctx.lat() - option.getRadius(), ctx.lon() + option.getRadius()));
-		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
+		List<BinaryMapIndexReader> usedMapList = suppliedReaders == null ? new ArrayList<>() : suppliedReaders;
 		try {
-			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = mapReadersService.getMapsForSearch(points, ctx.baseSearch());
-			if (list.isEmpty()) {
-				return new SearchResults(Collections.emptyList());
+			if (suppliedReaders == null) {
+				List<OsmAndMapsService.BinaryMapIndexReaderReference> list = mapReadersService.getMapsForSearch(points, ctx.baseSearch());
+				if (list.isEmpty()) return new SearchResults(Collections.emptyList());
+				usedMapList = osmAndMapsService.getReaders(list, null);
 			}
-			usedMapList = osmAndMapsService.getReaders(list, null);
 			if (usedMapList.isEmpty()) {
 				return new SearchResults(Collections.emptyList());
 			}
@@ -158,9 +164,9 @@ public class ClassicSearchService {
 						settings.getExportedCities());
 			}
 			return new SearchResults(res, settings, unitTestJson,
-					resultCollection == null ? null : resultCollection.getPhrase());
+					resultCollection == null ? null : resultCollection.getPhrase(), usedMapList.size());
 		} finally {
-			osmAndMapsService.unlockReaders(usedMapList);
+			if (suppliedReaders == null) osmAndMapsService.unlockReaders(usedMapList);
 		}
 	}
 }

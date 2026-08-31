@@ -2,9 +2,11 @@ package net.osmand.server.api.searchtest;
 
 import com.google.protobuf.CodedInputStream;
 import com.google.protobuf.WireFormat;
+import net.osmand.PlatformUtil;
 import net.osmand.binary.*;
 import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
 import net.osmand.data.*;
+import net.osmand.map.OsmandRegions;
 import net.osmand.map.WorldRegion;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiCategory;
@@ -94,6 +96,27 @@ public interface OBFService extends BaseService {
 	OsmAndMapsService getMapsService();
 	String getSearchTestDatasourceUrl();
 
+	default Long getOsmId(Object object) {
+		if (object instanceof MapObject mapObject && mapObject.getId() != null && mapObject.getId() >= 0) {
+			return ObfConstants.getOsmObjectId(mapObject);
+		}
+		return null;
+	}
+
+	default List<BinaryMapIndexReader> openObfReaders(List<String> obfs) throws IOException {
+		List<BinaryMapIndexReader> readers = new ArrayList<>();
+		try {
+			for (String path : obfs) {
+				File file = new File(path);
+				readers.add(new BinaryMapIndexReader(new RandomAccessFile(file, "r"), file, true));
+			}
+			return readers;
+		} catch (IOException | RuntimeException e) {
+			for (BinaryMapIndexReader reader : readers) reader.close();
+			throw e;
+		}
+	}
+
 	default List<String> getOBFs(Double radius, Double lat, Double lon, String obfPath) throws IOException {
 		synchronized (INDEX_TOKENS_CACHE) {
 			INDEX_TOKENS_CACHE.clear();
@@ -103,15 +126,17 @@ public interface OBFService extends BaseService {
 		if (!Algorithms.isEmpty(obfPath)) {
 			customObfs = getCustomObfFiles(obfPath);
 		}
+		List<String> obfList = new ArrayList<>();
+		addRegionsObf(obfList);
 		if (lat == null || lon == null) {
 			if (customObfs != null) {
-				List<String> obfList = new ArrayList<>();
 				for (File file : customObfs) {
 					obfList.add(file.getAbsolutePath());
 				}
 				return obfList;
 			}
-			return getMapsService().getOBFs();
+			obfList.addAll(getMapsService().getOBFs());
+			return obfList;
 		}
 		double latPlusRadius = lat + radius;
 		double lonMinusRadius = lon - radius;
@@ -121,7 +146,6 @@ public interface OBFService extends BaseService {
 				new LatLon(latPlusRadius, lonMinusRadius),
 				new LatLon(latMinusRadius, lonPlusRadius));
 
-		List<String> obfList = new ArrayList<>();
 		if (Algorithms.isEmpty(obfPath)) {
 			List<OsmAndMapsService.BinaryMapIndexReaderReference> list = getMapsService().getObfReaders(
 					points, OsmAndMapsService.ObfReason.SEARCH_TEST.value());
@@ -129,7 +153,32 @@ public interface OBFService extends BaseService {
 				obfList.add(ref.getFile().getAbsolutePath());
 			return obfList;
 		}
-		return getMaps(points, customObfs);
+		obfList.addAll(getOBFs(points, customObfs));
+		return obfList;
+	}
+
+	default List<String> getCustomOBFs(double radius, double lat, double lon, boolean spatial, String obfPath) throws IOException {
+		File[] candidates = getCustomObfFiles(obfPath);
+		QuadRect points;
+		if (spatial) {
+			QuadRect bbox = MapUtils.calculateLatLonBbox(lat, lon, Math.toIntExact(Math.round(radius * 1000)));
+			points = getMapsService().points(null, new LatLon(bbox.top, bbox.left), new LatLon(bbox.bottom, bbox.right));
+		} else {
+			points = getMapsService().points(null,
+					new LatLon(lat + radius, lon - radius), new LatLon(lat - radius, lon + radius));
+		}
+        return getOBFs(points, candidates);
+	}
+
+	private void addRegionsObf(List<String> obfList) throws IOException {
+		BinaryMapIndexReader regionsReader = PlatformUtil.getOsmandRegions().getFile();
+		File regionsFile = regionsReader == null ? null : regionsReader.getFile();
+		if (regionsFile != null) {
+			String path = regionsFile.getAbsolutePath();
+			if (!obfList.contains(path)) {
+				obfList.add(path);
+			}
+		}
 	}
 
 	private File[] getCustomObfFiles(String obfPath) {
@@ -144,7 +193,7 @@ public interface OBFService extends BaseService {
 	}
 
 	
-	private List<String> getMaps(QuadRect quadRect, File[] candidates) {
+	private List<String> getOBFs(QuadRect quadRect, File[] candidates) throws IOException {
 		List<String> maps = new ArrayList<>();
 		if (quadRect == null || quadRect.hasInitialState() || candidates == null) {
 			return maps;
@@ -155,10 +204,11 @@ public interface OBFService extends BaseService {
 				MapUtils.get31LatitudeY((int) Math.min(quadRect.top, quadRect.bottom)),
 				MapUtils.get31LongitudeX((int) Math.max(quadRect.left, quadRect.right)),
 				MapUtils.get31LatitudeY((int) Math.max(quadRect.top, quadRect.bottom)));
+		OsmandRegions regions = PlatformUtil.getOsmandRegions();
 
 		for (File file : candidates) {
 			String downloadName = getDownloadNameByFileName(file.getName());
-			WorldRegion wr = getMapsService().getOsmandRegions().getRegionDataByDownloadName(downloadName);
+			WorldRegion wr = regions.getRegionDataByDownloadName(downloadName);
 			if (wr == null) {
 				continue;
 			}
@@ -279,33 +329,30 @@ public interface OBFService extends BaseService {
 	interface GenerateDbProgressListener {
 		void onProgress(GenerateDbProgress progress);
 	}
-	record CityAddress(String name, LatLon point, List<StreetAddress> streets, int streetsCount, String type, String obf) {
-		public CityAddress(String name, LatLon point, List<StreetAddress> streets, int streetsCount, String type) {
-			this(name, point, streets, streetsCount, type, null);
+	record CityAddress(String name, LatLon point, List<StreetAddress> streets, int streetsCount, String type, String obf, Long osmId) {
+		public CityAddress(String name, LatLon point, List<StreetAddress> streets, int streetsCount, String type, Long osmId) {
+			this(name, point, streets, streetsCount, type, null, osmId);
 		}
 	}
-	record PoiAddress(String name, LatLon point, String value, String obf) {
-		public PoiAddress(String name, LatLon point, String value) {
-			this(name, point, value, null);
+	record PoiAddress(String name, LatLon point, String value, String obf, Long osmId) {
+		public PoiAddress(String name, LatLon point, String value, Long osmId) {
+			this(name, point, value, null, osmId);
 		}
 	}
-	record HouseAddress(String name, LatLon point, String obf) {
-		public HouseAddress(String name, LatLon point) {
-			this(name, point, null);
+	record HouseAddress(String name, LatLon point, String obf, Long osmId) {
+		public HouseAddress(String name, LatLon point, Long osmId) {
+			this(name, point, null, osmId);
 		}
 	}
-	record StreetAddress(String name, LatLon point, List<HouseAddress> houses, int houseCount, String obf) {
-		public StreetAddress(String name, LatLon point, List<HouseAddress> houses, int houseCount) {
-			this(name, point, houses, houseCount, null);
+	record StreetAddress(String name, LatLon point, List<HouseAddress> houses, int houseCount, String obf, Long osmId) {
+		public StreetAddress(String name, LatLon point, List<HouseAddress> houses, int houseCount, Long osmId) {
+			this(name, point, houses, houseCount, null, osmId);
 		}
 	}
 
 	default List<ObfFileInfo> getObfFileInfos() throws IOException {
 		List<ObfFileInfo> result = new ArrayList<>();
 		for (String obf : getMapsService().getOBFs()) {
-			if (OBFService.getObfFileName(obf).startsWith("World_base")) {
-				continue;
-			}
 			result.add(parseObfFileInfo(obf));
 		}
 		result.sort(Comparator.comparing(ObfFileInfo::name, String.CASE_INSENSITIVE_ORDER));
@@ -426,17 +473,18 @@ public interface OBFService extends BaseService {
 			return null;
 		}
 		LatLon location = new LatLon(objectRecord.lat, objectRecord.lon);
+		Long osmId = objectRecord.id > 0 ? ObfConstants.getOsmIdFromMapObjectId(objectRecord.id) : null;
 		String displayName = Algorithms.isEmpty(objectRecord.name) ? objectRecord.nameEn : objectRecord.name;
 		if (matchesPattern(objectRecord.name, poiPattern, normalizedPoiPattern)) {
-			return new PoiAddress(objectRecord.name, location, "name-> " + objectRecord.name);
+			return new PoiAddress(objectRecord.name, location, "name-> " + objectRecord.name, osmId);
 		}
 		if (matchesPattern(objectRecord.nameEn, poiPattern, normalizedPoiPattern)) {
-			return new PoiAddress(objectRecord.nameEn, location, "name:en-> " + objectRecord.nameEn);
+			return new PoiAddress(objectRecord.nameEn, location, "name:en-> " + objectRecord.nameEn, osmId);
 		}
 		for (Map.Entry<String, List<String>> entry : objectRecord.decodedTextTags.entrySet()) {
 			for (String value : entry.getValue()) {
 				if (matchesPattern(value, poiPattern, normalizedPoiPattern)) {
-					return new PoiAddress(displayName, location, entry.getKey() + "-> " + value);
+					return new PoiAddress(displayName, location, entry.getKey() + "-> " + value, osmId);
 				}
 			}
 		}

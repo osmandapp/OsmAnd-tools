@@ -217,8 +217,9 @@ public class UpdateInAppPurchase {
                     continue;
                 }
 
-                if (validBool != null && validBool && !pms.verifyAll) {
-                    continue; // Skip check if already valid
+                // Skip already-valid purchases, but always validate a purchase at least once (checktime == null)
+                if (validBool != null && validBool && checkTimeTs != null && !pms.verifyAll) {
+                    continue; // Skip check if already valid and validated at least once
                 }
 
                 boolean isGoogleApp = sku.equals("osmand_full_version_price") && platform.equals(PLATFORM_GOOGLE);
@@ -717,6 +718,7 @@ public class UpdateInAppPurchase {
         }
 
         FastSpringHelper.FastSpringPurchase purchase = null;
+        boolean ioError = false;
 
         try {
             purchase = FastSpringHelper.getInAppPurchaseByOrderIdAndSku(orderId, sku);
@@ -724,7 +726,13 @@ public class UpdateInAppPurchase {
                 System.out.println("Fastspring API Result: " + purchase);
             }
         } catch (IOException e) {
+            ioError = true;
             System.err.println("WARN: IOException verifying Fastspring IAP " + sku + " (OrderId: " + orderId + "): " + e.getMessage());
+        }
+
+        if (ioError) {
+            updateCheckTimeOnly(orderId, sku, currentTime);
+            return true;
         }
 
         if (purchase == null) {

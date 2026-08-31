@@ -100,7 +100,9 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
                         b.setLength(0);
                     }
                     appendIntersection(b, intersectionStreets);
-                    resultType = "STREET_INTERSECTION";
+                    if (!poiCategory) {
+                        resultType = "STREET_INTERSECTION";
+                    }
                 } else {
                     appendName(b, r.getExtraNameMatch(), street.getCity());
                 }
@@ -204,8 +206,9 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
         public String getTranslation(String keyName) {
             if (keyName.equals("hotel")) {
                 return "отель";
-            }
-            if (keyName.equals("island")) {
+            } else if (keyName.equals("school")) {
+            	return "школа";
+            } else if (keyName.equals("island")) {
                 return "остров";
             }
             return null;
@@ -220,9 +223,12 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
         public String getSynonyms(String keyName) {
             if (keyName.equals("hotel")) {
                 return "отель;готель;гатэль";
-            }
-            if (keyName.equals("island")) {
+            } else if (keyName.equals("school")) {
+            	return "школа";
+            } else if (keyName.equals("island")) {
                 return "остров";
+            } else if (keyName.equals("kindergarten")) {
+                return "Kindergarten;Дитячий садок";
             }
             return null;
         }
