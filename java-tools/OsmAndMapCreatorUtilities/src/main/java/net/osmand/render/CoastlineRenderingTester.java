@@ -149,6 +149,10 @@ public class CoastlineRenderingTester {
 	/** How the random tiles are split: coastal, open ocean, inland. */
 	private static final int SHARE_COASTAL = 80, SHARE_OCEAN = 10;
 
+	static final String GROUP_FIXED = "Fixed cases of coastline-tests.json";
+	static final String GROUP_RANDOM = "Random tiles";
+	static final String GROUP_SCAN = "Full scan";
+
 	private static final String BUNDLED_CASES = "/net/osmand/render/coastline-tests.json";
 	private static final String CHECK_SEAMARKS_INLAND = "seamarksInland";
 
@@ -194,6 +198,8 @@ public class CoastlineRenderingTester {
 		public String check = "water";
 		/** explicit {zoom, x, y} tiles - used by the random mode instead of bbox/radius */
 		public transient List<int[]> tiles;
+		/** {@link #GROUP_FIXED}, {@link #GROUP_RANDOM} or {@link #GROUP_SCAN} */
+		public transient String group = GROUP_FIXED;
 		/** max share of a tile that may be rendered as water while the reference is land */
 		public double maxExtraWater = 0.02;
 		/** max share of a tile that may be rendered as land while the reference is water */
@@ -258,6 +264,7 @@ public class CoastlineRenderingTester {
 		public String title;
 		public String url;
 		public String check;
+		public String group;
 		public int tiles;
 		public int comparedTiles;
 		public int skippedTiles;
@@ -278,6 +285,13 @@ public class CoastlineRenderingTester {
 		}
 	}
 
+	/** Failed / compared tiles of one group of cases. */
+	public static class GroupTotals {
+		public String group;
+		public int tiles;
+		public int failedTiles;
+	}
+
 	/** Result of a whole run, also written to {@code summary.json}. */
 	public static class RunResult {
 		public String style;
@@ -289,6 +303,7 @@ public class CoastlineRenderingTester {
 		public int comparedTiles;
 		public int failedTiles;
 		public List<CaseStats> cases = new ArrayList<>();
+		public List<GroupTotals> groups = new ArrayList<>();
 	}
 
 	// ----------------------------------------------------------------- parameters
@@ -424,6 +439,7 @@ public class CoastlineRenderingTester {
 		CaseDef c = new CaseDef();
 		c.issue = 3291;
 		c.title = "Random tiles";
+		c.group = GROUP_RANDOM;
 		c.minzoom = Integer.parseInt(opt("minzoom", "1"));
 		c.maxzoom = Integer.parseInt(opt("maxzoom", "17"));
 		c.maxExtraWater = Double.parseDouble(opt("maxExtraWater", "0.02"));
@@ -534,6 +550,7 @@ public class CoastlineRenderingTester {
 			CaseDef scan = new CaseDef();
 			scan.issue = 3291;
 			scan.title = "Full scan";
+			scan.group = GROUP_SCAN;
 			scan.minzoom = Integer.parseInt(opt("minzoom", "1"));
 			scan.maxzoom = Integer.parseInt(opt("maxzoom", "10"));
 			String bbox = opt("bbox", null);
@@ -544,6 +561,9 @@ public class CoastlineRenderingTester {
 		}
 		List<CaseDef> res = new ArrayList<>();
 		String issue = opt("issue", null);
+		if (issue != null && issue.isEmpty()) {
+			issue = null;
+		}
 		for (CaseDef def : casesFile.cases) {
 			if (issue == null || issue.equals(String.valueOf(def.issue))) {
 				res.add(def);
@@ -1316,15 +1336,36 @@ public class CoastlineRenderingTester {
 
 	// ----------------------------------------------------------------- reporting
 
+	/** Cases in report order: the fixed ones first, then the rest - the run order differs. */
+	private static List<CaseStats> orderedCases(RunResult result) {
+		List<CaseStats> res = new ArrayList<>(result.cases);
+		res.sort((a, b) -> {
+			String ga = a.group == null ? GROUP_FIXED : a.group;
+			String gb = b.group == null ? GROUP_FIXED : b.group;
+			return GROUP_FIXED.equals(ga) == GROUP_FIXED.equals(gb) ? ga.compareTo(gb)
+					: (GROUP_FIXED.equals(ga) ? -1 : 1);
+		});
+		return res;
+	}
+
 	private void recomputeTotals() {
 		result.tiles = 0;
 		result.comparedTiles = 0;
 		result.failedTiles = 0;
+		Map<String, GroupTotals> byGroup = new LinkedHashMap<>();
 		for (CaseStats s : result.cases) {
 			result.tiles += s.tiles;
 			result.comparedTiles += s.comparedTiles;
 			result.failedTiles += s.failedTiles;
+			GroupTotals g = byGroup.computeIfAbsent(s.group == null ? GROUP_FIXED : s.group, k -> {
+				GroupTotals t = new GroupTotals();
+				t.group = k;
+				return t;
+			});
+			g.tiles += s.comparedTiles;
+			g.failedTiles += s.failedTiles;
 		}
+		result.groups = new ArrayList<>(byGroup.values());
 	}
 
 	/**
@@ -1366,6 +1407,7 @@ public class CoastlineRenderingTester {
 		stats.title = def.title;
 		stats.url = def.url;
 		stats.check = def.check;
+		stats.group = def.group;
 		result.cases.add(stats);
 		return stats;
 	}
@@ -1401,7 +1443,13 @@ public class CoastlineRenderingTester {
 		System.out.println();
 		System.out.println("================================ coastline summary ================================");
 		System.out.printf("%-58s %7s %7s %9s %9s%n", "case", "tiles", "failed", "worst+H2O", "worst-H2O");
-		for (CaseStats s : result.cases) {
+		String printedGroup = null;
+		for (CaseStats s : orderedCases(result)) {
+			String g = s.group == null ? GROUP_FIXED : s.group;
+			if (!g.equals(printedGroup)) {
+				printedGroup = g;
+				System.out.println("-- " + g);
+			}
 			boolean seamarks = CHECK_SEAMARKS_INLAND.equals(s.check);
 			System.out.printf("%-58s %7d %7d %9s %9s%n",
 					trim("#" + s.issue + " " + s.title, 58), s.comparedTiles, s.failedTiles,
@@ -1419,6 +1467,9 @@ public class CoastlineRenderingTester {
 			}
 		}
 		System.out.println("-----------------------------------------------------------------------------------");
+		for (GroupTotals g : result.groups) {
+			System.out.printf("%-58s %7d %7d%n", g.group, g.tiles, g.failedTiles);
+		}
 		System.out.printf("%d tiles compared, %d failed, %d maps loaded, %.1f s%n", result.comparedTiles,
 				result.failedTiles, result.loadedMaps, result.durationMs / 1000.0);
 		System.out.println(result.failedTiles > 0
@@ -1454,6 +1505,12 @@ public class CoastlineRenderingTester {
 
 	private void writeHtmlReport(RunResult result, boolean quiet) throws IOException {
 		reported.sort((a, b) -> {
+			String ga = a.def.group == null ? GROUP_FIXED : a.def.group;
+			String gb = b.def.group == null ? GROUP_FIXED : b.def.group;
+			if (!ga.equals(gb)) {
+				// fixed cases first, they are the known problems
+				return GROUP_FIXED.equals(ga) ? -1 : (GROUP_FIXED.equals(gb) ? 1 : ga.compareTo(gb));
+			}
 			if (a.ok() != b.ok()) {
 				return a.ok() ? 1 : -1;
 			}
@@ -1471,9 +1528,24 @@ public class CoastlineRenderingTester {
 						+ "&middot; %d maps &middot; style %s &middot; %.1f s &middot; %s</p>",
 				result.failedTiles > 0 ? "bad" : "good", result.failedTiles, result.comparedTiles,
 				result.loadedMaps, esc(result.style), result.durationMs / 1000.0, new java.util.Date()));
+		if (result.groups.size() > 1) {
+			StringBuilder g = new StringBuilder();
+			for (GroupTotals t : result.groups) {
+				g.append(g.length() == 0 ? "" : " &middot; ").append(String.format(
+						"%s: <b class=\"%s\">%d failed</b> of %d tiles", esc(t.group),
+						t.failedTiles > 0 ? "bad" : "good", t.failedTiles, t.tiles));
+			}
+			sb.append("<p class=\"sum groups\">").append(g).append("</p>");
+		}
 		sb.append("</header>\n<main>\n<table class=\"stats\"><tr><th>case</th><th>tiles</th><th>failed</th>"
 				+ "<th>worst extra water</th><th>worst missing water</th><th>worst tile</th></tr>");
-		for (CaseStats s : result.cases) {
+		String tableGroup = null;
+		for (CaseStats s : orderedCases(result)) {
+			String g = s.group == null ? GROUP_FIXED : s.group;
+			if (!g.equals(tableGroup)) {
+				tableGroup = g;
+				sb.append(String.format("<tr class=\"grp\"><td colspan=\"6\">%s</td></tr>", esc(g)));
+			}
 			boolean seamarks = CHECK_SEAMARKS_INLAND.equals(s.check);
 			sb.append(String.format("<tr class=\"%s\"><td>%s#%d</a> %s</td><td>%d</td><td>%d</td>"
 							+ "<td>%s</td><td>%s</td><td>%s</td></tr>", s.failedTiles > 0 ? "bad" : "good",
@@ -1488,7 +1560,15 @@ public class CoastlineRenderingTester {
 		}
 		int lastIssue = -1;
 		String lastTitle = null;
+		String lastGroup = null;
 		for (TileResult r : reported) {
+			String g = r.def.group == null ? GROUP_FIXED : r.def.group;
+			if (!g.equals(lastGroup)) {
+				lastGroup = g;
+				lastIssue = -1;
+				lastTitle = null;
+				sb.append(String.format("<h1 class=\"grp\">%s</h1>\n", esc(g)));
+			}
 			if (r.def.issue != lastIssue || !r.def.title.equals(lastTitle)) {
 				lastIssue = r.def.issue;
 				lastTitle = r.def.title;
@@ -1556,6 +1636,9 @@ public class CoastlineRenderingTester {
 			+ "table.stats td,table.stats th{padding:5px 14px 5px 0;white-space:nowrap}\n"
 			+ "table.stats td:nth-child(n+2){text-align:right;font-variant-numeric:tabular-nums}\n"
 			+ "table.stats tr.bad td{color:var(--bad)}table.stats a{color:inherit}\n"
+			+ "table.stats tr.grp td{padding-top:14px;color:var(--fg);font-weight:600;text-align:left}\n"
+			+ "h1.grp{font-size:15px;margin:30px 0 0;padding:10px 0 0;border-top:2px solid var(--line)}\n"
+			+ ".sum.groups{margin-top:6px}\n"
 			+ "h2{font-size:15px;margin:26px 0 10px;padding-top:10px;border-top:1px solid var(--line)}\n"
 			+ "h2 a{color:inherit}.tile{display:inline-block;vertical-align:top;margin:0 12px 12px 0;"
 			+ "padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--card)}\n"
