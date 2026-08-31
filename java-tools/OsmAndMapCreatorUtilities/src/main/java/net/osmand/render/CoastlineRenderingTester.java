@@ -1116,8 +1116,10 @@ public class CoastlineRenderingTester {
 		StringBuilder sb = new StringBuilder();
 		sb.append("<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\">\n");
 		sb.append("<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n");
-		sb.append("<title>OsmAnd coastline tiles</title>\n<style>\n").append(REPORT_CSS)
-				.append("</style></head><body>\n");
+		// Jenkins serves the workspace with "style-src 'self'", which forbids an inline <style>,
+		// so the css goes into a file next to index.html
+		sb.append("<title>OsmAnd coastline tiles</title>\n");
+		sb.append("<link rel=\"stylesheet\" href=\"" + REPORT_CSS_FILE + "\">\n</head><body>\n");
 		sb.append("<header><h1>Coastline rendering &mdash; epic 3291</h1>");
 		sb.append(String.format("<p class=\"sum\"><b class=\"%s\">%d failed</b> &middot; %d tiles compared "
 						+ "&middot; %d maps &middot; style %s &middot; %.1f s &middot; %s</p>",
@@ -1174,12 +1176,18 @@ public class CoastlineRenderingTester {
 			sb.append("</section>\n");
 		}
 		sb.append("</main>\n</body></html>\n");
+		File css = new File(outputDir, REPORT_CSS_FILE);
+		try (Writer wr = new OutputStreamWriter(new FileOutputStream(css), StandardCharsets.UTF_8)) {
+			wr.write(REPORT_CSS);
+		}
 		File report = new File(outputDir, "index.html");
 		try (Writer wr = new OutputStreamWriter(new FileOutputStream(report), StandardCharsets.UTF_8)) {
 			wr.write(sb.toString());
 		}
 		System.out.println("HTML report : " + report.getAbsolutePath());
 	}
+
+	private static final String REPORT_CSS_FILE = "styles.css";
 
 	private static final String REPORT_CSS =
 			":root{--bg:#fff;--fg:#1b1b1f;--mut:#6a6a75;--line:#e2e2e8;--card:#fafafc;"
