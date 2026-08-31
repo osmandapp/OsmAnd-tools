@@ -63,7 +63,7 @@ import net.osmand.util.MapUtils;
  * OsmAndMapCreator/utilities.sh test-coastline-rendering -scan -minzoom=1 -maxzoom=10 -maps.dir=/var/maps
  * </pre>
  * Exit code: <b>0</b> - everything matches the reference, <b>2</b> - problems were reproduced,
- * <b>1</b> - the tester could not run (no native library, no maps, broken json).
+ * <b>1</b> - the tester could not run (native library could not be loaded, no maps, broken json).
  *
  * <p>Every option can be given either as an argument ({@code -maps.dir=...}) or as a system
  * property ({@code -Dmaps.dir=...}):
@@ -87,7 +87,9 @@ import net.osmand.util.MapUtils;
  * <li>{@code out} - output folder, default {@code build/coastline-tiles};</li>
  * <li>{@code save} - {@code failed} (default) writes the png tiles of the failed tiles only,
  * {@code all} writes everything, {@code none} keeps statistics only;</li>
- * <li>{@code native}, {@code fonts}, {@code style} - renderer setup, autodetected;</li>
+ * <li>{@code native} - path to {@code libosmand.dylib/so/dll}; by default the library bundled into
+ * OsmAndMapCreator is used, a local repository checkout picks it up from {@code core-legacy};</li>
+ * <li>{@code fonts}, {@code style} - renderer setup, autodetected;</li>
  * <li>{@code threads} - parallel reference tile downloads, default 8;</li>
  * <li>{@code download} - {@code false} to never download a missing map;</li>
  * <li>{@code referenceCache} - {@code false} to delete a reference tile once it was compared;</li>
@@ -427,23 +429,22 @@ public class CoastlineRenderingTester {
 	// ----------------------------------------------------------------- renderer setup
 
 	private void initRenderer() throws Exception {
+		// null lets NativeJavaRendering load the library bundled into OsmAndMapCreator
 		File nativeLib = findNativeLibrary();
-		if (nativeLib == null) {
-			throw new IllegalStateException("Native library libosmand is not found, build core-legacy "
-					+ "or pass -native=<path to libosmand.dylib/so/dll>");
-		}
 		File fonts = findFonts();
 		String style = opt("style", "default.render.xml");
-		System.out.println("Native library : " + nativeLib.getAbsolutePath());
+		System.out.println("Native library : " + (nativeLib == null
+				? "bundled with OsmAndMapCreator" : nativeLib.getAbsolutePath()));
 		System.out.println("Fonts          : " + (fonts == null ? "none" : fonts.getAbsolutePath()));
 		System.out.println("Maps           : " + mapsDir.getAbsolutePath());
 		System.out.println("Output         : " + outputDir.getAbsolutePath());
 		System.out.println("Style          : " + style);
 
-		renderer = NativeJavaRendering.getDefault(nativeLib.getAbsolutePath(), null,
+		renderer = NativeJavaRendering.getDefault(nativeLib == null ? null : nativeLib.getAbsolutePath(), null,
 				fonts == null ? null : fonts.getAbsolutePath());
 		if (renderer == null) {
-			throw new IllegalStateException("Native library " + nativeLib + " could not be loaded");
+			throw new IllegalStateException("Native library could not be loaded"
+					+ (nativeLib == null ? ", pass -native=<path to libosmand.dylib/so/dll>" : ": " + nativeLib));
 		}
 		renderer.loadRuleStorage(style, "density=1,textScale=1");
 		if (loadAllMaps) {
@@ -1267,31 +1268,26 @@ public class CoastlineRenderingTester {
 		return new File(System.getProperty("user.dir"));
 	}
 
+	/**
+	 * Explicit {@code -native=}, else the legacy core of a local repository checkout. Null means
+	 * "let NativeJavaRendering load the library bundled into OsmAndMapCreator", which is how every
+	 * utility of the distribution runs.
+	 */
 	private File findNativeLibrary() {
 		String explicit = opt("native", null);
 		if (explicit != null) {
 			File f = new File(explicit);
-			return f.exists() ? f : null;
+			if (!f.exists()) {
+				throw new IllegalStateException("-native=" + explicit + " does not exist");
+			}
+			return f;
 		}
 		String os = System.getProperty("os.name").toLowerCase();
 		String ext = os.contains("mac") || os.contains("darwin") ? "dylib" : (os.contains("win") ? "dll" : "so");
 		String libName = (os.contains("win") ? "" : "lib") + "osmand." + ext;
-		List<File> roots = new ArrayList<>();
-		File dist = distributionDir();
-		if (dist != null) {
-			// unpacked OsmAndMapCreator.zip: the native libraries are shipped in <dir>/lib
-			roots.add(dist);
-			roots.add(dist.getParentFile());
-		}
-		roots.add(new File(repoRoot(), "core-legacy/binaries"));
-		for (File root : roots) {
-			List<File> found = new ArrayList<>();
-			collect(root, libName, found, 4);
-			if (!found.isEmpty()) {
-				return found.get(0);
-			}
-		}
-		return null;
+		List<File> found = new ArrayList<>();
+		collect(new File(repoRoot(), "core-legacy/binaries"), libName, found, 4);
+		return found.isEmpty() ? null : found.get(0);
 	}
 
 	private static void collect(File dir, String name, List<File> res, int depth) {
