@@ -206,6 +206,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			StringBuilder memberIds = new StringBuilder();
 			QuadRect latLonBbox = OsmMapUtils.indexPoiBboxForSearch(tags) ? new QuadRect() : null;
 			relationCenters = collectRelationCenters(e, ctx, tags, relationCenters, memberIds, latLonBbox);
+			String extraWikidata = null;
+			if (!tags.containsKey(Amenity.WIKIDATA) && e instanceof Relation relation) {
+				extraWikidata = getWikidata(relation);
+			}
 			long id = e.getId();
 			if (icc.basemap && id < 0) {
 				id = GENERATE_OBJ_ID--;
@@ -227,6 +231,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					if (st == null || !a.getType().containsBasemapPoi(st)) {
 						continue;
 					}
+				}
+				if (extraWikidata != null) {
+					a.setAdditionalInfo(Amenity.WIKIDATA, extraWikidata);
 				}
 				for (int i = 0; i < relationCenters.size(); i++) {
                     LatLon cen = relationCenters.get(i);
@@ -1556,5 +1563,18 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
             amenity.setOrder(pt.getOrder());
         }
     }
+	
+	private String getWikidata(Relation relation) {
+		String wikidata = relation.getTag(OSMSettings.OSMTagKey.WIKIDATA);
+		if (wikidata == null) {
+			for (RelationMember es : relation.getMembers()) {
+				if (es.getEntity() instanceof Node &&
+						("admin_centre".equals(es.getRole()) || "admin_center".equals(es.getRole()))) {
+					wikidata = es.getEntity().getTag(OSMSettings.OSMTagKey.WIKIDATA);
+				}
+			}
+		}
+		return wikidata;
+	}
 
 }

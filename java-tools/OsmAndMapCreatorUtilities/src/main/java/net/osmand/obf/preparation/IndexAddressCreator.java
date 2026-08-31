@@ -418,6 +418,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			}
 			String bname = e.getTag(OSMTagKey.NAME);
 			MultipolygonBuilder m = new MultipolygonBuilder();
+			String extraWikidata = null;
 			if (e instanceof Relation) {
 				Relation aRelation = (Relation) e;
 				ctx.loadEntityRelation(aRelation);
@@ -437,6 +438,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 					} else if (es.getEntity() instanceof Node &&
 							("admin_centre".equals(es.getRole()) || "admin_center".equals(es.getRole()))) {
 						centerId = ObfConstants.createMapObjectIdFromOsmAndEntity(es.getEntity());
+						extraWikidata = es.getEntity().getTag(OSMTagKey.WIKIDATA);
 					} else if (es.getEntity() instanceof Node && ("label".equals(es.getRole()))) {
 						labelId = ObfConstants.createMapObjectIdFromOsmAndEntity(es.getEntity());
 					}
@@ -453,6 +455,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
             String wikidata = e.getTag(MapObject.NAME_WIKIDATA_ATTR);
             if (wikidata != null) {
                 boundary.addName(MapObject.NAME_WIKIDATA_ATTR, wikidata);
+			} else if (extraWikidata != null) {
+				boundary.addName(MapObject.NAME_WIKIDATA_ATTR, extraWikidata);
 			}
 			String ref = e.getTag(MapObject.NAME_REF_ATTR);
 			if (ref != null && adminLevel <= 6) {
