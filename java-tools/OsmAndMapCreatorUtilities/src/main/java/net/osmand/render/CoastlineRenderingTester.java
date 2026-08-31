@@ -886,8 +886,23 @@ public class CoastlineRenderingTester {
 	 */
 	private BufferedImage render(int zoom, int x, int y) throws IOException {
 		int shift = 31 - zoom;
-		RenderingImageContext ctx = new RenderingImageContext(x << shift, (x + 1) << shift,
-				y << shift, (y + 1) << shift, zoom);
+		int left = x << shift;
+		int top = y << shift;
+		// the last column and the last row end exactly at 2^31, which does not fit a signed int -
+		// VectorMetatile guards it the same way, without this the edge tiles render garbage
+		int tileSize31 = 1 << shift;
+		if (tileSize31 <= 0) {
+			tileSize31 = Integer.MAX_VALUE;
+		}
+		int right = left + tileSize31;
+		if (right <= 0) {
+			right = Integer.MAX_VALUE;
+		}
+		int bottom = top + tileSize31;
+		if (bottom <= 0) {
+			bottom = Integer.MAX_VALUE;
+		}
+		RenderingImageContext ctx = new RenderingImageContext(left, right, top, bottom, zoom);
 		return renderer.renderImage(ctx).getImage();
 	}
 
