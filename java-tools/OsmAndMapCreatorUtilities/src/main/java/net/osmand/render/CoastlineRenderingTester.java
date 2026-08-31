@@ -164,6 +164,15 @@ public class CoastlineRenderingTester {
 	/** The random tiles are always drawn over this whole range - see {@code minzoom}/{@code maxzoom}. */
 	private static final int RANDOM_MIN_ZOOM = 1, RANDOM_MAX_ZOOM = 17;
 
+	/** Fixed, so that the random tiles and the reference cache built for them never move. */
+	private static final long DEFAULT_SEED = 202608;
+
+	/** How long one Picker keeps guessing before it declares a zoom exhausted for a kind. */
+	private static final int PICK_ATTEMPTS = 20000;
+
+	/** Folders the reference cache is spread over - see {@link #referenceFile}. */
+	private static final int REFERENCE_BUCKETS = 1024;
+
 	static final String GROUP_FIXED = "Fixed cases of coastline-tests.json";
 	static final String GROUP_RANDOM = "Random tiles";
 	static final String GROUP_SCAN = "Full scan";
@@ -469,44 +478,49 @@ public class CoastlineRenderingTester {
 		c.maxzoom = Integer.parseInt(opt("maxzoom", String.valueOf(RANDOM_MAX_ZOOM)));
 		c.maxExtraWater = Double.parseDouble(opt("maxExtraWater", "0.02"));
 		c.maxMissingWater = Double.parseDouble(opt("maxMissingWater", "0.02"));
-		java.util.Calendar cal = java.util.Calendar.getInstance();
-		long seed = Long.parseLong(opt("seed", String.valueOf(
-				cal.get(java.util.Calendar.YEAR) * 100L + cal.get(java.util.Calendar.MONTH) + 1)));
-		seed = 202608;
-		java.util.Random rnd = new java.util.Random(seed);
+		// a constant, so that the tiles - and the reference cache built for them - stay the same
+		long seed = Long.parseLong(opt("seed", String.valueOf(DEFAULT_SEED)));
 		CoastalTiles tiles = new CoastalTiles();
 
+		// The sequence must not depend on totalTiles, otherwise raising -randomTilesK would draw a
+		// completely different set and throw away the reference cache. So every (zoom, kind) has its
+		// own stream seeded only by the seed, and the run takes tiles from them round robin, 8
+		// coastal + 1 ocean + 1 land per zoom per round. The first N of that are the same N for any
+		// N: going from 50k to 100k keeps the first 50k and only adds new tiles after them.
 		List<int[]> picked = new ArrayList<>();
 		int[] found = new int[3];
 		int skipped = 0;
-		int zoomsLeft = RANDOM_MAX_ZOOM - RANDOM_MIN_ZOOM + 1;
-		int left = totalTiles;
-		// the whole 1..17 set is always drawn, minzoom/maxzoom only decide which of it is rendered:
-		// the tiles are picked from the same random sequence either way, so a run of z1..6 and a run
-		// of z7..17 together are exactly the full run - that is what makes it splittable
-		for (int zoom = RANDOM_MIN_ZOOM; zoom <= RANDOM_MAX_ZOOM; zoom++, zoomsLeft--) {
-			// what a low zoom can not provide is spread over the zooms that follow
-			int quota = Math.min(left, (int) Math.ceil(left / (double) zoomsLeft));
-			int[] want = { quota * SHARE_COASTAL / 100, quota * SHARE_OCEAN / 100, 0 };
-			want[2] = quota - want[0] - want[1];
-			int got = 0;
-			boolean render = zoom >= c.minzoom && zoom <= c.maxzoom;
+		int drawn = 0;
+		CoastalTiles.Picker[][] pickers = new CoastalTiles.Picker[RANDOM_MAX_ZOOM + 1][3];
+		for (int zoom = RANDOM_MIN_ZOOM; zoom <= RANDOM_MAX_ZOOM; zoom++) {
 			for (int kind = 0; kind < 3; kind++) {
-				List<int[]> sel = tiles.pick(zoom, kind, want[kind], rnd);
-				got += sel.size();
-				if (!render) {
-					skipped += sel.size();
-					continue;
-				}
-				picked.addAll(sel);
-				found[kind] += sel.size();
+				pickers[zoom][kind] = tiles.picker(zoom, kind, seed);
 			}
-			left -= got;
 		}
-		// the quota has to be filled from the low zooms up - z1 has 4 tiles in the whole world and
-		// what it can not provide is spread over the zooms that follow - but the run goes the other
-		// way round, from the detailed zooms down, because the low zooms have been checked many
-		// times already and the interesting tiles are at the top. Same seed, same set, other order.
+		int[] perRound = { SHARE_COASTAL / 10, SHARE_OCEAN / 10, (100 - SHARE_COASTAL - SHARE_OCEAN) / 10 };
+		boolean anyLeft = true;
+		while (drawn < totalTiles && anyLeft) {
+			anyLeft = false;
+			for (int zoom = RANDOM_MIN_ZOOM; zoom <= RANDOM_MAX_ZOOM && drawn < totalTiles; zoom++) {
+				boolean render = zoom >= c.minzoom && zoom <= c.maxzoom;
+				for (int kind = 0; kind < 3 && drawn < totalTiles; kind++) {
+					for (int i = 0; i < perRound[kind] && drawn < totalTiles; i++) {
+						int[] t = pickers[zoom][kind].next();
+						if (t == null) {
+							break;
+						}
+						anyLeft = true;
+						drawn++;
+						if (render) {
+							picked.add(t);
+							found[kind]++;
+						} else {
+							skipped++;
+						}
+					}
+				}
+			}
+		}
 		Collections.reverse(picked);
 		c.tiles = picked;
 		if (c.minzoom > RANDOM_MIN_ZOOM || c.maxzoom < RANDOM_MAX_ZOOM) {
@@ -553,37 +567,57 @@ public class CoastlineRenderingTester {
 			return first >= 0.99f ? OCEAN : LAND;
 		}
 
-		/** Up to {@code want} distinct tiles of that kind at that zoom. */
-		List<int[]> pick(int zoom, int kind, int want, java.util.Random rnd) {
-			List<int[]> res = new ArrayList<>();
-			if (want <= 0) {
-				return res;
-			}
-			int max = 1 << zoom;
-			long total = (long) max * max;
-			if (total <= 1 << 18) {
-				// small zoom: take every tile of that kind and shuffle, so nothing is missed
-				List<int[]> all = new ArrayList<>();
-				for (int x = 0; x < max; x++) {
-					for (int y = 0; y < max; y++) {
-						if (kind(zoom, x, y) == kind) {
-							all.add(new int[] { zoom, x, y });
+		/**
+		 * An endless stream of distinct tiles of one kind at one zoom. It is seeded only by the run
+		 * seed, the zoom and the kind - never by how many tiles are wanted - so the n-th tile it
+		 * returns is always the same tile.
+		 */
+		Picker picker(int zoom, int kind, long seed) {
+			return new Picker(zoom, kind, new java.util.Random(seed * 1000003L + zoom * 13L + kind));
+		}
+
+		class Picker {
+			private final int zoom, kind, max;
+			private final java.util.Random rnd;
+			/** Small zooms are enumerated and shuffled, so that nothing is missed. */
+			private final List<int[]> all;
+			private int cursor;
+			private final Set<Long> seen = new LinkedHashSet<>();
+
+			Picker(int zoom, int kind, java.util.Random rnd) {
+				this.zoom = zoom;
+				this.kind = kind;
+				this.rnd = rnd;
+				this.max = 1 << zoom;
+				if ((long) max * max <= 1 << 18) {
+					all = new ArrayList<>();
+					for (int x = 0; x < max; x++) {
+						for (int y = 0; y < max; y++) {
+							if (kind(zoom, x, y) == kind) {
+								all.add(new int[] { zoom, x, y });
+							}
 						}
 					}
-				}
-				Collections.shuffle(all, rnd);
-				return all.subList(0, Math.min(want, all.size()));
-			}
-			Set<Long> seen = new LinkedHashSet<>();
-			int attempts = want * 500 + 20000;
-			while (res.size() < want && attempts-- > 0) {
-				int x = rnd.nextInt(max);
-				int y = rnd.nextInt(max);
-				if (kind(zoom, x, y) == kind && seen.add(((long) x << 32) | y)) {
-					res.add(new int[] { zoom, x, y });
+					Collections.shuffle(all, rnd);
+				} else {
+					all = null;
 				}
 			}
-			return res;
+
+			/** The next tile, or null once this zoom has no more of that kind to give. */
+			int[] next() {
+				if (all != null) {
+					return cursor < all.size() ? all.get(cursor++) : null;
+				}
+				for (int attempt = 0; attempt < PICK_ATTEMPTS; attempt++) {
+					int x = rnd.nextInt(max);
+					int y = rnd.nextInt(max);
+					if (kind(zoom, x, y) == kind && seen.add(((long) x << 32) | y)) {
+						return new int[] { zoom, x, y };
+					}
+				}
+				return null;
+			}
 		}
 	}
 
@@ -1180,25 +1214,26 @@ public class CoastlineRenderingTester {
 	/** How many reference tiles a previous run left behind - they are not downloaded again. */
 	private int countCachedReferences() {
 		int n = 0;
-		File[] zooms = referenceCacheDir.listFiles();
-		if (zooms == null) {
+		File[] buckets = referenceCacheDir.listFiles();
+		if (buckets == null) {
 			return 0;
 		}
-		for (File z : zooms) {
-			File[] columns = z.listFiles();
-			if (columns == null) {
-				continue;
-			}
-			for (File c : columns) {
-				String[] tiles = c.list();
-				n += tiles == null ? 0 : tiles.length;
-			}
+		for (File b : buckets) {
+			String[] tiles = b.list();
+			n += tiles == null ? 0 : tiles.length;
 		}
 		return n;
 	}
 
+	/**
+	 * A tile column per folder used to leave one or two files in each of tens of thousands of
+	 * folders. The tiles are spread over a fixed number of numbered buckets instead: about 100
+	 * files per folder for a 100k run and about 1000 for a million, and the file is still named by
+	 * its coordinates so that a tile can be found without a lookup.
+	 */
 	private File referenceFile(int zoom, int x, int y) {
-		return new File(referenceCacheDir, zoom + "/" + x + "/" + y + ".png");
+		int bucket = (((zoom * 31 + x) * 31 + y) & 0x7fffffff) % REFERENCE_BUCKETS;
+		return new File(referenceCacheDir, bucket + "/" + zoom + "_" + x + "_" + y + ".png");
 	}
 
 	private void downloadReference(int zoom, int x, int y) throws IOException {
