@@ -96,6 +96,13 @@ public interface OBFService extends BaseService {
 	OsmAndMapsService getMapsService();
 	String getSearchTestDatasourceUrl();
 
+	default Long getOsmId(Object object) {
+		if (object instanceof MapObject mapObject && mapObject.getId() != null && mapObject.getId() >= 0) {
+			return ObfConstants.getOsmObjectId(mapObject);
+		}
+		return null;
+	}
+
 	default List<BinaryMapIndexReader> openObfReaders(List<String> obfs) throws IOException {
 		List<BinaryMapIndexReader> readers = new ArrayList<>();
 		try {
@@ -322,24 +329,24 @@ public interface OBFService extends BaseService {
 	interface GenerateDbProgressListener {
 		void onProgress(GenerateDbProgress progress);
 	}
-	record CityAddress(String name, LatLon point, List<StreetAddress> streets, int streetsCount, String type, String obf) {
-		public CityAddress(String name, LatLon point, List<StreetAddress> streets, int streetsCount, String type) {
-			this(name, point, streets, streetsCount, type, null);
+	record CityAddress(String name, LatLon point, List<StreetAddress> streets, int streetsCount, String type, String obf, Long osmId) {
+		public CityAddress(String name, LatLon point, List<StreetAddress> streets, int streetsCount, String type, Long osmId) {
+			this(name, point, streets, streetsCount, type, null, osmId);
 		}
 	}
-	record PoiAddress(String name, LatLon point, String value, String obf) {
-		public PoiAddress(String name, LatLon point, String value) {
-			this(name, point, value, null);
+	record PoiAddress(String name, LatLon point, String value, String obf, Long osmId) {
+		public PoiAddress(String name, LatLon point, String value, Long osmId) {
+			this(name, point, value, null, osmId);
 		}
 	}
-	record HouseAddress(String name, LatLon point, String obf) {
-		public HouseAddress(String name, LatLon point) {
-			this(name, point, null);
+	record HouseAddress(String name, LatLon point, String obf, Long osmId) {
+		public HouseAddress(String name, LatLon point, Long osmId) {
+			this(name, point, null, osmId);
 		}
 	}
-	record StreetAddress(String name, LatLon point, List<HouseAddress> houses, int houseCount, String obf) {
-		public StreetAddress(String name, LatLon point, List<HouseAddress> houses, int houseCount) {
-			this(name, point, houses, houseCount, null);
+	record StreetAddress(String name, LatLon point, List<HouseAddress> houses, int houseCount, String obf, Long osmId) {
+		public StreetAddress(String name, LatLon point, List<HouseAddress> houses, int houseCount, Long osmId) {
+			this(name, point, houses, houseCount, null, osmId);
 		}
 	}
 
@@ -466,17 +473,18 @@ public interface OBFService extends BaseService {
 			return null;
 		}
 		LatLon location = new LatLon(objectRecord.lat, objectRecord.lon);
+		Long osmId = objectRecord.id > 0 ? ObfConstants.getOsmIdFromMapObjectId(objectRecord.id) : null;
 		String displayName = Algorithms.isEmpty(objectRecord.name) ? objectRecord.nameEn : objectRecord.name;
 		if (matchesPattern(objectRecord.name, poiPattern, normalizedPoiPattern)) {
-			return new PoiAddress(objectRecord.name, location, "name-> " + objectRecord.name);
+			return new PoiAddress(objectRecord.name, location, "name-> " + objectRecord.name, osmId);
 		}
 		if (matchesPattern(objectRecord.nameEn, poiPattern, normalizedPoiPattern)) {
-			return new PoiAddress(objectRecord.nameEn, location, "name:en-> " + objectRecord.nameEn);
+			return new PoiAddress(objectRecord.nameEn, location, "name:en-> " + objectRecord.nameEn, osmId);
 		}
 		for (Map.Entry<String, List<String>> entry : objectRecord.decodedTextTags.entrySet()) {
 			for (String value : entry.getValue()) {
 				if (matchesPattern(value, poiPattern, normalizedPoiPattern)) {
-					return new PoiAddress(displayName, location, entry.getKey() + "-> " + value);
+					return new PoiAddress(displayName, location, entry.getKey() + "-> " + value, osmId);
 				}
 			}
 		}

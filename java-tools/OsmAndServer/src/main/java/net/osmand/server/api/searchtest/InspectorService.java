@@ -3449,7 +3449,7 @@ public interface InspectorService extends OBFService {
 								
 								index.preloadStreets(c, null, null);
 								if (isStreetEmpty && isHouseEmpty) {
-									results.add(new CityAddress(cityName, c.getLocation(), streets, c.getStreets().size(), c.getType().name().toLowerCase()));
+									results.add(new CityAddress(cityName, c.getLocation(), streets, c.getStreets().size(), c.getType().name().toLowerCase(), getOsmId(c)));
 									continue;
 								}
 
@@ -3461,7 +3461,7 @@ public interface InspectorService extends OBFService {
 
 									index.preloadBuildings(s, null, null);
 									if (isHouseEmpty) {
-										streets.add(new StreetAddress(streetName, s.getLocation(), buildings, s.getBuildings().size()));
+										streets.add(new StreetAddress(streetName, s.getLocation(), buildings, s.getBuildings().size(), getOsmId(s)));
 										continue;
 									}
 
@@ -3470,16 +3470,16 @@ public interface InspectorService extends OBFService {
 										for (Building b : bs) {
 											final String houseName = b.getName(lang);
 											if (houseName != null && housePattern.matcher(houseName).find())
-												buildings.add(new HouseAddress(houseName, b.getLocation()));
+												buildings.add(new HouseAddress(houseName, b.getLocation(), getOsmId(b)));
 										}
 									}
 									if (!buildings.isEmpty()) {
-										StreetAddress street = new StreetAddress(streetName, s.getLocation(), buildings, s.getBuildings().size());
+										StreetAddress street = new StreetAddress(streetName, s.getLocation(), buildings, s.getBuildings().size(), getOsmId(s));
 										streets.add(street);
 									}
 								}
 								if (!streets.isEmpty())
-									results.add(new CityAddress(cityName, c.getLocation(), streets, c.getStreets().size(), c.getType().name().toLowerCase()));
+									results.add(new CityAddress(cityName, c.getLocation(), streets, c.getStreets().size(), c.getType().name().toLowerCase(), getOsmId(c)));
 							}
 						}
 					} else if (poiPattern != null && p instanceof BinaryMapPoiReaderAdapter.PoiRegion poi) {
@@ -3536,7 +3536,7 @@ public interface InspectorService extends OBFService {
 					streets.add((StreetAddress) withObf(street, obf));
 				}
 			}
-			return new CityAddress(city.name(), city.point(), streets, city.streetsCount(), city.type(), obf);
+			return new CityAddress(city.name(), city.point(), streets, city.streetsCount(), city.type(), obf, city.osmId());
 		}
 		if (record instanceof StreetAddress street) {
 			List<HouseAddress> houses = new ArrayList<>();
@@ -3545,13 +3545,13 @@ public interface InspectorService extends OBFService {
 					houses.add((HouseAddress) withObf(house, obf));
 				}
 			}
-			return new StreetAddress(street.name(), street.point(), houses, street.houseCount(), obf);
+			return new StreetAddress(street.name(), street.point(), houses, street.houseCount(), obf, street.osmId());
 		}
 		if (record instanceof HouseAddress house) {
-			return new HouseAddress(house.name(), house.point(), obf);
+			return new HouseAddress(house.name(), house.point(), obf, house.osmId());
 		}
 		if (record instanceof PoiAddress poi) {
-			return new PoiAddress(poi.name(), poi.point(), poi.value(), obf);
+			return new PoiAddress(poi.name(), poi.point(), poi.value(), obf, poi.osmId());
 		}
 		return record;
 	}
