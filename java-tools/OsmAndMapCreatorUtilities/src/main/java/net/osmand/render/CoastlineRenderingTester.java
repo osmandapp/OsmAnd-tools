@@ -75,6 +75,9 @@ import net.osmand.util.MapUtils;
  * {@code case} initializes only the maps a case declares;</li>
  * <li>{@code basemap} - the basemap loaded in the {@code load=case} mode, default
  * {@code World_basemap_2.obf};</li>
+ * <li>{@code cache.dir} - folder holding {@code indexes.cache}, default the working folder; the
+ * cache is what keeps the native library from re-reading the index of every map on every run, and
+ * it is deliberately not written into the shared maps folder;</li>
  * <li>{@code exclude} - comma separated name parts that {@code load=all} skips, default
  * {@code World_seamarks,basemap_mini} - an overlay and a second basemap would distort the
  * rendering; pass {@code -exclude=} to load literally everything;</li>
@@ -137,6 +140,8 @@ public class CoastlineRenderingTester {
 
 	/** Without it the ocean is not rendered at all outside of the detailed maps. */
 	private static final String DEFAULT_BASEMAP = "World_basemap_2.obf";
+
+	private static final String INDEXES_CACHE = "indexes.cache";
 
 	// ----------------------------------------------------------------- json model
 
@@ -266,6 +271,7 @@ public class CoastlineRenderingTester {
 	private final File mapsDir;
 	private final File outputDir;
 	private final File referenceCacheDir;
+	private final File cacheDir;
 	private final boolean loadAllMaps;
 	private final boolean downloadMaps;
 	private final boolean cacheReference;
@@ -287,6 +293,8 @@ public class CoastlineRenderingTester {
 				.getAbsolutePath()));
 		this.outputDir = new File(opt("out", "build/coastline-tiles"));
 		this.referenceCacheDir = new File(opt("referenceDir", new File(outputDir, "reference").getPath()));
+		// the obf indexes cache lives in the working folder, never in the shared maps folder
+		this.cacheDir = new File(opt("cache.dir", System.getProperty("user.dir")));
 		this.loadAllMaps = !"case".equalsIgnoreCase(opt("load", "all"));
 		this.downloadMaps = Boolean.parseBoolean(opt("download", "true"));
 		this.cacheReference = Boolean.parseBoolean(opt("referenceCache", "true"));
@@ -458,17 +466,30 @@ public class CoastlineRenderingTester {
 		}
 	}
 
-	/** Initializes every map of the maps folder - the mode the server scan uses. */
-	private void initAllMaps() {
-		File[] ls = mapsDir.listFiles();
-		if (ls == null) {
+	/**
+	 * Initializes every map of the maps folder - the mode the server scan uses. The obf indexes are
+	 * read through {@code indexes.cache}, otherwise the native library reports "File not
+	 * initialized from cache" and re-reads the index of every single map on every run.
+	 */
+	private void initAllMaps() throws IOException {
+		if (!mapsDir.isDirectory()) {
 			System.err.println("Maps folder " + mapsDir.getAbsolutePath() + " does not exist");
 			return;
 		}
+		File cacheFile = new File(cacheDir, INDEXES_CACHE);
+		cacheFile.getParentFile().mkdirs();
+		boolean existed = cacheFile.isFile();
+		List<File> obfFiles = new ArrayList<>();
+		// picks the newest version of every region and writes/refreshes the cache
+		renderer.initIndexesCache(mapsDir, cacheFile, obfFiles, true);
+		renderer.initCacheMapFile(cacheFile.getAbsolutePath());
+		System.out.println("Indexes cache : " + cacheFile.getAbsolutePath()
+				+ (existed ? " (reused)" : " (created)"));
+
 		String[] excluded = opt("exclude", DEFAULT_EXCLUDED_MAPS).split(",");
 		List<File> maps = new ArrayList<>();
 		List<String> skipped = new ArrayList<>();
-		for (File f : ls) {
+		for (File f : obfFiles) {
 			String n = f.getName();
 			if (!f.isFile() || !n.endsWith(".obf") || n.endsWith(".road.obf") || n.endsWith(".srtm.obf")
 					|| n.endsWith(".srtmf.obf") || n.endsWith(".wiki.obf") || n.endsWith(".depth.obf")) {

@@ -538,8 +538,16 @@ public class NativeJavaRendering extends NativeLibrary {
 	}
 
 	public Map<String, FileIndex> initIndexesCache(File dir, List<File> filesToUse, boolean filterDuplicates) throws IOException {
+		return initIndexesCache(dir, new File(dir, INDEXES_CACHE), filesToUse, filterDuplicates);
+	}
+
+	/**
+	 * Same, but the cache is kept in {@code cacheFile} instead of the maps folder itself, for the
+	 * callers that must not write into a shared or read only maps folder.
+	 */
+	public Map<String, FileIndex> initIndexesCache(File dir, File cacheFile, List<File> filesToUse,
+			boolean filterDuplicates) throws IOException {
 		Map<String, FileIndex> map = new TreeMap<>();
-		File cacheFile = new File(dir, INDEXES_CACHE);
 		CachedOsmandIndexes cache = new CachedOsmandIndexes();
 		if (cacheFile.exists()) {
 			cache.readFromFile(cacheFile);
@@ -553,13 +561,20 @@ public class NativeJavaRendering extends NativeLibrary {
 			}
 			List<File> filteredMaps = mapsCollection.getFilesToUse();
 			for (File file : filteredMaps) {
-				FileIndex fileIndex = cache.getFileIndex(file, true);
+				FileIndex fileIndex;
+				try {
+					fileIndex = cache.getFileIndex(file, true);
+				} catch (IOException e) {
+					// a single broken obf must not abort the whole folder
+					log.error("Skipping map " + file.getAbsolutePath() + ": " + e.getMessage());
+					continue;
+				}
 				if (fileIndex != null) {
 					map.put(file.getAbsolutePath(), fileIndex);
+					if (filesToUse != null) {
+						filesToUse.add(file);
+					}
 				}
-			}
-			if (filesToUse != null) {
-				filesToUse.addAll(filteredMaps);
 			}
 		}
 		cache.writeToFile(cacheFile);
