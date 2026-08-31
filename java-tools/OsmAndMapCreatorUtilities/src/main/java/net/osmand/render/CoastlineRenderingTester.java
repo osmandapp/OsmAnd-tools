@@ -86,6 +86,12 @@ import net.osmand.util.MapsCollection;
  * <li>{@code cases} - path to the json with the cases, default the bundled
  * {@code coastline-tests.json};</li>
  * <li>{@code issue} - run only the cases of one issue, e.g. {@code -issue=25618};</li>
+ * <li>{@code randomTilesK} - size of the random part of a run in thousands of tiles, default
+ * {@value #DEFAULT_RANDOM_TILES_K}; {@code -randomTilesK=0} runs the json cases only. The tiles are
+ * spread evenly over {@code minzoom}..{@code maxzoom} (1..17 by default), {@value #SHARE_COASTAL}%
+ * of them with a coastline in them and the rest split between open ocean and inland. {@code seed}
+ * defaults to the calendar month, so the same tiles are checked all month long. {@code -random}
+ * runs that part alone;</li>
  * <li>{@code scan}, {@code minzoom}, {@code maxzoom}, {@code bbox} - scan every tile of a zoom
  * range instead of the cases; {@code bbox} is {@code leftLon,bottomLat,rightLon,topLat} and
  * defaults to the whole world;</li>
@@ -137,6 +143,12 @@ public class CoastlineRenderingTester {
 	/** Server the report links to, so that a failed tile can be opened on the live map. */
 	private static final String MAP_SERVER = "https://test.osmand.net";
 
+	/** Default size of the random part of a run, in thousands of tiles - see {@code randomTilesK}. */
+	private static final int DEFAULT_RANDOM_TILES_K = 10;
+
+	/** How the random tiles are split: coastal, open ocean, inland. */
+	private static final int SHARE_COASTAL = 80, SHARE_OCEAN = 10;
+
 	private static final String BUNDLED_CASES = "/net/osmand/render/coastline-tests.json";
 	private static final String CHECK_SEAMARKS_INLAND = "seamarksInland";
 
@@ -180,6 +192,8 @@ public class CoastlineRenderingTester {
 		public int radius = 1;
 		public String[] maps = new String[0];
 		public String check = "water";
+		/** explicit {zoom, x, y} tiles - used by the random mode instead of bbox/radius */
+		public transient List<int[]> tiles;
 		/** max share of a tile that may be rendered as water while the reference is land */
 		public double maxExtraWater = 0.02;
 		/** max share of a tile that may be rendered as land while the reference is water */
@@ -291,8 +305,12 @@ public class CoastlineRenderingTester {
 	private final int maskTolerance;
 	private final int threads;
 	private final boolean writeHtml;
+	private final int flushEvery;
 
 	private CasesFile casesFile;
+	private RunResult result;
+	private int tilesSinceFlush;
+	private long lastFlush;
 	private NativeJavaRendering renderer;
 	private final Set<String> initializedMaps = new LinkedHashSet<>();
 	private final List<TileResult> reported = new ArrayList<>();
@@ -312,6 +330,7 @@ public class CoastlineRenderingTester {
 		this.maskTolerance = Integer.parseInt(opt("tolerance", "4"));
 		this.threads = Integer.parseInt(opt("threads", "8"));
 		this.writeHtml = Boolean.parseBoolean(opt("html", "true"));
+		this.flushEvery = Integer.parseInt(opt("flushEvery", "1000"));
 	}
 
 	private String opt(String name, String def) {
@@ -363,7 +382,7 @@ public class CoastlineRenderingTester {
 		initRenderer();
 		downloadPool = Executors.newFixedThreadPool(threads);
 
-		RunResult result = new RunResult();
+		result = new RunResult();
 		result.style = opt("style", "default.render.xml");
 		result.mapsDir = mapsDir.getAbsolutePath();
 		result.startedAt = start;
@@ -371,16 +390,17 @@ public class CoastlineRenderingTester {
 			// the seamarks cases close every map, so they go last
 			cases.sort((a, b) -> Boolean.compare(a.isSeamarksCheck(), b.isSeamarksCheck()));
 			for (CaseDef def : cases) {
-				CaseStats stats = def.isSeamarksCheck() ? runSeamarksCase(def) : runWaterCase(def);
-				result.cases.add(stats);
-				result.tiles += stats.tiles;
-				result.comparedTiles += stats.comparedTiles;
-				result.failedTiles += stats.failedTiles;
+				if (def.isSeamarksCheck()) {
+					runSeamarksCase(def);
+				} else {
+					runWaterCase(def);
+				}
 			}
 		} finally {
 			downloadPool.shutdownNow();
 		}
 		result.loadedMaps = initializedMaps.size();
+		recomputeTotals();
 		result.durationMs = System.currentTimeMillis() - start;
 		printSummary(result);
 		writeSummaryJson(result);
@@ -390,12 +410,130 @@ public class CoastlineRenderingTester {
 		return result;
 	}
 
+	/**
+	 * Picks the random part of a run: tiles spread evenly over the zoom range, {@value
+	 * #SHARE_COASTAL}% of them with a coastline in them, the rest split between deep ocean and deep
+	 * land so that a break away from any coast is noticed too. A plain random tile of the world is
+	 * almost always empty ocean or empty land, which is why the coastal ones are picked on purpose
+	 * from the bundled oceantiles_12 bitmap.
+	 *
+	 * <p>The seed is the calendar month, so the same tiles are checked for a whole month: runs stay
+	 * comparable and the reference tiles stay in the cache. Override with {@code -seed}.
+	 */
+	private CaseDef randomCase(int totalTiles) {
+		CaseDef c = new CaseDef();
+		c.issue = 3291;
+		c.title = "Random tiles";
+		c.minzoom = Integer.parseInt(opt("minzoom", "1"));
+		c.maxzoom = Integer.parseInt(opt("maxzoom", "17"));
+		c.maxExtraWater = Double.parseDouble(opt("maxExtraWater", "0.02"));
+		c.maxMissingWater = Double.parseDouble(opt("maxMissingWater", "0.02"));
+		java.util.Calendar cal = java.util.Calendar.getInstance();
+		long seed = Long.parseLong(opt("seed", String.valueOf(
+				cal.get(java.util.Calendar.YEAR) * 100L + cal.get(java.util.Calendar.MONTH) + 1)));
+		java.util.Random rnd = new java.util.Random(seed);
+		CoastalTiles tiles = new CoastalTiles();
+
+		List<int[]> picked = new ArrayList<>();
+		int[] found = new int[3];
+		int zoomsLeft = c.maxzoom - c.minzoom + 1;
+		int left = totalTiles;
+		for (int zoom = c.minzoom; zoom <= c.maxzoom; zoom++, zoomsLeft--) {
+			// what a low zoom can not provide is spread over the zooms that follow
+			int quota = Math.min(left, (int) Math.ceil(left / (double) zoomsLeft));
+			int[] want = { quota * SHARE_COASTAL / 100, quota * SHARE_OCEAN / 100, 0 };
+			want[2] = quota - want[0] - want[1];
+			int got = 0;
+			for (int kind = 0; kind < 3; kind++) {
+				List<int[]> sel = tiles.pick(zoom, kind, want[kind], rnd);
+				picked.addAll(sel);
+				found[kind] += sel.size();
+				got += sel.size();
+			}
+			left -= got;
+		}
+		c.tiles = picked;
+		System.out.printf("Random tiles  : seed %d, %d tiles over zooms %d..%d "
+						+ "(%d coastal, %d ocean, %d land)%n",
+				seed, picked.size(), c.minzoom, c.maxzoom, found[0], found[1], found[2]);
+		return c;
+	}
+
+	/**
+	 * Sea/land bitmap of oceantiles_12, bundled into the jar. Kind 0 is a tile with a coastline in
+	 * it, 1 is open ocean, 2 is inland.
+	 */
+	private static class CoastalTiles extends net.osmand.obf.preparation.BasemapProcessor {
+		private static final int Z = net.osmand.obf.preparation.BasemapProcessor.TILE_ZOOMLEVEL;
+		static final int COASTAL = 0, OCEAN = 1, LAND = 2;
+
+		CoastalTiles() {
+			constructBitSetInfo(null);
+		}
+
+		int kind(int zoom, int x, int y) {
+			if (zoom < Z) {
+				float sea = getSeaTile(x, y, zoom);
+				return sea > 0.01f && sea < 0.99f ? COASTAL : (sea >= 0.99f ? OCEAN : LAND);
+			}
+			int shift = zoom - Z;
+			int cx = x >> shift, cy = y >> shift, max = 1 << Z;
+			float first = getSeaTile(cx, cy, Z);
+			for (int dx = -1; dx <= 1; dx++) {
+				for (int dy = -1; dy <= 1; dy++) {
+					int nx = Math.max(0, Math.min(max - 1, cx + dx));
+					int ny = Math.max(0, Math.min(max - 1, cy + dy));
+					if (getSeaTile(nx, ny, Z) != first) {
+						return COASTAL;
+					}
+				}
+			}
+			return first >= 0.99f ? OCEAN : LAND;
+		}
+
+		/** Up to {@code want} distinct tiles of that kind at that zoom. */
+		List<int[]> pick(int zoom, int kind, int want, java.util.Random rnd) {
+			List<int[]> res = new ArrayList<>();
+			if (want <= 0) {
+				return res;
+			}
+			int max = 1 << zoom;
+			long total = (long) max * max;
+			if (total <= 1 << 18) {
+				// small zoom: take every tile of that kind and shuffle, so nothing is missed
+				List<int[]> all = new ArrayList<>();
+				for (int x = 0; x < max; x++) {
+					for (int y = 0; y < max; y++) {
+						if (kind(zoom, x, y) == kind) {
+							all.add(new int[] { zoom, x, y });
+						}
+					}
+				}
+				Collections.shuffle(all, rnd);
+				return all.subList(0, Math.min(want, all.size()));
+			}
+			Set<Long> seen = new LinkedHashSet<>();
+			int attempts = want * 500 + 20000;
+			while (res.size() < want && attempts-- > 0) {
+				int x = rnd.nextInt(max);
+				int y = rnd.nextInt(max);
+				if (kind(zoom, x, y) == kind && seen.add(((long) x << 32) | y)) {
+					res.add(new int[] { zoom, x, y });
+				}
+			}
+			return res;
+		}
+	}
+
 	private List<CaseDef> selectCases() {
+		int randomTiles = Integer.parseInt(opt("randomTilesK", String.valueOf(DEFAULT_RANDOM_TILES_K))) * 1000;
+		if (Boolean.parseBoolean(opt("random", "false"))) {
+			return new ArrayList<>(Collections.singletonList(randomCase(randomTiles)));
+		}
 		if (Boolean.parseBoolean(opt("scan", "false"))) {
 			CaseDef scan = new CaseDef();
 			scan.issue = 3291;
 			scan.title = "Full scan";
-			scan.url = "https://github.com/osmandapp/OsmAnd-Issues/issues/3291";
 			scan.minzoom = Integer.parseInt(opt("minzoom", "1"));
 			scan.maxzoom = Integer.parseInt(opt("maxzoom", "10"));
 			String bbox = opt("bbox", null);
@@ -410,6 +548,10 @@ public class CoastlineRenderingTester {
 			if (issue == null || issue.equals(String.valueOf(def.issue))) {
 				res.add(def);
 			}
+		}
+		// the default run is the fixed cases of the json plus the random tiles
+		if (issue == null && randomTiles > 0) {
+			res.add(randomCase(randomTiles));
 		}
 		return res;
 	}
@@ -643,7 +785,8 @@ public class CoastlineRenderingTester {
 
 	private CaseStats runWaterCase(CaseDef def) throws Exception {
 		System.out.println();
-		System.out.println("=== " + def + (def.bbox != null ? " bbox " + Arrays.toString(def.bbox)
+		System.out.println("=== " + def + (def.tiles != null ? " " + def.tiles.size() + " tiles"
+				: def.bbox != null ? " bbox " + Arrays.toString(def.bbox)
 				: String.format(" (%f, %f)", def.lat, def.lon)));
 		CaseStats stats = newStats(def);
 		if (!loadAllMaps) {
@@ -659,13 +802,12 @@ public class CoastlineRenderingTester {
 			}
 		}
 		File dir = caseDir(def);
+		int totalOfCase = countTiles(def);
 		for (List<int[]> chunk : chunks(def)) {
 			prefetchReferences(chunk);
 			for (int[] t : chunk) {
 				compareTile(def, stats, dir, t[0], t[1], t[2]);
-			}
-			if (stats.comparedTiles > 0 && stats.tiles % (CHUNK * 4) == 0) {
-				System.out.printf("  ... %d tiles, %d failed%n", stats.tiles, stats.failedTiles);
+				flush(stats, totalOfCase);
 			}
 		}
 		System.out.printf("  %d tiles, %d compared, %d skipped, %d failed%n", stats.tiles,
@@ -798,6 +940,7 @@ public class CoastlineRenderingTester {
 					res.images.put(String.join(", ", def.maps) + " only", tileName(zoom, x, y, "map-only"));
 				}
 				keepForReport(res);
+				flush(stats, countTiles(def));
 			}
 		}
 		System.out.printf("  %d tiles, %d failed%n", stats.tiles, stats.failedTiles);
@@ -814,6 +957,13 @@ public class CoastlineRenderingTester {
 	 * so the chunks are generated lazily instead of being collected into one list.
 	 */
 	private Iterable<List<int[]>> chunks(CaseDef def) {
+		if (def.tiles != null) {
+			List<List<int[]>> res = new ArrayList<>();
+			for (int i = 0; i < def.tiles.size(); i += CHUNK) {
+				res.add(new ArrayList<>(def.tiles.subList(i, Math.min(i + CHUNK, def.tiles.size()))));
+			}
+			return res;
+		}
 		int[] zoomList = def.zoomList();
 		return () -> new java.util.Iterator<List<int[]>>() {
 			int zi = 0, x, y, leftX, rightX, topY, bottomY;
@@ -872,6 +1022,28 @@ public class CoastlineRenderingTester {
 				return chunk;
 			}
 		};
+	}
+
+	/** How many tiles the case is going to check, for the progress line. */
+	private static int countTiles(CaseDef def) {
+		if (def.tiles != null) {
+			return def.tiles.size();
+		}
+		int total = 0;
+		for (int zoom : def.zoomList()) {
+			int max = 1 << zoom;
+			int w, h;
+			if (def.bbox != null) {
+				w = clamp((int) Math.floor(MapUtils.getTileNumberX(zoom, def.bbox[2])), max)
+						- clamp((int) Math.floor(MapUtils.getTileNumberX(zoom, def.bbox[0])), max) + 1;
+				h = clamp((int) Math.floor(MapUtils.getTileNumberY(zoom, def.bbox[1])), max)
+						- clamp((int) Math.floor(MapUtils.getTileNumberY(zoom, def.bbox[3])), max) + 1;
+			} else {
+				w = h = 2 * def.radius + 1;
+			}
+			total += Math.max(0, w) * Math.max(0, h);
+		}
+		return total;
 	}
 
 	private static int clamp(int v, int max) {
@@ -971,7 +1143,9 @@ public class CoastlineRenderingTester {
 		HttpURLConnection cn = (HttpURLConnection) new URL(url).openConnection();
 		cn.setRequestProperty("User-Agent", "OsmAnd-CoastlineRenderingTester");
 		cn.setConnectTimeout(30000);
-		cn.setReadTimeout(300000);
+		// a reference tile is a few KB - a minute is already a stuck connection, and one stuck
+		// download must not hold up the whole chunk
+		cn.setReadTimeout(60000);
 		if (cn.getResponseCode() != 200) {
 			throw new IOException("HTTP " + cn.getResponseCode() + " for " + url);
 		}
@@ -1142,12 +1316,57 @@ public class CoastlineRenderingTester {
 
 	// ----------------------------------------------------------------- reporting
 
+	private void recomputeTotals() {
+		result.tiles = 0;
+		result.comparedTiles = 0;
+		result.failedTiles = 0;
+		for (CaseStats s : result.cases) {
+			result.tiles += s.tiles;
+			result.comparedTiles += s.comparedTiles;
+			result.failedTiles += s.failedTiles;
+		}
+	}
+
+	/**
+	 * Writes the html report and summary.json every {@code flushEvery} tiles, so that a long run can
+	 * be watched while it goes and does not look stuck. Also prints how far it is and how long the
+	 * rest is going to take.
+	 */
+	private void flush(CaseStats stats, int totalOfCase) throws IOException {
+		if (++tilesSinceFlush < flushEvery) {
+			return;
+		}
+		tilesSinceFlush = 0;
+		long now = System.currentTimeMillis();
+		recomputeTotals();
+		result.loadedMaps = initializedMaps.size();
+		result.durationMs = now - result.startedAt;
+		writeSummaryJson(result, true);
+		if (writeHtml) {
+			writeHtmlReport(result, true);
+		}
+		double perSec = result.comparedTiles * 1000.0 / Math.max(1, now - result.startedAt);
+		String eta = totalOfCase > 0 && perSec > 0
+				? String.format(", eta %s", duration((long) ((totalOfCase - stats.tiles) / perSec * 1000)))
+				: "";
+		System.out.printf("  ... %d of %d tiles, %d failed, %.1f tiles/s%s%n", stats.tiles,
+				totalOfCase, stats.failedTiles, perSec, eta);
+		lastFlush = now;
+	}
+
+	private static String duration(long ms) {
+		long sec = ms / 1000;
+		return sec < 60 ? sec + "s" : (sec < 3600 ? (sec / 60) + "m " + (sec % 60) + "s"
+				: (sec / 3600) + "h " + ((sec % 3600) / 60) + "m");
+	}
+
 	private CaseStats newStats(CaseDef def) {
 		CaseStats stats = new CaseStats();
 		stats.issue = def.issue;
 		stats.title = def.title;
 		stats.url = def.url;
 		stats.check = def.check;
+		result.cases.add(stats);
 		return stats;
 	}
 
@@ -1212,11 +1431,17 @@ public class CoastlineRenderingTester {
 	}
 
 	private void writeSummaryJson(RunResult result) throws IOException {
+		writeSummaryJson(result, false);
+	}
+
+	private void writeSummaryJson(RunResult result, boolean quiet) throws IOException {
 		File f = new File(outputDir, "summary.json");
 		try (Writer w = new OutputStreamWriter(new FileOutputStream(f), StandardCharsets.UTF_8)) {
 			new Gson().toJson(result, w);
 		}
-		System.out.println("Summary json: " + f.getAbsolutePath());
+		if (!quiet) {
+			System.out.println("Summary json: " + f.getAbsolutePath());
+		}
 	}
 
 	/**
@@ -1224,6 +1449,10 @@ public class CoastlineRenderingTester {
 	 * rendered / reference / diff images.
 	 */
 	private void writeHtmlReport(RunResult result) throws IOException {
+		writeHtmlReport(result, false);
+	}
+
+	private void writeHtmlReport(RunResult result, boolean quiet) throws IOException {
 		reported.sort((a, b) -> {
 			if (a.ok() != b.ok()) {
 				return a.ok() ? 1 : -1;
@@ -1305,7 +1534,9 @@ public class CoastlineRenderingTester {
 		try (Writer wr = new OutputStreamWriter(new FileOutputStream(report), StandardCharsets.UTF_8)) {
 			wr.write(sb.toString());
 		}
-		System.out.println("HTML report : " + report.getAbsolutePath());
+		if (!quiet) {
+			System.out.println("HTML report : " + report.getAbsolutePath());
+		}
 	}
 
 	private static final String REPORT_CSS_FILE = "styles.css";

@@ -105,7 +105,6 @@
     {
       "issue": 3291,
       "title": "Ocean rendered as land: South Pacific",
-      "url": "https://github.com/osmandapp/OsmAnd-Issues/issues/3291",
       "lat": -21.943,
       "lon": -112.5,
       "zooms": [3],
@@ -115,7 +114,6 @@
     {
       "issue": 3291,
       "title": "Ocean rendered as land: Gulf of Alaska",
-      "url": "https://github.com/osmandapp/OsmAnd-Issues/issues/3291",
       "lat": 52.483,
       "lon": -140.625,
       "zooms": [5],
@@ -125,7 +123,6 @@
     {
       "issue": 3291,
       "title": "Ocean rendered as land: Pacific off Peru",
-      "url": "https://github.com/osmandapp/OsmAnd-Issues/issues/3291",
       "lat": -16.636,
       "lon": -84.375,
       "zooms": [5],
@@ -135,7 +132,6 @@
     {
       "issue": 3291,
       "title": "Ocean rendered as land: South Atlantic north",
-      "url": "https://github.com/osmandapp/OsmAnd-Issues/issues/3291",
       "lat": -16.636,
       "lon": 5.625,
       "zooms": [5],
@@ -145,7 +141,6 @@
     {
       "issue": 3291,
       "title": "Ocean rendered as land: South Atlantic south",
-      "url": "https://github.com/osmandapp/OsmAnd-Issues/issues/3291",
       "lat": -27.059,
       "lon": 5.625,
       "zooms": [5],
@@ -155,7 +150,6 @@
     {
       "issue": 3291,
       "title": "Ocean rendered as land: Amundsen Sea",
-      "url": "https://github.com/osmandapp/OsmAnd-Issues/issues/3291",
       "lat": -72.396,
       "lon": -140.625,
       "zooms": [5],
