@@ -17,12 +17,14 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -101,8 +103,13 @@ import net.osmand.util.MapsCollection;
  * <li>{@code native} - path to {@code libosmand.dylib/so/dll}; by default the library bundled into
  * OsmAndMapCreator is used, a local repository checkout picks it up from {@code core-legacy};</li>
  * <li>{@code fonts}, {@code style} - renderer setup, autodetected;</li>
- * <li>{@code threads} - parallel reference tile downloads, default 8;</li>
+ * <li>{@code threads} - parallel reference tile downloads, default 16. Rendering itself is single
+ * threaded, this only controls how many reference tiles are fetched at once - raise it if the
+ * progress line reports a high "waiting for references" share;</li>
  * <li>{@code download} - {@code false} to never download a missing map;</li>
+ * <li>{@code referenceDir} - where the downloaded reference tiles are kept, by default
+ * {@code coastline-reference} in the current folder. It is reused by every run, so a rerun only
+ * downloads the tiles it has not seen yet - delete the folder to force a refetch;</li>
  * <li>{@code referenceCache} - {@code false} to delete a reference tile once it was compared;</li>
  * <li>{@code tileSize}, {@code tolerance} - size of the compared tile and the mask tolerance.</li>
  * </ul>
@@ -330,20 +337,27 @@ public class CoastlineRenderingTester {
 	private final Set<String> initializedMaps = new LinkedHashSet<>();
 	private final List<TileResult> reported = new ArrayList<>();
 	private ExecutorService downloadPool;
+	/** Reference tiles already handed to the download pool, so that nobody downloads them twice. */
+	private final Map<String, Future<?>> pendingReferences = new ConcurrentHashMap<>();
+	private long referenceWaitNs;
 
 	public CoastlineRenderingTester(Map<String, String> options) {
 		this.options = options;
 		this.mapsDir = new File(opt("maps.dir", new File(System.getProperty("user.home"), "osmand/maps")
 				.getAbsolutePath()));
 		this.outputDir = new File(opt("out", "build/coastline-tiles"));
-		this.referenceCacheDir = new File(opt("referenceDir", new File(outputDir, "reference").getPath()));
+		// next to indexes.cache in the run folder, not inside the report - the report is rewritten
+		// (and published) on every run, while the downloaded reference tiles are worth keeping so
+		// that a rerun does not fetch them from tile.osmand.net again
+		this.referenceCacheDir = new File(opt("referenceDir",
+				new File(System.getProperty("user.dir"), "coastline-reference").getPath()));
 		this.loadAllMaps = !"case".equalsIgnoreCase(opt("load", "all"));
 		this.downloadMaps = Boolean.parseBoolean(opt("download", "true"));
 		this.cacheReference = Boolean.parseBoolean(opt("referenceCache", "true"));
 		this.saveImages = opt("save", "failed");
 		this.tileSize = Integer.parseInt(opt("tileSize", "256"));
 		this.maskTolerance = Integer.parseInt(opt("tolerance", "4"));
-		this.threads = Integer.parseInt(opt("threads", "8"));
+		this.threads = Integer.parseInt(opt("threads", "16"));
 		this.writeHtml = Boolean.parseBoolean(opt("html", "true"));
 		this.flushEvery = Integer.parseInt(opt("flushEvery", "1000"));
 	}
@@ -395,6 +409,9 @@ public class CoastlineRenderingTester {
 			throw new IllegalStateException("Nothing to check, no case matched the parameters");
 		}
 		initRenderer();
+		// the JDK keeps only 5 pooled keep alive connections per host by default, everything above
+		// that reconnects and does a TLS handshake per tile
+		System.setProperty("http.maxConnections", String.valueOf(Math.max(5, threads)));
 		downloadPool = Executors.newFixedThreadPool(threads);
 
 		result = new RunResult();
@@ -468,10 +485,16 @@ public class CoastlineRenderingTester {
 			}
 			left -= got;
 		}
+		// the quota has to be filled from the low zooms up - z1 has 4 tiles in the whole world and
+		// what it can not provide is spread over the zooms that follow - but the run goes the other
+		// way round, from the detailed zooms down, because the low zooms have been checked many
+		// times already and the interesting tiles are at the top. Same seed, same set, other order.
+		Collections.reverse(picked);
 		c.tiles = picked;
-		System.out.printf("Random tiles  : seed %d, %d tiles over zooms %d..%d "
+		System.out.printf("Random tiles  : seed %d, %d tiles over zooms %d..%d (rendered %d down to %d) "
 						+ "(%d coastal, %d ocean, %d land)%n",
-				seed, picked.size(), c.minzoom, c.maxzoom, found[0], found[1], found[2]);
+				seed, picked.size(), c.minzoom, c.maxzoom, c.maxzoom, c.minzoom,
+				found[0], found[1], found[2]);
 		return c;
 	}
 
@@ -617,6 +640,8 @@ public class CoastlineRenderingTester {
 		System.out.println("Fonts          : " + (fonts == null ? "none" : fonts.getAbsolutePath()));
 		System.out.println("Maps           : " + mapsDir.getAbsolutePath());
 		System.out.println("Output         : " + outputDir.getAbsolutePath());
+		System.out.println("Reference cache: " + referenceCacheDir.getAbsolutePath()
+				+ " (" + countCachedReferences() + " tiles kept from the previous runs)");
 		System.out.println("Style          : " + style);
 
 		renderer = NativeJavaRendering.getDefault(nativeLib == null ? null : nativeLib.getAbsolutePath(), null,
@@ -823,12 +848,20 @@ public class CoastlineRenderingTester {
 		}
 		File dir = caseDir(def);
 		int totalOfCase = countTiles(def);
-		for (List<int[]> chunk : chunks(def)) {
-			prefetchReferences(chunk);
+		// the reference tiles of the next chunk are downloaded while this one is being rendered -
+		// rendering is single threaded and the tile server is slow, so waiting for a whole chunk
+		// before starting to render leaves either the net or the cpu idle all of the time
+		Iterator<List<int[]>> it = chunks(def).iterator();
+		List<int[]> chunk = it.hasNext() ? it.next() : null;
+		prefetchReferences(chunk);
+		while (chunk != null) {
+			List<int[]> next = it.hasNext() ? it.next() : null;
+			prefetchReferences(next);
 			for (int[] t : chunk) {
 				compareTile(def, stats, dir, t[0], t[1], t[2]);
 				flush(stats, totalOfCase);
 			}
+			chunk = next;
 		}
 		System.out.printf("  %d tiles, %d compared, %d skipped, %d failed%n", stats.tiles,
 				stats.comparedTiles, stats.skippedTiles, stats.failedTiles);
@@ -837,6 +870,7 @@ public class CoastlineRenderingTester {
 
 	private void compareTile(CaseDef def, CaseStats stats, File dir, int zoom, int x, int y) throws IOException {
 		stats.tiles++;
+		awaitReference(zoom, x, y);
 		BufferedImage reference = reference(zoom, x, y);
 		if (reference == null) {
 			stats.skippedTiles++;
@@ -985,7 +1019,7 @@ public class CoastlineRenderingTester {
 			return res;
 		}
 		int[] zoomList = def.zoomList();
-		return () -> new java.util.Iterator<List<int[]>>() {
+		return () -> new Iterator<List<int[]>>() {
 			int zi = 0, x, y, leftX, rightX, topY, bottomY;
 			boolean started = false;
 
@@ -1098,31 +1132,69 @@ public class CoastlineRenderingTester {
 		return renderer.renderImage(ctx).getImage();
 	}
 
-	/** Downloads the reference tiles of a chunk in parallel, so that rendering never waits for the net. */
+	/**
+	 * Hands the reference tiles of a chunk to the download pool and returns at once - the tile is
+	 * awaited by {@link #awaitReference} right before it is needed, so the downloads of the next
+	 * chunk overlap the rendering of the current one.
+	 */
 	private void prefetchReferences(List<int[]> chunk) {
-		List<Future<?>> futures = new ArrayList<>();
+		if (chunk == null) {
+			return;
+		}
 		for (int[] t : chunk) {
 			final int zoom = t[0], x = t[1], y = t[2];
-			if (referenceFile(zoom, x, y).isFile()) {
+			String key = zoom + "/" + x + "/" + y;
+			if (referenceFile(zoom, x, y).isFile() || pendingReferences.containsKey(key)) {
 				continue;
 			}
-			futures.add(downloadPool.submit((Callable<Void>) () -> {
+			pendingReferences.put(key, downloadPool.submit((Callable<Void>) () -> {
 				downloadReference(zoom, x, y);
 				return null;
 			}));
 		}
-		for (Future<?> f : futures) {
-			try {
-				f.get();
-			} catch (Exception e) {
-				// the tile is simply skipped later
-			}
+	}
+
+	/** Waits for the prefetch of one tile, measuring how much of the run is spent waiting for the net. */
+	private void awaitReference(int zoom, int x, int y) {
+		Future<?> f = pendingReferences.remove(zoom + "/" + x + "/" + y);
+		if (f == null) {
+			return;
+		}
+		long start = System.nanoTime();
+		try {
+			f.get();
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		} catch (Exception e) {
+			// the tile is simply skipped later
+		} finally {
+			referenceWaitNs += System.nanoTime() - start;
 		}
 	}
 
 	private String referenceUrl(int zoom, int x, int y) {
 		return casesFile.referenceUrl.replace("{z}", String.valueOf(zoom)).replace("{x}", String.valueOf(x))
 				.replace("{y}", String.valueOf(y));
+	}
+
+	/** How many reference tiles a previous run left behind - they are not downloaded again. */
+	private int countCachedReferences() {
+		int n = 0;
+		File[] zooms = referenceCacheDir.listFiles();
+		if (zooms == null) {
+			return 0;
+		}
+		for (File z : zooms) {
+			File[] columns = z.listFiles();
+			if (columns == null) {
+				continue;
+			}
+			for (File c : columns) {
+				String[] tiles = c.list();
+				n += tiles == null ? 0 : tiles.length;
+			}
+		}
+		return n;
 	}
 
 	private File referenceFile(int zoom, int x, int y) {
@@ -1390,8 +1462,11 @@ public class CoastlineRenderingTester {
 		String eta = totalOfCase > 0 && perSec > 0
 				? String.format(", eta %s", duration((long) ((totalOfCase - stats.tiles) / perSec * 1000)))
 				: "";
-		System.out.printf("  ... %d of %d tiles, %d failed, %.1f tiles/s%s%n", stats.tiles,
-				totalOfCase, stats.failedTiles, perSec, eta);
+		// how much of the wall clock went into waiting for a reference tile that the pool had not
+		// finished yet - if this is high the run is bound by tile.osmand.net, not by the renderer
+		long net = referenceWaitNs / 1000000 * 100 / Math.max(1, now - result.startedAt);
+		System.out.printf("  ... %d of %d tiles, %d failed, %.1f tiles/s, %d%% waiting for references%s%n",
+				stats.tiles, totalOfCase, stats.failedTiles, perSec, net, eta);
 		lastFlush = now;
 	}
 
