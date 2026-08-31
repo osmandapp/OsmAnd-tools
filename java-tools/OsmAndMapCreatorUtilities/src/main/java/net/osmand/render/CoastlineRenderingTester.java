@@ -34,8 +34,10 @@ import com.google.gson.Gson;
 
 import net.osmand.NativeJavaRendering;
 import net.osmand.NativeJavaRendering.RenderingImageContext;
+import net.osmand.binary.CachedOsmandIndexes;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
+import net.osmand.util.MapsCollection;
 
 /**
  * Renders map tiles with the native (legacy) renderer and compares their <b>water mask</b> with the
@@ -137,6 +139,9 @@ public class CoastlineRenderingTester {
 
 	/** Without it the ocean is not rendered at all outside of the detailed maps. */
 	private static final String DEFAULT_BASEMAP = "World_basemap_2.obf";
+
+	/** Obf index cache, written into the folder the job runs in - never into the maps folder. */
+	private static final String INDEXES_CACHE = "indexes.cache";
 
 	// ----------------------------------------------------------------- json model
 
@@ -458,17 +463,45 @@ public class CoastlineRenderingTester {
 		}
 	}
 
-	/** Initializes every map of the maps folder - the mode the server scan uses. */
-	private void initAllMaps() {
-		File[] ls = mapsDir.listFiles();
-		if (ls == null) {
+	/**
+	 * Initializes every map of the maps folder - the mode the server scan uses. The obf indexes are
+	 * read through {@code indexes.cache}, otherwise the native library reports "File not
+	 * initialized from cache" and re-reads the index of every single map on every run.
+	 */
+	private void initAllMaps() throws IOException {
+		if (!mapsDir.isDirectory()) {
 			System.err.println("Maps folder " + mapsDir.getAbsolutePath() + " does not exist");
 			return;
 		}
+		// the cache lives in the folder the job runs in (the Jenkins workspace), so that it is
+		// wiped together with it and never written into the shared maps folder
+		File cacheFile = new File(System.getProperty("user.dir"), INDEXES_CACHE);
+		boolean existed = cacheFile.isFile();
+		CachedOsmandIndexes cache = new CachedOsmandIndexes();
+		if (existed) {
+			cache.readFromFile(cacheFile);
+		}
+		// keeps the newest version of every region only
+		MapsCollection collection = new MapsCollection(true);
+		for (File obf : Algorithms.getSortedFilesVersions(mapsDir)) {
+			if (!obf.isDirectory() && obf.getName().endsWith(".obf")) {
+				collection.add(obf);
+			}
+		}
+		List<File> obfFiles = collection.getFilesToUse();
+		for (File f : obfFiles) {
+			// a corrupt obf throws here on purpose - the map has to be fixed, not skipped
+			cache.getFileIndex(f, true);
+		}
+		cache.writeToFile(cacheFile);
+		renderer.initCacheMapFile(cacheFile.getAbsolutePath());
+		System.out.println("Indexes cache : " + cacheFile.getAbsolutePath()
+				+ (existed ? " (reused)" : " (created)"));
+
 		String[] excluded = opt("exclude", DEFAULT_EXCLUDED_MAPS).split(",");
 		List<File> maps = new ArrayList<>();
 		List<String> skipped = new ArrayList<>();
-		for (File f : ls) {
+		for (File f : obfFiles) {
 			String n = f.getName();
 			if (!f.isFile() || !n.endsWith(".obf") || n.endsWith(".road.obf") || n.endsWith(".srtm.obf")
 					|| n.endsWith(".srtmf.obf") || n.endsWith(".wiki.obf") || n.endsWith(".depth.obf")) {
