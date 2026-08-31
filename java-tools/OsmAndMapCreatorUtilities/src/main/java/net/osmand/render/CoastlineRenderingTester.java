@@ -90,9 +90,12 @@ import net.osmand.util.MapsCollection;
  * <li>{@code issue} - run only the cases of one issue, e.g. {@code -issue=25618};</li>
  * <li>{@code randomTilesK} - size of the random part of a run in thousands of tiles, default
  * {@value #DEFAULT_RANDOM_TILES_K}; {@code -randomTilesK=0} runs the json cases only. The tiles are
- * spread evenly over {@code minzoom}..{@code maxzoom} (1..17 by default), {@value #SHARE_COASTAL}%
- * of them with a coastline in them and the rest split between open ocean and inland. {@code seed}
- * defaults to the calendar month, so the same tiles are checked all month long. {@code -random}
+ * spread evenly over zooms {@value #RANDOM_MIN_ZOOM}..{@value #RANDOM_MAX_ZOOM},
+ * {@value #SHARE_COASTAL}% of them with a coastline in them and the rest split between open ocean
+ * and inland. {@code seed} defaults to the calendar month, so the same tiles are checked all month
+ * long. {@code minzoom}/{@code maxzoom} do not change what is drawn, they only skip the zooms
+ * outside the range, so a slow run can be split into parts that add up to the whole one -
+ * {@code -minzoom=1 -maxzoom=6} and {@code -minzoom=7} together are the full run. {@code -random}
  * runs that part alone;</li>
  * <li>{@code scan}, {@code minzoom}, {@code maxzoom}, {@code bbox} - scan every tile of a zoom
  * range instead of the cases; {@code bbox} is {@code leftLon,bottomLat,rightLon,topLat} and
@@ -155,6 +158,9 @@ public class CoastlineRenderingTester {
 
 	/** How the random tiles are split: coastal, open ocean, inland. */
 	private static final int SHARE_COASTAL = 80, SHARE_OCEAN = 10;
+
+	/** The random tiles are always drawn over this whole range - see {@code minzoom}/{@code maxzoom}. */
+	private static final int RANDOM_MIN_ZOOM = 1, RANDOM_MAX_ZOOM = 17;
 
 	static final String GROUP_FIXED = "Fixed cases of coastline-tests.json";
 	static final String GROUP_RANDOM = "Random tiles";
@@ -457,8 +463,8 @@ public class CoastlineRenderingTester {
 		c.issue = 3291;
 		c.title = "Random tiles";
 		c.group = GROUP_RANDOM;
-		c.minzoom = Integer.parseInt(opt("minzoom", "1"));
-		c.maxzoom = Integer.parseInt(opt("maxzoom", "17"));
+		c.minzoom = Integer.parseInt(opt("minzoom", String.valueOf(RANDOM_MIN_ZOOM)));
+		c.maxzoom = Integer.parseInt(opt("maxzoom", String.valueOf(RANDOM_MAX_ZOOM)));
 		c.maxExtraWater = Double.parseDouble(opt("maxExtraWater", "0.02"));
 		c.maxMissingWater = Double.parseDouble(opt("maxMissingWater", "0.02"));
 		java.util.Calendar cal = java.util.Calendar.getInstance();
@@ -469,19 +475,28 @@ public class CoastlineRenderingTester {
 
 		List<int[]> picked = new ArrayList<>();
 		int[] found = new int[3];
-		int zoomsLeft = c.maxzoom - c.minzoom + 1;
+		int skipped = 0;
+		int zoomsLeft = RANDOM_MAX_ZOOM - RANDOM_MIN_ZOOM + 1;
 		int left = totalTiles;
-		for (int zoom = c.minzoom; zoom <= c.maxzoom; zoom++, zoomsLeft--) {
+		// the whole 1..17 set is always drawn, minzoom/maxzoom only decide which of it is rendered:
+		// the tiles are picked from the same random sequence either way, so a run of z1..6 and a run
+		// of z7..17 together are exactly the full run - that is what makes it splittable
+		for (int zoom = RANDOM_MIN_ZOOM; zoom <= RANDOM_MAX_ZOOM; zoom++, zoomsLeft--) {
 			// what a low zoom can not provide is spread over the zooms that follow
 			int quota = Math.min(left, (int) Math.ceil(left / (double) zoomsLeft));
 			int[] want = { quota * SHARE_COASTAL / 100, quota * SHARE_OCEAN / 100, 0 };
 			want[2] = quota - want[0] - want[1];
 			int got = 0;
+			boolean render = zoom >= c.minzoom && zoom <= c.maxzoom;
 			for (int kind = 0; kind < 3; kind++) {
 				List<int[]> sel = tiles.pick(zoom, kind, want[kind], rnd);
+				got += sel.size();
+				if (!render) {
+					skipped += sel.size();
+					continue;
+				}
 				picked.addAll(sel);
 				found[kind] += sel.size();
-				got += sel.size();
 			}
 			left -= got;
 		}
@@ -491,9 +506,14 @@ public class CoastlineRenderingTester {
 		// times already and the interesting tiles are at the top. Same seed, same set, other order.
 		Collections.reverse(picked);
 		c.tiles = picked;
-		System.out.printf("Random tiles  : seed %d, %d tiles over zooms %d..%d (rendered %d down to %d) "
+		if (c.minzoom > RANDOM_MIN_ZOOM || c.maxzoom < RANDOM_MAX_ZOOM) {
+			c.title = "Random tiles z" + c.minzoom + "-" + c.maxzoom;
+		}
+		System.out.printf("Random tiles  : seed %d, %d of %d tiles, zooms %d..%d of %d..%d "
+						+ "(rendered %d down to %d, %d skipped by the zoom filter) "
 						+ "(%d coastal, %d ocean, %d land)%n",
-				seed, picked.size(), c.minzoom, c.maxzoom, c.maxzoom, c.minzoom,
+				seed, picked.size(), picked.size() + skipped, c.minzoom, c.maxzoom,
+				RANDOM_MIN_ZOOM, RANDOM_MAX_ZOOM, c.maxzoom, c.minzoom, skipped,
 				found[0], found[1], found[2]);
 		return c;
 	}
