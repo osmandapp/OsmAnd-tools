@@ -122,8 +122,20 @@ public class CoastlineRenderingTester {
 
 	private static final int SHADED_WATER_SPREAD_PX = 16;
 
+	/**
+	 * Ice: {@code natural=glacier} is {@code #E4FDFF} in default.render.xml and {@code #ddecec} in
+	 * openstreetmap-carto. Antarctica and the Arctic are drawn from it, the two styles disagree
+	 * about how ice relates to water, and none of that is a coastline problem - so pixels that are
+	 * ice on either side are ignored on both.
+	 */
+	private static final int[] OSMAND_ICE_COLORS = { 0xE4FDFF };
+	private static final int[] REFERENCE_ICE_COLORS = { 0xddecec };
+
 	/** Max per channel difference to still treat a pixel as water. */
 	private static final int COLOR_TOLERANCE = 10;
+
+	/** Server the report links to, so that a failed tile can be opened on the live map. */
+	private static final String MAP_SERVER = "https://test.osmand.net";
 
 	private static final String BUNDLED_CASES = "/net/osmand/render/coastline-tests.json";
 	private static final String CHECK_SEAMARKS_INLAND = "seamarksInland";
@@ -675,11 +687,13 @@ public class CoastlineRenderingTester {
 		boolean[] renderedWater = waterMask(rendered, OSMAND_WATER_COLORS);
 		boolean[] referenceWater = waterMask(reference, REFERENCE_WATER_COLORS);
 		boolean[] shaded = dilate(waterMask(rendered, SHADED_WATER_COLORS), w, h, SHADED_WATER_SPREAD_PX);
-		boolean[] extraAll = and(erode(renderedWater, w, h, maskTolerance),
-				not(dilate(referenceWater, w, h, maskTolerance)));
+		boolean[] ice = dilate(or(waterMask(rendered, OSMAND_ICE_COLORS),
+				waterMask(reference, REFERENCE_ICE_COLORS)), w, h, maskTolerance);
+		boolean[] extraAll = and(and(erode(renderedWater, w, h, maskTolerance),
+				not(dilate(referenceWater, w, h, maskTolerance))), not(ice));
 		boolean[] extra = and(extraAll, not(shaded));
-		boolean[] missing = and(erode(referenceWater, w, h, maskTolerance),
-				not(dilate(renderedWater, w, h, maskTolerance)));
+		boolean[] missing = and(and(erode(referenceWater, w, h, maskTolerance),
+				not(dilate(renderedWater, w, h, maskTolerance))), not(ice));
 		double extraRatio = count(extra) * 1.0 / (w * h);
 		double extraAllRatio = count(extraAll) * 1.0 / (w * h);
 		double missingRatio = count(missing) * 1.0 / (w * h);
@@ -864,9 +878,16 @@ public class CoastlineRenderingTester {
 		return v < 0 ? 0 : (v >= max ? max - 1 : v);
 	}
 
+	/**
+	 * Renders one tile the way the server does it in VectorMetatile.renderMetaTile: from the tile
+	 * aligned 31 bit bounds. The lat/lon constructor goes through RotatedTileBox and comes back a
+	 * few 31 bit units off the tile grid, which is enough to flip the ocean/land fill of a tile -
+	 * 6/4/62 and 6/58/19 come out as land through it and as water through this one.
+	 */
 	private BufferedImage render(int zoom, int x, int y) throws IOException {
-		RenderingImageContext ctx = new RenderingImageContext(MapUtils.getLatitudeFromTile(zoom, y + 0.5),
-				MapUtils.getLongitudeFromTile(zoom, x + 0.5), tileSize, tileSize, zoom, tileSize / 256);
+		int shift = 31 - zoom;
+		RenderingImageContext ctx = new RenderingImageContext(x << shift, (x + 1) << shift,
+				y << shift, (y + 1) << shift, zoom);
 		return renderer.renderImage(ctx).getImage();
 	}
 
@@ -892,6 +913,11 @@ public class CoastlineRenderingTester {
 		}
 	}
 
+	private String referenceUrl(int zoom, int x, int y) {
+		return casesFile.referenceUrl.replace("{z}", String.valueOf(zoom)).replace("{x}", String.valueOf(x))
+				.replace("{y}", String.valueOf(y));
+	}
+
 	private File referenceFile(int zoom, int x, int y) {
 		return new File(referenceCacheDir, zoom + "/" + x + "/" + y + ".png");
 	}
@@ -899,9 +925,7 @@ public class CoastlineRenderingTester {
 	private void downloadReference(int zoom, int x, int y) throws IOException {
 		File cached = referenceFile(zoom, x, y);
 		cached.getParentFile().mkdirs();
-		String url = casesFile.referenceUrl.replace("{z}", String.valueOf(zoom))
-				.replace("{x}", String.valueOf(x)).replace("{y}", String.valueOf(y));
-		download(url, cached);
+		download(referenceUrl(zoom, x, y), cached);
 	}
 
 	private BufferedImage reference(int zoom, int x, int y) {
@@ -1013,6 +1037,14 @@ public class CoastlineRenderingTester {
 		boolean[] r = new boolean[m.length];
 		for (int i = 0; i < m.length; i++) {
 			r[i] = !m[i];
+		}
+		return r;
+	}
+
+	private static boolean[] or(boolean[] a, boolean[] b) {
+		boolean[] r = new boolean[a.length];
+		for (int i = 0; i < a.length; i++) {
+			r[i] = a[i] || b[i];
 		}
 		return r;
 	}
@@ -1223,9 +1255,13 @@ public class CoastlineRenderingTester {
 			double lat = MapUtils.getLatitudeFromTile(r.zoom, r.y + 0.5);
 			double lon = MapUtils.getLongitudeFromTile(r.zoom, r.x + 0.5);
 			sb.append(String.format("<section class=\"tile %s\"><div class=\"hd\"><b>%d/%d/%d</b>"
-							+ "<a href=\"https://osmand.net/map?pin=%f,%f#%d/%f/%f\">map</a>"
+							+ "<a href=\"%s/map/#%d/%.4f/%.4f\" title=\"open this place on the map\">map</a>"
+							+ "<a href=\"%s/tile/df/%d/%d/%d.png\" title=\"the same tile rendered by the server\">"
+							+ "server tile</a>"
+							+ "<a href=\"%s\" title=\"the reference tile\">reference tile</a>"
 							+ "<span class=\"badge\">%s</span></div>", r.ok() ? "good" : "bad",
-					r.zoom, r.x, r.y, lat, lon, r.zoom, lat, lon, r.ok() ? "ok" : "failed"));
+					r.zoom, r.x, r.y, MAP_SERVER, r.zoom, lat, lon, MAP_SERVER, r.zoom, r.x, r.y,
+					esc(referenceUrl(r.zoom, r.x, r.y)), r.ok() ? "ok" : "failed"));
 			if (!r.images.isEmpty()) {
 				sb.append("<div class=\"imgs\">");
 				for (Map.Entry<String, String> e : r.images.entrySet()) {
@@ -1279,7 +1315,7 @@ public class CoastlineRenderingTester {
 			+ "padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--card)}\n"
 			+ ".tile.bad{border-color:var(--bad);background:var(--badbg)}\n"
 			+ ".hd{display:flex;align-items:center;gap:10px;margin-bottom:8px}\n"
-			+ ".hd a{color:var(--mut);font-size:12px}\n"
+			+ ".hd a{color:var(--mut);font-size:12px;white-space:nowrap}\n"
 			+ ".badge{margin-left:auto;font-size:11px;text-transform:uppercase;letter-spacing:.06em;"
 			+ "padding:2px 8px;border-radius:20px;background:var(--goodbg);color:var(--good)}\n"
 			+ ".tile.bad .badge{background:var(--bad);color:#fff}\n"
