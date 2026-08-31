@@ -470,6 +470,7 @@ public class CoastlineRenderingTester {
 		java.util.Calendar cal = java.util.Calendar.getInstance();
 		long seed = Long.parseLong(opt("seed", String.valueOf(
 				cal.get(java.util.Calendar.YEAR) * 100L + cal.get(java.util.Calendar.MONTH) + 1)));
+		seed = 202608;
 		java.util.Random rnd = new java.util.Random(seed);
 		CoastalTiles tiles = new CoastalTiles();
 
