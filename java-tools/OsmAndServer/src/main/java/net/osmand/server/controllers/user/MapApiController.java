@@ -384,8 +384,6 @@ public class MapApiController {
 		Set<String> types = userdataService.parseFileTypes(type);
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, true, types);
 		Map<String, Set<String>> sharedFilesMap = shareFileService.getFilesByOwner(dev.userid);
-		List<UserFileNoData> searchTracks = new ArrayList<>();
-		List<UserFileNoData> searchFavoriteFiles = new ArrayList<>();
 
 		res.uniqueFiles.forEach(nd -> {
 			String ext = nd.name.substring(nd.name.lastIndexOf('.'));
@@ -413,12 +411,8 @@ public class MapApiController {
 			if (isGPZTrack || isFavorite) {
 				boolean isSharedFile = webUserdataService.isShared(nd, sharedFilesMap);
 				nd.details.add(SHARE, gson.toJsonTree(isSharedFile));
-				(isGPZTrack ? searchTracks : searchFavoriteFiles).add(nd);
 			}
 		});
-		if (name == null && type == null) {
-			userDataSearchService.updateIndex(searchTracks, searchFavoriteFiles, dev);
-		}
 
 		if (addDevices && res.allFiles != null) {
 			Map<Integer, String> devices = new HashMap<>();
