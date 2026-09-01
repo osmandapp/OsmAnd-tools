@@ -9,6 +9,7 @@ import jakarta.transaction.Transactional;
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository;
+import net.osmand.server.api.services.search.UserDataSearchService;
 import net.osmand.server.controllers.pub.UserSessionResources;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
@@ -17,6 +18,7 @@ import net.osmand.shared.gpx.GpxUtilities;
 import okio.Buffer;
 import okio.Source;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -52,6 +54,10 @@ public class FavoriteService {
     
     @Autowired
     WebGpxParser webGpxParser;
+
+    @Lazy
+    @Autowired
+    UserDataSearchService userDataSearchService;
     
     Gson gson = new Gson();
     
@@ -110,6 +116,7 @@ public class FavoriteService {
             }
             WebGpxParser.TrackData trackData = gpxService.buildTrackDataFromGpxFile(file, null);
             userFile.details.add("trackData", gson.toJsonTree(gsonWithNans.toJson(trackData)));
+            userDataSearchService.updateFavorites(userFile, file, dev);
             resp = new UserdataService.ResponseFileStatus(userFile);
         }
         return resp;

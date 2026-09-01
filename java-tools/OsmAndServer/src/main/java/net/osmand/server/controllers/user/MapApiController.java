@@ -27,6 +27,7 @@ import jakarta.validation.constraints.NotNull;
 
 import net.osmand.map.OsmandRegions;
 import net.osmand.server.api.services.*;
+import net.osmand.server.api.services.search.UserDataSearchService;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.util.Algorithms;
@@ -96,6 +97,9 @@ public class MapApiController {
 
 	@Autowired
 	private SmartFolderService smartFolderService;
+
+	@Autowired
+	private UserDataSearchService userDataSearchService;
 
 	@Autowired
 	protected DeviceSubscriptionsRepository subscriptionsRepo;
@@ -380,6 +384,8 @@ public class MapApiController {
 		Set<String> types = userdataService.parseFileTypes(type);
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, true, types);
 		Map<String, Set<String>> sharedFilesMap = shareFileService.getFilesByOwner(dev.userid);
+		List<UserFileNoData> searchTracks = new ArrayList<>();
+		List<UserFileNoData> searchFavoriteFiles = new ArrayList<>();
 
 		res.uniqueFiles.forEach(nd -> {
 			String ext = nd.name.substring(nd.name.lastIndexOf('.'));
@@ -407,8 +413,12 @@ public class MapApiController {
 			if (isGPZTrack || isFavorite) {
 				boolean isSharedFile = webUserdataService.isShared(nd, sharedFilesMap);
 				nd.details.add(SHARE, gson.toJsonTree(isSharedFile));
+				(isGPZTrack ? searchTracks : searchFavoriteFiles).add(nd);
 			}
 		});
+		if (name == null && type == null) {
+			userDataSearchService.updateIndex(searchTracks, searchFavoriteFiles, dev);
+		}
 
 		if (addDevices && res.allFiles != null) {
 			Map<Integer, String> devices = new HashMap<>();
@@ -781,6 +791,15 @@ public class MapApiController {
 			return userdataService.tokenNotValidResponse();
 		}
 		return ResponseEntity.ok(gsonWithNans.toJson(trackAnalyzerService.getTracksBySegment(request, dev)));
+	}
+
+	@GetMapping(path = {"/search-user-data"}, produces = "application/json")
+	public ResponseEntity<String> searchUserData(@RequestParam String query) {
+		CloudUserDevice dev = osmAndMapsService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidResponse();
+		}
+		return ResponseEntity.ok(gson.toJson(userDataSearchService.search(query, dev)));
 	}
 
 }
