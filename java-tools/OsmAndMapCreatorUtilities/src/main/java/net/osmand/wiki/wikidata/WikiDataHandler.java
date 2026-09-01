@@ -61,6 +61,7 @@ public class WikiDataHandler extends DefaultHandler {
 	private PreparedStatement wikiRegionPrep;
 	private PreparedStatement wikidataPropPrep;
 	private PreparedStatement wikidataBlobPrep;
+	private final List<PreparedStatement> deleteByIdPreps = new ArrayList<>();
 	private int[] mappingBatch = new int[]{0};
 	private int[] coordsBatch = new int[]{0};
 	private int[] regionBatch = new int[]{0};
@@ -84,6 +85,8 @@ public class WikiDataHandler extends DefaultHandler {
 	private long lastProcessedId;
 	
 	private long limit = -1;
+
+	private boolean cleanupExisting = false;
 
 	private Map<Long, String> allAstroWids;
 
@@ -139,6 +142,9 @@ public class WikiDataHandler extends DefaultHandler {
 				ON CONFLICT(id) DO UPDATE SET
 				page = excluded.page;
 				""");
+		for (String table : List.of("wiki_coords", "wiki_mapping", "wiki_region", "wikidata_properties", "wikidata_blobs")) {
+			deleteByIdPreps.add(conn.prepareStatement("DELETE FROM " + table + " WHERE id = ?"));
+		}
 		gson = new GsonBuilder().registerTypeAdapter(ArticleMapper.Article.class, new ArticleMapper()).create();
 		
 		allAstroWids = getAllAstroWids();
@@ -148,6 +154,10 @@ public class WikiDataHandler extends DefaultHandler {
 	public void setLimit(long limit) {
 		this.limit = limit;
 		
+	}
+
+	public void setCleanupExisting(boolean cleanupExisting) {
+		this.cleanupExisting = cleanupExisting;
 	}
 	
 	
@@ -245,6 +255,9 @@ public class WikiDataHandler extends DefaultHandler {
         wikiRegionPrep.close();
     	wikidataPropPrep.close();
     	wikidataBlobPrep.close();
+    	for (PreparedStatement p : deleteByIdPreps) {
+    		p.close();
+    	}
         conn.close();
     }
 
@@ -338,6 +351,9 @@ public class WikiDataHandler extends DefaultHandler {
 			article.setLon(osmCoordinates.lon);
 		}
 
+		if (cleanupExisting) {
+			deleteExistingRows(id);
+		}
 		if (article.getLat() != 0 || article.getLon() != 0 || starType != null) {
 			if (++articleCount % ARTICLE_BATCH_SIZE == 0) {
 				log.info(String.format("Article accepted %s (%d)", title, articleCount));
@@ -397,7 +413,12 @@ public class WikiDataHandler extends DefaultHandler {
 		}
 	}
 
-
+	private void deleteExistingRows(long id) throws SQLException {
+		for (PreparedStatement p : deleteByIdPreps) {
+			p.setLong(1, id);
+			p.executeUpdate();
+		}
+	}
 
 	private OsmLatLonId getOsmCoordinates(long wid, ArticleMapper.Article article, OsmLatLonId osmCoordinates) {
 		for (ArticleMapper.SiteLink siteLink : article.getSiteLinks()) {
