@@ -5,8 +5,10 @@ import static net.osmand.server.api.services.UserdataService.FILE_TYPE_FAVOURITE
 import static net.osmand.server.api.services.UserdataService.FILE_TYPE_GPX;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -56,7 +58,13 @@ public class UserDataSearchService {
 	public record UserDataItem(String file, boolean shared, String name) {
 	}
 
-	public record SearchResult(List<UserDataItem> tracks, List<UserDataItem> favorites) {
+	public record OpenedTrack(String file, boolean shared) {
+	}
+
+	public record SearchResult(List<UserDataItem> tracks, List<UserDataItem> favorites, List<UserDataItem> wpts) {
+	}
+
+	private record FileVersion(String name, long updatetimems, boolean shared) {
 	}
 
 	private static class NamesIndex {
@@ -72,10 +80,12 @@ public class UserDataSearchService {
 
 	private static class UserIndex {
 		NamesIndex tracks = new NamesIndex();
+		Map<String, Long> trackVersions = Map.of();
 		Date tracksVersion;
 		Date favoritesVersion;
 		final Map<String, NamesIndex> favoritesByFile = new ConcurrentHashMap<>();
 		final Map<String, NamesIndex> sharedFavoritesByFile = new ConcurrentHashMap<>();
+		final Map<String, NamesIndex> wptsByTrack = new ConcurrentHashMap<>();
 	}
 
 	private record Match(UserDataItem item, int matchedTokens) {
@@ -83,26 +93,33 @@ public class UserDataSearchService {
 
 	// Called from get-shared-with-me for favorites
 	public void updateSharedFavorites(List<UserFileNoData> files, CloudUserDevice dev) {
-		syncFavorites(getUserIndex(dev).sharedFavoritesByFile, files, dev, true);
+		syncFiles(getUserIndex(dev).sharedFavoritesByFile, fileVersions(files, true), dev, FILE_TYPE_FAVOURITES);
 	}
 
 	public void removeSharedFavorites(String fileName, CloudUserDevice dev) {
 		getUserIndex(dev).sharedFavoritesByFile.remove(fileName);
 	}
 
-	public SearchResult search(String query, CloudUserDevice dev) {
+	public SearchResult search(String query, List<OpenedTrack> openedTracks, CloudUserDevice dev) {
 		UserIndex index = getUserIndex(dev);
 		refreshIndex(index, dev);
+		syncOpenedTracks(index, openedTracks == null ? List.of() : openedTracks, dev);
 		List<String> tokens = SearchAlgorithms.splitAndNormalize(SearchAlgorithms.alignChars(query), true);
+		return new SearchResult(
+				searchIndexes(tokens, List.of(index.tracks)),
+				searchIndexes(tokens, index.favoritesByFile.values(), index.sharedFavoritesByFile.values()),
+				searchIndexes(tokens, index.wptsByTrack.values()));
+	}
 
-		List<Match> tracks = new ArrayList<>();
-		collectMatches(index.tracks, tokens, tracks);
-
-		List<Match> favorites = new ArrayList<>();
-		index.favoritesByFile.values().forEach(groupIndex -> collectMatches(groupIndex, tokens, favorites));
-		index.sharedFavoritesByFile.values().forEach(groupIndex -> collectMatches(groupIndex, tokens, favorites));
-
-		return new SearchResult(topResults(tracks), topResults(favorites));
+	@SafeVarargs
+	private List<UserDataItem> searchIndexes(List<String> tokens, Collection<NamesIndex>... indexGroups) {
+		List<Match> matches = new ArrayList<>();
+		for (Collection<NamesIndex> indexes : indexGroups) {
+			indexes.forEach(index -> collectMatches(index, tokens, matches));
+		}
+		return matches.stream()
+				.sorted(Comparator.comparingInt(Match::matchedTokens).reversed())
+				.limit(RESULTS_LIMIT).map(Match::item).toList();
 	}
 
 	private UserIndex getUserIndex(CloudUserDevice dev) {
@@ -114,19 +131,41 @@ public class UserDataSearchService {
 		Date tracksVersion = filesRepository.maxUpdatetime(dev.userid, FILE_TYPE_GPX);
 		if (tracksVersion != null && !tracksVersion.equals(index.tracksVersion)) {
 			NamesIndex tracks = new NamesIndex();
+			Map<String, Long> trackVersions = new HashMap<>();
 			for (UserFileNoData file : listFiles(dev, FILE_TYPE_GPX)) {
 				if (file.name.toLowerCase().endsWith(GPX_FILE_EXT)) {
 					tracks.add(new UserDataItem(file.name, false, trackDisplayName(file.name)));
+					trackVersions.put(file.name, file.updatetimems);
 				}
 			}
 			index.tracks = tracks;
+			index.trackVersions = trackVersions;
 			index.tracksVersion = tracksVersion;
 		}
 		Date favoritesVersion = filesRepository.maxUpdatetime(dev.userid, FILE_TYPE_FAVOURITES);
 		if (favoritesVersion != null && !favoritesVersion.equals(index.favoritesVersion)) {
-			syncFavorites(index.favoritesByFile, listFiles(dev, FILE_TYPE_FAVOURITES), dev, false);
+			syncFiles(index.favoritesByFile, fileVersions(listFiles(dev, FILE_TYPE_FAVOURITES), false), dev, FILE_TYPE_FAVOURITES);
 			index.favoritesVersion = favoritesVersion;
 		}
+	}
+
+	private void syncOpenedTracks(UserIndex index, List<OpenedTrack> openedTracks, CloudUserDevice dev) {
+		List<FileVersion> files = new ArrayList<>();
+		for (OpenedTrack track : openedTracks) {
+			if (track.shared()) {
+				UserFile file = shareFileService.getSharedWithMeFile(track.file(), FILE_TYPE_GPX, dev);
+				if (file != null) {
+					files.add(new FileVersion(track.file(), file.updatetime.getTime(), true));
+				}
+			} else if (index.trackVersions.containsKey(track.file())) {
+				files.add(new FileVersion(track.file(), index.trackVersions.get(track.file()), false));
+			}
+		}
+		syncFiles(index.wptsByTrack, files, dev, FILE_TYPE_GPX);
+	}
+
+	private List<FileVersion> fileVersions(List<UserFileNoData> files, boolean shared) {
+		return files.stream().map(f -> new FileVersion(f.name, f.updatetimems, shared)).toList();
 	}
 
 	private List<UserFileNoData> listFiles(CloudUserDevice dev, String type) {
@@ -138,35 +177,35 @@ public class UserDataSearchService {
 		return name.substring(0, name.length() - GPX_FILE_EXT.length());
 	}
 
-	// Keeps only listed files, re-reads a file when its updatetime changed
-	private void syncFavorites(Map<String, NamesIndex> byFile, List<UserFileNoData> files, CloudUserDevice dev, boolean shared) {
-		byFile.keySet().retainAll(files.stream().map(f -> f.name).toList());
-		for (UserFileNoData file : files) {
-			NamesIndex current = byFile.get(file.name);
-			if (current == null || current.updatetimems != file.updatetimems) {
-				byFile.put(file.name, buildFavoritesIndex(file, shared, loadFavorites(file.name, shared, dev)));
+	// Keeps only listed files, re-reads a file when it is new or its updatetime changed
+	private void syncFiles(Map<String, NamesIndex> byFile, List<FileVersion> files, CloudUserDevice dev, String type) {
+		byFile.keySet().retainAll(files.stream().map(FileVersion::name).toList());
+		for (FileVersion file : files) {
+			NamesIndex current = byFile.get(file.name());
+			if (current == null || current.updatetimems != file.updatetimems()) {
+				byFile.put(file.name(), buildPointsIndex(file, loadGpx(file.name(), file.shared(), type, dev)));
 			}
 		}
 	}
 
-	private GpxFile loadFavorites(String fileName, boolean shared, CloudUserDevice dev) {
+	private GpxFile loadGpx(String fileName, boolean shared, String type, CloudUserDevice dev) {
 		try {
-			UserFile file = shared ? shareFileService.getSharedWithMeFile(fileName, FILE_TYPE_FAVOURITES, dev)
-					: userdataService.getLastFileVersion(dev.userid, fileName, FILE_TYPE_FAVOURITES);
+			UserFile file = shared ? shareFileService.getSharedWithMeFile(fileName, type, dev)
+					: userdataService.getLastFileVersion(dev.userid, fileName, type);
 			return shareFileService.getFile(file);
 		} catch (Exception e) {
-			LOG.warn(String.format("Favorites search index failed userid=%d %s: %s", dev.userid, fileName, e.getMessage()));
+			LOG.warn(String.format("User data search index failed userid=%d %s: %s", dev.userid, fileName, e.getMessage()));
 			return null;
 		}
 	}
 
-	private NamesIndex buildFavoritesIndex(UserFileNoData file, boolean shared, GpxFile gpxFile) {
+	private NamesIndex buildPointsIndex(FileVersion file, GpxFile gpxFile) {
 		NamesIndex index = new NamesIndex();
-		index.updatetimems = file.updatetimems;
+		index.updatetimems = file.updatetimems();
 		if (gpxFile != null) {
 			for (WptPt point : gpxFile.getPointsList()) {
 				if (point.getName() != null && !point.getName().isEmpty()) {
-					index.add(new UserDataItem(file.name, shared, point.getName()));
+					index.add(new UserDataItem(file.name(), file.shared(), point.getName()));
 				}
 			}
 		}
@@ -188,9 +227,4 @@ public class UserDataSearchService {
 		}
 	}
 
-	private List<UserDataItem> topResults(List<Match> matches) {
-		return matches.stream()
-				.sorted(Comparator.comparingInt(Match::matchedTokens).reversed())
-				.limit(RESULTS_LIMIT).map(Match::item).toList();
-	}
 }

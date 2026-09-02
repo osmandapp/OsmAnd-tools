@@ -787,13 +787,14 @@ public class MapApiController {
 		return ResponseEntity.ok(gsonWithNans.toJson(trackAnalyzerService.getTracksBySegment(request, dev)));
 	}
 
-	@GetMapping(path = {"/search-user-data"}, produces = "application/json")
-	public ResponseEntity<String> searchUserData(@RequestParam String query) {
+	@PostMapping(path = {"/search-user-data"}, produces = "application/json")
+	public ResponseEntity<String> searchUserData(@RequestParam String query,
+	                                             @RequestBody List<UserDataSearchService.OpenedTrack> openedTracks) {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
-		return ResponseEntity.ok(gson.toJson(userDataSearchService.search(query, dev)));
+		return ResponseEntity.ok(gson.toJson(userDataSearchService.search(query, openedTracks, dev)));
 	}
 
 }
