@@ -9,11 +9,13 @@ import net.osmand.util.MapUtils;
 import java.util.*;
 
 public class LiveResultActuator extends ResultActuator {
+	private static final double MATCH_RADIUS_METERS = 20;
+
 	private record ExpectedResult(long osmId, LatLon point, String result, int place, String entityType) {
 		public String entityId() {
-			if (entityType == null)
+			if (entityType == null || "U".equals(entityType))
 				return "U";
-			return entityType + ("U".equals(entityType) ? "" : osmId);
+			return entityType + osmId;
 		}
 	}
 
@@ -40,7 +42,6 @@ public class LiveResultActuator extends ResultActuator {
 			expectedResults.add(new ExpectedResult(osmId, point, 
 					Objects.toString(object.get("result"), null), i + 1, entityType));
 		}
-		metrics.put("ut", unitTest);
 	}
 
 	@Override
@@ -55,6 +56,10 @@ public class LiveResultActuator extends ResultActuator {
 			long actualId = osmId(actual);
 			String actualResultText = null;
 			for (ExpectedResult expected : expectedResults) {
+				if (expected.point() == null || actual.location == null
+						|| MapUtils.getDistance(expected.point(), actual.location) > MATCH_RADIUS_METERS) {
+					continue;
+				}
 				ResultType matchType = null;
 				if (expected.osmId() != -1 && expected.osmId() == actualId) {
 					matchType = ResultType.ById;
@@ -74,7 +79,10 @@ public class LiveResultActuator extends ResultActuator {
 				
 				if (matchType != null) {
 					matched = expected;
-					return new Result(matchType, actualIndex + 1, actual);
+					String name = formatter != null && actual.spatialResult != null
+							? formatter.format(actual.spatialResult) : actual.toString();
+					return new Result(matchType, getEntityId(actual.object), actualIndex + 1, name,
+							actual.location, getEntityType(actual.object));
 				}
 			}
 		}
@@ -90,6 +98,7 @@ public class LiveResultActuator extends ResultActuator {
 		
 		ExpectedResult first = expectedResults.get(0);
 		setActual(new Result(ResultType.Best, first.entityId(), 1, first.result, first.point, first.entityType));
+		metrics.put("web_type", unitTest);
 		if (searchResults.isEmpty()) {
 			error = "Search result is empty";
 			return false;
@@ -100,8 +109,8 @@ public class LiveResultActuator extends ResultActuator {
 			return false;
 		}
 
-		distance = matched.point() == null ? null
-				: ((int) MapUtils.getDistance(targetPoint, matched.point()) / 10) * 10;
+		distance = matched.point() == null || actualResult.location() == null ? null
+				: ((int) MapUtils.getDistance(matched.point(), actualResult.location()) / 10) * 10;
 		resultPlace = matched.place();
 		resultPoint = toString(matched.point);
 

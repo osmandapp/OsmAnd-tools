@@ -24,8 +24,10 @@ public abstract class ResultActuator implements Consumer<List<SearchResult>> {
 
 	public record Result(ResultType type, String entityId, int place, String name, LatLon location, String entityType) {
 		public Result(ResultType type, int place, SearchResult result) {
-			this(type, result == null ? null : getEntityId(result.object), place, result == null ? null : result.toString(), result == null ? null : result.location, 
-					result == null ? null : getEntityType((MapObject) result.object));
+			this(type, result == null ? null : getEntityId(result.object), place, 
+					result == null ? null : result.toString(), 
+					result == null ? null : result.location, 
+					result == null ? null : getEntityType(result.object));
 		}
 
 		public Result(ResultType type, Result result) {
@@ -34,6 +36,12 @@ public abstract class ResultActuator implements Consumer<List<SearchResult>> {
 		
 		public String toPlaceString() {
 			return place + " - " + type;
+		}
+		
+		public String getName() {
+			if (name == null)
+				return null;
+			return name.indexOf('[') != -1 ? name.substring(0, name.indexOf('[')).trim() : name;
 		}
 	}
 
@@ -114,7 +122,8 @@ public abstract class ResultActuator implements Consumer<List<SearchResult>> {
 			if (dupCount > 0) {
 				metrics.put("dup_count", dupCount);
 			}
-			
+
+			metrics.put("web_type", firstResult.entityType);
 			setFirst(firstResult);
 			if (actualResult == null && closestDuplicate < FOUND_DEDUPLICATE_RADIUS) {
 				SearchResult sr = searchResults.get(dupInd);
@@ -150,8 +159,7 @@ public abstract class ResultActuator implements Consumer<List<SearchResult>> {
 	public void setFormatter(SpatialResultFormatter formatter) {}
 	
 	public void setFirst(Result res) {
-		metrics.put("web_type", res.entityType);
-		metrics.put("res_name", res.name);
+		metrics.put("res_name", res.getName());
 		metrics.put("res_id", res.entityId);
 		if (res.location != null) {
 			metrics.put("res_dist", ((int) MapUtils.getDistance(targetPoint, res.location) / 10) * 10);
@@ -162,7 +170,7 @@ public abstract class ResultActuator implements Consumer<List<SearchResult>> {
 	public void setActual(Result res) {
 		metrics.put("actual_place", res.toPlaceString());
 		metrics.put("actual_id", res.entityId);
-		metrics.put("actual_name", res.name);
+		metrics.put("actual_name", res.getName());
 		if (res.location != null) {
 			metrics.put("actual_dist", ((int) MapUtils.getDistance(targetPoint, res.location) / 10) * 10);
 			metrics.put("actual_lat_lon", toString(res.location));

@@ -543,7 +543,8 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 						ClassicSearchService.SearchContext ctx = new ClassicSearchService.SearchContext(searchPoint.getLatitude(), searchPoint.getLongitude(),
 								query, run.locale, false, bbox[0], bbox[1]);
 						if (isSpatial) {
-							SpatialSearchService.SpatialResults spatialResult = searchTestSpatial(ctx, options, spatialReaders, false);
+							SpatialSearchService.SpatialResults spatialResult = searchTestSpatial(ctx, options,
+									spatialReaders, false, !isLive && !options.queryIsCompleted());
 							searchResult = fromSpatialResults(spatialResult, statMetrics, run.locale);
 							actuator.setFormatter(spatialResult.formatter());
 
@@ -616,6 +617,12 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 
 	public SpatialSearchService.SpatialResults searchTestSpatial(ClassicSearchService.SearchContext ctx, ClassicSearchService.SearchOption options, List<BinaryMapIndexReader> readers, boolean printLogs)
 			throws IOException {
+		return searchTestSpatial(ctx, options, readers, printLogs, !options.queryIsCompleted());
+	}
+
+	private SpatialSearchService.SpatialResults searchTestSpatial(ClassicSearchService.SearchContext ctx,
+			ClassicSearchService.SearchOption options, List<BinaryMapIndexReader> readers, boolean printLogs,
+			boolean autocomplete) throws IOException {
 		SpatialSearchService.SpatialResults res = null;
 		try {
 			if (readers == null) {
@@ -641,7 +648,7 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 				}
 			}
 
-			res = searchTestSpatial(ctx, readers, printLogs, obfCount, !options.queryIsCompleted());
+			res = searchTestSpatial(ctx, readers, printLogs, obfCount, autocomplete);
 		} catch (RuntimeException e) {
 			LOGGER.error(String.format("Spatial search failed for '%s': %s", ctx.text(), e), e);
 			throw e;
