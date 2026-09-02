@@ -12,26 +12,22 @@ import net.osmand.data.LatLon;
 import net.osmand.osm.MapPoiTypes;
 
 public class SpatialTestSearchEngine {
-    private static MapPoiTypes.PoiTranslator defaultPoiTranslator;
-
     private final SpatialTextSearch spatialSearch;
     private final SpatialSearchContext searchContext;
 	private final SpatialResultFormatter resultFormatter;
 
-    public SpatialTestSearchEngine(SpatialTextSearch.SpatialTextSearchSettings spatialSettings, LatLon location, 
-                                   List<BinaryMapIndexReader> readers, boolean translation) {
+    public SpatialTestSearchEngine(SpatialTextSearch.SpatialTextSearchSettings spatialSettings, LatLon location,
+                                   List<BinaryMapIndexReader> readers, MapPoiTypes.PoiTranslator poiTranslator,
+                                   boolean translation) {
         spatialSearch = new SpatialTextSearch();
-        MapPoiTypes.PoiTranslator currentPoiTranslator = MapPoiTypes.getDefault().getPoiTranslator();
-        if (!(currentPoiTranslator instanceof TestPoiTranslator)) {
-            defaultPoiTranslator = currentPoiTranslator;
-        }
-		MapPoiTypes poiTypes = new MapPoiTypes(null);
-        poiTypes.setPoiTranslator(translation ? new TestPoiTranslator() : defaultPoiTranslator);
+        MapPoiTypes poiTypes = new MapPoiTypes(null);
+        poiTypes.setPoiTranslator(translation ? new TestPoiTranslator() : poiTranslator);
+        // Binary readers and map objects still resolve POI metadata through MapPoiTypes.getDefault().
         MapPoiTypes.setDefault(poiTypes);
-        
+
         SpatialPoiSearch poiSearch = new SpatialPoiSearch(poiTypes);
         searchContext = new SpatialSearchContext(spatialSettings, readers, poiSearch, location);
-		resultFormatter = new SpatialResultFormatter(searchContext, location, poiTypes);
+        resultFormatter = new SpatialResultFormatter(searchContext, location, poiTypes);
     }
 
     public List<String> search(String phrase, boolean print) throws IOException {

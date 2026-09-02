@@ -6,6 +6,8 @@ import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
 import net.osmand.obf.OBFDataCreator;
 import net.osmand.obf.preparation.NameIndexCreator;
+import net.osmand.osm.MapPoiTypes;
+import net.osmand.server.api.services.search.PoiTypesService;
 import net.osmand.search.core.spatial.SpatialSearchResult;
 import net.osmand.search.core.spatial.SpatialTestSearchEngine;
 import net.osmand.search.core.spatial.SpatialTextSearch;
@@ -31,10 +33,12 @@ public final class SpatialSearchTestRunner {
 
 	private static final Object RUN_LOCK = new Object();
 	private final Path source;
+	private final MapPoiTypes.PoiTranslator poiTranslator;
 
     public SpatialSearchTestRunner(Path source) {
 		NameIndexCreator.MIN_LIMIT_COMMON_NON_INDEXED = 0;
 		this.source = source.toAbsolutePath().normalize();
+		poiTranslator = new PoiTypesService().getMapPoiTypes(PoiTypesService.DEFAULT_SEARCH_LANG).getPoiTranslator();
 	}
 
 	public List<CSVRow> run() throws IOException {
@@ -92,8 +96,8 @@ public final class SpatialSearchTestRunner {
 					continue;
 				}
 				LatLon location = parseLocation(phraseSettings);
-                SpatialTestSearchEngine searchEngine = new SpatialTestSearchEngine(parseSettings(phraseSettings), location, readers,
-                        phraseSettings.optBoolean("translation"));
+				SpatialTestSearchEngine searchEngine = new SpatialTestSearchEngine(parseSettings(phraseSettings), location,
+						readers, poiTranslator, phraseSettings.optBoolean("translation"));
 				List<SpatialSearchResult> results = searchEngine.searchResults(phrase.query(), false);
 				int resultLimit = Math.min(expectedResultCount(test, phraseIndex), results.size());
 				for (int resultIndex = 0; resultIndex < resultLimit; resultIndex++) {

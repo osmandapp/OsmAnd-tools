@@ -33,6 +33,6 @@ public class SpatialSearchCombinationsTest extends SpatialSearchPipelineTest {
     protected SpatialTestSearchEngine createSearchEngine(SpatialTextSearch.SpatialTextSearchSettings spatialSettings, 
                                                   LatLon point, List<BinaryMapIndexReader> readers, boolean translation) {
         spatialSettings.DEV_USE_PIPELINE = false;
-        return new SpatialTestSearchEngine(spatialSettings, point, readers, translation);
+		return new SpatialTestSearchEngine(spatialSettings, point, readers, defaultPoiTranslator, translation);
     }
 }
