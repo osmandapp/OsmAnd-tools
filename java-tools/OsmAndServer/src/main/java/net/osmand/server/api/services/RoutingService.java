@@ -211,6 +211,63 @@ public class RoutingService {
         }
     }
 
+    /**
+     * One LineString per alternative route, marked so that the client can draw and offer them
+     * differently from the main route. "alternative" is 1-based, "deltaTime" is the overhead
+     * against the main route in percent, measured the same way on both sides.
+     */
+    public List<Feature> buildAlternativeFeatures(List<List<RouteSegmentResult>> alternatives,
+                                                  List<RouteSegmentResult> mainRoute) {
+        List<Feature> features = new ArrayList<>();
+        if (alternatives == null || alternatives.isEmpty()) {
+            return features;
+        }
+        double mainRoutingTime = routingTime(mainRoute);
+        for (int i = 0; i < alternatives.size(); i++) {
+            List<RouteSegmentResult> alt = alternatives.get(i);
+            List<LatLon> points = new ArrayList<>();
+            double distance = 0, time = 0;
+            for (int k = 0; k < alt.size(); k++) {
+                RouteSegmentResult r = alt.get(k);
+                distance += r.getDistance();
+                time += r.getSegmentTime();
+                final int dir = r.isForwardDirection() ? 1 : -1;
+                // the very last segment has to include its very last point
+                final int last = k == alt.size() - 1 ? r.getEndPointIndex() + dir : r.getEndPointIndex();
+                for (int j = r.getStartPointIndex(); j != last; j += dir) {
+                    if (r.getPoint(j) != null) {
+                        points.add(r.getPoint(j));
+                    }
+                }
+            }
+            if (points.size() < 2) {
+                continue;
+            }
+            Feature f = new Feature(Geometry.lineString(points));
+            f.properties = new TreeMap<>();
+            f.properties.put("alternative", i + 1);
+            f.properties.put("distance", distance);
+            f.properties.put("time", time);
+            f.properties.put("routingTime", routingTime(alt));
+            if (mainRoutingTime > 0) {
+                double delta = 100 * (routingTime(alt) / mainRoutingTime - 1);
+                f.properties.put("deltaTime", Math.round(delta * 10) / 10.0);
+            }
+            features.add(f);
+        }
+        return features;
+    }
+
+    private static double routingTime(List<RouteSegmentResult> route) {
+        double t = 0;
+        if (route != null) {
+            for (RouteSegmentResult r : route) {
+                t += r.getRoutingTime();
+            }
+        }
+        return t;
+    }
+
     public List<LatLonEle> getElevationsBySegments(List<LatLonEle> resListEle,
                                             List<Feature> features, List<RouteSegmentResult> res) {
         for (int i = 0; i < res.size(); i++) {
