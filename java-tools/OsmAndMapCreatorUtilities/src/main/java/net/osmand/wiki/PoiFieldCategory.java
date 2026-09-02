@@ -1,13 +1,13 @@
 package net.osmand.wiki;
 
 public enum PoiFieldCategory {
-	SEE("special_photo_camera", 0xCC10A37E, new String[] { "see", "voir", "veja", "מוקדי", "دیدن" }, "church", "mosque",
+	SEE("special_photo_camera", 0xCC10A37E, new String[] { "see", "voir", "veja", "מוקדי", "دیدن", "zobacz" }, "church", "mosque",
 			"square", "town_hall", "building", "veja", "voir", "temple", "mosque", "synagogue", "monastery", "palace",
 			"château", "memorial", "archaeological", "fort", "monument", "castle", "دیدن", "tower", "cathedral",
-			"arts centre", "mill", "house", "ruins"),
+			"arts centre", "mill", "house", "ruins", "zabytek", "atrakcja"),
 	DO("special_photo_camera", 0xCC10A37E, new String[] { "do", "event", "פעילויות", "انجام‌دادن" }, "museum", "zoo",
 			"theater", "fair", "faire", "cinema", "disco", "sauna", "aquarium", "swimming", "amusement", "golf", "club",
-			"sports", "music", "spa", "انجام‌دادن", "festival"),
+			"sports", "music", "spa", "انجام‌دادن", "festival", "muzeum"),
 	EAT("restaurants", 0xCCCA2D1D, new String[] { "eat", "manger", "coma", "אוכל", "خوردن" }, "restaurant", "cafe",
 			"bistro"),
 	DRINK("restaurants", 0xCCCA2D1D, new String[] { "drink", "boire", "beba", "שתייה", "نوشیدن" }, "bar", "pub"),
@@ -16,8 +16,8 @@ public enum PoiFieldCategory {
 	BUY("shop_department_store", 0xCC8F2BAB, new String[] { "buy", "קניות", "فهرست‌بندی" }, "shop", "market", "mall"),
 	GO("public_transport_stop_position", 0xCC0F5FFF,
 			new String[] { "go", "destination", "aller", "circuler", "sortir", "רשימה" }, "airport", "train", "station",
-			"bus"),
-	NATURAL("special_photo_camera", 0xCC10A37E, new String[] { "landscape", "island", "nature", "island" }, "park",
+			"bus", "transport"),
+	NATURAL("special_photo_camera", 0xCC10A37E, new String[] { "landscape", "island", "nature", "island", "natura" }, "park",
 			"cemetery", "garden", "lake", "beach", "landmark", "cemetery", "cave", "garden", "waterfall", "viewpoint",
 			"mountain"),
 	OTHER("", 0xCC0F5FFF, new String[] { "other", "marker", "ville", "item", "רשימה", "دیدن", "יעד מרכזי",
