@@ -9,7 +9,7 @@ import net.osmand.data.City;
 import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
 import net.osmand.data.Street;
-import net.osmand.map.OsmandRegions;
+import net.osmand.osm.MapPoiTypes;
 import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.api.searchtest.*;
 import net.osmand.server.api.searchtest.repo.SearchTestCaseRepository;
@@ -29,6 +29,7 @@ import java.io.StringWriter;
 import net.osmand.search.core.spatial.SpatialTextSearch.SpatialSearchResults;
 import net.osmand.search.core.spatial.SpatialTextSearch.SpatialTextSearchSettings;
 import net.osmand.search.core.spatial.SpatialSearchResult;
+import net.osmand.search.core.spatial.SpatialResultFormatter;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import org.slf4j.Logger;
@@ -48,6 +49,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.file.Path;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -323,6 +325,8 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 		testCaseRepo.save(test);
 
 		Run finalRun = run;
+		finalRun.testCase = test;
+		finalRun.dataset = ds;
 		CompletableFuture.runAsync(() -> doMainRun(test, finalRun, payload.threadsCount == null ? 1 : payload.threadsCount, options));
 		return CompletableFuture.completedFuture(finalRun);
 	}
@@ -368,6 +372,7 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 	}
 
 	private void doMainRun(TestCase test, Run run, int threadsCount, ClassicSearchService.SearchOption options) {
+		long startedNs = System.nanoTime();
 		List<CompletableFuture<Void>> runTasks = new ArrayList<>();
 		AtomicReference<Run.Status> statusRef = runStatusFlags.computeIfAbsent(run.id, id ->
 				new AtomicReference<>(Run.Status.RUNNING));
@@ -441,6 +446,9 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 			loggedStoppedRuns.remove(run.id);
 			runResultBatches.remove(run.id);
 			runResultBatchTasks.remove(run.id);
+			LOGGER.info("PERF doMainRun runId={} caseId={} threads={} maps={} status={} elapsedMs={}",
+					run.id, test.id, maxParallel, run.mapsCount, run.status,
+					(System.nanoTime() - startedNs) / 1_000_000);
 		}
 	}
 
@@ -495,7 +503,6 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 				String query = (String) row.get("query");
 				int count = (Integer) row.get("gen_count");
 				String rowJson = (String) row.get("row");
-				Map<String, Object> genRow = getObjectMapper().readValue(rowJson, Map.class);
 
 				LatLon targetPoint = new LatLon((Double) row.get("lat"), (Double) row.get("lon"));
 				if (run.shift != null && run.shift >= 0.0) {
@@ -511,27 +518,37 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 						String.format(Locale.US, "%f, %f", searchPoint.getLatitude() - options.getRadius(),
 								searchPoint.getLongitude() + options.getRadius())};
 
-				Map<String, Object> newRow = new LinkedHashMap<>();
-				long datasetId;
-				try {
-					datasetId = Long.parseLong((String) genRow.get("id"));
-				} catch (NumberFormatException e) {
-					datasetId = -1;
+				final ResultActuator actuator;
+				Map<String, Object> statMetrics = new LinkedHashMap<>();
+				boolean isLive = Dataset.Source.UnitTest.equals(run.dataset.type);
+				boolean isSpatial = Boolean.TRUE.equals(run.spatial);
+				if (isLive) {
+					List<Map<String, Object>> objRows = getObjectMapper().readValue(rowJson, List.class);
+					actuator = new LiveResultActuator(targetPoint, statMetrics, objRows);
+				} else {
+					Map<String, Object> objRow = getObjectMapper().readValue(rowJson, Map.class);
+					long osmId;
+					try {
+						osmId = Long.parseLong((String) objRow.get("id"));
+					} catch (NumberFormatException e) {
+						osmId = -1;
+					}
+					actuator = isSpatial ? new SpatialResultActuator(targetPoint, statMetrics, osmId) : new ClassicResultActuator(targetPoint, statMetrics, osmId);
 				}
 
-				ResultActuator actuator = new ResultActuator(targetPoint, newRow, datasetId);
 				Object[] args = null;
 				try {
 					ClassicSearchService.SearchResults searchResult = null;
 					if (query != null && !query.trim().isEmpty()) {
 						ClassicSearchService.SearchContext ctx = new ClassicSearchService.SearchContext(searchPoint.getLatitude(), searchPoint.getLongitude(),
 								query, run.locale, false, bbox[0], bbox[1]);
-						if (Boolean.TRUE.equals(run.spatial)) {
+						if (isSpatial) {
 							SpatialSearchService.SpatialResults spatialResult = searchTestSpatial(ctx, options, spatialReaders, false);
-							searchResult = fromSpatialResults(spatialResult, newRow, run.locale);
+							searchResult = fromSpatialResults(spatialResult, statMetrics, run.locale);
+							actuator.setFormatter(spatialResult.formatter());
+
 							actuator.accept(searchResult.results());
 						} else {
-							actuator = new MapDataObjectFinder(targetPoint, newRow, datasetId);
 							searchResult = classicSearchService.getImmediateSearchResults(ctx, options, actuator);
 						}
 					}
@@ -615,16 +632,19 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 			int obfCount = readers.size();
 			readers = new ArrayList<>(readers);
 			BinaryMapIndexReader regionsReader = spatialSearchService.regionsReaderForThread();
-			if (regionsReader != null) {
-				readers.add(regionsReader);
+			if (regionsReader != null && regionsReader.getFile() != null) {
+				Path regionsPath = regionsReader.getFile().toPath().toAbsolutePath().normalize();
+				boolean alreadyAdded = readers.stream().anyMatch(reader -> reader.getFile() != null
+						&& reader.getFile().toPath().toAbsolutePath().normalize().equals(regionsPath));
+				if (!alreadyAdded) {
+					readers.add(regionsReader);
+				}
 			}
 
 			res = searchTestSpatial(ctx, readers, printLogs, obfCount, !options.queryIsCompleted());
 		} catch (RuntimeException e) {
 			LOGGER.error(String.format("Spatial search failed for '%s': %s", ctx.text(), e), e);
-			StringWriter stackTrace = new StringWriter();
-			e.printStackTrace(new PrintWriter(stackTrace));
-			LOGGER.error("RuntimeException stacktrace:\n" + stackTrace);
+			throw e;
 		} finally {
 			if (readers != null) {
 				mapsService.unlockReaders(readers);
@@ -648,34 +668,35 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 		stats.printLogs = printLogs;
 
 		SpatialSearchResults results = spatialSearchService.getSpatialTextSearch().searchAPI(ctx.text(), sscontext);
-		return new SpatialSearchService.SpatialResults(results, stats, obfCount);
+		return new SpatialSearchService.SpatialResults(results, stats, obfCount,
+				new SpatialResultFormatter(sscontext, new LatLon(ctx.lat(), ctx.lon()), MapPoiTypes.getDefault()));
 	}
 
 	private ClassicSearchService.SearchResults fromSpatialResults(SpatialSearchService.SpatialResults spatialResult,
-	                                                              Map<String, Object> row, String locale) {
+	                                                              Map<String, Object> statMetrics, String locale) {
 		List<SearchResult> results = new ArrayList<>();
 		if (spatialResult == null || spatialResult.results() == null) {
 			return new ClassicSearchService.SearchResults(results);
 		}
 
 		SpatialSearchContext.SpatialSearchStats stats = spatialResult.stats();
-		row.put("stat_time", stats.requestTime.time);
-		row.put("stat_bytes", stats.readTableBytes + stats.readAtomsBytes + stats.readObjsBytes);
-		row.put("stat_table_bytes", stats.readTableBytes);
-		row.put("stat_atoms_bytes", stats.readAtomsBytes);
-		row.put("stat_objs_bytes", stats.readObjsBytes);
+		statMetrics.put("stat_time", stats.requestTime.time);
+		statMetrics.put("stat_bytes", stats.readTableBytes + stats.readAtomsBytes + stats.readObjsBytes);
+		statMetrics.put("stat_table_bytes", stats.readTableBytes);
+		statMetrics.put("stat_atoms_bytes", stats.readAtomsBytes);
+		statMetrics.put("stat_objs_bytes", stats.readObjsBytes);
 
-		row.put("spatial_step1_atoms_time", stats.step1Atoms.time);
-		row.put("spatial_match_time", stats.sub1MatchTime.time);
-		row.put("spatial_file_atoms_time", stats.sub1FileAtomsTime.time);
+		statMetrics.put("spatial_step1_atoms_time", stats.step1Atoms.time);
+		statMetrics.put("spatial_match_time", stats.sub1MatchTime.time);
+		statMetrics.put("spatial_file_atoms_time", stats.sub1FileAtomsTime.time);
 
-		row.put("spatial_step2_compute_time", stats.step2Compute.time);
-		row.put("spatial_load_objects_bld_time", stats.sub2LoadObjectsBldTime.time);
-		row.put("spatial_read_obj_time", stats.sub2ReadObjTime.time);
-		row.put("spatial_max_combinations", stats.maxCombinations);
-		row.put("spatial_tokens_obj", stats.tokenObjs);
+		statMetrics.put("spatial_step2_compute_time", stats.step2Compute.time);
+		statMetrics.put("spatial_load_objects_bld_time", stats.sub2LoadObjectsBldTime.time);
+		statMetrics.put("spatial_read_obj_time", stats.sub2ReadObjTime.time);
+		statMetrics.put("spatial_max_combinations", stats.maxCombinations);
+		statMetrics.put("spatial_tokens_obj", stats.tokenObjs);
 
-		row.put("spatial_step3_sort_time", stats.step3Sort.time);
+		statMetrics.put("spatial_step3_sort_time", stats.step3Sort.time);
 
 		List<SpatialSearchResult> spatialResults = spatialResult.results().mainResults;
 		if (spatialResults == null) {
@@ -686,8 +707,8 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 			SearchResult result = fromSpatialResult(spatial, locale);
 			if (result != null) {
 				if (place == 1) {
-					row.put("spatial_matched_tokens", spatial.matchedTokens());
-					row.put("spatial_visible_level", spatial.visibleLevel());
+					statMetrics.put("spatial_matched_tokens", spatial.matchedTokens());
+					statMetrics.put("spatial_visible_level", spatial.visibleLevel());
 				}
 				results.add(result);
 				place++;

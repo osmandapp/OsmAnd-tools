@@ -17,7 +17,6 @@ import org.springframework.data.repository.query.Param;
 import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
-import java.util.Map;
 
 @SearchTestRepository
 public interface SearchTestRunRepository extends JpaRepository<Run, Long> {
@@ -93,7 +92,7 @@ public interface SearchTestRunRepository extends JpaRepository<Run, Long> {
 
 		@JdbcTypeCode(SqlTypes.JSON)
 		@Column
-		public Map<String, String> row;
+		public Object row;
 
 		@Column(columnDefinition = "TEXT")
 		public String error;
@@ -123,6 +122,9 @@ public interface SearchTestRunRepository extends JpaRepository<Run, Long> {
 	public class GenResult extends Result {
 		@Column(name = "ds_result_id")
 		public Integer dsResultId;
+
+		@Column(name = "unit_test")
+		public String unitTest;
 	}
 
 	@Entity

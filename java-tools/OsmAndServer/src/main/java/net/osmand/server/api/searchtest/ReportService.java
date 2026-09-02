@@ -156,9 +156,6 @@ public interface ReportService {
 					for (String p : OUT_PROPS) {
 						row.put(p, srcRow.get(p));
 					}
-					if (srcRow.containsKey("id")) {
-						row.put("oid", srcRow.get("id"));
-					}
 					JsonNode outRow = getObjectMapper().readTree(outRowJson);
 					// For consistency with CSV, serialize values as text, skipping excluded keys
 					outRow.fieldNames().forEachRemaining(fn -> {

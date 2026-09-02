@@ -15,61 +15,14 @@ import net.osmand.data.MapObject;
 import net.osmand.data.QuadRect;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.search.core.SearchResult;
+import net.osmand.util.MapUtils;
+
 import static net.osmand.util.MapUtils.*;
 
-public class MapDataObjectFinder extends ResultActuator implements Consumer<List<SearchResult>> {
-	public MapDataObjectFinder(LatLon targetPoint, Map<String, Object> row, long datasetId) {
-		super(targetPoint, row, datasetId);
-	}
-
-	protected Result findFirstResult(List<SearchResult> searchResults) throws IOException {
-		Result firstResult = super.findFirstResult(searchResults);
-		if (firstResult != null) {
-			if (firstResult.searchResult().object instanceof Building b) {
-				if (b.getInterpolationInterval() != 0 || b.getInterpolationType() != null) {
-					row.put("interpolation", b.toString());
-				}
-				// try to calculate precise id for first result 
-				// building name doesn't have unit probably it's a bug to fix, so we check with startsWith
-				if (firstResult.searchResult().file != null) {
-					List<Amenity> poi = getPoiObjects(firstResult.searchResult().file, firstResult.searchResult().location, null);
-					Amenity am = null;
-					BinaryMapDataObject obj = null;
-					for (Amenity o : poi) {
-						String hno = o.getAdditionalInfo(Amenity.ADDR_HOUSENUMBER);
-						if (hno != null && (hno.equals(b.getName()) || hno.startsWith(b.getName() + " "))) {
-							am = o;
-							break;
-						}
-					}
-					List<BinaryMapDataObject> objects = getMapObjects(firstResult.searchResult().file, firstResult.searchResult().location, null);
-					for (BinaryMapDataObject o : objects) {
-						String hno = o.getTagValue(OSMTagKey.ADDR_HOUSE_NUMBER.getValue());
-						if (hno != null && (hno.equals(b.getName()) || hno.startsWith(b.getName() + " "))) {
-							obj = o;
-							break;
-						}
-					}
-					
-					if (obj != null && am != null) {
-						double dObj = getDistance(firstResult.searchResult().location, obj.getLabelLatLon());
-						double dAm = getDistance(firstResult.searchResult().location, am.getLocation());
-						if (dObj < dAm) {
-							am = null;
-						} else {
-							obj = null;
-						}
-					}
-					if (obj != null) {
-						return new Result(ResultType.Best, obj, firstResult.place(), firstResult.searchResult());
-					} else if (am != null) {
-						return new Result(ResultType.Best, am, firstResult.place(), firstResult.searchResult());
-					}
-					
-				}
-			}
-		}
-		return firstResult;
+public class ClassicResultActuator extends SpatialResultActuator implements Consumer<List<SearchResult>> {
+	
+	public ClassicResultActuator(LatLon targetPoint, Map<String, Object> statMetrics, long osmId) {
+		super(targetPoint, statMetrics, osmId);
 	}
 	
 	private List<Amenity> getPoiObjects(BinaryMapIndexReader file, LatLon targetPoint, List<Amenity> poi) throws IOException {
@@ -93,7 +46,7 @@ public class MapDataObjectFinder extends ResultActuator implements Consumer<List
 		if (poi != null) {
 			res.addAll(poi);
 		}
-		res.sort(Comparator.comparingDouble(o -> getDistance(targetPoint, o.getLocation())));
+		res.sort(Comparator.comparingDouble(o ->  MapUtils.getDistance(targetPoint, o.getLocation())));
 		return res;
 	}
 
@@ -123,7 +76,7 @@ public class MapDataObjectFinder extends ResultActuator implements Consumer<List
 	}
 
 	private void sortPoints(LatLon targetPoint, List<BinaryMapDataObject> res) {
-		res.sort(Comparator.comparingDouble(o -> getDistance(targetPoint, o.getLabelLatLon())));
+		res.sort(Comparator.comparingDouble(o ->  MapUtils.getDistance(targetPoint, o.getLabelLatLon())));
 	}
 
 	protected Result findActualResult(List<SearchResult> searchResults) throws IOException {
@@ -150,18 +103,18 @@ public class MapDataObjectFinder extends ResultActuator implements Consumer<List
 		Amenity srcAmenity = null;
 		String srcAmenityHno = null, srcObjHno = null;
 		for (BinaryMapDataObject o : objects) {
-			if (ObfConstants.getOsmObjectId(o) == datasetId) {
+			if (ObfConstants.getOsmObjectId(o) == osmId) {
 				srcObj = o;
 				srcObjHno = srcObj.getTagValue(OSMTagKey.ADDR_HOUSE_NUMBER.getValue());
-				row.put("src_map_found", srcObjHno);
+				metrics.put("src_map_found", srcObjHno);
 				break;
 			}
 		}
 		for (Amenity o : poi) {
-			if (ObfConstants.getOsmObjectId(o) == datasetId) {
+			if (ObfConstants.getOsmObjectId(o) == osmId) {
 				srcAmenity = o;
 				srcAmenityHno = srcAmenity.getAdditionalInfo(Amenity.ADDR_HOUSENUMBER);
-				row.put("src_poi_found", srcAmenityHno);
+				metrics.put("src_poi_found", srcAmenityHno);
 				break;
 			}
 		}
@@ -169,13 +122,13 @@ public class MapDataObjectFinder extends ResultActuator implements Consumer<List
 		// Find closest by distance by id & by tags 
 		resPlace = 1;
 		for (SearchResult sr : searchResults) {
-			if (sr.object instanceof MapObject mo && ObfConstants.getOsmObjectId(mo) == datasetId) {
+			if (sr.object instanceof MapObject mo && ObfConstants.getOsmObjectId(mo) == osmId) {
 				actualResult = new Result(ResultType.ById, mo, resPlace, sr);
 				break;
-			} else if (sr.object instanceof BinaryMapDataObject bo && ObfConstants.getOsmObjectId(bo) == datasetId) {
+			} else if (sr.object instanceof BinaryMapDataObject bo && ObfConstants.getOsmObjectId(bo) == osmId) {
 				actualResult = new Result(ResultType.ById, bo, resPlace, sr);
 				break;
-			} else if(sr.object instanceof Building b && getDistance(sr.location, targetPoint) < DIST_PRECISE_THRESHOLD_M) {
+			} else if(sr.object instanceof Building b && MapUtils.getDistance(sr.location, targetPoint) < DIST_PRECISE_THRESHOLD_M) {
 				// only do matching by tags for object that we know don't store id like Building
 				// 1. here we can compare addr:street as well for amenity
 				// 2. building name doesn't have unit probably it's a bug to fix, so we check with startsWith

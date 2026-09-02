@@ -1,6 +1,5 @@
 package net.osmand.server.api.searchtest;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import net.osmand.binary.*;
 import net.osmand.data.*;
 import net.osmand.search.core.SearchResult;
@@ -28,16 +27,11 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static net.osmand.search.core.ObjectType.POI_TYPE;
 
 public interface DataService extends BaseService {
-	Pattern UNIT_TEST_OSM_ID = Pattern.compile("\\bosmId=(-?\\d+)\\b");
-	Pattern UNIT_TEST_LAT_LON = Pattern.compile("\\(lat=(-?\\d+(?:\\.\\d+)?),\\s*lon=(-?\\d+(?:\\.\\d+)?)\\)");
-
 	SearchTestDatasetRepository getDatasetRepo();
 
 	SearchTestCaseRepository getTestCaseRepo();
@@ -52,6 +46,7 @@ public interface DataService extends BaseService {
 	}
 
 	private Dataset checkDatasetInternal(Dataset dataset, boolean reload) {
+		long startedNs = System.nanoTime();
 		reload = dataset.total == null || reload;
 
 		Path fullPath = null;
@@ -150,7 +145,11 @@ public interface DataService extends BaseService {
 			}
 
 			dataset.setSourceStatus(dataset.total != null ? Dataset.ConfigStatus.OK : Dataset.ConfigStatus.UNKNOWN);
-			return getDatasetRepo().save(dataset);
+			dataset = getDatasetRepo().save(dataset);
+			if (dataset.type == Dataset.Source.UnitTest && reload) {
+				recreateUnitTestCase(dataset);
+			}
+			return dataset;
 		} catch (Exception e) {
 			dataset.setError(e.getMessage() == null ? e.toString() : e.getMessage());
 
@@ -166,80 +165,56 @@ public interface DataService extends BaseService {
 					getLogger().error("Error deleting temporary file: {}", fullPath, e);
 				}
 			}
+			getLogger().info("PERF checkDatasetInternal datasetId={} type={} reload={} rows={} status={} elapsedMs={}",
+					dataset.id, dataset.type, reload, dataset.total, dataset.getSourceStatus(),
+					(System.nanoTime() - startedNs) / 1_000_000);
 		}
+	}
+
+	private void recreateUnitTestCase(Dataset dataset) {
+		getJdbcTemplate().update("DELETE FROM run_result WHERE case_id IN "
+				+ "(SELECT id FROM test_case WHERE dataset_id = ? AND name = 'Main')", dataset.id);
+		getJdbcTemplate().update("DELETE FROM run WHERE case_id IN "
+				+ "(SELECT id FROM test_case WHERE dataset_id = ? AND name = 'Main')", dataset.id);
+		getJdbcTemplate().update("DELETE FROM gen_result WHERE case_id IN "
+				+ "(SELECT id FROM test_case WHERE dataset_id = ? AND name = 'Main')", dataset.id);
+		getJdbcTemplate().update("DELETE FROM test_case WHERE dataset_id = ? AND name = 'Main'", dataset.id);
+
+		TestCase test = new TestCase();
+		test.datasetId = dataset.id;
+		test.name = "Main";
+		test.status = TestCase.Status.NEW;
+		test.allCols = dataset.allCols;
+		test.selCols = dataset.selCols;
+		test.updated = LocalDateTime.now();
+		generate(dataset, getTestCaseRepo().save(test));
 	}
 
 	private int convertUnitTestsToCsv(Path outputPath, String source) throws IOException {
-		Path dir = Path.of(source);
-		if (!Files.isDirectory(dir)) {
-			throw new IOException("UnitTest source is not a directory: " + source);
+		List<SpatialSearchTestRunner.CSVRow> rows = new SpatialSearchTestRunner(Path.of(source)).run();
+		if (rows.isEmpty()) {
+			throw new IOException("Unit-test execution produced no dataset rows: " + source);
 		}
-
-		int rowCount = 0;
-		CSVFormat format = CSVFormat.DEFAULT.builder().setHeader("id", "lat", "lon", "query", "result").build();
+		CSVFormat format = CSVFormat.DEFAULT.builder().setHeader("lat", "lon", "unit-test", "query", "point", "id", "result", "entityType").build();
 		try (BufferedWriter writer = Files.newBufferedWriter(outputPath);
-			 CSVPrinter printer = new CSVPrinter(writer, format);
-			 Stream<Path> paths = Files.list(dir)) {
-			List<Path> jsonFiles = paths
-					.filter(Files::isRegularFile)
-					.filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".json"))
-					.sorted()
-					.toList();
-			for (Path jsonFile : jsonFiles) {
-				try (BufferedReader reader = Files.newBufferedReader(jsonFile)) {
-					JsonNode unitTest = getObjectMapper().readTree(reader);
-					rowCount += writeUnitTestRows(printer, unitTest, jsonFile.getFileName().toString());
-				} catch (Exception e) {
-					getLogger().warn("Skipping invalid unit-test file {}: {}", jsonFile, e.getMessage());
-				}
+			 CSVPrinter printer = new CSVPrinter(writer, format)) {
+			for (SpatialSearchTestRunner.CSVRow row : rows) {
+				printer.printRecord(row.location().getLatitude(), row.location().getLongitude(), row.unitTest(),
+						sanitizeCsvValue(row.query()), row.point(), row.osmId(), sanitizeCsvValue(row.result()));
 			}
 		}
-		return rowCount;
-	}
-
-	private int writeUnitTestRows(CSVPrinter printer, JsonNode unitTest, String fileName) throws IOException {
-		if (unitTest.path("ignore").asBoolean(false)) {
-			return 0;
-		}
-		JsonNode phrases = unitTest.path("phrases");
-		JsonNode results = unitTest.path("results");
-		if (!phrases.isArray() || !results.isArray()) {
-			throw new IOException("Missing phrases or results array");
-		}
-
-		int count = 0;
-		for (int i = 0; i < phrases.size(); i++) {
-			JsonNode indexedResults = results.path(i);
-			if (!indexedResults.isArray() || indexedResults.isEmpty()) {
-				getLogger().warn("Skipping {} phrase {}: top result is missing", fileName, i);
-				continue;
-			}
-			String rawResult = indexedResults.path(0).asText();
-			String id, lat, lon;
-			Matcher idMatcher = UNIT_TEST_OSM_ID.matcher(rawResult);
-			if (idMatcher.find()) {
-				Matcher pointMatcher = UNIT_TEST_LAT_LON.matcher(rawResult);
-				pointMatcher.region(idMatcher.end(), rawResult.length());
-				if (!pointMatcher.find()) {
-					getLogger().warn("Skipping {} phrase {}: coordinates are missing after osmId", fileName, i);
-					continue;
-				}
-				id = idMatcher.group(1);
-				lat = pointMatcher.group(1);
-				lon = pointMatcher.group(2);
-			} else {
-				continue;
-			}
-			printer.printRecord(id, lat, lon, phrases.path(i).asText(), rawResult);
-			count++;
-		}
-		return count;
+		return rows.size();
 	}
 
 	default TestCase generate(Dataset dataset, TestCase test) {
+		long startedNs = System.nanoTime();
+		int generatedRows = 0;
 		if (dataset.getSourceStatus() != Dataset.ConfigStatus.OK) {
 			test.status = TestCase.Status.FAILED;
 			getLogger().info("Dataset {} is not in OK state ({}).", dataset.id, dataset.getSourceStatus());
+			getLogger().info("PERF generate datasetId={} caseId={} type={} rows={} status={} elapsedMs={}",
+					dataset.id, test.id, dataset.type, generatedRows, test.status,
+					(System.nanoTime() - startedNs) / 1_000_000);
 			return test;
 		}
 
@@ -256,7 +231,10 @@ public interface DataService extends BaseService {
 			);
 			assert rows != null;
 
-			List<PolyglotEngine.GenRow> examples = getEngine().execute(getWebServerConfigDir(), test, rows);
+			List<PolyglotEngine.GenRow> examples = dataset.type == Dataset.Source.UnitTest
+					? buildUnitTestExamples(dataset, rows)
+					: getEngine().execute(getWebServerConfigDir(), test, rows);
+			generatedRows = examples.size();
 			double north = -Double.MAX_VALUE;
 			double south = Double.MAX_VALUE;
 			double west = Double.MAX_VALUE;
@@ -286,8 +264,49 @@ public interface DataService extends BaseService {
 			test.status = TestCase.Status.FAILED;
 		} finally {
 			test.updated = LocalDateTime.now();
+			getLogger().info("PERF generate datasetId={} caseId={} type={} rows={} status={} elapsedMs={}",
+					dataset.id, test.id, dataset.type, generatedRows, test.status,
+					(System.nanoTime() - startedNs) / 1_000_000);
 		}
 		return getTestCaseRepo().save(test);
+	}
+
+	private List<PolyglotEngine.GenRow> buildUnitTestExamples(Dataset dataset, Map<Integer, String> rows)
+			throws IOException {
+		String[] columns = getObjectMapper().readValue(dataset.allCols, String[].class);
+		Map<String, Integer> indexes = new HashMap<>();
+		for (int i = 0; i < columns.length; i++) {
+			indexes.put(columns[i], i);
+		}
+		List<String> required = List.of("lat", "lon", "unit_test", "query", "point", "id", "result", "entityType");
+		if (!indexes.keySet().containsAll(required)) {
+			throw new IOException("UnitTest dataset is missing columns: " + required.stream()
+					.filter(column -> !indexes.containsKey(column)).toList());
+		}
+
+		Map<List<String>, List<Map<String, Object>>> grouped = new LinkedHashMap<>();
+		Map<List<String>, Integer> sourceIds = new HashMap<>();
+		for (Map.Entry<Integer, String> entry : rows.entrySet()) {
+			String[] values = getObjectMapper().readValue(entry.getValue(), String[].class);
+			List<String> key = List.of(values[indexes.get("lat")], values[indexes.get("lon")],
+					values[indexes.get("unit_test")], values[indexes.get("query")]);
+			Map<String, Object> expected = new LinkedHashMap<>();
+			expected.put("point", values[indexes.get("point")]);
+			expected.put("id", Long.parseLong(values[indexes.get("id")]));
+			expected.put("result", values[indexes.get("result")]);
+			expected.put("entityType", values[indexes.get("entityType")]);
+			grouped.computeIfAbsent(key, ignored -> new ArrayList<>()).add(expected);
+			sourceIds.putIfAbsent(key, entry.getKey());
+		}
+
+		List<PolyglotEngine.GenRow> examples = new ArrayList<>();
+		for (Map.Entry<List<String>, List<Map<String, Object>>> entry : grouped.entrySet()) {
+			List<String> key = entry.getKey();
+			examples.add(new PolyglotEngine.GenRow(sourceIds.get(key),
+					new LatLon(Double.parseDouble(key.get(0)), Double.parseDouble(key.get(1))), entry.getValue(),
+					getObjectMapper().writeValueAsString(new String[] {key.get(3)}), 1, null, 0, key.get(2)));
+		}
+		return examples;
 	}
 
 	@Async
@@ -344,21 +363,19 @@ public interface DataService extends BaseService {
 
 	default void saveCaseResults(TestCase test, PolyglotEngine.GenRow row) throws IOException {
 		String sql =
-				"INSERT INTO gen_result (ds_result_id, gen_count, case_id, dataset_id, row, query, error, duration, lat, lon, " +
-						"timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+				"INSERT INTO gen_result (ds_result_id, gen_count, case_id, dataset_id, row, query, unit_test, error, duration, lat, lon, " +
+						"timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 		String rowJson = getObjectMapper().writeValueAsString(row.row());
 		String[] outputArray = row.output() == null || row.count() <= 0 ? new String[]{null} :
 				getObjectMapper().readValue(row.output(), String[].class);
 		for (String query : outputArray) {
-			getJdbcTemplate().update(sql, row.dsResultId(), row.count(), test.id, test.datasetId, rowJson, query, row.error(),
+			getJdbcTemplate().update(sql, row.dsResultId(), row.count(), test.id, test.datasetId, rowJson, query,
+					row.unitTest(), row.error(),
 					row.duration(),
 					row.point().getLatitude(), row.point().getLongitude(),
 					new Timestamp(System.currentTimeMillis()));
 		}
 	}
-
-	int SEARCH_DUPLICATE_NAME_RADIUS = 5000;
-	int FOUND_DEDUPLICATE_RADIUS = 100;
 
 	default Object[] collectRunResults(ResultActuator actuator, long genId, int count, Run run, String query,
 	                                   ClassicSearchService.SearchResults searchResult, LatLon targetPoint,
@@ -384,137 +401,83 @@ public interface DataService extends BaseService {
 			}
         }
 
-		Map<String, Object> row = actuator.getRow();
-		ResultActuator.Result firstResult = actuator.getFirstResult();
-		ResultActuator.Result actualResult = actuator.getActualResult();
+		Map<String, Object> statMetrics = actuator.getMetrics();
 		BinaryMapIndexReaderStats.SearchStat stat = searchResult != null && searchResult.settings() != null
 				? searchResult.settings().getStat()
 				: null;
-
 		int resultsCount = searchResults.size();
-		Integer distance = null, resPlace = null;
-		String resultPoint = null;
-		boolean found = false;
-		if (firstResult != null) {
-			LatLon resPoint = firstResult.searchResult().location;
-			if (resPoint != null) {
-				int dupCount = 0;
-				double closestDuplicate = MapUtils.getDistance(targetPoint, resPoint);
-				int dupInd = firstResult.place() - 1;
-				String resName = firstResult.searchResult().toString(); // to do check to string is not too much
-				for (int i = firstResult.place(); i < searchResults.size(); i++) {
-					SearchResult sr = searchResults.get(i);
-					double dist = MapUtils.getDistance(resPoint, sr.location);
-					if (resName.equals(sr.toString()) && dist < SEARCH_DUPLICATE_NAME_RADIUS) {
-						dupCount++;
+		statMetrics.put("time", duration);
+		
+		if (stat != null) {
+			statMetrics.put("min_dist", minDist);
+			statMetrics.put("stat_bytes", stat.totalBytes);
+			statMetrics.put("stat_time", stat.totalTime);
+			int statResultsCount = 0;
+			int statAmenityCount = 0;
+			int statTransportCount = 0;
+			int statAddressCount = 0;
+			for (BinaryMapIndexReaderStats.WordSearchStat wordSearchStat : stat.getWordStats().values()) {
+				if (wordSearchStat == null) {
+					continue;
+				}
+				statResultsCount += wordSearchStat.results;
+				if (wordSearchStat.resultCounts == null) {
+					continue;
+				}
+				for (Map.Entry<String, Integer> entry : wordSearchStat.resultCounts.entrySet()) {
+					String key = entry.getKey();
+					Integer value = entry.getValue();
+					int resCount = value == null ? 0 : value;
+					if (key != null && key.startsWith("Amenity")) {
+						statAmenityCount += resCount;
+					} else if (key != null && key.startsWith("Transport")) {
+						statTransportCount += resCount;
 					} else {
-						break;
-					}
-					if (MapUtils.getDistance(targetPoint, sr.location) < closestDuplicate) {
-						closestDuplicate = MapUtils.getDistance(targetPoint, sr.location);
-						dupInd = i;
+						statAddressCount += resCount;
 					}
 				}
-				resPlace = firstResult.place();
-
-				resultPoint = String.format(Locale.US, "%f, %f", resPoint.getLatitude(), resPoint.getLongitude());
-				distance = ((int) MapUtils.getDistance(targetPoint, resPoint) / 10) * 10;
-
-				if (dupCount > 0) {
-					row.put("dup_count", dupCount);
-				}
-				if (stat != null) {
-					row.put("min_dist", minDist);
-					row.put("stat_bytes", stat.totalBytes);
-					row.put("stat_time", stat.totalTime);
-					int statResultsCount = 0;
-					int statAmenityCount = 0;
-					int statTransportCount = 0;
-					int statAddressCount = 0;
-					for (BinaryMapIndexReaderStats.WordSearchStat wordSearchStat : stat.getWordStats().values()) {
-						if (wordSearchStat == null) {
-							continue;
-						}
-						statResultsCount += wordSearchStat.results;
-						if (wordSearchStat.resultCounts == null) {
-							continue;
-						}
-						for (Map.Entry<String, Integer> entry : wordSearchStat.resultCounts.entrySet()) {
-							String key = entry.getKey();
-							Integer value = entry.getValue();
-							int resCount = value == null ? 0 : value;
-							if (key != null && key.startsWith("Amenity")) {
-								statAmenityCount += resCount;
-							} else if (key != null && key.startsWith("Transport")) {
-								statTransportCount += resCount;
-							} else {
-								statAddressCount += resCount;
-							}
-						}
-					}
-					row.put("stat_results", statResultsCount);
-					row.put("stat_amenity_count", statAmenityCount);
-					row.put("stat_address_count", statAddressCount);
-					row.put("stat_transport_count", statTransportCount);
-
-					for (Map.Entry<BinaryMapIndexReaderStats.BinaryMapIndexReaderApiName, BinaryMapIndexReaderStats.StatByAPI> e : stat.getByApis().entrySet()) {
-						row.put("stat_time_" + e.getKey().name(), e.getValue().time);
-						row.put("stat_bytes_" + e.getKey().name(), e.getValue().bytes);
-						row.put("stat_calls_" + e.getKey().name(), e.getValue().calls);
-					}
-					row.put("sub_stats", stat.getSubStatsSummary());
-				} else {
-					int statAmenityCount = 0;
-					int statAddressCount = 0;
-					for (SearchResult sr : searchResults) {
-						if (sr.object instanceof Amenity || sr.objectType == POI_TYPE) {
-							statAmenityCount++;
-						} else {
-							statAddressCount++;
-						}
-					}
-					row.put("stat_results", resultsCount);
-					row.put("stat_amenity_count", statAmenityCount);
-					row.put("stat_address_count", statAddressCount);
-					row.put("stat_transport_count", 0);
-				}
-				row.put("time", duration);
-				row.put("web_type", firstResult.searchResult().objectType);
-				row.put("res_id", firstResult.toIdString());
-				row.put("res_place", firstResult.toPlaceString());
-				row.put("res_name", firstResult.placeName());
-				if (actualResult == null && closestDuplicate < FOUND_DEDUPLICATE_RADIUS) {
-					SearchResult sr = searchResults.get(dupInd);
-					actualResult = new ResultActuator.Result(ResultActuator.ResultType.ByDist, null, dupInd + 1, sr);
-				}
-				if (actualResult != null) {
-					row.put("actual_place", actualResult.toPlaceString());
-					row.put("actual_id", actualResult.toIdString());
-					row.put("actual_name", actualResult.placeName());
-					row.put("actual_dist",  ((int) MapUtils.getDistance(targetPoint, actualResult.searchResult().location) / 10) * 10);
-					LatLon pnt = actualResult.searchResult().location;
-					row.put("actual_lat_lon", String.format(Locale.US, "%f, %f", pnt.getLatitude(), pnt.getLongitude()));
-					found = actualResult.place() <= dupCount + firstResult.place();
-				}
-				found |= closestDuplicate < FOUND_DEDUPLICATE_RADIUS; // deduplication also count as found
-			} else {
-				error = "Result point location is null";
 			}
-		} else {
-			error = searchResults.isEmpty() ? "Search result is empty" : "First search result is missing";
-		}
-		String rowJson = getObjectMapper().writeValueAsString(row);
-		Object statTimeValue = row.get("stat_time");
-		Object statBytesValue = row.get("stat_bytes");
+			statMetrics.put("stat_results", statResultsCount);
+			statMetrics.put("stat_amenity_count", statAmenityCount);
+			statMetrics.put("stat_address_count", statAddressCount);
+			statMetrics.put("stat_transport_count", statTransportCount);
 
-		return new Object[] {genId, count, run.datasetId, run.id, run.caseId, query, rowJson, error, duration,
-				resultsCount, distance, resultPoint, resPlace,
+			for (Map.Entry<BinaryMapIndexReaderStats.BinaryMapIndexReaderApiName, BinaryMapIndexReaderStats.StatByAPI> e : stat.getByApis().entrySet()) {
+				statMetrics.put("stat_time_" + e.getKey().name(), e.getValue().time);
+				statMetrics.put("stat_bytes_" + e.getKey().name(), e.getValue().bytes);
+				statMetrics.put("stat_calls_" + e.getKey().name(), e.getValue().calls);
+			}
+			statMetrics.put("sub_stats", stat.getSubStatsSummary());
+		} else {
+			int statAmenityCount = 0;
+			int statAddressCount = 0;
+			for (SearchResult sr : searchResults) {
+				if (sr.object instanceof Amenity || sr.objectType == POI_TYPE) {
+					statAmenityCount++;
+				} else {
+					statAddressCount++;
+				}
+			}
+			statMetrics.put("stat_results", resultsCount);
+			statMetrics.put("stat_amenity_count", statAmenityCount);
+			statMetrics.put("stat_address_count", statAddressCount);
+			statMetrics.put("stat_transport_count", 0);
+		}
+
+		boolean found = actuator.isFound(searchResults);
+
+		String statsJson = getObjectMapper().writeValueAsString(statMetrics);
+		Object statTimeValue = statMetrics.get("stat_time");
+		Object statBytesValue = statMetrics.get("stat_bytes");
+
+		return new Object[] {genId, count, run.datasetId, run.id, run.caseId, query, statsJson, actuator.getError(), duration,
+				resultsCount, actuator.getResultDistance(), actuator.getResultPoint(), actuator.getResultPlace(),
 				searchPoint == null ? null : searchPoint.getLatitude(),
 				searchPoint == null ? null : searchPoint.getLongitude(),
 				bbox,
 				new Timestamp(System.currentTimeMillis()), found,
-				stat != null ? stat.totalBytes : statBytesValue instanceof Number n ? n.longValue() : null,
-				stat != null ? stat.totalTime : statTimeValue instanceof Number n ? n.longValue() : null
+				stat != null ? Long.valueOf(stat.totalBytes) : statBytesValue instanceof Number n ? n.longValue() : null,
+				stat != null ? Long.valueOf(stat.totalTime) : statTimeValue instanceof Number n ? n.longValue() : null
 		};
 	}
 

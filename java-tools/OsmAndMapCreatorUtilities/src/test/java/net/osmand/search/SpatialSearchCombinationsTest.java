@@ -30,7 +30,7 @@ public class SpatialSearchCombinationsTest extends SpatialSearchPipelineTest {
     }
 
     @Override
-    protected SearchTestEngine createSearchEngine(SpatialTextSearch.SpatialTextSearchSettings spatialSettings, 
+    protected SpatialTestSearchEngine createSearchEngine(SpatialTextSearch.SpatialTextSearchSettings spatialSettings, 
                                                   LatLon point, List<BinaryMapIndexReader> readers, boolean translation) {
         spatialSettings.DEV_USE_PIPELINE = false;
         return new SpatialTestSearchEngine(spatialSettings, point, readers, translation);

@@ -117,14 +117,7 @@ public class SpatialSearchPipelineTest {
 
 	private final File testFile;
     private Set<String> searchKeywords;
-
-    public interface SearchTestEngine {
-    	
-        List<String> search(String text, boolean print) throws IOException;
-        
-        void close();
-    }
-    
+	
 	public SpatialSearchPipelineTest(String name, File file) {
 		this.testFile = file;
 		NameIndexCreator.MIN_LIMIT_COMMON_NON_INDEXED = 0;
@@ -556,7 +549,7 @@ public class SpatialSearchPipelineTest {
 		return parseExpectedResults(sourceJson, "results", phrasesSize);
 	}
 
-	protected SearchTestEngine createSearchEngine(SpatialTextSearch.SpatialTextSearchSettings spatialSettings, 
+	protected SpatialTestSearchEngine createSearchEngine(SpatialTextSearch.SpatialTextSearchSettings spatialSettings, 
 												  LatLon point, List<BinaryMapIndexReader> readers, boolean translation) {
 		return new SpatialTestSearchEngine(spatialSettings, point, readers, translation);
 	}
@@ -590,7 +583,7 @@ public class SpatialSearchPipelineTest {
 			return;
 		}
 
-		SearchTestEngine defaultEngine = null;
+		SpatialTestSearchEngine defaultEngine = null;
 		try {
 			boolean useData = settingsJson.optBoolean("useData", true);
 			if (useData) {
@@ -613,7 +606,7 @@ public class SpatialSearchPipelineTest {
 			String text = phraseAndSettings.query;
 			List<String> expectedResults = results.get(k);
 			boolean enginePerPhrase = phraseAndSettings.settings != null && !phraseAndSettings.settings.keySet().isEmpty();
-			SearchTestEngine engine = defaultEngine;
+			SpatialTestSearchEngine engine = defaultEngine;
 			if (enginePerPhrase) {
 				if (!RUN_IGNORED_TESTS && phraseAndSettings.settings.optBoolean("ignore")) {
 					continue;

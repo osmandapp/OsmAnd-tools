@@ -680,50 +680,51 @@ public class BinaryMerger {
 		}
 
 		// write files
-		RandomAccessFile rafToExtract = new RandomAccessFile(fileToExtract, "rw");
-		BinaryMapIndexWriter writer = new BinaryMapIndexWriter(rafToExtract, dateCreated);
-		CodedOutputStream ous = writer.getCodedOutStream();
-		byte[] BUFFER_TO_READ = new byte[BUFFER_SIZE];
-		AddressRegion[] addressRegions = new AddressRegion[combineFiles ? files.size() : readers.size()];
-		PoiRegion[] poiRegions = new PoiRegion[combineFiles ? files.size() : readers.size()];
-		for (int k = 0; k < indexes.length; k++) {
-			BinaryMapIndexReader index = indexes[k];
-			RandomAccessFile raf = rafs != null ? rafs[k] : null;
-			for (int i = 0; i < index.getIndexes().size(); i++) {
-				BinaryIndexPart part = index.getIndexes().get(i);
-				if (combineParts.contains(part.getFieldNumber())) {
-					if (part.getFieldNumber() == OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER) {
-						addressRegions[k] = (AddressRegion) part;
-					} else if (part.getFieldNumber() == OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER) {
-						poiRegions[k] = (PoiRegion) part;
-					} else if (part.getFieldNumber() == OsmandOdb.OsmAndStructure.HHROUTINGINDEX_FIELD_NUMBER) {
-						// ignore as we don't know how to merge
-					}
-				} else if (raf != null) {
-					ous.writeTag(part.getFieldNumber(), WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
-					writeInt(ous, part.getLength());
-					copyBinaryPart(ous, BUFFER_TO_READ, raf, part.getFilePointer(), part.getLength());
-					System.out.println(MessageFormat.format("{2} part {0} is extracted {1} bytes",
-							new Object[]{part.getName(), part.getLength(), part.getPartName()}));
-				}
-			}
-		}
-		String nm = fileToExtract.getName();
-		int i = nm.indexOf('_');
-		if (i > 0) {
-			nm = nm.substring(0, i);
-		}
-		if (combineParts.contains(OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER)) {
-			combineAddressIndex(nm, writer, addressRegions, indexes);
-		}
-		if (combineParts.contains(OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER)) {
-			combinePoiIndex(nm, writer, dateCreated, poiRegions, indexes);
-		}
-		if (combineParts.contains(OsmandOdb.OsmAndStructure.OWNER_FIELD_NUMBER) && osmAndOwner != null) {
-			writer.writeOsmAndOwner(osmAndOwner);
-		}
-		ous.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, version);
-		ous.flush();
+        try (RandomAccessFile rafToExtract = new RandomAccessFile(fileToExtract, "rw")) {
+            BinaryMapIndexWriter writer = new BinaryMapIndexWriter(rafToExtract, dateCreated);
+            CodedOutputStream ous = writer.getCodedOutStream();
+            byte[] BUFFER_TO_READ = new byte[BUFFER_SIZE];
+            AddressRegion[] addressRegions = new AddressRegion[combineFiles ? files.size() : readers.size()];
+            PoiRegion[] poiRegions = new PoiRegion[combineFiles ? files.size() : readers.size()];
+            for (int k = 0; k < indexes.length; k++) {
+                BinaryMapIndexReader index = indexes[k];
+                RandomAccessFile raf = rafs != null ? rafs[k] : null;
+                for (int i = 0; i < index.getIndexes().size(); i++) {
+                    BinaryIndexPart part = index.getIndexes().get(i);
+                    if (combineParts.contains(part.getFieldNumber())) {
+                        if (part.getFieldNumber() == OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER) {
+                            addressRegions[k] = (AddressRegion) part;
+                        } else if (part.getFieldNumber() == OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER) {
+                            poiRegions[k] = (PoiRegion) part;
+                        } else if (part.getFieldNumber() == OsmandOdb.OsmAndStructure.HHROUTINGINDEX_FIELD_NUMBER) {
+                            // ignore as we don't know how to merge
+                        }
+                    } else if (raf != null) {
+                        ous.writeTag(part.getFieldNumber(), WireFormat.WIRETYPE_FIXED32_LENGTH_DELIMITED);
+                        writeInt(ous, part.getLength());
+                        copyBinaryPart(ous, BUFFER_TO_READ, raf, part.getFilePointer(), part.getLength());
+                        System.out.println(MessageFormat.format("{2} part {0} is extracted {1} bytes",
+                                new Object[]{part.getName(), part.getLength(), part.getPartName()}));
+                    }
+                }
+            }
+            String nm = fileToExtract.getName();
+            int i = nm.indexOf('_');
+            if (i > 0) {
+                nm = nm.substring(0, i);
+            }
+            if (combineParts.contains(OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER)) {
+                combineAddressIndex(nm, writer, addressRegions, indexes);
+            }
+            if (combineParts.contains(OsmandOdb.OsmAndStructure.POIINDEX_FIELD_NUMBER)) {
+                combinePoiIndex(nm, writer, dateCreated, poiRegions, indexes);
+            }
+            if (combineParts.contains(OsmandOdb.OsmAndStructure.OWNER_FIELD_NUMBER) && osmAndOwner != null) {
+                writer.writeOsmAndOwner(osmAndOwner);
+            }
+            ous.writeInt32(OsmandOdb.OsmAndStructure.VERSIONCONFIRM_FIELD_NUMBER, version);
+            ous.flush();
+        }
 	}
 
 	public void merger(String[] args) throws IOException, SQLException {
