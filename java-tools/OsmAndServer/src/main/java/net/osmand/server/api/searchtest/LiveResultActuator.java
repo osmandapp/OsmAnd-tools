@@ -9,7 +9,13 @@ import net.osmand.util.MapUtils;
 import java.util.*;
 
 public class LiveResultActuator extends ResultActuator {
-	private record ExpectedResult(long osmId, LatLon point, String result, int place, String entityType) {}
+	private record ExpectedResult(long osmId, LatLon point, String result, int place, String entityType) {
+		public String entityId() {
+			if (entityType == null)
+				return "U";
+			return entityType + ("U".equals(entityType) ? "" : osmId);
+		}
+	}
 
 	private final List<ExpectedResult> expectedResults;
 	private ExpectedResult matched;
@@ -27,7 +33,7 @@ public class LiveResultActuator extends ResultActuator {
 			long osmId = id instanceof Number number ? number.longValue() : Long.parseLong((String) id);
 			String pointText = Objects.toString(object.get("point"), null);
 			LatLon point = Algorithms.parseLatLon(pointText);
-			String entityType = (String)object.get("objectType");
+			String entityType = (String)object.get("entityType");
 			expectedResults.add(new ExpectedResult(osmId, point, 
 					Objects.toString(object.get("result"), null), i + 1, entityType));
 		}
@@ -63,11 +69,8 @@ public class LiveResultActuator extends ResultActuator {
 				}
 				
 				if (matchType != null) {
-					if (actualResultText == null && formatter != null && actual.spatialResult != null) {
-						actualResultText = formatter.format(actual.spatialResult);
-					}
 					matched = expected;
-					return new Result(matchType, actual.object, actualIndex + 1, actual);
+					return new Result(matchType, actualIndex + 1, actual);
 				}
 			}
 		}
@@ -76,27 +79,31 @@ public class LiveResultActuator extends ResultActuator {
 
 	@Override
 	public boolean isFound(List<SearchResult> searchResults) {
-		if (expectedResults.isEmpty() || searchResults.isEmpty()) {
+		if (expectedResults.isEmpty()) {
 			error = "Expected result is empty";
 			return false;
 		}
+		
+		ExpectedResult first = expectedResults.get(0);
+		String entityId = first.entityType + first.osmId;
+		setActual(new Result(ResultType.Best, entityId, 1, first.result, first.point, first.entityType));
+		if (searchResults.isEmpty()) {
+			error = "Search result is empty";
+			return false;
+		}
+		
 		if (matched == null || actualResult == null) {
 			setFirst(firstResult);
-
-			ExpectedResult first = expectedResults.get(0);
-			String entityId = first.entityType + first.osmId;
-			setActual(new Result(ResultType.Best, entityId, 1, first.result, first.point, first.entityType));
 			return false;
 		}
 
-		LatLon actualPoint = actualResult.location();
-		distance = actualPoint == null || matched.point() == null ? null
-				: ((int) MapUtils.getDistance(matched.point(), actualPoint) / 10) * 10;
+		distance = matched.point() == null ? null
+				: ((int) MapUtils.getDistance(targetPoint, matched.point()) / 10) * 10;
 		resultPlace = matched.place();
 		resultPoint = toString(matched.point);
 
 		setFirst(actualResult);
-		setActual(new Result(ResultType.ByResult, matched.entityType + matched.osmId, resultPlace, matched.result, matched.point, matched.entityType));
+		setActual(new Result(ResultType.ByResult, matched.entityId(), resultPlace, matched.result, matched.point, matched.entityType));
 
 		return true;
 	}

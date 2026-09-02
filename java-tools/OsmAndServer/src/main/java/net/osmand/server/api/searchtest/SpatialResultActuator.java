@@ -17,7 +17,7 @@ public class SpatialResultActuator extends ResultActuator {
 	public SpatialResultActuator(LatLon targetPoint, Map<String, Object> statMetrics, long osmId) {
 		super(targetPoint, statMetrics);
 		this.osmId = osmId;
-		metrics.put("osm_id", osmId);
+		metrics.put("oid", osmId);
 	}
 	
 	protected static final int DIST_PRECISE_THRESHOLD_M = 20;
@@ -28,16 +28,16 @@ public class SpatialResultActuator extends ResultActuator {
 		double minDistance = Double.MAX_VALUE;
 		for (SearchResult sr : searchResults) {
 			if (sr.object instanceof MapObject mo && ObfConstants.getOsmObjectId(mo) == osmId) {
-				actualResult = new Result(ResultType.ById, mo, resPlace, sr);
+				actualResult = new Result(ResultType.ById, resPlace, sr);
 				break;
 			} else if (sr.object instanceof BinaryMapDataObject bo && ObfConstants.getOsmObjectId(bo) == osmId) {
-				actualResult = new Result(ResultType.ById, bo, resPlace, sr);
+				actualResult = new Result(ResultType.ById, resPlace, sr);
 				break;
 			} else if(sr.location != null) {
 				double dist = MapUtils.getDistance(sr.location, targetPoint);
 				if (dist < DIST_PRECISE_THRESHOLD_M && dist < minDistance) {
 					minDistance = dist;
-					actualResult = new Result(ResultType.ByDist, sr.object, resPlace, sr);
+					actualResult = new Result(ResultType.ByDist, resPlace, sr);
 				}
 			}
 			resPlace++;

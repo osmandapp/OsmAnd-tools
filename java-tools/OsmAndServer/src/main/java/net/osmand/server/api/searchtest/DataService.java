@@ -200,7 +200,7 @@ public interface DataService extends BaseService {
 			 CSVPrinter printer = new CSVPrinter(writer, format)) {
 			for (SpatialSearchTestRunner.CSVRow row : rows) {
 				printer.printRecord(row.location().getLatitude(), row.location().getLongitude(), row.unitTest(),
-						sanitizeCsvValue(row.query()), row.point(), row.osmId(), sanitizeCsvValue(row.result()));
+						sanitizeCsvValue(row.query()), row.point(), row.osmId(), sanitizeCsvValue(row.result()), row.entityType());
 			}
 		}
 		return rows.size();
@@ -278,7 +278,7 @@ public interface DataService extends BaseService {
 		for (int i = 0; i < columns.length; i++) {
 			indexes.put(columns[i], i);
 		}
-		List<String> required = List.of("lat", "lon", "unit_test", "query", "point", "id", "result", "entityType");
+		List<String> required = List.of("lat", "lon", "unit_test", "query", "point", "id", "result", "entitytype");
 		if (!indexes.keySet().containsAll(required)) {
 			throw new IOException("UnitTest dataset is missing columns: " + required.stream()
 					.filter(column -> !indexes.containsKey(column)).toList());
@@ -294,7 +294,7 @@ public interface DataService extends BaseService {
 			expected.put("point", values[indexes.get("point")]);
 			expected.put("id", Long.parseLong(values[indexes.get("id")]));
 			expected.put("result", values[indexes.get("result")]);
-			expected.put("entityType", values[indexes.get("entityType")]);
+			expected.put("entityType", values[indexes.get("entitytype")]);
 			grouped.computeIfAbsent(key, ignored -> new ArrayList<>()).add(expected);
 			sourceIds.putIfAbsent(key, entry.getKey());
 		}

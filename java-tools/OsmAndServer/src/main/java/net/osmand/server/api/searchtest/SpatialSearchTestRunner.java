@@ -5,6 +5,7 @@ import net.osmand.binary.ObfConstants;
 import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
 import net.osmand.obf.OBFDataCreator;
+import net.osmand.obf.preparation.NameIndexCreator;
 import net.osmand.search.core.spatial.SpatialSearchResult;
 import net.osmand.search.core.spatial.SpatialTestSearchEngine;
 import net.osmand.search.core.spatial.SpatialTextSearch;
@@ -32,6 +33,7 @@ public final class SpatialSearchTestRunner {
 	private final Path source;
 
     public SpatialSearchTestRunner(Path source) {
+		NameIndexCreator.MIN_LIMIT_COMMON_NON_INDEXED = 0;
 		this.source = source.toAbsolutePath().normalize();
 	}
 

@@ -123,10 +123,10 @@ public class ClassicResultActuator extends SpatialResultActuator implements Cons
 		resPlace = 1;
 		for (SearchResult sr : searchResults) {
 			if (sr.object instanceof MapObject mo && ObfConstants.getOsmObjectId(mo) == osmId) {
-				actualResult = new Result(ResultType.ById, mo, resPlace, sr);
+				actualResult = new Result(ResultType.ById, resPlace, sr);
 				break;
 			} else if (sr.object instanceof BinaryMapDataObject bo && ObfConstants.getOsmObjectId(bo) == osmId) {
-				actualResult = new Result(ResultType.ById, bo, resPlace, sr);
+				actualResult = new Result(ResultType.ById, resPlace, sr);
 				break;
 			} else if(sr.object instanceof Building b && MapUtils.getDistance(sr.location, targetPoint) < DIST_PRECISE_THRESHOLD_M) {
 				// only do matching by tags for object that we know don't store id like Building
@@ -134,10 +134,10 @@ public class ClassicResultActuator extends SpatialResultActuator implements Cons
 				// 2. building name doesn't have unit probably it's a bug to fix, so we check with startsWith
 				String bName = b.getName();  
 				if (srcAmenityHno != null && (srcAmenityHno.equals(bName) || srcAmenityHno.startsWith(bName + " "))) {
-					actualResult = new Result(ResultType.ByTag, srcAmenity, resPlace, sr);
+					actualResult = new Result(ResultType.ByTag, resPlace, sr);
 					break;
 				} else if (srcObjHno != null && (srcObjHno.equals(bName) || srcObjHno.startsWith(bName + " "))) {
-					actualResult = new Result(ResultType.ByTag, srcObj, resPlace, sr);
+					actualResult = new Result(ResultType.ByTag, resPlace, sr);
 					break;
 				}
 			}

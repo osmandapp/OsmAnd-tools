@@ -23,8 +23,8 @@ public abstract class ResultActuator implements Consumer<List<SearchResult>> {
 	}
 
 	public record Result(ResultType type, String entityId, int place, String name, LatLon location, String entityType) {
-		public Result(ResultType type, Object exact, int place, SearchResult result) {
-			this(type, getEntityId(exact), place, result == null ? null : result.toString(), result == null ? null : result.location, 
+		public Result(ResultType type, int place, SearchResult result) {
+			this(type, result == null ? null : getEntityId(result.object), place, result == null ? null : result.toString(), result == null ? null : result.location, 
 					result == null ? null : getEntityType((MapObject) result.object));
 		}
 
@@ -58,7 +58,7 @@ public abstract class ResultActuator implements Consumer<List<SearchResult>> {
 		int resPlace = 1;
 		for (SearchResult sr : searchResults) {
 			if (sr.objectType != null && ObjectType.LOCATION != sr.objectType) {
-				firstResult = new Result(ResultType.Best, null, resPlace, sr);
+				firstResult = new Result(ResultType.Best, resPlace, sr);
 				break;
 			}
 			resPlace++;
@@ -118,7 +118,7 @@ public abstract class ResultActuator implements Consumer<List<SearchResult>> {
 			setFirst(firstResult);
 			if (actualResult == null && closestDuplicate < FOUND_DEDUPLICATE_RADIUS) {
 				SearchResult sr = searchResults.get(dupInd);
-				actualResult = new Result(ResultActuator.ResultType.ByDist, null, dupInd + 1, sr);
+				actualResult = new Result(ResultActuator.ResultType.ByDist, dupInd + 1, sr);
 			}
 			if (actualResult != null) {
 				setActual(actualResult);
@@ -181,39 +181,32 @@ public abstract class ResultActuator implements Consumer<List<SearchResult>> {
 	}
 
 	public static String toString(LatLon point) {
-		if (point == null) return null;
-		return String.format(Locale.US, "%f, %f", point.getLatitude(), point.getLongitude());
+		if (point == null) 
+			return null;
+		return String.format(Locale.US, "%.5f, %.5f", point.getLatitude(), point.getLongitude());
 	}
 	
 	public static String getEntityId(Object obj) {
-		if (obj instanceof BinaryMapDataObject) {
-			throw new IllegalArgumentException("BinaryMapDataObject");
-		} else if (obj instanceof Street s) {
-			return "S" + ObfConstants.getOsmObjectId(s);
-		} 
-		if (obj instanceof MapObject mo && mo.getId() != null) {
-			EntityType et = ObfConstants.getOsmEntityType(mo);
-			String entityType;
-			if (et == EntityType.NODE) {
-				entityType = "N";
-			} else if (et == EntityType.WAY) {
-				entityType = "W";
-			} else {
-				entityType = "R";
-			}
-			return entityType + ObfConstants.getOsmObjectId(mo);
+		if (!(obj instanceof MapObject mo)) {
+			throw new IllegalArgumentException("Not MapObject");
 		}
-		return "U";
+
+		String entityType = getEntityType(mo);
+		return entityType + ("U".equals(entityType) ? "" : ObfConstants.getOsmObjectId(mo));
 	}
 	
 	public static String getEntityType(MapObject object) {
-		if (object == null) return "U";
+		if (object == null) {
+			return "U";
+		}
+		EntityType et = ObfConstants.getOsmEntityType(object);
+		if (et == null) {
+			return "U";
+		}
 		
 		if (object instanceof Street) {
 			return "S";
 		}
-		
-		EntityType et = ObfConstants.getOsmEntityType(object);
 		if (et == EntityType.NODE) {
 			return "N";
 		} 
