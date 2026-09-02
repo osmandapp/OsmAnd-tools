@@ -212,9 +212,10 @@ public class RoutingService {
     }
 
     /**
-     * One LineString per alternative route, marked so that the client can draw and offer them
-     * differently from the main route. "alternative" is 1-based, "deltaTime" is the overhead
-     * against the main route in percent, measured the same way on both sides.
+     * One LineString per alternative route, with the same "overall" block as the main route so that
+     * a client can show an alternative in place of it. "alternative" is 1-based and marks the route
+     * as not the one currently displayed; "deltaTime" is the overhead against the main route,
+     * measured the same way on both sides.
      */
     public List<Feature> buildAlternativeFeatures(List<List<RouteSegmentResult>> alternatives,
                                                   List<RouteSegmentResult> mainRoute) {
@@ -225,30 +226,30 @@ public class RoutingService {
         double mainRoutingTime = routingTime(mainRoute);
         for (int i = 0; i < alternatives.size(); i++) {
             List<RouteSegmentResult> alt = alternatives.get(i);
-            List<LatLon> points = new ArrayList<>();
             double distance = 0, time = 0;
-            for (int k = 0; k < alt.size(); k++) {
-                RouteSegmentResult r = alt.get(k);
+            for (RouteSegmentResult r : alt) {
                 distance += r.getDistance();
                 time += r.getSegmentTime();
-                final int dir = r.isForwardDirection() ? 1 : -1;
-                // the very last segment has to include its very last point
-                final int last = k == alt.size() - 1 ? r.getEndPointIndex() + dir : r.getEndPointIndex();
-                for (int j = r.getStartPointIndex(); j != last; j += dir) {
-                    if (r.getPoint(j) != null) {
-                        points.add(r.getPoint(j));
-                    }
-                }
             }
+            // same elevation treatment as the main route, so the client can show its graph too
+            List<LatLonEle> points = getElevationsBySegments(new ArrayList<>(), new ArrayList<>(), alt);
+            interpolateEmptyElevationSegments(points);
             if (points.size() < 2) {
                 continue;
             }
-            Feature f = new Feature(Geometry.lineString(points));
+            Feature f = new Feature(Geometry.lineStringElevation(points));
             f.properties = new TreeMap<>();
             f.properties.put("alternative", i + 1);
-            f.properties.put("distance", distance);
-            f.properties.put("time", time);
-            f.properties.put("routingTime", routingTime(alt));
+            TreeMap<String, Object> overall = new TreeMap<>();
+            overall.put("distance", distance);
+            overall.put("time", time);
+            overall.put("routingTime", routingTime(alt));
+            f.properties.put("overall", overall);
+            List<Double> eleDiff = calculateElevationDiffs(points);
+            if (eleDiff.size() > 1 && !Double.isNaN(eleDiff.get(0)) && !Double.isNaN(eleDiff.get(1))) {
+                f.properties.put("diffElevationUp", eleDiff.get(0));
+                f.properties.put("diffElevationDown", eleDiff.get(1));
+            }
             if (mainRoutingTime > 0) {
                 double delta = 100 * (routingTime(alt) / mainRoutingTime - 1);
                 f.properties.put("deltaTime", Math.round(delta * 10) / 10.0);
