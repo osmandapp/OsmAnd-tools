@@ -26,6 +26,7 @@ import java.util.TreeMap;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.MapZooms;
 import net.osmand.impl.ConsoleProgressImplementation;
+import net.osmand.map.OsmandRegions;
 import net.osmand.obf.preparation.IndexCreator;
 import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.osm.MapRenderingTypesEncoder;
@@ -37,6 +38,9 @@ import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlSerializer;
 
 public class CountryOcbfGeneration {
+	private static final String TAG_REF_USPS = "ref:USPS"; // US state abbreviation
+	private static final String TAG_ISO_3166_2 = "ISO3166-2"; // ISO subdivision code
+
 	private int OSM_ID=-1000;
 	private static final Log log = PlatformUtil.getLog(CountryOcbfGeneration.class);
 
@@ -409,6 +413,7 @@ public class CountryOcbfGeneration {
         encoder.addExternalAdditionalText("short_name", true);
         encoder.addExternalAdditionalText("alt_name", true);
         encoder.addExternalAdditionalText("name:abbreviation", false);
+        encoder.addExternalAdditionalText(OsmandRegions.FIELD_REGION_REF, false);
         creator.generateIndexes(osm,
 				new ConsoleProgressImplementation(1), null, zooms,
 				encoder, log);
@@ -561,6 +566,11 @@ public class CountryOcbfGeneration {
 			} else {
 				TranslateEntity nt = set.iterator().next();
 				line += " translate-" + nt.tm.size() + "=" + nt.tm.get("name");
+				String uspsRef = nt.tm.get(TAG_REF_USPS);
+				String regionRef = Algorithms.isNotEmpty(uspsRef) ? uspsRef : nt.tm.get(TAG_ISO_3166_2);
+				if (Algorithms.isNotEmpty(regionRef)) {
+					addTag(serializer, OsmandRegions.FIELD_REGION_REF, regionRef);
+				}
 				Iterator<Entry<String, String>> it = nt.tm.entrySet().iterator();
                 boolean hasBoundary = false;
 				while (it.hasNext()) {
