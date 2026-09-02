@@ -1024,6 +1024,17 @@ public class OsmAndMapsService {
 	public List<RouteSegmentResult> routing(boolean disableOldRouting, String routeMode, Map<String, Object> props,
 	                                        LatLon start, LatLon end, List<LatLon> intermediates, List<String> avoidRoadsIds,
 	                                        RouteCalculationProgress progress) throws IOException, InterruptedException {
+		return routing(disableOldRouting, routeMode, props, start, end, intermediates, avoidRoadsIds, progress, 0, null);
+	}
+
+	/**
+	 * @param alternatives how many alternative routes to ask HH routing for (0 - none)
+	 * @param alternativesOut filled with the alternatives that were found, may be null
+	 */
+	public List<RouteSegmentResult> routing(boolean disableOldRouting, String routeMode, Map<String, Object> props,
+	                                        LatLon start, LatLon end, List<LatLon> intermediates, List<String> avoidRoadsIds,
+	                                        RouteCalculationProgress progress, int alternatives,
+	                                        List<List<RouteSegmentResult>> alternativesOut) throws IOException, InterruptedException {
 		String profile = routeMode.split("\\,")[0];
 		QuadRect points = points(intermediates, start, end);
 		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
@@ -1061,19 +1072,65 @@ public class OsmAndMapsService {
 			}
 			ctx.routingTime = 0;
 			ctx.calculationProgress = progress;
-			if (rp.onlineRouting != null) {
-				routeRes = onlineRouting(rp, ctx, router, props, start, end, intermediates);
-			} else {
-				RouteCalcResult rc = ctx.nativeLib != null ? runRoutingSync(start, end, intermediates, router, ctx)
-						: router.searchRoute(ctx, start, end, intermediates, null);
-				routeRes = rc == null ? null : rc.getList();
-				putResultProps(ctx, routeRes, props);
+			// the HH config can be shared with the routing cache, so the flag is set only for this
+			// request and put back before the context is unlocked
+			HHRoutingConfig hhConfig = alternatives > 0 ? router.getHHRoutingConfig() : null;
+			int keepAlternatives = hhConfig == null ? 0 : hhConfig.ALT_MAX_COUNT;
+			boolean keepCalcAlternatives = hhConfig != null && hhConfig.CALC_ALTERNATIVES;
+			if (hhConfig != null) {
+				hhConfig.calcAlternative(alternatives);
+			}
+			try {
+				if (rp.onlineRouting != null) {
+					routeRes = onlineRouting(rp, ctx, router, props, start, end, intermediates);
+				} else {
+					RouteCalcResult rc = ctx.nativeLib != null ? runRoutingSync(start, end, intermediates, router, ctx)
+							: router.searchRoute(ctx, start, end, intermediates, null);
+					routeRes = rc == null ? null : rc.getList();
+					if (rc != null && alternativesOut != null) {
+						alternativesOut.addAll(rc.getAlternatives());
+					}
+					putResultProps(ctx, routeRes, props);
+				}
+			} finally {
+				if (hhConfig != null) {
+					hhConfig.CALC_ALTERNATIVES = keepCalcAlternatives;
+					hhConfig.ALT_MAX_COUNT = keepAlternatives;
+				}
+			}
+			if (alternatives > 0) {
+				String reason = alternativesUnsupportedBy(rp, ctx, router, intermediates);
+				if (reason != null) {
+					// they would silently come back empty otherwise, which reads as a broken feature
+					props.put("alternativesNotSupported", reason);
+				}
 			}
 		} finally {
 			unlockReaders(usedMapList);
 			unlockCacheRoutingContext(ctx);
 		}
 		return routeRes;
+	}
+
+	/**
+	 * Only the Java HH planner produces alternatives, and only for a plain start -> end route.
+	 * Returns what stands in the way, or null when alternatives can be expected.
+	 */
+	private String alternativesUnsupportedBy(RouteParameters rp, RoutingContext ctx,
+			RoutePlannerFrontEnd router, List<LatLon> intermediates) {
+		if (rp.onlineRouting != null) {
+			return "online routing";
+		}
+		if (ctx.nativeLib != null) {
+			return "native (C++) routing";
+		}
+		if (!router.isHHRoutingConfigured()) {
+			return "HH routing is off";
+		}
+		if (intermediates != null && !intermediates.isEmpty()) {
+			return "intermediate points";
+		}
+		return null;
 	}
 
 	private static long getLocalTimeMillisByLatLon(double lat, double lon) {
