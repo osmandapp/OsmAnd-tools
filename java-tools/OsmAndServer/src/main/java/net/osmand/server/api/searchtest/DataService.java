@@ -288,13 +288,15 @@ public interface DataService extends BaseService {
 		Map<List<String>, Integer> sourceIds = new HashMap<>();
 		for (Map.Entry<Integer, String> entry : rows.entrySet()) {
 			String[] values = getObjectMapper().readValue(entry.getValue(), String[].class);
+			String unitTest = values[indexes.get("unit_test")];
 			List<String> key = List.of(values[indexes.get("lat")], values[indexes.get("lon")],
-					values[indexes.get("unit_test")], values[indexes.get("query")]);
+					unitTest, values[indexes.get("query")]);
 			Map<String, Object> expected = new LinkedHashMap<>();
 			expected.put("point", values[indexes.get("point")]);
 			expected.put("id", Long.parseLong(values[indexes.get("id")]));
 			expected.put("result", values[indexes.get("result")]);
 			expected.put("entityType", values[indexes.get("entitytype")]);
+			expected.put("unitTest", unitTest);
 			grouped.computeIfAbsent(key, ignored -> new ArrayList<>()).add(expected);
 			sourceIds.putIfAbsent(key, entry.getKey());
 		}

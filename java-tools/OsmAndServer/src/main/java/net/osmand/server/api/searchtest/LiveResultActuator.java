@@ -20,9 +20,11 @@ public class LiveResultActuator extends ResultActuator {
 	private final List<ExpectedResult> expectedResults;
 	private ExpectedResult matched;
 	private SpatialResultFormatter formatter;
+	private String unitTest;
 
-	public LiveResultActuator(LatLon targetPoint, Map<String, Object> statMetrics, List<Map<String, Object>> objects) {
-		super(targetPoint, statMetrics);
+	public LiveResultActuator(LatLon targetPoint, Map<String, Object> metrics, List<Map<String, Object>> objects) {
+		super(targetPoint, metrics);
+		
 		expectedResults = new ArrayList<>(objects.size());
 		for (int i = 0; i < objects.size(); i++) {
 			Map<String, Object> object = objects.get(i);
@@ -34,9 +36,11 @@ public class LiveResultActuator extends ResultActuator {
 			String pointText = Objects.toString(object.get("point"), null);
 			LatLon point = Algorithms.parseLatLon(pointText);
 			String entityType = (String)object.get("entityType");
+			unitTest = (String)object.get("unitTest");
 			expectedResults.add(new ExpectedResult(osmId, point, 
 					Objects.toString(object.get("result"), null), i + 1, entityType));
 		}
+		metrics.put("ut", unitTest);
 	}
 
 	@Override
@@ -64,7 +68,7 @@ public class LiveResultActuator extends ResultActuator {
 						actualResultText = actualResultText.substring(0, actualResultText.indexOf('[') + 4).trim();
 					}
 					if (Objects.equals(expectedResult, actualResultText)) {
-						matchType = ResultType.ByResult;
+						matchType = ResultType.ByName;
 					}
 				}
 				
@@ -85,8 +89,7 @@ public class LiveResultActuator extends ResultActuator {
 		}
 		
 		ExpectedResult first = expectedResults.get(0);
-		String entityId = first.entityType + first.osmId;
-		setActual(new Result(ResultType.Best, entityId, 1, first.result, first.point, first.entityType));
+		setActual(new Result(ResultType.Best, first.entityId(), 1, first.result, first.point, first.entityType));
 		if (searchResults.isEmpty()) {
 			error = "Search result is empty";
 			return false;
@@ -103,7 +106,7 @@ public class LiveResultActuator extends ResultActuator {
 		resultPoint = toString(matched.point);
 
 		setFirst(actualResult);
-		setActual(new Result(ResultType.ByResult, matched.entityId(), resultPlace, matched.result, matched.point, matched.entityType));
+		setActual(new Result(ResultType.ByName, matched.entityId(), resultPlace, matched.result, matched.point, matched.entityType));
 
 		return true;
 	}

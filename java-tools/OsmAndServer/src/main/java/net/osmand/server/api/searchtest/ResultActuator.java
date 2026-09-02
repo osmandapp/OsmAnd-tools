@@ -17,7 +17,7 @@ public abstract class ResultActuator implements Consumer<List<SearchResult>> {
 	public enum ResultType {
 		Best,
 		ById,
-		ByResult,
+		ByName,
 		ByTag,
 		ByDist
 	}
@@ -186,24 +186,33 @@ public abstract class ResultActuator implements Consumer<List<SearchResult>> {
 		return String.format(Locale.US, "%.5f, %.5f", point.getLatitude(), point.getLongitude());
 	}
 	
-	public static String getEntityId(Object obj) {
-		if (!(obj instanceof MapObject mo)) {
-			throw new IllegalArgumentException("Not MapObject");
+	public static String getEntityId(Object object) {
+		String entityType = getEntityType(object);
+		if ("U".equals(entityType)) {
+			return entityType;
 		}
-
-		String entityType = getEntityType(mo);
-		return entityType + ("U".equals(entityType) ? "" : ObfConstants.getOsmObjectId(mo));
+		if (object instanceof MapObject mo) {
+			return entityType + ObfConstants.getOsmObjectId(mo);
+		}
+		return entityType + ObfConstants.getOsmObjectId((BinaryMapDataObject)object);
 	}
 	
-	public static String getEntityType(MapObject object) {
+	public static String getEntityType(Object object) {
 		if (object == null) {
 			return "U";
 		}
-		EntityType et = ObfConstants.getOsmEntityType(object);
+		EntityType et;
+		if (object instanceof MapObject mo) {
+			et = ObfConstants.getOsmEntityType(mo);
+		} else if (object instanceof BinaryMapDataObject bmo) {
+			et = ObfConstants.getOsmEntityType(bmo);
+		} else {
+			throw new IllegalArgumentException("Unexpected class: " + object.getClass().getName());
+		}
+		
 		if (et == null) {
 			return "U";
 		}
-		
 		if (object instanceof Street) {
 			return "S";
 		}
