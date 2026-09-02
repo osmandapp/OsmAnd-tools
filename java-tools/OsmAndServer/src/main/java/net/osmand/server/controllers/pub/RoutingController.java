@@ -58,6 +58,8 @@ import net.osmand.util.MapUtils;
 @RequestMapping("/routing")
 public class RoutingController {
 	public static final String MSG_LONG_DIST = "Sorry, in our beta mode max routing distance is limited to ";
+	/** each alternative costs a detailed expansion, and no client asks for more than a couple */
+	private static final int MAX_ALTERNATIVES = 2;
 	protected static final Log LOGGER = LogFactory.getLog(RoutingController.class);
 
 	@Autowired
@@ -292,6 +294,8 @@ public class RoutingController {
 	                                 @RequestParam(required = false) String[] avoidRoads,
 	                                 @RequestParam(defaultValue = "production") String limits,
 	                                 @RequestParam(defaultValue = "0") int alternatives) throws IOException {
+		// client controlled, and every alternative costs a detailed expansion on the server
+		final int altCount = Math.min(Math.max(alternatives, 0), MAX_ALTERNATIVES);
 		RouteCalculationProgress progress = this.session.getRoutingProgress(session);
 		final int hhOnlyLimit = osmAndMapsService.getRoutingConfig().hhOnlyLimit;
 		List<LatLon> list = new ArrayList<>();
@@ -326,8 +330,8 @@ public class RoutingController {
 						osmAndMapsService.routing(disableOldRouting, routeMode, props, list.get(0),
 								list.get(list.size() - 1), list.subList(1, list.size() - 1),
 								avoidRoads == null ? Collections.emptyList() : Arrays.asList(avoidRoads), progress,
-								alternatives, altRoutes);
-				alternativeFeatures = routingService.buildAlternativeFeatures(altRoutes, res);
+								altCount, altRoutes);
+				alternativeFeatures = routingService.buildAlternativeFeatures(altRoutes);
 				if (res != null) {
 					resListElevation = routingService.getElevationsBySegments(resListElevation, features, res);
 					routingService.interpolateEmptyElevationSegments(resListElevation);

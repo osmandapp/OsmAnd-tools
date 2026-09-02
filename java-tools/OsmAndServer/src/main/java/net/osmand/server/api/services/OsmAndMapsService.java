@@ -1098,11 +1098,39 @@ public class OsmAndMapsService {
 					hhConfig.ALT_MAX_COUNT = keepAlternatives;
 				}
 			}
+			if (alternatives > 0) {
+				String reason = alternativesUnsupportedBy(rp, ctx, router, intermediates);
+				if (reason != null) {
+					// they would silently come back empty otherwise, which reads as a broken feature
+					props.put("alternativesNotSupported", reason);
+				}
+			}
 		} finally {
 			unlockReaders(usedMapList);
 			unlockCacheRoutingContext(ctx);
 		}
 		return routeRes;
+	}
+
+	/**
+	 * Only the Java HH planner produces alternatives, and only for a plain start -> end route.
+	 * Returns what stands in the way, or null when alternatives can be expected.
+	 */
+	private String alternativesUnsupportedBy(RouteParameters rp, RoutingContext ctx,
+			RoutePlannerFrontEnd router, List<LatLon> intermediates) {
+		if (rp.onlineRouting != null) {
+			return "online routing";
+		}
+		if (ctx.nativeLib != null) {
+			return "native (C++) routing";
+		}
+		if (!router.isHHRoutingConfigured()) {
+			return "HH routing is off";
+		}
+		if (intermediates != null && !intermediates.isEmpty()) {
+			return "intermediate points";
+		}
+		return null;
 	}
 
 	private static long getLocalTimeMillisByLatLon(double lat, double lon) {

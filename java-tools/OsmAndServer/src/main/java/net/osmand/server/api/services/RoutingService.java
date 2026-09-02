@@ -212,34 +212,40 @@ public class RoutingService {
     }
 
     /**
-     * One LineString per alternative route, with the same "overall" block as the main route so that
-     * a client can show an alternative in place of it. "alternative" is 1-based and marks the route
-     * as not the one currently displayed; "deltaTime" is the overhead against the main route,
-     * measured the same way on both sides.
+     * Per alternative route: one LineString with the same "overall" block as the main route, so a
+     * client can show it in place of the main one, followed by that route's own turn descriptions.
+     * Everything belonging to an alternative carries the same 1-based "alternative" number - the
+     * client swaps the line and its turn points together, otherwise it would keep showing the
+     * directions of the route it just replaced.
+     *
+     * "overall.routingTime" is the sum of the segments' routing time, the same cost the main route
+     * reports (RoutingContext.routingTime accumulates it a segment at a time, so the two agree to
+     * within rounding).
      */
-    public List<Feature> buildAlternativeFeatures(List<List<RouteSegmentResult>> alternatives,
-                                                  List<RouteSegmentResult> mainRoute) {
+    public List<Feature> buildAlternativeFeatures(List<List<RouteSegmentResult>> alternatives) {
         List<Feature> features = new ArrayList<>();
-        if (alternatives == null || alternatives.isEmpty()) {
+        if (alternatives == null) {
             return features;
         }
-        double mainRoutingTime = routingTime(mainRoute);
-        for (int i = 0; i < alternatives.size(); i++) {
-            List<RouteSegmentResult> alt = alternatives.get(i);
+        int number = 0;
+        for (List<RouteSegmentResult> alt : alternatives) {
+            List<Feature> turns = new ArrayList<>();
+            // same elevation and turn treatment as the main route, so the client can show its graph
+            // and its directions too
+            List<LatLonEle> points = getElevationsBySegments(new ArrayList<>(), turns, alt);
+            interpolateEmptyElevationSegments(points);
+            if (points.size() < 2) {
+                continue; // numbering counts the alternatives that are returned, so it has no gaps
+            }
+            number++;
             double distance = 0, time = 0;
             for (RouteSegmentResult r : alt) {
                 distance += r.getDistance();
                 time += r.getSegmentTime();
             }
-            // same elevation treatment as the main route, so the client can show its graph too
-            List<LatLonEle> points = getElevationsBySegments(new ArrayList<>(), new ArrayList<>(), alt);
-            interpolateEmptyElevationSegments(points);
-            if (points.size() < 2) {
-                continue;
-            }
             Feature f = new Feature(Geometry.lineStringElevation(points));
             f.properties = new TreeMap<>();
-            f.properties.put("alternative", i + 1);
+            f.properties.put("alternative", number);
             TreeMap<String, Object> overall = new TreeMap<>();
             overall.put("distance", distance);
             overall.put("time", time);
@@ -250,11 +256,11 @@ public class RoutingService {
                 f.properties.put("diffElevationUp", eleDiff.get(0));
                 f.properties.put("diffElevationDown", eleDiff.get(1));
             }
-            if (mainRoutingTime > 0) {
-                double delta = 100 * (routingTime(alt) / mainRoutingTime - 1);
-                f.properties.put("deltaTime", Math.round(delta * 10) / 10.0);
-            }
             features.add(f);
+            for (Feature turn : turns) {
+                turn.prop("alternative", number);
+            }
+            features.addAll(turns);
         }
         return features;
     }
