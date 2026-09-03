@@ -10,6 +10,7 @@ import java.util.*;
 
 public class LiveResultActuator extends ResultActuator {
 	private static final double MATCH_RADIUS_METERS = 20;
+	private static final int MAX_TOOLTIP_RESULTS = 10;
 
 	private record ExpectedResult(long osmId, LatLon point, String result, int place, String entityType) {
 		public String entityId() {
@@ -57,6 +58,8 @@ public class LiveResultActuator extends ResultActuator {
 
 	@Override
 	protected Result findActualResult(List<SearchResult> searchResults) {
+		actualResults.clear();
+		matched = null;
 		for (SearchResult actual : searchResults) {
 			actualResults.add(formatName(actual));
 		}
@@ -87,6 +90,7 @@ public class LiveResultActuator extends ResultActuator {
 				
 				if (matchType != null) {
 					matched = expected;
+					trimActualResults(actualIndex + 1);
 					String name = formatter != null && actual.spatialResult != null
 							? formatter.format(actual.spatialResult) : actual.toString();
 					return new Result(matchType, getEntityId(actual.object), actualIndex + 1, name,
@@ -94,7 +98,15 @@ public class LiveResultActuator extends ResultActuator {
 				}
 			}
 		}
+		trimActualResults(firstResult == null ? 0 : firstResult.place());
 		return null;
+	}
+
+	private void trimActualResults(int selectedPlace) {
+		int size = Math.max(MAX_TOOLTIP_RESULTS, Math.max(expectedResults.size(), selectedPlace));
+		if (actualResults.size() > size) {
+			actualResults.subList(size, actualResults.size()).clear();
+		}
 	}
 
 	private String formatName(SearchResult result) {
@@ -142,8 +154,7 @@ public class LiveResultActuator extends ResultActuator {
 		
 		String name = res.getName();
 		if (name != null) {
-			List<String> results = "res".equals(prefix)
-					? actualResults.subList(0, Math.min(actualResults.size(), Math.max(expectedResults.size(), res.place())))
+			List<String> results = "res".equals(prefix) ? actualResults
 					: expectedResults.stream().map(ExpectedResult::getName).toList();
 			metrics.put(prefix + "_name", new Object[] {name, String.join("\n", results)});
 		}
