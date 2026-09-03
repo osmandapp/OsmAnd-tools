@@ -151,8 +151,8 @@ public class UserDataSearchService {
 			index.tracksVersion = tracksVersion;
 		}
 		Date favoritesVersion = filesRepository.maxUpdatetime(dev.userid, FILE_TYPE_FAVOURITES);
-		if (favoritesVersion != null && !favoritesVersion.equals(index.favoritesVersion)) {
-			syncFiles(index.favoritesByFile, fileVersions(listFiles(dev, FILE_TYPE_FAVOURITES), false), dev, FILE_TYPE_FAVOURITES);
+		if (favoritesVersion != null && !favoritesVersion.equals(index.favoritesVersion)
+				&& syncFiles(index.favoritesByFile, fileVersions(listFiles(dev, FILE_TYPE_FAVOURITES), false), dev, FILE_TYPE_FAVOURITES)) {
 			index.favoritesVersion = favoritesVersion;
 		}
 	}
@@ -185,21 +185,29 @@ public class UserDataSearchService {
 		return name.substring(0, name.length() - GPX_FILE_EXT.length());
 	}
 
-	// Keeps only listed files, re-reads a file when it is new or its updatetime changed
-	private void syncFiles(Map<String, NamesIndex> byFile, List<FileVersion> files, CloudUserDevice dev, String type) {
+	// Keeps only listed files, re-reads a file when it is new or its updatetime changed.
+	private boolean syncFiles(Map<String, NamesIndex> byFile, List<FileVersion> files, CloudUserDevice dev, String type) {
 		byFile.keySet().retainAll(files.stream().map(FileVersion::key).toList());
+		boolean allLoaded = true;
 		for (FileVersion file : files) {
 			NamesIndex current = byFile.get(file.key());
 			if (current == null || current.updatetimems != file.updatetimems()) {
-				byFile.put(file.key(), buildPointsIndex(file, loadGpx(file.name(), file.shared(), type, dev)));
+				GpxFile gpxFile = loadGpx(file.name(), file.shared(), type, dev);
+				if (gpxFile == null) {
+					allLoaded = false;
+				} else {
+					byFile.put(file.key(), buildPointsIndex(file, gpxFile));
+				}
 			}
 		}
+
+		return allLoaded;
 	}
 
 	private GpxFile loadGpx(String fileName, boolean shared, String type, CloudUserDevice dev) {
 		try {
 			UserFile file = shared ? shareFileService.getSharedWithMeFile(fileName, type, dev)
-					: userdataService.getLastFileVersion(dev.userid, fileName, type);
+					: userdataService.getUserFile(fileName, type, null, dev);
 			return shareFileService.getFile(file);
 		} catch (Exception e) {
 			LOG.warn(String.format("User data search index failed userid=%d %s: %s", dev.userid, fileName, e.getMessage()));
@@ -210,11 +218,9 @@ public class UserDataSearchService {
 	private NamesIndex buildPointsIndex(FileVersion file, GpxFile gpxFile) {
 		NamesIndex index = new NamesIndex();
 		index.updatetimems = file.updatetimems();
-		if (gpxFile != null) {
-			for (WptPt point : gpxFile.getPointsList()) {
-				if (point.getName() != null && !point.getName().isEmpty()) {
-					index.add(new UserDataItem(file.name(), file.shared(), point.getName()));
-				}
+		for (WptPt point : gpxFile.getPointsList()) {
+			if (point.getName() != null && !point.getName().isEmpty()) {
+				index.add(new UserDataItem(file.name(), file.shared(), point.getName()));
 			}
 		}
 		return index;
