@@ -17,9 +17,15 @@ public class LiveResultActuator extends ResultActuator {
 				return "U";
 			return entityType + osmId;
 		}
+		public String getName() {
+			if (result == null)
+				return null;
+			return result.indexOf('[') != -1 ? result.substring(0, result.indexOf('[')).trim() : result;
+		}
 	}
 
 	private final List<ExpectedResult> expectedResults;
+	private final List<String> actualResults = new ArrayList<>();
 	private ExpectedResult matched;
 	private SpatialResultFormatter formatter;
 	private String unitTest;
@@ -51,10 +57,25 @@ public class LiveResultActuator extends ResultActuator {
 
 	@Override
 	protected Result findActualResult(List<SearchResult> searchResults) {
+        for (SearchResult actual : searchResults) {
+            String actualResultText = formatter.format(actual.spatialResult);
+            if (actualResultText != null && actualResultText.indexOf('[') != -1) {
+                actualResultText = actualResultText.substring(0, actualResultText.indexOf('[')).trim();
+            }
+            if (actualResults.size() < expectedResults.size()) {
+                actualResults.add(actualResultText);
+            }
+        }
+		
 		for (int actualIndex = 0; actualIndex < searchResults.size(); actualIndex++) {
 			SearchResult actual = searchResults.get(actualIndex);
+			
 			long actualId = osmId(actual);
-			String actualResultText = null;
+			String actualResultText = formatter.format(actual.spatialResult);
+			if (actualResultText != null && actualResultText.indexOf('[') != -1) {
+				actualResultText = actualResultText.substring(0, actualResultText.indexOf('[')).trim();
+			}
+			
 			for (ExpectedResult expected : expectedResults) {
 				if (expected.point() == null || actual.location == null
 						|| MapUtils.getDistance(expected.point(), actual.location) > MATCH_RADIUS_METERS) {
@@ -64,13 +85,9 @@ public class LiveResultActuator extends ResultActuator {
 				if (expected.osmId() != -1 && expected.osmId() == actualId) {
 					matchType = ResultType.ById;
 				} else if (expected.osmId() == -1 && actualId == -1 && formatter != null && actual.spatialResult != null) {
-					actualResultText = actualResultText == null ? formatter.format(actual.spatialResult) : actualResultText;
 					String expectedResult = expected.result();
 					if (expectedResult.indexOf('[') != -1) {
-						expectedResult = expectedResult.substring(0, expectedResult.indexOf('[') + 4).trim();
-					}
-					if (actualResultText != null && actualResultText.indexOf('[') != -1) {
-						actualResultText = actualResultText.substring(0, actualResultText.indexOf('[') + 4).trim();
+						expectedResult = expectedResult.substring(0, expectedResult.indexOf('[')).trim();
 					}
 					if (Objects.equals(expectedResult, actualResultText)) {
 						matchType = ResultType.ByName;
@@ -96,16 +113,16 @@ public class LiveResultActuator extends ResultActuator {
 			return false;
 		}
 		
-		ExpectedResult first = expectedResults.get(0);
-		setActual(new Result(ResultType.Best, first.entityId(), 1, first.result, first.point, first.entityType));
 		metrics.put("web_type", unitTest);
 		if (searchResults.isEmpty()) {
 			error = "Search result is empty";
 			return false;
 		}
-		
+
 		if (matched == null || actualResult == null) {
-			setFirst(firstResult);
+			setResult("res", firstResult);
+			ExpectedResult firstExpected = expectedResults.get(0);
+			setResult("actual", new Result(ResultType.Best, firstExpected.entityId(), 1, firstExpected.result, firstExpected.point, firstExpected.entityType));
 			return false;
 		}
 
@@ -114,9 +131,21 @@ public class LiveResultActuator extends ResultActuator {
 		resultPlace = matched.place();
 		resultPoint = toString(matched.point);
 
-		setFirst(actualResult);
-		setActual(new Result(ResultType.ByName, matched.entityId(), resultPlace, matched.result, matched.point, matched.entityType));
+		setResult("res", actualResult);
+		setResult("actual", new Result(ResultType.ByName, matched.entityId(), resultPlace, matched.result, 
+				matched.point, matched.entityType));
 
 		return true;
+	}
+
+	public void setResult(String prefix, Result res) {
+		super.setResult(prefix, res);
+		
+		String name = res.getName();
+		if (name != null) {
+			List<String> results = "res".equals(prefix) ? actualResults :
+					expectedResults.stream().map(ExpectedResult::getName).toList();
+			metrics.put(prefix + "_name", new Object[] {name, String.join("\n", results)});
+		}
 	}
 }

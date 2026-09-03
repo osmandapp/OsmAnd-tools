@@ -81,9 +81,24 @@ public interface ReportService {
 				WHEN query IS NULL OR trim(query) = '' THEN 'Empty' ELSE 'Processed' END AS type,
 			ds_id || '.' || tc_id AS row_id, id as gen_id, lat_lon, query, obj_id as id,
 			in_row, NULL, NULL, NULL, NULL, NULL, NULL, NULL as out_row, NULL, NULL, NULL FROM gen ORDER BY "group", gen_id""";
-	String[] IN_PROPS = new String[]{"group", "type", "row_id", "id", "lat_lon", "search_lat_lon", "query", "src_map_found"};
-	String[] OUT_PROPS = new String[]{"res_name", "actual_name", "res_dist", "actual_dist", "res_lat_lon", "actual_lat_lon", "res_place", "actual_place", "res_id", "actual_id", 
-			"oid", "res_count", "search_bbox", "stat_bytes", "stat_time", "time"};
+	
+	enum InProp {
+		group, type, row_id, id, lat_lon, search_lat_lon, query, src_map_found
+	}
+
+	enum OutProp {
+		res_name(true), actual_name(true), res_dist, actual_dist, res_lat_lon, actual_lat_lon, res_place, actual_place, res_id, actual_id, oid, res_count, search_bbox, stat_bytes, stat_time, time;
+
+		final boolean polymorphic;
+
+		OutProp() {
+			this(false);
+		}
+
+		OutProp(boolean polymorphic) {
+			this.polymorphic = polymorphic;
+		}
+	}
 
 	JdbcTemplate getJdbcTemplate();
 
@@ -132,29 +147,28 @@ public interface ReportService {
 
 	default List<Map<String, Object>> extendTo(List<Map<String, Object>> results, String[] allCols) {
 		// Exclude fields already exposed as top-level columns to avoid duplication
-		final java.util.Set<String> exclude = new java.util.HashSet<>(java.util.Arrays.asList(IN_PROPS));
+		final Set<String> exclude = Arrays.stream(InProp.values()).map(Enum::name).collect(Collectors.toSet());
 		exclude.add("web_type");
-		exclude.addAll(java.util.Arrays.asList(allCols));
-		List<String> outProps = Arrays.asList(OUT_PROPS);
+		exclude.addAll(Arrays.asList(allCols));
+		Map<String, OutProp> outProps = Arrays.stream(OutProp.values())
+				.collect(Collectors.toMap(Enum::name, p -> p));
 
 		return results.stream().map(srcRow -> {
 			String inRowJson = (String) srcRow.get("in_row");
 			String outRowJson = (String) srcRow.get("out_row");
-			srcRow.remove("in_row");
-			srcRow.remove("out_row");
 
 			Map<String, Object> row = new LinkedHashMap<>();
 			row.put("gen_id", srcRow.get("gen_id"));
 			if (inRowJson == null) return row;
-			for (String p : IN_PROPS)
-				if (srcRow.containsKey(p))
-					row.put(p, srcRow.get(p));
+			for (InProp p : InProp.values())
+				if (srcRow.containsKey(p.name()))
+					row.put(p.name(), srcRow.get(p.name()));
 
 			try {
 				Map<String, Object> out = new LinkedHashMap<>();
 				if (outRowJson != null) {
-					for (String p : OUT_PROPS) {
-						row.put(p, srcRow.get(p));
+					for (OutProp p : OutProp.values()) {
+						row.put(p.name(), srcRow.get(p.name()));
 					}
 					JsonNode outRow = getObjectMapper().readTree(outRowJson);
 					// For consistency with CSV, serialize values as text, skipping excluded keys
@@ -162,8 +176,10 @@ public interface ReportService {
 						if (exclude.contains(fn) || fn.startsWith("stat_") || fn.endsWith("_stats") || fn.startsWith("spatial_"))
 							return; // remove from the inner 'row' map
 						JsonNode v = outRow.get(fn);
-						if (outProps.contains(fn)) {
-							row.put(fn, v.asText());
+						OutProp prop = outProps.get(fn);
+						if (prop != null) {
+							// Names may be either the legacy scalar or a [selected, candidates] tuple.
+							row.put(fn, prop.polymorphic ? v : v.asText());
 						} else {
 							out.put(fn, v.asText());
 						}
@@ -172,7 +188,7 @@ public interface ReportService {
 					row.put("res_tags", getObjectMapper().writeValueAsString(out));
 				}
 			} catch (IOException e) {
-				// ignore invalid JSON in 'row'
+				getLogger().warn("Ignoring invalid result JSON for gen_id {}", srcRow.get("gen_id"), e);
 			}
 			return row;
 		}).collect(Collectors.toList());

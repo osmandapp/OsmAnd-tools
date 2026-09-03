@@ -124,13 +124,13 @@ public abstract class ResultActuator implements Consumer<List<SearchResult>> {
 			}
 
 			metrics.put("web_type", firstResult.entityType);
-			setFirst(firstResult);
+			setResult("res", firstResult);
 			if (actualResult == null && closestDuplicate < FOUND_DEDUPLICATE_RADIUS) {
 				SearchResult sr = searchResults.get(dupInd);
 				actualResult = new Result(ResultActuator.ResultType.ByDist, dupInd + 1, sr);
 			}
 			if (actualResult != null) {
-				setActual(actualResult);
+				setResult("actual", actualResult);
 				found = actualResult.place() <= dupCount + firstResult.place();
 			}
 			found |= closestDuplicate < FOUND_DEDUPLICATE_RADIUS; // deduplication also count as found
@@ -158,22 +158,13 @@ public abstract class ResultActuator implements Consumer<List<SearchResult>> {
 
 	public void setFormatter(SpatialResultFormatter formatter) {}
 	
-	public void setFirst(Result res) {
-		metrics.put("res_name", res.getName());
-		metrics.put("res_id", res.entityId);
+	public void setResult(String prefix, Result res) {
+		metrics.put(prefix + "_place", res.toPlaceString());
+		metrics.put(prefix + "_id", res.entityId);
+		metrics.put(prefix + "_name", res.getName());
 		if (res.location != null) {
-			metrics.put("res_dist", ((int) MapUtils.getDistance(targetPoint, res.location) / 10) * 10);
-			metrics.put("res_lat_lon", toString(res.location));
-		}
-	}
-
-	public void setActual(Result res) {
-		metrics.put("actual_place", res.toPlaceString());
-		metrics.put("actual_id", res.entityId);
-		metrics.put("actual_name", res.getName());
-		if (res.location != null) {
-			metrics.put("actual_dist", ((int) MapUtils.getDistance(targetPoint, res.location) / 10) * 10);
-			metrics.put("actual_lat_lon", toString(res.location));
+			metrics.put(prefix + "_dist", ((int) MapUtils.getDistance(targetPoint, res.location) / 10) * 10);
+			metrics.put(prefix + "_lat_lon", toString(res.location));
 		}
 	}
 
