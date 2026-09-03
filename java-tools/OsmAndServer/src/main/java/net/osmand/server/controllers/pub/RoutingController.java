@@ -58,6 +58,8 @@ import net.osmand.util.MapUtils;
 @RequestMapping("/routing")
 public class RoutingController {
 	public static final String MSG_LONG_DIST = "Sorry, in our beta mode max routing distance is limited to ";
+	/** each alternative costs a detailed expansion, and no client asks for more than a couple */
+	private static final int MAX_ALTERNATIVES = 2;
 	protected static final Log LOGGER = LogFactory.getLog(RoutingController.class);
 
 	@Autowired
@@ -290,7 +292,10 @@ public class RoutingController {
 	public ResponseEntity<String> routing(HttpSession session,
 			@RequestParam String[] points, @RequestParam(defaultValue = "car") String routeMode,
 	                                 @RequestParam(required = false) String[] avoidRoads,
-	                                 @RequestParam(defaultValue = "production") String limits) throws IOException {
+	                                 @RequestParam(defaultValue = "production") String limits,
+	                                 @RequestParam(defaultValue = "0") int alternatives) throws IOException {
+		// client controlled, and every alternative costs a detailed expansion on the server
+		final int altCount = Math.min(Math.max(alternatives, 0), MAX_ALTERNATIVES);
 		RouteCalculationProgress progress = this.session.getRoutingProgress(session);
 		final int hhOnlyLimit = osmAndMapsService.getRoutingConfig().hhOnlyLimit;
 		List<LatLon> list = new ArrayList<>();
@@ -316,13 +321,17 @@ public class RoutingController {
 		}
 		List<LatLonEle> resListElevation = new ArrayList<>();
 		List<Feature> features = new ArrayList<>();
+		List<Feature> alternativeFeatures = new ArrayList<>();
 		Map<String, Object> props = new TreeMap<>();
 		if (list.size() >= 2) {
 			try {
+				List<List<RouteSegmentResult>> altRoutes = new ArrayList<>();
 				List<RouteSegmentResult> res =
 						osmAndMapsService.routing(disableOldRouting, routeMode, props, list.get(0),
 								list.get(list.size() - 1), list.subList(1, list.size() - 1),
-								avoidRoads == null ? Collections.emptyList() : Arrays.asList(avoidRoads), progress);
+								avoidRoads == null ? Collections.emptyList() : Arrays.asList(avoidRoads), progress,
+								altCount, altRoutes);
+				alternativeFeatures = routingService.buildAlternativeFeatures(altRoutes);
 				if (res != null) {
 					resListElevation = routingService.getElevationsBySegments(resListElevation, features, res);
 					routingService.interpolateEmptyElevationSegments(resListElevation);
@@ -355,6 +364,8 @@ public class RoutingController {
 				new Feature(Geometry.lineStringElevation(resListElevation));
 		route.properties = props;
 		features.add(0, route);
+		// alternatives go last so that the main route stays the first feature
+		features.addAll(alternativeFeatures);
 
 		if (reportLimitError && dist >= hhOnlyLimit * 1000) {
 			return ResponseEntity.ok(gson.toJson(Map.of("features", new FeatureCollection(features.toArray(new Feature[features.size()])), "msg",
