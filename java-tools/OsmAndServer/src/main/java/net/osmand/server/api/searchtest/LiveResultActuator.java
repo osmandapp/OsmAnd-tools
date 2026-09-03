@@ -138,8 +138,7 @@ public class LiveResultActuator extends ResultActuator {
 			return false;
 		}
 
-		distance = matched.point() == null || actualResult.location() == null ? null
-				: ((int) MapUtils.getDistance(matched.point(), actualResult.location()) / 10) * 10;
+		distance = matched.point() == null ? null : ((int) MapUtils.getDistance(matched.point(), targetPoint) / 10) * 10;
 		resultPlace = matched.place();
 		resultPoint = toString(matched.point);
 
