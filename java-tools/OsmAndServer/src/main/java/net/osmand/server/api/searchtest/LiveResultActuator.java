@@ -120,7 +120,9 @@ public class LiveResultActuator extends ResultActuator {
 		}
 
 		if (matched == null || actualResult == null) {
-			setResult("res", firstResult);
+			if (firstResult != null) {
+				setResult("res", firstResult);
+			}
 			ExpectedResult firstExpected = expectedResults.get(0);
 			setResult("actual", new Result(ResultType.Best, firstExpected.entityId(), 1, firstExpected.result, firstExpected.point, firstExpected.entityType));
 			return false;

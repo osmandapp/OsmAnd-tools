@@ -623,6 +623,7 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 	private SpatialSearchService.SpatialResults searchTestSpatial(ClassicSearchService.SearchContext ctx,
 			ClassicSearchService.SearchOption options, List<BinaryMapIndexReader> readers, boolean printLogs,
 			boolean autocomplete) throws IOException {
+		long startedNs = System.nanoTime();
 		SpatialSearchService.SpatialResults res = null;
 		try {
 			if (readers == null) {
@@ -656,6 +657,10 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 			if (readers != null) {
 				mapsService.unlockReaders(readers);
 			}
+			LOGGER.info("PERF searchTestSpatial query='{}' autocomplete={} obfs={} results={} elapsedMs={}",
+					ctx.text(), autocomplete, res == null ? 0 : res.obfCount(),
+					res == null || res.results() == null || res.results().mainResults == null ? 0 : res.results().mainResults.size(),
+					(System.nanoTime() - startedNs) / 1_000_000);
 		}
 		return res;
 	}
