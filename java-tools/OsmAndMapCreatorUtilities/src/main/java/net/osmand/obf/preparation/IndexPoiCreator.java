@@ -96,6 +96,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private int maxTagGroupId = 0;
 	private Map<Integer, PoiCreatorTagGroup> tagGroupsFromDB;
 
+	// avoid add to name index a low rating wiki objects
+	private static final int MIN_WIKI_ELO = 1300;
+
     // Actual list of brands is constantly regenerated from BrandAnalyzer utlitity
 	private static final String ENV_POI_TOP_INDEXES_URL = "POI_TOP_INDEXES_URL";
 	public static final int DEFAULT_TOP_INDEX_MIN_COUNT = PoiType.DEFAULT_MIN_COUNT; 
@@ -984,7 +987,6 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		PoiAdditionalType streetRuleType = getOrCreate(Amenity.ADDR_STREET, null, true);
 		PoiAdditionalType hnoRuleType = getOrCreate(Amenity.ADDR_HOUSENUMBER, null, true);
 		PoiAdditionalType wikidataType = getOrCreate(Amenity.WIKIDATA, null, true);
-        PoiAdditionalType travelElo = settings.wikiQrankFilter ? getOrCreate(Amenity.TRAVEL_ELO, null, true) : null;
 		Set<String> duplicateWikiWids = new HashSet<String>();
 
 		while (rs.next()) {
@@ -1169,7 +1171,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 					}
 				}
 
-                if (settings.wikiQrankFilter && additionalTags.get(travelElo) == null) {
+                if (settings.wikiQrankFilter && rawRating < MIN_WIKI_ELO) {
                     continue;
                 }
 
