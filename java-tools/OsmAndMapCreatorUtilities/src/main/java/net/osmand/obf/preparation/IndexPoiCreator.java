@@ -97,7 +97,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private Map<Integer, PoiCreatorTagGroup> tagGroupsFromDB;
 
     // avoid add to name index a low rating wiki objects
-    private static final int MIN_WIKI_QRANK = 1000;
+    private static final int MIN_WIKI_QRANK = 1400;
 
 	// Actual list of brands is constantly regenerated from BrandAnalyzer utlitity
 	private static final String ENV_POI_TOP_INDEXES_URL = "POI_TOP_INDEXES_URL";
