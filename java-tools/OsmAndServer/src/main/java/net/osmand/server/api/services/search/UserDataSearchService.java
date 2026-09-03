@@ -65,6 +65,9 @@ public class UserDataSearchService {
 	}
 
 	private record FileVersion(String name, long updatetimems, boolean shared) {
+		String key() {
+			return sharedFileKey(name, shared);
+		}
 	}
 
 	private static class NamesIndex {
@@ -97,7 +100,11 @@ public class UserDataSearchService {
 	}
 
 	public void removeSharedFavorites(String fileName, CloudUserDevice dev) {
-		getUserIndex(dev).sharedFavoritesByFile.remove(fileName);
+		getUserIndex(dev).sharedFavoritesByFile.remove(sharedFileKey(fileName, true));
+	}
+
+	private static String sharedFileKey(String fileName, boolean shared) {
+		return shared ? "shared:" + fileName : fileName;
 	}
 
 	public SearchResult search(String query, List<OpenedTrack> openedTracks, CloudUserDevice dev) {
@@ -180,11 +187,11 @@ public class UserDataSearchService {
 
 	// Keeps only listed files, re-reads a file when it is new or its updatetime changed
 	private void syncFiles(Map<String, NamesIndex> byFile, List<FileVersion> files, CloudUserDevice dev, String type) {
-		byFile.keySet().retainAll(files.stream().map(FileVersion::name).toList());
+		byFile.keySet().retainAll(files.stream().map(FileVersion::key).toList());
 		for (FileVersion file : files) {
-			NamesIndex current = byFile.get(file.name());
+			NamesIndex current = byFile.get(file.key());
 			if (current == null || current.updatetimems != file.updatetimems()) {
-				byFile.put(file.name(), buildPointsIndex(file, loadGpx(file.name(), file.shared(), type, dev)));
+				byFile.put(file.key(), buildPointsIndex(file, loadGpx(file.name(), file.shared(), type, dev)));
 			}
 		}
 	}
