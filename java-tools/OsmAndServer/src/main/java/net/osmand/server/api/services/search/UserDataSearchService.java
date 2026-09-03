@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -137,7 +138,7 @@ public class UserDataSearchService {
 	// Any file change (upload, rename, delete, sync) adds a row with a new updatetime, so max(updatetime) is the index version
 	private void refreshIndex(UserIndex index, CloudUserDevice dev) {
 		Date tracksVersion = filesRepository.maxUpdatetime(dev.userid, FILE_TYPE_GPX);
-		if (tracksVersion != null && !tracksVersion.equals(index.tracksVersion)) {
+		if (!Objects.equals(tracksVersion, index.tracksVersion)) {
 			NamesIndex tracks = new NamesIndex();
 			Map<String, Long> trackVersions = new HashMap<>();
 			for (UserFileNoData file : listFiles(dev, FILE_TYPE_GPX)) {
@@ -151,7 +152,7 @@ public class UserDataSearchService {
 			index.tracksVersion = tracksVersion;
 		}
 		Date favoritesVersion = filesRepository.maxUpdatetime(dev.userid, FILE_TYPE_FAVOURITES);
-		if (favoritesVersion != null && !favoritesVersion.equals(index.favoritesVersion)
+		if (!Objects.equals(favoritesVersion, index.favoritesVersion)
 				&& syncFiles(index.favoritesByFile, fileVersions(listFiles(dev, FILE_TYPE_FAVOURITES), false), dev, FILE_TYPE_FAVOURITES)) {
 			index.favoritesVersion = favoritesVersion;
 		}
