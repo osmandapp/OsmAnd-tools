@@ -118,7 +118,8 @@ public class UserDataSearchService {
 			indexes.forEach(index -> collectMatches(index, tokens, matches));
 		}
 		return matches.stream()
-				.sorted(Comparator.comparingInt(Match::matchedTokens).reversed())
+				.sorted(Comparator.comparingInt(Match::matchedTokens).reversed()
+						.thenComparing(match -> match.item().name()))
 				.limit(RESULTS_LIMIT).map(Match::item).toList();
 	}
 
@@ -212,7 +213,7 @@ public class UserDataSearchService {
 		return index;
 	}
 
-	// Count query tokens matched by prefix in item name tokens; ties keep index order (stable sort)
+	// Count query tokens matched by prefix in item name tokens
 	private void collectMatches(NamesIndex index, List<String> tokens, List<Match> matches) {
 		int[] matchedTokens = new int[index.items.size()];
 		for (String token : tokens) {
