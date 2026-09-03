@@ -57,24 +57,15 @@ public class LiveResultActuator extends ResultActuator {
 
 	@Override
 	protected Result findActualResult(List<SearchResult> searchResults) {
-        for (SearchResult actual : searchResults) {
-            String actualResultText = formatter.format(actual.spatialResult);
-            if (actualResultText != null && actualResultText.indexOf('[') != -1) {
-                actualResultText = actualResultText.substring(0, actualResultText.indexOf('[')).trim();
-            }
-            if (actualResults.size() < expectedResults.size()) {
-                actualResults.add(actualResultText);
-            }
-        }
+		for (SearchResult actual : searchResults) {
+			actualResults.add(formatName(actual));
+		}
 		
 		for (int actualIndex = 0; actualIndex < searchResults.size(); actualIndex++) {
 			SearchResult actual = searchResults.get(actualIndex);
 			
 			long actualId = osmId(actual);
-			String actualResultText = formatter.format(actual.spatialResult);
-			if (actualResultText != null && actualResultText.indexOf('[') != -1) {
-				actualResultText = actualResultText.substring(0, actualResultText.indexOf('[')).trim();
-			}
+			String actualResultText = actualResults.get(actualIndex);
 			
 			for (ExpectedResult expected : expectedResults) {
 				if (expected.point() == null || actual.location == null
@@ -104,6 +95,12 @@ public class LiveResultActuator extends ResultActuator {
 			}
 		}
 		return null;
+	}
+
+	private String formatName(SearchResult result) {
+		String name = formatter != null && result.spatialResult != null
+				? formatter.format(result.spatialResult) : result.toString();
+		return name != null && name.indexOf('[') != -1 ? name.substring(0, name.indexOf('[')).trim() : name;
 	}
 
 	@Override
@@ -145,8 +142,9 @@ public class LiveResultActuator extends ResultActuator {
 		
 		String name = res.getName();
 		if (name != null) {
-			List<String> results = "res".equals(prefix) ? actualResults :
-					expectedResults.stream().map(ExpectedResult::getName).toList();
+			List<String> results = "res".equals(prefix)
+					? actualResults.subList(0, Math.min(actualResults.size(), Math.max(expectedResults.size(), res.place())))
+					: expectedResults.stream().map(ExpectedResult::getName).toList();
 			metrics.put(prefix + "_name", new Object[] {name, String.join("\n", results)});
 		}
 	}
