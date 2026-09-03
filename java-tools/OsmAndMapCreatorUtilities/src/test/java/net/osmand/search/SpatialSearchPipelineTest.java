@@ -626,14 +626,14 @@ public class SpatialSearchPipelineTest {
 			for (int i = 0; i < expectedResults.size(); i++) {
 				String expected = expectedResults.get(i);
 				String actual = i >= actualResults.size() ? null : actualResults.get(i);
-				if (!translation) {
-					if (expected.indexOf('[') != -1) {
-						expected = expected.substring(0, expected.indexOf('[') + shift).trim();
-					}
-					if (actual != null && actual.indexOf('[') != -1) {
-						actual = actual.substring(0, actual.indexOf('[') + shift).trim();
-					}
+
+				if (expected.indexOf('[') != -1) {
+					expected = expected.substring(0, expected.indexOf('[') + shift).trim();
 				}
+				if (actual != null && actual.indexOf('[') != -1) {
+					actual = actual.substring(0, actual.indexOf('[') + shift).trim();
+				}
+
 				// String present = result.toString();
 				expected = expected.replaceFirst("^@", "");
 				String present = actual == null ? ("#MISSING " + (i + 1)) : actual;
