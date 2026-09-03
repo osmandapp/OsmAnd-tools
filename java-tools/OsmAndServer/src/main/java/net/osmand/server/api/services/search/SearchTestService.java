@@ -284,10 +284,6 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 			throw new RuntimeException(String.format("TestCase %s is not in GENERATED state (%s)", caseId,
 					test.status));
 		}
-		if (test.getNorthWest() == null || test.getSouthEast() == null) {
-			calculateAndSaveTestCaseBbox(test);
-		}
-
 		Run run = new Run();
 		run.status = Run.Status.RUNNING;
 		run.caseId = caseId;
@@ -331,57 +327,16 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 		return CompletableFuture.completedFuture(finalRun);
 	}
 
-	private void calculateAndSaveTestCaseBbox(TestCase test) {
-		Map<String, Object> bbox = jdbcTemplate.queryForMap(
-				"SELECT MAX(lat) AS north, MIN(lat) AS south, MIN(lon) AS west, MAX(lon) AS east " +
-						"FROM gen_result WHERE case_id = ? AND lat IS NOT NULL AND lon IS NOT NULL",
-				test.id);
-		Double north = toDouble(bbox.get("north"));
-		Double south = toDouble(bbox.get("south"));
-		Double west = toDouble(bbox.get("west"));
-		Double east = toDouble(bbox.get("east"));
-		if (north == null || south == null || west == null || east == null) {
-			LOGGER.info("TestCase {} has no generated points to calculate bbox.", test.id);
-			return;
-		}
-		test.setNorthWest(String.format(Locale.US, "%.5f, %.5f", north, west));
-		test.setSouthEast(String.format(Locale.US, "%.5f, %.5f", south, east));
-		testCaseRepo.save(test);
-	}
-
-	private Double toDouble(Object value) {
-		if (value instanceof Number number) {
-			return number.doubleValue();
-		}
-		return null;
-	}
-
 	private static final int CHUNK_SIZE = 100;
-
-	private record RunReaderContext(List<List<BinaryMapIndexReader>> readerPool) {
-		List<BinaryMapIndexReader> readersForWorker(int workerIndex) {
-			if (readerPool == null || readerPool.isEmpty()) {
-				return null;
-			}
-			return readerPool.get(workerIndex % readerPool.size());
-		}
-
-		int openMapsCount() {
-			return readerPool == null || readerPool.isEmpty() ? 0 : readerPool.get(0).size();
-		}
-	}
 
 	private void doMainRun(TestCase test, Run run, int threadsCount, ClassicSearchService.SearchOption options) {
 		long startedNs = System.nanoTime();
 		List<CompletableFuture<Void>> runTasks = new ArrayList<>();
 		AtomicReference<Run.Status> statusRef = runStatusFlags.computeIfAbsent(run.id, id ->
 				new AtomicReference<>(Run.Status.RUNNING));
+		AtomicInteger maxMapsCount = new AtomicInteger();
 		final int maxParallel = threadsCount > 0 ? threadsCount : 1;
-		RunReaderContext spatialContext = null;
-
 		try {
-			spatialContext = createContext(test, maxParallel, options);
-			run.mapsCount = spatialContext == null ? 0 : spatialContext.openMapsCount();
 			if (maxParallel > 1) {
 				String sql = "SELECT count(*) FROM gen_result WHERE case_id = ? ORDER BY id";
 				final long count;
@@ -401,23 +356,19 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 				final int chunkSize = Math.min((int) (count / maxParallel) + 1, CHUNK_SIZE);
 				final AtomicInteger nextOffset = new AtomicInteger(0);
 				for (int workerIndex = 0; workerIndex < maxParallel; workerIndex++) {
-					final List<BinaryMapIndexReader> spatialReaders =
-							spatialContext == null ? null : spatialContext.readersForWorker(workerIndex);
 					runTasks.add(CompletableFuture.runAsync(() -> {
 						while (statusRef.get() == Run.Status.RUNNING) {
 							int currentOffset = nextOffset.getAndAdd(chunkSize);
 							if (currentOffset >= count) {
 								break;
 							}
-							runChunk(run, chunkSize, currentOffset, statusRef, options, spatialReaders);
+							runChunk(run, chunkSize, currentOffset, statusRef, options, maxMapsCount);
 						}
 					}, EXECUTOR));
 				}
 			} else {
-				final List<BinaryMapIndexReader> spatialReaders =
-						spatialContext == null ? null : spatialContext.readersForWorker(0);
 				runTasks.add(CompletableFuture.runAsync(() ->
-						runChunk(run, -1, 0, statusRef, options, spatialReaders), EXECUTOR));
+						runChunk(run, -1, 0, statusRef, options, maxMapsCount), EXECUTOR));
 			}
 
 			CompletableFuture.allOf(runTasks.toArray(new CompletableFuture[0])).join();
@@ -437,7 +388,7 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 			run.setError(ex.getMessage());
 			run.status = Run.Status.FAILED;
 		} finally {
-			closeContext(spatialContext);
+			run.mapsCount = maxMapsCount.get();
 			run.finish = LocalDateTime.now();
 
 			runRepo.save(run);
@@ -453,7 +404,7 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 	}
 
 	private void runChunk(Run run, int limit, int offset, AtomicReference<Run.Status> statusRef,
-	                      ClassicSearchService.SearchOption options, List<BinaryMapIndexReader> spatialReaders) {
+	                      ClassicSearchService.SearchOption options, AtomicInteger maxMapsCount) {
 		String sql = "SELECT id, lat, lon, row, query, gen_count FROM gen_result WHERE case_id = ? ORDER BY id";
 		if (run.rerunId != null) {
 			// Re-run uses items from a previous run's results by joining gen_result with run_result
@@ -544,7 +495,8 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 								query, run.locale, false, bbox[0], bbox[1]);
 						if (isSpatial) {
 							SpatialSearchService.SpatialResults spatialResult = searchTestSpatial(ctx, options,
-									spatialReaders, false, !isLive && !options.queryIsCompleted());
+									null, false, !isLive && !options.queryIsCompleted());
+							maxMapsCount.accumulateAndGet(spatialResult.obfCount(), Math::max);
 							searchResult = fromSpatialResults(spatialResult, statMetrics, run.locale);
 							actuator.setFormatter(spatialResult.formatter());
 
@@ -570,46 +522,6 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 			LOGGER.error("Evaluation batch failed for run {} at offset {}", run.id, offset, e);
 			run.setError(e.getMessage());
 			run.status = Run.Status.FAILED;
-		}
-	}
-
-	private RunReaderContext createContext(TestCase test, int maxParallel, ClassicSearchService.SearchOption options) throws IOException {
-		if (test.getNorthWest() == null || test.getSouthEast() == null) {
-			LOGGER.info("Test-case {} has no bbox; falling back to per-query map readers.", test.id);
-			return null;
-		}
-		List<OsmAndMapsService.BinaryMapIndexReaderReference> maps =
-				mapReadersService.getMapRefs(test.getNorthWest(), test.getSouthEast(), options.getRadius(), false);
-		if (maps.isEmpty()) {
-			LOGGER.info("Test-case {} bbox returned no maps; falling back to per-query map readers.", test.id);
-			return null;
-		}
-		List<List<BinaryMapIndexReader>> readerPool = new ArrayList<>();
-		try {
-			for (int i = 0; i < maxParallel; i++) {
-				List<BinaryMapIndexReader> readers = mapReadersService.openReaders(maps);
-				if (!readers.isEmpty()) {
-					readerPool.add(readers);
-				}
-			}
-		} catch (IOException | RuntimeException e) {
-			closeContext(new RunReaderContext(readerPool));
-			throw e;
-		}
-		if (readerPool.isEmpty()) {
-			LOGGER.info("Test-case {} opened no readers; falling back to per-query map readers.", test.id);
-			return null;
-		}
-		LOGGER.info("Test-case {} opened {} reader sets from {} map refs.", test.id, readerPool.size(), maps.size());
-		return new RunReaderContext(readerPool);
-	}
-
-	private void closeContext(RunReaderContext spatialContext) {
-		if (spatialContext == null || spatialContext.readerPool() == null) {
-			return;
-		}
-		for (List<BinaryMapIndexReader> readers : spatialContext.readerPool()) {
-			mapReadersService.closeReaders(readers);
 		}
 	}
 
