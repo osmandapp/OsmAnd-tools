@@ -97,7 +97,7 @@ def process_polygons(tags, filename):
 		elif tag == "place" :
 			array.append("place")
 			queryFields += ", \"place\""
-			conditions += " or \"place\" in ('state', 'county')"
+			conditions += " or \"place\" in ('state', 'province')"
 		else :
 			array.append(tag)
 			queryFields += ", " + tag
@@ -192,4 +192,4 @@ if __name__ == "__main__":
 		#-1175256, -1751158 causing troubles 
 		process_polygons(['admin_level_2'], 'polygon_admin_level_2.osm') 
 		process_polygons(['admin_level_4'], 'polygon_admin_level_4.osm')
-		process_polygons(['place'], 'polygon_place_state_and_county.osm')
+		process_polygons(['place'], 'polygon_place_state_and_province.osm')
