@@ -56,7 +56,8 @@ public class UserDataSearchService {
 	private final Cache<Integer, UserIndex> indexByUser = CacheBuilder.newBuilder()
 			.expireAfterAccess(24, TimeUnit.HOURS).build();
 
-	public record UserDataItem(String file, boolean shared, String name) {
+	// lat/lon are set for points (favorites, wpts) and null for tracks
+	public record UserDataItem(String file, boolean shared, String name, Double lat, Double lon) {
 	}
 
 	public record OpenedTrack(String file, boolean shared) {
@@ -143,7 +144,7 @@ public class UserDataSearchService {
 			Map<String, Long> trackVersions = new HashMap<>();
 			for (UserFileNoData file : listFiles(dev, FILE_TYPE_GPX)) {
 				if (file.name.toLowerCase().endsWith(GPX_FILE_EXT)) {
-					tracks.add(new UserDataItem(file.name, false, trackDisplayName(file.name)));
+					tracks.add(new UserDataItem(file.name, false, trackDisplayName(file.name), null, null));
 					trackVersions.put(file.name, file.updatetimems);
 				}
 			}
@@ -221,7 +222,7 @@ public class UserDataSearchService {
 		index.updatetimems = file.updatetimems();
 		for (WptPt point : gpxFile.getPointsList()) {
 			if (point.getName() != null && !point.getName().isEmpty()) {
-				index.add(new UserDataItem(file.name(), file.shared(), point.getName()));
+				index.add(new UserDataItem(file.name(), file.shared(), point.getName(), point.getLat(), point.getLon()));
 			}
 		}
 		return index;
