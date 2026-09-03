@@ -635,15 +635,15 @@ public class SpatialSearchPipelineTest {
 					}
 				}
 				// String present = result.toString();
-				expected = expected.replaceFirst("^@", "");
-				String present = actual == null ? ("#MISSING " + (i + 1)) : actual;
+				expected = cutPoiTypeId(expected.replaceFirst("^@", ""));
+				String present = actual == null ? ("#MISSING " + (i + 1)) : cutPoiTypeId(actual);
 				if (!Algorithms.stringsEqual(expected, present)) {
 					engine.search(text, true);
 					System.out.printf("Phrase #%s: %s%n", k + 1, text);
 					System.out.printf("Mismatch #%s for '%s' != '%s'. %n", i + 1, expected, present);
 					System.out.println("CURRENT RESULTS: ");
 					for (String r : actualResults) {
-						System.out.printf("\t\t\t\"%s\",%n", r);
+						System.out.printf("\t\t\t\"%s\",%n", cutPoiTypeId(r));
 					}
 					System.out.println("EXPECTED : ");
 					for (String r : expectedResults) {
@@ -666,6 +666,15 @@ public class SpatialSearchPipelineTest {
 				reader.close();
 			}
         }
+	}
+
+	/**
+	 * POI type id is a sequential poi_types.xml index, it shifts whenever a type is added or removed,
+	 * so POI_TYPE results are compared only up to 'id='.
+	 */
+	private static String cutPoiTypeId(String result) {
+		int ind = result != null && result.contains("POI_TYPE") ? result.indexOf(" id=") : -1;
+		return ind == -1 ? result : result.substring(0, ind);
 	}
 
 	private File getOsmAndRegions() {
