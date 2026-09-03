@@ -8,6 +8,7 @@ import net.osmand.data.Building;
 import net.osmand.data.City;
 import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
+import net.osmand.data.QuadRect;
 import net.osmand.data.Street;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.server.api.services.OsmAndMapsService;
@@ -424,6 +425,7 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 			if (rows.isEmpty())
 				return;
 
+			boolean isSpatial = Boolean.TRUE.equals(run.spatial);
 			LatLon srcPoint = null;
 			String[] srcBbox = null;
 			if (run.lat != null && run.lon != null)
@@ -431,7 +433,8 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 			else if (run.average != null && run.average)
 				srcPoint = getAveragePoint(rows);
 			if (srcPoint != null) {
-				srcBbox = run.getNorthWest() != null && run.getSouthEast() != null ?
+				srcBbox = isSpatial ? spatialBbox(srcPoint, options.getRadius())
+						: run.getNorthWest() != null && run.getSouthEast() != null ?
 						new String[]{run.getNorthWest(), run.getSouthEast()} : new String[]{
 						String.format(Locale.US, "%.5f, %.5f", srcPoint.getLatitude() + options.getRadius(),
 								srcPoint.getLongitude() - options.getRadius()),
@@ -463,7 +466,7 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 							Math.random() * 360.0); // [0, 360]
 				}
 				LatLon searchPoint = srcPoint != null ? srcPoint : targetPoint;
-				String[] bbox = srcBbox != null ? srcBbox : new String[]{
+				String[] bbox = srcBbox != null ? srcBbox : isSpatial ? spatialBbox(searchPoint, options.getRadius()) : new String[]{
 						String.format(Locale.US, "%f, %f", searchPoint.getLatitude() + options.getRadius(),
 								searchPoint.getLongitude() - options.getRadius()),
 						String.format(Locale.US, "%f, %f", searchPoint.getLatitude() - options.getRadius(),
@@ -472,7 +475,6 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 				final ResultActuator actuator;
 				Map<String, Object> statMetrics = new LinkedHashMap<>();
 				boolean isLive = Dataset.Source.UnitTest.equals(run.dataset.type);
-				boolean isSpatial = Boolean.TRUE.equals(run.spatial);
 				if (isLive) {
 					List<Map<String, Object>> objRows = getObjectMapper().readValue(rowJson, List.class);
 					actuator = new LiveResultActuator(targetPoint, statMetrics, objRows);
@@ -523,6 +525,14 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 			run.setError(e.getMessage());
 			run.status = Run.Status.FAILED;
 		}
+	}
+
+	static String[] spatialBbox(LatLon center, double radiusKm) {
+		QuadRect bbox = MapUtils.calculateLatLonBbox(center.getLatitude(), center.getLongitude(),
+				Math.toIntExact(Math.round(radiusKm * 1000)));
+		return new String[]{
+				String.format(Locale.US, "%.5f, %.5f", bbox.top, bbox.left),
+				String.format(Locale.US, "%.5f, %.5f", bbox.bottom, bbox.right)};
 	}
 
 	private static final int TEST_CACHE_PREFIX_LIMIT = 1_000; // 8_000 too much
