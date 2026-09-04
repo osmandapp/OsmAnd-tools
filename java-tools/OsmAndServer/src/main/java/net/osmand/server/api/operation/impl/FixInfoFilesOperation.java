@@ -14,10 +14,16 @@ import net.osmand.server.api.services.StorageService;
 import net.osmand.server.api.services.UserdataService;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Set;
 
 /**
- * Backfills required tags (type/file/subtype) into GPX *.info files that only contain "pointsGroups".
+ * Repairs the required tags (type/file/subtype) of GPX *.info files.
+ * <p>
+ * "file" is the track path on the device, so it must be "/tracks/" + the cloud name of the gpx,
+ * folder included. Two cases are fixed: the tags are missing altogether (old web uploads that
+ * contained only "pointsGroups"), and "file" points at a wrong path - web used to build it from the
+ * track title, dropping the folder and the extension, so Android could not match the item.
  */
 @Component
 @AdminOperation(name = "fix-info-files")
@@ -26,7 +32,6 @@ public class FixInfoFilesOperation extends AbstractFileFixOperation {
 	private static final ObjectMapper MAPPER = new ObjectMapper();
 	private static final String INFO_EXT = ".info";
 	private static final String GPX_INFO_EXT = ".gpx.info";
-	private static final String POINTS_GROUPS = "pointsGroups";
 	private static final String KEY_TYPE = "type";
 	private static final String KEY_FILE = "file";
 	private static final String KEY_SUBTYPE = "subtype";
@@ -56,23 +61,27 @@ public class FixInfoFilesOperation extends AbstractFileFixOperation {
 			return false;
 		}
 		ObjectNode obj = (ObjectNode) node;
-		if (!(obj.size() == 1 && obj.has(POINTS_GROUPS))) {
-			return false; // already has the tags or is not the broken shape
+		String expectedFile = TRACKS_PREFIX + trackName(file.name);
+		boolean noFile = !obj.hasNonNull(KEY_FILE);
+		boolean wrongFile = !noFile && !expectedFile.equals(obj.get(KEY_FILE).asText());
+		if (!noFile && !wrongFile) {
+			return false;
 		}
+		ObjectNode rest = obj.deepCopy();
+		rest.remove(List.of(KEY_TYPE, KEY_FILE, KEY_SUBTYPE));
 		ObjectNode out = MAPPER.createObjectNode();
 		out.put(KEY_TYPE, TYPE_GPX);
-		out.put(KEY_FILE, TRACKS_PREFIX + baseName(file.name));
+		out.put(KEY_FILE, expectedFile);
 		out.put(KEY_SUBTYPE, SUBTYPE_GPX);
-		out.setAll(obj);
+		out.setAll(rest);
 		if (!isTest(params)) {
 			save(file, MAPPER.writeValueAsBytes(out));
 		}
 		return true;
 	}
 
-	static String baseName(String name) {
-		String n = name.endsWith(INFO_EXT) ? name.substring(0, name.length() - INFO_EXT.length()) : name;
-		int slash = n.lastIndexOf('/');
-		return slash >= 0 ? n.substring(slash + 1) : n;
+	// cloud name of the gpx the info file belongs to, folder included: "Folder/Track.gpx.info" -> "Folder/Track.gpx"
+	static String trackName(String name) {
+		return name.endsWith(INFO_EXT) ? name.substring(0, name.length() - INFO_EXT.length()) : name;
 	}
 }
