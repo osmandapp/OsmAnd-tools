@@ -41,7 +41,7 @@ public abstract class ResultActuator implements Consumer<List<SearchResult>> {
 		public String getName() {
 			if (name == null)
 				return null;
-			return name.indexOf('[') != -1 ? name.substring(0, name.indexOf('[')).trim() : name;
+			return formatName(name);
 		}
 	}
 
@@ -222,5 +222,13 @@ public abstract class ResultActuator implements Consumer<List<SearchResult>> {
 			return "W";
 		} 
 		return "R";
+	}
+
+	public static String formatName(String name) {
+		if (name == null) {
+			return null;
+		}
+		int detailsIndex = name.indexOf('[');
+		return (detailsIndex == -1 ? name : name.substring(0, detailsIndex)).replaceAll("\\s*\\([^)]*\\)", "").trim();
 	}
 }

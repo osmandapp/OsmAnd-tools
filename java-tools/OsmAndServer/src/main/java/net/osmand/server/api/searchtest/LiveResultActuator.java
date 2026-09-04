@@ -19,9 +19,7 @@ public class LiveResultActuator extends ResultActuator {
 			return entityType + osmId;
 		}
 		public String getName() {
-			if (result == null)
-				return null;
-			return result.indexOf('[') != -1 ? result.substring(0, result.indexOf('[')).trim() : result;
+			return formatName(result);
 		}
 	}
 
@@ -61,7 +59,10 @@ public class LiveResultActuator extends ResultActuator {
 		actualResults.clear();
 		matched = null;
 		for (SearchResult actual : searchResults) {
-			actualResults.add(formatName(actual));
+			String name = formatter != null && actual.spatialResult != null
+					? formatter.format(actual.spatialResult) : actual.toString();
+
+			actualResults.add(formatName(name));
 		}
 		
 		for (int actualIndex = 0; actualIndex < searchResults.size(); actualIndex++) {
@@ -79,10 +80,7 @@ public class LiveResultActuator extends ResultActuator {
 				if (expected.osmId() != -1 && expected.osmId() == actualId) {
 					matchType = ResultType.ById;
 				} else if (expected.osmId() == -1 && actualId == -1 && formatter != null && actual.spatialResult != null) {
-					String expectedResult = expected.result();
-					if (expectedResult.indexOf('[') != -1) {
-						expectedResult = expectedResult.substring(0, expectedResult.indexOf('[')).trim();
-					}
+					String expectedResult = formatName(expected.result());
 					if (Objects.equals(expectedResult, actualResultText)) {
 						matchType = ResultType.ByName;
 					}
@@ -107,12 +105,6 @@ public class LiveResultActuator extends ResultActuator {
 		if (actualResults.size() > size) {
 			actualResults.subList(size, actualResults.size()).clear();
 		}
-	}
-
-	private String formatName(SearchResult result) {
-		String name = formatter != null && result.spatialResult != null
-				? formatter.format(result.spatialResult) : result.toString();
-		return name != null && name.indexOf('[') != -1 ? name.substring(0, name.indexOf('[')).trim() : name;
 	}
 
 	@Override
