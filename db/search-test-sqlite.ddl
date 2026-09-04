@@ -13,9 +13,7 @@ create table dataset
     test_row      TEXT,
     total         integer,
     type          varchar(255) not null,
-    updated       timestamp    not null,
-    check (source_status in ('UNKNOWN', 'OK', 'ERROR')),
-    check (type in ('CSV', 'Overpass'))
+    updated       timestamp    not null
 );
 
 create table domain
@@ -36,6 +34,7 @@ create table gen_result
     lat        float     not null,
     lon        float     not null,
     query      TEXT,
+    unit_test  TEXT,
     row        clob,
     timestamp  timestamp not null
 );
