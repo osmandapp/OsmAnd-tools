@@ -10,6 +10,7 @@ import net.osmand.server.api.services.GpxService;
 import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.api.services.UserdataService;
 import net.osmand.server.api.services.ShareFileService;
+import net.osmand.server.api.services.search.UserDataSearchService;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.shared.gpx.GpxFile;
@@ -31,6 +32,7 @@ import java.util.UUID;
 
 import static net.osmand.server.api.services.ShareFileService.PRIVATE_SHARE_TYPE;
 import static net.osmand.server.api.services.UserdataService.FILE_NOT_FOUND;
+import static net.osmand.server.api.services.UserdataService.FILE_TYPE_FAVOURITES;
 import static net.osmand.server.api.services.UserdataService.FILE_WAS_DELETED;
 
 
@@ -43,6 +45,9 @@ public class ShareFileController {
 
 	@Autowired
 	ShareFileService shareFileService;
+
+	@Autowired
+	UserDataSearchService userDataSearchService;
 
 	@Autowired
 	protected OsmAndMapsService osmAndMapsService;
@@ -278,6 +283,9 @@ public class ShareFileController {
 			return userdataService.tokenNotValidResponse();
 		}
 		UserdataController.UserFilesResults files = shareFileService.getSharedWithMe(dev.userid, type);
+		if (FILE_TYPE_FAVOURITES.equals(type)) {
+			userDataSearchService.updateSharedFavorites(files.uniqueFiles, dev);
+		}
 		return ResponseEntity.ok(gson.toJson(files));
 	}
 
@@ -291,6 +299,9 @@ public class ShareFileController {
 		boolean removed = shareFileService.removeSharedWithMeFile(name, type, dev);
 		if (!removed) {
 			return ResponseEntity.badRequest().body("Error removing file");
+		}
+		if (FILE_TYPE_FAVOURITES.equals(type)) {
+			userDataSearchService.removeSharedFavorites(name, dev);
 		}
 		return ResponseEntity.ok("File removed");
 	}

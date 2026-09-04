@@ -142,6 +142,9 @@ public interface CloudUserFilesRepository extends JpaRepository<UserFile, Long> 
 	List<UserFileNoData> listFilesByUserid(@Param(value = "userid") int userid,
 			@Param(value = "name") String name, @Param(value = "type") String type);
 
+	@Query("select max(u.updatetime) from UserFile u where u.userid = :userid and u.type = :type")
+	Date maxUpdatetime(@Param("userid") int userid, @Param("type") String type);
+
 	@Query("select new net.osmand.server.api.repo.CloudUserFilesRepository$UserFileNoData("
 			+ " u.id, u.userid, u.deviceid, u.type, u.name, u.updatetime, u.clienttime, u.filesize, u.zipfilesize, u.storage, u.details, u.storagename ) "
 			+ " from UserFile u "
