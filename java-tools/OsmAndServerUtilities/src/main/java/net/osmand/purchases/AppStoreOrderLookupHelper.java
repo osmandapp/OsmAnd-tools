@@ -29,11 +29,11 @@ import java.util.List;
  * the transactions behind it, so support can find (or register) the purchase by what the user has.
  * <p>
  * Configuration (App Store Connect -> Users and Access -> Integrations -> In-App Purchase key):
- * <ul>
- * <li>IOS_STORE_API_KEY - base64 body of the .p8 key (PKCS#8, without the BEGIN/END lines)</li>
- * <li>IOS_STORE_API_KEY_ID - key id of that key</li>
- * <li>IOS_STORE_API_ISSUER_ID - issuer id shown above the key list</li>
- * </ul>
+ * only the private key goes to the server environment as IOS_STORE_API_KEY (base64 body of the .p8
+ * file, a full PEM is accepted too). The key id and the issuer id are not secrets and are kept in
+ * {@link #KEY_ID} / {@link #ISSUER_ID} below, so that nothing but the key has to be configured;
+ * IOS_STORE_API_KEY_ID and IOS_STORE_API_ISSUER_ID override them without a redeploy.
+ * <p>
  * The lookup endpoint is not available in the sandbox environment, production orders only.
  */
 public class AppStoreOrderLookupHelper {
@@ -47,6 +47,11 @@ public class AppStoreOrderLookupHelper {
 	public static final String ENV_KEY = "IOS_STORE_API_KEY";
 	public static final String ENV_KEY_ID = "IOS_STORE_API_KEY_ID";
 	public static final String ENV_ISSUER_ID = "IOS_STORE_API_ISSUER_ID";
+
+	// Identifiers of the In-App Purchase key: public values, useless without the private key itself.
+	// TODO fill in once the key is generated in App Store Connect (or set the env vars above instead)
+	private static final String KEY_ID = "";
+	private static final String ISSUER_ID = "";
 
 	private static final String AUDIENCE = "appstoreconnect-v1";
 	// Apple rejects tokens valid for more than 60 minutes
@@ -83,8 +88,20 @@ public class AppStoreOrderLookupHelper {
 	}
 
 	public boolean isConfigured() {
-		return !isEmpty(System.getenv(ENV_KEY)) && !isEmpty(System.getenv(ENV_KEY_ID))
-				&& !isEmpty(System.getenv(ENV_ISSUER_ID));
+		return !isEmpty(System.getenv(ENV_KEY)) && !isEmpty(keyId()) && !isEmpty(issuerId());
+	}
+
+	private static String keyId() {
+		return envOrDefault(ENV_KEY_ID, KEY_ID);
+	}
+
+	private static String issuerId() {
+		return envOrDefault(ENV_ISSUER_ID, ISSUER_ID);
+	}
+
+	private static String envOrDefault(String env, String defaultValue) {
+		String value = System.getenv(env);
+		return isEmpty(value) ? defaultValue : value;
 	}
 
 	/**
@@ -97,8 +114,7 @@ public class AppStoreOrderLookupHelper {
 			throw new IllegalArgumentException("Order id is empty");
 		}
 		if (!isConfigured()) {
-			throw new IllegalStateException(String.format("App Store Server API is not configured (%s, %s, %s)",
-					ENV_KEY, ENV_KEY_ID, ENV_ISSUER_ID));
+			throw new IllegalStateException("App Store Server API is not configured (" + ENV_KEY + ")");
 		}
 		String token;
 		try {
@@ -166,17 +182,15 @@ public class AppStoreOrderLookupHelper {
 	}
 
 	private String generateToken() throws Exception {
-		String keyId = System.getenv(ENV_KEY_ID);
-		String issuerId = System.getenv(ENV_ISSUER_ID);
 		long now = System.currentTimeMillis() / 1000L;
 
 		JsonObject header = new JsonObject();
 		header.addProperty("alg", "ES256");
-		header.addProperty("kid", keyId);
+		header.addProperty("kid", keyId());
 		header.addProperty("typ", "JWT");
 
 		JsonObject payload = new JsonObject();
-		payload.addProperty("iss", issuerId);
+		payload.addProperty("iss", issuerId());
 		payload.addProperty("iat", now);
 		payload.addProperty("exp", now + TOKEN_LIFETIME_SEC);
 		payload.addProperty("aud", AUDIENCE);
