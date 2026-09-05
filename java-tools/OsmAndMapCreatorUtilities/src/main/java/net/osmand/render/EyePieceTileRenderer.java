@@ -18,6 +18,7 @@ import java.util.Deque;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import javax.imageio.ImageIO;
 
@@ -49,6 +50,12 @@ class EyePieceTileRenderer implements Closeable {
 
 	/** Output lines kept for the error message when the process dies. */
 	private static final int KEPT_LOG_LINES = 40;
+
+	/** How long {@link #checkBatchTileMode} waits for eyepiece to print its usage and exit. */
+	private static final int PROBE_TIMEOUT_SECONDS = 60;
+
+	/** How long a process gets to leave on its own once its stdin is closed. */
+	private static final int STOP_TIMEOUT_SECONDS = 30;
 
 	private final File binary;
 	private final File stylesPath;
@@ -174,13 +181,7 @@ class EyePieceTileRenderer implements Closeable {
 		cmd.add("-tiles=-");
 		cmd.add("-tilesOutputDir=" + tilesDir.getAbsolutePath());
 		cmd.add("-tileSize=" + tileSize);
-		ProcessBuilder pb = new ProcessBuilder(cmd);
-		pb.redirectErrorStream(true);
-		// the shared libraries of core and Qt normally sit next to the binary
-		String libs = binary.getAbsoluteFile().getParent();
-		pb.environment().merge("DYLD_LIBRARY_PATH", libs, (old, add) -> add + File.pathSeparator + old);
-		pb.environment().merge("LD_LIBRARY_PATH", libs, (old, add) -> add + File.pathSeparator + old);
-		process = pb.start();
+		process = start(cmd);
 		toProcess = new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8);
 		fromProcess = new BufferedReader(new InputStreamReader(process.getInputStream(),
 				StandardCharsets.UTF_8));
@@ -188,6 +189,56 @@ class EyePieceTileRenderer implements Closeable {
 		restartNeeded = false;
 		startCount++;
 		System.out.println("Started eyepiece #" + startCount + " with " + maps.size() + " map(s)");
+	}
+
+	private Process start(List<String> cmd) throws IOException {
+		ProcessBuilder pb = new ProcessBuilder(cmd);
+		pb.redirectErrorStream(true);
+		// the shared libraries of core and Qt normally sit next to the binary
+		String libs = binary.getAbsoluteFile().getParent();
+		pb.environment().merge("DYLD_LIBRARY_PATH", libs, (old, add) -> add + File.pathSeparator + old);
+		pb.environment().merge("LD_LIBRARY_PATH", libs, (old, add) -> add + File.pathSeparator + old);
+		return pb.start();
+	}
+
+	/**
+	 * Fails when the binary has no batch tile mode, <i>before</i> the maps and the cases. An
+	 * eyepiece older than <a href="https://github.com/osmandapp/OsmAnd-core/pull/1100">core#1100</a>
+	 * answers "Unrecognized argument: '-tiles=-'" and dies on the first tile, with its whole usage
+	 * text as the error - which is what a build server picking up a stale published binary looks
+	 * like. Started without arguments eyepiece prints that usage and exits in 0.2 s, so the check
+	 * costs nothing.
+	 */
+	void checkBatchTileMode() throws IOException {
+		Process p = start(new ArrayList<>(List.of(binary.getAbsolutePath())));
+		StringBuilder usage = new StringBuilder();
+		try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream(),
+				StandardCharsets.UTF_8))) {
+			for (String line = r.readLine(); line != null; line = r.readLine()) {
+				usage.append(line).append('\n');
+			}
+		}
+		try {
+			if (!p.waitFor(PROBE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+				p.destroyForcibly();
+				throw new IOException(binary.getAbsolutePath() + " does not answer, it printed:\n"
+						+ usage);
+			}
+		} catch (InterruptedException e) {
+			p.destroyForcibly();
+			Thread.currentThread().interrupt();
+			throw new IOException(e);
+		}
+		// "tilesOutputDir" appears in the usage text of the tile mode and nowhere else - "-tiles="
+		// alone would also match the "Unrecognized argument: '-tiles=-'" of an old binary
+		if (usage.indexOf("tilesOutputDir") < 0) {
+			throw new IOException(binary.getAbsolutePath() + " has no batch tile mode (-tiles),"
+					+ " it is older than https://github.com/osmandapp/OsmAnd-core/pull/1100."
+					+ " Take a newer build - the build server publishes one at"
+					+ " https://builder.osmand.net/binaries/amd64-linux-clang/eyepiece_standalone -"
+					+ " or build core from master. Pass -eyepieceCheck=false to skip this check."
+					+ " It printed:\n" + usage);
+		}
 	}
 
 	/**
@@ -225,7 +276,7 @@ class EyePieceTileRenderer implements Closeable {
 		}
 		try {
 			// closed stdin ends the tile loop, and eyepiece releases the OpenGL context on its own
-			if (!process.waitFor(30, java.util.concurrent.TimeUnit.SECONDS)) {
+			if (!process.waitFor(STOP_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
 				process.destroyForcibly();
 			}
 		} catch (InterruptedException e) {

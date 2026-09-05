@@ -115,7 +115,8 @@ import net.osmand.util.MapsCollection;
  * <li>{@code eyepiece}, {@code stylesPath} - only for {@code -renderer=opengl}: path to the
  * eyepiece binary (autodetected in {@code binaries} of a repository checkout and on the PATH) and
  * the folder with the {@code *.render.xml} styles (by default the styles built into OsmAndCore).
- * {@code -eyepieceLog=true} echoes everything eyepiece prints;</li>
+ * {@code -eyepieceLog=true} echoes everything eyepiece prints, {@code -eyepieceCheck=false} skips
+ * the check that the binary has the batch tile mode at all;</li>
  * <li>{@code native} - path to {@code libosmand.dylib/so/dll}; by default the library bundled into
  * OsmAndMapCreator is used, a local repository checkout picks it up from {@code core-legacy}.
  * Ignored by {@code -renderer=opengl}, which needs no legacy library at all;</li>
@@ -740,7 +741,7 @@ public class CoastlineRenderingTester {
 	 * itself. The style is resolved by name ({@code default.render.xml} is {@code default}), from
 	 * {@code -stylesPath} when it is given and from the styles built into core otherwise.
 	 */
-	private void initOpenGlRenderer(String style) {
+	private void initOpenGlRenderer(String style) throws IOException {
 		File binary = findEyePiece();
 		File stylesPath = findStyles();
 		String styleName = style.endsWith(".render.xml")
@@ -750,6 +751,9 @@ public class CoastlineRenderingTester {
 				? "built into OsmAndCore" : stylesPath.getAbsolutePath()));
 		eyePiece = new EyePieceTileRenderer(binary, stylesPath, styleName, tileSize, outputDir,
 				Boolean.parseBoolean(opt("eyepieceLog", "false")));
+		if (Boolean.parseBoolean(opt("eyepieceCheck", "true"))) {
+			eyePiece.checkBatchTileMode();
+		}
 	}
 
 	private void initRenderer() throws Exception {
