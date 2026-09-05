@@ -104,6 +104,7 @@ void printUsage(const std::string& warning /*= std::string()*/)
     tcout << xT("\t[-fov=16.5]") << std::endl;
     tcout << xT("\t[-referenceTileSize=256]") << std::endl;
     tcout << xT("\t[-displayDensityFactor=1.0]") << std::endl;
+    tcout << xT("\t[-noSymbols - no labels and icons, 94% faster per tile]") << std::endl;
     tcout << xT("\t[-locale=en]") << std::endl;
     tcout << xT("\t[-verbose]") << std::endl;
 #if defined(OSMAND_TARGET_OS_linux)

@@ -74,8 +74,9 @@ import net.osmand.util.MapsCollection;
  * # the same cases through the OpenGL engine of the apps instead of the legacy one
  * OsmAndMapCreator/utilities.sh test-coastline-rendering -renderer=opengl -maps.dir=/var/maps
  * </pre>
- * Exit code: <b>0</b> - everything matches the reference, <b>2</b> - problems were reproduced,
- * <b>1</b> - the tester could not run (native library could not be loaded, no maps, broken json).
+ * Exit code: <b>0</b> - everything matches the reference, <b>2</b> - problems were reproduced (a
+ * water difference, or a tile the renderer crashed on), <b>1</b> - the tester could not run (native
+ * library could not be loaded, no maps, broken json).
  *
  * <p>Every option can be given either as an argument ({@code -maps.dir=...}) or as a system
  * property ({@code -Dmaps.dir=...}):
@@ -117,6 +118,10 @@ import net.osmand.util.MapsCollection;
  * the folder with the {@code *.render.xml} styles (by default the styles built into OsmAndCore).
  * {@code -eyepieceLog=true} echoes everything eyepiece prints, {@code -eyepieceCheck=false} skips
  * the check that the binary has the batch tile mode at all;</li>
+ * <li>{@code symbols} - only for {@code -renderer=opengl}: {@code false} (default) renders the
+ * tiles without labels and icons. They are 94% of the time of a tile in the v2 engine (measured
+ * 500 ms against 30 ms per tile) and say nothing about a coastline, and the fixed cases come out
+ * identical either way; {@code -symbols=true} draws them;</li>
  * <li>{@code native} - path to {@code libosmand.dylib/so/dll}; by default the library bundled into
  * OsmAndMapCreator is used, a local repository checkout picks it up from {@code core-legacy}.
  * Ignored by {@code -renderer=opengl}, which needs no legacy library at all;</li>
@@ -311,6 +316,8 @@ public class CoastlineRenderingTester {
 		public int comparedTiles;
 		public int skippedTiles;
 		public int failedTiles;
+		/** Tiles the renderer could not draw at all - it crashed on them. */
+		public int renderErrors;
 		public double worstExtraWater;
 		public double worstMissingWater;
 		public double sumExtraWater;
@@ -332,6 +339,7 @@ public class CoastlineRenderingTester {
 		public String group;
 		public int tiles;
 		public int failedTiles;
+		public int renderErrors;
 	}
 
 	/** Result of a whole run, also written to {@code summary.json}. */
@@ -345,6 +353,9 @@ public class CoastlineRenderingTester {
 		public int tiles;
 		public int comparedTiles;
 		public int failedTiles;
+		public int renderErrors;
+		/** How many times the renderer died during the run, restarts included. */
+		public int rendererDeaths;
 		public List<CaseStats> cases = new ArrayList<>();
 		public List<GroupTotals> groups = new ArrayList<>();
 	}
@@ -432,7 +443,9 @@ public class CoastlineRenderingTester {
 		int code;
 		try {
 			RunResult res = new CoastlineRenderingTester(options).run();
-			code = res.failedTiles > 0 ? 2 : 0;
+			// a renderer that crashes on a tile is a worse problem than a wrong coastline, so it
+			// must not end in a green build either
+			code = res.failedTiles > 0 || res.renderErrors > 0 ? 2 : 0;
 		} catch (Throwable e) {
 			e.printStackTrace();
 			code = 1;
@@ -471,6 +484,10 @@ public class CoastlineRenderingTester {
 				} else {
 					runWaterCase(def);
 				}
+				// after every case, so that the fixed cases can be read while the random tiles -
+				// hours of them - are still running, and so that a killed job leaves behind the
+				// part of the report it did finish
+				writeReport();
 			}
 		} finally {
 			downloadPool.shutdownNow();
@@ -749,7 +766,10 @@ public class CoastlineRenderingTester {
 		System.out.println("eyepiece       : " + binary.getAbsolutePath());
 		System.out.println("Styles path    : " + (stylesPath == null
 				? "built into OsmAndCore" : stylesPath.getAbsolutePath()));
-		eyePiece = new EyePieceTileRenderer(binary, stylesPath, styleName, tileSize, outputDir,
+		boolean symbols = Boolean.parseBoolean(opt("symbols", "false"));
+		System.out.println("Map symbols    : " + (symbols
+				? "drawn" : "off, they are 94% of the time of a tile (-symbols=true draws them)"));
+		eyePiece = new EyePieceTileRenderer(binary, stylesPath, styleName, tileSize, symbols, outputDir,
 				Boolean.parseBoolean(opt("eyepieceLog", "false")));
 		if (Boolean.parseBoolean(opt("eyepieceCheck", "true"))) {
 			eyePiece.checkBatchTileMode();
@@ -1013,7 +1033,13 @@ public class CoastlineRenderingTester {
 			stats.skippedTiles++;
 			return;
 		}
-		BufferedImage rendered = render(zoom, x, y);
+		BufferedImage rendered;
+		try {
+			rendered = render(zoom, x, y);
+		} catch (EyePieceTileRenderer.TileRenderFailure e) {
+			renderError(def, stats, zoom, x, y, e);
+			return;
+		}
 		reference = scaleDown(reference, rendered.getWidth(), rendered.getHeight());
 		int w = rendered.getWidth(), h = rendered.getHeight();
 
@@ -1094,14 +1120,21 @@ public class CoastlineRenderingTester {
 			int[] t = it.next();
 			int zoom = t[0], x = t[1], y = t[2];
 			stats.tiles++;
-			closeAllMaps();
-			BufferedImage empty = render(zoom, x, y);
-			for (String map : def.maps) {
-				if (!initMap(map)) {
-					throw new IllegalStateException("Map " + map + " of " + def + " is not available");
+			BufferedImage empty, drawnImg;
+			try {
+				closeAllMaps();
+				empty = render(zoom, x, y);
+				for (String map : def.maps) {
+					if (!initMap(map)) {
+						throw new IllegalStateException("Map " + map + " of " + def + " is not available");
+					}
 				}
+				drawnImg = render(zoom, x, y);
+			} catch (EyePieceTileRenderer.TileRenderFailure e) {
+				closeAllMaps();
+				renderError(def, stats, zoom, x, y, e);
+				continue;
 			}
-			BufferedImage drawnImg = render(zoom, x, y);
 			closeAllMaps();
 
 			int background = dominantColor(empty);
@@ -1550,11 +1583,14 @@ public class CoastlineRenderingTester {
 		result.tiles = 0;
 		result.comparedTiles = 0;
 		result.failedTiles = 0;
+		result.renderErrors = 0;
+		result.rendererDeaths = eyePiece == null ? 0 : eyePiece.deaths();
 		Map<String, GroupTotals> byGroup = new LinkedHashMap<>();
 		for (CaseStats s : result.cases) {
 			result.tiles += s.tiles;
 			result.comparedTiles += s.comparedTiles;
 			result.failedTiles += s.failedTiles;
+			result.renderErrors += s.renderErrors;
 			GroupTotals g = byGroup.computeIfAbsent(s.group == null ? GROUP_FIXED : s.group, k -> {
 				GroupTotals t = new GroupTotals();
 				t.group = k;
@@ -1562,8 +1598,20 @@ public class CoastlineRenderingTester {
 			});
 			g.tiles += s.comparedTiles;
 			g.failedTiles += s.failedTiles;
+			g.renderErrors += s.renderErrors;
 		}
 		result.groups = new ArrayList<>(byGroup.values());
+	}
+
+	/** The report as it stands now - written after every case and every {@code flushEvery} tiles. */
+	private void writeReport() throws IOException {
+		recomputeTotals();
+		result.loadedMaps = initializedMaps.size();
+		result.durationMs = System.currentTimeMillis() - result.startedAt;
+		writeSummaryJson(result, true);
+		if (writeHtml) {
+			writeHtmlReport(result, true);
+		}
 	}
 
 	/**
@@ -1577,13 +1625,7 @@ public class CoastlineRenderingTester {
 		}
 		tilesSinceFlush = 0;
 		long now = System.currentTimeMillis();
-		recomputeTotals();
-		result.loadedMaps = initializedMaps.size();
-		result.durationMs = now - result.startedAt;
-		writeSummaryJson(result, true);
-		if (writeHtml) {
-			writeHtmlReport(result, true);
-		}
+		writeReport();
 		double perSec = result.comparedTiles * 1000.0 / Math.max(1, now - result.startedAt);
 		String eta = totalOfCase > 0 && perSec > 0
 				? String.format(", eta %s", duration((long) ((totalOfCase - stats.tiles) / perSec * 1000)))
@@ -1618,6 +1660,22 @@ public class CoastlineRenderingTester {
 			return false;
 		}
 		return "all".equalsIgnoreCase(saveImages) || !ok;
+	}
+
+	/**
+	 * A tile the renderer crashed on. It is a defect of the renderer rather than of the coastline,
+	 * but it is one the report has to carry - a run that quietly drops the tiles that killed the
+	 * renderer would look better the more broken the renderer is.
+	 */
+	private void renderError(CaseDef def, CaseStats stats, int zoom, int x, int y,
+			EyePieceTileRenderer.TileRenderFailure e) {
+		stats.renderErrors++;
+		TileResult res = new TileResult(def, zoom, x, y);
+		// worse than any water difference, so that these tiles come first in the report
+		res.severity = 2;
+		res.problems.add("Renderer error: " + e.getMessage());
+		keepForReport(res);
+		System.out.printf("  CRASHED %d/%d/%d - %s%n", zoom, x, y, e.getMessage());
 	}
 
 	private void keepForReport(TileResult res) {
@@ -1662,6 +1720,9 @@ public class CoastlineRenderingTester {
 				System.out.printf("%-58s worst tile %s, avg +H2O %s, avg -H2O %s%n", "",
 						s.worstTile, pct(s.avgExtraWater()), pct(s.avgMissingWater()));
 			}
+			if (s.renderErrors > 0) {
+				System.out.printf("%-58s %d tiles the renderer crashed on%n", "", s.renderErrors);
+			}
 			if (s.styledSaltPonds > 0.0001) {
 				System.out.printf("%-58s %s of the extra water is styled salt ponds (ignored)%n", "",
 						pct(s.styledSaltPonds / Math.max(1, s.comparedTiles)));
@@ -1669,14 +1730,22 @@ public class CoastlineRenderingTester {
 		}
 		System.out.println("-----------------------------------------------------------------------------------");
 		for (GroupTotals g : result.groups) {
-			System.out.printf("%-58s %7d %7d%n", g.group, g.tiles, g.failedTiles);
+			System.out.printf("%-58s %7d %7d%s%n", g.group, g.tiles, g.failedTiles,
+					g.renderErrors > 0 ? "   " + g.renderErrors + " renderer errors" : "");
 		}
 		System.out.printf("%d tiles compared, %d failed, %d maps loaded, %s renderer, %.1f s%n",
 				result.comparedTiles, result.failedTiles, result.loadedMaps, result.renderer,
 				result.durationMs / 1000.0);
+		if (result.renderErrors > 0) {
+			System.out.printf("%d tiles could not be rendered at all, the renderer died %d times -"
+					+ " see the report, that is a bug of the renderer%n",
+					result.renderErrors, result.rendererDeaths);
+		}
 		System.out.println(result.failedTiles > 0
 				? "COASTLINE PROBLEMS REPRODUCED - exit code 2"
-				: "No coastline problems found - exit code 0");
+				: result.renderErrors > 0
+						? "RENDERER ERRORS - exit code 2"
+						: "No coastline problems found - exit code 0");
 	}
 
 	private static String trim(String s, int len) {
@@ -1726,10 +1795,12 @@ public class CoastlineRenderingTester {
 		sb.append("<title>OsmAnd coastline tiles</title>\n");
 		sb.append("<link rel=\"stylesheet\" href=\"" + REPORT_CSS_FILE + "\">\n</head><body>\n");
 		sb.append("<header><h1>Coastline rendering &mdash; epic 3291</h1>");
-		sb.append(String.format("<p class=\"sum\"><b class=\"%s\">%d failed</b> &middot; %d tiles compared "
+		sb.append(String.format("<p class=\"sum\"><b class=\"%s\">%d failed</b>%s &middot; %d tiles compared "
 						+ "&middot; %d maps &middot; %s renderer &middot; style %s &middot; %.1f s &middot; %s</p>",
-				result.failedTiles > 0 ? "bad" : "good", result.failedTiles, result.comparedTiles,
-				result.loadedMaps, esc(result.renderer), esc(result.style),
+				result.failedTiles > 0 ? "bad" : "good", result.failedTiles,
+				result.renderErrors > 0 ? String.format(" &middot; <b class=\"bad\">%d renderer "
+						+ "errors</b> (%d crashes)", result.renderErrors, result.rendererDeaths) : "",
+				result.comparedTiles, result.loadedMaps, esc(result.renderer), esc(result.style),
 				result.durationMs / 1000.0, new java.util.Date()));
 		if (result.groups.size() > 1) {
 			StringBuilder g = new StringBuilder();

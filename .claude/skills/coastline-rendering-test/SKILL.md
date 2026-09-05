@@ -72,11 +72,24 @@ per tile). Things worth knowing:
   eyepiece; the maps are handed over as a folder of symlinks in `<out>/opengl-maps`. Watch the
   `Started eyepiece #N` lines: with `-load=case` there is one per case, which is normal, but a
   restart with a thousand maps loaded costs the whole obf scan again.
-- **It is ~20x slower per tile than the legacy renderer** - measured 0.7 s/tile against 25 ms/tile
-  (276 fixed case tiles: 193 s against 12 s). A 10 000 tile run is hours of rendering, so on the
-  build server keep the OpenGL run to the fixed cases or a small `-randomTilesK`.
+- **Map symbols (labels and icons) are 94% of the time of a v2 tile** - measured 500 ms/tile with
+  them against 30 ms/tile without, which is the legacy renderer's own 25 ms. They say nothing about
+  a coastline, so `-symbols=false` is the default here; `-symbols=true` draws them. The 276 fixed
+  case tiles come out identical either way.
+- **A tile eyepiece crashes on does not end the run**: the process is restarted, the tile is tried
+  once more, and if it dies again it is counted as a renderer error, named in the report with the
+  message it died with, and the run goes on. Renderer errors make the exit code 2 the way a water
+  difference does - a renderer that aborts is a worse defect than a wrong coastline, it must not
+  end in a green build. 50 deaths in one run still give up.
+- The report is written **after every case**, not only every `flushEvery` tiles, so the fixed cases
+  can be read while the random tiles - the long part - are still running.
+- **Do not trust a single `isIdle()`** if you write your own eyepiece driver: right after a target
+  change the renderer can report idle before the resources of the new location are requested, and
+  the frame then holds nothing but the background. The tile mode waits for three idle polls in a
+  row; without that, scattered tiles come out blank now and then, and a blank tile reads as a
+  perfect coastline failure (100% missing water) in this test.
 
-Measured on the 276 fixed case tiles (September 2026): v2 fixes #25119 (Goa flooding: 4 failed
+Measured on the 276 fixed case tiles (September 2026), with and without symbols alike: v2 fixes #25119 (Goa flooding: 4 failed
 tiles against 0) and most of #24376, reproduces #25618 (St. Lawrence, 23 failed tiles) exactly like
 v1, and fails one San Francisco tile that v1 draws correctly. The two `seamarksInland` cases fail
 identically in both, which is the expected sanity check - they are a map data problem and have
