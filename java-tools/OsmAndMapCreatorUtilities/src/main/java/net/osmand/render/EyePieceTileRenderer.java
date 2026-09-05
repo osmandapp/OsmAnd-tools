@@ -45,6 +45,28 @@ import javax.imageio.ImageIO;
  */
 class EyePieceTileRenderer implements Closeable {
 
+	/**
+	 * One tile could not be rendered because eyepiece died on it - the run goes on with the next
+	 * tile on a restarted process. A crash of the renderer is a defect worth reporting, so such
+	 * tiles are counted and named in the report instead of being dropped silently.
+	 */
+	static class TileRenderFailure extends IOException {
+		private static final long serialVersionUID = 1L;
+
+		TileRenderFailure(String message) {
+			super(message);
+		}
+	}
+
+	/** Thrown when the process is gone; {@link #render} decides whether that ends the run. */
+	private static class EyePieceDied extends IOException {
+		private static final long serialVersionUID = 1L;
+
+		EyePieceDied(String message) {
+			super(message);
+		}
+	}
+
 	/** Answer of eyepiece for one tile - see the tiles mode of EyePiece.cpp. */
 	private static final String TILE_PREFIX = "TILE ";
 
@@ -57,10 +79,17 @@ class EyePieceTileRenderer implements Closeable {
 	/** How long a process gets to leave on its own once its stdin is closed. */
 	private static final int STOP_TIMEOUT_SECONDS = 30;
 
+	/**
+	 * Deaths of the process before the whole run is given up. A restart costs the obf scan of every
+	 * map, so a binary that dies on every tile must not keep a run going for days.
+	 */
+	private static final int MAX_DEATHS = 50;
+
 	private final File binary;
 	private final File stylesPath;
 	private final String styleName;
 	private final int tileSize;
+	private final boolean symbols;
 	private final File mapsLinkDir;
 	private final File tilesDir;
 	private final boolean verbose;
@@ -74,13 +103,15 @@ class EyePieceTileRenderer implements Closeable {
 	/** The maps changed (or nothing was started yet), so the process has to be restarted. */
 	private boolean restartNeeded = true;
 	private int startCount;
+	private int deathCount;
 
-	EyePieceTileRenderer(File binary, File stylesPath, String styleName, int tileSize, File workDir,
-			boolean verbose) {
+	EyePieceTileRenderer(File binary, File stylesPath, String styleName, int tileSize,
+			boolean symbols, File workDir, boolean verbose) {
 		this.binary = binary;
 		this.stylesPath = stylesPath;
 		this.styleName = styleName;
 		this.tileSize = tileSize;
+		this.symbols = symbols;
 		this.mapsLinkDir = new File(workDir, "opengl-maps");
 		this.tilesDir = new File(workDir, "opengl-tiles");
 		this.verbose = verbose;
@@ -96,12 +127,66 @@ class EyePieceTileRenderer implements Closeable {
 		}
 	}
 
-	/** Renders one tile of the {@code z/x/y} scheme, 256x256 by default. */
+	/**
+	 * Renders one tile of the {@code z/x/y} scheme, 256x256 by default.
+	 *
+	 * <p>eyepiece dying is not the end of the run: rendering a tile can hit a bug of core (a Qt
+	 * assert, a segfault) and thousands of tiles must not be lost to one of them. The process is
+	 * restarted and the tile is tried once more - a crash can come from the state left by the
+	 * previous tiles and then does not repeat on a fresh process - and if it dies again the tile is
+	 * reported as a {@link TileRenderFailure} and the run continues.
+	 */
 	BufferedImage render(int zoom, int x, int y) throws IOException {
+		try {
+			return renderOnce(zoom, x, y);
+		} catch (EyePieceDied first) {
+			deathCount++;
+			System.err.println("  " + first.getMessage());
+			if (deathCount > MAX_DEATHS) {
+				throw new IOException("eyepiece died " + deathCount + " times, giving up", first);
+			}
+			System.err.printf("  restarting eyepiece and retrying %d/%d/%d%n", zoom, x, y);
+			try {
+				return renderOnce(zoom, x, y);
+			} catch (EyePieceDied second) {
+				deathCount++;
+				throw new TileRenderFailure("eyepiece dies on " + zoom + "/" + x + "/" + y + " - "
+						+ lastMeaningfulLine(second.getMessage()));
+			}
+		}
+	}
+
+	/** How many times eyepiece died during the run. */
+	int deaths() {
+		return deathCount;
+	}
+
+	/**
+	 * The line of the output that says what went wrong - the assert or the signal, not the last
+	 * {@code TILE} line before it, which is only the tile that went through.
+	 */
+	private static String lastMeaningfulLine(String output) {
+		String[] lines = output.split("\n");
+		for (int i = lines.length - 1; i >= 0; i--) {
+			String l = lines[i].trim();
+			if (!l.isEmpty() && !l.startsWith(TILE_PREFIX)) {
+				return l;
+			}
+		}
+		return output;
+	}
+
+	private BufferedImage renderOnce(int zoom, int x, int y) throws IOException {
 		ensureStarted();
 		String tile = zoom + "/" + x + "/" + y;
-		toProcess.write(tile + "\n");
-		toProcess.flush();
+		try {
+			toProcess.write(tile + "\n");
+			toProcess.flush();
+		} catch (IOException e) {
+			// the process died between two tiles, its output went with it
+			stop();
+			throw new EyePieceDied("eyepiece is gone before " + tile + ": " + e.getMessage());
+		}
 		String answer = readAnswer(tile);
 		File png = new File(answer);
 		if (!png.isFile()) {
@@ -136,7 +221,7 @@ class EyePieceTileRenderer implements Closeable {
 					Thread.currentThread().interrupt();
 				}
 				stop();
-				throw new IOException("eyepiece died (exit code " + code + ") on tile " + tile
+				throw new EyePieceDied("eyepiece died (exit code " + code + ") on tile " + tile
 						+ ", last output:\n" + String.join("\n", lastLines));
 			}
 			keepLine(line);
@@ -181,6 +266,11 @@ class EyePieceTileRenderer implements Closeable {
 		cmd.add("-tiles=-");
 		cmd.add("-tilesOutputDir=" + tilesDir.getAbsolutePath());
 		cmd.add("-tileSize=" + tileSize);
+		if (!symbols) {
+			// labels and icons are 94% of the time of a v2 tile (measured 500 ms against 30 ms per
+			// tile) and say nothing about a coastline, so they are off unless asked for
+			cmd.add("-noSymbols");
+		}
 		process = start(cmd);
 		toProcess = new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8);
 		fromProcess = new BufferedReader(new InputStreamReader(process.getInputStream(),
@@ -206,11 +296,14 @@ class EyePieceTileRenderer implements Closeable {
 	 * eyepiece older than <a href="https://github.com/osmandapp/OsmAnd-core/pull/1100">core#1100</a>
 	 * answers "Unrecognized argument: '-tiles=-'" and dies on the first tile, with its whole usage
 	 * text as the error - which is what a build server picking up a stale published binary looks
-	 * like. Started without arguments eyepiece prints that usage and exits in 0.2 s, so the check
-	 * costs nothing.
+	 * like. The check costs 0.2 s: the argument parser answers before anything is rendered.
 	 */
 	void checkBatchTileMode() throws IOException {
-		Process p = start(new ArrayList<>(List.of(binary.getAbsolutePath())));
+		// "-tiles=-" without an output dir is rejected by the argument parser of either binary,
+		// before anything is rendered: a new one asks for -tilesOutputDir, an old one does not know
+		// the argument at all. Asking about the feature itself rather than reading the usage text
+		// is what makes this work on a binary whose core is newer than its tools checkout.
+		Process p = start(new ArrayList<>(List.of(binary.getAbsolutePath(), "-tiles=-")));
 		StringBuilder usage = new StringBuilder();
 		try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream(),
 				StandardCharsets.UTF_8))) {
@@ -229,9 +322,7 @@ class EyePieceTileRenderer implements Closeable {
 			Thread.currentThread().interrupt();
 			throw new IOException(e);
 		}
-		// "tilesOutputDir" appears in the usage text of the tile mode and nowhere else - "-tiles="
-		// alone would also match the "Unrecognized argument: '-tiles=-'" of an old binary
-		if (usage.indexOf("tilesOutputDir") < 0) {
+		if (usage.indexOf("Unrecognized argument") >= 0) {
 			throw new IOException(binary.getAbsolutePath() + " has no batch tile mode (-tiles),"
 					+ " it is older than https://github.com/osmandapp/OsmAnd-core/pull/1100."
 					+ " Take a newer build - the build server publishes one at"
