@@ -55,11 +55,14 @@ It drives the `eyepiece` tool of core as a co-process through its batch tile mod
 (`-tiles=- -tilesOutputDir=...`, tiles as `z/x/y` lines on stdin, one `TILE z/x/y <file>` answer
 per tile). Things worth knowing:
 
-- **The binary needs the batch tile mode**, i.e. core with `-tiles=`. Check with
-  `strings eyepiece | grep tilesOutputDir` before blaming the tester; the published
+- **The binary needs the batch tile mode**, i.e. core with `-tiles=` (OsmAnd-core#1100). The tester
+  checks it at start up and stops with an explanation (`-eyepieceCheck=false` skips the check);
+  `strings eyepiece | grep tilesOutputDir` answers the same question by hand. The published
   `https://builder.osmand.net/binaries/amd64-linux-clang/eyepiece_standalone` is the build server's
   copy and is the one to use on Jenkins (it is linked with EGL - `EGL_PLATFORM_DEVICE_EXT` - so it
-  renders headless, no X server and no `xvfb-run` needed).
+  renders headless, no X server and no `xvfb-run` needed), **but it is rebuilt by
+  `OsmAndCoreAndTools-linux-clang-64bit` and lags a core merge until that job runs** - which is
+  exactly how the first opengl run of the Jenkins job failed.
 - `-eyepiece=` is autodetected from `binaries/` of a repository checkout and from the PATH.
   `-stylesPath=` defaults to the styles built into core, `-eyepieceLog=true` echoes everything
   eyepiece prints.
