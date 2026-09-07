@@ -20,6 +20,7 @@ import org.apache.commons.logging.LogFactory;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import net.osmand.binary.ObfConstants;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.Entity.EntityType;
@@ -102,6 +103,16 @@ public class OverpassFetcher {
 	}
 
 	private Map<EntityId, Entity> parseEntities(JSONArray elements, OsmDbAccessorContext ctx) {
+		return parseEntities(elements, ctx, null);
+	}
+
+	/**
+	 * @param internalIdByOsmId maps the id Overpass answers with back to the id the relation refers
+	 *                          to, so initializeLinks() can match what was fetched. Null when the
+	 *                          caller already works in plain OSM ids.
+	 */
+	private Map<EntityId, Entity> parseEntities(JSONArray elements, OsmDbAccessorContext ctx,
+			Map<Long, Long> internalIdByOsmId) {
 		Map<EntityId, Entity> fetchedEntities = new HashMap<>();
 		if (elements == null) {
 			return fetchedEntities;
@@ -129,7 +140,9 @@ public class OverpassFetcher {
 				JSONArray nodeIds = element.optJSONArray("nodes");
 				JSONArray geoms = element.optJSONArray("geometry");
 
-				Way way = new Way(wayId);
+				long targetId = internalIdByOsmId == null
+						? wayId : internalIdByOsmId.getOrDefault(wayId, wayId);
+				Way way = new Way(targetId);
 				if (nodeIds != null) {
 					for (int j = 0; j < nodeIds.length(); j++) {
 						long nodeId = nodeIds.getLong(j);
@@ -148,7 +161,7 @@ public class OverpassFetcher {
 						}
 					}
 				}
-				fetchedEntities.put(new EntityId(Entity.EntityType.WAY, wayId), way);
+				fetchedEntities.put(new EntityId(Entity.EntityType.WAY, targetId), way);
 			}
 		}
 		return fetchedEntities;
@@ -237,17 +250,41 @@ public class OverpassFetcher {
 		}
 
 		long startTime = System.currentTimeMillis();
-		String wayIds = String.join(",", wayIdsToFetch.stream().map(String::valueOf).toArray(String[]::new));
+
+		// Member ids here are already in OsmAnd's internal encoding - OsmDbCreator.convertId()
+		// shifts every positive OSM id left by ObfConstants.SHIFT_ID and packs a geohash into the
+		// low bits. Asking Overpass for those (way 99214274955 rather than way 1550223046) simply
+		// finds nothing, the relation stays incomplete and, before this, was dropped whole. Ask for
+		// the decoded ids and remember which internal id each one belongs to.
+		Map<Long, Long> internalIdByOsmId = new HashMap<>();
+		for (Long internalId : wayIdsToFetch) {
+			internalIdByOsmId.putIfAbsent(internalId, internalId);
+			long decoded = internalId >> ObfConstants.SHIFT_ID;
+			if (decoded > 0) {
+				internalIdByOsmId.putIfAbsent(decoded, internalId);
+			}
+		}
+		String wayIds = String.join(",",
+				internalIdByOsmId.keySet().stream().map(String::valueOf).toArray(String[]::new));
 		String dateHeader = buildDateHeader(lastModifiedDate);
 		String query = "[out:json]" + dateHeader + ";way(id:" + wayIds + "); out geom;";
 
-		JSONArray elements = executeOverpassQuery(query);
-		Map<EntityId, Entity> fetchedEntities = parseEntities(elements, ctx);
+        JSONArray elements = executeOverpassQuery(query);
+		Map<EntityId, Entity> fetchedEntities = parseEntities(elements, ctx, internalIdByOsmId);
 
 		relation.initializeLinks(fetchedEntities);
 
 		log.info(String.format("Fetched %d member ways for relation %d (%.2f sec)",
 				wayIdsToFetch.size(), relation.getId(), (System.currentTimeMillis() - startTime) / 1e3));
+
+		List<Long> stillIncomplete = getIncompleteWayIdsForRelation(relation);
+		if (!stillIncomplete.isEmpty()) {
+			log.warn(String.format("Relation %d: %d of %d fetched ways are still unresolved, e.g. %s"
+							+ " (elements returned: %d)",
+					relation.getId(), stillIncomplete.size(), wayIdsToFetch.size(),
+					stillIncomplete.subList(0, Math.min(5, stillIncomplete.size())),
+					elements == null ? -1 : elements.length()));
+		}
 	}
 
 	public List<Long> getIncompleteWayIdsForRelation(Relation relation) {

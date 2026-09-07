@@ -1,14 +1,14 @@
 ---
 name: coastline-rendering-test
-description: Run or debug the coastline rendering test (CoastlineRenderingTester / `utilities.sh test-coastline-rendering`) that compares locally rendered tiles against tile.osmand.net and reports water mask differences. Use when working on coastline issues, on the Web_Ocean_Tiles_Test Jenkins job, on coastline-tests.json, or when the test is slow, crashes on a map, or reports unexpected failures.
+description: Run or debug the coastline rendering test (CoastlineRenderingTester / `utilities.sh test-coastline-rendering`) that compares locally rendered tiles against tile.osmand.net and reports water mask differences, with either the legacy (v1) renderer or the OpenGL core one (v2, `-renderer=opengl`). Use when working on coastline issues, on the Web_Ocean_Tiles_Test Jenkins job, on coastline-tests.json, when comparing the two rendering engines, or when the test is slow, crashes on a map, or reports unexpected failures.
 ---
 
 # Coastline rendering test
 
-Renders tiles with the legacy native renderer and compares the water mask against the reference
-`https://tile.osmand.net/hd/{z}/{x}/{y}.png`. Exit code 0 = clean, 2 = problems reproduced,
-1 = could not run. Writes `index.html` + `summary.json` into the output folder, images for failed
-tiles only.
+Renders tiles with the legacy native renderer (v1) or with OsmAndCore (v2, `-renderer=opengl`) and
+compares the water mask against the reference `https://tile.osmand.net/hd/{z}/{x}/{y}.png`. Exit
+code 0 = clean, 2 = problems reproduced, 1 = could not run. Writes `index.html` + `summary.json`
+into the output folder, images for failed tiles only.
 
 - Utility: `java-tools/OsmAndMapCreatorUtilities/src/main/java/net/osmand/render/CoastlineRenderingTester.java`
   (all options are documented in its class javadoc - read it before guessing a flag).
@@ -38,6 +38,62 @@ unzip -q OsmAndMapCreator/build/distributions/OsmAndMapCreator.zip -d /tmp/mc
 `-native` is only needed when the bundled `osmand-<os>-<arch>.lib` is missing from the zip, which
 happens with `--offline` because `downloadCoreJni` is skipped. On the build server pass nothing -
 the bundled library is used, and `null` is the value that loads it.
+
+## The OpenGL (v2) engine
+
+`-renderer=opengl` renders every tile with OsmAndCore instead of the legacy library - the engine the
+apps actually draw with - and changes nothing else: same cases, same water masks, same report, same
+exit codes, so the two runs are directly comparable. The report and `summary.json` carry the
+`renderer` they were produced with.
+
+```bash
+/tmp/mc/utilities.sh test-coastline-rendering -renderer=opengl -maps.dir=$HOME/osmand/maps \
+  -out=/tmp/report-gl -eyepiece=<repo>/binaries/<platform>/Release/eyepiece
+```
+
+It drives the `eyepiece` tool of core as a co-process through its batch tile mode
+(`-tiles=- -tilesOutputDir=...`, tiles as `z/x/y` lines on stdin, one `TILE z/x/y <file>` answer
+per tile). Things worth knowing:
+
+- **The binary needs the batch tile mode**, i.e. core with `-tiles=` (OsmAnd-core#1100). The tester
+  checks it at start up and stops with an explanation (`-eyepieceCheck=false` skips the check);
+  `strings eyepiece | grep tilesOutputDir` answers the same question by hand. The published
+  `https://builder.osmand.net/binaries/amd64-linux-clang/eyepiece_standalone` is the build server's
+  copy and is the one to use on Jenkins (it is linked with EGL - `EGL_PLATFORM_DEVICE_EXT` - so it
+  renders headless, no X server and no `xvfb-run` needed), **but it is rebuilt by
+  `OsmAndCoreAndTools-linux-clang-64bit` and lags a core merge until that job runs** - which is
+  exactly how the first opengl run of the Jenkins job failed.
+- `-eyepiece=` is autodetected from `binaries/` of a repository checkout and from the PATH.
+  `-stylesPath=` defaults to the styles built into core, `-eyepieceLog=true` echoes everything
+  eyepiece prints.
+- **No legacy library, no fonts folder and no `indexes.cache`** are used in this mode - core does
+  all of that itself. `-native=` is ignored.
+- The set of maps is fixed when the process starts, so a case that opens or closes a map restarts
+  eyepiece; the maps are handed over as a folder of symlinks in `<out>/opengl-maps`. Watch the
+  `Started eyepiece #N` lines: with `-load=case` there is one per case, which is normal, but a
+  restart with a thousand maps loaded costs the whole obf scan again.
+- **Map symbols (labels and icons) are 94% of the time of a v2 tile** - measured 500 ms/tile with
+  them against 30 ms/tile without, which is the legacy renderer's own 25 ms. They say nothing about
+  a coastline, so `-symbols=false` is the default here; `-symbols=true` draws them. The 276 fixed
+  case tiles come out identical either way.
+- **A tile eyepiece crashes on does not end the run**: the process is restarted, the tile is tried
+  once more, and if it dies again it is counted as a renderer error, named in the report with the
+  message it died with, and the run goes on. Renderer errors make the exit code 2 the way a water
+  difference does - a renderer that aborts is a worse defect than a wrong coastline, it must not
+  end in a green build. 50 deaths in one run still give up.
+- The report is written **after every case**, not only every `flushEvery` tiles, so the fixed cases
+  can be read while the random tiles - the long part - are still running.
+- **Do not trust a single `isIdle()`** if you write your own eyepiece driver: right after a target
+  change the renderer can report idle before the resources of the new location are requested, and
+  the frame then holds nothing but the background. The tile mode waits for three idle polls in a
+  row; without that, scattered tiles come out blank now and then, and a blank tile reads as a
+  perfect coastline failure (100% missing water) in this test.
+
+Measured on the 276 fixed case tiles (September 2026), with and without symbols alike: v2 fixes #25119 (Goa flooding: 4 failed
+tiles against 0) and most of #24376, reproduces #25618 (St. Lawrence, 23 failed tiles) exactly like
+v1, and fails one San Francisco tile that v1 draws correctly. The two `seamarksInland` cases fail
+identically in both, which is the expected sanity check - they are a map data problem and have
+nothing to do with the renderer.
 
 ## The one number that explains a slow run
 

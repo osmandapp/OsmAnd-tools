@@ -160,12 +160,6 @@ void closeHandler(void);
 void activateProvider(int layerIdx, int idx);
 void verifyOpenGL();
 
-#if defined(OSMAND_TARGET_OS_macosx)
-void x11Init();
-void x11Release();
-void x11AlterModifiers(int& modifiers);
-#endif // defined(OSMAND_TARGET_OS_macosx)
-
 int elevationConfigurationPresetIndex = 0;
 std::pair<QString, OsmAnd::ElevationConfiguration> elevationConfigurationPresets[] =
 {
@@ -450,7 +444,7 @@ int main(int argc, char** argv)
         verifyOpenGL();
 
 #if defined(OSMAND_TARGET_OS_macosx)
-        x11Init();
+#define GLUT_ACTIVE_ALT GLUT_ACTIVE_SUPER
 #endif // defined(OSMAND_TARGET_OS_macosx)
 
         glutWasInitialized = true;
@@ -532,6 +526,7 @@ int main(int argc, char** argv)
     primitivizer.reset(new OsmAnd::MapPrimitiviser(mapPresentationEnvironment));
 
     OsmAnd::MapRendererSetupOptions rendererSetup;
+    rendererSetup.setMaxNumberOfRasterMapLayersInBatch(4);
     rendererSetup.frameUpdateRequestCallback =
         []
         (const OsmAnd::IMapRenderer* const mapRenderer)
@@ -636,11 +631,14 @@ int main(int argc, char** argv)
     renderer->setElevationAngle(20.0f);
     renderer->setAzimuth(-30.0f);
 
+    // Spherical Earth
+    renderer->setFlatEarth(false);
+
     auto renderConfig = renderer->getConfiguration();
     renderer->setConfiguration(renderConfig);
 
     if (lastClickedLocationMarker)
-        lastClickedLocationMarker->setPosition(renderer->getState().target31);
+        lastClickedLocationMarker->setPosition(renderer->getState().fixedLocation31);
 
     bool ok = renderer->initializeRendering(true);
     assert(ok);
@@ -678,9 +676,8 @@ void reshapeHandler(int newWidth, int newHeight)
 }
 
 bool dragInitialized = false;
-int dragInitX;
-int dragInitY;
-OsmAnd::PointI dragInitTarget;
+OsmAnd::PointI dragPrevPixel;
+OsmAnd::PointI dragLocation31;
 
 
 std::unique_ptr<QProcess> zenity(const QString& cmd)
@@ -715,22 +712,22 @@ void textInfoDialog(const QString& title, const QString& text)
 void mouseHandler(int button, int state, int x, int y)
 {
     auto modifiers = glutGetModifiers();
-#if defined(OSMAND_TARGET_OS_macosx)
-    x11AlterModifiers(modifiers);
-#endif // defined(OSMAND_TARGET_OS_macosx)
 
     if (button == GLUT_LEFT_BUTTON)
     {
         if (state == GLUT_DOWN && !dragInitialized)
         {
-            dragInitX = x;
-            dragInitY = y;
-            dragInitTarget = renderer->getState().target31;
-
-            dragInitialized = true;
+            OsmAnd::PointI dragPixel(x, y);
+            if (renderer->getLocationFromElevatedPoint(dragPixel, dragLocation31))
+            {
+                dragPrevPixel = renderer->getState().fixedPixel;
+                renderer->setMapTarget(dragPixel, dragLocation31);
+                dragInitialized = true;
+            }
         }
         else if (state == GLUT_UP && dragInitialized)
         {
+            renderer->resetMapTargetPixelCoordinates(dragPrevPixel);
             dragInitialized = false;
         }
     }
@@ -741,7 +738,7 @@ void mouseHandler(int button, int state, int x, int y)
             OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "--------------- click (%d, %d) -------------------", x, y);
 
             renderer->getLocationFromScreenPoint(OsmAnd::PointI(x, y), lastClickedLocation31);
-            const auto delta = lastClickedLocation31 - renderer->getState().target31;
+            const auto delta = lastClickedLocation31 - renderer->getState().fixedLocation31;
             OsmAnd::LogPrintf(OsmAnd::LogSeverityLevel::Info, "@ %d %d (offset from target %d %d)", lastClickedLocation31.x, lastClickedLocation31.y, delta.x, delta.y);
 
 
@@ -831,38 +828,12 @@ void mouseHandler(int button, int state, int x, int y)
 void mouseMotion(int x, int y)
 {
     if (dragInitialized)
-    {
-        auto deltaX = x - dragInitX;
-        auto deltaY = y - dragInitY;
-
-        const auto state = renderer->getState();
-
-        // Azimuth
-        auto angle = qDegreesToRadians(state.azimuth);
-        auto cosAngle = cosf(angle);
-        auto sinAngle = sinf(angle);
-
-        auto nx = deltaX * cosAngle - deltaY * sinAngle;
-        auto ny = deltaX * sinAngle + deltaY * cosAngle;
-
-        const auto tileSize31 = (1u << (31 - state.zoomLevel));
-        auto scale31 = static_cast<double>(tileSize31) /
-            renderer->getTileSizeOnScreenInPixels();
-
-        OsmAnd::PointI newTarget;
-        newTarget.x = dragInitTarget.x - static_cast<int32_t>(nx * scale31);
-        newTarget.y = dragInitTarget.y - static_cast<int32_t>(ny * scale31);
-
-        renderer->setMapTargetLocation(newTarget);
-    }
+        renderer->setMapTargetPixelCoordinates(OsmAnd::PointI(x, y));
 }
 
 void mouseWheelHandler(int button, int dir, int x, int y)
 {
     auto modifiers = glutGetModifiers();
-#if defined(OSMAND_TARGET_OS_macosx)
-    x11AlterModifiers(modifiers);
-#endif // defined(OSMAND_TARGET_OS_macosx)
 
     if (modifiers & GLUT_ACTIVE_ALT)
     {
@@ -898,9 +869,6 @@ void mouseWheelHandler(int button, int dir, int x, int y)
 void keyboardHandler(unsigned char key, int x, int y)
 {
     auto modifiers = glutGetModifiers();
-#if defined(OSMAND_TARGET_OS_macosx)
-    x11AlterModifiers(modifiers);
-#endif // defined(OSMAND_TARGET_OS_macosx)
 
     const auto state = renderer->getState();
     const auto wasdZoom = static_cast<int>(
@@ -918,7 +886,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'W':
     case 'w':
     {
-        auto newTarget = state.target31;
+        auto newTarget = state.fixedLocation31;
         newTarget.y -= wasdStep / (key == 'w' ? 50 : 10);
         renderer->setMapTargetLocation(newTarget);
         return;
@@ -926,7 +894,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'S':
     case 's':
     {
-        auto newTarget = state.target31;
+        auto newTarget = state.fixedLocation31;
         newTarget.y += wasdStep / (key == 's' ? 50 : 10);
         renderer->setMapTargetLocation(newTarget);
         return;
@@ -934,7 +902,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'A':
     case 'a':
     {
-        auto newTarget = state.target31;
+        auto newTarget = state.fixedLocation31;
         newTarget.x -= wasdStep / (key == 'a' ? 50 : 10);
         renderer->setMapTargetLocation(newTarget);
         return;
@@ -942,7 +910,7 @@ void keyboardHandler(unsigned char key, int x, int y)
     case 'D':
     case 'd':
     {
-        auto newTarget = state.target31;
+        auto newTarget = state.fixedLocation31;
         newTarget.x += wasdStep / (key == 'd' ? 50 : 10);
         renderer->setMapTargetLocation(newTarget);
         return;
@@ -1098,7 +1066,7 @@ void keyboardHandler(unsigned char key, int x, int y)
         return;
     case 'o':
     {
-        auto position31 = renderer->getState().target31;
+        auto position31 = renderer->getState().fixedLocation31;
         OsmAnd::ReverseGeocoder reverseGeocoder{obfsCollection, roadLocator};
         OsmAnd::ReverseGeocoder::Criteria criteria;
         criteria.position31 = position31;
@@ -1114,11 +1082,11 @@ void keyboardHandler(unsigned char key, int x, int y)
     }
     case 'l':
     {
-        auto latLon = OsmAnd::Utilities::convert31ToLatLon(state.target31);
+        auto latLon = OsmAnd::Utilities::convert31ToLatLon(state.fixedLocation31);
         auto text = inputDialog(QStringLiteral("Input coordinate"), QStringLiteral("Coordinate: "), latLon.toQString());
         latLon = OsmAnd::CoordinateSearch::search(text);
-        auto target31 = OsmAnd::Utilities::convertLatLonTo31(latLon);
-        renderer->setMapTargetLocation(target31);
+        auto fixedLocation31 = OsmAnd::Utilities::convertLatLonTo31(latLon);
+        renderer->setMapTargetLocation(fixedLocation31);
         return;
     }
     case 'c':
@@ -1325,9 +1293,6 @@ void keyboardHandler(unsigned char key, int x, int y)
 void specialHandler(int key, int x, int y)
 {
     auto modifiers = glutGetModifiers();
-#if defined(OSMAND_TARGET_OS_macosx)
-    x11AlterModifiers(modifiers);
-#endif // defined(OSMAND_TARGET_OS_macosx)
 
     const auto state = renderer->getState();
     const auto step = (modifiers & GLUT_ACTIVE_SHIFT) ? 1.0f : 0.1f;
@@ -1368,10 +1333,6 @@ void specialHandler(int key, int x, int y)
 void closeHandler()
 {
     renderer->releaseRendering(true);
-
-#if defined(OSMAND_TARGET_OS_macosx)
-    x11Release();
-#endif // defined(OSMAND_TARGET_OS_macosx)
 }
 
 void activateProvider(int layerIdx, int idx)
@@ -1399,7 +1360,7 @@ void activateProvider(int layerIdx, int idx)
 //        settings.insert("OSMMapperAssistantFixme", "true");
         mapPresentationEnvironment->setSettings(settings);
 
-        auto tileProvider = new OsmAnd::MapRasterLayerProvider_Software(mapPrimitivesProvider);
+        auto tileProvider = new OsmAnd::MapRasterLayerProvider_Software(mapPrimitivesProvider, false, false, true);
         renderer->setMapLayerProvider(layerIdx, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
     }
     else if (idx == 3)
@@ -1617,7 +1578,7 @@ void displayHandler()
 
         glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("target (keys w,a,s,d,l): %1 %2").arg(state.target31.x).arg(state.target31.y)));
+            QString("target (keys w,a,s,d,l): %1 %2").arg(state.fixedLocation31.x).arg(state.fixedLocation31.y)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * (++line));
@@ -1632,7 +1593,7 @@ void displayHandler()
 
         glRasterPos2f(8, t - 16 * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
-            QString("visual zoom (+ shift)  : %1 + %2").arg(state.visualZoom).arg(state.visualZoomShift)));
+            QString("visual zoom (+ shift)  : %1 + %2").arg(state.surfaceVisualZoom).arg(state.visualZoomShift)));
         verifyOpenGL();
 
         glRasterPos2f(8, t - 16 * (++line));
