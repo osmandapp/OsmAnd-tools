@@ -2,41 +2,54 @@ project(bird)
 
 set(extra_dependencies "")
 set(extra_libraries "")
-
-find_package(FreeGLUT)
-if (FreeGLUT_FOUND)
-	set(extra_dependencies ${extra_dependencies}
-		FreeGLUT::freeglut
-	)
-	set(extra_libraries ${extra_libraries}
-		FreeGLUT::freeglut
-	)
-else()
-	find_library(FREEGLUT_LIBRARY freeglut)
-	if (FREEGLUT_LIBRARY STREQUAL "FREEGLUT_LIBRARY-NOTFOUND")
-		add_subdirectory("${OSMAND_ROOT}/tools/cpp-tools/map-viewer/externals/freeglut" "externals/freeglut")
-		set(extra_dependencies ${extra_dependencies}
-			freeglut_static
-		)
-		set(extra_libraries ${extra_libraries}
-			freeglut_static
-		)
-	else()
-		set(extra_libraries ${extra_libraries}
-			${FREEGLUT_LIBRARY}
-		)
-	endif()
-endif()
-
 set(target_specific_sources "")
 set(target_specific_private_definitions "")
+
 if (CMAKE_TARGET_OS STREQUAL "macosx")
+	# freeglut on macOS only exists on top of X11/Mesa, which cannot share a GL context with
+	# OsmAndCore (it links Apple's OpenGL.framework). GLFW gives an NSOpenGLContext on the very
+	# same framework, so the viewer uses a small GLUT-compatible shim over it instead.
+	find_package(glfw3 REQUIRED)
+	set(extra_libraries ${extra_libraries}
+		glfw
+		"-framework CoreFoundation"
+		"-framework CoreGraphics"
+		"-framework CoreText"
+	)
 	set(target_specific_sources ${target_specific_sources}
-		"x11.cpp"
+		"glut_compat.cpp"
 	)
 	set(target_specific_private_definitions ${target_specific_private_definitions}
 		-DGL_SILENCE_DEPRECATION
 	)
+else()
+	# Homebrew's FreeGLUTConfig.cmake declares a link interface on the OpenGL::GL imported target,
+	# so OpenGL has to be found first or find_package(FreeGLUT) fails.
+	find_package(OpenGL)
+	find_package(FreeGLUT)
+	if (FreeGLUT_FOUND)
+		set(extra_dependencies ${extra_dependencies}
+			FreeGLUT::freeglut
+		)
+		set(extra_libraries ${extra_libraries}
+			FreeGLUT::freeglut
+		)
+	else()
+		find_library(FREEGLUT_LIBRARY freeglut)
+		if (FREEGLUT_LIBRARY STREQUAL "FREEGLUT_LIBRARY-NOTFOUND")
+			add_subdirectory("${OSMAND_ROOT}/tools/cpp-tools/map-viewer/externals/freeglut" "externals/freeglut")
+			set(extra_dependencies ${extra_dependencies}
+				freeglut_static
+			)
+			set(extra_libraries ${extra_libraries}
+				freeglut_static
+			)
+		else()
+			set(extra_libraries ${extra_libraries}
+				${FREEGLUT_LIBRARY}
+			)
+		endif()
+	endif()
 endif()
 
 set(sources

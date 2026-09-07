@@ -8,7 +8,13 @@
 #include <locale.h>
 
 #include <GL/glew.h>
-#include <GL/freeglut.h>
+#if defined(OSMAND_TARGET_OS_macosx)
+// freeglut on macOS is X11/Mesa-only and cannot share a GL context with OsmAndCore, which
+// links Apple's OpenGL.framework. glut_compat.h provides the same calls over GLFW.
+#   include "glut_compat.h"
+#else
+#   include <GL/freeglut.h>
+#endif
 
 #include <OsmAndCore/QtExtensions.h>
 #include <QString>
@@ -123,6 +129,14 @@ QString styleName = "default";
 bool heightmap = false;
 bool hillshade = false;
 
+double startLatitude = 43.5804;
+double startLongitude = 7.1251;
+float startZoom = 14.0f;
+float startElevationAngle = 20.0f;
+float startAzimuth = -30.0f;
+int startProvider = -1;
+QHash<QString, QString> extraStyleSettings;
+
 #define USE_GREEN_TEXT_COLOR 1
 #define SCREEN_WIDTH 1024
 #define SCREEN_HEIGHT 760
@@ -143,7 +157,11 @@ bool constantRefresh = false;
 bool nSight = false;
 bool gDEBugger = false;
 bool profiler = false;
-const float density = 1.0f;
+// Set from the actual framebuffer/window ratio once the window exists. Leaving it at 1 on a
+// display with a scaled framebuffer draws the whole map at half its physical size - tiny labels,
+// 256-pixel tiles on a 2x surface - and makes every screen-space computation disagree with the
+// viewport, which is in framebuffer pixels.
+float density = 1.0f;
 const float mapScale = 1.0f;
 const float symbolsScale = 1.0f;
 
@@ -158,13 +176,8 @@ void displayHandler(void);
 void idleHandler(void);
 void closeHandler(void);
 void activateProvider(int layerIdx, int idx);
+void toggleMapSymbols();
 void verifyOpenGL();
-
-#if defined(OSMAND_TARGET_OS_macosx)
-void x11Init();
-void x11Release();
-void x11AlterModifiers(int& modifiers);
-#endif // defined(OSMAND_TARGET_OS_macosx)
 
 int elevationConfigurationPresetIndex = 0;
 std::pair<QString, OsmAnd::ElevationConfiguration> elevationConfigurationPresets[] =
@@ -363,6 +376,92 @@ int main(int argc, char** argv)
         {
             cacheDir = QDir(arg.mid(strlen("-cacheDir=")));
         }
+        else if (arg.startsWith("-latLon="))
+        {
+            // The in-app "input coordinate" dialog shells out to zenity, which does not exist
+            // outside Linux, so the start location has to be settable from the command line.
+            const auto values = arg.mid(strlen("-latLon=")).split(QLatin1Char(':'));
+            bool okLat = false, okLon = false;
+            if (values.size() == 2)
+            {
+                const auto lat = values[0].toDouble(&okLat);
+                const auto lon = values[1].toDouble(&okLon);
+                if (okLat && okLon)
+                {
+                    startLatitude = lat;
+                    startLongitude = lon;
+                }
+            }
+            if (!okLat || !okLon)
+            {
+                std::cerr << "'" << arg.toStdString() << "' can not be parsed as -latLon=<lat>:<lon>" << std::endl;
+                OsmAnd::ReleaseCore();
+                return EXIT_FAILURE;
+            }
+        }
+        else if (arg.startsWith("-elevationAngle="))
+        {
+            bool ok = false;
+            const auto value = arg.mid(strlen("-elevationAngle=")).toFloat(&ok);
+            if (!ok)
+            {
+                std::cerr << "'" << arg.toStdString() << "' can not be parsed as -elevationAngle=<float>" << std::endl;
+                OsmAnd::ReleaseCore();
+                return EXIT_FAILURE;
+            }
+            startElevationAngle = value;
+        }
+        else if (arg.startsWith("-azimuth="))
+        {
+            bool ok = false;
+            const auto value = arg.mid(strlen("-azimuth=")).toFloat(&ok);
+            if (!ok)
+            {
+                std::cerr << "'" << arg.toStdString() << "' can not be parsed as -azimuth=<float>" << std::endl;
+                OsmAnd::ReleaseCore();
+                return EXIT_FAILURE;
+            }
+            startAzimuth = value;
+        }
+        else if (arg.startsWith("-styleSetting:"))
+        {
+            // Same spelling as eyepiece: -styleSetting:<renderingProperty>=<value>. Without this
+            // there is no way to turn on rules gated behind a rendering property (hiking/cycle
+            // routes, contour lines, ...) from the command line.
+            const auto setting = arg.mid(strlen("-styleSetting:"));
+            const auto separator = setting.indexOf(QLatin1Char('='));
+            if (separator <= 0)
+            {
+                std::cerr << "'" << arg.toStdString() << "' can not be parsed as -styleSetting:<name>=<value>" << std::endl;
+                OsmAnd::ReleaseCore();
+                return EXIT_FAILURE;
+            }
+            extraStyleSettings.insert(setting.left(separator), setting.mid(separator + 1));
+        }
+        else if (arg.startsWith("-provider="))
+        {
+            bool ok = false;
+            const auto value = arg.mid(strlen("-provider=")).toInt(&ok);
+            if (!ok || value < 0 || value > 9)
+            {
+                std::cerr << "'" << arg.toStdString() << "' can not be parsed as -provider=<0..9>" << std::endl;
+                OsmAnd::ReleaseCore();
+                return EXIT_FAILURE;
+            }
+            startProvider = value;
+        }
+        else if (arg.startsWith("-zoom="))
+        {
+            bool ok = false;
+            const auto value = arg.mid(strlen("-zoom=")).toFloat(&ok);
+            if (!ok)
+            {
+                std::cerr << "'" << arg.toStdString() << "' can not be parsed as -zoom=<float>" << std::endl;
+                OsmAnd::ReleaseCore();
+                return EXIT_FAILURE;
+            }
+            startZoom = value;
+        }
         else if (arg.startsWith("-heightsDir="))
         {
             heightsDir = QDir(arg.mid(strlen("-heightsDir=")));
@@ -449,12 +548,12 @@ int main(int argc, char** argv)
         glutCloseFunc(&closeHandler);
         verifyOpenGL();
 
-#if defined(OSMAND_TARGET_OS_macosx)
-        x11Init();
-#endif // defined(OSMAND_TARGET_OS_macosx)
-
         glutWasInitialized = true;
     }
+
+#if defined(OSMAND_TARGET_OS_macosx)
+    density = glutCompatPixelScale();
+#endif
 
     //////////////////////////////////////////////////////////////////////////
 
@@ -623,18 +722,15 @@ int main(int argc, char** argv)
 //        36.528217)));
 //    renderer->setZoom(8.0f);
 
-    // Nice
-    renderer->setMapTarget(OsmAnd::PointI(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2),
+    // -latLon=/-zoom=, defaulting to Nice
+    renderer->setMapTarget(OsmAnd::PointI(SCREEN_WIDTH * density / 2, SCREEN_HEIGHT * density / 2),
         OsmAnd::Utilities::convertLatLonTo31(OsmAnd::LatLon(
-            43.5804,
-            7.1251)));
-    renderer->setZoom(14.0f);
+            startLatitude,
+            startLongitude)));
+    renderer->setZoom(startZoom);
 
-    renderer->setAzimuth(0.0f);
-
-    // Elevation
-    renderer->setElevationAngle(20.0f);
-    renderer->setAzimuth(-30.0f);
+    renderer->setElevationAngle(startElevationAngle);
+    renderer->setAzimuth(startAzimuth);
 
     auto renderConfig = renderer->getConfiguration();
     renderer->setConfiguration(renderConfig);
@@ -644,6 +740,19 @@ int main(int argc, char** argv)
 
     bool ok = renderer->initializeRendering(true);
     assert(ok);
+
+    // Map layers are chosen with keys 1..9 (see the on-screen hints). Starting with no layer at all
+    // shows an empty grid, which is only useful when no map data was given in the first place, so
+    // pointing the viewer at OBFs starts on the offline vector map unless -provider= says otherwise.
+    if (startProvider < 0)
+        startProvider = (obfsDirSpecified || dataDirSpecified) ? 2 : 0;
+    if (startProvider > 0)
+    {
+        activateProvider(0, startProvider);
+        // A vector map with no labels reads as broken; symbols are otherwise behind key 'h'.
+        if (startProvider >= 2 && startProvider <= 4)
+            toggleMapSymbols();
+    }
     //////////////////////////////////////////////////////////////////////////
 
     glutMainLoop();
@@ -715,9 +824,6 @@ void textInfoDialog(const QString& title, const QString& text)
 void mouseHandler(int button, int state, int x, int y)
 {
     auto modifiers = glutGetModifiers();
-#if defined(OSMAND_TARGET_OS_macosx)
-    x11AlterModifiers(modifiers);
-#endif // defined(OSMAND_TARGET_OS_macosx)
 
     if (button == GLUT_LEFT_BUTTON)
     {
@@ -860,9 +966,6 @@ void mouseMotion(int x, int y)
 void mouseWheelHandler(int button, int dir, int x, int y)
 {
     auto modifiers = glutGetModifiers();
-#if defined(OSMAND_TARGET_OS_macosx)
-    x11AlterModifiers(modifiers);
-#endif // defined(OSMAND_TARGET_OS_macosx)
 
     if (modifiers & GLUT_ACTIVE_ALT)
     {
@@ -898,9 +1001,6 @@ void mouseWheelHandler(int button, int dir, int x, int y)
 void keyboardHandler(unsigned char key, int x, int y)
 {
     auto modifiers = glutGetModifiers();
-#if defined(OSMAND_TARGET_OS_macosx)
-    x11AlterModifiers(modifiers);
-#endif // defined(OSMAND_TARGET_OS_macosx)
 
     const auto state = renderer->getState();
     const auto wasdZoom = static_cast<int>(
@@ -1179,19 +1279,7 @@ void keyboardHandler(unsigned char key, int x, int y)
         return;
     case 'h':
     {
-        if (mapObjectsSymbolsProvider && renderer->removeSymbolsProvider(mapObjectsSymbolsProvider))
-        {
-            mapObjectsSymbolsProvider.reset();
-        }
-        else
-        {
-            if (!binaryMapObjectsProvider)
-                binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection, obfMapObjectsProviderMode));
-            mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
-
-            mapObjectsSymbolsProvider.reset(new OsmAnd::MapObjectsSymbolsProvider(mapPrimitivesProvider, 256u, nullptr, false));
-            renderer->addSymbolsProvider(mapObjectsSymbolsProvider);
-        }
+        toggleMapSymbols();
         return;
     }
     case '.':
@@ -1325,9 +1413,6 @@ void keyboardHandler(unsigned char key, int x, int y)
 void specialHandler(int key, int x, int y)
 {
     auto modifiers = glutGetModifiers();
-#if defined(OSMAND_TARGET_OS_macosx)
-    x11AlterModifiers(modifiers);
-#endif // defined(OSMAND_TARGET_OS_macosx)
 
     const auto state = renderer->getState();
     const auto step = (modifiers & GLUT_ACTIVE_SHIFT) ? 1.0f : 0.1f;
@@ -1368,10 +1453,23 @@ void specialHandler(int key, int x, int y)
 void closeHandler()
 {
     renderer->releaseRendering(true);
+}
 
-#if defined(OSMAND_TARGET_OS_macosx)
-    x11Release();
-#endif // defined(OSMAND_TARGET_OS_macosx)
+void toggleMapSymbols()
+{
+    if (mapObjectsSymbolsProvider && renderer->removeSymbolsProvider(mapObjectsSymbolsProvider))
+    {
+        mapObjectsSymbolsProvider.reset();
+    }
+    else
+    {
+        if (!binaryMapObjectsProvider)
+            binaryMapObjectsProvider.reset(new OsmAnd::ObfMapObjectsProvider(obfsCollection, obfMapObjectsProviderMode));
+        mapPrimitivesProvider.reset(new OsmAnd::MapPrimitivesProvider(binaryMapObjectsProvider, primitivizer));
+
+        mapObjectsSymbolsProvider.reset(new OsmAnd::MapObjectsSymbolsProvider(mapPrimitivesProvider, 256u, nullptr, false));
+        renderer->addSymbolsProvider(mapObjectsSymbolsProvider);
+    }
 }
 
 void activateProvider(int layerIdx, int idx)
@@ -1397,6 +1495,7 @@ void activateProvider(int layerIdx, int idx)
         //settings.insert("contourLines", "11");
         // settings.insert("osmcTraces", "true");
 //        settings.insert("OSMMapperAssistantFixme", "true");
+        settings.insert(extraStyleSettings);
         mapPresentationEnvironment->setSettings(settings);
 
         auto tileProvider = new OsmAnd::MapRasterLayerProvider_Software(mapPrimitivesProvider);
@@ -1411,6 +1510,7 @@ void activateProvider(int layerIdx, int idx)
         // car
         QHash< QString, QString > settings;
         settings.insert("baseAppMode", "car");
+        settings.insert(extraStyleSettings);
         mapPresentationEnvironment->setSettings(settings);
 
         auto tileProvider = new OsmAnd::MapRasterLayerProvider_Software(mapPrimitivesProvider);
@@ -1425,6 +1525,7 @@ void activateProvider(int layerIdx, int idx)
         // bicycle
         QHash< QString, QString > settings;
         settings.insert("baseAppMode", "bicycle");
+        settings.insert(extraStyleSettings);
         mapPresentationEnvironment->setSettings(settings);
 
         auto tileProvider = new OsmAnd::MapRasterLayerProvider_Software(mapPrimitivesProvider);
@@ -1439,6 +1540,7 @@ void activateProvider(int layerIdx, int idx)
         // pedestrian
         QHash< QString, QString > settings;
         settings.insert("baseAppMode", "pedestrian");
+        settings.insert(extraStyleSettings);
         mapPresentationEnvironment->setSettings(settings);
 
         auto tileProvider = new OsmAnd::MapRasterLayerProvider_Software(mapPrimitivesProvider);
@@ -1571,8 +1673,17 @@ void displayHandler()
 
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-        auto w = 390;
-        auto h1 = 15.5f * 31;
+        // The panel is laid out in framebuffer pixels. On a display with a scaled framebuffer
+        // (every Retina Mac) that is half the intended size, so everything scales by the ratio;
+        // it is 1 wherever the framebuffer matches window points.
+#if defined(OSMAND_TARGET_OS_macosx)
+        const auto hudScale = glutCompatPixelScale();
+#else
+        const auto hudScale = 1.0f;
+#endif
+        const auto hudLine = 16.0f * hudScale;
+        auto w = 390 * hudScale;
+        auto h1 = 15.5f * 31 * hudScale;
         auto t = viewport.height();
         glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
         glBegin(GL_QUADS);
@@ -1590,150 +1701,150 @@ void displayHandler()
 #endif
         auto line = 0;
 
-        glRasterPos2f(8, t - 16 * (++line));
+        glRasterPos2f(8 * hudScale, t - hudLine * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("fov (keys i,k)         : %1").arg(state.fieldOfView)));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * (++line));
+        glRasterPos2f(8 * hudScale, t - hudLine * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("visible distance (f,r) : %1").arg(state.visibleDistance)));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * (++line));
+        glRasterPos2f(8 * hudScale, t - hudLine * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("detailed distance (g,t): %1").arg(state.detailedDistance)));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * (++line));
+        glRasterPos2f(8 * hudScale, t - hudLine * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("azimuth (arrows l,r)   : %1").arg(state.azimuth)));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * (++line));
+        glRasterPos2f(8 * hudScale, t - hudLine * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("pitch (arrows u,d)     : %1").arg(state.elevationAngle)));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * (++line));
+        glRasterPos2f(8 * hudScale, t - hudLine * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("target (keys w,a,s,d,l): %1 %2").arg(state.target31.x).arg(state.target31.y)));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * (++line));
+        glRasterPos2f(8 * hudScale, t - hudLine * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("zoom (mouse wheel)     : %1").arg(state.surfaceZoomLevel + (state.surfaceVisualZoom >= 1.0f ? state.surfaceVisualZoom - 1.0f : (state.surfaceVisualZoom - 1.0f) * 2.0f))));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * (++line));
+        glRasterPos2f(8 * hudScale, t - hudLine * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("zoom level (key z)     : %1").arg(state.surfaceZoomLevel)));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * (++line));
+        glRasterPos2f(8 * hudScale, t - hudLine * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("visual zoom (+ shift)  : %1 + %2").arg(state.visualZoom).arg(state.visualZoomShift)));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * (++line));
+        glRasterPos2f(8 * hudScale, t - hudLine * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("camera latitude        : %1").arg(std::dynamic_pointer_cast<OsmAnd::IAtlasMapRenderer>(renderer)->getCameraCoordinates().latitude)));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * (++line));
+        glRasterPos2f(8 * hudScale, t - hudLine * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("camera longitude       : %1").arg(std::dynamic_pointer_cast<OsmAnd::IAtlasMapRenderer>(renderer)->getCameraCoordinates().longitude)));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * (++line));
+        glRasterPos2f(8 * hudScale, t - hudLine * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("camera height (meters) : %1").arg(std::dynamic_pointer_cast<OsmAnd::IAtlasMapRenderer>(renderer)->getCameraHeight())));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * (++line));
+        glRasterPos2f(8 * hudScale, t - hudLine * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("visible tiles          : %1").arg(std::dynamic_pointer_cast<OsmAnd::IAtlasMapRenderer>(renderer)->getAllTilesCount())));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * (++line));
+        glRasterPos2f(8 * hudScale, t - hudLine * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("high-detailed tiles    : %1").arg(std::dynamic_pointer_cast<OsmAnd::IAtlasMapRenderer>(renderer)->getVisibleTilesCount())));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * (++line));
+        glRasterPos2f(8 * hudScale, t - hudLine * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("detail levels          : %1").arg(std::dynamic_pointer_cast<OsmAnd::IAtlasMapRenderer>(renderer)->getDetailLevelsCount())));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * (++line));
+        glRasterPos2f(8 * hudScale, t - hudLine * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("wireframe (key x)      : %1").arg(renderWireframe)));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * (++line));
+        glRasterPos2f(8 * hudScale, t - hudLine * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("elevation (key alt+e)  : %1").arg((bool)state.elevationDataProvider)));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * (++line));
+        glRasterPos2f(8 * hudScale, t - hudLine * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString(" -> preset (key e)     : %1").arg(elevationConfigurationPresets[elevationConfigurationPresetIndex].first)));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * (++line));
+        glRasterPos2f(8 * hudScale, t - hudLine * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString(" -> alpha (key E)      : %1").arg(state.elevationConfiguration.visualizationAlpha)));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * (++line));
+        glRasterPos2f(8 * hudScale, t - hudLine * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString(" -> z (key alt+E)      : %1").arg(state.elevationConfiguration.visualizationZ)));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * (++line));
+        glRasterPos2f(8 * hudScale, t - hudLine * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QStringLiteral("reverse geocoding (key o)")));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * (++line));
+        glRasterPos2f(8 * hudScale, t - hudLine * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("16-bit textures (key c): %1").arg(configuration->limitTextureColorDepthBy16bits)));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * (++line));
+        glRasterPos2f(8 * hudScale, t - hudLine * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("tex-filtering (b,n,m)  : %1").arg(static_cast<int>(configuration->texturesFilteringQuality))));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * (++line));
+        glRasterPos2f(8 * hudScale, t - hudLine * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("symbols (key h)        : %1").arg(!state.keyedSymbolsProviders.isEmpty() || !state.tiledSymbolsProviders.isEmpty())));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * (++line));
+        glRasterPos2f(8 * hudScale, t - hudLine * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("symbols loaded         : %1").arg(renderer->getSymbolsCount())));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * (++line));
+        glRasterPos2f(8 * hudScale, t - hudLine * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("symbols suspended ([)  : %1").arg(renderer->isSymbolsUpdateSuspended())));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * (++line));
+        glRasterPos2f(8 * hudScale, t - hudLine * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("Raster batching off (\\): %1").arg(renderer->getDebugSettings()->mapLayersBatchingForbidden)));
         verifyOpenGL();
 
-        glRasterPos2f(8, t - 16 * (++line));
+        glRasterPos2f(8 * hudScale, t - hudLine * (++line));
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("# of resource tasks    : %1").arg(renderer->getActiveResourceRequestsCount())));
         verifyOpenGL();
 
         glColor4f(0.5f, 0.5f, 0.5f, 0.6f);
         glBegin(GL_QUADS);
-        glVertex2f(0.0f, 16 * 13);
-        glVertex2f(w, 16 * 13);
+        glVertex2f(0.0f, hudLine * 13);
+        glVertex2f(w, hudLine * 13);
         glVertex2f(w, 0.0f);
         glVertex2f(0.0f, 0.0f);
         glEnd();
@@ -1744,7 +1855,7 @@ void displayHandler()
 #else
         glColor3f(0.2f, 0.2f, 0.2f);
 #endif
-        glRasterPos2f(8, 16 * 12);
+        glRasterPos2f(8 * hudScale, hudLine * 12);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("Last clicked tile: (%1, %2)@%3")
                 .arg(lastClickedLocation31.x >> (31 - state.zoomLevel))
@@ -1752,57 +1863,57 @@ void displayHandler()
                 .arg(state.zoomLevel)));
         verifyOpenGL();
 
-        glRasterPos2f(8, 16 * 11);
+        glRasterPos2f(8 * hudScale, hudLine * 11);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("Last clicked location: %1 %2").arg(lastClickedLocation31.x).arg(lastClickedLocation31.y)));
         verifyOpenGL();
 
-        glRasterPos2f(8, 16 * 10);
+        glRasterPos2f(8 * hudScale, hudLine * 10);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("Tile providers (holding alt controls overlay0):")));
         verifyOpenGL();
 
-        glRasterPos2f(8, 16 * 9);
+        glRasterPos2f(8 * hudScale, hudLine * 9);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("0 - disable")));
         verifyOpenGL();
 
-        glRasterPos2f(8, 16 * 8);
+        glRasterPos2f(8 * hudScale, hudLine * 8);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("1 - Mapnik (OsmAnd)")));
         verifyOpenGL();
 
-        glRasterPos2f(8, 16 * 7);
+        glRasterPos2f(8 * hudScale, hudLine * 7);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("2 - Offline maps [General]")));
         verifyOpenGL();
 
-        glRasterPos2f(8, 16 * 6);
+        glRasterPos2f(8 * hudScale, hudLine * 6);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("3 - Offline maps [Car]")));
         verifyOpenGL();
 
-        glRasterPos2f(8, 16 * 5);
+        glRasterPos2f(8 * hudScale, hudLine * 5);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("4 - Offline maps [Bicycle]")));
         verifyOpenGL();
 
-        glRasterPos2f(8, 16 * 4);
+        glRasterPos2f(8 * hudScale, hudLine * 4);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("5 - Offline maps [Pedestrian]")));
         verifyOpenGL();
 
-        glRasterPos2f(8, 16 * 3);
+        glRasterPos2f(8 * hudScale, hudLine * 3);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("6 - Metrics [Binary Map Data Provider]")));
         verifyOpenGL();
 
-        glRasterPos2f(8, 16 * 2);
+        glRasterPos2f(8 * hudScale, hudLine * 2);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("7 - Metrics [Binary Map Primitives Provider]")));
         verifyOpenGL();
 
-        glRasterPos2f(8, 16 * 1);
+        glRasterPos2f(8 * hudScale, hudLine * 1);
         glutBitmapString(GLUT_BITMAP_8_BY_13, (const unsigned char*)qPrintable(
             QString("8 - Metrics [Binary Map Raster Tile Provider]")));
         verifyOpenGL();
