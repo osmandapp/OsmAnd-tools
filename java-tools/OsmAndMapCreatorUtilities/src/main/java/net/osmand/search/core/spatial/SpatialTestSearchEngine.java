@@ -1,24 +1,31 @@
 package net.osmand.search.core.spatial;
 
 import java.io.IOException;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import net.osmand.osm.AbstractPoiType;
-
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.LatLon;
+import net.osmand.osm.AbstractPoiType;
 import net.osmand.osm.MapPoiTypes;
 
 public class SpatialTestSearchEngine {
     private final SpatialTextSearch spatialSearch;
     private final SpatialSearchContext searchContext;
 	private final SpatialResultFormatter resultFormatter;
+	private final SpatialSearchResultStore resultStore;
 
     public SpatialTestSearchEngine(SpatialTextSearch.SpatialTextSearchSettings spatialSettings, LatLon location,
                                    List<BinaryMapIndexReader> readers, MapPoiTypes.PoiTranslator poiTranslator,
                                    boolean translation) {
+        this("SpatialTestSearchEngine", spatialSettings, location, readers, poiTranslator, translation);
+    }
+
+    public SpatialTestSearchEngine(String testName, SpatialTextSearch.SpatialTextSearchSettings spatialSettings,
+                                   LatLon location, List<BinaryMapIndexReader> readers,
+                                   MapPoiTypes.PoiTranslator poiTranslator, boolean translation) {
         spatialSearch = new SpatialTextSearch();
         MapPoiTypes poiTypes = new MapPoiTypes(null);
         poiTypes.setPoiTranslator(translation ? new TestPoiTranslator() : poiTranslator);
@@ -28,6 +35,7 @@ public class SpatialTestSearchEngine {
         SpatialPoiSearch poiSearch = new SpatialPoiSearch(poiTypes);
         searchContext = new SpatialSearchContext(spatialSettings, readers, poiSearch, location);
         resultFormatter = new SpatialResultFormatter(searchContext, location, poiTypes);
+		resultStore = new SpatialSearchResultStore(testName);
     }
 
     public List<String> search(String phrase, boolean print) throws IOException {
@@ -35,6 +43,11 @@ public class SpatialTestSearchEngine {
         List<String> result = new ArrayList<>();
 		for (SpatialSearchResult res : mainResults) {
 			result.add(formatResult(res));
+		}
+		try {
+			resultStore.store(phrase, mainResults, result);
+		} catch (SQLException e) {
+			throw new IOException("Failed to store spatial search results", e);
 		}
 		return result;
 	}
@@ -51,7 +64,9 @@ public class SpatialTestSearchEngine {
 		return resultFormatter.format(r);
     }
 
-    public void close() {}
+    public void close() {
+		resultStore.close();
+	}
 
     private static class TestPoiTranslator implements MapPoiTypes.PoiTranslator {
 

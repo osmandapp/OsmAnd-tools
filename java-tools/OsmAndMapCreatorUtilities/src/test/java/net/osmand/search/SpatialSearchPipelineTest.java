@@ -553,7 +553,8 @@ public class SpatialSearchPipelineTest {
 
 	protected SpatialTestSearchEngine createSearchEngine(SpatialTextSearch.SpatialTextSearchSettings spatialSettings, 
 												  LatLon point, List<BinaryMapIndexReader> readers, boolean translation) {
-		return new SpatialTestSearchEngine(spatialSettings, point, readers, defaultPoiTranslator, translation);
+		return new SpatialTestSearchEngine(testFile.getName(), spatialSettings, point, readers,
+				defaultPoiTranslator, translation);
 	}
 	
 	@Test
