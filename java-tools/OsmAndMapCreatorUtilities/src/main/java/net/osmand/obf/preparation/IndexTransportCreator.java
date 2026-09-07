@@ -75,6 +75,11 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	private RTree transportStopsTree;
 	private Map<Long, Relation> masterRoutes = new HashMap<Long, Relation>();
 	private Connection gtfsConnection;
+	// osm ids (Way.getId()) of ways already covered by a real route=ferry relation -
+	// populated during the relations pre-pass (indexRelations), consulted during the ways pass
+	// (iterateMainEntity) so a real relation always takes priority over generating a route from
+	// the bare way directly (see issue #17773 design notes).
+	private Set<Long> ferryWaysInRelations = new HashSet<Long>();
 
 	private static final long TEST_ROUTE_ID_MISSING_STOPS = 192037l;
 	
@@ -258,6 +263,17 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	}
 
 	public void indexRelations(Relation e, OsmDbAccessorContext ctx) throws SQLException {
+		if ("ferry".equals(e.getTag(OSMTagKey.ROUTE))) {
+			// remember way members of a real ferry route relation, so the ways pass
+			// (iterateMainEntity) does not also generate a synthetic route for them
+			ctx.loadEntityRelation(e);
+			for (RelationMember member : e.getMembers()) {
+				Entity entity = member.getEntity();
+				if (entity instanceof Way) {
+					ferryWaysInRelations.add(entity.getId());
+				}
+			}
+		}
 		if (e.getTag(OSMTagKey.ROUTE_MASTER) != null) {
 			ctx.loadEntityRelation(e);
 			for (RelationMember child : ((Relation) e).getMembers()) {
@@ -310,6 +326,15 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			List<TransportRoute> troutes = new ArrayList<>();
 			indexTransportRoute((Relation) e, troutes, icc);
 			for(TransportRoute route : troutes) {
+				insertTransportIntoIndex(route);
+			}
+		} else if (e instanceof Way && "ferry".equals(e.getTag(OSMTagKey.ROUTE))
+				&& !ferryWaysInRelations.contains(e.getId())) {
+			// orphan ferry way: no wrapping public-transport relation exists for it (see issue #17773)
+			ctx.loadEntityWay((Way) e);
+			List<TransportRoute> troutes = new ArrayList<>();
+			indexTransportRouteFromWay((Way) e, troutes, icc);
+			for (TransportRoute route : troutes) {
 				insertTransportIntoIndex(route);
 			}
 		}
@@ -804,6 +829,93 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				transportRouteTagValues.registerTagValues(rel, backwardRoute.getId());
 			}
 		}
+	}
+
+	// Build direct + backward TransportRoute for a route=ferry way that has no wrapping
+	// public-transport relation (issue #17773). Stops are derived by scanning the way's own
+	// node list in order: any node tagged amenity=ferry_terminal becomes a stop wherever it sits
+	// along the way (a real intermediate port, e.g. Hyppeln on Nordöleden way/16794766, not only
+	// at the ends); the way's first/last node additionally always becomes a stop even without
+	// that tag, since the end of the way is a de facto boarding point (e.g. Smögen end of
+	// way/189584079, which carries no amenity=ferry_terminal tag).
+	// No stitching of adjacent orphan ferry ways into one composite route: each way gets its own
+	// TransportRoute with a real, traceable id; the router's existing stop-based transfer search
+	// (TransportRoutingContext::getTransportStops / walkChangeRadius) already connects them at a
+	// shared node with a normal (zero-distance) transfer, same as any other pair of routes.
+	private void indexTransportRouteFromWay(Way way, List<TransportRoute> troutes, IndexCreationContext icc) throws SQLException {
+		String ref = way.getTag(OSMTagKey.REF);
+		String route = way.getTag(OSMTagKey.ROUTE);
+		String operator = way.getTag(OSMTagKey.OPERATOR);
+		String color = way.getTag(OSMTagKey.COLOUR);
+		if (ref == null && route != null) {
+			String name = way.getTag(OSMTagKey.NAME);
+			if (name != null) {
+				if (name.length() <= 5) {
+					ref = name.toUpperCase();
+				} else if (name.contains(" ") || name.contains("-")) {
+					String[] subnames = name.split(" ");
+					char[] newRef = new char[subnames.length];
+					for (int i = 0; i < subnames.length; i++) {
+						if (!Algorithms.isEmpty(subnames[i])) {
+							newRef[i] = subnames[i].charAt(0);
+						}
+					}
+					ref = newRef.length <= 5 ? new String(newRef).toUpperCase() : new String(newRef).substring(0, 4).toUpperCase();
+				}
+			}
+		}
+		if (route == null || ref == null) {
+			return;
+		}
+		if (!acceptedRoutes.contains(route)) {
+			return;
+		}
+		if (color != null) {
+			String tmp = MapRenderingTypesEncoder.formatColorToPalette(color, false).replaceAll("_", "");
+			color = "subwayText" + Algorithms.capitalizeFirstLetter(tmp) + "Color";
+		}
+
+		List<Node> nodes = way.getNodes();
+		if (nodes.size() < 2) {
+			return;
+		}
+		List<TransportStop> forwardStops = new ArrayList<>();
+		for (int i = 0; i < nodes.size(); i++) {
+			Node n = nodes.get(i);
+			if (n == null) {
+				continue;
+			}
+			boolean isEndpoint = i == 0 || i == nodes.size() - 1;
+			boolean isTaggedTerminal = "ferry_terminal".equals(n.getTag(OSMTagKey.AMENITY));
+			if (isTaggedTerminal || isEndpoint) {
+				forwardStops.add(EntityParser.parseTransportStop(n));
+			}
+		}
+		if (forwardStops.size() < 2) {
+			return;
+		}
+
+		TransportRoute directRoute = EntityParser.parserRoute(way, ref);
+		directRoute.setOperator(operator);
+		directRoute.setColor(color);
+		directRoute.setType(route);
+		directRoute.setRef(ref);
+		directRoute.setId(directRoute.getId() << 1);
+		directRoute.setForwardStops(forwardStops);
+		directRoute.addWay(way);
+		troutes.add(directRoute);
+		transportRouteTagValues.registerTagValues(directRoute.getId(), way.getTags());
+
+		List<TransportStop> backwardStops = new ArrayList<>(forwardStops);
+		Collections.reverse(backwardStops);
+		TransportRoute backwardRoute = new TransportRoute(directRoute, backwardStops, directRoute.getForwardWays());
+		backwardRoute.setId(directRoute.getId() + 1);
+		backwardRoute.setName(reverseName(ref, backwardRoute.getName()));
+		if (!Algorithms.isEmpty(backwardRoute.getEnName(false))) {
+			backwardRoute.setEnName(reverseName(ref, backwardRoute.getEnName(false)));
+		}
+		troutes.add(backwardRoute);
+		transportRouteTagValues.registerTagValues(backwardRoute.getId(), way.getTags());
 	}
 
 	private void insertMissingStop(TransportRoute directRoute, List<Entity> incompleteStops,
