@@ -56,6 +56,9 @@ import net.osmand.shared.gpx.primitives.TrkSegment;
 import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.shared.io.KFile;
 import net.osmand.shared.routing.RouteColorize.ColorizationType;
+import net.osmand.shared.data.KQuadRect;
+import net.osmand.shared.data.KQuadTree;
+import net.osmand.shared.routing.DirectionPoint;
 import net.osmand.shared.routing.RouteCalculationProgress;
 import net.osmand.shared.routing.TurnType;
 import org.apache.commons.logging.Log;
@@ -82,8 +85,6 @@ import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.shared.routing.RouteTypeRule;
 import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
-import net.osmand.data.QuadRect;
-import net.osmand.data.QuadTree;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.obf.preparation.IndexHeightData;
 import net.osmand.osm.edit.Entity;
@@ -130,7 +131,7 @@ public class MapRouterLayer implements MapPanelLayer {
 	private JButton playPauseButton;
 	private JButton stopButton;
 	private GpxFile selectedGPXFile;
-	private QuadTree<net.osmand.osm.edit.Node> directionPointsFile;
+	private KQuadTree<DirectionPoint> directionPointsFile;
 
 
 	private List<RouteSegmentResult> previousRoute;
@@ -402,7 +403,7 @@ public class MapRouterLayer implements MapPanelLayer {
 					if (fileChooser.showOpenDialog(map) == JFileChooser.APPROVE_OPTION) {
 						File file = fileChooser.getSelectedFile();
 						Gson gson = new Gson();
-						directionPointsFile = new QuadTree<net.osmand.osm.edit.Node>(new QuadRect(0, 0, Integer.MAX_VALUE, Integer.MAX_VALUE), 15, 0.5f);
+						directionPointsFile = new KQuadTree<DirectionPoint>(new KQuadRect(0, 0, Integer.MAX_VALUE, Integer.MAX_VALUE), 15, 0.5f);
 						try {
 							com.google.gson.JsonObject mp = gson.fromJson(new JsonReader(new FileReader(file)), com.google.gson.JsonObject.class);
 							JsonElement features = mp.get("features");
@@ -416,7 +417,7 @@ public class MapRouterLayer implements MapPanelLayer {
 								double lon = ar.get(0).getAsDouble();
 								double lat = ar.get(1).getAsDouble();
 								JsonObject props = obj.get("properties").getAsJsonObject();
-								net.osmand.osm.edit.Node pt = new net.osmand.osm.edit.Node(lat, lon, -1);
+								DirectionPoint pt = new DirectionPoint(lat, lon);
 								int x = MapUtils.get31TileNumberX(lon);
 								int y = MapUtils.get31TileNumberY(lat);
 								Iterator<Entry<String, JsonElement>> keyIt = props.entrySet().iterator();
@@ -424,7 +425,7 @@ public class MapRouterLayer implements MapPanelLayer {
 									Entry<String, JsonElement> el = keyIt.next();
 									pt.putTag(el.getKey(), el.getValue().getAsString());
 								}
-								directionPointsFile.insert(pt, new QuadRect(x, y, x, y));
+								directionPointsFile.insert(pt, new KQuadRect(x, y, x, y));
 							}
 						} catch (Exception e1) {
 							log.info("Error loading directions point (geojson): " + e1.getMessage(), e1);
@@ -682,9 +683,14 @@ public class MapRouterLayer implements MapPanelLayer {
 			}
 		}
 		if (directionPointsFile != null) {
-			List<net.osmand.osm.edit.Node> pnts =
-					directionPointsFile.queryInBox(new QuadRect(0, 0, Integer.MAX_VALUE, Integer.MAX_VALUE), new ArrayList<net.osmand.osm.edit.Node>());
-			for (net.osmand.osm.edit.Node n : pnts) {
+			List<DirectionPoint> pnts =
+					directionPointsFile.queryInBox(new KQuadRect(0, 0, Integer.MAX_VALUE, Integer.MAX_VALUE), new ArrayList<DirectionPoint>());
+			for (DirectionPoint p : pnts) {
+				// the viewer draws Entity, so the point is shown through a node carrying its tags
+				net.osmand.osm.edit.Node n = new net.osmand.osm.edit.Node(p.getLatitude(), p.getLongitude(), -1);
+				for (Entry<String, String> tag : p.getTags().entrySet()) {
+					n.putTag(tag.getKey(), tag.getValue());
+				}
 				points.registerObject(n.getLatitude(), n.getLongitude(), n);
 			}
 		}
