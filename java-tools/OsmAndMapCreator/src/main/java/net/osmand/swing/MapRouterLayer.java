@@ -56,6 +56,7 @@ import net.osmand.shared.gpx.primitives.TrkSegment;
 import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.shared.io.KFile;
 import net.osmand.shared.routing.RouteColorize.ColorizationType;
+import net.osmand.shared.routing.RouteCalculationProgress;
 import net.osmand.shared.routing.TurnType;
 import org.apache.commons.logging.Log;
 import org.json.JSONException;

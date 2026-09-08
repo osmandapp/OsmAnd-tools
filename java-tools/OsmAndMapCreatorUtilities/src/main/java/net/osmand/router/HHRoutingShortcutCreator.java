@@ -30,6 +30,7 @@ import gnu.trove.map.TLongObjectMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.PlatformUtil;
 import net.osmand.shared.routing.RouteRegion;
+import net.osmand.shared.routing.RouteCalculationProgress;
 import net.osmand.shared.routing.RouteSubregion;
 import net.osmand.data.LatLon;
 import net.osmand.osm.edit.Entity;
