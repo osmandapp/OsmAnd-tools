@@ -18,7 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import net.osmand.Location;
-import net.osmand.binary.RouteDataBundle;
+import net.osmand.shared.routing.RouteDataBundle;
 import net.osmand.shared.routing.RouteTypeRule;
 import net.osmand.shared.util.StringBundle;
 import net.osmand.data.LatLon;
@@ -30,6 +30,7 @@ import net.osmand.util.MapUtils;
 import static net.osmand.gpx.GPXUtilities.GAP_PROFILE_TYPE;
 import static net.osmand.server.utils.WebGpxParser.LINE_PROFILE_TYPE;
 import static net.osmand.server.controllers.pub.GeojsonClasses.*;
+import net.osmand.shared.routing.RouteDataResources;
 
 @Service
 public class RoutingService {
@@ -422,7 +423,7 @@ public class RoutingService {
 
     private TrkSegment generateRouteSegments(List<RouteSegmentResult> route, List<Location> locations) {
         TrkSegment trkSegment = new TrkSegment();
-        RouteDataResources resources = new RouteDataResources(locations, Collections.emptyList());
+        RouteDataResources resources = new RouteDataResources(Location.toShared(locations), Collections.emptyList());
         List<StringBundle> routeItems = new ArrayList<>();
         if (!Algorithms.isEmpty(route)) {
             for (RouteSegmentResult sr : route) {
@@ -435,7 +436,7 @@ public class RoutingService {
             for (RouteSegmentResult sr : route) {
                 RouteDataBundle itemBundle = new RouteDataBundle(resources);
                 sr.writeToBundle(itemBundle);
-                routeItems.add(toKotlinStringBundle(itemBundle));
+                routeItems.add(itemBundle);
             }
         }
         List<StringBundle> typeList = new ArrayList<>();
@@ -446,7 +447,7 @@ public class RoutingService {
             if (rule.getValue() != null) {
                 typeBundle.putString("v", rule.getValue());
             }
-            typeList.add(toKotlinStringBundle(typeBundle));
+            typeList.add(typeBundle);
         }
 
         if (locations.isEmpty()) {
@@ -466,18 +467,6 @@ public class RoutingService {
         trkSegment.setRouteTypes(routeTypes);
 
         return trkSegment;
-    }
-
-    public StringBundle toKotlinStringBundle(RouteDataBundle routeDataBundle) {
-        StringBundle kotlinBundle = new StringBundle();
-        for (Map.Entry<String, net.osmand.binary.StringBundle.Item<?>> entry : routeDataBundle.getMap().entrySet()) {
-            String key = entry.getKey();
-            String value = entry.getValue().getValue() != null ? entry.getValue().getValue().toString() : null;
-            if (value != null) {
-                kotlinBundle.putString(key, value);
-            }
-        }
-        return kotlinBundle;
     }
 
     private void addDistance(List<WebGpxParser.Point> pointsRes) {
