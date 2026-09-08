@@ -25,7 +25,7 @@ import net.osmand.router.HHRoutePlanner;
 import net.osmand.router.NativeTransportRoutingResult;
 import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RouteResultPreparation;
-import net.osmand.router.RouteSegmentResult;
+import net.osmand.shared.routing.RouteSegmentResult;
 import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingContext;
 import net.osmand.router.TransportRoutePlanner;
