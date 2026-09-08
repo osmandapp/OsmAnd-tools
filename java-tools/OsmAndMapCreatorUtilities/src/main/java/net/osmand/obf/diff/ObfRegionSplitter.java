@@ -2,7 +2,7 @@ package net.osmand.obf.diff;
 
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.MapZooms.MapZoomPair;
-import net.osmand.binary.RouteDataObject;
+import net.osmand.shared.routing.RouteDataObject;
 import net.osmand.data.Amenity;
 import net.osmand.data.TransportStop;
 import net.osmand.map.OsmandRegions;

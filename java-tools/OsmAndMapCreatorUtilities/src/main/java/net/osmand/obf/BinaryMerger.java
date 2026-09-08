@@ -8,7 +8,7 @@ import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
 import net.osmand.ResultMatcher;
-import net.osmand.binary.BinaryIndexPart;
+import net.osmand.shared.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.CityBlocks;
 import net.osmand.binary.BinaryMapIndexReader;

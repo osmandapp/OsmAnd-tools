@@ -17,8 +17,8 @@ import net.osmand.binary.BinaryMapIndexReader.MapRoot;
 import net.osmand.binary.BinaryMapIndexReader.SearchFilter;
 import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
 import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
-import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
-import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
+import net.osmand.shared.routing.RouteRegion;
+import net.osmand.shared.routing.RouteSubregion;
 import net.osmand.binary.BinaryMapTransportReaderAdapter.TransportIndex;
 import net.osmand.binary.MapZooms.MapZoomPair;
 import net.osmand.data.Amenity;
@@ -42,6 +42,8 @@ import java.util.*;
 import java.util.Map.Entry;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
+import net.osmand.shared.routing.RouteDataObject;
+import net.osmand.shared.binary.BinaryIndexPart;
 
 public class ObfFileInMemory {
 	private static final int ZOOM_LEVEL_POI = 15;

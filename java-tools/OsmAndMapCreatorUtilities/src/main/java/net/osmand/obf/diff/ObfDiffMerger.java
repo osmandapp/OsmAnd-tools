@@ -14,6 +14,8 @@ import org.apache.commons.logging.Log;
 import net.osmand.PlatformUtil;
 import net.osmand.util.Algorithms;
 import rtree.RTreeException;
+import net.osmand.shared.routing.RouteDataObject;
+import net.osmand.shared.routing.RouteRegion;
 
 public class ObfDiffMerger {
 	static SimpleDateFormat day = new SimpleDateFormat("yyyy_MM_dd");
@@ -141,7 +143,7 @@ public class ObfDiffMerger {
 		System.out.println("Map section. Merged " + cnt);
 
 		//Route section
-		BinaryMapRouteReaderAdapter.RouteRegion ri = commonObf.getRouteIndex();
+		RouteRegion ri = commonObf.getRouteIndex();
 		deleteId = ri.searchRouteEncodingRule(OSMAND_CHANGE_TAG, OSMAND_CHANGE_VALUE);
 		TLongObjectHashMap<RouteDataObject> relRouteData = relObf.getRoutingData();
 		TLongObjectHashMap<RouteDataObject> commonRouteData = commonObf.getRoutingData();

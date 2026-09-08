@@ -9,9 +9,9 @@ import java.util.*;
 
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
-import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
-import net.osmand.binary.RouteDataObject;
+import net.osmand.shared.routing.RouteRegion;
+import net.osmand.shared.routing.RouteSubregion;
+import net.osmand.shared.routing.RouteDataObject;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.router.*;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;

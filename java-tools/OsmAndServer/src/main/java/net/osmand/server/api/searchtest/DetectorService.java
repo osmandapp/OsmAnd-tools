@@ -30,6 +30,7 @@ import java.sql.SQLException;
 import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
+import net.osmand.shared.routing.RouteDataObject;
 
 public interface DetectorService extends OBFService {
 	ClassicSearchService getClassicSearchService();

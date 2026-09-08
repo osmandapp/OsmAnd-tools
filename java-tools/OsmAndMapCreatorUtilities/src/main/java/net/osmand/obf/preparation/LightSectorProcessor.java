@@ -29,7 +29,7 @@ import net.osmand.MainUtilities;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.MapZooms;
 import net.osmand.binary.MapZooms.MapZoomPair;
-import net.osmand.binary.RouteDataObject;
+import net.osmand.shared.routing.RouteDataObject;
 import net.osmand.data.LatLon;
 import net.osmand.obf.BinaryInspector;
 import net.osmand.obf.BinaryInspector.FileExtractFrom;

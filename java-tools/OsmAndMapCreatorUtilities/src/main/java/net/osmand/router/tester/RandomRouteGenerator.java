@@ -3,11 +3,11 @@ package net.osmand.router.tester;
 import net.osmand.PlatformUtil;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryHHRouteReaderAdapter;
-import net.osmand.binary.BinaryIndexPart;
+import net.osmand.shared.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapRouteReaderAdapter;
 import net.osmand.binary.ObfConstants;
-import net.osmand.binary.RouteDataObject;
+import net.osmand.shared.routing.RouteDataObject;
 import net.osmand.data.LatLon;
 import net.osmand.map.WorldRegion;
 import net.osmand.router.HHRouteDataStructure;
@@ -25,6 +25,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
+import net.osmand.shared.routing.RouteRegion;
+import net.osmand.shared.routing.RouteSubregion;
 
 class RandomRouteGenerator {
 	private final RandomRouteTester.GeneratorConfig config;
@@ -131,7 +133,7 @@ class RandomRouteGenerator {
 
 		Set<String> routingIndexNames = new HashSet<>();
 		for (BinaryIndexPart part : parts) {
-				if (part instanceof BinaryMapRouteReaderAdapter.RouteRegion that) {
+				if (part instanceof RouteRegion that) {
 				routingIndexNames.add(that.getName());
 			}
 		}
@@ -191,13 +193,13 @@ class RandomRouteGenerator {
 		int pointSkipDivisor = 1 + fixedRandom(100, RandomActions.HIGHWAY_SKIP_DIV, 0, seed);
 
 		for (BinaryIndexPart p : index.getIndexes()) {
-			if (p instanceof BinaryMapRouteReaderAdapter.RouteRegion) {
-				List<BinaryMapRouteReaderAdapter.RouteSubregion> regions =
+			if (p instanceof RouteRegion) {
+				List<RouteSubregion> regions =
 						index.searchRouteIndexTree(
 								BinaryMapIndexReader.buildSearchRequest(
 										0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, 15, null
 								),
-								((BinaryMapRouteReaderAdapter.RouteRegion) p).getSubregions()
+								((RouteRegion) p).getSubregions()
 						);
 				index.loadRouteIndexData(regions, new ResultMatcher<>() {
 					@Override
