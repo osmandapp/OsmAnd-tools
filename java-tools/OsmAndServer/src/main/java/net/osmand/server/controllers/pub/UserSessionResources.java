@@ -19,7 +19,7 @@ import net.osmand.shared.gpx.GpxTrackAnalysis;
 import net.osmand.shared.gpx.primitives.Metadata;
 import org.springframework.stereotype.Component;
 
-import net.osmand.router.RouteCalculationProgress;
+import net.osmand.shared.routing.RouteCalculationProgress;
 
 @WebListener
 @Component

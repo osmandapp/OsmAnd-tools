@@ -22,6 +22,7 @@ import net.osmand.router.HHRoutingPreparationDB.NetworkRouteRegion;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RoutingConfiguration.Builder;
 import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
+import net.osmand.shared.routing.RouteCalculationProgress;
 
 public class HHRoutingPrepareContext {
 
