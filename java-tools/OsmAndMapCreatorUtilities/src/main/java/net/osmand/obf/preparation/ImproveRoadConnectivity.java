@@ -21,6 +21,7 @@ import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
 import net.osmand.router.RoutingContext.RoutingSubregionTile;
 import net.osmand.util.MapUtils;
 import org.apache.commons.logging.Log;
+import net.osmand.shared.routing.VehicleRouter;
 
 
 //This map generation step adds roads to the Base routing to improve it.
