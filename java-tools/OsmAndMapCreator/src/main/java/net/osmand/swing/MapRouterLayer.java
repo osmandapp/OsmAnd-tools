@@ -62,6 +62,7 @@ import net.osmand.shared.routing.DirectionPoint;
 import net.osmand.shared.routing.RouteCalculationProgress;
 import net.osmand.shared.routing.TurnType;
 import net.osmand.shared.routing.RoutingConfiguration;
+import net.osmand.shared.routing.PrecalculatedRouteDirection;
 import org.apache.commons.logging.Log;
 import org.json.JSONException;
 import org.json.JSONObject;
