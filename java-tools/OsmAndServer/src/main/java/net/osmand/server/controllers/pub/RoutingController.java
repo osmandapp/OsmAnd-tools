@@ -43,7 +43,7 @@ import net.osmand.shared.routing.GeneralRouter;
 import net.osmand.shared.routing.GeneralRouter.RoutingParameterType;
 import net.osmand.shared.routing.RouteCalculationProgress;
 import net.osmand.shared.routing.RouteSegmentResult;
-import net.osmand.router.RoutingConfiguration;
+import net.osmand.shared.routing.RoutingConfiguration;
 import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.api.services.OsmAndMapsService.RoutingServerConfigEntry;
 import net.osmand.server.api.services.RoutingService;

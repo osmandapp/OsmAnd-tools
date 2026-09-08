@@ -2,7 +2,7 @@ package net.osmand.swing;
 
 
 
-import static net.osmand.router.RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT;
+import static net.osmand.shared.routing.RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT;
 
 import java.awt.Color;
 import java.awt.Component;
@@ -61,6 +61,7 @@ import net.osmand.shared.data.KQuadTree;
 import net.osmand.shared.routing.DirectionPoint;
 import net.osmand.shared.routing.RouteCalculationProgress;
 import net.osmand.shared.routing.TurnType;
+import net.osmand.shared.routing.RoutingConfiguration;
 import org.apache.commons.logging.Log;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -100,7 +101,7 @@ import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 import net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RouteResultPreparation.RouteCalcResult;
-import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
+import net.osmand.shared.routing.RoutingConfiguration.RoutingMemoryLimits;
 import net.osmand.util.MapUtils;
 import net.osmand.shared.routing.RouteSegmentResult;
 import net.osmand.shared.util.KMapUtils;

@@ -2,7 +2,6 @@ package net.osmand.swing;
 
 import java.awt.Rectangle;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
@@ -11,14 +10,13 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.prefs.Preferences;
 
-import org.xmlpull.v1.XmlPullParserException;
 
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.CachedOsmandIndexes;
 import net.osmand.binary.MapZooms;
 import net.osmand.data.LatLon;
-import net.osmand.router.RoutingConfiguration;
-import net.osmand.router.RoutingConfiguration.Builder;
+import net.osmand.shared.routing.RoutingConfiguration;
+import net.osmand.shared.routing.RoutingConfiguration.Builder;
 import net.osmand.util.Algorithms;
 
 
@@ -306,10 +304,8 @@ public class DataExtractionSettings {
 			builder = RoutingConfiguration.getDefault() ;
 		} else{
 			try {
-				builder = RoutingConfiguration.parseFromInputStream(new FileInputStream(xmlPath));
-			} catch (IOException e) {
-				throw new IllegalArgumentException("Error parsing routing.xml file",e);
-			} catch (XmlPullParserException e) {
+				builder = RoutingConfiguration.parseFromFile(xmlPath);
+			} catch (Exception e) {
 				throw new IllegalArgumentException("Error parsing routing.xml file",e);
 			}
 		}

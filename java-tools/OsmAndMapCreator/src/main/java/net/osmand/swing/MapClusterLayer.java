@@ -1,8 +1,8 @@
 package net.osmand.swing;
 
-import static net.osmand.router.RoutingConfiguration.DEFAULT_MEMORY_LIMIT;
-import static net.osmand.router.RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT;
-import static net.osmand.router.RoutingConfiguration.getDefault;
+import static net.osmand.shared.routing.RoutingConfiguration.DEFAULT_MEMORY_LIMIT;
+import static net.osmand.shared.routing.RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT;
+import static net.osmand.shared.routing.RoutingConfiguration.getDefault;
 
 import java.awt.Graphics2D;
 import java.awt.Point;
@@ -39,9 +39,9 @@ import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.shared.routing.RouteSegmentResult;
-import net.osmand.router.RoutingConfiguration;
-import net.osmand.router.RoutingConfiguration.Builder;
-import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
+import net.osmand.shared.routing.RoutingConfiguration;
+import net.osmand.shared.routing.RoutingConfiguration.Builder;
+import net.osmand.shared.routing.RoutingConfiguration.RoutingMemoryLimits;
 import net.osmand.router.RoutingContext;
 import net.osmand.util.MapUtils;
 
