@@ -7,15 +7,13 @@ import static net.osmand.search.SearchUICore.createAddressString;
 import static net.osmand.search.SearchUICore.getDominatedCity;
 import static net.osmand.search.SearchUICore.getMainCityName;
 import static net.osmand.shared.gpx.GpxUtilities.OSM_PREFIX;
-import static net.osmand.util.OpeningHoursParser.parseOpenedHours;
+import static net.osmand.shared.util.OpeningHoursParser.parseOpenedHours;
 
-import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.StringJoiner;
-import java.util.TimeZone;
 import java.util.TreeMap;
 
 import org.jetbrains.annotations.Nullable;
@@ -38,7 +36,8 @@ import net.osmand.search.core.TopIndexFilter;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import net.osmand.server.controllers.pub.GeojsonClasses.Geometry;
 import net.osmand.util.Algorithms;
-import net.osmand.util.OpeningHoursParser.OpeningHours;
+import net.osmand.shared.util.OpeningHoursParser.OpeningHours;
+import net.osmand.shared.util.OpeningHoursTime;
 
 @Service
 public class SearchResultConverter {
@@ -133,7 +132,7 @@ public class SearchResultConverter {
 			feature.prop(entry.getKey(), value);
 		}
 		String openingHoursValue = tags.get(AMENITY_PREFIX + OPENING_HOURS);
-		Calendar clientTime = getClientTime(timeZone);
+		OpeningHoursTime clientTime = getClientTime(timeZone);
 		if (clientTime != null && openingHoursValue != null) {
 			String openingHoursInfo = getOpeningHoursInfo(openingHoursValue, clientTime);
 			if (openingHoursInfo != null) {
@@ -285,10 +284,10 @@ public class SearchResultConverter {
 		return merged;
 	}
 
-	private String getOpeningHoursInfo(String openingHoursValue, Calendar calendar) {
+	private String getOpeningHoursInfo(String openingHoursValue, OpeningHoursTime time) {
 		OpeningHours openingHours = parseOpenedHours(openingHoursValue);
 		if (openingHours != null) {
-			List<OpeningHours.Info> openingHoursInfo = openingHours.getInfo(calendar);
+			List<OpeningHours.Info> openingHoursInfo = openingHours.getInfo(time);
 			if (!Algorithms.isEmpty(openingHoursInfo)) {
 				StringJoiner openHoursInfos = new StringJoiner(";");
 				for (OpeningHours.Info info : openingHoursInfo) {
@@ -366,12 +365,10 @@ public class SearchResultConverter {
 	}
 
 	@Nullable
-	private static Calendar getClientTime(String timeZone) {
+	private static OpeningHoursTime getClientTime(String timeZone) {
 		if (Algorithms.isBlank(timeZone)) {
 			return null;
 		}
-		Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone(timeZone));
-		calendar.setTimeInMillis(System.currentTimeMillis());
-		return calendar;
+		return OpeningHoursTime.ofEpochMillis(System.currentTimeMillis(), timeZone);
 	}
 }

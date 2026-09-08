@@ -6,6 +6,7 @@ import net.osmand.ResultMatcher;
 import net.osmand.binary.*;
 import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
 import net.osmand.data.*;
+import net.osmand.shared.routing.RouteTypeRule;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.osmand.util.SearchAlgorithms;
@@ -3734,7 +3735,7 @@ public interface InspectorService extends OBFService {
 		JSONArray types = new JSONArray();
 		if (road.types != null) {
 			for (int type : road.types) {
-				BinaryMapRouteReaderAdapter.RouteTypeRule rule = road.region.quickGetEncodingRule(type);
+				RouteTypeRule rule = road.region.quickGetEncodingRule(type);
 				if (rule != null) {
 					JSONObject typeJson = new JSONObject();
 					typeJson.put("tag", rule.getTag());
@@ -3747,7 +3748,7 @@ public interface InspectorService extends OBFService {
 		JSONArray names = new JSONArray();
 		if (road.nameIds != null && road.names != null) {
 			for (int nameId : road.nameIds) {
-				BinaryMapRouteReaderAdapter.RouteTypeRule rule = road.region.quickGetEncodingRule(nameId);
+				RouteTypeRule rule = road.region.quickGetEncodingRule(nameId);
 				if (rule == null) {
 					continue;
 				}

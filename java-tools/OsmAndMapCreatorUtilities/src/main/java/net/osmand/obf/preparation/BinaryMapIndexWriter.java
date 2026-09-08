@@ -42,8 +42,7 @@ import net.osmand.IndexConstants;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.CityBlocks;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
-import net.osmand.binary.BinaryMapRouteReaderAdapter;
-import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteTypeRule;
+import net.osmand.shared.routing.RouteTypeRule;
 import net.osmand.binary.OsmandOdb;
 import net.osmand.binary.OsmandOdb.AddressNameIndexDataAtom;
 import net.osmand.binary.OsmandOdb.CityBlockIndex;
@@ -441,7 +440,7 @@ public class BinaryMapIndexWriter {
 		}
 	}
 
-	public void writeRouteRawEncodingRules(List<BinaryMapRouteReaderAdapter.RouteTypeRule> types) throws IOException {
+	public void writeRouteRawEncodingRules(List<RouteTypeRule> types) throws IOException {
 		checkPeekState(ROUTE_INDEX_INIT);
 
 		for (int i = 1; i < types.size(); i++) {

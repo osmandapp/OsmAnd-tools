@@ -14,6 +14,7 @@ import net.osmand.router.HHRouteDataStructure;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
+import net.osmand.shared.routing.RouteTypeRule;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -202,7 +203,7 @@ class RandomRouteGenerator {
 					@Override
 					public boolean publish(RouteDataObject obj) {
 						for (int i = 0; i < obj.getTypes().length; i++) {
-							BinaryMapRouteReaderAdapter.RouteTypeRule rr =
+							RouteTypeRule rr =
 									obj.region.quickGetEncodingRule(obj.getTypes()[i]);
 							// use highway=primary|secondary as a universally suitable way for any profile
 							if ("highway".equals(rr.getTag()) &&
