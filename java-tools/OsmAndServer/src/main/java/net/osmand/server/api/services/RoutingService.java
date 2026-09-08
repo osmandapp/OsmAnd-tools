@@ -32,6 +32,7 @@ import static net.osmand.server.utils.WebGpxParser.LINE_PROFILE_TYPE;
 import static net.osmand.server.controllers.pub.GeojsonClasses.*;
 import net.osmand.shared.routing.RouteDataResources;
 import net.osmand.shared.routing.RouteSegmentResult;
+import net.osmand.shared.routing.GeneralRouter;
 
 @Service
 public class RoutingService {

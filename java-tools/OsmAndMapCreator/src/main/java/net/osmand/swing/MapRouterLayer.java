@@ -102,6 +102,7 @@ import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
 import net.osmand.util.MapUtils;
 import net.osmand.shared.routing.RouteSegmentResult;
 import net.osmand.shared.util.KMapUtils;
+import net.osmand.shared.routing.GeneralRouter;
 
 
 public class MapRouterLayer implements MapPanelLayer {

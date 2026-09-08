@@ -19,7 +19,7 @@ import java.util.Set;
 import net.osmand.MainUtilities.CommandLineOpts;
 import net.osmand.PlatformUtil;
 import net.osmand.NativeLibrary;
-import net.osmand.router.GeneralRouter;
+import net.osmand.shared.routing.GeneralRouter;
 import net.osmand.router.HHRouteDataStructure;
 import net.osmand.router.HHRoutePlanner;
 import net.osmand.router.NativeTransportRoutingResult;
