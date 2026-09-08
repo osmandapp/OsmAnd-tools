@@ -1,7 +1,7 @@
 package net.osmand.swing;
 
-import static net.osmand.router.RoutingConfiguration.DEFAULT_MEMORY_LIMIT;
-import static net.osmand.router.RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT;
+import static net.osmand.shared.routing.RoutingConfiguration.DEFAULT_MEMORY_LIMIT;
+import static net.osmand.shared.routing.RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT;
 
 import net.osmand.binary.BinaryMapAddressReaderAdapter.CityBlocks;
 import net.osmand.binary.BinaryMapIndexReader;
@@ -15,8 +15,8 @@ import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.router.RoutePlannerFrontEnd;
-import net.osmand.router.RoutingConfiguration;
-import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
+import net.osmand.shared.routing.RoutingConfiguration;
+import net.osmand.shared.routing.RoutingConfiguration.RoutingMemoryLimits;
 import net.osmand.router.RoutingContext;
 import net.osmand.util.MapUtils;
 

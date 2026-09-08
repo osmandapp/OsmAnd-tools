@@ -14,6 +14,7 @@ import net.osmand.util.Algorithms;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
+import net.osmand.shared.routing.RoutingConfiguration;
 
 @Ignore
 public class JUnitRouteTest  {
