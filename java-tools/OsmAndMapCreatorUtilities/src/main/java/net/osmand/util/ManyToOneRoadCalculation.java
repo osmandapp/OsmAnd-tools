@@ -22,7 +22,7 @@ import net.osmand.shared.routing.RouteSubregion;
 import net.osmand.shared.routing.RouteDataObject;
 import net.osmand.router.BinaryRoutePlanner;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
-import net.osmand.router.GeneralRouter;
+import net.osmand.shared.routing.GeneralRouter;
 import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RoutingConfiguration;

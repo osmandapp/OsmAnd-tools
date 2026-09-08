@@ -39,6 +39,7 @@ import net.osmand.router.BinaryRoutePlanner.RouteSegmentPoint;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 import net.osmand.router.HHRouteDataStructure.NetworkDBSegment;
 import net.osmand.util.MapUtils;
+import net.osmand.shared.routing.GeneralRouter;
 
 public class HHRoutingShortcutCreator {
 

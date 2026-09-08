@@ -36,7 +36,7 @@ import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Way;
-import net.osmand.router.GeneralRouter;
+import net.osmand.shared.routing.GeneralRouter;
 import net.osmand.router.NativeTransportRoutingResult;
 import net.osmand.router.RoutingConfiguration.Builder;
 import net.osmand.router.TransportRoutePlanner;
