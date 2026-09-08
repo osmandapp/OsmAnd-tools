@@ -100,6 +100,8 @@ import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RouteResultPreparation.RouteCalcResult;
 import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
 import net.osmand.util.MapUtils;
+import net.osmand.shared.routing.RouteSegmentResult;
+import net.osmand.shared.util.KMapUtils;
 
 
 public class MapRouterLayer implements MapPanelLayer {
@@ -1002,7 +1004,7 @@ public class MapRouterLayer implements MapPanelLayer {
 					int i = rs.getStartPointIndex(), end = rs.getEndPointIndex();
 					int step = i <= end ? 1 : -1;
 					while (i != end) {
-						d += MapUtils.getDistance(rs.getPoint(i), rs.getPoint(i + step));
+						d += KMapUtils.INSTANCE.getDistance(rs.getPoint(i), rs.getPoint(i + step));
 						i += step;
 					}
 				}
@@ -1053,7 +1055,7 @@ public class MapRouterLayer implements MapPanelLayer {
 		int i = segment.getStartPointIndex(), end = segment.getEndPointIndex();
 		int step = i <= end ? 1 : -1;
 		while (true) {
-			LatLon l = segment.getPoint(i);
+			LatLon l = LatLon.of(segment.getPoint(i));
 			w.addNode(new net.osmand.osm.edit.Node(l.getLatitude(), l.getLongitude(), -1));
 			if (i == end) {
 				break;
@@ -1370,7 +1372,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				way.putTag("colour", colour);
 			}
 			if (prevSegm != null
-					&& MapUtils.getDistance(prevSegm.getEndPoint(), segm.getStartPoint()) > 0) {
+					&& KMapUtils.INSTANCE.getDistance(prevSegm.getEndPoint(), segm.getStartPoint()) > 0) {
 				net.osmand.osm.edit.Node pp = new net.osmand.osm.edit.Node(prevSegm.getEndPoint().getLatitude(), prevSegm.getEndPoint().getLongitude(), -1);
 				res.add(pp);
 				pp.putTag("colour", "blue");
@@ -1378,14 +1380,14 @@ public class MapRouterLayer implements MapPanelLayer {
 				pn.putTag("colour", "red");
 				res.add(pn);
 				System.out.println(String.format("Not connected road '%f m' (%.5f/%.5f -> %.5f/%.5f) [%d: %s -> %d: %s]",
-						MapUtils.getDistance(prevSegm.getEndPoint(), segm.getStartPoint()),
+						KMapUtils.INSTANCE.getDistance(prevSegm.getEndPoint(), segm.getStartPoint()),
 						pp.getLatLon().getLatitude(), pp.getLatLon().getLongitude(), pn.getLatLon().getLatitude(), pn.getLatLon().getLongitude(),
 						segm.getStartPointIndex(), segm.getObject(), prevSegm.getStartPointIndex(), prevSegm.getObject() ));
 			}
 			boolean plus = segm.getStartPointIndex() < segm.getEndPointIndex();
 			int ind = segm.getStartPointIndex();
 			while (true) {
-				LatLon l = segm.getPoint(ind);
+				LatLon l = LatLon.of(segm.getPoint(ind));
 				net.osmand.osm.edit.Node n = new net.osmand.osm.edit.Node(l.getLatitude(), l.getLongitude(), -1);
 
 				int[] pointTypes = segm.getObject().getPointTypes(ind);

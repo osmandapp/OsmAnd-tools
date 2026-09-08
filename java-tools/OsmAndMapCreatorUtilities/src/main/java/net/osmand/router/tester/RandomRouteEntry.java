@@ -2,7 +2,7 @@ package net.osmand.router.tester;
 
 import net.osmand.shared.routing.RouteDataObject;
 import net.osmand.data.LatLon;
-import net.osmand.router.RouteSegmentResult;
+import net.osmand.shared.routing.RouteSegmentResult;
 import net.osmand.router.RoutingContext;
 import net.osmand.router.TransportRoutePlanner;
 import net.osmand.router.TransportRouteResult;

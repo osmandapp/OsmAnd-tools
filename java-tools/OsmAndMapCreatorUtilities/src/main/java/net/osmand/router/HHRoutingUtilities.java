@@ -35,6 +35,7 @@ import net.osmand.router.HHRoutingSubGraphCreator.NetworkIsland;
 import net.osmand.router.HHRoutingSubGraphCreator.RouteSegmentBorderPoint;
 import net.osmand.router.HHRoutingSubGraphCreator.RouteSegmentVertex;
 import net.osmand.util.MapUtils;
+import net.osmand.shared.routing.RouteSegmentResult;
 
 public class HHRoutingUtilities {
 	static long DEBUG_OSM_ID = -1;

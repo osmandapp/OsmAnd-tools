@@ -31,6 +31,7 @@ import static net.osmand.gpx.GPXUtilities.GAP_PROFILE_TYPE;
 import static net.osmand.server.utils.WebGpxParser.LINE_PROFILE_TYPE;
 import static net.osmand.server.controllers.pub.GeojsonClasses.*;
 import net.osmand.shared.routing.RouteDataResources;
+import net.osmand.shared.routing.RouteSegmentResult;
 
 @Service
 public class RoutingService {
@@ -316,7 +317,7 @@ public class RoutingService {
                     double lon = r.getStartPoint().getLongitude();
                     point = Geometry.pointElevation(new LatLonEle(lat, lon, ele));
                 } else {
-                    point = Geometry.point(r.getStartPoint());
+                    point = Geometry.point(LatLon.of(r.getStartPoint()));
                 }
 
                 Feature f = new Feature(point);
@@ -401,7 +402,7 @@ public class RoutingService {
             int dir = r.isForwardDirection() ? 1 : -1;
             String description = r.getDescription(true);
             if (!Algorithms.isEmpty(description)) {
-                Feature f = new Feature(Geometry.point(r.getStartPoint()));
+                Feature f = new Feature(Geometry.point(LatLon.of(r.getStartPoint())));
                 f.prop("description", description).prop("routingTime", r.getRoutingTime())
                         .prop("segmentTime", r.getRoutingTime()).prop("segmentSpeed", r.getRoutingTime())
                         .prop("roadId", r.getObject().getId());
@@ -409,9 +410,9 @@ public class RoutingService {
             }
             for (i = r.getStartPointIndex(); ; i += dir) {
                 if(i != r.getEndPointIndex()) {
-                    resList.add(r.getPoint(i));
+                    resList.add(LatLon.of(r.getPoint(i)));
                 } else {
-                    last = r.getPoint(i);
+                    last = LatLon.of(r.getPoint(i));
                     break;
                 }
             }
@@ -509,7 +510,7 @@ public class RoutingService {
     }
 
     private void getPoint(int ind, RouteSegmentResult r, List<Location> locations, float[] heightArray, List<WebGpxParser.Point> pointsRes) {
-        LatLon point = r.getPoint(ind);
+        LatLon point = LatLon.of(r.getPoint(ind));
         locations.add(new Location("", point.getLatitude(), point.getLongitude()));
         WptPt pt = new WptPt();
         if (heightArray != null && heightArray.length > ind * 2 + 1) {
