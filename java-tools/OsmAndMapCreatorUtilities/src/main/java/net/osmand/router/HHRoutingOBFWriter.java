@@ -40,7 +40,7 @@ import gnu.trove.procedure.TLongProcedure;
 import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryHHRouteReaderAdapter.HHRouteRegion;
-import net.osmand.binary.BinaryIndexPart;
+import net.osmand.shared.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapIndexReader.MapIndex;
@@ -61,6 +61,8 @@ import rtree.RTree;
 import rtree.RTreeException;
 import rtree.RTreeInsertException;
 import rtree.Rect;
+import net.osmand.shared.routing.RouteRegion;
+import net.osmand.shared.routing.RouteSubregion;
 
 public class HHRoutingOBFWriter {
 	final static Log LOG = PlatformUtil.getLog(HHRoutingOBFWriter.class);

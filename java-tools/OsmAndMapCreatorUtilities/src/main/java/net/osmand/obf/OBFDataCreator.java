@@ -4,7 +4,7 @@ import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapIndexTestReader;
 import net.osmand.binary.OsmandOdb;
-import net.osmand.binary.RouteDataObject;
+import net.osmand.shared.routing.RouteDataObject;
 import net.osmand.obf.diff.ObfFileInMemory;
 import net.osmand.util.Algorithms;
 import rtree.RTreeException;

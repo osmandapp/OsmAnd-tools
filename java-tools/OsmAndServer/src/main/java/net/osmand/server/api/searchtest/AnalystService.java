@@ -25,6 +25,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 import static net.osmand.binary.ObfConstants.*;
+import net.osmand.shared.binary.BinaryIndexPart;
 
 public interface AnalystService extends InspectorService, GenDbService {
 

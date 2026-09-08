@@ -7,7 +7,7 @@ import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import net.osmand.MainUtilities;
 import net.osmand.ResultMatcher;
-import net.osmand.binary.BinaryIndexPart;
+import net.osmand.shared.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapIndexReader.MapIndex;

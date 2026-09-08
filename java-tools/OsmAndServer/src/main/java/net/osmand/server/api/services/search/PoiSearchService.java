@@ -20,7 +20,7 @@ import org.springframework.stereotype.Service;
 
 import net.osmand.CollatorStringMatcher;
 import net.osmand.ResultMatcher;
-import net.osmand.binary.BinaryIndexPart;
+import net.osmand.shared.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.BinaryMapIndexReader.SearchPoiTypeFilter;

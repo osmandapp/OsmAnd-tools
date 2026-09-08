@@ -51,7 +51,7 @@ import net.osmand.binary.BinaryMapAddressReaderAdapter;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapPoiReaderAdapter;
 import net.osmand.binary.BinaryMapRouteReaderAdapter;
-import net.osmand.binary.RouteDataObject;
+import net.osmand.shared.routing.RouteDataObject;
 import net.osmand.obf.OBFDataCreator;
 import net.osmand.obf.preparation.IndexAddressCreator;
 import net.osmand.obf.preparation.IndexCreator;
@@ -64,6 +64,8 @@ import net.osmand.search.core.SearchCoreFactory;
 import net.osmand.search.core.spatial.SpatialTestSearchEngine;
 import net.osmand.util.Algorithms;
 import net.osmand.shared.routing.RouteTypeRule;
+import net.osmand.shared.routing.RouteRegion;
+import net.osmand.shared.routing.RouteSubregion;
 
 /**
  * Unit-test class is responsible for:
@@ -798,10 +800,10 @@ public class SpatialSearchPipelineTest {
 		try (RandomAccessFile r = new RandomAccessFile(file.getAbsolutePath(), "r")) {
 			BinaryMapIndexReader index = new BinaryMapIndexReader(r, file);
 			try {
-				for (BinaryMapRouteReaderAdapter.RouteRegion region : index.getRoutingIndexes()) {
+				for (RouteRegion region : index.getRoutingIndexes()) {
 					BinaryMapIndexReader.SearchRequest<RouteDataObject> request = BinaryMapIndexReader.buildSearchRouteRequest(
 							0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, null);
-					List<BinaryMapRouteReaderAdapter.RouteSubregion> subregions =
+					List<RouteSubregion> subregions =
 							index.searchRouteIndexTree(request, region.getSubregions());
 					index.loadRouteIndexData(subregions, new ResultMatcher<>() {
 						@Override

@@ -18,8 +18,8 @@ import net.osmand.binary.OsmandOdb.OsmAndRoutingIndex.RouteDataBlock;
 import net.osmand.binary.OsmandOdb.RestrictionData;
 import net.osmand.binary.OsmandOdb.RestrictionData.Builder;
 import net.osmand.binary.OsmandOdb.RouteData;
-import net.osmand.binary.RouteDataObject;
-import net.osmand.binary.RouteDataObject.RestrictionInfo;
+import net.osmand.shared.routing.RouteDataObject;
+import net.osmand.shared.routing.RouteDataObject.RestrictionInfo;
 import net.osmand.data.*;
 import net.osmand.obf.preparation.BinaryMapIndexWriter.RoutePointToWrite;
 import net.osmand.osm.MapRenderingTypes;
@@ -49,6 +49,7 @@ import java.io.RandomAccessFile;
 import java.sql.*;
 import java.util.*;
 import java.util.Map.Entry;
+import net.osmand.shared.util.collections.KTIntObjectIterator;
 
 public class IndexRouteCreator extends AbstractIndexPartCreator {
 
@@ -1398,7 +1399,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 
 					wayNames.clear();
 					if (rdo.names != null) {
-						TIntObjectIterator<String> it = rdo.names.iterator();
+						KTIntObjectIterator<String> it = rdo.names.iterator();
 						while (it.hasNext()) {
 							it.advance();
 							int vl = it.key();

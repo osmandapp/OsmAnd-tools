@@ -22,6 +22,10 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 import static net.osmand.binary.ObfConstants.*;
+import net.osmand.shared.routing.RouteDataObject;
+import net.osmand.shared.routing.RouteRegion;
+import net.osmand.shared.routing.RouteSubregion;
+import net.osmand.shared.binary.BinaryIndexPart;
 
 public interface InspectorService extends OBFService {
 	enum ObfLengthType {
@@ -3624,10 +3628,10 @@ public interface InspectorService extends OBFService {
 		try (RandomAccessFile r = new RandomAccessFile(file.getAbsolutePath(), "r")) {
 			BinaryMapIndexReader index = new BinaryMapIndexReader(r, file);
 			try {
-				for (BinaryMapRouteReaderAdapter.RouteRegion region : index.getRoutingIndexes()) {
+				for (RouteRegion region : index.getRoutingIndexes()) {
 					BinaryMapIndexReader.SearchRequest<RouteDataObject> request = BinaryMapIndexReader.buildSearchRouteRequest(
 							0, Integer.MAX_VALUE, 0, Integer.MAX_VALUE, null);
-					List<BinaryMapRouteReaderAdapter.RouteSubregion> subregions =
+					List<RouteSubregion> subregions =
 							index.searchRouteIndexTree(request, region.getSubregions());
 					index.loadRouteIndexData(subregions, new ResultMatcher<>() {
 						@Override

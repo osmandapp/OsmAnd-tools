@@ -21,6 +21,10 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import net.osmand.shared.routing.RouteDataObject;
+import net.osmand.shared.routing.RouteRegion;
+import net.osmand.shared.routing.RouteSubregion;
+import net.osmand.shared.util.collections.KTIntObjectMap;
 
 public class BinaryMapIndexTestReader extends BinaryMapIndexReader {
 
@@ -113,10 +117,10 @@ public class BinaryMapIndexTestReader extends BinaryMapIndexReader {
 		if (sourceJson.has("routing")) {
 			JSONArray routingArr = sourceJson.getJSONArray("routing");
 			List<RouteDataObject> routeObjects = new ArrayList<>();
-			BinaryMapRouteReaderAdapter.RouteRegion region = new BinaryMapRouteReaderAdapter.RouteRegion();
+			RouteRegion region = new RouteRegion();
 			region.name = Algorithms.getFileNameWithoutExtension(jsonFile);
 			region.routeEncodingRules.add(null);
-			BinaryMapRouteReaderAdapter.RouteSubregion subregion = new BinaryMapRouteReaderAdapter.RouteSubregion(region);
+			RouteSubregion subregion = new RouteSubregion(region);
 			subregion.filePointer = 1;
 			subregion.length = 1;
 			int left = Integer.MAX_VALUE;
@@ -155,7 +159,7 @@ public class BinaryMapIndexTestReader extends BinaryMapIndexReader {
 	}
 
 	private static RouteDataObject parseRouteDataObject(JSONObject routeObj,
-			BinaryMapRouteReaderAdapter.RouteRegion region) {
+			RouteRegion region) {
 		RouteDataObject route = new RouteDataObject(region);
 		route.id = routeObj.optLong("id");
 		route.pointsX = parseIntArray(routeObj.optJSONArray("pointsX"));
@@ -171,7 +175,7 @@ public class BinaryMapIndexTestReader extends BinaryMapIndexReader {
 		JSONArray namesArr = routeObj.optJSONArray("names");
 		if (namesArr != null && namesArr.length() > 0) {
 			route.nameIds = new int[namesArr.length()];
-			route.names = new TIntObjectHashMap<>();
+			route.names = new KTIntObjectMap<>();
 			for (int i = 0; i < namesArr.length(); i++) {
 				JSONObject nameObj = namesArr.getJSONObject(i);
 				int ruleId = region.findOrCreateRouteType(nameObj.optString("tag"), null);
@@ -292,8 +296,8 @@ public class BinaryMapIndexTestReader extends BinaryMapIndexReader {
 
 	@Override
 	public boolean containsRouteData(int left31x, int top31y, int right31x, int bottom31y, int zoom) {
-		for (BinaryMapRouteReaderAdapter.RouteRegion region : routingIndexes) {
-			for (BinaryMapRouteReaderAdapter.RouteSubregion subregion : region.getSubregions()) {
+		for (RouteRegion region : routingIndexes) {
+			for (RouteSubregion subregion : region.getSubregions()) {
 				if (right31x >= subregion.left && left31x <= subregion.right
 						&& subregion.top <= bottom31y && subregion.bottom >= top31y) {
 					return true;
@@ -304,10 +308,10 @@ public class BinaryMapIndexTestReader extends BinaryMapIndexReader {
 	}
 
 	@Override
-	public List<BinaryMapRouteReaderAdapter.RouteSubregion> searchRouteIndexTree(SearchRequest<?> req,
-			List<BinaryMapRouteReaderAdapter.RouteSubregion> list) {
-		List<BinaryMapRouteReaderAdapter.RouteSubregion> result = new ArrayList<>();
-		for (BinaryMapRouteReaderAdapter.RouteSubregion subregion : list) {
+	public List<RouteSubregion> searchRouteIndexTree(SearchRequest<?> req,
+			List<RouteSubregion> list) {
+		List<RouteSubregion> result = new ArrayList<>();
+		for (RouteSubregion subregion : list) {
 			if (req.intersects(subregion.left, subregion.top, subregion.right, subregion.bottom)) {
 				result.add(subregion);
 			}
@@ -316,9 +320,9 @@ public class BinaryMapIndexTestReader extends BinaryMapIndexReader {
 	}
 
 	@Override
-	public void loadRouteIndexData(List<BinaryMapRouteReaderAdapter.RouteSubregion> toLoad,
+	public void loadRouteIndexData(List<RouteSubregion> toLoad,
 			ResultMatcher<RouteDataObject> matcher) {
-		for (BinaryMapRouteReaderAdapter.RouteSubregion subregion : toLoad) {
+		for (RouteSubregion subregion : toLoad) {
 			if (subregion.dataObjects == null) {
 				continue;
 			}
@@ -332,7 +336,7 @@ public class BinaryMapIndexTestReader extends BinaryMapIndexReader {
 	}
 
 	@Override
-	public List<RouteDataObject> loadRouteIndexData(BinaryMapRouteReaderAdapter.RouteSubregion rs) {
+	public List<RouteDataObject> loadRouteIndexData(RouteSubregion rs) {
 		return rs.dataObjects == null ? Collections.emptyList() : rs.dataObjects;
 	}
 

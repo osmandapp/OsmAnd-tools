@@ -35,7 +35,7 @@ import gnu.trove.map.hash.TLongObjectHashMap;
 import net.osmand.IndexConstants;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryHHRouteReaderAdapter.HHRouteRegion;
-import net.osmand.binary.BinaryIndexPart;
+import net.osmand.shared.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.AddressRegion;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.CitiesBlock;
 import net.osmand.binary.BinaryMapAddressReaderAdapter.CityBlocks;
@@ -49,8 +49,8 @@ import net.osmand.binary.BinaryMapIndexReader.TagValuePair;
 import net.osmand.binary.BinaryMapIndexReaderStats.MapObjectStat;
 import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiSubType;
-import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
-import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
+import net.osmand.shared.routing.RouteRegion;
+import net.osmand.shared.routing.RouteSubregion;
 import net.osmand.shared.routing.RouteTypeRule;
 import net.osmand.binary.BinaryMapTransportReaderAdapter.TransportIndex;
 import net.osmand.binary.NameIndexReader;
@@ -59,7 +59,7 @@ import net.osmand.binary.NameIndexReader.SuffixesStat;
 import net.osmand.binary.NameIndexReader.ValueFreq;
 import net.osmand.binary.ObfConstants;
 import net.osmand.binary.OsmandOdb;
-import net.osmand.binary.RouteDataObject;
+import net.osmand.shared.routing.RouteDataObject;
 import net.osmand.data.Amenity;
 import net.osmand.data.Building;
 import net.osmand.data.City;
@@ -78,6 +78,7 @@ import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 import net.osmand.router.TransportRoutePlanner;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
+import net.osmand.shared.util.collections.KTIntObjectMap;
 
 public class BinaryInspector {
 
@@ -1421,7 +1422,7 @@ public class BinaryInspector {
 			String value = quoteName(rt.getValue());
 			tags.append("\t<tag k='").append(rt.getTag()).append("' v='").append(value).append("' />\n");
 		}
-		TIntObjectHashMap<String> names = obj.getNames();
+		KTIntObjectMap<String> names = obj.getNames();
 		if (names != null && !names.isEmpty()) {
 			int[] keys = names.keys();
 			for (int j = 0; j < keys.length; j++) {

@@ -27,7 +27,7 @@ import org.apache.commons.logging.LogFactory;
 
 import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.binary.RouteDataObject;
+import net.osmand.shared.routing.RouteDataObject;
 import net.osmand.data.DataTileManager;
 import net.osmand.data.LatLon;
 import net.osmand.osm.edit.Entity;
