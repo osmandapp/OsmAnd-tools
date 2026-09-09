@@ -835,7 +835,11 @@ public class MapRouterLayer implements MapPanelLayer {
 					router.setUseOnlyHHRouting(true).setHHRoutingConfig(hhConfig);
 					res = selfRoute(startRoute, endRoute, intermediates, false, previousRoute, router,  m);
 					if (USE_CACHE_CONTEXT) {
-						cacheHHCtx = hhConfig.cacheCtx;
+						// HHRoutingConfig is in OsmAnd-shared now and carries the context as an Object:
+						// HHRoutingContext holds BinaryMapIndexReaders and stays in net.osmand.router
+						@SuppressWarnings("unchecked")
+						HHRoutingContext<NetworkDBPoint> cached = (HHRoutingContext<NetworkDBPoint>) hhConfig.cacheCtx;
+						cacheHHCtx = cached;
 					}
 				} else {
 					router.setUseOnlyHHRouting(false).setHHRoutingConfig(null);
