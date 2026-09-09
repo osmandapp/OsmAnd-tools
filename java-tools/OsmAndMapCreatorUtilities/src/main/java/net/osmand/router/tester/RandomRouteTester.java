@@ -599,7 +599,7 @@ public class RandomRouteTester {
 		long started = System.currentTimeMillis();
 
 		HHRoutePlanner.DEBUG_VERBOSE_LEVEL = 1;
-		HHRouteDataStructure.HHRoutingConfig.STATS_VERBOSE_LEVEL = 1;
+		HHRoutingConfig.STATS_VERBOSE_LEVEL = 1;
 		RouteResultPreparation.PRINT_TO_CONSOLE_ROUTE_INFORMATION = true;
 
 		RoutePlannerFrontEnd fe = new RoutePlannerFrontEnd();

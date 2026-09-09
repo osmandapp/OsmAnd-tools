@@ -12,7 +12,7 @@ import net.osmand.obf.preparation.DBDialect;
 import net.osmand.osm.edit.Entity;
 import net.osmand.router.HHRouteDataStructure.HHNetworkRouteRes;
 import net.osmand.router.HHRouteDataStructure.HHNetworkSegmentRes;
-import net.osmand.router.HHRouteDataStructure.HHRoutingConfig;
+import net.osmand.shared.routing.HHRoutingConfig;
 
 public class TestHHRouting {
 	
