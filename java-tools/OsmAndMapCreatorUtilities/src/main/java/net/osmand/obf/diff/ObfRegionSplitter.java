@@ -1,7 +1,6 @@
 package net.osmand.obf.diff;
 
 import net.osmand.binary.BinaryMapDataObject;
-import net.osmand.binary.BinaryMapRouteReaderAdapter;
 import net.osmand.binary.MapZooms.MapZoomPair;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.Amenity;
@@ -13,6 +12,7 @@ import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
+import net.osmand.shared.routing.RouteTypeRule;
 
 import java.io.File;
 import java.io.IOException;
@@ -243,7 +243,7 @@ public class ObfRegionSplitter {
 		Way simpleWay = new Way(obj.getId(), nodes);
 		List<String> removeAfterSrtm = new ArrayList<>();
 		for (int t : obj.getTypes()) {
-			BinaryMapRouteReaderAdapter.RouteTypeRule type = obj.region.routeEncodingRules.get(t);
+			RouteTypeRule type = obj.region.routeEncodingRules.get(t);
 			String tag = type.getTag();
 			if (IndexHeightData.ELEVATION_TAGS.contains(tag)) {
 				// already has SRTM tags

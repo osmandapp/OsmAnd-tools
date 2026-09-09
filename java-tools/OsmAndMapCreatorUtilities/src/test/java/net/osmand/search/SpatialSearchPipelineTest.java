@@ -63,6 +63,7 @@ import net.osmand.osm.MapPoiTypes;
 import net.osmand.search.core.SearchCoreFactory;
 import net.osmand.search.core.spatial.SpatialTestSearchEngine;
 import net.osmand.util.Algorithms;
+import net.osmand.shared.routing.RouteTypeRule;
 
 /**
  * Unit-test class is responsible for:
@@ -915,7 +916,7 @@ public class SpatialSearchPipelineTest {
 		JSONArray types = new JSONArray();
 		if (road.types != null) {
 			for (int type : road.types) {
-				BinaryMapRouteReaderAdapter.RouteTypeRule rule = road.region.quickGetEncodingRule(type);
+				RouteTypeRule rule = road.region.quickGetEncodingRule(type);
 				if (rule != null) {
 					JSONObject typeJson = new JSONObject();
 					typeJson.put("tag", rule.getTag());
@@ -928,7 +929,7 @@ public class SpatialSearchPipelineTest {
 		JSONArray names = new JSONArray();
 		if (road.nameIds != null && road.names != null) {
 			for (int nameId : road.nameIds) {
-				BinaryMapRouteReaderAdapter.RouteTypeRule rule = road.region.quickGetEncodingRule(nameId);
+				RouteTypeRule rule = road.region.quickGetEncodingRule(nameId);
 				if (rule == null) {
 					continue;
 				}

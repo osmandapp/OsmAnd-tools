@@ -18,8 +18,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import net.osmand.Location;
-import net.osmand.binary.BinaryMapRouteReaderAdapter;
 import net.osmand.binary.RouteDataBundle;
+import net.osmand.shared.routing.RouteTypeRule;
 import net.osmand.shared.util.StringBundle;
 import net.osmand.data.LatLon;
 import net.osmand.server.controllers.pub.RoutingController;
@@ -30,6 +30,7 @@ import net.osmand.util.MapUtils;
 import static net.osmand.gpx.GPXUtilities.GAP_PROFILE_TYPE;
 import static net.osmand.server.utils.WebGpxParser.LINE_PROFILE_TYPE;
 import static net.osmand.server.controllers.pub.GeojsonClasses.*;
+
 @Service
 public class RoutingService {
 
@@ -438,10 +439,13 @@ public class RoutingService {
             }
         }
         List<StringBundle> typeList = new ArrayList<>();
-        Map<BinaryMapRouteReaderAdapter.RouteTypeRule, Integer> rules = resources.getRules();
-        for (BinaryMapRouteReaderAdapter.RouteTypeRule rule : rules.keySet()) {
+        Map<RouteTypeRule, Integer> rules = resources.getRules();
+        for (RouteTypeRule rule : rules.keySet()) {
             RouteDataBundle typeBundle = new RouteDataBundle(resources);
-            rule.writeToBundle(typeBundle);
+            typeBundle.putString("t", rule.getTag());
+            if (rule.getValue() != null) {
+                typeBundle.putString("v", rule.getValue());
+            }
             typeList.add(toKotlinStringBundle(typeBundle));
         }
 
