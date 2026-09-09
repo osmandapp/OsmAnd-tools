@@ -96,7 +96,7 @@ import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentVisitor;
 import net.osmand.router.HHRouteDataStructure.HHNetworkRouteRes;
 import net.osmand.router.HHRouteDataStructure.HHNetworkSegmentRes;
-import net.osmand.router.HHRouteDataStructure.HHRoutingConfig;
+import net.osmand.shared.routing.HHRoutingConfig;
 import net.osmand.router.HHRouteDataStructure.HHRoutingContext;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 import net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
@@ -835,7 +835,11 @@ public class MapRouterLayer implements MapPanelLayer {
 					router.setUseOnlyHHRouting(true).setHHRoutingConfig(hhConfig);
 					res = selfRoute(startRoute, endRoute, intermediates, false, previousRoute, router,  m);
 					if (USE_CACHE_CONTEXT) {
-						cacheHHCtx = hhConfig.cacheCtx;
+						// HHRoutingConfig is in OsmAnd-shared now and carries the context as an Object:
+						// HHRoutingContext holds BinaryMapIndexReaders and stays in net.osmand.router
+						@SuppressWarnings("unchecked")
+						HHRoutingContext<NetworkDBPoint> cached = (HHRoutingContext<NetworkDBPoint>) hhConfig.cacheCtx;
+						cacheHHCtx = cached;
 					}
 				} else {
 					router.setUseOnlyHHRouting(false).setHHRoutingConfig(null);

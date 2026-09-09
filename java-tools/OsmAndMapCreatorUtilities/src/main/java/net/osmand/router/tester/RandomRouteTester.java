@@ -20,6 +20,7 @@ import net.osmand.MainUtilities.CommandLineOpts;
 import net.osmand.PlatformUtil;
 import net.osmand.NativeLibrary;
 import net.osmand.shared.routing.GeneralRouter;
+import net.osmand.shared.routing.HHRoutingConfig;
 import net.osmand.router.HHRouteDataStructure;
 import net.osmand.router.HHRoutePlanner;
 import net.osmand.router.NativeTransportRoutingResult;
@@ -599,7 +600,7 @@ public class RandomRouteTester {
 		long started = System.currentTimeMillis();
 
 		HHRoutePlanner.DEBUG_VERBOSE_LEVEL = 1;
-		HHRouteDataStructure.HHRoutingConfig.STATS_VERBOSE_LEVEL = 1;
+		HHRoutingConfig.STATS_VERBOSE_LEVEL = 1;
 		RouteResultPreparation.PRINT_TO_CONSOLE_ROUTE_INFORMATION = true;
 
 		RoutePlannerFrontEnd fe = new RoutePlannerFrontEnd();

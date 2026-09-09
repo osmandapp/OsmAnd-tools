@@ -82,7 +82,7 @@ import net.osmand.shared.routing.GeneralRouter;
 import net.osmand.shared.routing.GeneralRouter.RoutingParameter;
 import net.osmand.shared.routing.GeneralRouter.RoutingParameterType;
 import net.osmand.router.GpxRouteApproximation;
-import net.osmand.router.HHRouteDataStructure.HHRoutingConfig;
+import net.osmand.shared.routing.HHRoutingConfig;
 import net.osmand.router.HHRouteDataStructure.HHRoutingContext;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 import net.osmand.shared.routing.RouteCalculationProgress;
@@ -1285,7 +1285,10 @@ public class OsmAndMapsService {
 		synchronized (routingCaches) {
 			for (RoutingCacheContext c : routingCaches) {
 				if (c.rCtx == ctx) {
-					c.hCtx = c.hhConfig.cacheCtx;
+					// HHRoutingConfig is in OsmAnd-shared now and carries the context as an Object
+					@SuppressWarnings("unchecked")
+					HHRoutingContext<NetworkDBPoint> cached = (HHRoutingContext<NetworkDBPoint>) c.hhConfig.cacheCtx;
+					c.hCtx = cached;
 					c.locked = 0;
 					return true;
 				}

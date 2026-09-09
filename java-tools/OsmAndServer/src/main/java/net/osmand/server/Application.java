@@ -26,7 +26,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 import kotlinx.serialization.json.Json;
 import kotlinx.serialization.json.Json.Default;
-import net.osmand.router.HHRouteDataStructure.HHRoutingConfig;
+import net.osmand.shared.routing.HHRoutingConfig;
 import net.osmand.router.HHRoutePlanner;
 import net.osmand.router.RouteResultPreparation;
 import net.osmand.server.api.services.StorageService;
