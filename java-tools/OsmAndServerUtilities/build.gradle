@@ -44,4 +44,7 @@ dependencies {
 	implementation 'com.sendgrid:sendgrid-java:4.2.1'
 	implementation 'org.apache.commons:commons-email:1.5'
 	implementation 'org.apache.commons:commons-csv:1.10.0'
+
+	implementation platform('software.amazon.awssdk:bom:2.25.66')
+	implementation 'software.amazon.awssdk:s3'
 }
