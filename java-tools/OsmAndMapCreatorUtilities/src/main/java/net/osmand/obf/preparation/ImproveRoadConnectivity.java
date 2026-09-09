@@ -16,7 +16,7 @@ import net.osmand.shared.routing.RoutingConfiguration;
 import net.osmand.impl.ConsoleProgressImplementation;
 import net.osmand.router.*;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
-import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
+import net.osmand.shared.routing.RouteCalculationMode;
 import net.osmand.shared.routing.RoutingConfiguration.Builder;
 import net.osmand.shared.routing.RoutingConfiguration.RoutingMemoryLimits;
 import net.osmand.router.RoutingContext.RoutingSubregionTile;

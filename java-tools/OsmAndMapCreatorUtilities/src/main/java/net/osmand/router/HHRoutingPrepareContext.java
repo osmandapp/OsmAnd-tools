@@ -19,7 +19,7 @@ import static net.osmand.shared.routing.RouteConditionalHelper.RULE_INT_MAX;
 
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.router.HHRoutingPreparationDB.NetworkRouteRegion;
-import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
+import net.osmand.shared.routing.RouteCalculationMode;
 import net.osmand.shared.routing.RoutingConfiguration.Builder;
 import net.osmand.shared.routing.RoutingConfiguration.RoutingMemoryLimits;
 import net.osmand.shared.routing.RouteCalculationProgress;
