@@ -37,7 +37,7 @@ import net.osmand.router.BinaryRoutePlanner.RouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentVisitor;
 import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
-import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
+import net.osmand.shared.routing.RouteCalculationMode;
 import net.osmand.shared.routing.RouteSegmentResult;
 import net.osmand.shared.routing.RoutingConfiguration;
 import net.osmand.shared.routing.RoutingConfiguration.Builder;

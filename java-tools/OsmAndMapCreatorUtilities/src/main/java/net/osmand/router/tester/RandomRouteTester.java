@@ -36,6 +36,7 @@ import net.osmand.util.Algorithms;
 
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.util.MapUtils;
+import net.osmand.shared.routing.RouteCalculationMode;
 
 public class RandomRouteTester {
 	static final String PUBLIC_TRANSPORT_PROFILE = "public_transport";
@@ -551,10 +552,8 @@ public class RandomRouteTester {
 
 		RoutingConfiguration config = buildRoutingConfiguration(builder, entry, memoryLimits);
 
-		RoutePlannerFrontEnd.RouteCalculationMode mode =
-				(this.config.CAR_2PHASE_MODE && "car".equals(entry.profile)) ?
-						RoutePlannerFrontEnd.RouteCalculationMode.COMPLEX :
-						RoutePlannerFrontEnd.RouteCalculationMode.NORMAL;
+		RouteCalculationMode mode = (this.config.CAR_2PHASE_MODE && "car".equals(entry.profile)) ?
+				RouteCalculationMode.COMPLEX : RouteCalculationMode.NORMAL;
 
 		if (this.config.USE_TIME_CONDITIONAL_ROUTING == 1) {
 			config.routeCalculationTime = System.currentTimeMillis();
@@ -630,7 +629,7 @@ public class RandomRouteTester {
 				config,
 				useNative ? nativeLibrary : null,
 				obfReaders.toArray(new BinaryMapIndexReader[0]),
-				RoutePlannerFrontEnd.RouteCalculationMode.NORMAL
+				RouteCalculationMode.NORMAL
 		);
 		applyImpassableRoads(ctx, entry);
 

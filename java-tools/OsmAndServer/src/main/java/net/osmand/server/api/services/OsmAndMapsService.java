@@ -88,7 +88,7 @@ import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 import net.osmand.shared.routing.RouteCalculationProgress;
 import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
-import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
+import net.osmand.shared.routing.RouteCalculationMode;
 import net.osmand.router.RouteResultPreparation;
 import net.osmand.router.RouteResultPreparation.RouteCalcResult;
 import net.osmand.shared.routing.RouteSegmentResult;

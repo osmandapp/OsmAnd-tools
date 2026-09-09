@@ -100,7 +100,7 @@ import net.osmand.router.HHRouteDataStructure.HHRoutingConfig;
 import net.osmand.router.HHRouteDataStructure.HHRoutingContext;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 import net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
-import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
+import net.osmand.shared.routing.RouteCalculationMode;
 import net.osmand.router.RouteResultPreparation.RouteCalcResult;
 import net.osmand.shared.routing.RoutingConfiguration.RoutingMemoryLimits;
 import net.osmand.util.MapUtils;
