@@ -1209,6 +1209,9 @@ public class SpatialSearchPipelineTest {
 				settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES);
 		settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES = settingsJson.optInt("LIMIT_GOAL_LEVEL_2", settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES);
 		settings.DEV_USE_PIPELINE = settingsJson.optBoolean("DEV_USE_PIPELINE", settings.DEV_USE_PIPELINE);
+		// the golden lists here are recorded with the lexicographic ladder, so the score ranking is
+		// off by default and a test that wants it asks for it
+		settings.SCORE_RANKING = settingsJson.optBoolean("SCORE_RANKING", false);
 
 		return settings;
 	}
