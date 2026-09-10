@@ -24,9 +24,6 @@ import net.osmand.search.core.ObjectType;
 import net.osmand.search.core.SearchResult;
 import net.osmand.search.core.spatial.SpatialSearchContext;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
-
 import net.osmand.search.core.spatial.SpatialTextSearch.SpatialSearchResults;
 import net.osmand.search.core.spatial.SpatialTextSearch.SpatialTextSearchSettings;
 import net.osmand.search.core.spatial.SpatialSearchResult;

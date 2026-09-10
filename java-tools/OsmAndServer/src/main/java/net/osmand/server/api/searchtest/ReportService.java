@@ -87,7 +87,7 @@ public interface ReportService {
 	}
 
 	enum OutProp {
-		res_name(true), actual_name(true), res_dist, actual_dist, res_lat_lon, actual_lat_lon, res_place, actual_place, res_id, actual_id, oid, res_count, search_bbox, stat_bytes, stat_time, time;
+		res_name(true), actual_name(true), res_dist, actual_dist, res_lat_lon, actual_lat_lon, res_place, actual_place, res_id, actual_id, oid, res_count, actual_count, search_bbox, stat_bytes, stat_time, time;
 
 		final boolean polymorphic;
 

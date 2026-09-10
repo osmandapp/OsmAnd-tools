@@ -22,9 +22,10 @@ public class LiveResultActuator extends ResultActuator {
 			return formatName(result);
 		}
 	}
+	public record ResultInfo(String name, Integer distance, String location, String entityId) {}
 
 	private final List<ExpectedResult> expectedResults;
-	private final List<String> actualResults = new ArrayList<>();
+	private final List<ResultInfo> actualResults = new ArrayList<>();
 	private ExpectedResult matched;
 	private SpatialResultFormatter formatter;
 	private String unitTest;
@@ -62,14 +63,15 @@ public class LiveResultActuator extends ResultActuator {
 			String name = formatter != null && actual.spatialResult != null
 					? formatter.format(actual.spatialResult) : actual.toString();
 
-			actualResults.add(formatName(name));
+			Object object = actual.spatialResult == null ? actual.object : actual.spatialResult.getMainObject();
+			actualResults.add(toResultInfo(name, actual.location, getEntityId(object)));
 		}
 		
 		for (int actualIndex = 0; actualIndex < searchResults.size(); actualIndex++) {
 			SearchResult actual = searchResults.get(actualIndex);
 			
 			long actualId = osmId(actual);
-			String actualResultText = actualResults.get(actualIndex);
+			String actualResultText = actualResults.get(actualIndex).name();
 			
 			for (ExpectedResult expected : expectedResults) {
 				if (expected.point() == null || actual.location == null
@@ -107,6 +109,11 @@ public class LiveResultActuator extends ResultActuator {
 		}
 	}
 
+	private ResultInfo toResultInfo(String name, LatLon point, String entityId) {
+		Integer distance = point == null ? null : ((int) MapUtils.getDistance(targetPoint, point) / 10) * 10;
+		return new ResultInfo(formatName(name), distance, toString(point), entityId);
+	}
+
 	@Override
 	public boolean isFound(List<SearchResult> searchResults) {
 		if (expectedResults.isEmpty()) {
@@ -115,6 +122,7 @@ public class LiveResultActuator extends ResultActuator {
 		}
 		
 		metrics.put("web_type", unitTest);
+		metrics.put("actual_count", expectedResults.size());
 		if (searchResults.isEmpty()) {
 			error = "Search result is empty";
 			return false;
@@ -122,7 +130,7 @@ public class LiveResultActuator extends ResultActuator {
 
 		if (matched == null || actualResult == null) {
 			if (firstResult != null) {
-				setResult("res", new Result(ResultType.Best, firstResult.entityId(), 1, actualResults.get(firstResult.place() - 1), 
+				setResult("res", new Result(ResultType.Best, firstResult.entityId(), 1, actualResults.get(firstResult.place() - 1).name(),
 						firstResult.location(), firstResult.entityType()));
 			}
 			ExpectedResult firstExpected = expectedResults.get(0);
@@ -146,9 +154,11 @@ public class LiveResultActuator extends ResultActuator {
 		
 		String name = res.getName();
 		if (name != null) {
-			List<String> results = "res".equals(prefix) ? actualResults
-					: expectedResults.stream().map(ExpectedResult::getName).toList();
-			metrics.put(prefix + "_name", new Object[] {name, String.join("\n", results)});
+			List<ResultInfo> results = "res".equals(prefix) ? actualResults
+					: expectedResults.stream()
+							.map(result -> toResultInfo(result.result(), result.point(), result.entityId()))
+							.toList();
+			metrics.put(prefix + "_name", new Object[] {name, results});
 		}
 	}
 }
