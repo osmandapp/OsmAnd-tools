@@ -32,6 +32,7 @@ import jakarta.validation.constraints.NotNull;
 
 import net.osmand.map.OsmandRegions;
 import net.osmand.server.api.services.*;
+import net.osmand.server.api.services.search.UserDataSearchService;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.util.Algorithms;
@@ -107,6 +108,9 @@ public class MapApiController {
 
 	@Autowired
 	private SmartFolderService smartFolderService;
+
+	@Autowired
+	private UserDataSearchService userDataSearchService;
 
 	@Autowired
 	protected DeviceSubscriptionsRepository subscriptionsRepo;
@@ -828,6 +832,16 @@ public class MapApiController {
 			return ResponseEntity.status(HttpStatus.GONE).build();
 		}
 		return ResponseEntity.notFound().build();
+	}
+
+	@PostMapping(path = {"/search-user-data"}, produces = "application/json")
+	public ResponseEntity<String> searchUserData(@RequestParam String query,
+	                                             @RequestBody List<UserDataSearchService.OpenedTrack> openedTracks) {
+		CloudUserDevice dev = osmAndMapsService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidResponse();
+		}
+		return ResponseEntity.ok(gson.toJson(userDataSearchService.search(query, openedTracks, dev)));
 	}
 
 }

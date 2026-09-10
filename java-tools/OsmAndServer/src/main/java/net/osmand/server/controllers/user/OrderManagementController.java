@@ -8,6 +8,7 @@ import net.osmand.server.api.repo.CloudUsersRepository;
 import net.osmand.server.api.services.AdminService;
 import net.osmand.server.api.services.AdminService.Purchase;
 import net.osmand.server.WebSecurityConfiguration;
+import net.osmand.server.api.services.AppleOrderLookupService;
 import net.osmand.server.api.services.OrderManagementService;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +34,9 @@ public class OrderManagementController {
 
 	@Autowired
 	OrderManagementService orderManagementService;
+
+	@Autowired
+	AppleOrderLookupService appleOrderLookupService;
 
 	@Autowired
 	private CloudUsersRepository usersRepository;
@@ -66,11 +70,7 @@ public class OrderManagementController {
 			return Collections.emptyList();
 		}
 		List<AdminService.Purchase> purchases = orderManagementService.searchPurchases(trimmed, limit);
-		for (Purchase p : purchases) {
-			if (p.purchaseToken != null && p.purchaseToken.length() > 50) {
-				p.purchaseToken = p.purchaseToken.substring(0, 50) + "...";
-			}
-		}
+		purchases.forEach(OrderManagementController::shortenToken);
 		if (purchases.isEmpty()) {
 			List<CloudUsersRepository.CloudUser> users = usersRepository.findByEmailStartingWith(text, PageRequest.of(0, limit));
 			if (!users.isEmpty()) {
@@ -96,6 +96,24 @@ public class OrderManagementController {
 			}
 		}
 		return purchases;
+	}
+
+	/**
+	 * Resolves an Apple order id from the customer's receipt email (MXXXXXXXXX) into the purchases we
+	 * store: Apple purchases are keyed by original_transaction_id, which is not in that email.
+	 */
+	@GetMapping(value = "/orders/apple-lookup", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<AppleOrderLookupService.AppleOrderLookup> appleOrderLookup(
+			@RequestParam(name = "orderId") String orderId) {
+		if (StringUtils.isBlank(orderId)) {
+			return ResponseEntity.badRequest().build();
+		}
+		AppleOrderLookupService.AppleOrderLookup lookup = appleOrderLookupService.lookup(orderId.trim());
+		for (Purchase p : lookup.purchases) {
+			shortenToken(p);
+		}
+		return ResponseEntity.ok(lookup);
 	}
 
 	@GetMapping("/skus")
@@ -161,6 +179,12 @@ public class OrderManagementController {
 			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Order version already exists");
 		}
 		return ResponseEntity.ok("Order version created");
+	}
+
+	private static void shortenToken(Purchase p) {
+		if (p.purchaseToken != null && p.purchaseToken.length() > 50) {
+			p.purchaseToken = p.purchaseToken.substring(0, 50) + "...";
+		}
 	}
 
 	@GetMapping("/generate-order-id")

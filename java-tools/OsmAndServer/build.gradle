@@ -89,9 +89,6 @@ dependencies {
 
     implementation "org.telegram:telegrambots:5.7.1"
 
-    implementation 'org.springframework.security.oauth:spring-security-oauth2:2.5.2.RELEASE'
-    implementation "org.springframework.security.oauth.boot:spring-security-oauth2-autoconfigure:2.0.1.RELEASE"
-
     implementation 'org.apache.httpcomponents:httpclient:4.5.13'
     implementation platform('com.amazonaws:aws-java-sdk-bom:1.11.1019')
     implementation 'com.amazonaws:aws-java-sdk-s3'

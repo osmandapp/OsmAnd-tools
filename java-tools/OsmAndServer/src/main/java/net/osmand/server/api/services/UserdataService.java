@@ -607,7 +607,7 @@ public class UserdataService {
         email = email.toLowerCase().trim();
         CloudUsersRepository.CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
         if (pu == null) {
-            LOG.error("device-register: email is not found (" + email + ")");
+            LOG.error("device-register: email is not found (" + EmailSenderService.shorten(email) + ")");
             throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_NOT_REGISTERED, "user with that email is not registered");
         }
         boolean tokenIsActive = pu.token != null && pu.tokenTime != null &&
@@ -650,7 +650,7 @@ public class UserdataService {
 	    userSubService.verifyAndRefreshProOrderId(pu);
 
         devicesRepository.saveAndFlush(device);
-        LOG.info("device-register: success (" + email + ")");
+        LOG.info("device-register: success (" + EmailSenderService.shorten(email) + ")");
         return ResponseEntity.ok(gson.toJson(device));
     }
 

@@ -818,6 +818,7 @@ public class MapRouterLayer implements MapPanelLayer {
 						router.setHHRouteCpp(true);
 					}
 					HHRoutingConfig hhConfig = HHRoutePlanner.prepareDefaultRoutingConfig(null).cacheContext(cacheHHCtx);
+					hhConfig.calcAlternative(ALT_ROUTE_COLOURS.length);
 					router.setUseOnlyHHRouting(true).setHHRoutingConfig(hhConfig);
 					res = selfRoute(startRoute, endRoute, intermediates, false, previousRoute, router,  m);
 					if (USE_CACHE_CONTEXT) {
@@ -987,6 +988,80 @@ public class MapRouterLayer implements MapPanelLayer {
 	}
 
 
+	// "colour" is resolved as a java.awt.Color field name by MapPointsLayer.
+	// The main route is only coloured when alternatives are shown, otherwise it keeps the default black.
+	private static final String MAIN_ROUTE_COLOUR = "BLUE";
+	private static final String[] ALT_ROUTE_COLOURS = { "GREEN", "MAGENTA" };
+
+	private static double routeDistance(HHNetworkRouteRes route) {
+		double d = 0;
+		for (HHNetworkSegmentRes r : route.segments) {
+			if (r.list != null) {
+				for (RouteSegmentResult rs : r.list) {
+					int i = rs.getStartPointIndex(), end = rs.getEndPointIndex();
+					int step = i <= end ? 1 : -1;
+					while (i != end) {
+						d += MapUtils.getDistance(rs.getPoint(i), rs.getPoint(i + step));
+						i += step;
+					}
+				}
+			}
+		}
+		return d;
+	}
+
+	private static void addAlternativeRoutes(List<Entity> res, RouteCalcResult route) {
+		List<List<RouteSegmentResult>> alternatives = route.getAlternatives();
+		if (alternatives.isEmpty()) {
+			return;
+		}
+		double mainTime = 0, mainDist = 0;
+		for (RouteSegmentResult rs : route.getList()) {
+			mainTime += rs.getRoutingTime();
+			mainDist += rs.getDistance();
+		}
+		System.out.printf("Main route [%s] %.1f km, %.1f min%n",
+				MAIN_ROUTE_COLOUR.toLowerCase(), mainDist / 1000, mainTime / 60);
+		// last alternative first: entities are drawn in registration order, so the main route
+		// (added afterwards) always stays fully visible on top
+		for (int i = alternatives.size() - 1; i >= 0; i--) {
+			List<RouteSegmentResult> alt = alternatives.get(i);
+			String colour = ALT_ROUTE_COLOURS[i % ALT_ROUTE_COLOURS.length];
+			double dist = 0, time = 0;
+			for (RouteSegmentResult rs : alt) {
+				dist += rs.getDistance();
+				time += rs.getRoutingTime();
+			}
+			String label = String.format("alt %d: %.1f km, %.1f min (%+.1f%%)", i + 1,
+					dist / 1000, time / 60, mainTime > 0 ? 100 * (time / mainTime - 1) : 0);
+			System.out.println("Alternative route [" + colour.toLowerCase() + "] " + label);
+			// only the middle way carries the label - one caption per route instead of one per segment
+			int labelled = alt.size() / 2;
+			for (int k = 0; k < alt.size(); k++) {
+				res.add(altRouteWay(alt.get(k), colour, k == labelled ? label : null));
+			}
+		}
+	}
+
+	private static Way altRouteWay(RouteSegmentResult segment, String colour, String label) {
+		Way w = new Way(-1);
+		w.putTag("colour", colour);
+		if (label != null) {
+			w.putTag(OSMTagKey.NAME.getValue(), label);
+		}
+		int i = segment.getStartPointIndex(), end = segment.getEndPointIndex();
+		int step = i <= end ? 1 : -1;
+		while (true) {
+			LatLon l = segment.getPoint(i);
+			w.addNode(new net.osmand.osm.edit.Node(l.getLatitude(), l.getLongitude(), -1));
+			if (i == end) {
+				break;
+			}
+			i += step;
+		}
+		return w;
+	}
+
 	protected Collection<Entity> hhRoute(LatLon startRoute, LatLon endRoute) {
 		// specialize testing
 		try {
@@ -1010,7 +1085,9 @@ public class MapRouterLayer implements MapPanelLayer {
 //				hhPlanners.put(profile, hhRoutePlanner);
 //			}
 
-			HHNetworkRouteRes route = hhRoutePlanner.runRouting(startRoute, endRoute, null);
+			HHRoutingConfig hhConfig = HHRoutePlanner.prepareDefaultRoutingConfig(null);
+			hhConfig.calcAlternative(ALT_ROUTE_COLOURS.length);
+			HHNetworkRouteRes route = hhRoutePlanner.runRouting(startRoute, endRoute, hhConfig);
 			List<Entity> lst = new ArrayList<Entity>();
 			if (route.getError() != null) {
 				JOptionPane.showMessageDialog(OsmExtractionUI.MAIN_APP.getFrame(), route.getError(), "Routing error",
@@ -1018,7 +1095,7 @@ public class MapRouterLayer implements MapPanelLayer {
 				System.err.println(route.getError());
 			}
 			if (!route.getList().isEmpty()) {
-				calculateResult(lst, route.getList());
+				calculateResult(lst, route.getList(), route.altRoutes.isEmpty() ? null : MAIN_ROUTE_COLOUR);
 			} else {
 				TLongObjectHashMap<Entity> entities = new TLongObjectHashMap<Entity>();
 				for (HHNetworkSegmentRes r : route.segments) {
@@ -1032,19 +1109,30 @@ public class MapRouterLayer implements MapPanelLayer {
 				}
 				lst.addAll(entities.valueCollection());
 			}
-			for (HHNetworkRouteRes altRoute : route.altRoutes) {
-				TLongObjectHashMap<Entity> entities = new TLongObjectHashMap<Entity>();
+			double mainCost = route.getHHRoutingTime();
+			System.out.printf("HH route: %.1f km, %.1f min, %d alternative(s)\n",
+					routeDistance(route) / 1000, mainCost / 60, route.altRoutes.size());
+			List<Entity> altEntities = new ArrayList<Entity>();
+			for (int i = route.altRoutes.size() - 1; i >= 0; i--) {
+				HHNetworkRouteRes altRoute = route.altRoutes.get(i);
+				String colour = ALT_ROUTE_COLOURS[i % ALT_ROUTE_COLOURS.length];
+				double cost = altRoute.getHHRoutingTime();
+				double dist = routeDistance(altRoute);
+				String label = String.format("alt %d: %.1f km, %.1f min (%+.1f%%)", i + 1,
+						dist / 1000, cost / 60, 100 * (cost / mainCost - 1));
+				System.out.println("  " + colour.toLowerCase() + " - " + label);
+				List<RouteSegmentResult> segments = new ArrayList<RouteSegmentResult>();
 				for (HHNetworkSegmentRes r : altRoute.segments) {
 					if (r.list != null) {
-						for (RouteSegmentResult rs : r.list) {
-							HHRoutingUtilities.addWay(entities, rs, "highway", "tertiary");
-						}
-					} else if (r.segment != null) {
-						HHRoutingUtilities.addWay(entities, r.segment, "highway", "tertiary");
+						segments.addAll(r.list);
 					}
 				}
-				lst.addAll(entities.valueCollection());
+				int labelled = segments.size() / 2;
+				for (int k = 0; k < segments.size(); k++) {
+					altEntities.add(altRouteWay(segments.get(k), colour, k == labelled ? label : null));
+				}
 			}
+			lst.addAll(0, altEntities); // main route is registered last, so it stays on top
 
 			return lst;
 		} catch (Exception e) {
@@ -1116,7 +1204,9 @@ public class MapRouterLayer implements MapPanelLayer {
 						nextTurn.setText(">>");
 					}
 					this.previousRoute = searchRoute.getList();
-					calculateResult(res, searchRoute.getList());
+					boolean hasAlternatives = !searchRoute.getAlternatives().isEmpty();
+					addAlternativeRoutes(res, searchRoute);
+					calculateResult(res, searchRoute.getList(), hasAlternatives ? MAIN_ROUTE_COLOUR : null);
 				} finally {
 					if (ctx.calculationProgress != null) {
 						ctx.calculationProgress.isCancelled = true;
@@ -1251,6 +1341,10 @@ public class MapRouterLayer implements MapPanelLayer {
 	}
 
 	private void calculateResult(List<Entity> res, List<RouteSegmentResult> searchRoute) {
+		calculateResult(res, searchRoute, null);
+	}
+
+	private void calculateResult(List<Entity> res, List<RouteSegmentResult> searchRoute, String colour) {
 		RouteSegmentResult prevSegm = null;
 		int indVisual = 0;
 		for (RouteSegmentResult segm : searchRoute) {
@@ -1271,6 +1365,9 @@ public class MapRouterLayer implements MapPanelLayer {
 //			}
 //					String name = String.format("beg %.2f end %.2f ", s.getBearingBegin(), s.getBearingEnd());
 			way.putTag(OSMTagKey.NAME.getValue(), name);
+			if (colour != null) {
+				way.putTag("colour", colour);
+			}
 			if (prevSegm != null
 					&& MapUtils.getDistance(prevSegm.getEndPoint(), segm.getStartPoint()) > 0) {
 				net.osmand.osm.edit.Node pp = new net.osmand.osm.edit.Node(prevSegm.getEndPoint().getLatitude(), prevSegm.getEndPoint().getLongitude(), -1);

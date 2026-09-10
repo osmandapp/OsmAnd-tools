@@ -155,7 +155,7 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 
 	private boolean processFileById(long id, Params params, Stats stats) {
 		UserFile file = filesRepository.findById(id).orElse(null);
-		if (file == null || !accepts(file.name)) {
+		if (file == null || !isSupportedType(file) || !accepts(file.name)) {
 			stats.skipped.incrementAndGet();
 			return false;
 		}
@@ -234,6 +234,11 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 
 	public Set<String> supportedTypes() {
 		return null;
+	}
+
+	private boolean isSupportedType(UserFile file) {
+		Set<String> supported = supportedTypes();
+		return supported == null || supported.contains(file.type);
 	}
 
 	// optional tag added to each found file entry and counted in byTag; null = no tag (default)

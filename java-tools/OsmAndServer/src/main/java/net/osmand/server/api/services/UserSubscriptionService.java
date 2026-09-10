@@ -358,7 +358,11 @@ public class UserSubscriptionService {
 		try {
 			FastSpringHelper.FastSpringSubscription fsSub = FastSpringHelper.getSubscriptionByOrderIdAndSku(s.orderId, s.sku);
 			if (fsSub != null) {
-				if (fsSub.nextChargeDate == null) {
+				if (!Boolean.TRUE.equals(fsSub.active)) {
+					// canceled/deactivated on FastSpring side (e.g. refund with subscription cancellation)
+					LOG.info(String.format("FastSpring subscription %s - %s is not active (state %s)", s.sku, s.orderId, fsSub.state));
+					s.valid = false;
+				} else if (fsSub.nextChargeDate == null) {
 					LOG.info(String.format("FastSpring subscription %s - %s has null nextChargeDate", s.sku, s.orderId));
 					s.valid = false;
 				} else {
@@ -410,11 +414,11 @@ public class UserSubscriptionService {
 		}
 		if (subOrderId != null) {
 			pu.orderid = subOrderId;
-			LOG.info("Updated orderId for user " + pu.email + " " + pu.orderid);
+			LOG.info("Updated orderId for user " + EmailSenderService.shorten(pu.email) + " " + pu.orderid);
 			usersRepository.saveAndFlush(pu);
 			return true;
 		}
-		LOG.info("Empty update orderId for user " + pu.email);
+		LOG.info("Empty update orderId for user " + EmailSenderService.shorten(pu.email));
 		return false;
 	}
 

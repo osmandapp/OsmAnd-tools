@@ -1232,7 +1232,7 @@ public class WikiDatabasePreparation {
 			log.info("Process OSM coordinates...");
 			osmCoordinates.parse(wikidataDB.getParentFile());
 			log.info("Create wikidata...");
-			processWikidata(wikidataDB, wikidataFile, osmCoordinates, 0, -1);
+			processWikidata(wikidataDB, wikidataFile, osmCoordinates, 0, -1, false);
 			createOSMWikidataTable(wikidataDB, osmCoordinates);
 			break;
 		case "create-osm-wikidata":
@@ -1262,7 +1262,7 @@ public class WikiDatabasePreparation {
 //			log.info("Process OSM coordinates...");
 //			osmCoordinates.parse(wikidataDB.getParentFile());
 			log.info("Create wikidata...");
-			processWikidata(wikidataDB, wikidataFolder + WIKIDATA_ARTICLES_GZ, osmCoordinates, 0, 10000);
+			processWikidata(wikidataDB, wikidataFolder + WIKIDATA_ARTICLES_GZ, osmCoordinates, 0, 10000, false);
 			createOSMWikidataTable(wikidataDB, osmCoordinates);
 			break;
 		case "create-wikidata-mapping":
@@ -1283,7 +1283,8 @@ public class WikiDatabasePreparation {
 		log.info("Updating wikidata...");
 		for (String fileName : downloadedPageFiles) {
 			log.info("Updating from " + fileName);
-			processWikidata(wikidataDB, fileName, osmCoordinates, maxQId, -1);
+			// daily incremental dumps contain edited existing items: clean their stale rows before re-insert
+			processWikidata(wikidataDB, fileName, osmCoordinates, maxQId, -1, dailyUpdate);
 		}
 		wfd.removeDownloadedPages();
 		createOSMWikidataTable(wikidataDB, osmCoordinates);
@@ -1479,7 +1480,8 @@ public class WikiDatabasePreparation {
 	}
 
 	public static void processWikidata(File wikidataSqlite, final String wikidataFile,
-									   OsmCoordinatesByTag osmCoordinates, long lastProcessedId, long limit)
+									   OsmCoordinatesByTag osmCoordinates, long lastProcessedId, long limit,
+									   boolean cleanupExisting)
 			throws ParserConfigurationException, SAXException, IOException, SQLException {
 		SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
 		FileProgressImplementation progress = new FileProgressImplementation("Read wikidata file",
@@ -1491,6 +1493,7 @@ public class WikiDatabasePreparation {
 		final WikiDataHandler handler = new WikiDataHandler(sx, progress, wikidataSqlite, osmCoordinates, regions,
 				lastProcessedId);
 		handler.setLimit(limit);
+		handler.setCleanupExisting(cleanupExisting);
 		try {
 			sx.parse(is, handler);
 		} catch (IllegalStateException e) {

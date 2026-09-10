@@ -382,6 +382,10 @@ public class SpatialSearchService {
 		return tags;
 	}
 
+	public SearchResult buildSpatialPoiSearchResult(Amenity amenity, String locale) {
+		return searchResultConverter.buildPoiSearchResult(amenity, locale, "");
+	}
+
 	private List<Map<String, Object>> matchedObjects(List<MapObject> objs, String locale, String timeZone,
 	                                                 String dominatedCity, int[] bbox31,
 	                                                 Map<MapObject, Feature> amenityFeatureCache) {

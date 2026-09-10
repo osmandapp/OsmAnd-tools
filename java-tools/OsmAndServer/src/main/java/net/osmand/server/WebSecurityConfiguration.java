@@ -38,7 +38,6 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.oauth2.config.annotation.web.configuration.EnableOAuth2Client;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
@@ -59,7 +58,6 @@ import net.osmand.server.api.services.UserdataService;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
-@EnableOAuth2Client
 @EnableMethodSecurity
 public class WebSecurityConfiguration {
 	
@@ -67,11 +65,7 @@ public class WebSecurityConfiguration {
 	public static final String ROLE_PRO_USER = "ROLE_PRO_USER"; // actually it's logged in user not necessarily pro
 	public static final String ROLE_ADMIN = "ROLE_ADMIN";
 	public static final String ROLE_SUPPORT = "ROLE_SUPPORT";
-	public static final String ROLE_USER = "ROLE_USER";
 	private static final int SESSION_TTL_SECONDS = 3600 * 24 * 30;
-    
-    @Value("${admin.api-oauth2-url}")
-    private String adminOauth2Url;
 
 	@Value("${spring.session.redisHost}")
 	private String redisHost;

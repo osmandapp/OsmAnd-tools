@@ -105,7 +105,7 @@ public class EmailSenderService {
 	}
 
 	// hide full email from logs
-	private String shorten(String full) {
-		return full.replaceFirst(".....", "....."); // osmand@t-online.de -> .....d@t-online.de
+	public static String shorten(String full) {
+		return full == null ? null : full.replaceFirst(".....", "....."); // osmand@t-online.de -> .....d@t-online.de
 	}
  }

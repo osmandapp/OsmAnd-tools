@@ -75,6 +75,8 @@ public class MainUtilities {
 				TopTagValuesAnalyzer.main(subArgsArray);
 			} else if (utl.equals("test-style-rendering")) {
 				OsmAndTestStyleRenderer.main(subArgsArray);
+			} else if (utl.equals("test-coastline-rendering")) {
+				CoastlineRenderingTester.main(subArgsArray);
 			} else if (utl.equals("generate-region-tags")) {
 				GenerateRegionTags.main(subArgsArray);
 			} else if (utl.equals("generate-obf-files-in-batch")) {
@@ -495,5 +497,6 @@ public class MainUtilities {
 		System.out.println("\t\t route-relation-extractor --help # generate TravelObf from OSM relations");
 		System.out.println("\t\t process-commonswiki --help # download and parse commonswiki pages into meta_commonswiki.sqlite ");
 		System.out.println("\t\t generate-mvt-icons --help # generate SVG icons with shield for web vector map");
+		System.out.println("\t\t test-coastline-rendering [-scan -minzoom=1 -maxzoom=10] [-maps.dir=...]: compares the rendered water mask with the reference tiles of tile.osmand.net, exit code 2 when a coastline problem is found");
 	}
 }

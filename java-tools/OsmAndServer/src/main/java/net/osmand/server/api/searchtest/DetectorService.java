@@ -32,6 +32,7 @@ import java.util.zip.ZipOutputStream;
 
 public interface DetectorService extends OBFService {
 	ClassicSearchService getClassicSearchService();
+	SpatialSearchService getSpatialSearchService();
 
 	SpatialSearchService.SpatialResults searchTestSpatial(ClassicSearchService.SearchContext ctx, ClassicSearchService.SearchOption options,
 			List<BinaryMapIndexReader> readers, boolean printLogs) throws IOException;
@@ -49,7 +50,7 @@ public interface DetectorService extends OBFService {
 	record ResultMetric(String obf, int depth, double foundWordCount, double unknownPhraseMatchWeight,
 	                    Collection<String> otherWordsMatch, Double distance, boolean isEqual, boolean inResult) {}
 	record AddressResult(String name, String type, String address, AddressResult parent, ResultMetric metric,
-	                     LatLon location, String mainWord) {}
+	                     LatLon location, String mainWord, Long osmId) {}
 
 	default ResultsWithStats getSearchResults(ClassicSearchService.SearchContext ctx, ClassicSearchService.SearchOption options, Boolean spatial,
 	                                         List<BinaryMapIndexReader> readers) throws IOException {
@@ -114,6 +115,11 @@ public interface DetectorService extends OBFService {
 		Double distance = location == null ? null : MapUtils.getDistance(new LatLon(ctx.lat(), ctx.lon()), location) / 1000.0;
 		ResultMetric metric = new ResultMetric("", res.visibleLevel(), res.matchedTokens(), res.sumOther(),
 				Collections.emptyList(), distance, true, true);
+		if (res.isPoiCategory()) {
+			var type = res.getPoiCategory(getSpatialSearchService().getSpatialPoiTypeSearch());
+			String name = type == null ? "" : getSpatialSearchService().getSpatialPoiTypeFields(type).getOrDefault("name", type.toString());
+			return new AddressResult(name, "poi_type", "", null, metric, location, null, null);
+		}
 		List<Street> streets = spatialStreets(objects, ctx.locale());
 		if (streets.size() > 1) {
 			City city = spatialCity(objects, streets);
@@ -122,16 +128,38 @@ public interface DetectorService extends OBFService {
 					.toList());
 			AddressResult parent = city == null ? null : toParent(ctx, city, 1, res.matchedTokens());
 			return new AddressResult(name, "street_intersection", spatialName(city, ctx.locale()),
-					parent, metric, location, null);
+					parent, metric, location, null, null);
 		}
 
 		MapObject object = res.getMainObject();
 		if (object == null && objects != null && !objects.isEmpty()) {
 			object = objects.get(0);
 		}
+		String name = spatialName(object, ctx.locale());
+		if (Algorithms.isEmpty(name) && object instanceof Amenity amenity) {
+			String subtype = amenity.getSubType();
+			if (Algorithms.isNotEmpty(subtype)) {
+				subtype = subtype.split(";", 2)[0];
+				var poiType = amenity.getType() == null ? null : amenity.getType().getPoiTypeByKeyName(subtype);
+				name = poiType == null ? "" : poiType.getTranslation();
+				if (Algorithms.isEmpty(name)) {
+					name = Algorithms.capitalizeFirstLetter(subtype.replace('_', ' '));
+				}
+			}
+		}
+		String extraName = res.getExtraNameMatch();
+		if (object instanceof Building building && building.isInterpolation() && Algorithms.isNotEmpty(extraName)) {
+			name = extraName;
+		} else if (Algorithms.isNotEmpty(extraName)) {
+			name += " (" + extraName + ")";
+		}
+		if (object instanceof Amenity amenity) {
+			SearchResult poi = getSpatialSearchService().buildSpatialPoiSearchResult(amenity, ctx.locale());
+			return new AddressResult(name, "poi", poi.addressName, null, metric, location, null, getOsmId(object));
+		}
 		AddressResult parent = toParent(ctx, objects, 1, res.matchedTokens());
-		return new AddressResult(spatialName(object, ctx.locale()), spatialType(object), spatialAddress(object, ctx.locale()),
-				parent, metric, location, null);
+		return new AddressResult(name, spatialType(object), spatialAddress(object, ctx.locale()),
+				parent, metric, location, null, getOsmId(object));
 	}
 
 	private List<Street> spatialStreets(List<MapObject> objects, String locale) {
@@ -177,7 +205,7 @@ public interface DetectorService extends OBFService {
 		ResultMetric metric = new ResultMetric("", depth, foundWordCount, 0,
 				Collections.emptyList(), distance, true, true);
 		return new AddressResult(spatialName(object, ctx.locale()), spatialType(object),
-				spatialAddress(object, ctx.locale()), null, metric, location, null);
+				spatialAddress(object, ctx.locale()), null, metric, location, null, getOsmId(object));
 	}
 
 	private AddressResult toParent(ClassicSearchService.SearchContext ctx, List<MapObject> objects, int index, double foundWordCount) {
@@ -189,7 +217,7 @@ public interface DetectorService extends OBFService {
 		Double distance = location == null ? null : MapUtils.getDistance(new LatLon(ctx.lat(), ctx.lon()), location) / 1000.0;
 		ResultMetric metric = new ResultMetric("", index, foundWordCount, 0, Collections.emptyList(), distance, true, true);
 		return new AddressResult(spatialName(object, ctx.locale()), spatialType(object), spatialAddress(object, ctx.locale()),
-				toParent(ctx, objects, index + 1, foundWordCount), metric, location, null);
+				toParent(ctx, objects, index + 1, foundWordCount), metric, location, null, getOsmId(object));
 	}
 
 	private String spatialName(MapObject object, String locale) {
@@ -205,6 +233,8 @@ public interface DetectorService extends OBFService {
 			return "poi";
 		} else if (object instanceof Street) {
 			return "street";
+		} else if (object instanceof Building) {
+			return "house";
 		} else if (object instanceof City city) {
 			return city.getType() == null ? "city" : city.getType().name().toLowerCase(Locale.ROOT);
 		} else if (object == null) {
@@ -231,10 +261,10 @@ public interface DetectorService extends OBFService {
 
 		// If we've already visited this node, break the cycle by not traversing further
 		if (!seen.add(r))
-			return new AddressResult(r.toString(), type, r.addressName, null, metric, r.location, mainWord);
+			return new AddressResult(r.toString(), type, r.addressName, null, metric, r.location, mainWord, getOsmId(r.object));
 
 		AddressResult parent = toResult(r.parentSearchResult, mainWord, seen);
-		return new AddressResult(r.toString(), type, r.addressName, parent, metric, r.location, mainWord);
+		return new AddressResult(r.toString(), type, r.addressName, parent, metric, r.location, mainWord, getOsmId(r.object));
 	}
 
 	record UnitTestPayload(
@@ -334,8 +364,28 @@ public interface DetectorService extends OBFService {
 		}
 	}
 
-	private String amenityKey(Amenity amenity) {
-		return amenity.getId() + "|" + amenity.getType() + "|" + amenity.getSubType();
+	private void collectUnitTestAmenity(Amenity amenity, Map<String, Amenity> amenities) {
+		if (amenity == null) {
+			return;
+		}
+		if (amenity.getId() == null) {
+			amenity = Amenity.parseJSON(amenity.toJSON());
+			long id = -1;
+			while (containsAmenityId(amenities, id)) {
+				id--;
+			}
+			amenity.setId(id);
+		}
+		amenities.putIfAbsent(amenity.getId() + "|" + amenity.getType() + "|" + amenity.getSubType(), amenity);
+	}
+
+	private boolean containsAmenityId(Map<String, Amenity> amenities, long id) {
+		for (Amenity amenity : amenities.values()) {
+			if (Objects.equals(amenity.getId(), id)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private City compactUnitTestCity(City city) {
@@ -435,8 +485,7 @@ public interface DetectorService extends OBFService {
 			}
 			for (MapObject object : objects) {
 				if (object instanceof Amenity amenity) {
-					String amenityKey = amenityKey(amenity);
-					amenities.putIfAbsent(amenityKey, amenity);
+					collectUnitTestAmenity(amenity, amenities);
 				} else if (object instanceof City city) {
 					collectCompactUnitTestCity(city, cities);
 				} else if (object instanceof Street street) {
@@ -483,7 +532,7 @@ public interface DetectorService extends OBFService {
 			for (int i = 0; i < amenitiesJson.length(); i++) {
 				Amenity amenity = Amenity.parseJSON(amenitiesJson.getJSONObject(i));
 				if (isWithinUnitTestSourceRadius(amenity, point, unitTest.radius())) {
-					amenities.putIfAbsent(amenityKey(amenity), amenity);
+					collectUnitTestAmenity(amenity, amenities);
 				}
 			}
 		}

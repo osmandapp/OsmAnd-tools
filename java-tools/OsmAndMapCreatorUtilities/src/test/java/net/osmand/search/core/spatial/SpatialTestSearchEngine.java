@@ -227,6 +227,8 @@ public class SpatialTestSearchEngine implements SearchTestEngine {
             	return "школа";
             } else if (keyName.equals("island")) {
                 return "остров";
+            } else if (keyName.equals("kindergarten")) {
+                return "Kindergarten;Дитячий садок";
             }
             return null;
         }
