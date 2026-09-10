@@ -67,7 +67,6 @@ dependencies {
     implementation "org.springframework.boot:spring-boot-starter-security"
     implementation "org.springframework.boot:spring-boot-starter-thymeleaf"
     implementation "org.springframework.boot:spring-boot-starter-data-jpa"
-    implementation "org.springframework.boot:spring-boot-starter-oauth2-client"
     // implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.1.0'
     implementation "org.javassist:javassist:3.25.0-GA"
     implementation "javax.xml.bind:jaxb-api:2.3.1"
@@ -86,9 +85,6 @@ dependencies {
     implementation "nl.basjes.parse.httpdlog:httpdlog-parser:5.1"
 
     implementation "org.telegram:telegrambots:5.7.1"
-
-    implementation 'org.springframework.security.oauth:spring-security-oauth2:2.5.2.RELEASE'
-    implementation "org.springframework.security.oauth.boot:spring-security-oauth2-autoconfigure:2.0.1.RELEASE"
 
     implementation 'org.apache.httpcomponents:httpclient:4.5.13'
     implementation platform('com.amazonaws:aws-java-sdk-bom:1.11.1019')
