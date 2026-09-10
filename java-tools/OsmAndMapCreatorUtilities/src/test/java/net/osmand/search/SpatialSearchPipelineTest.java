@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -109,6 +110,7 @@ public class SpatialSearchPipelineTest {
 			IndexAddressCreator.class);
 	private static final String HASH_VERSION = "2";
 	private static final String OBF_HASH_FILE_NAME = ".obf.hash";
+	private static final int MAX_KNOWN_HASHES = 4; // one per build that writes its own class files
 	private static final boolean RUN_IGNORED_TESTS = false;
 	
 	private static final boolean FILTER_DATA_JSON = false;
@@ -373,20 +375,35 @@ public class SpatialSearchPipelineTest {
 	}
 
 	private static boolean isHashActual() {
-		return Algorithms.stringsEqual(getHash(), getObfGenerateHash());
+		return getHashes().contains(getObfGenerateHash());
 	}
 
 	private static File getObfHashFile() {
 		return new File(GEN_DIR, OBF_HASH_FILE_NAME);
 	}
 
-	private static String getHash() {
+	/**
+	 * The hash is taken over the compiled generator classes, and the IDE and Gradle write their own
+	 * class files: the same sources hash differently depending on who built them, and one hash per
+	 * file would throw the whole map cache away on every switch. The file keeps a hash per line, so
+	 * both builds are recognised, while a real change in the generators matches none of them.
+	 */
+	private static Set<String> getHashes() {
 		File hashFile = getObfHashFile();
 		if (!hashFile.isFile()) {
-			return null;
+			return Collections.emptySet();
 		}
-		String hash = Algorithms.getFileAsString(hashFile);
-		return hash == null ? null : hash.trim();
+		String content = Algorithms.getFileAsString(hashFile);
+		if (content == null) {
+			return Collections.emptySet();
+		}
+		Set<String> hashes = new LinkedHashSet<>();
+		for (String line : content.split("\\R")) {
+			if (!line.trim().isEmpty()) {
+				hashes.add(line.trim());
+			}
+		}
+		return hashes;
 	}
 
 	private void writeHash() throws IOException {
@@ -395,9 +412,20 @@ public class SpatialSearchPipelineTest {
 		if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
 			throw new IOException("Cannot create generated OBF directory " + parent);
 		}
+		Set<String> hashes = new LinkedHashSet<>(getHashes());
+		if (!hashes.add(getObfGenerateHash())) {
+			return;
+		}
+		while (hashes.size() > MAX_KNOWN_HASHES) {
+			Iterator<String> it = hashes.iterator();
+			it.next();
+			it.remove();
+		}
 		try (Writer writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(hashFile), StandardCharsets.UTF_8))) {
-			writer.write(getObfGenerateHash());
-			writer.write(System.lineSeparator());
+			for (String hash : hashes) {
+				writer.write(hash);
+				writer.write(System.lineSeparator());
+			}
 		}
 	}
 
@@ -1184,6 +1212,7 @@ public class SpatialSearchPipelineTest {
 
 	private SpatialTextSearch.SpatialTextSearchSettings parseSpatialSettings(JSONObject settingsJson) {
 		SpatialTextSearch.SpatialTextSearchSettings settings = SpatialTextSearch.SpatialTextSearchSettings.defaultSettings();
+		settings.SCORE_RANKING = false;
 		settings.SEARCH_ADDR = settingsJson.optBoolean("SEARCH_ADDR", settings.SEARCH_ADDR);
 		settings.SEARCH_POI = settingsJson.optBoolean("SEARCH_POI", settings.SEARCH_POI);
 		settings.SEARCH_BUILDINGS = settingsJson.optBoolean("SEARCH_BUILDINGS", settings.SEARCH_BUILDINGS);
