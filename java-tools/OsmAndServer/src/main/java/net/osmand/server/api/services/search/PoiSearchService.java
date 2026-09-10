@@ -38,6 +38,7 @@ import net.osmand.data.QuadRect;
 import net.osmand.osm.PoiType;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiCategory;
+import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.EntityParser;
 import net.osmand.osm.edit.Node;
 import net.osmand.search.core.ObjectType;
@@ -503,9 +504,13 @@ public class PoiSearchService {
 
 	public Feature searchPoiByOsmId(LatLon loc, long osmid, String type, String timeZone) throws IOException {
 		final String NODE_TYPE = "1";
+		return searchPoiByOsmId(loc, osmid, NODE_TYPE.equals(type) ? EntityType.NODE : EntityType.WAY, timeZone);
+	}
+
+	private Feature searchPoiByOsmId(LatLon loc, long osmid, EntityType type, String timeZone) throws IOException {
 		final double WAY_SEARCH_RADIUS = 0.0055; // ~600 meters, way/relation amenity is located at its centroid
 		final double NODE_SEARCH_RADIUS = 0.0001; // ~11 meters
-		double radiusDegree = NODE_TYPE.equals(type) ? NODE_SEARCH_RADIUS : WAY_SEARCH_RADIUS;
+		double radiusDegree = type == EntityType.NODE ? NODE_SEARCH_RADIUS : WAY_SEARCH_RADIUS;
 		SearchResult res = searchSinglePoi(loc, radiusDegree, new ResultMatcher<>() {
 			@Override
 			public boolean publish(Amenity amenity) {
@@ -523,7 +528,7 @@ public class PoiSearchService {
 	private Feature getMapObjectFeature(SearchResult res, String timeZone) throws IOException {
 		Feature feature = searchResultConverter.getPoiFeature(res, timeZone);
 		Amenity amenity = (Amenity) res.object;
-		if (feature != null && transportStopsService.isPublicTransportStop(amenity)) {
+		if (transportStopsService.isPublicTransportStop(amenity)) {
 			Long stopId = transportStopsService.findBestTransportStopId(amenity);
 			if (stopId != null) {
 				feature.prop(SearchResultConverter.PoiTypeField.TRANSPORT_STOP_ID.getFieldName(), stopId);
@@ -532,20 +537,24 @@ public class PoiSearchService {
 		return feature;
 	}
 
-	// vector tile object that is not in the POI index (no_indx types, buildings, ...): amenity from its tags as the map creator does
-	public Feature getPoiByTags(Map<String, String> tags, LatLon loc, long mapObjectId, String timeZone) throws IOException {
-		Node node = new Node(loc.getLatitude(), loc.getLongitude(), -1);
-		node.replaceTags(tags);
+	// vector tile object: POI from the index by its osm id, else (no_indx types, buildings, ...) an amenity from its tags as the map creator does
+	public Feature getPoiByMapObject(long mapObjectId, LatLon loc, Map<String, String> tags, String timeZone) throws IOException {
+		RenderedObject renderedObject = new RenderedObject();
+		renderedObject.setId(mapObjectId);
+		long osmId = ObfConstants.getOsmObjectId(renderedObject);
+		EntityType entityType = ObfConstants.getOsmEntityType(renderedObject);
+		Feature feature = searchPoiByOsmId(loc, osmId, entityType, timeZone);
+		if (feature != null || tags.isEmpty()) {
+			return feature;
+		}
 		MapPoiTypes poiTypes = poiTypesService.getMapPoiTypes(PoiTypesService.DEFAULT_SEARCH_LANG);
+		Node node = new Node(loc.getLatitude(), loc.getLongitude(), -1);
 		List<Amenity> amenities = EntityParser.parseAmenities(poiTypes, node, tags, new ArrayList<>(), false);
 		if (amenities.isEmpty()) {
 			return null;
 		}
 		Amenity amenity = amenities.get(0);
-		RenderedObject renderedObject = new RenderedObject();
-		renderedObject.setId(mapObjectId);
-		amenity.setId(ObfConstants.createMapObjectIdFromCleanOsmId(ObfConstants.getOsmObjectId(renderedObject),
-				ObfConstants.getOsmEntityType(renderedObject)));
+		amenity.setId(ObfConstants.createMapObjectIdFromCleanOsmId(osmId, entityType));
 		return getMapObjectFeature(
 				searchResultConverter.buildPoiSearchResult(amenity, PoiTypesService.DEFAULT_SEARCH_LANG, ""), timeZone);
 	}

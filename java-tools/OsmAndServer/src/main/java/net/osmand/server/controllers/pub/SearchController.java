@@ -345,20 +345,20 @@ public class SearchController {
 	public ResponseEntity<String> getPoiByOsmId(@RequestParam double lat,
 	                                            @RequestParam double lon,
 	                                            @RequestParam long osmid,
-	                                            @RequestParam(required = false) String type,
+	                                            @RequestParam String type,
 	                                            @RequestParam(required = false) String timeZone) throws IOException {
 		Feature poi = poiSearchService.searchPoiByOsmId(new LatLon(lat, lon), osmid, type, timeZone);
 		return ResponseEntity.ok(gson.toJson(poi));
 	}
 
-	@PostMapping(path = {"/get-poi-by-tags"}, produces = "application/json")
+	@PostMapping(path = {"/get-poi-by-map-object"}, produces = "application/json")
 	@ResponseBody
-	public ResponseEntity<String> getPoiByTags(@RequestBody Map<String, String> tags,
-	                                           @RequestParam double lat,
-	                                           @RequestParam double lon,
-	                                           @RequestParam long id,
-	                                           @RequestParam(required = false) String timeZone) throws IOException {
-		Feature poi = poiSearchService.getPoiByTags(tags, new LatLon(lat, lon), id, timeZone);
+	public ResponseEntity<String> getPoiByMapObject(@RequestBody Map<String, String> tags,
+	                                                @RequestParam double lat,
+	                                                @RequestParam double lon,
+	                                                @RequestParam long id,
+	                                                @RequestParam(required = false) String timeZone) throws IOException {
+		Feature poi = poiSearchService.getPoiByMapObject(id, new LatLon(lat, lon), tags, timeZone);
 		return ResponseEntity.ok(gson.toJson(poi));
 	}
 
