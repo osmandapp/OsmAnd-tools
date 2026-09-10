@@ -345,7 +345,7 @@ public class SearchController {
 	public ResponseEntity<String> getPoiByOsmId(@RequestParam double lat,
 	                                            @RequestParam double lon,
 	                                            @RequestParam long osmid,
-	                                            @RequestParam String type,
+	                                            @RequestParam(required = false) String type,
 	                                            @RequestParam(required = false) String timeZone) throws IOException {
 		Feature poi = poiSearchService.searchPoiByOsmId(new LatLon(lat, lon), osmid, type, timeZone);
 		return ResponseEntity.ok(gson.toJson(poi));

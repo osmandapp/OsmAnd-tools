@@ -58,7 +58,8 @@ public class SearchResultConverter {
 		// names of all objects matched in a spatial-search result (street, city, ...)
 		MATCHED_OBJECTS("web_matched_objects"), VISIBLE_LEVEL("web_visible_level"),
 		COMPARE_KEY("web_compare_key"), BBOX_LAT_LON("web_bbox_lat_lon"),
-		WIKIDATA_ID("web_wikidata_id"), CITY_TYPE("web_city_type"), ELO("web_poi_elo");
+		WIKIDATA_ID("web_wikidata_id"), CITY_TYPE("web_city_type"), ELO("web_poi_elo"),
+		TRANSPORT_STOP_ID("web_transport_stop_id");
 
 		private final String fieldName;
 

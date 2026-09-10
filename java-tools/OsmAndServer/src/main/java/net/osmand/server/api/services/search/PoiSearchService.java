@@ -45,6 +45,7 @@ import net.osmand.search.core.spatial.SpatialSearchResult;
 import net.osmand.search.core.spatial.SpatialTextSearch.SpatialSearchResults;
 import net.osmand.search.core.spatial.SpatialTextSearch.SpatialTextSearchSettings;
 import net.osmand.server.api.services.OsmAndMapsService;
+import net.osmand.server.api.services.TransportStopsService;
 import net.osmand.server.api.services.WikiService;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import net.osmand.server.controllers.pub.GeojsonClasses.FeatureCollection;
@@ -78,6 +79,9 @@ public class PoiSearchService {
 
 	@Autowired
 	private SearchResultConverter searchResultConverter;
+
+	@Autowired
+	private TransportStopsService transportStopsService;
 
 	public static class PoiSearchResult {
 
@@ -492,11 +496,11 @@ public class PoiSearchService {
 	}
 
 	public Feature searchPoiByOsmId(LatLon loc, long osmid, String type, String timeZone) throws IOException {
-		final String RELATION_TYPE = "3";
-		final double RELATION_SEARCH_RADIUS = 0.0055; // ~600 meters
-		final double OTHER_POI_SEARCH_RADIUS = 0.0001; // ~11 meters
-		double radiusDegree = type.equals(RELATION_TYPE) ? RELATION_SEARCH_RADIUS : OTHER_POI_SEARCH_RADIUS;
-		return searchSinglePoi(loc, radiusDegree, new ResultMatcher<>() {
+		final String NODE_TYPE = "1";
+		final double WAY_SEARCH_RADIUS = 0.0055; // ~600 meters, way/relation amenity is located at its centroid
+		final double NODE_SEARCH_RADIUS = 0.0001; // ~11 meters
+		double radiusDegree = NODE_TYPE.equals(type) ? NODE_SEARCH_RADIUS : WAY_SEARCH_RADIUS;
+		SearchResult res = searchSinglePoi(loc, radiusDegree, new ResultMatcher<>() {
 			@Override
 			public boolean publish(Amenity amenity) {
 				return ObfConstants.getOsmObjectId(amenity) == osmid;
@@ -506,12 +510,24 @@ public class PoiSearchService {
 			public boolean isCancelled() {
 				return false;
 			}
-		}, timeZone);
+		});
+		if (res == null) {
+			return null;
+		}
+		Feature feature = searchResultConverter.getPoiFeature(res, timeZone);
+		Amenity amenity = (Amenity) res.object;
+		if (feature != null && transportStopsService.isPublicTransportStop(amenity)) {
+			Long stopId = transportStopsService.findBestTransportStopId(amenity);
+			if (stopId != null) {
+				feature.prop(SearchResultConverter.PoiTypeField.TRANSPORT_STOP_ID.getFieldName(), stopId);
+			}
+		}
+		return feature;
 	}
 
 	public Feature searchPoiByEnName(LatLon loc, String enName) throws IOException {
 		final double SEARCH_RADIUS_DEGREE = 0.0001;
-		return searchSinglePoi(loc, SEARCH_RADIUS_DEGREE, new ResultMatcher<>() {
+		SearchResult res = searchSinglePoi(loc, SEARCH_RADIUS_DEGREE, new ResultMatcher<>() {
 			@Override
 			public boolean publish(Amenity amenity) {
 				return amenity.getEnName(false).equals(enName);
@@ -521,10 +537,11 @@ public class PoiSearchService {
 			public boolean isCancelled() {
 				return false;
 			}
-		}, null);
+		});
+		return res != null ? searchResultConverter.getPoiFeature(res, null) : null;
 	}
 
-	private Feature searchSinglePoi(LatLon loc, double radiusDegree, ResultMatcher<Amenity> matcher, String timeZone)
+	private SearchResult searchSinglePoi(LatLon loc, double radiusDegree, ResultMatcher<Amenity> matcher)
 			throws IOException {
 		final int mapZoom = 15;
 		LatLon p1 = new LatLon(loc.getLatitude() + radiusDegree, loc.getLongitude() - radiusDegree);
@@ -533,9 +550,8 @@ public class PoiSearchService {
 				MapUtils.get31TileNumberX(p1.getLongitude()), MapUtils.get31TileNumberX(p2.getLongitude()),
 				MapUtils.get31TileNumberY(p1.getLatitude()), MapUtils.get31TileNumberY(p2.getLatitude()), mapZoom,
 				BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER, matcher);
-		SearchResult res = searchPoiByReq(req, p1, p2, false);
 
-		return res != null ? searchResultConverter.getPoiFeature(res, timeZone) : null;
+		return searchPoiByReq(req, p1, p2, false);
 	}
 
 	private SearchResult searchPoiByReq(BinaryMapIndexReader.SearchRequest<Amenity> req, LatLon p1, LatLon p2,
