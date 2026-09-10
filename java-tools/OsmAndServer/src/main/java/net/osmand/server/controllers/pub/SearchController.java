@@ -351,6 +351,17 @@ public class SearchController {
 		return ResponseEntity.ok(gson.toJson(poi));
 	}
 
+	@PostMapping(path = {"/get-poi-by-tags"}, produces = "application/json")
+	@ResponseBody
+	public ResponseEntity<String> getPoiByTags(@RequestBody Map<String, String> tags,
+	                                           @RequestParam double lat,
+	                                           @RequestParam double lon,
+	                                           @RequestParam long id,
+	                                           @RequestParam(required = false) String timeZone) throws IOException {
+		Feature poi = poiSearchService.getPoiByTags(tags, new LatLon(lat, lon), id, timeZone);
+		return ResponseEntity.ok(gson.toJson(poi));
+	}
+
 	@GetMapping(path = {"/get-poi-by-name"}, produces = "application/json")
 	@ResponseBody
 	public ResponseEntity<String> getPoiByOsmId(@RequestParam double lat,

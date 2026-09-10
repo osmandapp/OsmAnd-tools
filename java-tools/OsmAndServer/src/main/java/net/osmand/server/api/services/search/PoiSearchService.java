@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import net.osmand.CollatorStringMatcher;
+import net.osmand.NativeLibrary.RenderedObject;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapIndexReader;
@@ -37,6 +38,8 @@ import net.osmand.data.QuadRect;
 import net.osmand.osm.PoiType;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiCategory;
+import net.osmand.osm.edit.EntityParser;
+import net.osmand.osm.edit.Node;
 import net.osmand.search.core.ObjectType;
 import net.osmand.search.core.SearchResult;
 import net.osmand.search.core.spatial.SpatialPoiSearch;
@@ -82,6 +85,9 @@ public class PoiSearchService {
 
 	@Autowired
 	private TransportStopsService transportStopsService;
+
+	@Autowired
+	private PoiTypesService poiTypesService;
 
 	public static class PoiSearchResult {
 
@@ -511,9 +517,10 @@ public class PoiSearchService {
 				return false;
 			}
 		});
-		if (res == null) {
-			return null;
-		}
+		return res != null ? getMapObjectFeature(res, timeZone) : null;
+	}
+
+	private Feature getMapObjectFeature(SearchResult res, String timeZone) throws IOException {
 		Feature feature = searchResultConverter.getPoiFeature(res, timeZone);
 		Amenity amenity = (Amenity) res.object;
 		if (feature != null && transportStopsService.isPublicTransportStop(amenity)) {
@@ -523,6 +530,24 @@ public class PoiSearchService {
 			}
 		}
 		return feature;
+	}
+
+	// vector tile object that is not in the POI index (no_indx types, buildings, ...): amenity from its tags as the map creator does
+	public Feature getPoiByTags(Map<String, String> tags, LatLon loc, long mapObjectId, String timeZone) throws IOException {
+		Node node = new Node(loc.getLatitude(), loc.getLongitude(), -1);
+		node.replaceTags(tags);
+		MapPoiTypes poiTypes = poiTypesService.getMapPoiTypes(PoiTypesService.DEFAULT_SEARCH_LANG);
+		List<Amenity> amenities = EntityParser.parseAmenities(poiTypes, node, tags, new ArrayList<>(), false);
+		if (amenities.isEmpty()) {
+			return null;
+		}
+		Amenity amenity = amenities.get(0);
+		RenderedObject renderedObject = new RenderedObject();
+		renderedObject.setId(mapObjectId);
+		amenity.setId(ObfConstants.createMapObjectIdFromCleanOsmId(ObfConstants.getOsmObjectId(renderedObject),
+				ObfConstants.getOsmEntityType(renderedObject)));
+		return getMapObjectFeature(
+				searchResultConverter.buildPoiSearchResult(amenity, PoiTypesService.DEFAULT_SEARCH_LANG, ""), timeZone);
 	}
 
 	public Feature searchPoiByEnName(LatLon loc, String enName) throws IOException {
