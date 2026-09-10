@@ -181,29 +181,39 @@ public class SearchController {
 	@ResponseBody
 	public ResponseEntity<String> visibleTags(@RequestBody Map<String, String> tags,
 	                                          @RequestParam(required = false) String lang) {
-		if (tags != null) {
-			if (tags.size() > MAX_TAG_ENTRIES) {
-				return ResponseEntity.badRequest().body(gson.toJson(Map.of(
-						"error", "Too many tags " + tags.size() + ", maximum is " + MAX_TAG_ENTRIES)));
-			}
-			for (Map.Entry<String, String> entry : tags.entrySet()) {
-				String value = entry.getValue();
-				if (value == null) {
-					continue;
-				}
-				if (value.length() > MAX_TAG_VALUE_LENGTH) {
-					return ResponseEntity.badRequest().body(gson.toJson(Map.of(
-							"error", "Tag '" + entry.getKey() + "' value is too long, maximum is "
-									+ MAX_TAG_VALUE_LENGTH + " characters")));
-				}
-				if (MapObject.isContentZipped(value)) {
-					return ResponseEntity.badRequest().body(gson.toJson(Map.of(
-							"error", "Tag '" + entry.getKey() + "' has an unsupported value encoding")));
-				}
-			}
+		ResponseEntity<String> error = validateTags(tags);
+		if (error != null) {
+			return error;
 		}
 		List<AmenityTagsService.VisibleTag> visibleTags = amenityTagsService.convertToVisibleTags(tags, lang);
 		return ResponseEntity.ok(gson.toJson(visibleTags));
+	}
+
+	// tags sent by a client: null when valid, else the error response
+	private ResponseEntity<String> validateTags(Map<String, String> tags) {
+		if (tags == null) {
+			return null;
+		}
+		if (tags.size() > MAX_TAG_ENTRIES) {
+			return ResponseEntity.badRequest().body(gson.toJson(Map.of(
+					"error", "Too many tags " + tags.size() + ", maximum is " + MAX_TAG_ENTRIES)));
+		}
+		for (Map.Entry<String, String> entry : tags.entrySet()) {
+			String value = entry.getValue();
+			if (value == null) {
+				continue;
+			}
+			if (value.length() > MAX_TAG_VALUE_LENGTH) {
+				return ResponseEntity.badRequest().body(gson.toJson(Map.of(
+						"error", "Tag '" + entry.getKey() + "' value is too long, maximum is "
+								+ MAX_TAG_VALUE_LENGTH + " characters")));
+			}
+			if (MapObject.isContentZipped(value)) {
+				return ResponseEntity.badRequest().body(gson.toJson(Map.of(
+						"error", "Tag '" + entry.getKey() + "' has an unsupported value encoding")));
+			}
+		}
+		return null;
 	}
 
 	@GetMapping(path = {"/get-top-filters"}, produces = "application/json")
@@ -358,6 +368,10 @@ public class SearchController {
 	                                                @RequestParam double lon,
 	                                                @RequestParam long id,
 	                                                @RequestParam(required = false) String timeZone) throws IOException {
+		ResponseEntity<String> error = validateTags(tags);
+		if (error != null) {
+			return error;
+		}
 		Feature poi = poiSearchService.getPoiByMapObject(id, new LatLon(lat, lon), tags, timeZone);
 		return ResponseEntity.ok(gson.toJson(poi));
 	}
