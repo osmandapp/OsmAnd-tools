@@ -1184,6 +1184,7 @@ public class SpatialSearchPipelineTest {
 
 	private SpatialTextSearch.SpatialTextSearchSettings parseSpatialSettings(JSONObject settingsJson) {
 		SpatialTextSearch.SpatialTextSearchSettings settings = SpatialTextSearch.SpatialTextSearchSettings.defaultSettings();
+		settings.SCORE_RANKING = false;
 		settings.SEARCH_ADDR = settingsJson.optBoolean("SEARCH_ADDR", settings.SEARCH_ADDR);
 		settings.SEARCH_POI = settingsJson.optBoolean("SEARCH_POI", settings.SEARCH_POI);
 		settings.SEARCH_BUILDINGS = settingsJson.optBoolean("SEARCH_BUILDINGS", settings.SEARCH_BUILDINGS);
