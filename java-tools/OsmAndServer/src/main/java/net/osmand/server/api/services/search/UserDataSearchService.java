@@ -93,7 +93,7 @@ public class UserDataSearchService {
 		final Map<String, NamesIndex> wptsByTrack = new ConcurrentHashMap<>();
 	}
 
-	private record Match(UserDataItem item, int matchedTokens) {
+	private record Match(UserDataItem item, int exactTokens) {
 	}
 
 	// Called from get-shared-with-me for favorites
@@ -127,7 +127,7 @@ public class UserDataSearchService {
 			indexes.forEach(index -> collectMatches(index, tokens, matches));
 		}
 		return matches.stream()
-				.sorted(Comparator.comparingInt(Match::matchedTokens).reversed()
+				.sorted(Comparator.comparingInt(Match::exactTokens).reversed()
 						.thenComparing(match -> match.item().name()))
 				.limit(RESULTS_LIMIT).map(Match::item).toList();
 	}
@@ -228,17 +228,24 @@ public class UserDataSearchService {
 		return index;
 	}
 
-	// Count query tokens matched by prefix in item name tokens
+	// Item matches when every query token is a prefix of some token of its name; exact word matches rank higher
 	private void collectMatches(NamesIndex index, List<String> tokens, List<Match> matches) {
+		if (tokens.isEmpty()) {
+			return;
+		}
 		int[] matchedTokens = new int[index.items.size()];
+		int[] exactTokens = new int[index.items.size()];
 		for (String token : tokens) {
 			for (int position : new HashSet<>(index.tree.simpleGet(token + CollatorStringMatcher.INCOMPLETE_DOT))) {
 				matchedTokens[position]++;
 			}
+			for (int position : new HashSet<>(index.tree.simpleGet(token))) {
+				exactTokens[position]++;
+			}
 		}
 		for (int position = 0; position < matchedTokens.length; position++) {
-			if (matchedTokens[position] > 0) {
-				matches.add(new Match(index.items.get(position), matchedTokens[position]));
+			if (matchedTokens[position] == tokens.size()) {
+				matches.add(new Match(index.items.get(position), exactTokens[position]));
 			}
 		}
 	}
