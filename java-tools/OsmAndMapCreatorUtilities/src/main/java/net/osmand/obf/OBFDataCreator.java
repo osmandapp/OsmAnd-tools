@@ -6,6 +6,7 @@ import net.osmand.binary.BinaryMapIndexTestReader;
 import net.osmand.binary.OsmandOdb;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.obf.diff.ObfFileInMemory;
+import net.osmand.obf.preparation.NameIndexCreator;
 import net.osmand.util.Algorithms;
 import rtree.RTreeException;
 
@@ -38,6 +39,7 @@ public class OBFDataCreator extends BinaryMerger {
 		File outputFile = new File(obfFilePath);
 		List<BinaryMapIndexReader> readers = new ArrayList<>();
 		List<BinaryMapIndexTestReader> testReaders = new ArrayList<>();
+		int prevMinCommonNonIndexed = NameIndexCreator.MIN_LIMIT_COMMON_NON_INDEXED;
 		try {
 			for (String jsonFilePath : jsonFilePaths) {
 				File jsonFile = new File(jsonFilePath);
@@ -55,6 +57,12 @@ public class OBFDataCreator extends BinaryMerger {
 
 			if (readers.isEmpty()) {
 				throw new IOException("No data for merge");
+			}
+			// a map cut out by a few words counts them far more often than the map it came from does
+			for (BinaryMapIndexTestReader testReader : testReaders) {
+				if (testReader.getMinCommonNonIndexed() >= 0) {
+					NameIndexCreator.MIN_LIMIT_COMMON_NON_INDEXED = testReader.getMinCommonNonIndexed();
+				}
 			}
 			if (outputFile.exists()) {
 				if (!outputFile.delete()) {
@@ -83,6 +91,7 @@ public class OBFDataCreator extends BinaryMerger {
 
 			return outFile;
 		} finally {
+			NameIndexCreator.MIN_LIMIT_COMMON_NON_INDEXED = prevMinCommonNonIndexed;
 			for (BinaryMapIndexReader reader : readers) {
 				reader.close();
 			}
