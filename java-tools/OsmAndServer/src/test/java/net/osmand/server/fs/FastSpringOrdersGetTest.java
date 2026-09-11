@@ -16,6 +16,17 @@ public class FastSpringOrdersGetTest {
 
 	private static final String SKU = "net.osmand.fastspring.inapp.maps.plus";
 
+	@Test
+	public void completedInAppIsValid() throws IOException {
+		FastSpringOrder order = json("orders-get-completed.json", FastSpringOrder.class);
+		FastSpringPurchase p = FastSpringHelper.inAppPurchase(order, SKU);
+		assertNotNull(p);
+		assertTrue(p.isValid());
+		assertEquals(1789097070073L, (long) p.purchaseTime);
+		assertEquals("MXN", p.currency);
+		assertEquals(1299.0, p.price, 0);
+	}
+
 	// full refund: order stays completed=true, refund is only visible in returns[]
 	@Test
 	public void refundedInAppIsInvalid() throws IOException {

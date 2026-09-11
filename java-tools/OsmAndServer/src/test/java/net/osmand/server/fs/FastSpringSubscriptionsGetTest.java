@@ -67,6 +67,15 @@ public class FastSpringSubscriptionsGetTest {
 	}
 
 	@Test
+	public void activeTakesExpireTimeFromNextBillingDate() throws IOException {
+		SupporterDeviceSubscription s = revalidate("subscriptions-get-active.json");
+		assertTrue(s.valid);
+		assertTrue(s.autorenewing);
+		assertEquals("expiretime must be FastSpring next billing date (2027-09-11)", 1820620800000L, s.expiretime.getTime());
+		verify(repo).save(s);
+	}
+
+	@Test
 	public void canceledStaysValidUntilDeactivationDate() throws IOException {
 		SupporterDeviceSubscription s = revalidate("subscriptions-get-canceled.json");
 		assertTrue("canceled subscription is active on FastSpring until deactivationDate, valid must stay true", s.valid);
