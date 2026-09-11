@@ -34,6 +34,10 @@ public class FastSpringHelper {
 	// to allow FastSpring systems to process the order
 	public static final long MINIMUM_VALIDATION_DELAY_MILLIS = 15 * 60 * 1000;
 
+	// subscription states (https://developer.fastspring.com/reference/retrieve-a-subscription)
+	public static final String SUBSCRIPTION_STATE_CANCELED = "canceled";
+	public static final String SUBSCRIPTION_STATE_DEACTIVATED = "deactivated";
+
 	private static final String API_BASE = "https://api.fastspring.com";
 	private static final int CONNECT_TIMEOUT_MILLIS = 30 * 1000;
 	private static final int READ_TIMEOUT_MILLIS = 60 * 1000;
@@ -66,8 +70,8 @@ public class FastSpringHelper {
 				LOG.warn("Failed to get subscription with orderId: " + orderId);
 				return;
 			}
-			LOG.info(String.format("Subscription[id=%s, sku=%s, active=%s, autoRenew=%s, begin=%s, nextChargeDate=%s]",
-					sub.id, sub.sku, sub.active, sub.autoRenew, sub.begin, sub.nextChargeDate));
+			LOG.info(String.format("Subscription[id=%s, sku=%s, active=%s, state=%s, autoRenew=%s, begin=%s, next=%s, nextChargeDate=%s, deactivationDate=%s]",
+					sub.id, sub.sku, sub.active, sub.state, sub.autoRenew, sub.begin, sub.next, sub.nextChargeDate, sub.deactivationDate));
 		} else if (type.equals("-inapp")) {
 			FastSpringPurchase inApp = getInAppPurchaseByOrderIdAndSku(orderId, sku);
 			if (inApp == null) {
@@ -227,10 +231,24 @@ public class FastSpringHelper {
 		public String state; // active, overdue, canceled, deactivated, trial (https://developer.fastspring.com/reference/retrieve-a-subscription)
 		public String sku;
 		public Long begin; //purchaseTime
-		public Long nextChargeDate; //expiretime
-		public Boolean autoRenew;
+		public Long next; // next billing date; for canceled equals deactivationDate
+		public Long nextChargeDate; // documented but not returned by GET /subscriptions/{id}
+		public Long deactivationDate;
+		public Boolean autoRenew; // stays true after cancel, state is authoritative
 		public Double price;
 		public String currency;
+
+		public boolean isAutoRenewing() {
+			return Boolean.TRUE.equals(autoRenew) && !SUBSCRIPTION_STATE_CANCELED.equals(state)
+					&& !SUBSCRIPTION_STATE_DEACTIVATED.equals(state);
+		}
+
+		public Long getExpiryTime() {
+			if (next != null) {
+				return next;
+			}
+			return nextChargeDate != null ? nextChargeDate : deactivationDate;
+		}
 	}
 
 	public static class FastSpringPurchase {

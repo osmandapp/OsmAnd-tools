@@ -680,8 +680,8 @@ public class UpdateSubscription {
 				subscription = new SubscriptionPurchase();
 				subscription.setOrderId(fsSub.id);
 				subscription.setStartTimeMillis(fsSub.begin);
-				subscription.setExpiryTimeMillis(fsSub.nextChargeDate);
-				subscription.setAutoRenewing(fsSub.autoRenew);
+				subscription.setExpiryTimeMillis(fsSub.getExpiryTime());
+				subscription.setAutoRenewing(fsSub.isAutoRenewing());
 				subscription.setPriceAmountMicros(Math.round(fsSub.price * 1000000));
 				subscription.setPriceCurrencyCode(fsSub.currency);
 

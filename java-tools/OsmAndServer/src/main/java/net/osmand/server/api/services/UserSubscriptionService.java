@@ -359,19 +359,21 @@ public class UserSubscriptionService {
 			FastSpringHelper.FastSpringSubscription fsSub = FastSpringHelper.getSubscriptionByOrderIdAndSku(s.orderId, s.sku);
 			if (fsSub != null) {
 				if (!Boolean.TRUE.equals(fsSub.active)) {
-					// canceled/deactivated on FastSpring side (e.g. refund with subscription cancellation)
+					// deactivated on FastSpring side: period ended after cancel, refund with cancellation, chargeback
 					LOG.info(String.format("FastSpring subscription %s - %s is not active (state %s)", s.sku, s.orderId, fsSub.state));
 					s.valid = false;
-				} else if (fsSub.nextChargeDate == null) {
-					LOG.info(String.format("FastSpring subscription %s - %s has null nextChargeDate", s.sku, s.orderId));
-					s.valid = false;
 				} else {
-					if (s.expiretime == null) {
-						LOG.error(String.format("FastSpring subscription %s - %s has no expiretime", s.sku, s.orderId));
-					} else if (s.expiretime.getTime() < fsSub.nextChargeDate) {
-						s.expiretime = new Date(fsSub.nextChargeDate);
+					// canceled stays active until deactivationDate; FastSpring date replaces the hook estimate
+					Long expiry = fsSub.getExpiryTime();
+					if (expiry != null) {
+						s.expiretime = new Date(expiry);
 					}
-					s.valid = System.currentTimeMillis() < fsSub.nextChargeDate;
+					if (s.expiretime == null) {
+						LOG.error(String.format("FastSpring subscription %s - %s has no expiretime (state %s)", s.sku, s.orderId, fsSub.state));
+					} else {
+						s.valid = System.currentTimeMillis() < s.expiretime.getTime();
+					}
+					s.autorenewing = fsSub.isAutoRenewing();
 				}
 				subscriptionsRepo.save(s);
 			}
