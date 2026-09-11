@@ -78,8 +78,8 @@ public class FastSpringHelper {
 				LOG.warn("Failed to get in-app purchase with orderId: " + orderId);
 				return;
 			}
-			LOG.info(String.format("InAppPurchase[sku=%s, purchaseTime=%s, completed=%s, valid=%s]",
-					inApp.sku, inApp.purchaseTime, inApp.completed, inApp.isValid()));
+			LOG.info(String.format("InAppPurchase[sku=%s, purchaseTime=%s, completed=%s, refunded=%s, valid=%s]",
+					inApp.sku, inApp.purchaseTime, inApp.completed, inApp.refunded, inApp.isValid()));
 		} else {
 			LOG.warn("Unknown type: " + type);
 		}
@@ -100,16 +100,13 @@ public class FastSpringHelper {
 
 	public static FastSpringPurchase getInAppPurchaseByOrderIdAndSku(String orderId, String sku) throws IOException {
 		FastSpringOrder order = getOrder(orderId);
-		if (order == null) {
-			return null;
-		}
+		return order == null ? null : inAppPurchase(order, sku);
+	}
+
+	public static FastSpringPurchase inAppPurchase(FastSpringOrder order, String sku) {
 		for (FastSpringOrder.Item item : order.items) {
 			if (sku.equals(item.sku)) {
-				Long purchaseTime = order.changed;
-				Boolean completed = order.completed;
-				String currency = order.currency;
-				Double price = item.subtotal;
-				return new FastSpringPurchase(item.sku, purchaseTime, completed, currency, price);
+				return new FastSpringPurchase(item.sku, order.changed, order.completed, order.currency, item.subtotal, order.isRefunded());
 			}
 		}
 		return null;
@@ -217,6 +214,14 @@ public class FastSpringHelper {
 		public Boolean completed;
 		public String currency;
 		public List<Item> items;
+		public List<Return> returns; // refunds; the order itself stays completed=true
+
+		public boolean isRefunded() {
+			return returns != null && !returns.isEmpty();
+		}
+
+		public static class Return {
+		}
 
 		public static class Item {
 			public String sku;
@@ -238,16 +243,20 @@ public class FastSpringHelper {
 		public Double price;
 		public String currency;
 
-		public boolean isAutoRenewing() {
-			return Boolean.TRUE.equals(autoRenew) && !SUBSCRIPTION_STATE_CANCELED.equals(state)
-					&& !SUBSCRIPTION_STATE_DEACTIVATED.equals(state);
+		public boolean isCanceled() {
+			return SUBSCRIPTION_STATE_CANCELED.equals(state) || SUBSCRIPTION_STATE_DEACTIVATED.equals(state);
 		}
 
+		public boolean isAutoRenewing() {
+			return Boolean.TRUE.equals(autoRenew) && !isCanceled();
+		}
+
+		// after cancel "next" still holds the would-be billing date, access ends at deactivationDate
 		public Long getExpiryTime() {
-			if (next != null) {
-				return next;
+			if (isCanceled()) {
+				return deactivationDate;
 			}
-			return nextChargeDate != null ? nextChargeDate : deactivationDate;
+			return next != null ? next : nextChargeDate;
 		}
 	}
 
@@ -257,17 +266,19 @@ public class FastSpringHelper {
 		public Boolean completed;
 		public String currency;
 		public Double price;
+		public boolean refunded;
 
-		FastSpringPurchase(String sku, Long purchaseTime, Boolean completed, String currency, Double price) {
+		FastSpringPurchase(String sku, Long purchaseTime, Boolean completed, String currency, Double price, boolean refunded) {
 			this.sku = sku;
 			this.purchaseTime = purchaseTime;
 			this.completed = completed;
 			this.currency = currency;
 			this.price = price;
+			this.refunded = refunded;
 		}
 
 		public boolean isValid() {
-			return this.completed;
+			return Boolean.TRUE.equals(completed) && !refunded;
 		}
 	}
 }

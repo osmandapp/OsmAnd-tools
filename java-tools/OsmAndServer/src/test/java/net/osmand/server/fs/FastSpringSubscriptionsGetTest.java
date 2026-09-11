@@ -37,9 +37,9 @@ public class FastSpringSubscriptionsGetTest {
 	@InjectMocks
 	UserSubscriptionService service;
 
-	private static FastSpringSubscription response(String name) throws IOException {
+	static <T> T json(String name, Class<T> type) throws IOException {
 		try (InputStream in = FastSpringSubscriptionsGetTest.class.getResourceAsStream("/fs/" + name)) {
-			return new Gson().fromJson(new InputStreamReader(Objects.requireNonNull(in, name)), FastSpringSubscription.class);
+			return new Gson().fromJson(new InputStreamReader(Objects.requireNonNull(in, name)), type);
 		}
 	}
 
@@ -56,17 +56,30 @@ public class FastSpringSubscriptionsGetTest {
 		return s;
 	}
 
-	@Test
-	public void canceledStaysValidUntilDeactivationDate() throws IOException {
+	private SupporterDeviceSubscription revalidate(String response) throws IOException {
 		SupporterDeviceSubscription s = hookRecord();
 		try (MockedStatic<FastSpringHelper> fs = mockStatic(FastSpringHelper.class)) {
 			fs.when(() -> FastSpringHelper.getSubscriptionByOrderIdAndSku(ORDER, SKU))
-					.thenReturn(response("subscriptions-get-canceled.json"));
+					.thenReturn(json(response, FastSpringSubscription.class));
 			service.revalidateFastSpringSubscription(s);
 		}
+		return s;
+	}
+
+	@Test
+	public void canceledStaysValidUntilDeactivationDate() throws IOException {
+		SupporterDeviceSubscription s = revalidate("subscriptions-get-canceled.json");
 		assertTrue("canceled subscription is active on FastSpring until deactivationDate, valid must stay true", s.valid);
 		assertFalse("canceled subscription must not autorenew", s.autorenewing);
 		assertEquals("expiretime must be FastSpring deactivationDate (2026-10-07)", 1791331200000L, s.expiretime.getTime());
+		verify(repo).save(s);
+	}
+
+	// refund with "Cancel Related Subscriptions": active=false, next still set
+	@Test
+	public void deactivatedIsInvalid() throws IOException {
+		SupporterDeviceSubscription s = revalidate("subscriptions-get-deactivated.json");
+		assertFalse("deactivated subscription must be invalid", s.valid);
 		verify(repo).save(s);
 	}
 }
