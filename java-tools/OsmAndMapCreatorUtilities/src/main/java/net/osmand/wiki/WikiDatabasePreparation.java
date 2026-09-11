@@ -974,13 +974,13 @@ public class WikiDatabasePreparation {
 
 	private static PoiFieldCategory transformCategory(String[] info) {
 		// {{listing | type=go}
-		// en: type, pt: tipo, fr: group,
+		// en: type, pt: tipo, fr: group, pl: typ
 		PoiFieldCategory res = PoiFieldCategory.OTHER;
 		for (int i = 0; i < info.length; i++) {
 			int ind = info[i].indexOf('=');
 			if (ind >= 0) {
 				String key = info[i].substring(0, ind).trim();
-				if (key.equals("type") || key.equals("tipo") || key.equals("group")) {
+				if (key.equals("type") || key.equals("tipo") || key.equals("group") || key.equals("typ")) {
 					String val = info[i].substring(ind + 1).toLowerCase().trim();
 					for (PoiFieldCategory p : PoiFieldCategory.values()) {
 						for (String s : p.names) {
@@ -1008,7 +1008,8 @@ public class WikiDatabasePreparation {
 	}
 
 	private static PoiFieldCategory isPOIKey(String str, String lang) {
-		if (str.startsWith("listing") || str.startsWith("vcard")) {
+		// pl: {{znacznik | typ=...}} is the generic listing template (like en "listing")
+		if (str.startsWith("listing") || str.startsWith("vcard") || str.startsWith("znacznik")) {
 			return transformCategory(str.split("\\|"));
 		}
 		for (PoiFieldCategory p : PoiFieldCategory.values()) {
