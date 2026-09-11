@@ -27,6 +27,8 @@ osmand:
   web.location: ${osmand.files.location}/web-server-config
   srtm.location: ${SRTM_LOCATION:}
   weather.location: ${WEATHER_LOCATION:}
+  # traffic feeds (downloads, day files, index.json) served by /traffic; roads come from tile-server.obf.location
+  traffic.location: ${TRAFFIC_LOCATION:}
   wiki.location: ${osmand.files.location}/wikidata/wikidata_commons_osm.sqlitedb
   heightmap.location: ${HEIGHTMAP_LOCATION:}
 
