@@ -116,6 +116,8 @@ public class OsmAndMapsService {
 
 	private static final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8;
 	private static final int MEM_MAX_HITS_PER_RUN = 5;
+	// maps are picked by the start/end bbox, but a route with avoid_* / prefer_* params can detour out of it
+	private static final double ROUTING_MAPS_MARGIN_KM = 30;
 
 	private static final long INTERVAL_TO_MONITOR_ZIP = 5 * 60 * 1000;
 	private static final long INTERVAL_TO_CLEANUP_ROUTING_CACHE = 10 * 60 * 1000;
@@ -1049,7 +1051,8 @@ public class OsmAndMapsService {
 					di.selectedCache, di.waitTime / 1e3, di.routeParametersStr, start, end, di.routingCacheInfo));
 			if (ctx == null) {
 				validateAndInitConfig();
-				List<BinaryMapIndexReaderReference> list = getObfReaders(points, ObfReason.ROUTING.value());
+				List<BinaryMapIndexReaderReference> list = getObfReaders(withMargin(points, ROUTING_MAPS_MARGIN_KM),
+						ObfReason.ROUTING.value());
 				boolean[] incomplete = new boolean[1];
 				usedMapList = getReaders(list, incomplete);
 				if (incomplete[0]) {
@@ -1342,6 +1345,21 @@ public class OsmAndMapsService {
 		if (ctx.calculationProgressFirstPhase != null) {
 			props.put("devbase", ctx.calculationProgressFirstPhase.getInfo(null));
 		}
+	}
+
+	// bbox in 31-tile coordinates (top < bottom) expanded by marginKm on each side
+	private static QuadRect withMargin(QuadRect r, double marginKm) {
+		if (r == null) {
+			return null;
+		}
+		double top = MapUtils.get31LatitudeY((int) r.top);
+		double bottom = MapUtils.get31LatitudeY((int) r.bottom);
+		double dLat = marginKm / 111.0;
+		double dLon = marginKm / (111.0 * Math.cos(Math.toRadians((top + bottom) / 2)));
+		return new QuadRect(MapUtils.get31TileNumberX(MapUtils.get31LongitudeX((int) r.left) - dLon),
+				MapUtils.get31TileNumberY(Math.min(top + dLat, MapUtils.MAX_LATITUDE)),
+				MapUtils.get31TileNumberX(MapUtils.get31LongitudeX((int) r.right) + dLon),
+				MapUtils.get31TileNumberY(Math.max(bottom - dLat, MapUtils.MIN_LATITUDE)));
 	}
 
 	public QuadRect points(List<LatLon> intermediates, LatLon start, LatLon end) {
