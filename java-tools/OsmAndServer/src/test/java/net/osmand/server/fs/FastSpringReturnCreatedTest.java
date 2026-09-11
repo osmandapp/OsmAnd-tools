@@ -78,6 +78,14 @@ public class FastSpringReturnCreatedTest {
 		assertNotNull(s.checktime);
 	}
 
+	// refund may arrive before order.completed is recorded: reject so that FastSpring retries
+	@Test
+	public void refundOfUnknownOrderIsRejectedForRetry() throws IOException {
+		FastSpringWebhookRequest request = json("return-created.json", FastSpringWebhookRequest.class);
+		assertEquals(202, controller.handleRefundEvent(request).getStatusCode().value());
+		verify(subs, never()).saveAndFlush(any());
+	}
+
 	// in-app: no subscription on FastSpring side, revoked by the hook itself
 	@Test
 	public void inAppRefundRevokes() throws IOException {

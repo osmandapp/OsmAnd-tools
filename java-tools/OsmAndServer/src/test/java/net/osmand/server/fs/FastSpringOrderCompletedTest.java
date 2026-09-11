@@ -6,6 +6,7 @@ import static org.mockito.Mockito.*;
 
 import java.io.IOException;
 import java.util.Calendar;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.Before;
@@ -54,7 +55,7 @@ public class FastSpringOrderCompletedTest {
 	public void setUp() {
 		user.id = USER_ID;
 		user.email = "user@example.com";
-		when(usersRepository.findByEmailIgnoreCase(user.email)).thenReturn(user);
+		lenient().when(usersRepository.findByEmailIgnoreCase(user.email)).thenReturn(user);
 	}
 
 	@Test
@@ -97,5 +98,31 @@ public class FastSpringOrderCompletedTest {
 		assertTrue(p.valid);
 		assertEquals(1789097070231L, p.purchaseTime.getTime());
 		verify(userSubService).verifyAndRefreshProOrderId(user);
+	}
+
+	@Test
+	public void duplicateOrderIsIgnored() throws IOException {
+		FastSpringWebhookRequest request = json("order-completed-inapp.json", FastSpringWebhookRequest.class);
+		when(inApps.findByOrderId("ORDER_ID_IAP_TEST00000")).thenReturn(List.of(new SupporterDeviceInAppPurchase()));
+		assertEquals(200, controller.handleOrderCompletedEvent(request).getStatusCode().value());
+		verify(inApps, never()).saveAndFlush(any());
+	}
+
+	// checkout requires a logged in account, so an unknown email is a deleted account or a forged hook: nothing to retry
+	@Test
+	public void unknownUserIsAcknowledgedWithoutRecord() throws IOException {
+		FastSpringWebhookRequest request = json("order-completed-inapp.json", FastSpringWebhookRequest.class);
+		request.events.get(0).data.tags.userEmail = "nobody@example.com";
+		assertEquals(200, controller.handleOrderCompletedEvent(request).getStatusCode().value());
+		verifyNoInteractions(inApps, subs);
+	}
+
+	// 202 + processed ids = partial accept, FastSpring retries the failed event
+	@Test
+	public void unknownSkuIsRejectedForRetry() throws IOException {
+		FastSpringWebhookRequest request = json("order-completed-inapp.json", FastSpringWebhookRequest.class);
+		request.events.get(0).data.items.get(0).sku = "net.osmand.fastspring.inapp.unknown";
+		assertEquals(202, controller.handleOrderCompletedEvent(request).getStatusCode().value());
+		verifyNoInteractions(inApps, subs);
 	}
 }
