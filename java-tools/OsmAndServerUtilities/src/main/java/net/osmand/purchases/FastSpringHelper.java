@@ -1,5 +1,6 @@
 package net.osmand.purchases;
 
+import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
 import com.google.gson.Gson;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -257,6 +258,16 @@ public class FastSpringHelper {
 				return deactivationDate;
 			}
 			return next != null ? next : nextChargeDate;
+		}
+
+		public SubscriptionPurchase toSubscriptionPurchase() {
+			return new SubscriptionPurchase()
+					.setOrderId(id)
+					.setStartTimeMillis(begin)
+					.setExpiryTimeMillis(getExpiryTime())
+					.setAutoRenewing(isAutoRenewing())
+					.setPriceAmountMicros(Math.round(price * 1000000))
+					.setPriceCurrencyCode(currency);
 		}
 	}
 

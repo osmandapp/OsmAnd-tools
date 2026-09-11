@@ -16,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.MockitoJUnitRunner;
 
+import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
 import com.google.gson.Gson;
 
 import net.osmand.purchases.FastSpringHelper;
@@ -82,6 +83,25 @@ public class FastSpringSubscriptionsGetTest {
 		assertFalse("canceled subscription must not autorenew", s.autorenewing);
 		assertEquals("expiretime must be FastSpring deactivationDate (2026-10-07)", 1791331200000L, s.expiretime.getTime());
 		verify(repo).save(s);
+	}
+
+	// UpdateSubscription job: what is written to supporters_device_sub
+	@Test
+	public void jobWritesActiveSubscriptionFromApi() throws IOException {
+		SubscriptionPurchase p = json("subscriptions-get-active.json", FastSpringSubscription.class).toSubscriptionPurchase();
+		assertEquals("SUBSCRIPTION_ID_TEST01", p.getOrderId());
+		assertEquals(1789120577858L, (long) p.getStartTimeMillis());
+		assertEquals(1820620800000L, (long) p.getExpiryTimeMillis());
+		assertTrue(p.getAutoRenewing());
+		assertEquals(39990000L, (long) p.getPriceAmountMicros());
+		assertEquals("EUR", p.getPriceCurrencyCode());
+	}
+
+	@Test
+	public void jobWritesCanceledSubscriptionUntilDeactivationDate() throws IOException {
+		SubscriptionPurchase p = json("subscriptions-get-canceled.json", FastSpringSubscription.class).toSubscriptionPurchase();
+		assertEquals(1791331200000L, (long) p.getExpiryTimeMillis());
+		assertFalse(p.getAutoRenewing());
 	}
 
 	// refund with "Cancel Related Subscriptions": active=false, next still set
