@@ -4,9 +4,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -17,7 +15,7 @@ import java.util.Map;
 /**
  * Day format: everything a client shows is computed here, the client only draws it.
  * <p>
- * A day file &lt;source&gt;/&lt;yyyy-mm-dd&gt;.json is {@code {meta, hours, sensors, events}}; index.json lists the sources and
+ * A day file &lt;source&gt;/&lt;yyyy-mm-dd&gt;.json.gz is {@code {meta, hours, sensors, events}}; index.json lists the sources and
  * their days (see {@link TrafficFeeds}).
  * <ul>
  * <li>meta: id, name, day, zone, source, speedNote, stateSource (occupancy | city | speed | volume), defaultHour,
@@ -162,9 +160,7 @@ public class TrafficDayFormat {
 			eventsJson.put(e.toJson());
 		}
 
-		try (Writer w = new FileWriter(out)) {
-			w.write(new JSONObject().put("meta", meta).put("hours", hours).put("sensors", arr).put("events", eventsJson).toString());
-		}
+		TrafficFeed.writeGz(out, new JSONObject().put("meta", meta).put("hours", hours).put("sensors", arr).put("events", eventsJson).toString());
 	}
 
 	private static JSONObject sensorJson(TrafficSensor s, int dup, int shared) {

@@ -29,7 +29,7 @@ import java.util.Set;
 /**
  * Traffic feeds in one folder. On every tick each feed is asked whether it wants a download
  * ({@link TrafficFeed#wantsDownload}); raw days older than RETENTION_DAYS are dropped; changed days are rebuilt into
- * &lt;source&gt;/&lt;yyyy-mm-dd&gt;.json and index.json lists the sources and their days. Downloads are only ever added,
+ * &lt;source&gt;/&lt;yyyy-mm-dd&gt;.json.gz and index.json lists the sources and their days. Downloads are only ever added,
  * day files are derived from them and can be rebuilt at any time.
  */
 public class TrafficFeeds {
@@ -163,8 +163,8 @@ public class TrafficFeeds {
 		}
 		Set<LocalDate> raw = new HashSet<>(feed.rawDays());
 		boolean changed = false;
-		for (File f : TrafficFeed.filesOf(feed.dayFile(today).getParentFile(), ".json")) {
-			String name = f.getName().replace(".json", "");
+		for (File f : TrafficFeed.filesOf(feed.dayFile(today).getParentFile(), ".json.gz")) {
+			String name = f.getName().replace(".json.gz", "");
 			if (name.matches("\\d{4}-\\d{2}-\\d{2}") && !raw.contains(LocalDate.parse(name))) {
 				Files.delete(f.toPath());
 				changed = true;
@@ -176,11 +176,11 @@ public class TrafficFeeds {
 	private void writeIndex() throws IOException {
 		JSONArray sources = new JSONArray();
 		for (TrafficFeed feed : feeds) {
-			List<File> files = TrafficFeed.filesOf(feed.dayFile(LocalDate.now()).getParentFile(), ".json");
+			List<File> files = TrafficFeed.filesOf(feed.dayFile(LocalDate.now()).getParentFile(), ".json.gz");
 			JSONArray days = new JSONArray();
 			for (int i = files.size() - 1; i >= 0; i--) {
-				if (files.get(i).getName().matches("\\d{4}-\\d{2}-\\d{2}\\.json")) {
-					JSONObject meta = new JSONObject(Files.readString(files.get(i).toPath())).getJSONObject("meta");
+				if (files.get(i).getName().matches("\\d{4}-\\d{2}-\\d{2}\\.json\\.gz")) {
+					JSONObject meta = new JSONObject(TrafficFeed.readText(files.get(i))).getJSONObject("meta");
 					days.put(new JSONObject().put("day", meta.getString("day")).put("sensors", meta.getInt("sensors"))
 							.put("events", meta.optInt("events")).put("hours", meta.getInt("hours")).put("source", meta.getString("source")));
 				}

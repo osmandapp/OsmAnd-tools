@@ -28,7 +28,7 @@ import java.util.zip.GZIPOutputStream;
  * <ul>
  * <li>raw/&lt;yyyy-mm-dd&gt;/ - files downloaded for that local day (removed after {@link TrafficFeeds#RETENTION_DAYS})</li>
  * <li>static/ - site tables and calibration data that are not tied to a day</li>
- * <li>&lt;yyyy-mm-dd&gt;.json - the day in {@link TrafficDayFormat}</li>
+ * <li>&lt;yyyy-mm-dd&gt;.json.gz - the day in {@link TrafficDayFormat}</li>
  * </ul>
  */
 public abstract class TrafficFeed {
@@ -137,7 +137,7 @@ public abstract class TrafficFeed {
 	}
 
 	public File dayFile(LocalDate day) {
-		return new File(dir, day + ".json");
+		return new File(dir, day + ".json.gz");
 	}
 
 	/**

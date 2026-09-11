@@ -55,7 +55,8 @@ public class MadridFeed extends TrafficFeed {
 	private static final String HISTORY_PACKAGE = "208627-0-transporte-ptomedida-historico";
 	private static final Pattern DIRECTION = Pattern.compile("\\b(NE|NO|SE|SO|N|S|E|O)-(NE|NO|SE|SO|N|S|E|O)\\b");
 	private static final Pattern HISTORY_FILE = Pattern.compile("history-(\\d{2})-(\\d{4})\\.zip");
-	private static final DateTimeFormatter SNAPSHOT_TIME = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+	// the feed writes hours before 10:00 without a leading zero: "12/09/2026 0:30:06"
+	private static final DateTimeFormatter SNAPSHOT_TIME = DateTimeFormatter.ofPattern("d/M/yyyy H:mm:ss");
 
 	@Override
 	public String id() {

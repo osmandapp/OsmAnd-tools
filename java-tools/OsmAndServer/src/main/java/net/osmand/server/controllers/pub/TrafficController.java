@@ -5,6 +5,7 @@ import java.io.File;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -46,6 +47,11 @@ public class TrafficController {
 		if (file == null || !file.exists()) {
 			return ResponseEntity.notFound().build();
 		}
-		return ResponseEntity.ok().contentType(type).body(new FileSystemResource(file));
+		ResponseEntity.BodyBuilder response = ResponseEntity.ok().contentType(type);
+		if (file.getName().endsWith(".gz")) {
+			// day files are stored gzipped, the browser unpacks them
+			response.header(HttpHeaders.CONTENT_ENCODING, "gzip");
+		}
+		return response.body(new FileSystemResource(file));
 	}
 }
