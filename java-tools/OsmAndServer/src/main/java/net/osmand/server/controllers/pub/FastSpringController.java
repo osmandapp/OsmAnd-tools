@@ -253,8 +253,12 @@ public class FastSpringController {
 		if (Boolean.TRUE.equals(fsSub.active) && !FastSpringHelper.SUBSCRIPTION_STATE_DEACTIVATED.equals(fsSub.state)) {
 			if (FastSpringHelper.SUBSCRIPTION_STATE_CANCELED.equals(fsSub.state)) {
 				Date now = new Date();
+				Long expiry = fsSub.getExpiryTime();
 				for (DeviceSubscriptionsRepository.SupporterDeviceSubscription sub : subs) {
 					sub.autorenewing = false;
+					if (expiry != null) {
+						sub.expiretime = new Date(expiry);
+					}
 					sub.checktime = now;
 					deviceSubscriptionsRepository.saveAndFlush(sub);
 					LOGGER.info(String.format("FastSpring: subscription canceled after refund, active until period end, orderId: %s, sku: %s", orderId, sub.sku));

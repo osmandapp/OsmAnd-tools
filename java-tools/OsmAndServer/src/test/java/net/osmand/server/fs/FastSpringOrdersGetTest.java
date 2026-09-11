@@ -1,6 +1,5 @@
 package net.osmand.server.fs;
 
-import static net.osmand.server.fs.FastSpringSubscriptionsGetTest.json;
 import static org.junit.Assert.*;
 
 import java.io.IOException;
@@ -18,7 +17,7 @@ public class FastSpringOrdersGetTest {
 
 	@Test
 	public void completedInAppIsValid() throws IOException {
-		FastSpringOrder order = json("orders-get-completed.json", FastSpringOrder.class);
+		FastSpringOrder order = FsJson.read("orders-get-completed.json", FastSpringOrder.class);
 		FastSpringPurchase p = FastSpringHelper.inAppPurchase(order, SKU);
 		assertNotNull(p);
 		assertTrue(p.isValid());
@@ -30,7 +29,7 @@ public class FastSpringOrdersGetTest {
 	// full refund: order stays completed=true, refund is only visible in returns[]
 	@Test
 	public void refundedInAppIsInvalid() throws IOException {
-		FastSpringOrder order = json("orders-get-refunded.json", FastSpringOrder.class);
+		FastSpringOrder order = FsJson.read("orders-get-refunded.json", FastSpringOrder.class);
 		FastSpringPurchase p = FastSpringHelper.inAppPurchase(order, SKU);
 		assertNotNull(p);
 		assertEquals(1788192806114L, (long) p.purchaseTime);

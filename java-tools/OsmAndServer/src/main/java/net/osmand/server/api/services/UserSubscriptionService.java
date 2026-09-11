@@ -362,6 +362,7 @@ public class UserSubscriptionService {
 					// deactivated on FastSpring side: period ended after cancel, refund with cancellation, chargeback
 					LOG.info(String.format("FastSpring subscription %s - %s is not active (state %s)", s.sku, s.orderId, fsSub.state));
 					s.valid = false;
+					s.autorenewing = false;
 				} else {
 					// canceled stays active until deactivationDate; FastSpring date replaces the hook estimate
 					Long expiry = fsSub.getExpiryTime();

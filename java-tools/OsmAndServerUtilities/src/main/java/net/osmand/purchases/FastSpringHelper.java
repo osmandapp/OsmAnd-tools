@@ -237,24 +237,23 @@ public class FastSpringHelper {
 		public String state; // active, overdue, canceled, deactivated, trial (https://developer.fastspring.com/reference/retrieve-a-subscription)
 		public String sku;
 		public Long begin; //purchaseTime
-		public Long next; // next billing date; for canceled equals deactivationDate
-		public Long nextChargeDate; // documented but not returned by GET /subscriptions/{id}
+		public Long next; // next billing date, not cleared by cancel/deactivation
+		public Long nextChargeDate; // only while a next charge is scheduled, absent after cancel
 		public Long deactivationDate;
 		public Boolean autoRenew; // stays true after cancel, state is authoritative
 		public Double price;
 		public String currency;
 
-		public boolean isCanceled() {
+		public boolean isCanceledOrDeactivated() {
 			return SUBSCRIPTION_STATE_CANCELED.equals(state) || SUBSCRIPTION_STATE_DEACTIVATED.equals(state);
 		}
 
 		public boolean isAutoRenewing() {
-			return Boolean.TRUE.equals(autoRenew) && !isCanceled();
+			return Boolean.TRUE.equals(autoRenew) && !isCanceledOrDeactivated();
 		}
 
-		// after cancel "next" still holds the would-be billing date, access ends at deactivationDate
 		public Long getExpiryTime() {
-			if (isCanceled()) {
+			if (isCanceledOrDeactivated()) {
 				return deactivationDate;
 			}
 			return next != null ? next : nextChargeDate;

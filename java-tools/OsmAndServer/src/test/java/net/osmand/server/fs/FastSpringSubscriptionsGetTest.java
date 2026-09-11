@@ -4,10 +4,7 @@ import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.Date;
-import java.util.Objects;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -17,7 +14,6 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.MockitoJUnitRunner;
 
 import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
-import com.google.gson.Gson;
 
 import net.osmand.purchases.FastSpringHelper;
 import net.osmand.purchases.FastSpringHelper.FastSpringSubscription;
@@ -38,12 +34,6 @@ public class FastSpringSubscriptionsGetTest {
 	@InjectMocks
 	UserSubscriptionService service;
 
-	static <T> T json(String name, Class<T> type) throws IOException {
-		try (InputStream in = FastSpringSubscriptionsGetTest.class.getResourceAsStream("/fs/" + name)) {
-			return new Gson().fromJson(new InputStreamReader(Objects.requireNonNull(in, name)), type);
-		}
-	}
-
 	// record as written by the order.completed hook an hour ago
 	private static SupporterDeviceSubscription hookRecord() {
 		SupporterDeviceSubscription s = new SupporterDeviceSubscription();
@@ -61,7 +51,7 @@ public class FastSpringSubscriptionsGetTest {
 		SupporterDeviceSubscription s = hookRecord();
 		try (MockedStatic<FastSpringHelper> fs = mockStatic(FastSpringHelper.class)) {
 			fs.when(() -> FastSpringHelper.getSubscriptionByOrderIdAndSku(ORDER, SKU))
-					.thenReturn(json(response, FastSpringSubscription.class));
+					.thenReturn(FsJson.read(response, FastSpringSubscription.class));
 			service.revalidateFastSpringSubscription(s);
 		}
 		return s;
@@ -88,7 +78,7 @@ public class FastSpringSubscriptionsGetTest {
 	// UpdateSubscription job: what is written to supporters_device_sub
 	@Test
 	public void jobWritesActiveSubscriptionFromApi() throws IOException {
-		SubscriptionPurchase p = json("subscriptions-get-active.json", FastSpringSubscription.class).toSubscriptionPurchase();
+		SubscriptionPurchase p = FsJson.read("subscriptions-get-active.json", FastSpringSubscription.class).toSubscriptionPurchase();
 		assertEquals("SUBSCRIPTION_ID_TEST01", p.getOrderId());
 		assertEquals(1789120577858L, (long) p.getStartTimeMillis());
 		assertEquals(1820620800000L, (long) p.getExpiryTimeMillis());
@@ -99,7 +89,7 @@ public class FastSpringSubscriptionsGetTest {
 
 	@Test
 	public void jobWritesCanceledSubscriptionUntilDeactivationDate() throws IOException {
-		SubscriptionPurchase p = json("subscriptions-get-canceled.json", FastSpringSubscription.class).toSubscriptionPurchase();
+		SubscriptionPurchase p = FsJson.read("subscriptions-get-canceled.json", FastSpringSubscription.class).toSubscriptionPurchase();
 		assertEquals(1791331200000L, (long) p.getExpiryTimeMillis());
 		assertFalse(p.getAutoRenewing());
 	}
@@ -109,6 +99,7 @@ public class FastSpringSubscriptionsGetTest {
 	public void deactivatedIsInvalid() throws IOException {
 		SupporterDeviceSubscription s = revalidate("subscriptions-get-deactivated.json");
 		assertFalse("deactivated subscription must be invalid", s.valid);
+		assertFalse(s.autorenewing);
 		verify(repo).save(s);
 	}
 }

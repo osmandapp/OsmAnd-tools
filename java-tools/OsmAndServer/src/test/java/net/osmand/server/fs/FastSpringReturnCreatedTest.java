@@ -1,6 +1,5 @@
 package net.osmand.server.fs;
 
-import static net.osmand.server.fs.FastSpringSubscriptionsGetTest.json;
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
@@ -50,10 +49,10 @@ public class FastSpringReturnCreatedTest {
 		s.valid = true;
 		s.autorenewing = true;
 		when(subs.findByOrderIdAndSku(ORDER, SKU)).thenReturn(List.of(s));
-		FastSpringWebhookRequest request = json("return-created.json", FastSpringWebhookRequest.class);
+		FastSpringWebhookRequest request = FsJson.read("return-created.json", FastSpringWebhookRequest.class);
 		try (MockedStatic<FastSpringHelper> fs = mockStatic(FastSpringHelper.class)) {
 			fs.when(() -> FastSpringHelper.getSubscriptionByOrderIdAndSku(ORDER, SKU))
-					.thenReturn(json(subscriptionResponse, FastSpringSubscription.class));
+					.thenReturn(FsJson.read(subscriptionResponse, FastSpringSubscription.class));
 			assertEquals(200, controller.handleRefundEvent(request).getStatusCode().value());
 		}
 		verify(subs).saveAndFlush(s);
@@ -75,13 +74,14 @@ public class FastSpringReturnCreatedTest {
 		assertTrue("subscription still active on FastSpring must stay valid", s.valid);
 		assertNull(s.kind);
 		assertFalse(s.autorenewing);
+		assertEquals(1791331200000L, s.expiretime.getTime());
 		assertNotNull(s.checktime);
 	}
 
 	// refund may arrive before order.completed is recorded: reject so that FastSpring retries
 	@Test
 	public void refundOfUnknownOrderIsRejectedForRetry() throws IOException {
-		FastSpringWebhookRequest request = json("return-created.json", FastSpringWebhookRequest.class);
+		FastSpringWebhookRequest request = FsJson.read("return-created.json", FastSpringWebhookRequest.class);
 		assertEquals(202, controller.handleRefundEvent(request).getStatusCode().value());
 		verify(subs, never()).saveAndFlush(any());
 	}
@@ -94,7 +94,7 @@ public class FastSpringReturnCreatedTest {
 		iap.orderId = "ORDER_ID_INAPP_TEST000";
 		iap.valid = true;
 		when(inApps.findByOrderIdAndSku(iap.orderId, iap.sku)).thenReturn(List.of(iap));
-		FastSpringWebhookRequest request = json("return-created-inapp.json", FastSpringWebhookRequest.class);
+		FastSpringWebhookRequest request = FsJson.read("return-created-inapp.json", FastSpringWebhookRequest.class);
 		assertEquals(200, controller.handleRefundEvent(request).getStatusCode().value());
 		assertFalse(iap.valid);
 		assertNotNull(iap.checktime);

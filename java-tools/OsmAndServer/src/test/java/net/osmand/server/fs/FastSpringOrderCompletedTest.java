@@ -1,6 +1,5 @@
 package net.osmand.server.fs;
 
-import static net.osmand.server.fs.FastSpringSubscriptionsGetTest.json;
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
@@ -63,7 +62,7 @@ public class FastSpringOrderCompletedTest {
 		String sku = "net.osmand.fastspring.subscription.pro.annual";
 		when(purchasesDataLoader.getSubscriptions()).thenReturn(Map.of(sku, new PurchasesDataLoader.Subscription(
 				"OsmAnd Pro", null, BooleanNode.TRUE, null, null, null, null, null, true, 1, "year", 0, 0, "fastspring")));
-		FastSpringWebhookRequest request = json("order-completed-subscription.json", FastSpringWebhookRequest.class);
+		FastSpringWebhookRequest request = FsJson.read("order-completed-subscription.json", FastSpringWebhookRequest.class);
 		assertEquals(200, controller.handleOrderCompletedEvent(request).getStatusCode().value());
 
 		ArgumentCaptor<SupporterDeviceSubscription> saved = ArgumentCaptor.forClass(SupporterDeviceSubscription.class);
@@ -85,7 +84,7 @@ public class FastSpringOrderCompletedTest {
 
 	@Test
 	public void inAppIsRecordedValid() throws IOException {
-		FastSpringWebhookRequest request = json("order-completed-inapp.json", FastSpringWebhookRequest.class);
+		FastSpringWebhookRequest request = FsJson.read("order-completed-inapp.json", FastSpringWebhookRequest.class);
 		assertEquals(200, controller.handleOrderCompletedEvent(request).getStatusCode().value());
 
 		ArgumentCaptor<SupporterDeviceInAppPurchase> saved = ArgumentCaptor.forClass(SupporterDeviceInAppPurchase.class);
@@ -102,7 +101,7 @@ public class FastSpringOrderCompletedTest {
 
 	@Test
 	public void duplicateOrderIsIgnored() throws IOException {
-		FastSpringWebhookRequest request = json("order-completed-inapp.json", FastSpringWebhookRequest.class);
+		FastSpringWebhookRequest request = FsJson.read("order-completed-inapp.json", FastSpringWebhookRequest.class);
 		when(inApps.findByOrderId("ORDER_ID_IAP_TEST00000")).thenReturn(List.of(new SupporterDeviceInAppPurchase()));
 		assertEquals(200, controller.handleOrderCompletedEvent(request).getStatusCode().value());
 		verify(inApps, never()).saveAndFlush(any());
@@ -111,7 +110,7 @@ public class FastSpringOrderCompletedTest {
 	// checkout requires a logged in account, so an unknown email is a deleted account or a forged hook: nothing to retry
 	@Test
 	public void unknownUserIsAcknowledgedWithoutRecord() throws IOException {
-		FastSpringWebhookRequest request = json("order-completed-inapp.json", FastSpringWebhookRequest.class);
+		FastSpringWebhookRequest request = FsJson.read("order-completed-inapp.json", FastSpringWebhookRequest.class);
 		request.events.get(0).data.tags.userEmail = "nobody@example.com";
 		assertEquals(200, controller.handleOrderCompletedEvent(request).getStatusCode().value());
 		verifyNoInteractions(inApps, subs);
@@ -120,7 +119,7 @@ public class FastSpringOrderCompletedTest {
 	// 202 + processed ids = partial accept, FastSpring retries the failed event
 	@Test
 	public void unknownSkuIsRejectedForRetry() throws IOException {
-		FastSpringWebhookRequest request = json("order-completed-inapp.json", FastSpringWebhookRequest.class);
+		FastSpringWebhookRequest request = FsJson.read("order-completed-inapp.json", FastSpringWebhookRequest.class);
 		request.events.get(0).data.items.get(0).sku = "net.osmand.fastspring.inapp.unknown";
 		assertEquals(202, controller.handleOrderCompletedEvent(request).getStatusCode().value());
 		verifyNoInteractions(inApps, subs);
