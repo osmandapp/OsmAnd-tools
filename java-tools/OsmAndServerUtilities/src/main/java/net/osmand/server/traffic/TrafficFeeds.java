@@ -1,5 +1,6 @@
 package net.osmand.server.traffic;
 
+import net.osmand.router.RouteResultPreparation;
 import net.osmand.server.traffic.feeds.BrusselsFeed;
 import net.osmand.server.traffic.feeds.FinlandFeed;
 import net.osmand.server.traffic.feeds.HamburgFeed;
@@ -78,16 +79,23 @@ public class TrafficFeeds {
 	 * @param tick how often the scheduler calls it
 	 */
 	public void tick(Duration tick) throws IOException {
-		boolean changed = false;
-		for (TrafficFeed feed : feeds) {
-			try {
-				changed |= runFeed(feed, tick);
-			} catch (Exception e) {
-				LOG.error("Traffic feed " + feed.id() + " failed", e);
+		// road matching runs the router for every sensor: no route info in the console for this run
+		boolean printRoutes = RouteResultPreparation.PRINT_TO_CONSOLE_ROUTE_INFORMATION;
+		RouteResultPreparation.PRINT_TO_CONSOLE_ROUTE_INFORMATION = false;
+		try {
+			boolean changed = false;
+			for (TrafficFeed feed : feeds) {
+				try {
+					changed |= runFeed(feed, tick);
+				} catch (Exception e) {
+					LOG.error("Traffic feed " + feed.id() + " failed", e);
+				}
 			}
-		}
-		if (changed || !new File(dir, INDEX_FILE).exists()) {
-			writeIndex();
+			if (changed || !new File(dir, INDEX_FILE).exists()) {
+				writeIndex();
+			}
+		} finally {
+			RouteResultPreparation.PRINT_TO_CONSOLE_ROUTE_INFORMATION = printRoutes;
 		}
 	}
 
