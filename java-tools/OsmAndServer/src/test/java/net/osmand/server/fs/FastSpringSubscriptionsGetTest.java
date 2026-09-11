@@ -34,12 +34,12 @@ public class FastSpringSubscriptionsGetTest {
 	@InjectMocks
 	UserSubscriptionService service;
 
-	// record as written by the order.completed hook an hour ago
-	private static SupporterDeviceSubscription hookRecord() {
+	// record as written by the order.completed hook an hour before "now"
+	private static SupporterDeviceSubscription hookRecord(long now) {
 		SupporterDeviceSubscription s = new SupporterDeviceSubscription();
 		s.sku = SKU;
 		s.orderId = ORDER;
-		s.timestamp = new Date(System.currentTimeMillis() - HOUR);
+		s.timestamp = new Date(now - HOUR);
 		s.starttime = s.timestamp;
 		s.expiretime = new Date(s.timestamp.getTime() + 30 * 24 * HOUR);
 		s.valid = true;
@@ -47,19 +47,19 @@ public class FastSpringSubscriptionsGetTest {
 		return s;
 	}
 
-	private SupporterDeviceSubscription revalidate(String response) throws IOException {
-		SupporterDeviceSubscription s = hookRecord();
-		try (MockedStatic<FastSpringHelper> fs = mockStatic(FastSpringHelper.class)) {
+	private SupporterDeviceSubscription revalidate(String response, long now) throws IOException {
+		SupporterDeviceSubscription s = hookRecord(now);
+		try (MockedStatic<FastSpringHelper> fs = mockStatic(FastSpringHelper.class, CALLS_REAL_METHODS)) {
 			fs.when(() -> FastSpringHelper.getSubscriptionByOrderIdAndSku(ORDER, SKU))
 					.thenReturn(FsJson.read(response, FastSpringSubscription.class));
-			service.revalidateFastSpringSubscription(s);
+			service.revalidateFastSpringSubscription(s, now);
 		}
 		return s;
 	}
 
 	@Test
 	public void activeTakesExpireTimeFromNextBillingDate() throws IOException {
-		SupporterDeviceSubscription s = revalidate("subscriptions-get-active.json");
+		SupporterDeviceSubscription s = revalidate("subscriptions-get-active.json", 1789120579204L); // 2026-09-11
 		assertTrue(s.valid);
 		assertTrue(s.autorenewing);
 		assertEquals("expiretime must be FastSpring next billing date (2027-09-11)", 1820620800000L, s.expiretime.getTime());
@@ -68,7 +68,7 @@ public class FastSpringSubscriptionsGetTest {
 
 	@Test
 	public void canceledStaysValidUntilDeactivationDate() throws IOException {
-		SupporterDeviceSubscription s = revalidate("subscriptions-get-canceled.json");
+		SupporterDeviceSubscription s = revalidate("subscriptions-get-canceled.json", 1788811865783L); // 2026-09-07
 		assertTrue("canceled subscription is active on FastSpring until deactivationDate, valid must stay true", s.valid);
 		assertFalse("canceled subscription must not autorenew", s.autorenewing);
 		assertEquals("expiretime must be FastSpring deactivationDate (2026-10-07)", 1791331200000L, s.expiretime.getTime());
@@ -97,7 +97,7 @@ public class FastSpringSubscriptionsGetTest {
 	// refund with "Cancel Related Subscriptions": active=false, next still set
 	@Test
 	public void deactivatedIsInvalid() throws IOException {
-		SupporterDeviceSubscription s = revalidate("subscriptions-get-deactivated.json");
+		SupporterDeviceSubscription s = revalidate("subscriptions-get-deactivated.json", 1788969830287L); // 2026-09-09
 		assertFalse("deactivated subscription must be invalid", s.valid);
 		assertFalse(s.autorenewing);
 		verify(repo).save(s);

@@ -347,9 +347,13 @@ public class UserSubscriptionService {
 	}
 
 	public SupporterDeviceSubscription revalidateFastSpringSubscription(SupporterDeviceSubscription s) {
+		return revalidateFastSpringSubscription(s, System.currentTimeMillis());
+	}
+
+	public SupporterDeviceSubscription revalidateFastSpringSubscription(SupporterDeviceSubscription s, long now) {
 		// Don't validate if subscription is less than 15 minutes old
-		if (s.timestamp != null && FastSpringHelper.isTooEarlyToValidate(s.timestamp.getTime())) {
-			long timeSincePurchase = System.currentTimeMillis() - s.timestamp.getTime();
+		if (s.timestamp != null && FastSpringHelper.isTooEarlyToValidate(s.timestamp.getTime(), now)) {
+			long timeSincePurchase = now - s.timestamp.getTime();
 			LOG.info(String.format("FastSpring subscription %s - %s is too recent (%d minutes old), skipping validation",
 					s.sku, s.orderId, timeSincePurchase / (60 * 1000)));
 			return s;
@@ -372,7 +376,7 @@ public class UserSubscriptionService {
 					if (s.expiretime == null) {
 						LOG.error(String.format("FastSpring subscription %s - %s has no expiretime (state %s)", s.sku, s.orderId, fsSub.state));
 					} else {
-						s.valid = System.currentTimeMillis() < s.expiretime.getTime();
+						s.valid = now < s.expiretime.getTime();
 					}
 					s.autorenewing = fsSub.isAutoRenewing();
 				}

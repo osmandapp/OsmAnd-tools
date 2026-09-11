@@ -52,8 +52,11 @@ public class FastSpringHelper {
 	 * @return true if it's too early to validate (less than 15 minutes old), false if validation can proceed
 	 */
 	public static boolean isTooEarlyToValidate(long recordTimestampMillis) {
-		long timeSincePurchase = System.currentTimeMillis() - recordTimestampMillis;
-		return timeSincePurchase < MINIMUM_VALIDATION_DELAY_MILLIS;
+		return isTooEarlyToValidate(recordTimestampMillis, System.currentTimeMillis());
+	}
+
+	public static boolean isTooEarlyToValidate(long recordTimestampMillis, long now) {
+		return now - recordTimestampMillis < MINIMUM_VALIDATION_DELAY_MILLIS;
 	}
 
 	public static void main(String[] args) throws IOException {
