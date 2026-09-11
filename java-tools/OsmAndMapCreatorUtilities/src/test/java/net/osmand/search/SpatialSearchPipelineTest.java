@@ -112,6 +112,7 @@ public class SpatialSearchPipelineTest {
 	private static final String OBF_HASH_FILE_NAME = ".obf.hash";
 	private static final int MAX_KNOWN_HASHES = 4; // one per build that writes its own class files
 	private static final boolean RUN_IGNORED_TESTS = false;
+	protected static MapPoiTypes.PoiTranslator defaultPoiTranslator;
 	
 	private static final boolean FILTER_DATA_JSON = false;
 	private static final double FILTER_REMOVE_PROBABILITY = 0.8; // means 80% probability of removal
@@ -119,14 +120,7 @@ public class SpatialSearchPipelineTest {
 
 	private final File testFile;
     private Set<String> searchKeywords;
-
-    public interface SearchTestEngine {
-    	
-        List<String> search(String text, boolean print) throws IOException;
-        
-        void close();
-    }
-    
+	
 	public SpatialSearchPipelineTest(String name, File file) {
 		this.testFile = file;
 		NameIndexCreator.MIN_LIMIT_COMMON_NON_INDEXED = 0;
@@ -239,7 +233,8 @@ public class SpatialSearchPipelineTest {
 			e.printStackTrace();
 		}
 
-		poiTypes.setPoiTranslator(new TestSearchTranslator(phrases, enPhrases));
+		defaultPoiTranslator = new TestSearchTranslator(phrases, enPhrases);
+		poiTypes.setPoiTranslator(defaultPoiTranslator);
 	}
 
 	/**
@@ -584,9 +579,10 @@ public class SpatialSearchPipelineTest {
 		return parseExpectedResults(sourceJson, "results", phrasesSize);
 	}
 
-	protected SearchTestEngine createSearchEngine(SpatialTextSearch.SpatialTextSearchSettings spatialSettings, 
+	protected SpatialTestSearchEngine createSearchEngine(SpatialTextSearch.SpatialTextSearchSettings spatialSettings, 
 												  LatLon point, List<BinaryMapIndexReader> readers, boolean translation) {
-		return new SpatialTestSearchEngine(spatialSettings, point, readers, translation);
+		return new SpatialTestSearchEngine(testFile.getName(), spatialSettings, point, readers,
+				defaultPoiTranslator, translation);
 	}
 	
 	@Test
@@ -618,7 +614,7 @@ public class SpatialSearchPipelineTest {
 			return;
 		}
 
-		SearchTestEngine defaultEngine = null;
+		SpatialTestSearchEngine defaultEngine = null;
 		try {
 			boolean useData = settingsJson.optBoolean("useData", true);
 			if (useData) {
@@ -641,7 +637,7 @@ public class SpatialSearchPipelineTest {
 			String text = phraseAndSettings.query;
 			List<String> expectedResults = results.get(k);
 			boolean enginePerPhrase = phraseAndSettings.settings != null && !phraseAndSettings.settings.keySet().isEmpty();
-			SearchTestEngine engine = defaultEngine;
+			SpatialTestSearchEngine engine = defaultEngine;
 			if (enginePerPhrase) {
 				if (!RUN_IGNORED_TESTS && phraseAndSettings.settings.optBoolean("ignore")) {
 					continue;

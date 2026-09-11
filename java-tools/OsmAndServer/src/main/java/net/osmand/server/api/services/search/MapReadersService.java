@@ -78,7 +78,7 @@ public class MapReadersService {
 					continue;
 				}
 				BinaryMapIndexReader reader = new BinaryMapIndexReader(new RandomAccessFile(ref.getFile(), "r"), ref.getFile(), true);
-				if (reader.containsAddressData() && reader.containsRouteData()) {
+				if (reader.containsAddressData()) {
 					readers.add(reader);
 				} else {
 					reader.close();
