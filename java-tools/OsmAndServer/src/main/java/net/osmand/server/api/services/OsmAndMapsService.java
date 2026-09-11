@@ -140,7 +140,7 @@ public class OsmAndMapsService {
 		ALWAYS_IN_MEMORY.add("bicycle:{}");
 		ALWAYS_IN_MEMORY.add("bicycle:{height_obstacles=true}");
 		ALWAYS_IN_MEMORY.add("pedestrian:{}");
-		ALWAYS_IN_MEMORY.add("pedestrian:{}");
+//		ALWAYS_IN_MEMORY.add("pedestrian:{}");
 	}
 
 
@@ -1247,6 +1247,21 @@ public class OsmAndMapsService {
 		BinaryMapIndexReader reader = cache.getReader(target, true);
 		cache.writeToFile(targetIndex);
 		cs.rCtx = prepareRouterContext(rp, router, Collections.singletonList(reader), false);
+		HHRoutingContext<NetworkDBPoint> loaded = null;
+		synchronized (routingCaches) {
+			for (RoutingCacheContext c : routingCaches) {
+				if (c.hCtx != null && rProfile.equals(c.profile) && rParamsStr.equals(c.routeParamsStr)) {
+					loaded = c.hCtx;
+				}
+			}
+		}
+		if (loaded != null) {
+			// copy the points already loaded for the same profile instead of reading and filtering them again
+			long copyTime = System.currentTimeMillis();
+			cs.hhConfig.cacheCtx = HHRoutingContext.copy(loaded, cs.rCtx);
+			LOGGER.info(String.format("Copy routing context for %s profile (%s params): %s, %d ms", rProfile, rParamsStr,
+					cs.hhConfig.cacheCtx != null ? "done" : "failed", System.currentTimeMillis() - copyTime));
+		}
 		router.setHHRoutingConfig(cs.hhConfig); // after prepare
 		LOGGER.info(String.format("Use new routing context for %s profile (%s params)", rProfile, rParamsStr));
 		di.waitTime = System.currentTimeMillis() - waitTime;
