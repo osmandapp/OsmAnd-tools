@@ -677,14 +677,7 @@ public class UpdateSubscription {
 				kind = EXPIRED_STATE;
 				reason = "FastSpring: subscription not active";
 			} else {
-				subscription = new SubscriptionPurchase();
-				subscription.setOrderId(fsSub.id);
-				subscription.setStartTimeMillis(fsSub.begin);
-				subscription.setExpiryTimeMillis(fsSub.nextChargeDate);
-				subscription.setAutoRenewing(fsSub.autoRenew);
-				subscription.setPriceAmountMicros(Math.round(fsSub.price * 1000000));
-				subscription.setPriceCurrencyCode(fsSub.currency);
-
+				subscription = fsSub.toSubscriptionPurchase();
 				if (pms.verbose) {
 					LOGGER.info("Result: " + subscription.toPrettyString());
 				}

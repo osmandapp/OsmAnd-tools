@@ -59,10 +59,6 @@ public class FastSpringController {
 	private static final String EVENT_CHARGEBACK_CREATED = "chargeback.created";
 	private static final Set<String> HANDLED_EVENTS = Set.of(EVENT_ORDER_COMPLETED, EVENT_RETURN_CREATED, EVENT_CHARGEBACK_CREATED);
 
-	// FastSpring subscription states (https://developer.fastspring.com/reference/retrieve-a-subscription)
-	private static final String SUBSCRIPTION_STATE_CANCELED = "canceled";
-	private static final String SUBSCRIPTION_STATE_DEACTIVATED = "deactivated";
-
 	// values for the "kind" column, same convention as UpdateSubscription.deleteSubscription (expired/invalid/gone)
 	private static final String KIND_REFUND = "refund";
 	private static final String KIND_CHARGEBACK = "chargeback";
@@ -254,11 +250,15 @@ public class FastSpringController {
 			LOGGER.error("FastSpring: subscription not found for refunded orderId " + orderId + ", sku " + sku);
 			return ResponseEntity.internalServerError().body("FastSpring: subscription not found for refunded orderId " + orderId);
 		}
-		if (Boolean.TRUE.equals(fsSub.active) && !SUBSCRIPTION_STATE_DEACTIVATED.equals(fsSub.state)) {
-			if (SUBSCRIPTION_STATE_CANCELED.equals(fsSub.state)) {
+		if (Boolean.TRUE.equals(fsSub.active) && !FastSpringHelper.SUBSCRIPTION_STATE_DEACTIVATED.equals(fsSub.state)) {
+			if (FastSpringHelper.SUBSCRIPTION_STATE_CANCELED.equals(fsSub.state)) {
 				Date now = new Date();
+				Long expiry = fsSub.getExpiryTime();
 				for (DeviceSubscriptionsRepository.SupporterDeviceSubscription sub : subs) {
 					sub.autorenewing = false;
+					if (expiry != null) {
+						sub.expiretime = new Date(expiry);
+					}
 					sub.checktime = now;
 					deviceSubscriptionsRepository.saveAndFlush(sub);
 					LOGGER.info(String.format("FastSpring: subscription canceled after refund, active until period end, orderId: %s, sku: %s", orderId, sub.sku));
