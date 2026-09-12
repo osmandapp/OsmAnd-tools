@@ -644,8 +644,12 @@ public class DownloadOsmGPX {
 							movingTimeMs += dtMs;
 							coordMaxMps = Math.max(coordMaxMps, speedMps);
 						}
+						anchor = p;
+					} else if (dtMs < 0) {
+						anchor = p; // clock went back: measure from here
 					}
-					anchor = p;
+					// otherwise keep the anchor: moving it on every point would never reach MIN_SPEED_INTERVAL_MS
+					// on tracks sampled faster than 2 Hz, and their speed stayed 0
 				}
 			}
 		}
