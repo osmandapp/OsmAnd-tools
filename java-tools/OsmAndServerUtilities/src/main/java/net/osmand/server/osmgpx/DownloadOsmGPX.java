@@ -167,9 +167,10 @@ public class DownloadOsmGPX {
 	private static final long SPEED_WINDOW_STANDING_MS = 120_000; // a window this long counts even if it moved less
 	private static final long SPEED_WINDOW_MAX_MS = 600_000; // longer gaps are pauses, not movement
 	private static final double MOVING_MIN_KMH = 1;
-	// cleaning: a jump is a step of more than 1 km faster than 300 km/h (more than 5 km without time), a spike jumps out
-	// and back with the ends closer than 30% of the way; pieces split at jumps and pauses, short pieces are dropped
-	private static final double NOISE_JUMP_KMH = 300;
+	// cleaning: a jump is a step of more than 1 km faster than an airliner (more than 5 km without time), a spike jumps
+	// out and back faster than 300 km/h with the ends closer than 30% of the way; pieces split at jumps and pauses
+	private static final double NOISE_JUMP_KMH = 1200;
+	private static final double NOISE_SPIKE_KMH = 300;
 	private static final double NOISE_JUMP_MIN_M = 1000;
 	private static final double NOISE_UNTIMED_JUMP_M = 5000;
 	private static final double NOISE_SPIKE_RETURN_RATIO = 0.3;
@@ -759,10 +760,11 @@ public class DownloadOsmGPX {
 			facts.row = row;
 			facts.fileActivity = d.fileActivity;
 			facts.points = d.pointsCount;
-			facts.distance = d.distanceMeters;
-			facts.maxDistBetweenPoints = d.maxDistBetweenPoints;
-			facts.avgSpeedKmh = d.avgSpeedKmh;
-			facts.maxSpeedKmh = d.maxSpeedKmh;
+			// the rounded values that are stored, so classify_tracks makes the same decision from the columns
+			facts.distance = round2(d.distanceMeters);
+			facts.maxDistBetweenPoints = round2(d.maxDistBetweenPoints);
+			facts.avgSpeedKmh = round2(d.avgSpeedKmh);
+			facts.maxSpeedKmh = round2(d.maxSpeedKmh);
 			facts.hasSpeed = d.hasSpeed;
 			facts.teleport = d.teleport;
 			Classification c = classify(facts, activitiesMap);
@@ -854,6 +856,9 @@ public class DownloadOsmGPX {
 		}
 		d.waypointsCount = gpxFile.getPointsList().size();
 		CleanTrack clean = cleanTrack(gpxFile);
+		if (Float.isNaN(d.distanceMeters)) {
+			d.distanceMeters = (float) clean.distanceM; // one point with nan coordinates makes the whole total nan
+		}
 		d.simplifiedGeometry = encodeGeometry(gpxFile, clean);
 
 		d.hasSpeed = analysis.getHasSpeedInTrack();
@@ -963,9 +968,14 @@ public class DownloadOsmGPX {
 
 	static CleanTrack cleanTrack(GpxFile gpxFile) {
 		CleanTrack clean = new CleanTrack();
+		List<WptPt> points = new ArrayList<>();
 		for (Track track : gpxFile.getTracks(false)) {
 			for (TrkSegment seg : track.getSegments()) {
-				List<WptPt> points = new ArrayList<>();
+				if (seg.getPoints().size() > 1 && !points.isEmpty()) {
+					// a segment of one point continues the previous one: some apps write every point as its own segment
+					splitPieces(removeSpikes(points, clean), clean);
+					points = new ArrayList<>();
+				}
 				for (WptPt p : seg.getPoints()) {
 					WptPt last = points.isEmpty() ? null : points.get(points.size() - 1);
 					if (!(Math.abs(p.getLat()) <= 90 && Math.abs(p.getLon()) <= 180)
@@ -980,9 +990,9 @@ public class DownloadOsmGPX {
 						points.add(p);
 					}
 				}
-				splitPieces(removeSpikes(points, clean), clean);
 			}
 		}
+		splitPieces(removeSpikes(points, clean), clean);
 		return clean;
 	}
 
@@ -996,7 +1006,7 @@ public class DownloadOsmGPX {
 				double outM = distance(from, spike);
 				double backM = distance(spike, p);
 				if (outM > NOISE_JUMP_MIN_M && backM > NOISE_JUMP_MIN_M
-						&& kmh(from, spike, outM) > NOISE_JUMP_KMH && kmh(spike, p, backM) > NOISE_JUMP_KMH
+						&& kmh(from, spike, outM) > NOISE_SPIKE_KMH && kmh(spike, p, backM) > NOISE_SPIKE_KMH
 						&& distance(from, p) < NOISE_SPIKE_RETURN_RATIO * (outM + backM)) {
 					res.remove(n - 1);
 					clean.spikes++;
@@ -1010,6 +1020,7 @@ public class DownloadOsmGPX {
 	private static void splitPieces(List<WptPt> points, CleanTrack clean) {
 		List<WptPt> piece = new ArrayList<>();
 		double pieceM = 0;
+		boolean afterJump = false;
 		for (WptPt p : points) {
 			if (!piece.isEmpty()) {
 				WptPt prev = piece.get(piece.size() - 1);
@@ -1024,20 +1035,23 @@ public class DownloadOsmGPX {
 					clean.pauses++;
 				}
 				if (jump || pause) {
-					keepPiece(piece, pieceM, clean);
+					keepPiece(piece, pieceM, afterJump || jump, clean);
 					piece = new ArrayList<>();
 					pieceM = 0;
+					afterJump = jump;
 				} else {
 					pieceM += stepM;
 				}
 			}
 			piece.add(p);
 		}
-		keepPiece(piece, pieceM, clean);
+		keepPiece(piece, pieceM, afterJump, clean);
 	}
 
-	private static void keepPiece(List<WptPt> piece, double pieceM, CleanTrack clean) {
-		if (piece.size() >= CLEAN_MIN_PIECE_POINTS && pieceM >= CLEAN_MIN_PIECE_M) {
+	// a short piece next to a jump is the far side of a GPS jump; other pieces are dropped only when they cannot be drawn
+	private static void keepPiece(List<WptPt> piece, double pieceM, boolean nextToJump, CleanTrack clean) {
+		boolean shortPiece = piece.size() < CLEAN_MIN_PIECE_POINTS || pieceM < CLEAN_MIN_PIECE_M;
+		if (piece.size() >= 2 && !(nextToJump && shortPiece)) {
 			clean.pieces.add(piece);
 			clean.points += piece.size();
 			clean.distanceM += pieceM;
