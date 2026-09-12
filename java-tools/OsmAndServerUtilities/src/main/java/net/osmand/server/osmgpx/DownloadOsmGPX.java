@@ -326,6 +326,8 @@ public class DownloadOsmGPX {
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS activity_source text");
 			// facts from one GPX parse, so classification rules can change without parsing again (see computeTrackStats)
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS track_stats json");
+			// verdicts people give tracks on the heatmap (OsmGpxReviewController); parsing and classifying never write it
+			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS manual_review json");
 			// ids of the tracks parse_tracks still has to parse: a restarted run starts at once instead of reading
 			// the parsed rows; built once per TRACK_STATS_VERSION, a parsed track leaves it
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_parse_v" + TRACK_STATS_VERSION
