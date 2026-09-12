@@ -24,7 +24,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
-import javax.annotation.Nullable;
 import java.util.*;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
@@ -50,9 +49,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import net.osmand.obf.ToolsOsmAndContextImpl;
 import net.osmand.shared.data.KQuadRect;
-import net.osmand.shared.gpx.RouteActivityHelper;
 import net.osmand.shared.gpx.primitives.Route;
-import net.osmand.shared.gpx.primitives.RouteActivity;
 import net.osmand.shared.gpx.primitives.Track;
 import net.osmand.shared.gpx.primitives.TrkSegment;
 import net.osmand.shared.gpx.primitives.WptPt;
@@ -124,35 +121,7 @@ public class DownloadOsmGPX {
 	private static final int RETRY_TIMEOUT = 15000;
 
 	private static final String ERROR_ACTIVITY_TYPE = "error";
-	private static final String NOSPEED_ACTIVITY_TYPE = "nospeed";
-	private static final String AVIATION_ACTIVITY_TYPE = "aviation";
-	private static final String FOOT_GROUP = "foot";
-	private static final String CYCLING_GROUP = "cycling";
-	private static final String WINTER_SPORT_GROUP = "winter_sport";
-	private static final String DRIVING_GROUP = "driving";
-	private static final String MOTORCYCLING_GROUP = "motorcycling";
-	private static final String OTHER_GROUP = "other";
-
 	private static final Map<String, String> ACTIVITY_GROUPS = new LinkedHashMap<>();
-	private static final Map<String, Double> GROUP_AVG_LIMIT_KMH = Map.of(
-			FOOT_GROUP, 12d,
-			CYCLING_GROUP, 25d,
-			WINTER_SPORT_GROUP, 45d,
-			DRIVING_GROUP, 130d,
-			MOTORCYCLING_GROUP, 130d,
-			AVIATION_ACTIVITY_TYPE, 1000d);
-	private static final Map<String, Double> GROUP_MAX_LIMIT_KMH = Map.of(
-			FOOT_GROUP, 25d,
-			CYCLING_GROUP, 45d,
-			WINTER_SPORT_GROUP, 130d,
-			DRIVING_GROUP, 250d,
-			MOTORCYCLING_GROUP, 300d,
-			AVIATION_ACTIVITY_TYPE, 1200d);
-	private static final List<String> ACTIVITY_BY_SPEED = List.of(
-			FOOT_GROUP, CYCLING_GROUP, DRIVING_GROUP, AVIATION_ACTIVITY_TYPE);
-
-	// Garmin exports named "COURSE_<id>.gpx" would otherwise match "road_running"
-	private static final Set<String> ACTIVITY_KEYWORD_EXCLUSIONS = Set.of("course");
 
 	private static final long MIN_SPEED_INTERVAL_MS = 500; // min elapsed time to trust a speed sample
 	private static final double MIN_MOVING_SPEED_MPS = 0.1; // below this the interval counts as standing still
@@ -188,7 +157,6 @@ public class DownloadOsmGPX {
 	private static final double CLEAN_MIN_PIECE_M = 200;
 
 	private static final String GPX_FILE_PREIX = "OG";
-	private final RouteActivityHelper routeActivityHelper = RouteActivityHelper.INSTANCE;
 
 	private static float round2(float value) {
 		return Math.round(value * 100) / 100.0f;
@@ -446,7 +414,7 @@ public class DownloadOsmGPX {
 					}
 				});
 			} else if (activitiesMap.containsKey(token) || GarbageClassifier.TYPES.contains(token)
-					|| ERROR_ACTIVITY_TYPE.equals(token) || NOSPEED_ACTIVITY_TYPE.equals(token)) {
+					|| ERROR_ACTIVITY_TYPE.equals(token) || ActivityClassifier.NOSPEED.equals(token)) {
 				result.add(token);
 			} else {
 				LOG.info("Unknown category '" + token + "' ignored.");
@@ -518,7 +486,7 @@ public class DownloadOsmGPX {
 		dbConn.setAutoCommit(false);
 		try (PreparedStatement selectRows = dbConn.prepareStatement(selectSql);
 			 PreparedStatement selectData = dbConn.prepareStatement("SELECT data FROM " + GPX_FILES_TABLE_NAME + " WHERE id = ?");
-			 ParseBatch batch = new ParseBatch(activitiesMap)) {
+			 ParseBatch batch = new ParseBatch(new ActivityClassifier(activitiesMap, ACTIVITY_GROUPS))) {
 			while (moreRows || !queued.isEmpty() || !running.isEmpty()) {
 				if (moreRows && queued.isEmpty()) {
 					selectRows.setLong(1, lastId);
@@ -597,10 +565,10 @@ public class DownloadOsmGPX {
 			return;
 		}
 		LOG.info("Classifying tracks from stored columns" + condition + "...");
+		ActivityClassifier classifier = new ActivityClassifier(activitiesMap, ACTIVITY_GROUPS);
 		String selectSql = "SELECT id, name, description, tags, activity, activity_source, speed_matches_activity, "
-				+ "file_activity, points, distance, max_dist_between_points, speed, max_speed, track_stats FROM "
-				+ GPX_METADATA_TABLE_NAME + " WHERE id > ? AND track_stats IS NOT NULL" + condition
-				+ " ORDER BY id LIMIT " + CLASSIFY_BATCH_LIMIT;
+				+ "file_activity, track_stats FROM " + GPX_METADATA_TABLE_NAME + " WHERE id > ? AND track_stats IS NOT NULL"
+				+ condition + " ORDER BY id LIMIT " + CLASSIFY_BATCH_LIMIT;
 		int read = 0;
 		int changed = 0;
 		int skipped = 0;
@@ -619,12 +587,12 @@ public class DownloadOsmGPX {
 						read++;
 						TrackRow row = new TrackRow(rs);
 						lastId = row.id;
-						TrackFacts facts = storedFacts(row, rs);
-						if (facts == null) {
-							skipped++; // error rows, and stats written before the keys classification needs
+						ActivityClassifier.Track track = storedTrack(row, rs);
+						if (track == null) {
+							skipped++; // error rows have no cleaning or speed stats
 							continue;
 						}
-						Classification c = classify(facts, activitiesMap);
+						ActivityClassifier.Result c = classifier.classify(track);
 						if (!Objects.equals(c.activity(), rs.getString("activity"))
 								|| !Objects.equals(c.source(), rs.getString("activity_source"))
 								|| !Objects.equals(c.speedMatches(), rs.getObject("speed_matches_activity"))) {
@@ -684,69 +652,26 @@ public class DownloadOsmGPX {
 		}
 	}
 
-	// what classification reads, from a fresh parse (parse_tracks) or from stored columns (classify_tracks)
-	private static class TrackFacts {
-		TrackRow row;
-		String fileActivity;
-		int points;
-		double distance;
-		double maxDistBetweenPoints;
-		float avgSpeedKmh;
-		float maxSpeedKmh;
-		boolean hasSpeed;
-		boolean teleport;
+	// the track as the classifier sees it, from stored columns; null for rows without cleaning stats (errors)
+	private static ActivityClassifier.Track storedTrack(TrackRow row, ResultSet rs) throws SQLException {
+		JsonNode stats = readStats(rs.getString("track_stats"));
+		if (stats == null || !stats.has("clean_points")) {
+			return null;
+		}
+		return new ActivityClassifier.Track(row.name, row.description, row.tags, rs.getString("file_activity"), stats);
 	}
 
-	record Classification(String activity, String source, Boolean speedMatches) {
-	}
-
-	private Classification classify(TrackFacts facts, Map<String, List<String>> activitiesMap) {
-		String activity = GarbageClassifier.classify(facts.points, facts.distance, facts.maxDistBetweenPoints, facts.teleport);
-		String source = activity != null ? "garbage" : null;
-		// each step runs only when the previous ones found nothing, so the last source set is the one used
-		if (activity == null) {
-			activity = getActivityByFileActivity(facts.fileActivity, activitiesMap);
-			source = "file";
-		}
-		if (activity == null) {
-			activity = analyzeActivity(facts.row.name, facts.row.description, facts.row.tags, activitiesMap);
-			source = "keyword";
-		}
-		Boolean speedMatches = speedMatchesActivity(activity, facts.avgSpeedKmh, facts.maxSpeedKmh);
-		if (activity == null) {
-			activity = analyzeActivityBySpeed(facts.hasSpeed, facts.avgSpeedKmh, facts.maxSpeedKmh);
-			source = "speed";
-		}
-		return new Classification(activity, source, speedMatches);
-	}
-
-	// facts from stored columns, null when track_stats lacks what classification needs
-	private static TrackFacts storedFacts(TrackRow row, ResultSet rs) throws SQLException {
-		JsonNode stats;
+	private static JsonNode readStats(String json) {
 		try {
-			stats = JSON_MAPPER.readTree(rs.getString("track_stats"));
+			return json == null ? null : JSON_MAPPER.readTree(json);
 		} catch (IOException e) {
 			return null;
 		}
-		if (!stats.has("has_speed")) {
-			return null;
-		}
-		TrackFacts facts = new TrackFacts();
-		facts.row = row;
-		facts.fileActivity = rs.getString("file_activity");
-		facts.points = rs.getInt("points");
-		facts.distance = rs.getDouble("distance");
-		facts.maxDistBetweenPoints = rs.getDouble("max_dist_between_points");
-		facts.avgSpeedKmh = rs.getFloat("speed");
-		facts.maxSpeedKmh = rs.getFloat("max_speed");
-		facts.hasSpeed = stats.get("has_speed").asBoolean();
-		facts.teleport = stats.path("teleport").asBoolean();
-		return facts;
 	}
 
 	// writes results of parse_tracks in batches; used only on the thread that owns dbConn
 	private class ParseBatch implements AutoCloseable {
-		private final Map<String, List<String>> activitiesMap;
+		private final ActivityClassifier classifier;
 		private final PreparedStatement metricsStmt;
 		private final PreparedStatement errorStmt;
 		private final long startMs = System.currentTimeMillis();
@@ -754,8 +679,8 @@ public class DownloadOsmGPX {
 		private int processed;
 		private int identified;
 
-		ParseBatch(Map<String, List<String>> activitiesMap) throws SQLException {
-			this.activitiesMap = activitiesMap;
+		ParseBatch(ActivityClassifier classifier) throws SQLException {
+			this.classifier = classifier;
 			metricsStmt = dbConn.prepareStatement(
 					"UPDATE " + GPX_METADATA_TABLE_NAME + " SET activity = ?, speed = ?, distance = ?, points = ?, " +
 							"max_speed = ?, max_dist_between_points = ?, time_minutes = ?, waypoints = ?, " +
@@ -778,18 +703,14 @@ public class DownloadOsmGPX {
 				writeError(row, d.errorReason);
 				return;
 			}
-			TrackFacts facts = new TrackFacts();
-			facts.row = row;
-			facts.fileActivity = d.fileActivity;
-			facts.points = d.pointsCount;
-			// the rounded values that are stored, so classify_tracks makes the same decision from the columns
-			facts.distance = round2(d.distanceMeters);
-			facts.maxDistBetweenPoints = round2(d.maxDistBetweenPoints);
-			facts.avgSpeedKmh = round2(d.avgSpeedKmh);
-			facts.maxSpeedKmh = round2(d.maxSpeedKmh);
-			facts.hasSpeed = d.hasSpeed;
-			facts.teleport = d.teleport;
-			Classification c = classify(facts, activitiesMap);
+			JsonNode stats = readStats(d.trackStats);
+			if (stats == null) {
+				writeError(row, "track_stats");
+				return;
+			}
+			// classified from track_stats as stored, so classify_tracks makes the same decision later
+			ActivityClassifier.Result c = classifier.classify(
+					new ActivityClassifier.Track(row.name, row.description, row.tags, d.fileActivity, stats));
 			metricsStmt.setString(1, c.activity());
 			metricsStmt.setFloat(2, round2(d.avgSpeedKmh));
 			metricsStmt.setFloat(3, round2(d.distanceMeters));
@@ -884,7 +805,6 @@ public class DownloadOsmGPX {
 		}
 		d.simplifiedGeometry = encodeGeometry(gpxFile, clean);
 
-		d.hasSpeed = analysis.getHasSpeedInTrack();
 		d.teleport = GarbageClassifier.hasTeleportGap(gpxFile);
 		d.fileActivity = gpxFile.getMetadata().getExtensionsToRead().get(GpxUtilities.ACTIVITY_TYPE);
 		d.trackStats = computeTrackStats(gpxFile, analysis, d.teleport, clean);
@@ -1308,69 +1228,7 @@ public class DownloadOsmGPX {
 		String fileActivity;
 		String trackStats;
 		String errorReason;
-		boolean hasSpeed;
 		boolean teleport;
-	}
-
-	private String getActivityByFileActivity(String fileActivity, Map<String, List<String>> activitiesMap) {
-		if (fileActivity == null || activitiesMap.isEmpty()) {
-			return null;
-		}
-		for (RouteActivity routeActivity : routeActivityHelper.getActivities()) {
-			if (routeActivity.getId().equals(fileActivity)) {
-				return activitiesMap.containsKey(fileActivity) ? fileActivity : null;
-			}
-		}
-		return null;
-	}
-
-	private String analyzeActivity(String name, String desc, List<String> tags, Map<String, List<String>> activitiesMap) {
-		if (activitiesMap.isEmpty()) {
-			return null;
-		}
-
-		// check tags first
-		for (String tag : tags) {
-			RouteActivity activity = routeActivityHelper.findActivityByTag(tag);
-			if (activity != null && activitiesMap.containsKey(activity.getId())) {
-				return activity.getId();
-			}
-		}
-
-		// check name/desc
-		Map<String, String> tagMap = new LinkedHashMap<>();
-		activitiesMap.forEach((activityId, tagList) ->
-				tagList.stream()
-						.sorted((tag1, tag2) -> Integer.compare(tag2.length(), tag1.length()))
-						.forEach(tag -> tagMap.put(tag, activityId))
-		);
-
-		for (Map.Entry<String, String> entry : tagMap.entrySet()) {
-			String tag = entry.getKey();
-			String activityId = entry.getValue();
-			if (containsWord(name, tag)) {
-				if (ACTIVITY_KEYWORD_EXCLUSIONS.contains(tag)) {
-					continue;
-				}
-				return activityId;
-			}
-			if (containsWord(desc, tag)) {
-				return activityId;
-			}
-		}
-		return null;
-	}
-
-	private static boolean containsWord(String text, String word) {
-		if (text == null) {
-			return false;
-		}
-		for (String part : text.split("[\\s_]+")) {
-			if (part.equalsIgnoreCase(word)) {
-				return true;
-			}
-		}
-		return false;
 	}
 
 	private static Map<String, List<String>> createActivitiesMap(String rootPath) {
@@ -1415,35 +1273,6 @@ public class DownloadOsmGPX {
 		}
 
 		return activitiesMap;
-	}
-
-	private String analyzeActivityBySpeed(boolean hasSpeedInTrack, float avgSpeed, float maxSpeed) {
-		if (!hasSpeedInTrack || avgSpeed <= 0) {
-			return NOSPEED_ACTIVITY_TYPE;
-		}
-		for (String type : ACTIVITY_BY_SPEED) {
-			if (avgSpeed <= GROUP_AVG_LIMIT_KMH.get(type) && maxSpeed <= GROUP_MAX_LIMIT_KMH.get(type)) {
-				return type;
-			}
-		}
-		return OTHER_GROUP;
-	}
-
-	@Nullable
-	private static Boolean speedMatchesActivity(String activity, float avgSpeedKmh, float maxSpeedKmh) {
-		if (activity == null || avgSpeedKmh <= 0) {
-			return null;
-		}
-		String group = ACTIVITY_GROUPS.get(activity);
-		if (group == null) {
-			return null; // unknown/garbage/error activity
-		}
-		Double avgLimitKmh = GROUP_AVG_LIMIT_KMH.get(group);
-		Double maxLimitKmh = GROUP_MAX_LIMIT_KMH.get(group);
-		if (avgLimitKmh == null || maxLimitKmh == null) {
-			return null;
-		}
-		return avgSpeedKmh <= avgLimitKmh && maxSpeedKmh <= maxLimitKmh;
 	}
 
 	protected void queryGPXForBBOX(QueryParams qp) throws SQLException, IOException, FactoryConfigurationError, XMLStreamException, InterruptedException, XmlPullParserException {
