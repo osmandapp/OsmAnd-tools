@@ -167,10 +167,15 @@ public class DownloadOsmGPX {
 	private static final long SPEED_WINDOW_STANDING_MS = 120_000; // a window this long counts even if it moved less
 	private static final long SPEED_WINDOW_MAX_MS = 600_000; // longer gaps are pauses, not movement
 	private static final double MOVING_MIN_KMH = 1;
-	// cleaning: a jump is a step of more than 1 km faster than an airliner (more than 5 km without time), a spike jumps
-	// out and back faster than 300 km/h with the ends closer than 30% of the way; pieces split at jumps and pauses
-	private static final double NOISE_JUMP_KMH = 1200;
+	// cleaning: a jump is a step of more than 1 km much faster than the track moves (1.5 x p85 of its step speeds, from
+	// 300 km/h on the ground up to 1200 km/h; with the clock going back; more than 5 km without time), a spike jumps out
+	// and back faster than 300 km/h with the ends closer than 30% of the way, a gap is a step longer than 5 km at any
+	// speed. Pieces split at jumps, pauses and gaps. A flight (median step speed above 200 km/h) has no gap limit
+	private static final double FLIGHT_MEDIAN_KMH = 200;
+	private static final double NOISE_JUMP_MAX_KMH = 1200;
+	private static final double NOISE_JUMP_P85_FACTOR = 1.5;
 	private static final double NOISE_SPIKE_KMH = 300;
+	private static final double CLEAN_GAP_M = 5000;
 	private static final double NOISE_JUMP_MIN_M = 1000;
 	private static final double NOISE_UNTIMED_JUMP_M = 5000;
 	private static final double NOISE_SPIKE_RETURN_RATIO = 0.3;
@@ -940,6 +945,7 @@ public class DownloadOsmGPX {
 		stats.put("jumps", clean.jumps);
 		stats.put("jump_m", Math.round(clean.jumpM));
 		stats.put("pauses", clean.pauses);
+		stats.put("gaps", clean.gaps);
 		stats.put("pieces", clean.pieces.size());
 		stats.put("dropped_pieces", clean.droppedPieces);
 		stats.put("clean_points", clean.points);
@@ -960,6 +966,7 @@ public class DownloadOsmGPX {
 		int spikes;
 		int jumps;
 		int pauses;
+		int gaps;
 		int droppedPieces;
 		int points;
 		double jumpM;
@@ -1018,6 +1025,9 @@ public class DownloadOsmGPX {
 	}
 
 	private static void splitPieces(List<WptPt> points, CleanTrack clean) {
+		List<Double> speeds = stepSpeedsKmh(points);
+		boolean flight = percentile(speeds, 0.5) > FLIGHT_MEDIAN_KMH;
+		double jumpKmh = Math.max(NOISE_SPIKE_KMH, Math.min(NOISE_JUMP_MAX_KMH, NOISE_JUMP_P85_FACTOR * percentile(speeds, 0.85)));
 		List<WptPt> piece = new ArrayList<>();
 		double pieceM = 0;
 		boolean afterJump = false;
@@ -1026,15 +1036,18 @@ public class DownloadOsmGPX {
 				WptPt prev = piece.get(piece.size() - 1);
 				double stepM = distance(prev, p);
 				boolean timed = prev.getTime() > 0 && p.getTime() > 0;
-				boolean jump = timed ? stepM > NOISE_JUMP_MIN_M && kmh(prev, p, stepM) > NOISE_JUMP_KMH : stepM > NOISE_UNTIMED_JUMP_M;
+				boolean jump = timed ? stepM > NOISE_JUMP_MIN_M && kmh(prev, p, stepM) > jumpKmh : stepM > NOISE_UNTIMED_JUMP_M;
 				boolean pause = timed && p.getTime() - prev.getTime() > CLEAN_PAUSE_MS && stepM > CLEAN_PAUSE_MIN_M;
+				boolean gap = !flight && stepM > CLEAN_GAP_M; // a straight line this long is not the way the track went
 				if (jump) {
 					clean.jumps++;
 					clean.jumpM += stepM;
 				} else if (pause) {
 					clean.pauses++;
+				} else if (gap) {
+					clean.gaps++;
 				}
-				if (jump || pause) {
+				if (jump || pause || gap) {
 					keepPiece(piece, pieceM, afterJump || jump, clean);
 					piece = new ArrayList<>();
 					pieceM = 0;
@@ -1046,6 +1059,25 @@ public class DownloadOsmGPX {
 			piece.add(p);
 		}
 		keepPiece(piece, pieceM, afterJump, clean);
+	}
+
+	// sorted speeds of the steps at least a second apart: how fast the track itself moves
+	private static List<Double> stepSpeedsKmh(List<WptPt> points) {
+		List<Double> speeds = new ArrayList<>();
+		for (int i = 1; i < points.size(); i++) {
+			WptPt a = points.get(i - 1);
+			WptPt b = points.get(i);
+			long dtMs = b.getTime() - a.getTime();
+			if (a.getTime() > 0 && dtMs >= 1000) {
+				speeds.add(distance(a, b) / dtMs * 3_600);
+			}
+		}
+		Collections.sort(speeds);
+		return speeds;
+	}
+
+	private static double percentile(List<Double> sorted, double q) {
+		return sorted.isEmpty() ? 0 : sorted.get((int) (sorted.size() * q));
 	}
 
 	// a short piece next to a jump is the far side of a GPS jump; other pieces are dropped only when they cannot be drawn
@@ -1080,13 +1112,13 @@ public class DownloadOsmGPX {
 		return MapUtils.getDistance(a.getLat(), a.getLon(), b.getLat(), b.getLon());
 	}
 
-	// km/h between two points; 0 without timestamps or when the clock went back
+	// km/h between two points; 0 without timestamps, infinite when the clock stood still or went back
 	private static double kmh(WptPt from, WptPt to, double meters) {
 		long dtMs = to.getTime() - from.getTime();
-		if (from.getTime() <= 0 || to.getTime() <= 0 || dtMs < 0) {
+		if (from.getTime() <= 0 || to.getTime() <= 0) {
 			return 0;
 		}
-		return dtMs == 0 ? Double.POSITIVE_INFINITY : meters / dtMs * 3_600;
+		return dtMs <= 0 ? Double.POSITIVE_INFINITY : meters / dtMs * 3_600;
 	}
 
 	// Speeds of the cleaned pieces over windows of >= SPEED_WINDOW_MIN_MS and >= SPEED_WINDOW_MIN_M: time-weighted percentiles and the share of
