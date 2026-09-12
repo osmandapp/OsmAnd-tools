@@ -25,11 +25,13 @@ import java.sql.Statement;
 import java.sql.Types;
 import javax.annotation.Nullable;
 import java.util.*;
+import java.util.concurrent.CompletionService;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -48,6 +50,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import net.osmand.obf.ToolsOsmAndContextImpl;
 import net.osmand.shared.data.KQuadRect;
 import net.osmand.shared.gpx.RouteActivityHelper;
+import net.osmand.shared.gpx.primitives.Route;
 import net.osmand.shared.gpx.primitives.RouteActivity;
 import net.osmand.shared.gpx.primitives.Track;
 import net.osmand.shared.gpx.primitives.TrkSegment;
@@ -152,6 +155,34 @@ public class DownloadOsmGPX {
 	private static final long MIN_SPEED_INTERVAL_MS = 500; // min elapsed time to trust a speed sample
 	private static final double MIN_MOVING_SPEED_MPS = 0.1; // below this the interval counts as standing still
 	private static final int SRID_WGS84 = 4326;
+	private static final int TRACK_STATS_VERSION = 1;
+	private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
+	private static final int PARSE_BATCH_LIMIT = 1000;
+	private static final int CLASSIFY_BATCH_LIMIT = 10000;
+	private static final long TRACK_TIMEOUT_MS = 120_000;
+	// lower edges (km/h) of the speed_hist_time / speed_hist_dist bins in track_stats
+	private static final double[] SPEED_BINS_KMH = {1, 3, 5, 7, 9, 12, 16, 20, 25, 32, 45, 60, 90, 130, 180, 300};
+	private static final long SPEED_WINDOW_MIN_MS = 10_000; // windows of >= 10 s and >= 30 m smooth out GPS jitter
+	private static final double SPEED_WINDOW_MIN_M = 30;
+	private static final long SPEED_WINDOW_STANDING_MS = 120_000; // a window this long counts even if it moved less
+	private static final long SPEED_WINDOW_MAX_MS = 600_000; // longer gaps are pauses, not movement
+	private static final double MOVING_MIN_KMH = 1;
+	// cleaning: a jump is a step of more than 1 km much faster than the track moves (1.5 x p85 of its step speeds, from
+	// 300 km/h on the ground up to 1200 km/h; with the clock going back; more than 5 km without time), a spike jumps out
+	// and back faster than 300 km/h with the ends closer than 30% of the way, a gap is a step longer than 5 km at any
+	// speed. Pieces split at jumps, pauses and gaps. A flight (median step speed above 200 km/h) has no gap limit
+	private static final double FLIGHT_MEDIAN_KMH = 200;
+	private static final double NOISE_JUMP_MAX_KMH = 1200;
+	private static final double NOISE_JUMP_P85_FACTOR = 1.5;
+	private static final double NOISE_SPIKE_KMH = 300;
+	private static final double CLEAN_GAP_M = 5000;
+	private static final double NOISE_JUMP_MIN_M = 1000;
+	private static final double NOISE_UNTIMED_JUMP_M = 5000;
+	private static final double NOISE_SPIKE_RETURN_RATIO = 0.3;
+	private static final long CLEAN_PAUSE_MS = 600_000;
+	private static final double CLEAN_PAUSE_MIN_M = 500;
+	private static final int CLEAN_MIN_PIECE_POINTS = 10;
+	private static final double CLEAN_MIN_PIECE_M = 200;
 
 	private static final String GPX_FILE_PREIX = "OG";
 	private final RouteActivityHelper routeActivityHelper = RouteActivityHelper.INSTANCE;
@@ -262,11 +293,22 @@ public class DownloadOsmGPX {
 		} else if ("recalculateminmax_and_download".equals(main)) {
 			utility.recalculateMinMaxLatLon(true);
 		} else if ("add_activity".equals(main)) {
+			// kept for existing jobs: parses tracks without activity
 			utility.addActivityColumnAndPopulate(args[1]);
 		} else if ("update_activity".equals(main)) {
-			// update_activity <rootPath> foot,cycling,garbage
+			// kept for existing jobs: update_activity <rootPath> foot,cycling,garbage parses those tracks again
 			String categories = args.length > 2 ? args[2] : null;
 			utility.updateActivity(args[1], categories);
+		} else if ("parse_tracks".equals(main)) {
+			// parse_tracks <rootPath> [--threads=N] [--categories=foot,garbage] [--where=<SQL condition>] [--force]
+			// parses tracks without track_stats or with an older TRACK_STATS_VERSION (every track with --force),
+			// so a stopped run continues where it stopped
+			JobOptions options = JobOptions.parse(args, 2);
+			utility.parseTracks(args[1], options.force ? TrackSelection.ALL : TrackSelection.OUTDATED_STATS, options);
+		} else if ("classify_tracks".equals(main)) {
+			// classify_tracks <rootPath> [--categories=foot,garbage] [--where=<SQL condition>]
+			// sets activity again from stored columns and track_stats, without reading GPX
+			utility.classifyTracks(args[1], JobOptions.parse(args, 2));
 		} else {
 			System.out.println("Arguments " + Arrays.toString(args));
 			for (int i = 0; i < args.length; i++) {
@@ -303,6 +345,12 @@ public class DownloadOsmGPX {
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS waypoints integer");
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS simplified_geometry bytea");
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS speed_matches_activity boolean");
+			// activity written in the file itself (osmand:activity), kept apart from the computed activity
+			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS file_activity text");
+			// rule that set activity: file, keyword, speed, garbage, error
+			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS activity_source text");
+			// facts from one GPX parse, so classification rules can change without parsing again (see computeTrackStats)
+			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS track_stats json");
 
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_speed ON " + GPX_METADATA_TABLE_NAME + " (speed)");
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_distance ON " + GPX_METADATA_TABLE_NAME + " (distance)");
@@ -333,37 +381,48 @@ public class DownloadOsmGPX {
 		LOG.info("Activity schema (columns and indexes) ensured.");
 	}
 
-	protected void addActivityColumnAndPopulate(String rootPath) throws SQLException {
-		LOG.info("Starting add_activity (column/indexes + populate only activity IS NULL)...");
-		ensureActivitySchema();
-		Map<String, List<String>> activitiesMap = createActivitiesMap(rootPath);
-		if (activitiesMap.isEmpty()) {
-			LOG.info("Activities map is empty. Skipping the 'activity' column population.");
-		} else {
-			fillActivityColumn(activitiesMap, false, null);
-		}
+	protected void addActivityColumnAndPopulate(String rootPath) throws SQLException, InterruptedException {
+		parseTracks(rootPath, TrackSelection.WITHOUT_ACTIVITY, new JobOptions());
 	}
 
-	protected void updateActivity(String rootPath, String categories) throws SQLException {
-		ensureActivitySchema();
-		Map<String, List<String>> activitiesMap = createActivitiesMap(rootPath);
-		if (activitiesMap.isEmpty()) {
-			LOG.info("Activities map is empty. Skipping.");
-			return;
-		}
-		Set<String> categoryFilter = null;
-		if (!isEmpty(categories)) {
-			categoryFilter = expandCategories(categories, activitiesMap);
-			if (categoryFilter.isEmpty()) {
-				LOG.info("No known categories matched '" + categories + "'. Nothing to do.");
-				return;
+	protected void updateActivity(String rootPath, String categories) throws SQLException, InterruptedException {
+		JobOptions options = new JobOptions();
+		options.categories = categories;
+		parseTracks(rootPath, TrackSelection.ALL, options);
+	}
+
+	private enum TrackSelection {
+		WITHOUT_ACTIVITY, // add_activity: tracks not processed yet
+		OUTDATED_STATS, // parse_tracks: no track_stats or an older TRACK_STATS_VERSION
+		ALL // update_activity, parse_tracks --force
+	}
+
+	// options of parse_tracks and classify_tracks
+	static class JobOptions {
+		int threads = 1;
+		String categories;
+		String where; // e.g. "id % 1000 = 0" for a sample, "(track_stats->>'speed_p95')::float > 40" for a subgroup
+		boolean force;
+
+		static JobOptions parse(String[] args, int from) {
+			JobOptions options = new JobOptions();
+			for (int i = from; i < args.length; i++) {
+				String arg = args[i];
+				String value = arg.substring(arg.indexOf('=') + 1).trim();
+				if (arg.startsWith("--threads=")) {
+					options.threads = Math.max(1, Integer.parseInt(value));
+				} else if (arg.startsWith("--categories=")) {
+					options.categories = value;
+				} else if (arg.startsWith("--where=")) {
+					options.where = value;
+				} else if (arg.equals("--force")) {
+					options.force = true;
+				} else {
+					throw new IllegalArgumentException("Unknown option: " + arg);
+				}
 			}
-			LOG.info("Starting update_activity for categories " + categoryFilter + "...");
-		} else {
-			LOG.info("Starting update_activity (all records)...");
+			return options;
 		}
-		fillActivityColumn(activitiesMap, true, categoryFilter);
-		LOG.info("Update activity finished.");
 	}
 
 	private Set<String> expandCategories(String categories, Map<String, List<String>> activitiesMap) {
@@ -405,178 +464,367 @@ public class DownloadOsmGPX {
 		return sb.toString();
 	}
 
-	private void fillActivityColumn(Map<String, List<String>> activitiesMap, boolean update,
-			Set<String> categoryFilter) throws SQLException {
-		String scope = categoryFilter != null ? " (categories " + categoryFilter + ")"
-				: (update ? " (all records)" : " (only activity IS NULL)");
-		LOG.info("Starting to populate the 'activity' column" + scope + "...");
-		if (categoryFilter != null) {
-			update = true;
+	// SQL conditions for --categories and --where, null when none of the categories is known
+	private String trackCondition(Map<String, List<String>> activitiesMap, JobOptions options) {
+		StringBuilder condition = new StringBuilder();
+		if (!isEmpty(options.categories)) {
+			Set<String> categoryFilter = expandCategories(options.categories, activitiesMap);
+			if (categoryFilter.isEmpty()) {
+				LOG.info("No known categories matched '" + options.categories + "'. Nothing to do.");
+				return null;
+			}
+			condition.append(" AND activity IN (").append(sqlList(categoryFilter)).append(")");
 		}
-		final String categoryCondition = categoryFilter != null
-				? " AND activity IN (" + sqlList(categoryFilter) + ")" : "";
+		if (!isEmpty(options.where)) {
+			condition.append(" AND (").append(options.where).append(")");
+		}
+		return condition.toString();
+	}
+
+	protected void parseTracks(String rootPath, TrackSelection selection, JobOptions options)
+			throws SQLException, InterruptedException {
+		ensureActivitySchema();
+		Map<String, List<String>> activitiesMap = createActivitiesMap(rootPath);
+		if (activitiesMap.isEmpty()) {
+			LOG.info("Activities map is empty. Skipping.");
+			return;
+		}
+		String condition = trackCondition(activitiesMap, options);
+		if (condition == null) {
+			return;
+		}
+		if (selection == TrackSelection.WITHOUT_ACTIVITY) {
+			condition += " AND activity IS NULL";
+		} else if (selection == TrackSelection.OUTDATED_STATS) {
+			condition += " AND (track_stats IS NULL OR COALESCE((track_stats->>'v')::int, 0) < " + TRACK_STATS_VERSION + ")";
+		}
+		LOG.info("Parsing tracks: " + selection + condition + ", " + options.threads + " threads...");
+		String selectSql = "SELECT id, name, description, tags FROM " + GPX_METADATA_TABLE_NAME
+				+ " WHERE id > ?" + condition + " ORDER BY id LIMIT " + PARSE_BATCH_LIMIT;
+		// only GPX parsing runs in the pool; reads, classification and writes stay on this thread and dbConn
+		ExecutorService pool = Executors.newCachedThreadPool(r -> {
+			Thread t = new Thread(r);
+			t.setDaemon(true); // a track stuck in the parser must not keep the job alive
+			return t;
+		});
+		CompletionService<TrackData> completed = new ExecutorCompletionService<>(pool);
+		Map<Future<TrackData>, TrackRow> running = new HashMap<>();
+		Deque<TrackRow> queued = new ArrayDeque<>();
+		long lastId = -1; // so id=0 is included when present
+		boolean moreRows = true;
 		dbConn.setAutoCommit(false);
-		PreparedStatement updateStmtMetrics = dbConn.prepareStatement(
-				"UPDATE " + GPX_METADATA_TABLE_NAME + " SET activity = ?, speed = ?, distance = ?, points = ?, " +
-						"max_speed = ?, max_dist_between_points = ?, time_minutes = ?, waypoints = ?, " +
-						"simplified_geometry = ?, speed_matches_activity = ? WHERE id = ?"
-		);
-		PreparedStatement updateStmtActivityOnly = dbConn.prepareStatement(
-				"UPDATE " + GPX_METADATA_TABLE_NAME + " SET activity = ? WHERE id = ?"
-		);
-
-		final int TRACK_TIMEOUT_SEC = 120;
-		ExecutorService trackExec = null;
-
-		int batchSize = 0;
-		final int BATCH_LIMIT = 1000;
-		int processedCount = 0;
-		int identifiedActivityCount = 0;
-		long lastUpdatedId = -1; // so id=0 is included when present
-		boolean hasMoreRecords = true;
-		try {
-			trackExec = Executors.newCachedThreadPool(r -> {
-				Thread t = new Thread(r);
-				t.setDaemon(true);
-				return t;
-			});
-			while (hasMoreRecords) {
-				hasMoreRecords = false;
-
-				String selectSql = update
-						? "SELECT id, name, description, tags FROM " + GPX_METADATA_TABLE_NAME + " WHERE id > " + lastUpdatedId + categoryCondition + " ORDER BY id LIMIT " + BATCH_LIMIT
-						: "SELECT id, name, description, tags FROM " + GPX_METADATA_TABLE_NAME + " WHERE activity IS NULL LIMIT " + BATCH_LIMIT;
-				try (Statement selectStmt = dbConn.createStatement();
-				     ResultSet rs = selectStmt.executeQuery(selectSql)) {
-					if (!rs.isBeforeFirst()) {
-						break; // no more records to process
+		try (PreparedStatement selectRows = dbConn.prepareStatement(selectSql);
+			 PreparedStatement selectData = dbConn.prepareStatement("SELECT data FROM " + GPX_FILES_TABLE_NAME + " WHERE id = ?");
+			 ParseBatch batch = new ParseBatch(activitiesMap)) {
+			while (moreRows || !queued.isEmpty() || !running.isEmpty()) {
+				if (moreRows && queued.isEmpty()) {
+					selectRows.setLong(1, lastId);
+					try (ResultSet rs = selectRows.executeQuery()) {
+						while (rs.next()) {
+							TrackRow row = new TrackRow(rs);
+							queued.add(row);
+							lastId = row.id;
+						}
 					}
-					while (rs.next()) {
-						String activity = null;
-						hasMoreRecords = true;
-						long id = rs.getLong("id");
-						GpxFile gpxFile = null;
-						GpxTrackAnalysis analysis = null;
-						int pointsCount = 0;
-						float distanceMeters = 0f;
-						float avgSpeedKmh = 0f;
-						float maxSpeedKmh = 0f;
-						float maxDistBetweenPoints = 0f;
-						int timeMinutes = 0;
-						int waypointsCount = 0;
-						byte[] simplifiedGeometry = null;
-						byte[] bytes = null;
-						try (Statement dataStmt = dbConn.createStatement();
-						     ResultSet rf = dataStmt.executeQuery(
-								     "SELECT data FROM " + GPX_FILES_TABLE_NAME + " WHERE id = " + id
-						     )) {
-							if (rf.next()) {
-								bytes = rf.getBytes("data");
-							}
-						}
-
-						if (bytes == null) {
-							activity = ERROR_ACTIVITY_TYPE;
-						} else {
-							final byte[] trackBytes = bytes;
-							Future<TrackData> future = trackExec.submit(() -> computeTrackData(trackBytes));
-							try {
-								TrackData d = future.get(TRACK_TIMEOUT_SEC, TimeUnit.SECONDS);
-								gpxFile = d.gpxFile;
-								analysis = d.analysis;
-								if (d.error) {
-									activity = ERROR_ACTIVITY_TYPE;
-								} else {
-									pointsCount = d.pointsCount;
-									distanceMeters = d.distanceMeters;
-									avgSpeedKmh = d.avgSpeedKmh;
-									maxSpeedKmh = d.maxSpeedKmh;
-									maxDistBetweenPoints = d.maxDistBetweenPoints;
-									timeMinutes = d.timeMinutes;
-									waypointsCount = d.waypointsCount;
-									simplifiedGeometry = d.simplifiedGeometry;
-									if (d.garbageType != null) {
-										activity = d.garbageType;
-									}
-								}
-							} catch (TimeoutException te) {
-								future.cancel(true);
-								LOG.error("Timeout (>" + TRACK_TIMEOUT_SEC + "s) processing id=" + id + ", marking as error");
-								activity = ERROR_ACTIVITY_TYPE;
-							} catch (Exception e) {
-								LOG.error("Error processing id=" + id, e);
-								activity = ERROR_ACTIVITY_TYPE;
-							}
-						}
-
-						if (activity == null) {
-							activity = getActivityByRouteActivity(gpxFile, activitiesMap);
-						}
-						if (activity == null) {
-							activity = analyzeActivity(rs, activitiesMap);
-						}
-						Boolean speedMatches = speedMatchesActivity(activity, avgSpeedKmh, maxSpeedKmh);
-						if (activity == null) {
-							activity = analyzeActivityFromGpx(analysis, avgSpeedKmh, maxSpeedKmh);
-						}
-
-						if (!GarbageClassifier.isGarbage(activity) && !ERROR_ACTIVITY_TYPE.equals(activity)) {
-							identifiedActivityCount++;
-						}
-						boolean fillMetrics = !ERROR_ACTIVITY_TYPE.equals(activity);
-						if (fillMetrics) {
-							updateStmtMetrics.setString(1, activity);
-							updateStmtMetrics.setFloat(2, round2(avgSpeedKmh));
-							updateStmtMetrics.setFloat(3, round2(distanceMeters));
-							updateStmtMetrics.setInt(4, pointsCount);
-							updateStmtMetrics.setFloat(5, round2(maxSpeedKmh));
-							updateStmtMetrics.setFloat(6, round2(maxDistBetweenPoints));
-							updateStmtMetrics.setInt(7, timeMinutes);
-							updateStmtMetrics.setInt(8, waypointsCount);
-							updateStmtMetrics.setBytes(9, simplifiedGeometry);
-							updateStmtMetrics.setObject(10, speedMatches, Types.BOOLEAN);
-							updateStmtMetrics.setLong(11, id);
-							updateStmtMetrics.addBatch();
-						} else {
-							updateStmtActivityOnly.setString(1, activity);
-							updateStmtActivityOnly.setLong(2, id);
-							updateStmtActivityOnly.addBatch();
-						}
-
-						batchSize++;
-						processedCount++;
-						if (update) {
-							lastUpdatedId = id;
-						}
-
-						if (batchSize >= BATCH_LIMIT) {
-							updateStmtMetrics.executeBatch();
-							updateStmtActivityOnly.executeBatch();
-							dbConn.commit();
-							batchSize = 0;
-							LOG.info("Processed " + processedCount + " records so far. Identified " + identifiedActivityCount + " activities.");
-						}
+					moreRows = !queued.isEmpty();
+				}
+				while (running.size() < options.threads && !queued.isEmpty()) {
+					TrackRow row = queued.poll();
+					byte[] data = loadGpxData(selectData, row.id);
+					if (data == null) {
+						batch.writeError(row, "no_data");
+					} else {
+						row.startMs = System.currentTimeMillis();
+						running.put(completed.submit(() -> computeTrackData(data)), row);
+					}
+				}
+				Future<TrackData> done = running.isEmpty() ? null : completed.poll(1, TimeUnit.SECONDS);
+				while (done != null) {
+					TrackRow row = running.remove(done);
+					if (row != null) { // null for a track that finished after its timeout
+						batch.writeTrack(row, done);
+					}
+					done = completed.poll();
+				}
+				long now = System.currentTimeMillis();
+				Iterator<Map.Entry<Future<TrackData>, TrackRow>> it = running.entrySet().iterator();
+				while (it.hasNext()) {
+					Map.Entry<Future<TrackData>, TrackRow> task = it.next();
+					if (now - task.getValue().startMs > TRACK_TIMEOUT_MS) {
+						task.getKey().cancel(true);
+						it.remove();
+						LOG.error("Timeout (>" + TRACK_TIMEOUT_MS / 1000 + "s) processing id=" + task.getValue().id
+								+ ", marking as error");
+						batch.writeError(task.getValue(), "timeout");
 					}
 				}
 			}
+			batch.commit();
+			LOG.info("Finished parsing tracks. Total records processed: " + batch.processed);
+		} catch (SQLException e) {
+			dbConn.rollback();
+			throw e;
+		} finally {
+			pool.shutdownNow();
+			dbConn.setAutoCommit(true);
+		}
+	}
 
-			if (batchSize > 0) {
-				updateStmtMetrics.executeBatch();
-				updateStmtActivityOnly.executeBatch();
+	protected void classifyTracks(String rootPath, JobOptions options) throws SQLException {
+		ensureActivitySchema();
+		Map<String, List<String>> activitiesMap = createActivitiesMap(rootPath);
+		if (activitiesMap.isEmpty()) {
+			LOG.info("Activities map is empty. Skipping.");
+			return;
+		}
+		String condition = trackCondition(activitiesMap, options);
+		if (condition == null) {
+			return;
+		}
+		LOG.info("Classifying tracks from stored columns" + condition + "...");
+		String selectSql = "SELECT id, name, description, tags, activity, activity_source, speed_matches_activity, "
+				+ "file_activity, points, distance, max_dist_between_points, speed, max_speed, track_stats FROM "
+				+ GPX_METADATA_TABLE_NAME + " WHERE id > ? AND track_stats IS NOT NULL" + condition
+				+ " ORDER BY id LIMIT " + CLASSIFY_BATCH_LIMIT;
+		int read = 0;
+		int changed = 0;
+		int skipped = 0;
+		long lastId = -1;
+		dbConn.setAutoCommit(false);
+		try (PreparedStatement selectRows = dbConn.prepareStatement(selectSql);
+			 PreparedStatement update = dbConn.prepareStatement("UPDATE " + GPX_METADATA_TABLE_NAME
+					 + " SET activity = ?, activity_source = ?, speed_matches_activity = ? WHERE id = ?")) {
+			boolean moreRows = true;
+			while (moreRows) {
+				moreRows = false;
+				selectRows.setLong(1, lastId);
+				try (ResultSet rs = selectRows.executeQuery()) {
+					while (rs.next()) {
+						moreRows = true;
+						read++;
+						TrackRow row = new TrackRow(rs);
+						lastId = row.id;
+						TrackFacts facts = storedFacts(row, rs);
+						if (facts == null) {
+							skipped++; // error rows, and stats written before the keys classification needs
+							continue;
+						}
+						Classification c = classify(facts, activitiesMap);
+						if (!Objects.equals(c.activity(), rs.getString("activity"))
+								|| !Objects.equals(c.source(), rs.getString("activity_source"))
+								|| !Objects.equals(c.speedMatches(), rs.getObject("speed_matches_activity"))) {
+							update.setString(1, c.activity());
+							update.setString(2, c.source());
+							update.setObject(3, c.speedMatches(), Types.BOOLEAN);
+							update.setLong(4, row.id);
+							update.addBatch();
+							changed++;
+						}
+					}
+				}
+				update.executeBatch();
 				dbConn.commit();
+				LOG.info("Classified " + read + " tracks, changed " + changed + ", skipped " + skipped);
 			}
 		} catch (SQLException e) {
 			dbConn.rollback();
 			throw e;
 		} finally {
-			if (trackExec != null) {
-				trackExec.shutdownNow();
-			}
 			dbConn.setAutoCommit(true);
-			updateStmtMetrics.close();
-			updateStmtActivityOnly.close();
 		}
-		LOG.info("Finished populating the 'activity' column. Total records processed: " + processedCount);
+	}
+
+	private static byte[] loadGpxData(PreparedStatement selectData, long id) throws SQLException {
+		selectData.setLong(1, id);
+		try (ResultSet rs = selectData.executeQuery()) {
+			return rs.next() ? rs.getBytes(1) : null;
+		}
+	}
+
+	// metadata of one track, read on the DB thread
+	private static class TrackRow {
+		final long id;
+		final String name;
+		final String description;
+		final List<String> tags = new ArrayList<>();
+		long startMs;
+
+		TrackRow(ResultSet rs) throws SQLException {
+			id = rs.getLong("id");
+			name = rs.getString("name");
+			description = rs.getString("description");
+			Array tagsArray = rs.getArray("tags");
+			if (tagsArray != null) {
+				try (ResultSet tagRs = tagsArray.getResultSet()) {
+					while (tagRs.next()) {
+						String tag = tagRs.getString(2);
+						if (tag != null) {
+							tags.add(tag.toLowerCase());
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// what classification reads, from a fresh parse (parse_tracks) or from stored columns (classify_tracks)
+	private static class TrackFacts {
+		TrackRow row;
+		String fileActivity;
+		int points;
+		double distance;
+		double maxDistBetweenPoints;
+		float avgSpeedKmh;
+		float maxSpeedKmh;
+		boolean hasSpeed;
+		boolean teleport;
+	}
+
+	record Classification(String activity, String source, Boolean speedMatches) {
+	}
+
+	private Classification classify(TrackFacts facts, Map<String, List<String>> activitiesMap) {
+		String activity = GarbageClassifier.classify(facts.points, facts.distance, facts.maxDistBetweenPoints, facts.teleport);
+		String source = activity != null ? "garbage" : null;
+		// each step runs only when the previous ones found nothing, so the last source set is the one used
+		if (activity == null) {
+			activity = getActivityByFileActivity(facts.fileActivity, activitiesMap);
+			source = "file";
+		}
+		if (activity == null) {
+			activity = analyzeActivity(facts.row.name, facts.row.description, facts.row.tags, activitiesMap);
+			source = "keyword";
+		}
+		Boolean speedMatches = speedMatchesActivity(activity, facts.avgSpeedKmh, facts.maxSpeedKmh);
+		if (activity == null) {
+			activity = analyzeActivityBySpeed(facts.hasSpeed, facts.avgSpeedKmh, facts.maxSpeedKmh);
+			source = "speed";
+		}
+		return new Classification(activity, source, speedMatches);
+	}
+
+	// facts from stored columns, null when track_stats lacks what classification needs
+	private static TrackFacts storedFacts(TrackRow row, ResultSet rs) throws SQLException {
+		JsonNode stats;
+		try {
+			stats = JSON_MAPPER.readTree(rs.getString("track_stats"));
+		} catch (IOException e) {
+			return null;
+		}
+		if (!stats.has("has_speed")) {
+			return null;
+		}
+		TrackFacts facts = new TrackFacts();
+		facts.row = row;
+		facts.fileActivity = rs.getString("file_activity");
+		facts.points = rs.getInt("points");
+		facts.distance = rs.getDouble("distance");
+		facts.maxDistBetweenPoints = rs.getDouble("max_dist_between_points");
+		facts.avgSpeedKmh = rs.getFloat("speed");
+		facts.maxSpeedKmh = rs.getFloat("max_speed");
+		facts.hasSpeed = stats.get("has_speed").asBoolean();
+		facts.teleport = stats.path("teleport").asBoolean();
+		return facts;
+	}
+
+	// writes results of parse_tracks in batches; used only on the thread that owns dbConn
+	private class ParseBatch implements AutoCloseable {
+		private final Map<String, List<String>> activitiesMap;
+		private final PreparedStatement metricsStmt;
+		private final PreparedStatement errorStmt;
+		private final long startMs = System.currentTimeMillis();
+		private int pending;
+		private int processed;
+		private int identified;
+
+		ParseBatch(Map<String, List<String>> activitiesMap) throws SQLException {
+			this.activitiesMap = activitiesMap;
+			metricsStmt = dbConn.prepareStatement(
+					"UPDATE " + GPX_METADATA_TABLE_NAME + " SET activity = ?, speed = ?, distance = ?, points = ?, " +
+							"max_speed = ?, max_dist_between_points = ?, time_minutes = ?, waypoints = ?, " +
+							"simplified_geometry = ?, speed_matches_activity = ?, file_activity = ?, track_stats = ?::json, " +
+							"activity_source = ? WHERE id = ?");
+			errorStmt = dbConn.prepareStatement(
+					"UPDATE " + GPX_METADATA_TABLE_NAME + " SET activity = ?, activity_source = ?, track_stats = ?::json WHERE id = ?");
+		}
+
+		void writeTrack(TrackRow row, Future<TrackData> future) throws SQLException, InterruptedException {
+			TrackData d;
+			try {
+				d = future.get();
+			} catch (ExecutionException e) {
+				LOG.error("Error processing id=" + row.id, e.getCause());
+				writeError(row, e.getCause().getClass().getSimpleName());
+				return;
+			}
+			if (d.error) {
+				writeError(row, d.errorReason);
+				return;
+			}
+			TrackFacts facts = new TrackFacts();
+			facts.row = row;
+			facts.fileActivity = d.fileActivity;
+			facts.points = d.pointsCount;
+			// the rounded values that are stored, so classify_tracks makes the same decision from the columns
+			facts.distance = round2(d.distanceMeters);
+			facts.maxDistBetweenPoints = round2(d.maxDistBetweenPoints);
+			facts.avgSpeedKmh = round2(d.avgSpeedKmh);
+			facts.maxSpeedKmh = round2(d.maxSpeedKmh);
+			facts.hasSpeed = d.hasSpeed;
+			facts.teleport = d.teleport;
+			Classification c = classify(facts, activitiesMap);
+			metricsStmt.setString(1, c.activity());
+			metricsStmt.setFloat(2, round2(d.avgSpeedKmh));
+			metricsStmt.setFloat(3, round2(d.distanceMeters));
+			metricsStmt.setInt(4, d.pointsCount);
+			metricsStmt.setFloat(5, round2(d.maxSpeedKmh));
+			metricsStmt.setFloat(6, round2(d.maxDistBetweenPoints));
+			metricsStmt.setInt(7, d.timeMinutes);
+			metricsStmt.setInt(8, d.waypointsCount);
+			metricsStmt.setBytes(9, d.simplifiedGeometry);
+			metricsStmt.setObject(10, c.speedMatches(), Types.BOOLEAN);
+			metricsStmt.setString(11, d.fileActivity);
+			metricsStmt.setString(12, d.trackStats);
+			metricsStmt.setString(13, c.source());
+			metricsStmt.setLong(14, row.id);
+			metricsStmt.addBatch();
+			if (!GarbageClassifier.isGarbage(c.activity())) {
+				identified++;
+			}
+			added();
+		}
+
+		void writeError(TrackRow row, String reason) throws SQLException {
+			errorStmt.setString(1, ERROR_ACTIVITY_TYPE);
+			errorStmt.setString(2, "error");
+			errorStmt.setString(3, errorTrackStats(reason));
+			errorStmt.setLong(4, row.id);
+			errorStmt.addBatch();
+			added();
+		}
+
+		private void added() throws SQLException {
+			processed++;
+			if (++pending >= PARSE_BATCH_LIMIT) {
+				commit();
+			}
+		}
+
+		void commit() throws SQLException {
+			metricsStmt.executeBatch();
+			errorStmt.executeBatch();
+			dbConn.commit();
+			pending = 0;
+			double seconds = Math.max(1, System.currentTimeMillis() - startMs) / 1000d;
+			LOG.info(String.format("Processed %d records so far (%.1f per second). Identified %d activities.",
+					processed, processed / seconds, identified));
+		}
+
+		@Override
+		public void close() throws SQLException {
+			metricsStmt.close();
+			errorStmt.close();
+		}
 	}
 
 	// Parse GPX + analysis + build simplified geometry. Runs in a worker thread guarded by a timeout,
@@ -589,11 +837,14 @@ public class DownloadOsmGPX {
 		} catch (IOException e) {
 			LOG.error("Error loading GPX file", e);
 			d.error = true;
+			d.errorReason = e.getClass().getSimpleName();
 			return d;
 		}
 		d.gpxFile = gpxFile;
 		if (gpxFile.getError() != null) {
 			d.error = true;
+			Throwable error = gpxFile.getError();
+			d.errorReason = error.getMessage() != null ? error.getMessage() : error.getClass().getSimpleName();
 			return d;
 		}
 		GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
@@ -609,11 +860,374 @@ public class DownloadOsmGPX {
 			d.timeMinutes = (int) (timeSpanMs / 60000d);
 		}
 		d.waypointsCount = gpxFile.getPointsList().size();
-		d.simplifiedGeometry = TrackSimplifyEncoder.encodeGeometry(
-				TrackSimplifyEncoder.simplifyGpx(gpxFile, TrackSimplifyEncoder.SIMPLIFY_ZOOM));
+		CleanTrack clean = cleanTrack(gpxFile);
+		if (Float.isNaN(d.distanceMeters)) {
+			d.distanceMeters = (float) clean.distanceM; // one point with nan coordinates makes the whole total nan
+		}
+		d.simplifiedGeometry = encodeGeometry(gpxFile, clean);
 
-		d.garbageType = GarbageClassifier.classify(gpxFile, analysis);
+		d.hasSpeed = analysis.getHasSpeedInTrack();
+		d.teleport = GarbageClassifier.hasTeleportGap(gpxFile);
+		d.fileActivity = gpxFile.getMetadata().getExtensionsToRead().get(GpxUtilities.ACTIVITY_TYPE);
+		d.trackStats = computeTrackStats(gpxFile, analysis, d.teleport, clean);
 		return d;
+	}
+
+	// JSON for the track_stats column. Add keys and bump TRACK_STATS_VERSION instead of adding table columns.
+	static String computeTrackStats(GpxFile gpxFile, GpxTrackAnalysis analysis, boolean teleport, CleanTrack clean) {
+		int points = 0;
+		for (Track track : gpxFile.getTracks(false)) {
+			for (TrkSegment seg : track.getSegments()) {
+				points += seg.getPoints().size();
+			}
+		}
+		int segments = 0;
+		int timed = 0;
+		int intervals = 0;
+		long[] intervalsMs = new long[Math.max(points, 1)];
+		long startTime = Long.MAX_VALUE;
+		long endTime = 0;
+		for (Track track : gpxFile.getTracks(false)) {
+			for (TrkSegment seg : track.getSegments()) {
+				if (seg.getPoints().isEmpty()) {
+					continue;
+				}
+				segments++;
+				long prevTime = 0;
+				for (WptPt p : seg.getPoints()) {
+					long t = p.getTime();
+					if (t <= 0) {
+						continue;
+					}
+					timed++;
+					startTime = Math.min(startTime, t);
+					endTime = Math.max(endTime, t);
+					if (prevTime > 0 && t > prevTime) {
+						intervalsMs[intervals++] = t - prevTime;
+					}
+					prevTime = t;
+				}
+			}
+		}
+		int routePoints = 0;
+		for (Route route : gpxFile.getRoutes()) {
+			routePoints += route.getPoints().size();
+		}
+		Map<String, Object> stats = new LinkedHashMap<>();
+		stats.put("v", TRACK_STATS_VERSION);
+		if (!Algorithms.isEmpty(gpxFile.getAuthor())) {
+			stats.put("creator", gpxFile.getAuthor()); // app that wrote the file: openpilot car logs, GPSies plans
+		}
+		stats.put("segments", segments);
+		stats.put("route_points", routePoints); // planned route instead of a recording
+		stats.put("time_frac", points > 0 ? Math.round(timed * 1000d / points) / 1000d : 0);
+		if (timed > 0) {
+			stats.put("start_time", startTime / 1000); // recording time, the date column is the upload date
+			stats.put("end_time", endTime / 1000);
+		}
+		if (intervals > 0) {
+			Arrays.sort(intervalsMs, 0, intervals);
+			stats.put("interval_median_s", intervalsMs[intervals / 2] / 1000d); // sampling rate
+			stats.put("interval_max_s", intervalsMs[intervals - 1] / 1000d);
+		}
+		stats.put("has_speed", analysis.getHasSpeedInTrack()); // <speed> in the file, the track is nospeed without it
+		stats.put("teleport", teleport); // a gap crossed faster than an airliner, see GarbageClassifier
+		if (analysis.hasElevationData()) {
+			stats.put("ele_min", Math.round(analysis.getMinElevation()));
+			stats.put("ele_max", Math.round(analysis.getMaxElevation()));
+			stats.put("ele_up", Math.round(analysis.getDiffElevationUp()));
+			stats.put("ele_down", Math.round(analysis.getDiffElevationDown()));
+		}
+		stats.put("invalid_points", clean.invalidPoints);
+		stats.put("frozen_points", clean.frozenPoints);
+		stats.put("time_back", clean.timeBack);
+		stats.put("spikes", clean.spikes);
+		stats.put("jumps", clean.jumps);
+		stats.put("jump_m", Math.round(clean.jumpM));
+		stats.put("pauses", clean.pauses);
+		stats.put("gaps", clean.gaps);
+		stats.put("pieces", clean.pieces.size());
+		stats.put("dropped_pieces", clean.droppedPieces);
+		stats.put("clean_points", clean.points);
+		stats.put("clean_distance_m", Math.round(clean.distanceM));
+		// frozen points are ordinary stops and pauses are not errors; noisy tracks can get a better cleaning later:
+		// parse_tracks --force --where="(track_stats->>'noisy')::boolean"
+		stats.put("noisy", clean.invalidPoints + clean.timeBack + clean.spikes + clean.jumps > 0);
+		putWindowSpeeds(clean.pieces, stats);
+		return toJson(stats);
+	}
+
+	// the track without invalid points, frozen duplicates, spikes, jumps and long pauses, and what was removed
+	static class CleanTrack {
+		final List<List<WptPt>> pieces = new ArrayList<>();
+		int invalidPoints;
+		int frozenPoints;
+		int timeBack;
+		int spikes;
+		int jumps;
+		int pauses;
+		int gaps;
+		int droppedPieces;
+		int points;
+		double jumpM;
+		double distanceM;
+	}
+
+	static CleanTrack cleanTrack(GpxFile gpxFile) {
+		CleanTrack clean = new CleanTrack();
+		List<WptPt> points = new ArrayList<>();
+		for (Track track : gpxFile.getTracks(false)) {
+			for (TrkSegment seg : track.getSegments()) {
+				if (seg.getPoints().size() > 1 && !points.isEmpty()) {
+					// a segment of one point continues the previous one: some apps write every point as its own segment
+					splitPieces(removeSpikes(points, clean), clean);
+					points = new ArrayList<>();
+				}
+				for (WptPt p : seg.getPoints()) {
+					WptPt last = points.isEmpty() ? null : points.get(points.size() - 1);
+					if (!(Math.abs(p.getLat()) <= 90 && Math.abs(p.getLon()) <= 180)
+							|| (Math.abs(p.getLat()) < 0.01 && Math.abs(p.getLon()) < 0.01)) {
+						clean.invalidPoints++;
+					} else if (last != null && p.getLat() == last.getLat() && p.getLon() == last.getLon()) {
+						clean.frozenPoints++;
+					} else {
+						if (last != null && p.getTime() > 0 && p.getTime() < last.getTime()) {
+							clean.timeBack++;
+						}
+						points.add(p);
+					}
+				}
+			}
+		}
+		splitPieces(removeSpikes(points, clean), clean);
+		return clean;
+	}
+
+	private static List<WptPt> removeSpikes(List<WptPt> points, CleanTrack clean) {
+		List<WptPt> res = new ArrayList<>(points.size());
+		for (WptPt p : points) {
+			int n = res.size();
+			if (n >= 2) {
+				WptPt from = res.get(n - 2);
+				WptPt spike = res.get(n - 1);
+				double outM = distance(from, spike);
+				double backM = distance(spike, p);
+				if (outM > NOISE_JUMP_MIN_M && backM > NOISE_JUMP_MIN_M
+						&& kmh(from, spike, outM) > NOISE_SPIKE_KMH && kmh(spike, p, backM) > NOISE_SPIKE_KMH
+						&& distance(from, p) < NOISE_SPIKE_RETURN_RATIO * (outM + backM)) {
+					res.remove(n - 1);
+					clean.spikes++;
+				}
+			}
+			res.add(p);
+		}
+		return res;
+	}
+
+	private static void splitPieces(List<WptPt> points, CleanTrack clean) {
+		List<Double> speeds = stepSpeedsKmh(points);
+		boolean flight = percentile(speeds, 0.5) > FLIGHT_MEDIAN_KMH;
+		double jumpKmh = Math.max(NOISE_SPIKE_KMH, Math.min(NOISE_JUMP_MAX_KMH, NOISE_JUMP_P85_FACTOR * percentile(speeds, 0.85)));
+		List<WptPt> piece = new ArrayList<>();
+		double pieceM = 0;
+		boolean afterJump = false;
+		for (WptPt p : points) {
+			if (!piece.isEmpty()) {
+				WptPt prev = piece.get(piece.size() - 1);
+				double stepM = distance(prev, p);
+				boolean timed = prev.getTime() > 0 && p.getTime() > 0;
+				boolean jump = timed ? stepM > NOISE_JUMP_MIN_M && kmh(prev, p, stepM) > jumpKmh : stepM > NOISE_UNTIMED_JUMP_M;
+				boolean pause = timed && p.getTime() - prev.getTime() > CLEAN_PAUSE_MS && stepM > CLEAN_PAUSE_MIN_M;
+				boolean gap = !flight && stepM > CLEAN_GAP_M; // a straight line this long is not the way the track went
+				if (jump) {
+					clean.jumps++;
+					clean.jumpM += stepM;
+				} else if (pause) {
+					clean.pauses++;
+				} else if (gap) {
+					clean.gaps++;
+				}
+				if (jump || pause || gap) {
+					keepPiece(piece, pieceM, afterJump || jump, clean);
+					piece = new ArrayList<>();
+					pieceM = 0;
+					afterJump = jump;
+				} else {
+					pieceM += stepM;
+				}
+			}
+			piece.add(p);
+		}
+		keepPiece(piece, pieceM, afterJump, clean);
+	}
+
+	// sorted speeds of the steps at least a second apart: how fast the track itself moves
+	private static List<Double> stepSpeedsKmh(List<WptPt> points) {
+		List<Double> speeds = new ArrayList<>();
+		for (int i = 1; i < points.size(); i++) {
+			WptPt a = points.get(i - 1);
+			WptPt b = points.get(i);
+			long dtMs = b.getTime() - a.getTime();
+			if (a.getTime() > 0 && dtMs >= 1000) {
+				speeds.add(distance(a, b) / dtMs * 3_600);
+			}
+		}
+		Collections.sort(speeds);
+		return speeds;
+	}
+
+	private static double percentile(List<Double> sorted, double q) {
+		return sorted.isEmpty() ? 0 : sorted.get((int) (sorted.size() * q));
+	}
+
+	// a short piece next to a jump is the far side of a GPS jump; other pieces are dropped only when they cannot be drawn
+	private static void keepPiece(List<WptPt> piece, double pieceM, boolean nextToJump, CleanTrack clean) {
+		boolean shortPiece = piece.size() < CLEAN_MIN_PIECE_POINTS || pieceM < CLEAN_MIN_PIECE_M;
+		if (piece.size() >= 2 && !(nextToJump && shortPiece)) {
+			clean.pieces.add(piece);
+			clean.points += piece.size();
+			clean.distanceM += pieceM;
+		} else if (!piece.isEmpty()) {
+			clean.droppedPieces++;
+		}
+	}
+
+	// simplified geometry of the cleaned pieces; the raw line when nothing survives cleaning, so the track stays visible
+	private static byte[] encodeGeometry(GpxFile gpxFile, CleanTrack clean) {
+		if (clean.pieces.isEmpty()) {
+			return TrackSimplifyEncoder.encodeGeometry(TrackSimplifyEncoder.simplifyGpx(gpxFile, TrackSimplifyEncoder.SIMPLIFY_ZOOM));
+		}
+		GpxFile cleaned = new GpxFile(null);
+		Track track = new Track();
+		cleaned.getTracks().add(track);
+		for (List<WptPt> piece : clean.pieces) {
+			TrkSegment seg = new TrkSegment();
+			seg.getPoints().addAll(TrackSimplifyEncoder.simplifyPoints(piece, TrackSimplifyEncoder.SIMPLIFY_ZOOM));
+			track.getSegments().add(seg);
+		}
+		return TrackSimplifyEncoder.encodeGeometry(cleaned);
+	}
+
+	private static double distance(WptPt a, WptPt b) {
+		return MapUtils.getDistance(a.getLat(), a.getLon(), b.getLat(), b.getLon());
+	}
+
+	// km/h between two points; 0 without timestamps, infinite when the clock stood still or went back
+	private static double kmh(WptPt from, WptPt to, double meters) {
+		long dtMs = to.getTime() - from.getTime();
+		if (from.getTime() <= 0 || to.getTime() <= 0) {
+			return 0;
+		}
+		return dtMs <= 0 ? Double.POSITIVE_INFINITY : meters / dtMs * 3_600;
+	}
+
+	// Speeds of the cleaned pieces over windows of >= SPEED_WINDOW_MIN_MS and >= SPEED_WINDOW_MIN_M: time-weighted percentiles and the share of
+	// moving time and distance per SPEED_BINS_KMH bin, so speed thresholds can change without parsing again
+	static void putWindowSpeeds(List<List<WptPt>> pieces, Map<String, Object> stats) {
+		List<double[]> windows = new ArrayList<>(); // km/h, seconds, meters of moving windows
+		double totalS = 0;
+		for (List<WptPt> piece : pieces) {
+			WptPt anchor = null;
+			for (WptPt p : piece) {
+				if (p.getTime() <= 0) {
+					continue;
+				}
+				long dtMs = anchor == null ? 0 : p.getTime() - anchor.getTime();
+				if (anchor == null || dtMs < 0) {
+					anchor = p;
+					continue;
+				}
+				double dist = distance(anchor, p);
+				if (dtMs >= SPEED_WINDOW_MIN_MS && (dist >= SPEED_WINDOW_MIN_M || dtMs >= SPEED_WINDOW_STANDING_MS)) {
+					if (dtMs < SPEED_WINDOW_MAX_MS) {
+						totalS += dtMs / 1000d;
+						double kmh = dist / dtMs * 3_600; // m/ms -> km/h
+						if (kmh > MOVING_MIN_KMH) {
+							windows.add(new double[] {kmh, dtMs / 1000d, dist});
+						}
+					}
+					anchor = p;
+				}
+			}
+		}
+		if (windows.isEmpty()) {
+			return;
+		}
+		windows.sort(Comparator.comparingDouble(w -> w[0]));
+		double movingS = 0;
+		double movingM = 0;
+		for (double[] w : windows) {
+			movingS += w[1];
+			movingM += w[2];
+		}
+		stats.put("moving_s", Math.round(movingS));
+		stats.put("stop_frac", round3(1 - movingS / totalS)); // share of windowed time below MOVING_MIN_KMH
+		double meanKmh = movingM / movingS * 3.6;
+		double[] percentiles = {0.5, 0.85, 0.95, 0.99};
+		String[] keys = {"speed_p50", "speed_p85", "speed_p95", "speed_p99"};
+		double[] binTime = new double[SPEED_BINS_KMH.length];
+		double[] binDist = new double[SPEED_BINS_KMH.length];
+		double variance = 0;
+		double accS = 0;
+		int next = 0;
+		for (double[] w : windows) {
+			accS += w[1];
+			while (next < percentiles.length && accS >= percentiles[next] * movingS) {
+				stats.put(keys[next++], round1(w[0]));
+			}
+			int bin = SPEED_BINS_KMH.length - 1;
+			while (bin > 0 && w[0] < SPEED_BINS_KMH[bin]) {
+				bin--;
+			}
+			binTime[bin] += w[1];
+			binDist[bin] += w[2];
+			variance += w[1] * (w[0] - meanKmh) * (w[0] - meanKmh);
+		}
+		stats.put("speed_cv", round3(Math.sqrt(variance / movingS) / meanKmh)); // near 0: generated timestamps
+		stats.put("speed_hist_time", perMille(binTime, movingS));
+		stats.put("speed_hist_dist", perMille(binDist, movingM));
+	}
+
+	private static int[] perMille(double[] values, double total) {
+		int[] res = new int[values.length];
+		for (int i = 0; i < values.length; i++) {
+			res[i] = (int) Math.round(values[i] * 1000 / total);
+		}
+		return res;
+	}
+
+	private static double round1(double value) {
+		return Math.round(value * 10) / 10d;
+	}
+
+	private static double round3(double value) {
+		return Math.round(value * 1000) / 1000d;
+	}
+
+	// track_stats for rows marked error: why, so they can be counted and retried when the reason is fixable
+	static String errorTrackStats(String reason) {
+		Map<String, Object> stats = new LinkedHashMap<>();
+		stats.put("v", TRACK_STATS_VERSION);
+		if (reason != null) {
+			// parser messages carry a position or a parser instance, drop them to group rows by reason
+			for (String tail : new String[] {" (position:", " in org.kxml2"}) {
+				int i = reason.indexOf(tail);
+				if (i > 0) {
+					reason = reason.substring(0, i);
+				}
+			}
+			stats.put("error", reason);
+		}
+		return toJson(stats);
+	}
+
+	private static String toJson(Map<String, Object> stats) {
+		try {
+			return JSON_MAPPER.writeValueAsString(stats);
+		} catch (IOException e) {
+			LOG.error("Error writing track stats", e);
+			return null;
+		}
 	}
 
 	// Measures each move from the last distinct position (skipping frozen duplicate coordinates),
@@ -665,7 +1279,6 @@ public class DownloadOsmGPX {
 		GpxFile gpxFile;
 		GpxTrackAnalysis analysis;
 		boolean error;
-		String garbageType;
 		int pointsCount;
 		int timeMinutes;
 		int waypointsCount;
@@ -674,44 +1287,28 @@ public class DownloadOsmGPX {
 		float maxSpeedKmh;
 		float maxDistBetweenPoints;
 		byte[] simplifiedGeometry;
+		String fileActivity;
+		String trackStats;
+		String errorReason;
+		boolean hasSpeed;
+		boolean teleport;
 	}
 
-	private String getActivityByRouteActivity(GpxFile gpxFile, Map<String, List<String>> activitiesMap) {
-		if (gpxFile == null || activitiesMap.isEmpty()) {
+	private String getActivityByFileActivity(String fileActivity, Map<String, List<String>> activitiesMap) {
+		if (fileActivity == null || activitiesMap.isEmpty()) {
 			return null;
 		}
-		RouteActivity routeActivity = gpxFile.getMetadata()
-				.getRouteActivity(routeActivityHelper.getActivities());
-		if (routeActivity == null) {
-			return null;
+		for (RouteActivity routeActivity : routeActivityHelper.getActivities()) {
+			if (routeActivity.getId().equals(fileActivity)) {
+				return activitiesMap.containsKey(fileActivity) ? fileActivity : null;
+			}
 		}
-
-		String activityId = routeActivity.getId();
-		if (activitiesMap.containsKey(activityId)) {
-			return activityId;
-		}
-
 		return null;
 	}
 
-	private String analyzeActivity(ResultSet rs, Map<String, List<String>> activitiesMap) throws SQLException {
+	private String analyzeActivity(String name, String desc, List<String> tags, Map<String, List<String>> activitiesMap) {
 		if (activitiesMap.isEmpty()) {
 			return null;
-		}
-		String name = rs.getString("name");
-		String desc = rs.getString("description");
-		Array tagsArray = rs.getArray("tags");
-		List<String> tags = new ArrayList<>();
-
-		if (tagsArray != null) {
-			try (ResultSet tagRs = tagsArray.getResultSet()) {
-				while (tagRs.next()) {
-					String tag = tagRs.getString(2);
-					if (tag != null) {
-						tags.add(tag.toLowerCase());
-					}
-				}
-			}
 		}
 
 		// check tags first
@@ -802,11 +1399,8 @@ public class DownloadOsmGPX {
 		return activitiesMap;
 	}
 
-	private String analyzeActivityFromGpx(GpxTrackAnalysis analysis, float avgSpeed, float maxSpeed) {
-		if (analysis == null) {
-			return ERROR_ACTIVITY_TYPE;
-		}
-		if (!analysis.getHasSpeedInTrack() || avgSpeed <= 0) {
+	private String analyzeActivityBySpeed(boolean hasSpeedInTrack, float avgSpeed, float maxSpeed) {
+		if (!hasSpeedInTrack || avgSpeed <= 0) {
 			return NOSPEED_ACTIVITY_TYPE;
 		}
 		for (String type : ACTIVITY_BY_SPEED) {

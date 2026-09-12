@@ -3,7 +3,6 @@ package net.osmand.server.osmgpx;
 import java.util.Set;
 
 import net.osmand.shared.gpx.GpxFile;
-import net.osmand.shared.gpx.GpxTrackAnalysis;
 import net.osmand.shared.gpx.primitives.Track;
 import net.osmand.shared.gpx.primitives.TrkSegment;
 import net.osmand.shared.gpx.primitives.WptPt;
@@ -31,14 +30,15 @@ public final class GarbageClassifier {
 		return activity != null && activity.startsWith(GARBAGE);
 	}
 
-	static String classify(GpxFile gpxFile, GpxTrackAnalysis analysis) {
-		if (gpxFile.getAllSegmentsPoints().size() < MIN_POINTS) {
+	// points of the track, distance and the largest gap between points in meters, teleport: hasTeleportGap(track)
+	static String classify(int points, double distance, double maxDistBetweenPoints, boolean teleport) {
+		if (points < MIN_POINTS) {
 			return SPARSE;
 		}
-		if (analysis.getTotalDistance() < MIN_DISTANCE) {
+		if (distance < MIN_DISTANCE) {
 			return SHORT;
 		}
-		if (analysis.getMaxDistanceBetweenPoints() > TELEPORT_GAP_MIN_DISTANCE && hasTeleportGap(gpxFile)) {
+		if (maxDistBetweenPoints > TELEPORT_GAP_MIN_DISTANCE && teleport) {
 			return TELEPORT;
 		}
 		return null;
