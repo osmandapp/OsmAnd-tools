@@ -30,6 +30,15 @@ public class OBFDataCreator extends BinaryMerger {
 		COMBINE_ARGS.put("--route", OsmandOdb.OsmAndStructure.ROUTINGINDEX_FIELD_NUMBER);
 	}
 
+	private String sourceMap;
+
+	/**
+	 * @param sourceMap download name of the map the test data comes from: its language group chooses the keys of names
+	 */
+	public void setSourceMap(String sourceMap) {
+		this.sourceMap = sourceMap;
+	}
+
 	public File create(String obfFilePath, String[] jsonFilePaths) throws IOException, SQLException {
 		Set<Integer> combineParts = new HashSet<>(COMBINE_ARGS.values());
 		return create(obfFilePath, jsonFilePaths, combineParts);
@@ -96,6 +105,11 @@ public class OBFDataCreator extends BinaryMerger {
 				reader.close();
 			}
 		}
+	}
+
+	@Override
+	protected String getNameIndexMapName(String fileName) {
+		return sourceMap != null ? sourceMap : fileName;
 	}
 
 	@Override

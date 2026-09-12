@@ -325,6 +325,11 @@ public class BinaryMerger {
 		}
 	}
 
+	// download name of the map whose language group chooses the keys of names in the merged file
+	protected String getNameIndexMapName(String fileName) {
+		return fileName;
+	}
+
 	protected boolean shouldMergeCitiesByNameDistance() {
 		return true;
 	}
@@ -467,6 +472,7 @@ public class BinaryMerger {
 		attributeTagsTable.addAll(attributeTagsTableSet);
 		Map<String, Integer> tagRules = new HashMap<String, Integer>();
 		NameIndexCreator<MapObject> namesIndex = new NameIndexCreator<>(CommonWords.getAddrInstance());
+		namesIndex.setMapName(getNameIndexMapName(name));
 		ListIterator<String> it = attributeTagsTable.listIterator();
 		while (it.hasNext()) {
 			tagRules.put(it.next(), it.previousIndex());
@@ -560,6 +566,7 @@ public class BinaryMerger {
 		MapRenderingTypesEncoder renderingTypes = new MapRenderingTypesEncoder(null, name);
 		IndexCreatorSettings settings = new IndexCreatorSettings();
 		settings.indexPOI = true;
+		settings.nameIndexMapName = getNameIndexMapName(name);
 
 		final IndexPoiCreator indexPoiCreator = new IndexPoiCreator(settings, renderingTypes);
 		indexPoiCreator.createDatabaseStructure(new File(new File(System.getProperty("user.dir")), IndexCreator.getPoiFileName(name)));

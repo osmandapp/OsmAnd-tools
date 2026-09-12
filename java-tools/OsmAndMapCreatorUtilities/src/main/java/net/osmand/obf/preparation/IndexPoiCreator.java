@@ -764,6 +764,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		poiConnection.commit();
 
 		NameIndexCreator<PoiNameObject> namesIndex = new NameIndexCreator<>(CommonWords.getPoiInstance());
+		namesIndex.setMapName(settings.nameIndexMapName != null ? settings.nameIndexMapName : regionName);
 
 		int zoomToStart = ZOOM_TO_SAVE_START;
 		IntBbox bbox = new IntBbox();
@@ -1176,8 +1177,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
                 }
 
 				int[] bboxObj = decodeBbox(rs.getString(8));
+				boolean wikidata = additionalTags.keySet().stream().anyMatch(t -> "wikidata".equals(t.getTag()));
 				PoiNameObject obj = new PoiNameObject(prevTree.getNode(), poiIndInBlock, elo, type, subtype,
-						encoded, bboxObj);
+						encoded, bboxObj, wikidata);
 				putPoiObjectPrefix(namesIndex, obj, additionalTags.get(nameRuleType),
 						additionalTags.get(nameEnRuleType), otherNames, idNames, settings);
 			} else {
