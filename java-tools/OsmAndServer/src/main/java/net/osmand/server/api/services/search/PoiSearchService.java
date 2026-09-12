@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import net.osmand.CollatorStringMatcher;
+import net.osmand.NativeLibrary.RenderedObject;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryIndexPart;
 import net.osmand.binary.BinaryMapIndexReader;
@@ -37,6 +38,9 @@ import net.osmand.data.QuadRect;
 import net.osmand.osm.PoiType;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiCategory;
+import net.osmand.osm.edit.Entity.EntityType;
+import net.osmand.osm.edit.EntityParser;
+import net.osmand.osm.edit.Node;
 import net.osmand.search.core.ObjectType;
 import net.osmand.search.core.SearchResult;
 import net.osmand.search.core.spatial.SpatialPoiSearch;
@@ -45,6 +49,7 @@ import net.osmand.search.core.spatial.SpatialSearchResult;
 import net.osmand.search.core.spatial.SpatialTextSearch.SpatialSearchResults;
 import net.osmand.search.core.spatial.SpatialTextSearch.SpatialTextSearchSettings;
 import net.osmand.server.api.services.OsmAndMapsService;
+import net.osmand.server.api.services.TransportStopsService;
 import net.osmand.server.api.services.WikiService;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import net.osmand.server.controllers.pub.GeojsonClasses.FeatureCollection;
@@ -78,6 +83,12 @@ public class PoiSearchService {
 
 	@Autowired
 	private SearchResultConverter searchResultConverter;
+
+	@Autowired
+	private TransportStopsService transportStopsService;
+
+	@Autowired
+	private PoiTypesService poiTypesService;
 
 	public static class PoiSearchResult {
 
@@ -492,11 +503,15 @@ public class PoiSearchService {
 	}
 
 	public Feature searchPoiByOsmId(LatLon loc, long osmid, String type, String timeZone) throws IOException {
-		final String RELATION_TYPE = "3";
-		final double RELATION_SEARCH_RADIUS = 0.0055; // ~600 meters
-		final double OTHER_POI_SEARCH_RADIUS = 0.0001; // ~11 meters
-		double radiusDegree = type.equals(RELATION_TYPE) ? RELATION_SEARCH_RADIUS : OTHER_POI_SEARCH_RADIUS;
-		return searchSinglePoi(loc, radiusDegree, new ResultMatcher<>() {
+		final String NODE_TYPE = "1";
+		return searchPoiByOsmId(loc, osmid, NODE_TYPE.equals(type) ? EntityType.NODE : EntityType.WAY, timeZone);
+	}
+
+	private Feature searchPoiByOsmId(LatLon loc, long osmid, EntityType type, String timeZone) throws IOException {
+		final double WAY_SEARCH_RADIUS = 0.0055; // ~600 meters, way/relation amenity is located at its centroid
+		final double NODE_SEARCH_RADIUS = 0.0001; // ~11 meters
+		double radiusDegree = type == EntityType.NODE ? NODE_SEARCH_RADIUS : WAY_SEARCH_RADIUS;
+		SearchResult res = searchSinglePoi(loc, radiusDegree, new ResultMatcher<>() {
 			@Override
 			public boolean publish(Amenity amenity) {
 				return ObfConstants.getOsmObjectId(amenity) == osmid;
@@ -506,12 +521,47 @@ public class PoiSearchService {
 			public boolean isCancelled() {
 				return false;
 			}
-		}, timeZone);
+		});
+		return res != null ? getMapObjectFeature(res, timeZone) : null;
+	}
+
+	private Feature getMapObjectFeature(SearchResult res, String timeZone) throws IOException {
+		Feature feature = searchResultConverter.getPoiFeature(res, timeZone);
+		Amenity amenity = (Amenity) res.object;
+		if (transportStopsService.isPublicTransportStop(amenity)) {
+			Long stopId = transportStopsService.findBestTransportStopId(amenity);
+			if (stopId != null) {
+				feature.prop(SearchResultConverter.PoiTypeField.TRANSPORT_STOP_ID.getFieldName(), stopId);
+			}
+		}
+		return feature;
+	}
+
+	// vector tile object: POI from the index by its osm id, else (no_indx types, buildings, ...) an amenity from its tags as the map creator does
+	public Feature getPoiByMapObject(long mapObjectId, LatLon loc, Map<String, String> tags, String timeZone) throws IOException {
+		RenderedObject renderedObject = new RenderedObject();
+		renderedObject.setId(mapObjectId);
+		long osmId = ObfConstants.getOsmObjectId(renderedObject);
+		EntityType entityType = ObfConstants.getOsmEntityType(renderedObject);
+		Feature feature = searchPoiByOsmId(loc, osmId, entityType, timeZone);
+		if (feature != null || tags.isEmpty()) {
+			return feature;
+		}
+		MapPoiTypes poiTypes = poiTypesService.getMapPoiTypes(PoiTypesService.DEFAULT_SEARCH_LANG);
+		Node node = new Node(loc.getLatitude(), loc.getLongitude(), -1);
+		List<Amenity> amenities = EntityParser.parseAmenities(poiTypes, node, tags, new ArrayList<>(), false);
+		if (amenities.isEmpty()) {
+			return null;
+		}
+		Amenity amenity = amenities.get(0);
+		amenity.setId(ObfConstants.createMapObjectIdFromCleanOsmId(osmId, entityType));
+		return getMapObjectFeature(
+				searchResultConverter.buildPoiSearchResult(amenity, PoiTypesService.DEFAULT_SEARCH_LANG, ""), timeZone);
 	}
 
 	public Feature searchPoiByEnName(LatLon loc, String enName) throws IOException {
 		final double SEARCH_RADIUS_DEGREE = 0.0001;
-		return searchSinglePoi(loc, SEARCH_RADIUS_DEGREE, new ResultMatcher<>() {
+		SearchResult res = searchSinglePoi(loc, SEARCH_RADIUS_DEGREE, new ResultMatcher<>() {
 			@Override
 			public boolean publish(Amenity amenity) {
 				return amenity.getEnName(false).equals(enName);
@@ -521,10 +571,11 @@ public class PoiSearchService {
 			public boolean isCancelled() {
 				return false;
 			}
-		}, null);
+		});
+		return res != null ? searchResultConverter.getPoiFeature(res, null) : null;
 	}
 
-	private Feature searchSinglePoi(LatLon loc, double radiusDegree, ResultMatcher<Amenity> matcher, String timeZone)
+	private SearchResult searchSinglePoi(LatLon loc, double radiusDegree, ResultMatcher<Amenity> matcher)
 			throws IOException {
 		final int mapZoom = 15;
 		LatLon p1 = new LatLon(loc.getLatitude() + radiusDegree, loc.getLongitude() - radiusDegree);
@@ -533,9 +584,8 @@ public class PoiSearchService {
 				MapUtils.get31TileNumberX(p1.getLongitude()), MapUtils.get31TileNumberX(p2.getLongitude()),
 				MapUtils.get31TileNumberY(p1.getLatitude()), MapUtils.get31TileNumberY(p2.getLatitude()), mapZoom,
 				BinaryMapIndexReader.ACCEPT_ALL_POI_TYPE_FILTER, matcher);
-		SearchResult res = searchPoiByReq(req, p1, p2, false);
 
-		return res != null ? searchResultConverter.getPoiFeature(res, timeZone) : null;
+		return searchPoiByReq(req, p1, p2, false);
 	}
 
 	private SearchResult searchPoiByReq(BinaryMapIndexReader.SearchRequest<Amenity> req, LatLon p1, LatLon p2,
