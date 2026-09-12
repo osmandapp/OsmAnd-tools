@@ -308,6 +308,8 @@ public class DownloadOsmGPX {
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS speed_matches_activity boolean");
 			// activity written in the file itself (osmand:activity), kept apart from the computed activity
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS file_activity text");
+			// rule that set activity: file, keyword, speed, garbage, error
+			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS activity_source text");
 			// facts from one GPX parse, so classification rules can change without parsing again (see computeTrackStats)
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS track_stats json");
 
@@ -426,10 +428,11 @@ public class DownloadOsmGPX {
 		PreparedStatement updateStmtMetrics = dbConn.prepareStatement(
 				"UPDATE " + GPX_METADATA_TABLE_NAME + " SET activity = ?, speed = ?, distance = ?, points = ?, " +
 						"max_speed = ?, max_dist_between_points = ?, time_minutes = ?, waypoints = ?, " +
-						"simplified_geometry = ?, speed_matches_activity = ?, file_activity = ?, track_stats = ?::json WHERE id = ?"
+						"simplified_geometry = ?, speed_matches_activity = ?, file_activity = ?, track_stats = ?::json, " +
+						"activity_source = ? WHERE id = ?"
 		);
 		PreparedStatement updateStmtActivityOnly = dbConn.prepareStatement(
-				"UPDATE " + GPX_METADATA_TABLE_NAME + " SET activity = ? WHERE id = ?"
+				"UPDATE " + GPX_METADATA_TABLE_NAME + " SET activity = ?, activity_source = ?, track_stats = ?::json WHERE id = ?"
 		);
 
 		final int TRACK_TIMEOUT_SEC = 120;
@@ -474,6 +477,7 @@ public class DownloadOsmGPX {
 						byte[] simplifiedGeometry = null;
 						String fileActivity = null;
 						String trackStats = null;
+						String errorReason = null;
 						byte[] bytes = null;
 						try (Statement dataStmt = dbConn.createStatement();
 						     ResultSet rf = dataStmt.executeQuery(
@@ -486,6 +490,7 @@ public class DownloadOsmGPX {
 
 						if (bytes == null) {
 							activity = ERROR_ACTIVITY_TYPE;
+							errorReason = "no_data";
 						} else {
 							final byte[] trackBytes = bytes;
 							Future<TrackData> future = trackExec.submit(() -> computeTrackData(trackBytes));
@@ -495,6 +500,7 @@ public class DownloadOsmGPX {
 								analysis = d.analysis;
 								if (d.error) {
 									activity = ERROR_ACTIVITY_TYPE;
+									errorReason = d.errorReason;
 								} else {
 									pointsCount = d.pointsCount;
 									distanceMeters = d.distanceMeters;
@@ -514,21 +520,31 @@ public class DownloadOsmGPX {
 								future.cancel(true);
 								LOG.error("Timeout (>" + TRACK_TIMEOUT_SEC + "s) processing id=" + id + ", marking as error");
 								activity = ERROR_ACTIVITY_TYPE;
+								errorReason = "timeout";
 							} catch (Exception e) {
 								LOG.error("Error processing id=" + id, e);
 								activity = ERROR_ACTIVITY_TYPE;
+								errorReason = e.getClass().getSimpleName();
 							}
 						}
 
+						String activitySource = null;
+						if (activity != null) {
+							activitySource = GarbageClassifier.isGarbage(activity) ? "garbage" : "error";
+						}
+						// each step runs only when the previous ones found nothing, so the last source set is the one used
 						if (activity == null) {
 							activity = getActivityByRouteActivity(gpxFile, activitiesMap);
+							activitySource = "file";
 						}
 						if (activity == null) {
 							activity = analyzeActivity(rs, activitiesMap);
+							activitySource = "keyword";
 						}
 						Boolean speedMatches = speedMatchesActivity(activity, avgSpeedKmh, maxSpeedKmh);
 						if (activity == null) {
 							activity = analyzeActivityFromGpx(analysis, avgSpeedKmh, maxSpeedKmh);
+							activitySource = "speed";
 						}
 
 						if (!GarbageClassifier.isGarbage(activity) && !ERROR_ACTIVITY_TYPE.equals(activity)) {
@@ -548,11 +564,14 @@ public class DownloadOsmGPX {
 							updateStmtMetrics.setObject(10, speedMatches, Types.BOOLEAN);
 							updateStmtMetrics.setString(11, fileActivity);
 							updateStmtMetrics.setString(12, trackStats);
-							updateStmtMetrics.setLong(13, id);
+							updateStmtMetrics.setString(13, activitySource);
+							updateStmtMetrics.setLong(14, id);
 							updateStmtMetrics.addBatch();
 						} else {
 							updateStmtActivityOnly.setString(1, activity);
-							updateStmtActivityOnly.setLong(2, id);
+							updateStmtActivityOnly.setString(2, activitySource);
+							updateStmtActivityOnly.setString(3, errorTrackStats(errorReason));
+							updateStmtActivityOnly.setLong(4, id);
 							updateStmtActivityOnly.addBatch();
 						}
 
@@ -602,11 +621,14 @@ public class DownloadOsmGPX {
 		} catch (IOException e) {
 			LOG.error("Error loading GPX file", e);
 			d.error = true;
+			d.errorReason = e.getClass().getSimpleName();
 			return d;
 		}
 		d.gpxFile = gpxFile;
 		if (gpxFile.getError() != null) {
 			d.error = true;
+			Throwable error = gpxFile.getError();
+			d.errorReason = error.getMessage() != null ? error.getMessage() : error.getClass().getSimpleName();
 			return d;
 		}
 		GpxTrackAnalysis analysis = gpxFile.getAnalysis(System.currentTimeMillis());
@@ -688,6 +710,27 @@ public class DownloadOsmGPX {
 			stats.put("interval_median_s", intervalsMs[intervals / 2] / 1000d); // sampling rate
 			stats.put("interval_max_s", intervalsMs[intervals - 1] / 1000d);
 		}
+		return toJson(stats);
+	}
+
+	// track_stats for rows marked error: why, so they can be counted and retried when the reason is fixable
+	static String errorTrackStats(String reason) {
+		Map<String, Object> stats = new LinkedHashMap<>();
+		stats.put("v", TRACK_STATS_VERSION);
+		if (reason != null) {
+			// parser messages carry a position or a parser instance, drop them to group rows by reason
+			for (String tail : new String[] {" (position:", " in org.kxml2"}) {
+				int i = reason.indexOf(tail);
+				if (i > 0) {
+					reason = reason.substring(0, i);
+				}
+			}
+			stats.put("error", reason);
+		}
+		return toJson(stats);
+	}
+
+	private static String toJson(Map<String, Object> stats) {
 		try {
 			return JSON_MAPPER.writeValueAsString(stats);
 		} catch (IOException e) {
@@ -724,12 +767,8 @@ public class DownloadOsmGPX {
 							movingTimeMs += dtMs;
 							coordMaxMps = Math.max(coordMaxMps, speedMps);
 						}
-						anchor = p;
-					} else if (dtMs < 0) {
-						anchor = p; // clock went back: measure from here
 					}
-					// otherwise keep the anchor: moving it on every point would never reach MIN_SPEED_INTERVAL_MS
-					// on tracks sampled faster than 2 Hz, and their speed stayed 0
+					anchor = p;
 				}
 			}
 		}
@@ -756,6 +795,7 @@ public class DownloadOsmGPX {
 		byte[] simplifiedGeometry;
 		String fileActivity;
 		String trackStats;
+		String errorReason;
 	}
 
 	private String getActivityByRouteActivity(GpxFile gpxFile, Map<String, List<String>> activitiesMap) {
