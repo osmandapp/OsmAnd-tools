@@ -17,10 +17,7 @@ public final class GarbageClassifier {
 	// The "garbage" category and all its concrete subtypes.
 	public static final Set<String> TYPES = Set.of(GARBAGE, SHORT, SPARSE, TELEPORT);
 
-	private static final int MIN_POINTS = 10;
-	private static final int MIN_DISTANCE = 200;
-	private static final double GAP_MAX_SPEED_KMH = 1200; // above any airliner: crossing a gap faster = teleport = garbage
-	private static final int TELEPORT_GAP_MIN_DISTANCE = 1000; // skip teleport check unless the largest gap exceeds this (m)
+	private static final double GAP_MAX_SPEED_KMH = 1200; // above any airliner: crossing a gap faster = teleport
 	private static final long MIN_SPEED_INTERVAL_MS = 500; // min elapsed time to trust a speed sample
 
 	private GarbageClassifier() {
@@ -28,20 +25,6 @@ public final class GarbageClassifier {
 
 	public static boolean isGarbage(String activity) {
 		return activity != null && activity.startsWith(GARBAGE);
-	}
-
-	// points of the track, distance and the largest gap between points in meters, teleport: hasTeleportGap(track)
-	static String classify(int points, double distance, double maxDistBetweenPoints, boolean teleport) {
-		if (points < MIN_POINTS) {
-			return SPARSE;
-		}
-		if (distance < MIN_DISTANCE) {
-			return SHORT;
-		}
-		if (maxDistBetweenPoints > TELEPORT_GAP_MIN_DISTANCE && teleport) {
-			return TELEPORT;
-		}
-		return null;
 	}
 
 	static boolean hasTeleportGap(GpxFile gpxFile) {
