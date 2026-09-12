@@ -167,6 +167,16 @@ public class DownloadOsmGPX {
 	private static final long SPEED_WINDOW_STANDING_MS = 120_000; // a window this long counts even if it moved less
 	private static final long SPEED_WINDOW_MAX_MS = 600_000; // longer gaps are pauses, not movement
 	private static final double MOVING_MIN_KMH = 1;
+	// cleaning: a jump is a step of more than 1 km faster than 300 km/h (more than 5 km without time), a spike jumps out
+	// and back with the ends closer than 30% of the way; pieces split at jumps and pauses, short pieces are dropped
+	private static final double NOISE_JUMP_KMH = 300;
+	private static final double NOISE_JUMP_MIN_M = 1000;
+	private static final double NOISE_UNTIMED_JUMP_M = 5000;
+	private static final double NOISE_SPIKE_RETURN_RATIO = 0.3;
+	private static final long CLEAN_PAUSE_MS = 600_000;
+	private static final double CLEAN_PAUSE_MIN_M = 500;
+	private static final int CLEAN_MIN_PIECE_POINTS = 10;
+	private static final double CLEAN_MIN_PIECE_M = 200;
 
 	private static final String GPX_FILE_PREIX = "OG";
 	private final RouteActivityHelper routeActivityHelper = RouteActivityHelper.INSTANCE;
@@ -843,18 +853,18 @@ public class DownloadOsmGPX {
 			d.timeMinutes = (int) (timeSpanMs / 60000d);
 		}
 		d.waypointsCount = gpxFile.getPointsList().size();
-		d.simplifiedGeometry = TrackSimplifyEncoder.encodeGeometry(
-				TrackSimplifyEncoder.simplifyGpx(gpxFile, TrackSimplifyEncoder.SIMPLIFY_ZOOM));
+		CleanTrack clean = cleanTrack(gpxFile);
+		d.simplifiedGeometry = encodeGeometry(gpxFile, clean);
 
 		d.hasSpeed = analysis.getHasSpeedInTrack();
 		d.teleport = GarbageClassifier.hasTeleportGap(gpxFile);
 		d.fileActivity = gpxFile.getMetadata().getExtensionsToRead().get(GpxUtilities.ACTIVITY_TYPE);
-		d.trackStats = computeTrackStats(gpxFile, analysis, d.teleport);
+		d.trackStats = computeTrackStats(gpxFile, analysis, d.teleport, clean);
 		return d;
 	}
 
 	// JSON for the track_stats column. Add keys and bump TRACK_STATS_VERSION instead of adding table columns.
-	static String computeTrackStats(GpxFile gpxFile, GpxTrackAnalysis analysis, boolean teleport) {
+	static String computeTrackStats(GpxFile gpxFile, GpxTrackAnalysis analysis, boolean teleport, CleanTrack clean) {
 		int points = 0;
 		for (Track track : gpxFile.getTracks(false)) {
 			for (TrkSegment seg : track.getSegments()) {
@@ -918,38 +928,179 @@ public class DownloadOsmGPX {
 			stats.put("ele_up", Math.round(analysis.getDiffElevationUp()));
 			stats.put("ele_down", Math.round(analysis.getDiffElevationDown()));
 		}
-		putWindowSpeeds(gpxFile, stats);
+		stats.put("invalid_points", clean.invalidPoints);
+		stats.put("frozen_points", clean.frozenPoints);
+		stats.put("time_back", clean.timeBack);
+		stats.put("spikes", clean.spikes);
+		stats.put("jumps", clean.jumps);
+		stats.put("jump_m", Math.round(clean.jumpM));
+		stats.put("pauses", clean.pauses);
+		stats.put("pieces", clean.pieces.size());
+		stats.put("dropped_pieces", clean.droppedPieces);
+		stats.put("clean_points", clean.points);
+		stats.put("clean_distance_m", Math.round(clean.distanceM));
+		// frozen points are ordinary stops and pauses are not errors; noisy tracks can get a better cleaning later:
+		// parse_tracks --force --where="(track_stats->>'noisy')::boolean"
+		stats.put("noisy", clean.invalidPoints + clean.timeBack + clean.spikes + clean.jumps > 0);
+		putWindowSpeeds(clean.pieces, stats);
 		return toJson(stats);
 	}
 
-	// Speeds over windows of >= SPEED_WINDOW_MIN_MS and >= SPEED_WINDOW_MIN_M: time-weighted percentiles and the share of
-	// moving time and distance per SPEED_BINS_KMH bin, so speed thresholds can change without parsing again
-	static void putWindowSpeeds(GpxFile gpxFile, Map<String, Object> stats) {
-		List<double[]> windows = new ArrayList<>(); // km/h, seconds, meters of moving windows
-		double totalS = 0;
+	// the track without invalid points, frozen duplicates, spikes, jumps and long pauses, and what was removed
+	static class CleanTrack {
+		final List<List<WptPt>> pieces = new ArrayList<>();
+		int invalidPoints;
+		int frozenPoints;
+		int timeBack;
+		int spikes;
+		int jumps;
+		int pauses;
+		int droppedPieces;
+		int points;
+		double jumpM;
+		double distanceM;
+	}
+
+	static CleanTrack cleanTrack(GpxFile gpxFile) {
+		CleanTrack clean = new CleanTrack();
 		for (Track track : gpxFile.getTracks(false)) {
 			for (TrkSegment seg : track.getSegments()) {
-				WptPt anchor = null;
+				List<WptPt> points = new ArrayList<>();
 				for (WptPt p : seg.getPoints()) {
-					if (p.getTime() <= 0) {
-						continue;
-					}
-					long dtMs = anchor == null ? 0 : p.getTime() - anchor.getTime();
-					if (anchor == null || dtMs < 0) {
-						anchor = p;
-						continue;
-					}
-					double dist = MapUtils.getDistance(anchor.getLat(), anchor.getLon(), p.getLat(), p.getLon());
-					if (dtMs >= SPEED_WINDOW_MIN_MS && (dist >= SPEED_WINDOW_MIN_M || dtMs >= SPEED_WINDOW_STANDING_MS)) {
-						if (dtMs < SPEED_WINDOW_MAX_MS) {
-							totalS += dtMs / 1000d;
-							double kmh = dist / dtMs * 3_600; // m/ms -> km/h
-							if (kmh > MOVING_MIN_KMH) {
-								windows.add(new double[] {kmh, dtMs / 1000d, dist});
-							}
+					WptPt last = points.isEmpty() ? null : points.get(points.size() - 1);
+					if (!(Math.abs(p.getLat()) <= 90 && Math.abs(p.getLon()) <= 180)
+							|| (Math.abs(p.getLat()) < 0.01 && Math.abs(p.getLon()) < 0.01)) {
+						clean.invalidPoints++;
+					} else if (last != null && p.getLat() == last.getLat() && p.getLon() == last.getLon()) {
+						clean.frozenPoints++;
+					} else {
+						if (last != null && p.getTime() > 0 && p.getTime() < last.getTime()) {
+							clean.timeBack++;
 						}
-						anchor = p;
+						points.add(p);
 					}
+				}
+				splitPieces(removeSpikes(points, clean), clean);
+			}
+		}
+		return clean;
+	}
+
+	private static List<WptPt> removeSpikes(List<WptPt> points, CleanTrack clean) {
+		List<WptPt> res = new ArrayList<>(points.size());
+		for (WptPt p : points) {
+			int n = res.size();
+			if (n >= 2) {
+				WptPt from = res.get(n - 2);
+				WptPt spike = res.get(n - 1);
+				double outM = distance(from, spike);
+				double backM = distance(spike, p);
+				if (outM > NOISE_JUMP_MIN_M && backM > NOISE_JUMP_MIN_M
+						&& kmh(from, spike, outM) > NOISE_JUMP_KMH && kmh(spike, p, backM) > NOISE_JUMP_KMH
+						&& distance(from, p) < NOISE_SPIKE_RETURN_RATIO * (outM + backM)) {
+					res.remove(n - 1);
+					clean.spikes++;
+				}
+			}
+			res.add(p);
+		}
+		return res;
+	}
+
+	private static void splitPieces(List<WptPt> points, CleanTrack clean) {
+		List<WptPt> piece = new ArrayList<>();
+		double pieceM = 0;
+		for (WptPt p : points) {
+			if (!piece.isEmpty()) {
+				WptPt prev = piece.get(piece.size() - 1);
+				double stepM = distance(prev, p);
+				boolean timed = prev.getTime() > 0 && p.getTime() > 0;
+				boolean jump = timed ? stepM > NOISE_JUMP_MIN_M && kmh(prev, p, stepM) > NOISE_JUMP_KMH : stepM > NOISE_UNTIMED_JUMP_M;
+				boolean pause = timed && p.getTime() - prev.getTime() > CLEAN_PAUSE_MS && stepM > CLEAN_PAUSE_MIN_M;
+				if (jump) {
+					clean.jumps++;
+					clean.jumpM += stepM;
+				} else if (pause) {
+					clean.pauses++;
+				}
+				if (jump || pause) {
+					keepPiece(piece, pieceM, clean);
+					piece = new ArrayList<>();
+					pieceM = 0;
+				} else {
+					pieceM += stepM;
+				}
+			}
+			piece.add(p);
+		}
+		keepPiece(piece, pieceM, clean);
+	}
+
+	private static void keepPiece(List<WptPt> piece, double pieceM, CleanTrack clean) {
+		if (piece.size() >= CLEAN_MIN_PIECE_POINTS && pieceM >= CLEAN_MIN_PIECE_M) {
+			clean.pieces.add(piece);
+			clean.points += piece.size();
+			clean.distanceM += pieceM;
+		} else if (!piece.isEmpty()) {
+			clean.droppedPieces++;
+		}
+	}
+
+	// simplified geometry of the cleaned pieces; the raw line when nothing survives cleaning, so the track stays visible
+	private static byte[] encodeGeometry(GpxFile gpxFile, CleanTrack clean) {
+		if (clean.pieces.isEmpty()) {
+			return TrackSimplifyEncoder.encodeGeometry(TrackSimplifyEncoder.simplifyGpx(gpxFile, TrackSimplifyEncoder.SIMPLIFY_ZOOM));
+		}
+		GpxFile cleaned = new GpxFile(null);
+		Track track = new Track();
+		cleaned.getTracks().add(track);
+		for (List<WptPt> piece : clean.pieces) {
+			TrkSegment seg = new TrkSegment();
+			seg.getPoints().addAll(TrackSimplifyEncoder.simplifyPoints(piece, TrackSimplifyEncoder.SIMPLIFY_ZOOM));
+			track.getSegments().add(seg);
+		}
+		return TrackSimplifyEncoder.encodeGeometry(cleaned);
+	}
+
+	private static double distance(WptPt a, WptPt b) {
+		return MapUtils.getDistance(a.getLat(), a.getLon(), b.getLat(), b.getLon());
+	}
+
+	// km/h between two points; 0 without timestamps or when the clock went back
+	private static double kmh(WptPt from, WptPt to, double meters) {
+		long dtMs = to.getTime() - from.getTime();
+		if (from.getTime() <= 0 || to.getTime() <= 0 || dtMs < 0) {
+			return 0;
+		}
+		return dtMs == 0 ? Double.POSITIVE_INFINITY : meters / dtMs * 3_600;
+	}
+
+	// Speeds of the cleaned pieces over windows of >= SPEED_WINDOW_MIN_MS and >= SPEED_WINDOW_MIN_M: time-weighted percentiles and the share of
+	// moving time and distance per SPEED_BINS_KMH bin, so speed thresholds can change without parsing again
+	static void putWindowSpeeds(List<List<WptPt>> pieces, Map<String, Object> stats) {
+		List<double[]> windows = new ArrayList<>(); // km/h, seconds, meters of moving windows
+		double totalS = 0;
+		for (List<WptPt> piece : pieces) {
+			WptPt anchor = null;
+			for (WptPt p : piece) {
+				if (p.getTime() <= 0) {
+					continue;
+				}
+				long dtMs = anchor == null ? 0 : p.getTime() - anchor.getTime();
+				if (anchor == null || dtMs < 0) {
+					anchor = p;
+					continue;
+				}
+				double dist = distance(anchor, p);
+				if (dtMs >= SPEED_WINDOW_MIN_MS && (dist >= SPEED_WINDOW_MIN_M || dtMs >= SPEED_WINDOW_STANDING_MS)) {
+					if (dtMs < SPEED_WINDOW_MAX_MS) {
+						totalS += dtMs / 1000d;
+						double kmh = dist / dtMs * 3_600; // m/ms -> km/h
+						if (kmh > MOVING_MIN_KMH) {
+							windows.add(new double[] {kmh, dtMs / 1000d, dist});
+						}
+					}
+					anchor = p;
 				}
 			}
 		}
