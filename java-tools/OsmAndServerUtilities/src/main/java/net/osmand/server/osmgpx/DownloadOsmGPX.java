@@ -48,6 +48,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import net.osmand.obf.ToolsOsmAndContextImpl;
 import net.osmand.shared.data.KQuadRect;
 import net.osmand.shared.gpx.RouteActivityHelper;
+import net.osmand.shared.gpx.primitives.Route;
 import net.osmand.shared.gpx.primitives.RouteActivity;
 import net.osmand.shared.gpx.primitives.Track;
 import net.osmand.shared.gpx.primitives.TrkSegment;
@@ -152,6 +153,8 @@ public class DownloadOsmGPX {
 	private static final long MIN_SPEED_INTERVAL_MS = 500; // min elapsed time to trust a speed sample
 	private static final double MIN_MOVING_SPEED_MPS = 0.1; // below this the interval counts as standing still
 	private static final int SRID_WGS84 = 4326;
+	private static final int TRACK_STATS_VERSION = 1;
+	private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
 
 	private static final String GPX_FILE_PREIX = "OG";
 	private final RouteActivityHelper routeActivityHelper = RouteActivityHelper.INSTANCE;
@@ -303,6 +306,10 @@ public class DownloadOsmGPX {
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS waypoints integer");
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS simplified_geometry bytea");
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS speed_matches_activity boolean");
+			// activity written in the file itself (osmand:activity), kept apart from the computed activity
+			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS file_activity text");
+			// facts from one GPX parse, so classification rules can change without parsing again (see computeTrackStats)
+			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS track_stats json");
 
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_speed ON " + GPX_METADATA_TABLE_NAME + " (speed)");
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_distance ON " + GPX_METADATA_TABLE_NAME + " (distance)");
@@ -419,7 +426,7 @@ public class DownloadOsmGPX {
 		PreparedStatement updateStmtMetrics = dbConn.prepareStatement(
 				"UPDATE " + GPX_METADATA_TABLE_NAME + " SET activity = ?, speed = ?, distance = ?, points = ?, " +
 						"max_speed = ?, max_dist_between_points = ?, time_minutes = ?, waypoints = ?, " +
-						"simplified_geometry = ?, speed_matches_activity = ? WHERE id = ?"
+						"simplified_geometry = ?, speed_matches_activity = ?, file_activity = ?, track_stats = ?::json WHERE id = ?"
 		);
 		PreparedStatement updateStmtActivityOnly = dbConn.prepareStatement(
 				"UPDATE " + GPX_METADATA_TABLE_NAME + " SET activity = ? WHERE id = ?"
@@ -465,6 +472,8 @@ public class DownloadOsmGPX {
 						int timeMinutes = 0;
 						int waypointsCount = 0;
 						byte[] simplifiedGeometry = null;
+						String fileActivity = null;
+						String trackStats = null;
 						byte[] bytes = null;
 						try (Statement dataStmt = dbConn.createStatement();
 						     ResultSet rf = dataStmt.executeQuery(
@@ -495,6 +504,8 @@ public class DownloadOsmGPX {
 									timeMinutes = d.timeMinutes;
 									waypointsCount = d.waypointsCount;
 									simplifiedGeometry = d.simplifiedGeometry;
+									fileActivity = d.fileActivity;
+									trackStats = d.trackStats;
 									if (d.garbageType != null) {
 										activity = d.garbageType;
 									}
@@ -535,7 +546,9 @@ public class DownloadOsmGPX {
 							updateStmtMetrics.setInt(8, waypointsCount);
 							updateStmtMetrics.setBytes(9, simplifiedGeometry);
 							updateStmtMetrics.setObject(10, speedMatches, Types.BOOLEAN);
-							updateStmtMetrics.setLong(11, id);
+							updateStmtMetrics.setString(11, fileActivity);
+							updateStmtMetrics.setString(12, trackStats);
+							updateStmtMetrics.setLong(13, id);
 							updateStmtMetrics.addBatch();
 						} else {
 							updateStmtActivityOnly.setString(1, activity);
@@ -613,7 +626,74 @@ public class DownloadOsmGPX {
 				TrackSimplifyEncoder.simplifyGpx(gpxFile, TrackSimplifyEncoder.SIMPLIFY_ZOOM));
 
 		d.garbageType = GarbageClassifier.classify(gpxFile, analysis);
+		d.fileActivity = gpxFile.getMetadata().getExtensionsToRead().get(GpxUtilities.ACTIVITY_TYPE);
+		d.trackStats = computeTrackStats(gpxFile);
 		return d;
+	}
+
+	// JSON for the track_stats column. Add keys and bump TRACK_STATS_VERSION instead of adding table columns.
+	static String computeTrackStats(GpxFile gpxFile) {
+		int points = 0;
+		for (Track track : gpxFile.getTracks(false)) {
+			for (TrkSegment seg : track.getSegments()) {
+				points += seg.getPoints().size();
+			}
+		}
+		int segments = 0;
+		int timed = 0;
+		int intervals = 0;
+		long[] intervalsMs = new long[Math.max(points, 1)];
+		long startTime = Long.MAX_VALUE;
+		long endTime = 0;
+		for (Track track : gpxFile.getTracks(false)) {
+			for (TrkSegment seg : track.getSegments()) {
+				if (seg.getPoints().isEmpty()) {
+					continue;
+				}
+				segments++;
+				long prevTime = 0;
+				for (WptPt p : seg.getPoints()) {
+					long t = p.getTime();
+					if (t <= 0) {
+						continue;
+					}
+					timed++;
+					startTime = Math.min(startTime, t);
+					endTime = Math.max(endTime, t);
+					if (prevTime > 0 && t > prevTime) {
+						intervalsMs[intervals++] = t - prevTime;
+					}
+					prevTime = t;
+				}
+			}
+		}
+		int routePoints = 0;
+		for (Route route : gpxFile.getRoutes()) {
+			routePoints += route.getPoints().size();
+		}
+		Map<String, Object> stats = new LinkedHashMap<>();
+		stats.put("v", TRACK_STATS_VERSION);
+		if (!Algorithms.isEmpty(gpxFile.getAuthor())) {
+			stats.put("creator", gpxFile.getAuthor()); // app that wrote the file: openpilot car logs, GPSies plans
+		}
+		stats.put("segments", segments);
+		stats.put("route_points", routePoints); // planned route instead of a recording
+		stats.put("time_frac", points > 0 ? Math.round(timed * 1000d / points) / 1000d : 0);
+		if (timed > 0) {
+			stats.put("start_time", startTime / 1000); // recording time, the date column is the upload date
+			stats.put("end_time", endTime / 1000);
+		}
+		if (intervals > 0) {
+			Arrays.sort(intervalsMs, 0, intervals);
+			stats.put("interval_median_s", intervalsMs[intervals / 2] / 1000d); // sampling rate
+			stats.put("interval_max_s", intervalsMs[intervals - 1] / 1000d);
+		}
+		try {
+			return JSON_MAPPER.writeValueAsString(stats);
+		} catch (IOException e) {
+			LOG.error("Error writing track stats", e);
+			return null;
+		}
 	}
 
 	// Measures each move from the last distinct position (skipping frozen duplicate coordinates),
@@ -644,8 +724,12 @@ public class DownloadOsmGPX {
 							movingTimeMs += dtMs;
 							coordMaxMps = Math.max(coordMaxMps, speedMps);
 						}
+						anchor = p;
+					} else if (dtMs < 0) {
+						anchor = p; // clock went back: measure from here
 					}
-					anchor = p;
+					// otherwise keep the anchor: moving it on every point would never reach MIN_SPEED_INTERVAL_MS
+					// on tracks sampled faster than 2 Hz, and their speed stayed 0
 				}
 			}
 		}
@@ -670,6 +754,8 @@ public class DownloadOsmGPX {
 		float maxSpeedKmh;
 		float maxDistBetweenPoints;
 		byte[] simplifiedGeometry;
+		String fileActivity;
+		String trackStats;
 	}
 
 	private String getActivityByRouteActivity(GpxFile gpxFile, Map<String, List<String>> activitiesMap) {
