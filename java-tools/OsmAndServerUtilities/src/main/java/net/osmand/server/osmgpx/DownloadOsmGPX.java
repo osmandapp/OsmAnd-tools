@@ -127,11 +127,15 @@ public class DownloadOsmGPX {
 	private static final double MIN_MOVING_SPEED_MPS = 0.1; // below this the interval counts as standing still
 	private static final int SRID_WGS84 = 4326;
 	private static final int TRACK_STATS_VERSION = 1;
+	// tracks parse_tracks still has to parse; also the idx_osm_gpx_parse_v* predicate, the query must use the same text
+	private static final String OUTDATED_STATS_CONDITION =
+			"track_stats IS NULL OR COALESCE((track_stats->>'v')::int, 0) < " + TRACK_STATS_VERSION;
 	private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
 	private static final int PARSE_BATCH_LIMIT = 1000;
 	private static final int LARGE_GPX_BYTES = 5 << 20; // compressed; larger files are parsed one at a time
 	private static final int CLASSIFY_BATCH_LIMIT = 10000;
 	private static final long TRACK_TIMEOUT_MS = 120_000;
+	private static final long PROGRESS_LOG_MS = 60_000;
 	// lower edges (km/h) of the speed_hist_time / speed_hist_dist bins in track_stats
 	private static final double[] SPEED_BINS_KMH = {1, 3, 5, 7, 9, 12, 16, 20, 25, 32, 45, 60, 90, 130, 180, 300};
 	private static final long SPEED_WINDOW_MIN_MS = 10_000; // windows of >= 10 s and >= 30 m smooth out GPS jitter
@@ -322,6 +326,11 @@ public class DownloadOsmGPX {
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS activity_source text");
 			// facts from one GPX parse, so classification rules can change without parsing again (see computeTrackStats)
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS track_stats json");
+			// ids of the tracks parse_tracks still has to parse: a restarted run starts at once instead of reading
+			// the parsed rows; built once per TRACK_STATS_VERSION, a parsed track leaves it
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_parse_v" + TRACK_STATS_VERSION
+					+ " ON " + GPX_METADATA_TABLE_NAME + " (id) WHERE " + OUTDATED_STATS_CONDITION);
+			statement.executeUpdate("DROP INDEX IF EXISTS idx_osm_gpx_parse_v" + (TRACK_STATS_VERSION - 1));
 
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_speed ON " + GPX_METADATA_TABLE_NAME + " (speed)");
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_distance ON " + GPX_METADATA_TABLE_NAME + " (distance)");
@@ -467,7 +476,7 @@ public class DownloadOsmGPX {
 		if (selection == TrackSelection.WITHOUT_ACTIVITY) {
 			condition += " AND activity IS NULL";
 		} else if (selection == TrackSelection.OUTDATED_STATS) {
-			condition += " AND (track_stats IS NULL OR COALESCE((track_stats->>'v')::int, 0) < " + TRACK_STATS_VERSION + ")";
+			condition += " AND (" + OUTDATED_STATS_CONDITION + ")";
 		}
 		LOG.info("Parsing tracks: " + selection + condition + ", " + options.threads + " threads...");
 		String selectSql = "SELECT id, name, description, tags FROM " + GPX_METADATA_TABLE_NAME
@@ -483,6 +492,7 @@ public class DownloadOsmGPX {
 		Deque<TrackRow> queued = new ArrayDeque<>();
 		long lastId = -1; // so id=0 is included when present
 		boolean moreRows = true;
+		long lastProgressMs = System.currentTimeMillis();
 		dbConn.setAutoCommit(false);
 		try (PreparedStatement selectRows = dbConn.prepareStatement(selectSql);
 			 PreparedStatement selectData = dbConn.prepareStatement("SELECT data FROM " + GPX_FILES_TABLE_NAME + " WHERE id = ?");
@@ -540,6 +550,11 @@ public class DownloadOsmGPX {
 								+ ", marking as error");
 						batch.writeError(task.getValue(), "timeout");
 					}
+				}
+				if (now - lastProgressMs >= PROGRESS_LOG_MS) { // between commits, e.g. while large files are parsed
+					lastProgressMs = now;
+					LOG.info(String.format("Parsing: %d processed, %d running%s, %d queued, last selected id %d",
+							batch.processed, running.size(), largeRunning ? " (a large file alone)" : "", queued.size(), lastId));
 				}
 			}
 			batch.commit();
