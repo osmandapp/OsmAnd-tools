@@ -3,6 +3,7 @@ package net.osmand.server.osmgpx;
 
 import static net.osmand.util.Algorithms.readFromInputStream;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -56,6 +57,7 @@ import net.osmand.shared.gpx.primitives.Track;
 import net.osmand.shared.gpx.primitives.TrkSegment;
 import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.util.MapUtils;
+import okio.Okio;
 import okio.Source;
 import okio.Buffer;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
@@ -158,6 +160,7 @@ public class DownloadOsmGPX {
 	private static final int TRACK_STATS_VERSION = 1;
 	private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
 	private static final int PARSE_BATCH_LIMIT = 1000;
+	private static final int LARGE_GPX_BYTES = 5 << 20; // compressed; larger files are parsed one at a time
 	private static final int CLASSIFY_BATCH_LIMIT = 10000;
 	private static final long TRACK_TIMEOUT_MS = 120_000;
 	// lower edges (km/h) of the speed_hist_time / speed_hist_dist bins in track_stats
@@ -528,15 +531,27 @@ public class DownloadOsmGPX {
 					}
 					moreRows = !queued.isEmpty();
 				}
-				while (running.size() < options.threads && !queued.isEmpty()) {
-					TrackRow row = queued.poll();
-					byte[] data = loadGpxData(selectData, row.id);
-					if (data == null) {
-						batch.writeError(row, "no_data");
-					} else {
-						row.startMs = System.currentTimeMillis();
-						running.put(completed.submit(() -> computeTrackData(data)), row);
+				boolean largeRunning = running.values().stream().anyMatch(r -> r.large);
+				while (running.size() < options.threads && !queued.isEmpty() && !largeRunning) {
+					TrackRow row = queued.peek();
+					if (row.data == null) {
+						row.data = loadGpxData(selectData, row.id);
+						if (row.data == null) {
+							queued.poll();
+							batch.writeError(row, "no_data");
+							continue;
+						}
 					}
+					row.large = row.data.length > LARGE_GPX_BYTES;
+					if (row.large && !running.isEmpty()) {
+						break; // a large file is parsed alone, once the running tracks finish
+					}
+					queued.poll();
+					byte[] data = row.data;
+					row.data = null;
+					row.startMs = System.currentTimeMillis();
+					running.put(completed.submit(() -> computeTrackData(data)), row);
+					largeRunning = row.large;
 				}
 				Future<TrackData> done = running.isEmpty() ? null : completed.poll(1, TimeUnit.SECONDS);
 				while (done != null) {
@@ -648,6 +663,8 @@ public class DownloadOsmGPX {
 		final String description;
 		final List<String> tags = new ArrayList<>();
 		long startMs;
+		byte[] data; // loaded but not submitted yet: a large file waits until the pool is empty
+		boolean large;
 
 		TrackRow(ResultSet rs) throws SQLException {
 			id = rs.getLong("id");
@@ -832,7 +849,8 @@ public class DownloadOsmGPX {
 	private TrackData computeTrackData(byte[] bytes) {
 		TrackData d = new TrackData();
 		GpxFile gpxFile;
-		try (Source src = new Buffer().write(Objects.requireNonNull(Algorithms.gzipToString(bytes)).getBytes())) {
+		// decompress straight into the parser, without a String and a byte[] copy of a GPX that can be hundreds of MB
+		try (Source src = Okio.source(new GZIPInputStream(new ByteArrayInputStream(bytes), 1 << 16))) {
 			gpxFile = GpxUtilities.INSTANCE.loadGpxFile(src);
 		} catch (IOException e) {
 			LOG.error("Error loading GPX file", e);
