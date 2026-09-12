@@ -78,6 +78,11 @@ public class ActivityClassifier {
 	private static final double MIN_TIME_FRAC = 0.9;
 	private static final double SYNTHETIC_CV = 0.03; // generated timestamps: almost constant speed
 	private static final double SYNTHETIC_P95_TO_P50 = 1.08;
+	// planners set walking or cycling speeds; motorway, rail and flights keep a steady speed above this
+	private static final double PLANNED_MAX_P50_KMH = 50;
+	// GPSies times its routes at 10 km/h whatever the activity, so that speed says nothing
+	private static final double PLANNER_DEFAULT_MIN_KMH = 9.5;
+	private static final double PLANNER_DEFAULT_MAX_KMH = 10.5;
 	private static final double FLIGHT_MEDIAN_KMH = 200;
 
 	private final Map<String, String> groups; // activity or group id -> group id
@@ -113,8 +118,9 @@ public class ActivityClassifier {
 		double p50 = stats.path("speed_p50").asDouble();
 		double p85 = stats.path("speed_p85").asDouble();
 		double p95 = stats.path("speed_p95").asDouble();
-		boolean synthetic = timed && (stats.path("speed_cv").asDouble() < SYNTHETIC_CV
+		boolean steady = timed && (stats.path("speed_cv").asDouble() < SYNTHETIC_CV
 				|| (p50 > 0 && p95 / p50 < SYNTHETIC_P95_TO_P50));
+		boolean synthetic = steady && p50 < PLANNED_MAX_P50_KMH;
 		boolean checkSpeed = timed && !synthetic;
 
 		// candidates in the order they are trusted; the first one the speed allows wins
@@ -137,6 +143,9 @@ public class ActivityClassifier {
 			}
 		}
 		if (!checkSpeed) {
+			if (synthetic && (p50 < PLANNER_DEFAULT_MIN_KMH || p50 > PLANNER_DEFAULT_MAX_KMH)) {
+				return new Result(bySpeed(p50, p85, p95), "speed", null); // the speed picked in the planner
+			}
 			return new Result(NOSPEED, "none", null);
 		}
 		return new Result(bySpeed(p50, p85, p95), "speed", true);
