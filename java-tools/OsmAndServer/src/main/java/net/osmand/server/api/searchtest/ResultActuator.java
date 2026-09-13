@@ -206,7 +206,8 @@ public abstract class ResultActuator implements Consumer<List<SearchResult>> {
 		} else if (object instanceof BinaryMapDataObject bmo) {
 			et = ObfConstants.getOsmEntityType(bmo);
 		} else {
-			throw new IllegalArgumentException("Unexpected class: " + object.getClass().getName());
+			// a POI category or any other non-map result
+			return "U";
 		}
 		
 		if (et == null) {

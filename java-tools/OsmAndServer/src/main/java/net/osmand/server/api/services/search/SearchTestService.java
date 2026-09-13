@@ -495,9 +495,11 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 						if (isSpatial) {
 							SpatialSearchService.SpatialResults spatialResult = searchTestSpatial(ctx, options,
 									null, false, !isLive && !options.queryIsCompleted());
-							maxMapsCount.accumulateAndGet(spatialResult.obfCount(), Math::max);
+							if (spatialResult != null) {
+								maxMapsCount.accumulateAndGet(spatialResult.obfCount(), Math::max);
+								actuator.setFormatter(spatialResult.formatter());
+							}
 							searchResult = fromSpatialResults(spatialResult, statMetrics, run.locale);
-							actuator.setFormatter(spatialResult.formatter());
 
 							actuator.accept(searchResult.results());
 						} else {
