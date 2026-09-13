@@ -9,13 +9,13 @@ import net.osmand.obf.preparation.NameIndexCreator;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.server.api.services.search.PoiTypesService;
 import net.osmand.search.core.spatial.SpatialSearchResult;
+import net.osmand.search.core.spatial.SpatialSearchTestFile;
+import net.osmand.search.core.spatial.SpatialSearchTestFile.Phrase;
 import net.osmand.search.core.spatial.SpatialTestSearchEngine;
-import net.osmand.search.core.spatial.SpatialTextSearch;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -29,16 +29,15 @@ import java.util.zip.GZIPInputStream;
 public final class SpatialSearchTestRunner {
 	public record CSVRow(String unitTest, String query, LatLon location, long osmId, String point, String result, String entityType) {}
 
-	private record Phrase(String query, JSONObject settings) {}
-
 	private static final Object RUN_LOCK = new Object();
 	private final Path source;
-	private final MapPoiTypes.PoiTranslator poiTranslator;
+	// POI types of the tests; the server's own POI types stay the process default
+	private final MapPoiTypes poiTypes;
+	private MapPoiTypes translationPoiTypes;
 
-    public SpatialSearchTestRunner(Path source) {
-		NameIndexCreator.MIN_LIMIT_COMMON_NON_INDEXED = 0;
+	public SpatialSearchTestRunner(Path source) {
 		this.source = source.toAbsolutePath().normalize();
-		poiTranslator = new PoiTypesService().getMapPoiTypes(PoiTypesService.DEFAULT_SEARCH_LANG).getPoiTranslator();
+		poiTypes = new PoiTypesService().getMapPoiTypes(PoiTypesService.DEFAULT_SEARCH_LANG);
 	}
 
 	public List<CSVRow> run() throws IOException {
@@ -77,27 +76,27 @@ public final class SpatialSearchTestRunner {
 		List<BinaryMapIndexReader> readers = new ArrayList<>();
 		try {
 			if (settings.optBoolean("useData", true)) {
-				loadReaders(testFile, test, readers);
+				loadReaders(testFile, test, settings.optString("sourceMap", null), readers);
 				if (readers.isEmpty()) {
 					throw new IOException("No OBF indexes loaded for " + testFile.getFileName());
 				}
 			}
 			if (settings.optBoolean("world")) {
-				readers.add(openReader(findRegionsFile(testFile.getParent())));
-				readers.add(openReader(resolveObf(testFile.getParent(), "world_basemap.json.gz")));
+				readers.add(SpatialSearchTestFile.openReader(findRegionsFile(testFile.getParent()).toFile()));
+				readers.add(SpatialSearchTestFile.openReader(resolveObf(testFile.getParent(), "world_basemap.json.gz", null).toFile()));
 			}
 
 			List<CSVRow> rows = new ArrayList<>();
-			List<Phrase> phrases = parsePhrases(test);
+			List<Phrase> phrases = SpatialSearchTestFile.parsePhrases(test);
 			for (int phraseIndex = 0; phraseIndex < phrases.size(); phraseIndex++) {
 				Phrase phrase = phrases.get(phraseIndex);
-				JSONObject phraseSettings = merge(settings, phrase.settings());
+				JSONObject phraseSettings = SpatialSearchTestFile.merge(settings, phrase.settings());
 				if (phraseSettings.optBoolean("ignore")) {
 					continue;
 				}
-				LatLon location = parseLocation(phraseSettings);
-				SpatialTestSearchEngine searchEngine = new SpatialTestSearchEngine(parseSettings(phraseSettings), location,
-						readers, poiTranslator, phraseSettings.optBoolean("translation"));
+				LatLon location = SpatialSearchTestFile.parseLocation(phraseSettings);
+				SpatialTestSearchEngine searchEngine = new SpatialTestSearchEngine(SpatialSearchTestFile.parseSettings(phraseSettings),
+						location, readers, poiTypes(phraseSettings.optBoolean("translation")));
 				List<SpatialSearchResult> results = searchEngine.searchResults(phrase.query(), false);
 				int resultLimit = Math.min(expectedResultCount(test, phraseIndex), results.size());
 				for (int resultIndex = 0; resultIndex < resultLimit; resultIndex++) {
@@ -120,31 +119,34 @@ public final class SpatialSearchTestRunner {
 		}
 	}
 
-	private void loadReaders(Path testFile, JSONObject test, List<BinaryMapIndexReader> readers) throws IOException {
+	private MapPoiTypes poiTypes(boolean translation) {
+		if (!translation) {
+			return poiTypes;
+		}
+		if (translationPoiTypes == null) {
+			translationPoiTypes = new MapPoiTypes(null);
+			translationPoiTypes.setPoiTranslator(new SpatialTestSearchEngine.TestPoiTranslator());
+			translationPoiTypes.init();
+		}
+		return translationPoiTypes;
+	}
+
+	private void loadReaders(Path testFile, JSONObject test, String sourceMap, List<BinaryMapIndexReader> readers) throws IOException {
 		JSONArray files = test.optJSONArray("files");
 		if (files == null) {
-			readers.add(openReader(resolveObf(testFile.getParent(), testFile.getFileName().toString())));
+			readers.add(SpatialSearchTestFile.openReader(resolveObf(testFile.getParent(), testFile.getFileName().toString(), sourceMap).toFile()));
 			return;
 		}
 		for (int i = 0; i < files.length(); i++) {
 			String file = files.optString(i, null);
 			if (file != null && !file.isBlank()) {
-				readers.add(openReader(resolveObf(testFile.getParent(), file)));
+				readers.add(SpatialSearchTestFile.openReader(resolveObf(testFile.getParent(), file, sourceMap).toFile()));
 			}
 		}
 	}
 
-	private BinaryMapIndexReader openReader(Path file) throws IOException {
-		RandomAccessFile randomAccessFile = new RandomAccessFile(file.toFile(), "r");
-		try {
-			return new BinaryMapIndexReader(randomAccessFile, file.toFile());
-		} catch (IOException | RuntimeException e) {
-			randomAccessFile.close();
-			throw e;
-		}
-	}
-
-	private Path resolveObf(Path testDir, String fileName) throws IOException {
+	/** @param sourceMap download name of the map the test data comes from, its language group chooses the keys of names */
+	private Path resolveObf(Path testDir, String fileName, String sourceMap) throws IOException {
 		String baseName = baseName(fileName);
 		Path generated = testDir.resolve("gen").resolve(baseName + ".gen.obf");
 		Path source = newest(testDir.resolve("src").resolve(baseName + ".json"),
@@ -174,7 +176,16 @@ public final class SpatialSearchTestRunner {
 				}
 				json = unpacked;
 			}
-			new OBFDataCreator().create(temporaryObf.toString(), new String[] {json.toString()});
+			OBFDataCreator creator = new OBFDataCreator();
+			creator.setSourceMap(sourceMap);
+			// the tests generate their maps with every common word indexed
+			int minCommonNonIndexed = NameIndexCreator.MIN_LIMIT_COMMON_NON_INDEXED;
+			NameIndexCreator.MIN_LIMIT_COMMON_NON_INDEXED = 0;
+			try {
+				creator.create(temporaryObf.toString(), new String[] {json.toString()});
+			} finally {
+				NameIndexCreator.MIN_LIMIT_COMMON_NON_INDEXED = minCommonNonIndexed;
+			}
 			Files.move(temporaryObf, generated, StandardCopyOption.REPLACE_EXISTING);
 			return generated;
 		} catch (SQLException e) {
@@ -216,82 +227,6 @@ public final class SpatialSearchTestRunner {
 			}
 		}
 		throw new IOException("regions.ocbf not found; set ANDROID_PATH");
-	}
-
-	private List<Phrase> parsePhrases(JSONObject test) {
-		List<Phrase> phrases = new ArrayList<>();
-		addPhrase(phrases, test.optString("phrase", null));
-		JSONArray array = test.optJSONArray("phrases");
-		if (array != null) {
-			for (int i = 0; i < array.length(); i++) {
-				addPhrase(phrases, array.optString(i, null));
-			}
-		}
-		return phrases;
-	}
-
-	private void addPhrase(List<Phrase> phrases, String value) {
-		if (value == null || value.isBlank()) {
-			return;
-		}
-		int settingsStart = value.lastIndexOf('{');
-		if (settingsStart < 0 || !value.trim().endsWith("}")) {
-			phrases.add(new Phrase(value, null));
-		} else {
-			phrases.add(new Phrase(value.substring(0, settingsStart).trim(),
-					new JSONObject(value.substring(settingsStart))));
-		}
-	}
-
-	private JSONObject merge(JSONObject settings, JSONObject override) {
-		JSONObject merged = new JSONObject(settings.toString());
-		if (override != null) {
-			for (String key : override.keySet()) {
-				merged.put(key, override.get(key));
-			}
-		}
-		return merged;
-	}
-
-	private LatLon parseLocation(JSONObject settings) {
-		JSONObject location = settings.optJSONObject("location");
-		if (location != null) {
-			return new LatLon(location.getDouble("lat"), location.getDouble("lon"));
-		}
-		return settings.has("lat") && settings.has("lon")
-				? new LatLon(settings.getDouble("lat"), settings.getDouble("lon"))
-				: null;
-	}
-
-	private SpatialTextSearch.SpatialTextSearchSettings parseSettings(JSONObject json) {
-		SpatialTextSearch.SpatialTextSearchSettings settings = SpatialTextSearch.SpatialTextSearchSettings.defaultSettings();
-		settings.SEARCH_ADDR = json.optBoolean("SEARCH_ADDR", settings.SEARCH_ADDR);
-		settings.SEARCH_POI = json.optBoolean("SEARCH_POI", settings.SEARCH_POI);
-		settings.SEARCH_BUILDINGS = json.optBoolean("SEARCH_BUILDINGS", settings.SEARCH_BUILDINGS);
-		settings.SEARCH_STREET_INTERSECTIONS = json.optBoolean("SEARCH_STREET_INTERSECTIONS", settings.SEARCH_STREET_INTERSECTIONS);
-		settings.SEARCH_POI_INTERSECTIONS = json.optBoolean("SEARCH_POI_INTERSECTIONS", settings.SEARCH_POI_INTERSECTIONS);
-		settings.SEARCH_POI_CATEGORIES = json.optBoolean("SEARCH_POI_CATEGORIES", settings.SEARCH_POI_CATEGORIES);
-		settings.ALLOW_VIRTUAL_STREET_INTERSECTIONS = json.optBoolean("ALLOW_VIRTUAL_STREET_INTERSECTIONS",
-				settings.ALLOW_VIRTUAL_STREET_INTERSECTIONS);
-		settings.OPTIM_DELETE_EMBEDDED_BOUNDARIES = json.optBoolean("OPTIM_DELETE_EMBEDDED_BOUNDARIES",
-				settings.OPTIM_DELETE_EMBEDDED_BOUNDARIES);
-		settings.OPTIM_FLAG_POI_SAME_AS_CITY_STREET = json.optBoolean("OPTIM_FLAG_POI_SAME_AS_CITY_STREET",
-				settings.OPTIM_FLAG_POI_SAME_AS_CITY_STREET);
-		settings.DEDUPLICATE_RES = json.optBoolean("DEDUPLICATE_RES", settings.DEDUPLICATE_RES);
-		settings.LIMIT_POI_CATEGORY_BY_FREQ = json.optInt("LIMIT_POI_CATEGORY_BY_FREQ", settings.LIMIT_POI_CATEGORY_BY_FREQ);
-		settings.OPTIM_READ_COMMON_WORDS_LIMIT = json.optInt("OPTIM_READ_COMMON_WORDS_LIMIT", settings.OPTIM_READ_COMMON_WORDS_LIMIT);
-		settings.LANG_DEDUPLICATE = json.optString("LANG_DEDUPLICATE", settings.LANG_DEDUPLICATE);
-		settings.MIN_ELO_RATING = json.optInt("MIN_ELO_RATING", settings.MIN_ELO_RATING);
-		settings.MIN_CHARACTERS_INCOMPLETE = json.optInt("MIN_CHARACTERS_INCOMPLETE", settings.MIN_CHARACTERS_INCOMPLETE);
-		settings.LIMIT_ATOMIC_OBJECTS = json.optInt("LIMIT_ATOMIC_OBJECTS", settings.LIMIT_ATOMIC_OBJECTS);
-		settings.LIMIT_STOP_GOALS_ANY_LEVEL_WHEN_REACHED_RES = json.optInt("LIMIT_ALL_GOALS_MAX_UNIQUE_OBJECTS",
-				settings.LIMIT_STOP_GOALS_ANY_LEVEL_WHEN_REACHED_RES);
-		settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES = json.optInt("LIMIT_STOP_OTHER_GOALS_WHEN_REACHED_UNIQUE_OBJECTS",
-				settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES);
-		settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES = json.optInt("LIMIT_GOAL_LEVEL_2",
-				settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES);
-		settings.DEV_USE_PIPELINE = json.optBoolean("DEV_USE_PIPELINE", settings.DEV_USE_PIPELINE);
-		return settings;
 	}
 
 	private int expectedResultCount(JSONObject test, int phraseIndex) {
