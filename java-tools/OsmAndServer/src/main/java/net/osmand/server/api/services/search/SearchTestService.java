@@ -493,8 +493,9 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 						ClassicSearchService.SearchContext ctx = new ClassicSearchService.SearchContext(searchPoint.getLatitude(), searchPoint.getLongitude(),
 								query, run.locale, false, bbox[0], bbox[1]);
 						if (isSpatial) {
+							// test rows are complete queries: suggestion settings match the last word as a prefix
 							SpatialSearchService.SpatialResults spatialResult = searchTestSpatial(ctx, options,
-									null, false, !isLive && !options.queryIsCompleted());
+									null, false, false);
 							if (spatialResult != null) {
 								maxMapsCount.accumulateAndGet(spatialResult.obfCount(), Math::max);
 								actuator.setFormatter(spatialResult.formatter());
