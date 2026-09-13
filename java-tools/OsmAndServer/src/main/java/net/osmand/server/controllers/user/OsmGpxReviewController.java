@@ -51,7 +51,8 @@ public class OsmGpxReviewController {
 
 	private static final Log LOG = LogFactory.getLog(OsmGpxReviewController.class);
 	private static final String TABLE = "osm_gpx_data";
-	private static final Set<String> VERDICTS = Set.of("ok", "wrong_activity", "garbage", "simulated", "bad_line");
+	// the quick actions of the heatmap page
+	private static final Set<String> VERDICTS = Set.of("ok", "wrong_activity", "bad_quality", "bad_line", "simulated", "garbage");
 	private static final int MAX_COMMENT = 2000;
 	private static final int MAX_IDS = 1000;
 	private static final int EXPORT_BATCH = 500;
