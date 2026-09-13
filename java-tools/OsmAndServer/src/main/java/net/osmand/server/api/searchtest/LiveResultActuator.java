@@ -2,7 +2,7 @@ package net.osmand.server.api.searchtest;
 
 import net.osmand.data.LatLon;
 import net.osmand.search.core.SearchResult;
-import net.osmand.search.core.spatial.SpatialResultFormatter;
+import net.osmand.search.core.spatial.test.SpatialResultFormatter;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 

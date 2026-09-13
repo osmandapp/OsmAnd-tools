@@ -9,9 +9,9 @@ import net.osmand.obf.preparation.NameIndexCreator;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.server.api.services.search.PoiTypesService;
 import net.osmand.search.core.spatial.SpatialSearchResult;
-import net.osmand.search.core.spatial.SpatialSearchTestFile;
-import net.osmand.search.core.spatial.SpatialSearchTestFile.Phrase;
-import net.osmand.search.core.spatial.SpatialTestSearchEngine;
+import net.osmand.search.core.spatial.test.SpatialSearchTestFile;
+import net.osmand.search.core.spatial.test.SpatialSearchTestFile.Phrase;
+import net.osmand.search.core.spatial.test.SpatialTestSearchEngine;
 import org.json.JSONArray;
 import org.json.JSONObject;
 

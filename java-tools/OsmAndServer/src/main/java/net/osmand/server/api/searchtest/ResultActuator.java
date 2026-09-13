@@ -6,7 +6,7 @@ import net.osmand.data.*;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.search.core.ObjectType;
 import net.osmand.search.core.SearchResult;
-import net.osmand.search.core.spatial.SpatialResultFormatter;
+import net.osmand.search.core.spatial.test.SpatialResultFormatter;
 import net.osmand.util.MapUtils;
 
 import java.io.IOException;

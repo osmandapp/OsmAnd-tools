@@ -27,7 +27,7 @@ import net.osmand.search.core.spatial.SpatialSearchContext;
 import net.osmand.search.core.spatial.SpatialTextSearch.SpatialSearchResults;
 import net.osmand.search.core.spatial.SpatialTextSearch.SpatialTextSearchSettings;
 import net.osmand.search.core.spatial.SpatialSearchResult;
-import net.osmand.search.core.spatial.SpatialResultFormatter;
+import net.osmand.search.core.spatial.test.SpatialResultFormatter;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import org.slf4j.Logger;

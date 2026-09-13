@@ -1,4 +1,4 @@
-package net.osmand.search.core.spatial;
+package net.osmand.search.core.spatial.test;
 
 import net.osmand.data.Amenity;
 import net.osmand.data.Building;
@@ -16,6 +16,9 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import net.osmand.search.core.spatial.SpatialSearchContext;
+import net.osmand.search.core.spatial.SpatialSearchResult;
+import net.osmand.search.core.spatial.SpatialSearchToken;
 
 public class SpatialResultFormatter {
 	private final SpatialSearchContext searchContext;
@@ -93,9 +96,7 @@ public class SpatialResultFormatter {
 	private List<Street> getIntersectionStreets(SpatialSearchResult result) {
 		SpatialSearchToken.NameIndexAtom first = null;
 		SpatialSearchToken.NameIndexAtom second = null;
-		SpatialSearchResultsList parent = result.getParent();
-		for (int i = 0; i < parent.tCount; i++) {
-			SpatialSearchToken.NameIndexAtom atom = parent.linearResults.get(result.parentInd * parent.tCount + i);
+		for (SpatialSearchToken.NameIndexAtom atom : result.getAtoms()) {
 			if (atom.getObject() instanceof Street && !atom.isCityStreetName()) {
 				if (first == null || Objects.equals(first.getObject().getId(), atom.getObject().getId())) {
 					first = atom;

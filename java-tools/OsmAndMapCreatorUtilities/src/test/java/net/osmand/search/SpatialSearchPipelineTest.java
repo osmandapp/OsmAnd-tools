@@ -63,8 +63,8 @@ import net.osmand.obf.preparation.NameIndexCreator;
 import net.osmand.osm.AbstractPoiType;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.search.core.SearchCoreFactory;
-import net.osmand.search.core.spatial.SpatialSearchTestFile;
-import net.osmand.search.core.spatial.SpatialTestSearchEngine;
+import net.osmand.search.core.spatial.test.SpatialSearchTestFile;
+import net.osmand.search.core.spatial.test.SpatialTestSearchEngine;
 import net.osmand.util.Algorithms;
 
 /**

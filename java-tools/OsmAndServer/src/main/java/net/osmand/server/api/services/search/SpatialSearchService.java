@@ -48,7 +48,7 @@ import net.osmand.search.core.TopIndexFilter;
 import net.osmand.search.core.spatial.SpatialPoiSearch;
 import net.osmand.search.core.spatial.SpatialSearchContext;
 import net.osmand.search.core.spatial.SpatialSearchResult;
-import net.osmand.search.core.spatial.SpatialResultFormatter;
+import net.osmand.search.core.spatial.test.SpatialResultFormatter;
 import net.osmand.search.core.spatial.SpatialTextSearch;
 import net.osmand.search.core.spatial.SpatialTextSearch.SpatialSearchResults;
 import net.osmand.search.core.spatial.SpatialTextSearch.SpatialTextSearchSettings;

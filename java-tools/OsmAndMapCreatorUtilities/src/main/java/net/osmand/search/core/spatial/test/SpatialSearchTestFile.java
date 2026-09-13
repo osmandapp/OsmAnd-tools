@@ -1,4 +1,4 @@
-package net.osmand.search.core.spatial;
+package net.osmand.search.core.spatial.test;
 
 import java.io.File;
 import java.io.IOException;
@@ -12,6 +12,7 @@ import org.json.JSONObject;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.LatLon;
 import net.osmand.util.Algorithms;
+import net.osmand.search.core.spatial.SpatialTextSearch;
 
 /**
  * The JSON of a spatial search unit test, read the same way by the tests and by the search-test server: phrases with

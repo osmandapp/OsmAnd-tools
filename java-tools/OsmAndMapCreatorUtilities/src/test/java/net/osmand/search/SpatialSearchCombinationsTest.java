@@ -2,7 +2,7 @@ package net.osmand.search;
 
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.LatLon;
-import net.osmand.search.core.spatial.SpatialTestSearchEngine;
+import net.osmand.search.core.spatial.test.SpatialTestSearchEngine;
 import net.osmand.search.core.spatial.SpatialTextSearch;
 import org.json.JSONObject;
 

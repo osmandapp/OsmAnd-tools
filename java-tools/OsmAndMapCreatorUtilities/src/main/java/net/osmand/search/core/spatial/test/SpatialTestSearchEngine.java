@@ -1,4 +1,4 @@
-package net.osmand.search.core.spatial;
+package net.osmand.search.core.spatial.test;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -9,6 +9,10 @@ import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.LatLon;
 import net.osmand.osm.AbstractPoiType;
 import net.osmand.osm.MapPoiTypes;
+import net.osmand.search.core.spatial.SpatialTextSearch;
+import net.osmand.search.core.spatial.SpatialSearchContext;
+import net.osmand.search.core.spatial.SpatialPoiSearch;
+import net.osmand.search.core.spatial.SpatialSearchResult;
 
 /** Runs the phrases of a spatial search unit test and formats rows the way the test JSON stores them */
 public class SpatialTestSearchEngine {
@@ -35,7 +39,7 @@ public class SpatialTestSearchEngine {
 	}
 
 	public List<SpatialSearchResult> searchResults(String phrase, boolean print) throws IOException {
-		searchContext.stats.printLogs = print;
+		searchContext.getStats().printLogs = print;
 		SpatialTextSearch.SpatialSearchResults searchResults = spatialSearch.searchAPI(phrase, searchContext);
 		return searchResults.mainResults == null ? Collections.emptyList() : searchResults.mainResults;
 	}
