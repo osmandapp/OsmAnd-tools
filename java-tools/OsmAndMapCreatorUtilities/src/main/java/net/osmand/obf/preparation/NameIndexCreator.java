@@ -467,7 +467,9 @@ public class NameIndexCreator<T> {
 			if (Algorithms.isEmpty(prefix)) {
 				continue;
 			}
-			if (!indexNumbers && SearchAlgorithms.isNumber2Letters(token)) {
+			// a pure number is kept with the other words of the name ("6178/2.Sokak"), a number with letters is not:
+			// "33-я" of "вулиця 33-я Лінія" is the only word telling apart its Лінія streets
+			if (!indexNumbers && SearchAlgorithms.isNumber2Letters(token) && parsePureIntegerSuffix(token) != null) {
 				continue;
 			}
 			if (keys != null && !keys.contains(token)) {
