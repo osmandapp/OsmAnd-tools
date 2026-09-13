@@ -31,6 +31,7 @@ import net.osmand.obf.preparation.IndexPoiCreator.PoiAdditionalType;
 import net.osmand.obf.preparation.IndexPoiCreator.PoiTileBox;
 import net.osmand.osm.AbstractPoiType;
 import net.osmand.osm.MapPoiTypes;
+import net.osmand.search.core.SearchPhrase;
 import net.osmand.search.core.TopIndexFilter;
 import net.osmand.util.Algorithms;
 import net.osmand.util.SearchAlgorithms;
@@ -433,6 +434,18 @@ public class NameIndexCreator<T> {
 				|| obj instanceof City c && c.getType() == CityType.CITY;
 		Set<String> keys = mapName == null ? null
 				: new HashSet<>(CommonWordsMultiIndex.getInstance().getWordsToIndex(mapName, uniqueNames, notable));
+		String legacyKey = null;
+		if (keys != null) {
+			// TODO remove when app versions with the legacy search (SearchCoreFactory) no longer download maps: it looks a
+			// name up by the one query word SearchPhrase picks, a word CommonWords does not know first, so the name keeps
+			// such a word ("amsterdam" of Amsterdam City Farm, frequent in the Netherlands); known words like "de" stay out
+			List<String> words = new ArrayList<>(uniqueNames);
+			words.remove(NameIndexReader.CITY_AS_STREET_COMMON);
+			String legacyWord = SearchPhrase.selectMainUnknownWordToSearch(words);
+			if (!legacyWord.isEmpty() && CommonWords.getInstance().getCommonSearch(legacyWord) == -1 && keys.add(legacyWord)) {
+				legacyKey = legacyWord;
+			}
+		}
 		boolean hasRareName = false;
 		for (String token : uniqueNames) {
 			if (!token.equalsIgnoreCase(NameIndexReader.CITY_AS_STREET_COMMON) &&
@@ -463,6 +476,10 @@ public class NameIndexCreator<T> {
 				tokenFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
 				commonNonIndexedFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
 				continue;
+			}
+			if (token.equals(legacyKey)) {
+				// the other words of the name still refer to it, as they did before it became a key
+				notKeyWords.add(token);
 			}
 			NamedObjectsByPrefix<T> entry = namesIndex.get(prefix);
 			if (entry == null) {
