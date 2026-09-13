@@ -68,7 +68,8 @@ public class ActivityClassifier {
 	private static final Set<String> STOP_KEYWORDS = Set.of("van", "vehicle", "motorway", "terrain",
 			"feldweg", "feldwege", "racing", "course", "langlauf", "winter", "skating", "designated", "water", "river",
 			"lake", "canal", "waterway", "boat", "boating", "riding", "multi", "climbing", "walkway", "cycleway", "etna",
-			"etnanatura", "rungis", "fitotrack");
+			"etnanatura", "rungis", "fitotrack",
+			"piste", "pistes"); // French "piste cyclable", "piste agricole": a path, not a ski run
 
 	private static final String[] CAR_CREATORS = {"sunnypilot", "dragonpilot", "openpilot"};
 
