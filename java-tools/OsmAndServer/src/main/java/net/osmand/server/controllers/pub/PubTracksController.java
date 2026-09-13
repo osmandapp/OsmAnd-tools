@@ -106,9 +106,6 @@ public class PubTracksController {
 			if (!VERDICTS.contains(req.verdict())) {
 				return ResponseEntity.badRequest().body("verdict must be one of " + VERDICTS);
 			}
-			if ("wrong_activity".equals(req.verdict()) && isBlank(req.activity())) {
-				return ResponseEntity.badRequest().body("wrong_activity needs the right activity");
-			}
 			review = new JsonObject();
 			review.addProperty("verdict", req.verdict());
 			if (!isBlank(req.activity())) {
