@@ -1,5 +1,7 @@
 package net.osmand.server.osmgpx;
 
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -7,13 +9,15 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
 /**
  * Activity of an OSM GPX trace from stored columns and track_stats only, so the same rules run in parse_tracks and
  * classify_tracks. A label from the file or its text is accepted only when the track's own speed fits that activity;
- * otherwise the next label is tried and, when none fits, the activity comes from speed alone.
+ * otherwise the next label is tried and, when none fits, the activity comes from speed alone. A winter-sport word counts
+ * only where and when snow is possible, and a fast track is a flight only when it climbs.
  */
 public class ActivityClassifier {
 
@@ -23,9 +27,11 @@ public class ActivityClassifier {
 	public static final String FOOT = "foot";
 	public static final String CYCLING = "cycling";
 	public static final String DRIVING = "driving";
+	private static final String WINTER_SPORT = "winter_sport";
+	private static final String SNOWMOBILING = "snowmobiling";
 
-	// what a track has: text and file labels from osm_gpx_data, everything measured from track_stats
-	public record Track(String name, String description, List<String> tags, String fileActivity, JsonNode stats) {
+	// what a track has: text and file labels and the start latitude from osm_gpx_data, everything measured from track_stats
+	public record Track(String name, String description, List<String> tags, String fileActivity, Double lat, JsonNode stats) {
 	}
 
 	// speedMatches: null without usable speed, otherwise whether the activity fits the track's speed
@@ -72,6 +78,21 @@ public class ActivityClassifier {
 			"etnanatura", "rungis", "fitotrack",
 			"piste", "pistes"); // French "piste cyclable", "piste agricole": a path, not a ski run
 
+	// winter-sport words activities.json does not list, in the languages of the stored tracks; without them a ski day is
+	// labelled by speed as cycling or foot. Like every winter-sport keyword they count only when snow is possible.
+	private static final Map<String, String> WINTER_KEYWORDS = Map.ofEntries(
+			Map.entry("loipe", "cross_country_skiing"), Map.entry("loipen", "cross_country_skiing"),
+			Map.entry("skiloipe", "cross_country_skiing"), Map.entry("skiløype", "cross_country_skiing"),
+			Map.entry("skiløyper", "cross_country_skiing"), Map.entry("skidspår", "cross_country_skiing"),
+			Map.entry("ski de fond", "cross_country_skiing"),
+			Map.entry("skitag", "skiing"), Map.entry("skifahren", "skiing"), Map.entry("skigebiet", "skiing"),
+			Map.entry("skidor", "skiing"), Map.entry("skidåkning", "skiing"), Map.entry("skijanje", "skiing"),
+			Map.entry("lyže", "skiing"), Map.entry("lyžování", "skiing"), Map.entry("lyžovanie", "skiing"),
+			Map.entry("sci", "skiing"), Map.entry("sciare", "skiing"), Map.entry("hiihto", "skiing"),
+			Map.entry("лыжная", "skiing"), Map.entry("лыжный", "skiing"), Map.entry("лыжные", "skiing"),
+			Map.entry("лыжах", "skiing"), Map.entry("горнолыжная", "skiing"), Map.entry("горнолыжный", "skiing"),
+			Map.entry("skitouren", "ski_touring"), Map.entry("skialp", "ski_touring"), Map.entry("scialpinismo", "ski_touring"));
+
 	private static final String[] CAR_CREATORS = {"sunnypilot", "dragonpilot", "openpilot"};
 
 	private static final int MIN_POINTS = 10;
@@ -85,9 +106,23 @@ public class ActivityClassifier {
 	// GPSies times its routes at 10 km/h whatever the activity, so that speed says nothing
 	private static final double PLANNER_DEFAULT_MIN_KMH = 9.5;
 	private static final double PLANNER_DEFAULT_MAX_KMH = 10.5;
+	private static final double FOOT_MAX_P85_KMH = 8.5;
+	private static final double FOOT_MAX_P95_KMH = 14;
+	private static final double CYCLING_MAX_P85_KMH = 32;
+	private static final double CYCLING_MAX_P95_KMH = 50;
 	private static final double FLIGHT_MEDIAN_KMH = 350; // high-speed trains keep a median of 250-320 km/h
 	private static final double TRAIN_MEDIAN_KMH = 200;
-	private static final double TRAIN_MAX_P95_KMH = 400; // a flight passes it while climbing or landing
+	// GPS in a cabin passes 1000 m even on short turboprop hops; rail, roads and routes drawn with made-up times stay lower
+	private static final double FLIGHT_MIN_ELE_M = 1000;
+	private static final double FLIGHT_MIN_KM_WITHOUT_ELE = 150; // a file without elevation needs a long line instead
+	private static final double TRAIN_MIN_KM = 50; // a shorter fast low track is a drawn route with made-up times
+	// snow by latitude of the start (north of the equator, south shifted by six months): October-May from 55 degrees,
+	// November-April from 35, November-April above 1000 m from the tropics' edge; any month on glaciers
+	private static final double SNOW_LONG_WINTER_LAT = 55;
+	private static final double SNOW_WINTER_LAT = 35;
+	private static final double SNOW_SUBTROPICS_LAT = 23.5;
+	private static final double SNOW_SUBTROPICS_MIN_ELE_M = 1000;
+	private static final double GLACIER_ELE_M = 2500;
 
 	private final Map<String, String> groups; // activity or group id -> group id
 	private final List<Map.Entry<String, String>> keywords; // normalized keyword -> activity id, longest first
@@ -102,6 +137,11 @@ public class ActivityClassifier {
 				if (!keyword.isEmpty() && !STOP_KEYWORDS.contains(keyword)) {
 					byKeyword.putIfAbsent(keyword, activity);
 				}
+			}
+		});
+		WINTER_KEYWORDS.forEach((keyword, activity) -> {
+			if (groups.containsKey(activity)) {
+				byKeyword.putIfAbsent(normalize(keyword), activity);
 			}
 		});
 		keywords = new ArrayList<>(byKeyword.entrySet());
@@ -127,13 +167,20 @@ public class ActivityClassifier {
 		boolean synthetic = steady && p50 < PLANNED_MAX_P50_KMH;
 		boolean checkSpeed = timed && !synthetic;
 
+		// out of the snow season a winter-sport word names a place or a trail walked in summer ("Ski, Akershus", "Official
+		// Winter Trail"); a snowmobile route keeps its label unless it was walked, since old receivers log wrong dates
+		boolean snowless = Boolean.FALSE.equals(snowPossible(track.lat(), stats));
+		boolean walked = checkSpeed && p85 <= FOOT_MAX_P85_KMH && p95 <= FOOT_MAX_P95_KMH;
+		Predicate<String> inSeason = activity -> !snowless || !WINTER_SPORT.equals(groups.get(activity))
+				|| (SNOWMOBILING.equals(activity) && !walked);
+
 		// candidates in the order they are trusted; the first one the speed allows wins
 		String[][] candidates = {
 				{track.fileActivity(), "file"},
 				{creatorActivity(stats.path("creator").asText("")), "creator"},
-				{keyword(String.join(" | ", track.tags())), "tag"},
-				{keyword(track.name()), "name"},
-				{keyword(track.description()), "description"}};
+				{keyword(String.join(" | ", track.tags()), inSeason), "tag"},
+				{keyword(track.name(), inSeason), "name"},
+				{keyword(track.description(), inSeason), "description"}};
 		for (String[] candidate : candidates) {
 			String activity = candidate[0];
 			if (activity == null || !groups.containsKey(activity)) {
@@ -148,11 +195,41 @@ public class ActivityClassifier {
 		}
 		if (!checkSpeed) {
 			if (synthetic && (p50 < PLANNER_DEFAULT_MIN_KMH || p50 > PLANNER_DEFAULT_MAX_KMH)) {
-				return new Result(bySpeed(p50, p85, p95), "speed", null); // the speed picked in the planner
+				return new Result(bySpeed(p50, p85, p95, stats), "speed", null); // the speed picked in the planner
 			}
 			return new Result(NOSPEED, "none", null);
 		}
-		return new Result(bySpeed(p50, p85, p95), "speed", true);
+		String activity = bySpeed(p50, p85, p95, stats);
+		return NOSPEED.equals(activity) ? new Result(NOSPEED, "none", null) : new Result(activity, "speed", true);
+	}
+
+	/**
+	 * Whether snow can lie where and when the track starts: any month on glaciers (ele_max from {@value #GLACIER_ELE_M} m),
+	 * otherwise by the latitude band and the month in UTC, south of the equator shifted by six months. Null without a
+	 * start time or position, so nothing is decided on it.
+	 */
+	static Boolean snowPossible(Double lat, JsonNode stats) {
+		if (lat == null || !stats.has("start_time")) {
+			return null;
+		}
+		double eleMax = stats.path("ele_max").asDouble(0);
+		if (eleMax >= GLACIER_ELE_M) {
+			return true;
+		}
+		int month = Instant.ofEpochSecond(stats.path("start_time").asLong()).atZone(ZoneOffset.UTC).getMonthValue();
+		int m = lat >= 0 ? month : (month + 5) % 12 + 1; // July in the south is January in the north
+		double latitude = Math.abs(lat);
+		boolean novemberToApril = m >= 11 || m <= 4;
+		if (latitude >= SNOW_LONG_WINTER_LAT) {
+			return m >= 10 || m <= 5;
+		}
+		if (latitude >= SNOW_WINTER_LAT) {
+			return novemberToApril;
+		}
+		if (latitude >= SNOW_SUBTROPICS_LAT) {
+			return novemberToApril && eleMax >= SNOW_SUBTROPICS_MIN_ELE_M;
+		}
+		return false;
 	}
 
 	private boolean fits(String activity, double p85, double p95) {
@@ -163,17 +240,21 @@ public class ActivityClassifier {
 		return envelope == null || envelope.fits(p85, p95); // no envelope: speed says nothing against it
 	}
 
-	private static String bySpeed(double p50, double p85, double p95) {
-		if (p50 > FLIGHT_MEDIAN_KMH) {
-			return AVIATION;
-		}
+	// NOSPEED for a fast track that is neither a flight nor a train: a route drawn with made-up times
+	private static String bySpeed(double p50, double p85, double p95, JsonNode stats) {
 		if (p50 > TRAIN_MEDIAN_KMH) {
-			return p95 <= TRAIN_MAX_P95_KMH ? TRAIN : AVIATION;
+			double km = stats.path("clean_distance_m").asDouble() / 1000;
+			double eleMax = stats.path("ele_max").asDouble(0);
+			boolean noElevation = eleMax == 0 && stats.path("ele_min").asDouble(0) == 0;
+			if (eleMax >= FLIGHT_MIN_ELE_M || (noElevation && km >= FLIGHT_MIN_KM_WITHOUT_ELE)) {
+				return AVIATION;
+			}
+			return p50 <= FLIGHT_MEDIAN_KMH && km >= TRAIN_MIN_KM ? TRAIN : NOSPEED;
 		}
-		if (p85 <= 8.5 && p95 <= 14) {
+		if (p85 <= FOOT_MAX_P85_KMH && p95 <= FOOT_MAX_P95_KMH) {
 			return FOOT;
 		}
-		if (p85 <= 32 && p95 <= 50) {
+		if (p85 <= CYCLING_MAX_P85_KMH && p95 <= CYCLING_MAX_P95_KMH) {
 			return CYCLING;
 		}
 		return DRIVING;
@@ -189,8 +270,9 @@ public class ActivityClassifier {
 		return null;
 	}
 
-	// first keyword, longest first, found as whole words in the text: with hyphens kept and with hyphens as spaces
-	String keyword(String text) {
+	// first keyword, longest first, found as whole words in the text: with hyphens kept and with hyphens as spaces;
+	// keywords of activities the track rules out are skipped, so a later keyword of the same text can still match
+	String keyword(String text, Predicate<String> allowed) {
 		if (text == null || text.isEmpty()) {
 			return null;
 		}
@@ -198,7 +280,7 @@ public class ActivityClassifier {
 		String split = " " + words.replace('-', ' ').trim() + " ";
 		for (Map.Entry<String, String> e : keywords) {
 			String k = " " + e.getKey() + " ";
-			if (words.contains(k) || split.contains(k)) {
+			if ((words.contains(k) || split.contains(k)) && allowed.test(e.getValue())) {
 				return e.getValue();
 			}
 		}

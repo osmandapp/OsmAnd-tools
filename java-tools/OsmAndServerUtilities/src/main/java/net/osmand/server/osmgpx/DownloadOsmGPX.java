@@ -481,7 +481,7 @@ public class DownloadOsmGPX {
 			condition += " AND (" + OUTDATED_STATS_CONDITION + ")";
 		}
 		LOG.info("Parsing tracks: " + selection + condition + ", " + options.threads + " threads...");
-		String selectSql = "SELECT id, name, description, tags FROM " + GPX_METADATA_TABLE_NAME
+		String selectSql = "SELECT id, name, description, tags, lat FROM " + GPX_METADATA_TABLE_NAME
 				+ " WHERE id > ?" + condition + " ORDER BY id LIMIT " + PARSE_BATCH_LIMIT;
 		// only GPX parsing runs in the pool; reads, classification and writes stay on this thread and dbConn
 		ExecutorService pool = Executors.newCachedThreadPool(r -> {
@@ -583,7 +583,7 @@ public class DownloadOsmGPX {
 		}
 		LOG.info("Classifying tracks from stored columns" + condition + "...");
 		ActivityClassifier classifier = new ActivityClassifier(activitiesMap, ACTIVITY_GROUPS);
-		String selectSql = "SELECT id, name, description, tags, activity, activity_source, speed_matches_activity, "
+		String selectSql = "SELECT id, name, description, tags, lat, activity, activity_source, speed_matches_activity, "
 				+ "file_activity, track_stats FROM " + GPX_METADATA_TABLE_NAME + " WHERE id > ? AND track_stats IS NOT NULL"
 				+ condition + " ORDER BY id LIMIT " + CLASSIFY_BATCH_LIMIT;
 		int read = 0;
@@ -647,6 +647,7 @@ public class DownloadOsmGPX {
 		final String name;
 		final String description;
 		final List<String> tags = new ArrayList<>();
+		final Double lat; // the start OSM lists for the trace; the classifier takes the snow season from it
 		long startMs;
 		byte[] data; // loaded but not submitted yet: a large file waits until the pool is empty
 		boolean large;
@@ -655,6 +656,8 @@ public class DownloadOsmGPX {
 			id = rs.getLong("id");
 			name = rs.getString("name");
 			description = rs.getString("description");
+			double latValue = rs.getDouble("lat");
+			lat = rs.wasNull() ? null : latValue;
 			Array tagsArray = rs.getArray("tags");
 			if (tagsArray != null) {
 				try (ResultSet tagRs = tagsArray.getResultSet()) {
@@ -675,7 +678,7 @@ public class DownloadOsmGPX {
 		if (stats == null || !stats.has("clean_points")) {
 			return null;
 		}
-		return new ActivityClassifier.Track(row.name, row.description, row.tags, rs.getString("file_activity"), stats);
+		return new ActivityClassifier.Track(row.name, row.description, row.tags, rs.getString("file_activity"), row.lat, stats);
 	}
 
 	private static JsonNode readStats(String json) {
@@ -727,7 +730,7 @@ public class DownloadOsmGPX {
 			}
 			// classified from track_stats as stored, so classify_tracks makes the same decision later
 			ActivityClassifier.Result c = classifier.classify(
-					new ActivityClassifier.Track(row.name, row.description, row.tags, d.fileActivity, stats));
+					new ActivityClassifier.Track(row.name, row.description, row.tags, d.fileActivity, row.lat, stats));
 			metricsStmt.setString(1, c.activity());
 			metricsStmt.setFloat(2, round2(d.avgSpeedKmh));
 			metricsStmt.setFloat(3, round2(d.distanceMeters));
