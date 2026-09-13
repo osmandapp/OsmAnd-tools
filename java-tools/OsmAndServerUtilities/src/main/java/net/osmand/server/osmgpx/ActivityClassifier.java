@@ -19,6 +19,7 @@ public class ActivityClassifier {
 
 	public static final String NOSPEED = "nospeed";
 	public static final String AVIATION = "aviation";
+	public static final String TRAIN = "train_riding";
 	public static final String FOOT = "foot";
 	public static final String CYCLING = "cycling";
 	public static final String DRIVING = "driving";
@@ -68,7 +69,8 @@ public class ActivityClassifier {
 	private static final Set<String> STOP_KEYWORDS = Set.of("van", "vehicle", "motorway", "terrain",
 			"feldweg", "feldwege", "racing", "course", "langlauf", "winter", "skating", "designated", "water", "river",
 			"lake", "canal", "waterway", "boat", "boating", "riding", "multi", "climbing", "walkway", "cycleway", "etna",
-			"etnanatura", "rungis", "fitotrack");
+			"etnanatura", "rungis", "fitotrack",
+			"piste", "pistes"); // French "piste cyclable", "piste agricole": a path, not a ski run
 
 	private static final String[] CAR_CREATORS = {"sunnypilot", "dragonpilot", "openpilot"};
 
@@ -83,7 +85,9 @@ public class ActivityClassifier {
 	// GPSies times its routes at 10 km/h whatever the activity, so that speed says nothing
 	private static final double PLANNER_DEFAULT_MIN_KMH = 9.5;
 	private static final double PLANNER_DEFAULT_MAX_KMH = 10.5;
-	private static final double FLIGHT_MEDIAN_KMH = 200;
+	private static final double FLIGHT_MEDIAN_KMH = 350; // high-speed trains keep a median of 250-320 km/h
+	private static final double TRAIN_MEDIAN_KMH = 200;
+	private static final double TRAIN_MAX_P95_KMH = 400; // a flight passes it while climbing or landing
 
 	private final Map<String, String> groups; // activity or group id -> group id
 	private final List<Map.Entry<String, String>> keywords; // normalized keyword -> activity id, longest first
@@ -162,6 +166,9 @@ public class ActivityClassifier {
 	private static String bySpeed(double p50, double p85, double p95) {
 		if (p50 > FLIGHT_MEDIAN_KMH) {
 			return AVIATION;
+		}
+		if (p50 > TRAIN_MEDIAN_KMH) {
+			return p95 <= TRAIN_MAX_P95_KMH ? TRAIN : AVIATION;
 		}
 		if (p85 <= 8.5 && p95 <= 14) {
 			return FOOT;
