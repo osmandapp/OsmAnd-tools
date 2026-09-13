@@ -15,9 +15,9 @@ public class SpatialSearchScoreTest extends SpatialSearchPipelineTest {
     }
 
     @Override
-    protected SearchTestEngine createSearchEngine(SpatialTextSearch.SpatialTextSearchSettings spatialSettings, 
+    protected SpatialTestSearchEngine createSearchEngine(SpatialTextSearch.SpatialTextSearchSettings spatialSettings, 
                                                   LatLon point, List<BinaryMapIndexReader> readers, boolean translation) {
         spatialSettings.SCORE_RANKING = true;
-        return new SpatialTestSearchEngine(spatialSettings, point, readers, translation);
+        return super.createSearchEngine(spatialSettings, point, readers, translation);
     }
 }
