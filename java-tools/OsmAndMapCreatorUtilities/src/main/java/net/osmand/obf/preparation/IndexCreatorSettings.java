@@ -75,6 +75,9 @@ public class IndexCreatorSettings {
 
 	public int charsToBuildAddressNameIndex = 4;
 
+	// download name of the map whose language group chooses the keys of names, null for the region name
+	public String nameIndexMapName;
+
 	public boolean keepOnlyRouteRelationObjects;
 
 	public boolean indexMultipolygon = true;

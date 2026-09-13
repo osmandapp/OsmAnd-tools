@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -52,6 +53,7 @@ import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapPoiReaderAdapter;
 import net.osmand.binary.BinaryMapRouteReaderAdapter;
 import net.osmand.binary.RouteDataObject;
+import net.osmand.binary.CommonWordsMultiIndex;
 import net.osmand.obf.OBFDataCreator;
 import net.osmand.obf.preparation.IndexAddressCreator;
 import net.osmand.obf.preparation.IndexCreator;
@@ -106,9 +108,10 @@ public class SpatialSearchPipelineTest {
 	private static final boolean REGENERATE_OBF = true; // bypassed by LIVE_TESTING
 	private static final boolean TEST_EXTRA_RESULTS = true;
 	private static final List<Class<?>> OBF_GENERATE_CLASSES = List.of(IndexCreator.class, IndexPoiCreator.class,
-			IndexAddressCreator.class);
+			IndexAddressCreator.class, NameIndexCreator.class, CommonWordsMultiIndex.class);
 	private static final String HASH_VERSION = "2";
 	private static final String OBF_HASH_FILE_NAME = ".obf.hash";
+	private static final int MAX_KNOWN_HASHES = 4; // one per build that writes its own class files
 	private static final boolean RUN_IGNORED_TESTS = false;
 	protected static MapPoiTypes.PoiTranslator defaultPoiTranslator;
 	
@@ -248,7 +251,11 @@ public class SpatialSearchPipelineTest {
 	 * <li>New plain source JSON files are compressed back to {@code *.json.gz} for later runs.
 	 * <li>When {@link #REGENERATE_OBF} is {@code false}, the transformation/cache chain is skipped and only the original OBF is used.
 	 */
-	private File createOBFIfNeeded(String fileName) throws IOException, SQLException {
+	/**
+	 * @param sourceMap download name of the map the test data comes from ("sourceMap" of the test settings): its
+	 * language group chooses the keys of names, as it does when that map is generated
+	 */
+	private File createOBFIfNeeded(String fileName, String sourceMap) throws IOException, SQLException {
 		String baseName = getBaseName(fileName);
 		File originalObf = getNewestExistingFile(
 				new File(SEARCH_RESOURCES_PATH, baseName + ".obf"),
@@ -299,9 +306,10 @@ public class SpatialSearchPipelineTest {
 			if (!alreadyGenerated || !generatedObfFile.isFile()
 					|| generatedObfFile.lastModified() < sourceFile.lastModified()) {
 				if (sourceOsm != null) {
-					createObfFromOsm(sourceOsm, generatedObfFile);
+					createObfFromOsm(sourceOsm, generatedObfFile, sourceMap);
 				} else {
 					OBFDataCreator creator = new OBFDataCreator();
+					creator.setSourceMap(sourceMap);
 					creator.create(generatedObfFile.getAbsolutePath(), new String[] { sourceFile.getAbsolutePath() });
 				}
 				writeHash();
@@ -311,8 +319,9 @@ public class SpatialSearchPipelineTest {
 		return generatedObfFile;
 	}
 
-	private void createObfFromOsm(File sourceOsm, File generatedObfFile) throws IOException, SQLException {
+	private void createObfFromOsm(File sourceOsm, File generatedObfFile, String sourceMap) throws IOException, SQLException {
 		IndexCreatorSettings settings = new IndexCreatorSettings();
+		settings.nameIndexMapName = sourceMap;
 		settings.indexAddress = true;
 		settings.indexPOI = true;
 		settings.indexRouting = true;
@@ -368,20 +377,35 @@ public class SpatialSearchPipelineTest {
 	}
 
 	private static boolean isHashActual() {
-		return Algorithms.stringsEqual(getHash(), getObfGenerateHash());
+		return getHashes().contains(getObfGenerateHash());
 	}
 
 	private static File getObfHashFile() {
 		return new File(GEN_DIR, OBF_HASH_FILE_NAME);
 	}
 
-	private static String getHash() {
+	/**
+	 * The hash is taken over the compiled generator classes, and the IDE and Gradle write their own
+	 * class files: the same sources hash differently depending on who built them, and one hash per
+	 * file would throw the whole map cache away on every switch. The file keeps a hash per line, so
+	 * both builds are recognised, while a real change in the generators matches none of them.
+	 */
+	private static Set<String> getHashes() {
 		File hashFile = getObfHashFile();
 		if (!hashFile.isFile()) {
-			return null;
+			return Collections.emptySet();
 		}
-		String hash = Algorithms.getFileAsString(hashFile);
-		return hash == null ? null : hash.trim();
+		String content = Algorithms.getFileAsString(hashFile);
+		if (content == null) {
+			return Collections.emptySet();
+		}
+		Set<String> hashes = new LinkedHashSet<>();
+		for (String line : content.split("\\R")) {
+			if (!line.trim().isEmpty()) {
+				hashes.add(line.trim());
+			}
+		}
+		return hashes;
 	}
 
 	private void writeHash() throws IOException {
@@ -390,9 +414,20 @@ public class SpatialSearchPipelineTest {
 		if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
 			throw new IOException("Cannot create generated OBF directory " + parent);
 		}
+		Set<String> hashes = new LinkedHashSet<>(getHashes());
+		if (!hashes.add(getObfGenerateHash())) {
+			return;
+		}
+		while (hashes.size() > MAX_KNOWN_HASHES) {
+			Iterator<String> it = hashes.iterator();
+			it.next();
+			it.remove();
+		}
 		try (Writer writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(hashFile), StandardCharsets.UTF_8))) {
-			writer.write(getObfGenerateHash());
-			writer.write(System.lineSeparator());
+			for (String hash : hashes) {
+				writer.write(hash);
+				writer.write(System.lineSeparator());
+			}
 		}
 	}
 
@@ -462,17 +497,19 @@ public class SpatialSearchPipelineTest {
 					&& f.getName().endsWith(".obf")));
 			readers.addAll(maps);
 		} else {
+			JSONObject settingsJson = sourceJson.optJSONObject("settings");
+			String sourceMap = settingsJson == null ? null : settingsJson.optString("sourceMap", null);
 			JSONArray filesJson = sourceJson.optJSONArray("files");
 			if (filesJson != null) {
 				for (int i = 0; i < filesJson.length(); i++) {
 					String file = filesJson.optString(i, null);
 					if (!Algorithms.isEmpty(file) && isDataFileName(file)) {
-						File obfFile = createOBFIfNeeded(file);
+						File obfFile = createOBFIfNeeded(file, sourceMap);
 						readers.add(openReader(obfFile));
 					}
 				}
 			} else {
-				File obfFile = createOBFIfNeeded(testFile.getName());
+				File obfFile = createOBFIfNeeded(testFile.getName(), sourceMap);
 				readers.add(openReader(obfFile));
 			}
 		}
@@ -597,7 +634,7 @@ public class SpatialSearchPipelineTest {
 				System.out.printf("TEST %s - %s\n ", testFile.getName(), world);
 				if (world) {
 					readers.add(openReader(getOsmAndRegions()));
-					readers.add(openReader(createOBFIfNeeded("world_basemap.json.gz")));
+					readers.add(openReader(createOBFIfNeeded("world_basemap.json.gz", null)));
 				}
 			}
 
@@ -1180,6 +1217,7 @@ public class SpatialSearchPipelineTest {
 
 	private SpatialTextSearch.SpatialTextSearchSettings parseSpatialSettings(JSONObject settingsJson) {
 		SpatialTextSearch.SpatialTextSearchSettings settings = SpatialTextSearch.SpatialTextSearchSettings.defaultSettings();
+		settings.SCORE_RANKING = false;
 		settings.SEARCH_ADDR = settingsJson.optBoolean("SEARCH_ADDR", settings.SEARCH_ADDR);
 		settings.SEARCH_POI = settingsJson.optBoolean("SEARCH_POI", settings.SEARCH_POI);
 		settings.SEARCH_BUILDINGS = settingsJson.optBoolean("SEARCH_BUILDINGS", settings.SEARCH_BUILDINGS);

@@ -6,6 +6,7 @@ import net.osmand.binary.BinaryMapIndexTestReader;
 import net.osmand.binary.OsmandOdb;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.obf.diff.ObfFileInMemory;
+import net.osmand.obf.preparation.NameIndexCreator;
 import net.osmand.util.Algorithms;
 import rtree.RTreeException;
 
@@ -29,6 +30,15 @@ public class OBFDataCreator extends BinaryMerger {
 		COMBINE_ARGS.put("--route", OsmandOdb.OsmAndStructure.ROUTINGINDEX_FIELD_NUMBER);
 	}
 
+	private String sourceMap;
+
+	/**
+	 * @param sourceMap download name of the map the test data comes from: its language group chooses the keys of names
+	 */
+	public void setSourceMap(String sourceMap) {
+		this.sourceMap = sourceMap;
+	}
+
 	public File create(String obfFilePath, String[] jsonFilePaths) throws IOException, SQLException {
 		Set<Integer> combineParts = new HashSet<>(COMBINE_ARGS.values());
 		return create(obfFilePath, jsonFilePaths, combineParts);
@@ -38,6 +48,7 @@ public class OBFDataCreator extends BinaryMerger {
 		File outputFile = new File(obfFilePath);
 		List<BinaryMapIndexReader> readers = new ArrayList<>();
 		List<BinaryMapIndexTestReader> testReaders = new ArrayList<>();
+		int prevMinCommonNonIndexed = NameIndexCreator.MIN_LIMIT_COMMON_NON_INDEXED;
 		try {
 			for (String jsonFilePath : jsonFilePaths) {
 				File jsonFile = new File(jsonFilePath);
@@ -55,6 +66,12 @@ public class OBFDataCreator extends BinaryMerger {
 
 			if (readers.isEmpty()) {
 				throw new IOException("No data for merge");
+			}
+			// a map cut out by a few words counts them far more often than the map it came from does
+			for (BinaryMapIndexTestReader testReader : testReaders) {
+				if (testReader.getMinCommonNonIndexed() >= 0) {
+					NameIndexCreator.MIN_LIMIT_COMMON_NON_INDEXED = testReader.getMinCommonNonIndexed();
+				}
 			}
 			if (outputFile.exists()) {
 				if (!outputFile.delete()) {
@@ -83,10 +100,16 @@ public class OBFDataCreator extends BinaryMerger {
 
 			return outFile;
 		} finally {
+			NameIndexCreator.MIN_LIMIT_COMMON_NON_INDEXED = prevMinCommonNonIndexed;
 			for (BinaryMapIndexReader reader : readers) {
 				reader.close();
 			}
 		}
+	}
+
+	@Override
+	protected String getNameIndexMapName(String fileName) {
+		return sourceMap != null ? sourceMap : fileName;
 	}
 
 	@Override
