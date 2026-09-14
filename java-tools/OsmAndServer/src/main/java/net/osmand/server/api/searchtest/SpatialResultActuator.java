@@ -21,15 +21,17 @@ public class SpatialResultActuator extends ResultActuator {
 	}
 	
 	protected static final int DIST_PRECISE_THRESHOLD_M = 20;
-	// the number interpolated on the line can be up to 150 m from the address point ("1831-1847" for 1833)
-	protected static final int DIST_INTERPOLATION_THRESHOLD_M = 150;
+	// the number interpolated on the line can be up to 300 m from the address point ("1512-1598" for 1526 at 230 m);
+	// in the US runs of 2026-09-14 the next interpolated top results were 500 m+ away and wrong
+	protected static final int DIST_INTERPOLATION_THRESHOLD_M = 300;
 	
 	protected Result findActualResult(List<SearchResult> searchResults) throws IOException {
 		// The first result that is the target: the same object or one at the point (deduplication may keep the id of the
-		// building). Categories take no place; a street from the way with the same number is not the address.
+		// building). Categories and LOCATION rows take no place (findFirstResult skips LOCATION too: "Via Provinciale 39"
+		// had 4 of them above the house at 0 m); a street from the way with the same number is not the address.
 		int resPlace = 0;
 		for (SearchResult sr : searchResults) {
-			if (sr.objectType == ObjectType.POI_TYPE) {
+			if (sr.objectType == ObjectType.POI_TYPE || sr.objectType == ObjectType.LOCATION) {
 				continue;
 			}
 			resPlace++;
