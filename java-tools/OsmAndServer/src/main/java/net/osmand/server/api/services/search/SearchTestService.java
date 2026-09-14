@@ -483,7 +483,8 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 					} catch (NumberFormatException e) {
 						osmId = -1;
 					}
-					actuator = isSpatial ? new SpatialResultActuator(targetPoint, statMetrics, osmId, (String) objRow.get("addr:housenumber"))
+					// dataset columns are sanitized (DataService.sanitize): addr:housenumber -> addr_housenumber
+					actuator = isSpatial ? new SpatialResultActuator(targetPoint, statMetrics, osmId, (String) objRow.get("addr_housenumber"))
 							: new ClassicResultActuator(targetPoint, statMetrics, osmId);
 				}
 
