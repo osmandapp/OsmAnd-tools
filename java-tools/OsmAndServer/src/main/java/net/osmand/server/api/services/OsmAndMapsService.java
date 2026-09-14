@@ -2,6 +2,7 @@ package net.osmand.server.api.services;
 
 
 import java.awt.image.BufferedImage;
+import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -569,7 +570,7 @@ public class OsmAndMapsService {
 	}
 
 	@Scheduled(fixedRate = INTERVAL_TO_MONITOR_ZIP)
-	public synchronized void checkZippedFiles() throws IOException {
+	public void checkZippedFiles() throws IOException {
 		if (tileConfig != null && !Algorithms.isEmpty(tileConfig.obfZipLocation) && !Algorithms.isEmpty(tileConfig.obfLocation)) {
 			LOGGER.info("Checking new files at " + tileConfig.obfZipLocation + " " + tileConfig.obfLocation);
 			File[] zipFiles = new File(tileConfig.obfZipLocation).listFiles();
@@ -582,7 +583,7 @@ public class OsmAndMapsService {
 					if (!target.exists() || target.lastModified() < zipFile.lastModified()
 							|| zipFile.length() > target.length()) {
 						long val = System.currentTimeMillis();
-						ZipInputStream zis = new ZipInputStream(new FileInputStream(zipFile));
+						ZipInputStream zis = new ZipInputStream(new BufferedInputStream(new FileInputStream(zipFile), 1 << 20));
 						ZipEntry ze = zis.getNextEntry();
 						boolean success = false;
 						while (ze != null && !success) {
@@ -1400,7 +1401,7 @@ public class OsmAndMapsService {
 	}
 
 
-	private void initNewObfFiles(File target, File targetTemp) throws IOException {
+	private synchronized void initNewObfFiles(File target, File targetTemp) throws IOException {
 		initObfReaders();
 		long val = System.currentTimeMillis();
 		BinaryMapIndexReaderReference ref = obfFiles.get(target.getAbsolutePath());
