@@ -1476,6 +1476,11 @@ public class BinaryMapIndexWriter {
 			if (st.getEnName(false) != null) {
 				tStop.setNameEn(registerString(stringTable, st.getEnName(false)));
 			}
+			// TODO(#17773): mirrors TransportStop.syntheticTerminal onto the per-route embedded
+			// copy - see OBF.proto TransportRouteStop.syntheticTerminal comment.
+			if (st.isSyntheticTerminal()) {
+				tStop.setSyntheticTerminal(true);
+			}
 			tRoute.addDirectStops(tStop.build());
 		}
 		if (directRoute != null) {
@@ -1612,7 +1617,8 @@ public class BinaryMapIndexWriter {
 	}
 
 	public void writeTransportStop(long id, int x24, int y24, String name, String nameEn, Map<String, String> names, Map<String, Integer> stringTable,
-			TLongArrayList routesOffsets, TLongArrayList routesIds, TLongArrayList deletedRoutes, Map<Entity.EntityId, List<TransportStopExit>> exits) throws IOException {
+			TLongArrayList routesOffsets, TLongArrayList routesIds, TLongArrayList deletedRoutes, Map<Entity.EntityId, List<TransportStopExit>> exits,
+			boolean syntheticTerminal) throws IOException {
 		checkPeekState(TRANSPORT_STOPS_TREE);
 
 		Bounds bounds = stackBounds.peek();
@@ -1631,6 +1637,13 @@ public class BinaryMapIndexWriter {
 		ts.setDx(x24 - bounds.leftX);
 		ts.setDy(y24 - bounds.topY);
 		ts.setId(id - stackBaseIds.peek());
+		// TODO(#17773): see TransportStop.syntheticTerminal - only true for stops the generator
+		// itself fabricated (orphan route=ferry way endpoints with no real backing OSM tag), never
+		// for a real pre-existing tagged terminal. Only written when true, to keep old-format-sized
+		// obf files for the (overwhelming majority of) stops that aren't synthetic.
+		if (syntheticTerminal) {
+			ts.setSyntheticTerminal(true);
+		}
 		mapDataBuf.clear();
 		for (Map.Entry<String, String> entry : names.entrySet()) {
 			writeRawVarint32(mapDataBuf, registerString(stringTable,entry.getKey()));
