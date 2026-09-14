@@ -1,9 +1,9 @@
 package net.osmand.server.api.searchtest;
 
-import net.osmand.binary.BinaryMapDataObject;
-import net.osmand.binary.ObfConstants;
+import net.osmand.data.Building;
 import net.osmand.data.LatLon;
-import net.osmand.data.MapObject;
+import net.osmand.data.Street;
+import net.osmand.search.core.ObjectType;
 import net.osmand.search.core.SearchResult;
 import net.osmand.util.MapUtils;
 
@@ -21,27 +21,27 @@ public class SpatialResultActuator extends ResultActuator {
 	}
 	
 	protected static final int DIST_PRECISE_THRESHOLD_M = 20;
+	// the number interpolated on the line can be up to 150 m from the address point ("1831-1847" for 1833)
+	protected static final int DIST_INTERPOLATION_THRESHOLD_M = 150;
 	
 	protected Result findActualResult(List<SearchResult> searchResults) throws IOException {
-		// Find closest by distance by id & by tags 
-		int resPlace = 1;
-		double minDistance = Double.MAX_VALUE;
+		// The first result that is the target: the same object or one at the point (deduplication may keep the id of the
+		// building). Categories take no place; a street from the way with the same number is not the address.
+		int resPlace = 0;
 		for (SearchResult sr : searchResults) {
-			if (sr.object instanceof MapObject mo && ObfConstants.getOsmObjectId(mo) == osmId) {
-				actualResult = new Result(ResultType.ById, resPlace, sr);
-				break;
-			} else if (sr.object instanceof BinaryMapDataObject bo && ObfConstants.getOsmObjectId(bo) == osmId) {
-				actualResult = new Result(ResultType.ById, resPlace, sr);
-				break;
-			} else if(sr.location != null) {
-				double dist = MapUtils.getDistance(sr.location, targetPoint);
-				if (dist < DIST_PRECISE_THRESHOLD_M && dist < minDistance) {
-					minDistance = dist;
-					actualResult = new Result(ResultType.ByDist, resPlace, sr);
-				}
+			if (sr.objectType == ObjectType.POI_TYPE) {
+				continue;
 			}
 			resPlace++;
+			if (!(sr.object instanceof Street) && osmId(sr) == osmId) {
+				return new Result(ResultType.ById, resPlace, sr);
+			}
+			int threshold = sr.object instanceof Building b && b.getLatLon2() != null ? DIST_INTERPOLATION_THRESHOLD_M
+					: DIST_PRECISE_THRESHOLD_M;
+			if (sr.location != null && MapUtils.getDistance(sr.location, targetPoint) < threshold) {
+				return new Result(ResultType.ByDist, resPlace, sr);
+			}
 		}
-		return actualResult;
+		return null;
 	}
 }
