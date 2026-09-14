@@ -15,6 +15,10 @@ public class SpatialResultActuator extends ResultActuator {
 	protected final long osmId;
 	protected final String houseNumber;
 
+	public SpatialResultActuator(LatLon targetPoint, Map<String, Object> statMetrics, long osmId) {
+		this(targetPoint, statMetrics, osmId, null);
+	}
+
 	public SpatialResultActuator(LatLon targetPoint, Map<String, Object> statMetrics, long osmId, String houseNumber) {
 		super(targetPoint, statMetrics);
 		this.osmId = osmId;
