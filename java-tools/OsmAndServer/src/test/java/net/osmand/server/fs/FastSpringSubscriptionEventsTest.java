@@ -33,7 +33,9 @@ public class FastSpringSubscriptionEventsTest {
 	private static final String ORDER_MONTHLY = "MP_ORDER_ID_TEST000000";
 	private static final String SKU_ANNUAL = "net.osmand.fastspring.subscription.pro.annual";
 	private static final String ORDER_ANNUAL = "ORDER_ID_TEST000000000";
+	private static final String ORDER_REBILLED = "ORDER_ID_SUB_TEST00000";
 	private static final String SUBSCRIPTION = "SUBSCRIPTION_ID_TEST00";
+	private static final String SUBSCRIPTION_REBILLED = "SUBSCRIPTION_ID_TEST01";
 
 	@Mock
 	CloudUsersRepository usersRepository;
@@ -44,8 +46,8 @@ public class FastSpringSubscriptionEventsTest {
 	@InjectMocks
 	FastSpringController controller;
 
-	private SupporterDeviceSubscription handle(String webhook, String apiResponse, String sku, String orderId, boolean recorded,
-	                                           Function<FastSpringWebhookRequest, ResponseEntity<String>> endpoint) throws IOException {
+	private SupporterDeviceSubscription handle(String webhook, String apiResponse, String subscriptionId, String sku, String orderId,
+	                                           boolean recorded, Function<FastSpringWebhookRequest, ResponseEntity<String>> endpoint) throws IOException {
 		SupporterDeviceSubscription s = new SupporterDeviceSubscription();
 		s.sku = sku;
 		s.orderId = orderId;
@@ -56,7 +58,7 @@ public class FastSpringSubscriptionEventsTest {
 		}
 		FastSpringWebhookRequest request = FsJson.read(webhook, FastSpringWebhookRequest.class);
 		try (MockedStatic<FastSpringHelper> fs = mockStatic(FastSpringHelper.class)) {
-			fs.when(() -> FastSpringHelper.getSubscription(SUBSCRIPTION))
+			fs.when(() -> FastSpringHelper.getSubscription(subscriptionId))
 					.thenReturn(FsJson.read(apiResponse, FastSpringSubscription.class));
 			assertEquals(recorded ? 200 : 202, endpoint.apply(request).getStatusCode().value());
 		}
@@ -64,8 +66,8 @@ public class FastSpringSubscriptionEventsTest {
 	}
 
 	private SupporterDeviceSubscription canceled(boolean recorded) throws IOException {
-		return handle("subscription-canceled.json", "subscriptions-get-canceled.json", SKU_MONTHLY, ORDER_MONTHLY, recorded,
-				controller::handleSubscriptionCanceledEvent);
+		return handle("subscription-canceled.json", "subscriptions-get-canceled.json", SUBSCRIPTION, SKU_MONTHLY, ORDER_MONTHLY,
+				recorded, controller::handleSubscriptionCanceledEvent);
 	}
 
 	// the hook payload has no order id, the record is found by initialOrderId of the API response
@@ -89,11 +91,24 @@ public class FastSpringSubscriptionEventsTest {
 	@Test
 	public void deactivatedRevokesSubscription() throws IOException {
 		SupporterDeviceSubscription s = handle("subscription-deactivated.json", "subscriptions-get-deactivated.json",
-				SKU_ANNUAL, ORDER_ANNUAL, true, controller::handleSubscriptionDeactivatedEvent);
+				SUBSCRIPTION, SKU_ANNUAL, ORDER_ANNUAL, true, controller::handleSubscriptionDeactivatedEvent);
 		assertFalse("deactivated subscription must be invalid", s.valid);
 		assertFalse(s.autorenewing);
 		assertEquals("expired", s.kind);
 		assertNotNull(s.checktime);
 		verify(subs).saveAndFlush(s);
+	}
+
+	// a rebill is a new order, the existing record is updated instead of recording the new order id
+	@Test
+	public void chargeCompletedMovesExpireTimeToNextBillingDate() throws IOException {
+		SupporterDeviceSubscription s = handle("subscription-charge-completed.json", "subscriptions-get-active.json",
+				SUBSCRIPTION_REBILLED, SKU_ANNUAL, ORDER_REBILLED, true, controller::handleSubscriptionChargeCompletedEvent);
+		assertEquals("expiretime must be FastSpring next billing date (2027-09-11)", 1820620800000L, s.expiretime.getTime());
+		assertTrue(s.autorenewing);
+		assertEquals("the rebill order id must not replace the initial one", ORDER_REBILLED, s.orderId);
+		assertNotNull(s.checktime);
+		verify(subs).saveAndFlush(s);
+		verify(subs, never()).findByOrderIdAndSku(eq("MP_ORDER_ID_REBILL000"), any());
 	}
 }

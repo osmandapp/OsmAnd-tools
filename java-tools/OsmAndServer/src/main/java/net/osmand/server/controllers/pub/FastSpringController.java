@@ -59,8 +59,9 @@ public class FastSpringController {
 	private static final String EVENT_CHARGEBACK_CREATED = "chargeback.created";
 	private static final String EVENT_SUBSCRIPTION_CANCELED = "subscription.canceled";
 	private static final String EVENT_SUBSCRIPTION_DEACTIVATED = "subscription.deactivated";
+	private static final String EVENT_SUBSCRIPTION_CHARGE_COMPLETED = "subscription.charge.completed";
 	private static final Set<String> HANDLED_EVENTS = Set.of(EVENT_ORDER_COMPLETED, EVENT_RETURN_CREATED, EVENT_CHARGEBACK_CREATED,
-			EVENT_SUBSCRIPTION_CANCELED, EVENT_SUBSCRIPTION_DEACTIVATED);
+			EVENT_SUBSCRIPTION_CANCELED, EVENT_SUBSCRIPTION_DEACTIVATED, EVENT_SUBSCRIPTION_CHARGE_COMPLETED);
 
 	// values for the "kind" column, same convention as UpdateSubscription.deleteSubscription (expired/invalid/gone)
 	private static final String KIND_REFUND = "refund";
@@ -190,6 +191,16 @@ public class FastSpringController {
 			return ResponseEntity.internalServerError().body("FastSpring: empty request");
 		}
 		return processEventsBatch(request.events, Set.of(EVENT_SUBSCRIPTION_DEACTIVATED));
+	}
+
+	// https://developer.fastspring.com/reference/subscription-charge-completed
+	@Transactional
+	@PostMapping("/subscription-charge-completed")
+	public ResponseEntity<String> handleSubscriptionChargeCompletedEvent(@RequestBody FastSpringWebhookRequest request) {
+		if (request == null || request.events == null) {
+			return ResponseEntity.internalServerError().body("FastSpring: empty request");
+		}
+		return processEventsBatch(request.events, Set.of(EVENT_SUBSCRIPTION_CHARGE_COMPLETED));
 	}
 
 	// https://developer.fastspring.com/reference/processed-and-unprocessed-webhook-events
@@ -424,6 +435,9 @@ public class FastSpringController {
 			return handleSubscriptionStateEvent(event);
 		} else if (EVENT_SUBSCRIPTION_DEACTIVATED.equals(event.type)) {
 			// https://developer.fastspring.com/reference/subscription-deactivated
+			return handleSubscriptionStateEvent(event);
+		} else if (EVENT_SUBSCRIPTION_CHARGE_COMPLETED.equals(event.type)) {
+			// https://developer.fastspring.com/reference/subscription-charge-completed
 			return handleSubscriptionStateEvent(event);
 		}
 		return null;
