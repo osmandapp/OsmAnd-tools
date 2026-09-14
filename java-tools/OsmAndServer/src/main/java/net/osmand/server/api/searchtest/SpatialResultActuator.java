@@ -2,6 +2,7 @@ package net.osmand.server.api.searchtest;
 
 import net.osmand.data.Building;
 import net.osmand.data.LatLon;
+import net.osmand.data.MapObject;
 import net.osmand.data.Street;
 import net.osmand.search.core.ObjectType;
 import net.osmand.search.core.SearchResult;
@@ -43,7 +44,32 @@ public class SpatialResultActuator extends ResultActuator {
 			if (sr.location != null && MapUtils.getDistance(sr.location, targetPoint) < threshold) {
 				return new Result(ResultType.ByDist, resPlace, sr);
 			}
+			if (sr.object instanceof Building b && b.getLatLon2() == null && unitAtTarget(sr, b)) {
+				return new Result(ResultType.ByDist, resPlace, sr);
+			}
 		}
 		return null;
+	}
+
+	// The target is a unit of the found house: the query has no unit, so '1198 Maple Avenue' for the node 1198 C9
+	// gives the house 1198 105 m away (search prefers the exact number), while '1198-C9' of the same street is at the point.
+	private boolean unitAtTarget(SearchResult sr, Building found) {
+		if (sr.spatialResult == null || found.getName() == null) {
+			return false;
+		}
+		String unitPrefix = found.getName() + "-";
+		for (MapObject o : sr.spatialResult.getObjects()) {
+			if (!(o instanceof Street s)) {
+				continue;
+			}
+			for (Building unit : s.getBuildings()) {
+				if (unit.getLatLon2() == null && unit.getName() != null && unit.getName().startsWith(unitPrefix)
+						&& unit.getLocation() != null
+						&& MapUtils.getDistance(unit.getLocation(), targetPoint) < DIST_PRECISE_THRESHOLD_M) {
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 }
