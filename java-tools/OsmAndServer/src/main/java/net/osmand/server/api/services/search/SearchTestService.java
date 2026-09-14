@@ -308,6 +308,7 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 		// Persist optional lat/lon overrides if provided
 		run.lat = payload.lat;
 		run.lon = payload.lon;
+		run.threadsCount = payload.threadsCount;
 		run.start = LocalDateTime.now();
 		run = runRepo.save(run);
 
@@ -315,7 +316,6 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 		test.lat = run.lat;
 		test.lon = run.lon;
 		test.threadsCount = payload.threadsCount;
-		run.threadsCount = payload.threadsCount;
 		testCaseRepo.save(test);
 
 		Run finalRun = run;
