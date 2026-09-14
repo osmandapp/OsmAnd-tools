@@ -115,7 +115,11 @@ public class SpatialSearchPipelineTest {
 	private static final int MAX_KNOWN_HASHES = 4; // one per build that writes its own class files
 	private static final boolean RUN_IGNORED_TESTS = false;
 	protected static MapPoiTypes.PoiTranslator defaultPoiTranslator;
-	
+	private static Map<String, String> enPhrases = new HashMap<>();
+	private static final Map<String, MapPoiTypes.PoiTranslator> langPoiTranslators = new HashMap<>();
+	/** settings "phrasesLang" of the test being run */
+	protected String phrasesLang;
+
 	private static final boolean FILTER_DATA_JSON = false;
 	private static final double FILTER_REMOVE_PROBABILITY = 0.8; // means 80% probability of removal
 	private static boolean HASH_IS_ACTUAL_FOR_RUN; // evaluated once during non-LIVE setup
@@ -225,7 +229,6 @@ public class SpatialSearchPipelineTest {
 	private static void defaultSetup() {
 		MapPoiTypes.setDefault(new MapPoiTypes(RESOURCES_PATH + "poi/poi_types.xml"));
 		MapPoiTypes poiTypes = MapPoiTypes.getDefault();
-		Map<String, String> enPhrases = new HashMap<>();
 		Map<String, String> phrases = new HashMap<>();
 		try {
 			enPhrases = Algorithms.parseStringsXml(new File(getAndroidPath() + "OsmAnd/res/values/phrases.xml"));
@@ -237,6 +240,23 @@ public class SpatialSearchPipelineTest {
 
 		defaultPoiTranslator = new TestSearchTranslator(phrases, enPhrases);
 		poiTypes.setPoiTranslator(defaultPoiTranslator);
+	}
+
+	/** POI categories named as the app names them in that language ("phrasesLang": "de" makes "parkplatz" a
+	 *  category and not only a name); English where the language has no phrase */
+	private static synchronized MapPoiTypes.PoiTranslator translatorFor(String lang) {
+		if (Algorithms.isEmpty(lang)) {
+			return defaultPoiTranslator;
+		}
+		return langPoiTranslators.computeIfAbsent(lang, l -> {
+			Map<String, String> phrases = new HashMap<>(enPhrases);
+			try {
+				phrases.putAll(Algorithms.parseStringsXml(new File(getAndroidPath() + "OsmAnd/res/values-" + l + "/phrases.xml")));
+			} catch (IOException | XmlPullParserException e) {
+				throw new IllegalStateException("No phrases for " + l, e);
+			}
+			return new TestSearchTranslator(phrases, enPhrases);
+		});
 	}
 
 	/**
@@ -539,7 +559,7 @@ public class SpatialSearchPipelineTest {
 	protected SpatialTestSearchEngine createSearchEngine(SpatialTextSearch.SpatialTextSearchSettings spatialSettings, 
 												  LatLon point, List<BinaryMapIndexReader> readers, boolean translation) {
 		MapPoiTypes poiTypes = new MapPoiTypes(null);
-		poiTypes.setPoiTranslator(translation ? new SpatialTestSearchEngine.TestPoiTranslator() : defaultPoiTranslator);
+		poiTypes.setPoiTranslator(translation ? new SpatialTestSearchEngine.TestPoiTranslator() : translatorFor(phrasesLang));
 		// binary readers resolve POI types of map objects through the default
 		MapPoiTypes.setDefault(poiTypes);
 		return new SpatialTestSearchEngine(spatialSettings, point, readers, poiTypes);
@@ -562,6 +582,7 @@ public class SpatialSearchPipelineTest {
 		}
 
 		boolean translation = settingsJson.optBoolean("translation");
+		phrasesLang = settingsJson.optString("phrasesLang", null);
 		boolean world = settingsJson.optBoolean("world");
 		List<BinaryMapIndexReader> readers = new ArrayList<>();
 		boolean prevDisplayDefaultPoiTypes = SearchCoreFactory.DISPLAY_DEFAULT_POI_TYPES;
