@@ -60,12 +60,10 @@ public class FastSpringController {
 	private static final String EVENT_SUBSCRIPTION_CANCELED = "subscription.canceled";
 	private static final String EVENT_SUBSCRIPTION_DEACTIVATED = "subscription.deactivated";
 	private static final String EVENT_SUBSCRIPTION_CHARGE_COMPLETED = "subscription.charge.completed";
+	private static final Set<String> SUBSCRIPTION_EVENTS = Set.of(EVENT_SUBSCRIPTION_CANCELED, EVENT_SUBSCRIPTION_DEACTIVATED,
+			EVENT_SUBSCRIPTION_CHARGE_COMPLETED);
 	private static final Set<String> HANDLED_EVENTS = Set.of(EVENT_ORDER_COMPLETED, EVENT_RETURN_CREATED, EVENT_CHARGEBACK_CREATED,
 			EVENT_SUBSCRIPTION_CANCELED, EVENT_SUBSCRIPTION_DEACTIVATED, EVENT_SUBSCRIPTION_CHARGE_COMPLETED);
-
-	// values for the "kind" column, same convention as UpdateSubscription.deleteSubscription (expired/invalid/gone)
-	private static final String KIND_REFUND = "refund";
-	private static final String KIND_CHARGEBACK = "chargeback";
 
 	private static final String SKU_OSMAND_PRO_XV = "osmand_pro_xv";
 
@@ -302,15 +300,15 @@ public class FastSpringController {
 			}
 			return null;
 		}
-		revokeSubscriptions(subs, orderId, affectedUserIds, KIND_REFUND);
+		revokeSubscriptions(subs, orderId, affectedUserIds, UserSubscriptionService.KIND_REFUND);
 		return null;
 	}
 
 	private ResponseEntity<String> handleSubscriptionStateEvent(FastSpringWebhookRequest.Event event) {
 		FastSpringWebhookRequest.Data data = event.data;
 		if (data == null || data.subscription == null) {
-			LOGGER.error("FastSpring: " + event.type + " event without subscription id, skipping");
-			return null;
+			LOGGER.error("FastSpring: " + event.type + " event without subscription id");
+			return ResponseEntity.internalServerError().body("FastSpring: " + event.type + " event without subscription id");
 		}
 		FastSpringHelper.FastSpringSubscription fsSub;
 		try {
@@ -353,7 +351,7 @@ public class FastSpringController {
 		String orderId = data.order;
 		Set<Integer> affectedUserIds = new HashSet<>();
 		boolean revokedAny = revokePurchases(deviceInAppPurchasesRepository.findByOrderId(orderId),
-				deviceSubscriptionsRepository.findByOrderId(orderId), orderId, affectedUserIds, KIND_CHARGEBACK);
+				deviceSubscriptionsRepository.findByOrderId(orderId), orderId, affectedUserIds, UserSubscriptionService.KIND_CHARGEBACK);
 		if (!revokedAny) {
 			return ResponseEntity.internalServerError().body("FastSpring: nothing to revoke for orderId " + orderId);
 		}
@@ -430,14 +428,7 @@ public class FastSpringController {
 		} else if (EVENT_ORDER_COMPLETED.equals(event.type)) {
 			// https://developer.fastspring.com/reference/ordercompleted
 			return handleOrderCompletedEvent(event);
-		} else if (EVENT_SUBSCRIPTION_CANCELED.equals(event.type)) {
-			// https://developer.fastspring.com/reference/subscription-canceled
-			return handleSubscriptionStateEvent(event);
-		} else if (EVENT_SUBSCRIPTION_DEACTIVATED.equals(event.type)) {
-			// https://developer.fastspring.com/reference/subscription-deactivated
-			return handleSubscriptionStateEvent(event);
-		} else if (EVENT_SUBSCRIPTION_CHARGE_COMPLETED.equals(event.type)) {
-			// https://developer.fastspring.com/reference/subscription-charge-completed
+		} else if (SUBSCRIPTION_EVENTS.contains(event.type)) {
 			return handleSubscriptionStateEvent(event);
 		}
 		return null;

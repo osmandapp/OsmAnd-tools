@@ -53,6 +53,8 @@ public class UserSubscriptionService {
 	private static final String PLATFORM_WEB_NAME_APPLE = "Apple App Store";
 	private static final String PLATFORM_WEB_NAME_HUAWEI = "Huawei AppGallery";
 	private static final String PLATFORM_WEB_NAME_AMAZON = "Amazon";
+	public static final String KIND_REFUND = "refund";
+	public static final String KIND_CHARGEBACK = "chargeback";
 
 	private static final String ACCOUNT_KEY = "account";
 	private static final String FREE_ACCOUNT = "Free";
@@ -377,9 +379,15 @@ public class UserSubscriptionService {
 			LOG.info(String.format("FastSpring subscription %s - %s is not active (state %s)", s.sku, s.orderId, fsSub.state));
 			s.valid = false;
 			s.autorenewing = false;
+			if (fsSub.deactivationDate != null && (s.expiretime == null || fsSub.deactivationDate < s.expiretime.getTime())) {
+				s.expiretime = new Date(fsSub.deactivationDate);
+			}
 			if (s.kind == null || s.kind.isEmpty()) {
 				s.kind = UpdateSubscription.EXPIRED_STATE; // refund and chargeback keep their own kind
 			}
+		} else if (KIND_REFUND.equals(s.kind) || KIND_CHARGEBACK.equals(s.kind)) {
+			// FastSpring keeps a refunded or charged back subscription active until it deactivates, the money is already back
+			LOG.info(String.format("FastSpring subscription %s - %s stays revoked (%s), state %s", s.sku, s.orderId, s.kind, fsSub.state));
 		} else {
 			// canceled stays active until deactivationDate; FastSpring date replaces the hook estimate
 			Long expiry = fsSub.getExpiryTime();
