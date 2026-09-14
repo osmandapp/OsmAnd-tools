@@ -57,7 +57,9 @@ public class FastSpringController {
 	private static final String EVENT_ORDER_COMPLETED = "order.completed";
 	private static final String EVENT_RETURN_CREATED = "return.created";
 	private static final String EVENT_CHARGEBACK_CREATED = "chargeback.created";
-	private static final Set<String> HANDLED_EVENTS = Set.of(EVENT_ORDER_COMPLETED, EVENT_RETURN_CREATED, EVENT_CHARGEBACK_CREATED);
+	private static final String EVENT_SUBSCRIPTION_CANCELED = "subscription.canceled";
+	private static final Set<String> HANDLED_EVENTS = Set.of(EVENT_ORDER_COMPLETED, EVENT_RETURN_CREATED, EVENT_CHARGEBACK_CREATED,
+			EVENT_SUBSCRIPTION_CANCELED);
 
 	// values for the "kind" column, same convention as UpdateSubscription.deleteSubscription (expired/invalid/gone)
 	private static final String KIND_REFUND = "refund";
@@ -169,6 +171,16 @@ public class FastSpringController {
 		return processEventsBatch(request.events, HANDLED_EVENTS);
 	}
 
+	// https://developer.fastspring.com/reference/subscription-canceled
+	@Transactional
+	@PostMapping("/subscription-canceled")
+	public ResponseEntity<String> handleSubscriptionCanceledEvent(@RequestBody FastSpringWebhookRequest request) {
+		if (request == null || request.events == null) {
+			return ResponseEntity.internalServerError().body("FastSpring: empty request");
+		}
+		return processEventsBatch(request.events, Set.of(EVENT_SUBSCRIPTION_CANCELED));
+	}
+
 	// https://developer.fastspring.com/reference/processed-and-unprocessed-webhook-events
 	// 200 acknowledges the whole batch; on partial failure return 202 with the ids of the processed events
 	// (one per line) so that FastSpring retries only the failed ones.
@@ -272,6 +284,44 @@ public class FastSpringController {
 		return null;
 	}
 
+	private ResponseEntity<String> handleSubscriptionCanceledEvent(FastSpringWebhookRequest.Event event) {
+		FastSpringWebhookRequest.Data data = event.data;
+		if (data == null || data.subscription == null) {
+			LOGGER.error("FastSpring: " + event.type + " event without subscription id, skipping");
+			return null;
+		}
+		FastSpringHelper.FastSpringSubscription fsSub;
+		try {
+			fsSub = FastSpringHelper.getSubscription(data.subscription);
+		} catch (Exception e) {
+			LOGGER.error("FastSpring: failed to read subscription " + data.subscription + ": " + e.getMessage(), e);
+			return ResponseEntity.internalServerError().body("FastSpring: failed to read subscription " + data.subscription);
+		}
+		if (fsSub == null || fsSub.initialOrderId == null || fsSub.sku == null) {
+			LOGGER.error("FastSpring: subscription " + data.subscription + " is not available");
+			return ResponseEntity.internalServerError().body("FastSpring: subscription " + data.subscription + " is not available");
+		}
+		List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subs =
+				deviceSubscriptionsRepository.findByOrderIdAndSku(fsSub.initialOrderId, fsSub.sku);
+		if (subs.isEmpty()) {
+			return ResponseEntity.internalServerError().body("FastSpring: no subscription recorded for orderId " + fsSub.initialOrderId);
+		}
+		long now = System.currentTimeMillis();
+		Set<Integer> affectedUserIds = new HashSet<>();
+		for (DeviceSubscriptionsRepository.SupporterDeviceSubscription sub : subs) {
+			userSubService.applyFastSpringSubscription(sub, fsSub, now);
+			sub.checktime = new Date(now);
+			deviceSubscriptionsRepository.saveAndFlush(sub);
+			if (sub.userId != null) {
+				affectedUserIds.add(sub.userId);
+			}
+			LOGGER.info(String.format("FastSpring: %s applied for orderId: %s, sku: %s (state: %s, valid: %s, expiretime: %s)",
+					event.type, sub.orderId, sub.sku, fsSub.state, sub.valid, sub.expiretime));
+		}
+		refreshAffectedUsers(affectedUserIds);
+		return null;
+	}
+
 	private ResponseEntity<String> handleChargebackCreatedEvent(FastSpringWebhookRequest.Event event) {
 		FastSpringWebhookRequest.Data data = event.data;
 		if (data == null || data.order == null) {
@@ -358,6 +408,9 @@ public class FastSpringController {
 		} else if (EVENT_ORDER_COMPLETED.equals(event.type)) {
 			// https://developer.fastspring.com/reference/ordercompleted
 			return handleOrderCompletedEvent(event);
+		} else if (EVENT_SUBSCRIPTION_CANCELED.equals(event.type)) {
+			// https://developer.fastspring.com/reference/subscription-canceled
+			return handleSubscriptionCanceledEvent(event);
 		}
 		return null;
 	}
@@ -444,6 +497,7 @@ public class FastSpringController {
 
 		public static class Data {
 			public String order; // orderId
+			public String subscription; // subscriptionId, present on subscription.* events
 			public String reference; // purchaseToken
 			public Customer customer;
 			public Tags tags;

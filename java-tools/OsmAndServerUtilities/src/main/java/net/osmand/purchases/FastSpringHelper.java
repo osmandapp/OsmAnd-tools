@@ -167,7 +167,7 @@ public class FastSpringHelper {
 		}
 	}
 
-	private static FastSpringSubscription getSubscription(String subscriptionId) throws IOException {
+	public static FastSpringSubscription getSubscription(String subscriptionId) throws IOException {
 		HttpURLConnection connection = openConnection("/subscriptions/" + subscriptionId);
 		try (InputStream is = connection.getInputStream();
 		     InputStreamReader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
@@ -236,6 +236,7 @@ public class FastSpringHelper {
 
 	public static class FastSpringSubscription {
 		public String id;
+		public String initialOrderId; // order that created the subscription, our key together with sku
 		public Boolean active;
 		public String state; // active, overdue, canceled, deactivated, trial (https://developer.fastspring.com/reference/retrieve-a-subscription)
 		public String sku;

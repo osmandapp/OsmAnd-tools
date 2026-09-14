@@ -362,30 +362,34 @@ public class UserSubscriptionService {
 		try {
 			FastSpringHelper.FastSpringSubscription fsSub = FastSpringHelper.getSubscriptionByOrderIdAndSku(s.orderId, s.sku);
 			if (fsSub != null) {
-				if (!Boolean.TRUE.equals(fsSub.active)) {
-					// deactivated on FastSpring side: period ended after cancel, refund with cancellation, chargeback
-					LOG.info(String.format("FastSpring subscription %s - %s is not active (state %s)", s.sku, s.orderId, fsSub.state));
-					s.valid = false;
-					s.autorenewing = false;
-				} else {
-					// canceled stays active until deactivationDate; FastSpring date replaces the hook estimate
-					Long expiry = fsSub.getExpiryTime();
-					if (expiry != null) {
-						s.expiretime = new Date(expiry);
-					}
-					if (s.expiretime == null) {
-						LOG.error(String.format("FastSpring subscription %s - %s has no expiretime (state %s)", s.sku, s.orderId, fsSub.state));
-					} else {
-						s.valid = now < s.expiretime.getTime();
-					}
-					s.autorenewing = fsSub.isAutoRenewing();
-				}
+				applyFastSpringSubscription(s, fsSub, now);
 				subscriptionsRepo.save(s);
 			}
 		} catch (IOException e) {
 			LOG.error(String.format("Error retrieving fastspring subscription %s - %s: %s", s.sku, s.orderId, e.getMessage()), e);
 		}
 		return s;
+	}
+
+	public void applyFastSpringSubscription(SupporterDeviceSubscription s, FastSpringHelper.FastSpringSubscription fsSub, long now) {
+		if (!Boolean.TRUE.equals(fsSub.active)) {
+			// deactivated on FastSpring side: period ended after cancel, refund with cancellation, chargeback
+			LOG.info(String.format("FastSpring subscription %s - %s is not active (state %s)", s.sku, s.orderId, fsSub.state));
+			s.valid = false;
+			s.autorenewing = false;
+		} else {
+			// canceled stays active until deactivationDate; FastSpring date replaces the hook estimate
+			Long expiry = fsSub.getExpiryTime();
+			if (expiry != null) {
+				s.expiretime = new Date(expiry);
+			}
+			if (s.expiretime == null) {
+				LOG.error(String.format("FastSpring subscription %s - %s has no expiretime (state %s)", s.sku, s.orderId, fsSub.state));
+			} else {
+				s.valid = now < s.expiretime.getTime();
+			}
+			s.autorenewing = fsSub.isAutoRenewing();
+		}
 	}
 
 	public boolean updateOrderId(CloudUsersRepository.CloudUser pu) {
