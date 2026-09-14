@@ -483,7 +483,8 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 					} catch (NumberFormatException e) {
 						osmId = -1;
 					}
-					actuator = isSpatial ? new SpatialResultActuator(targetPoint, statMetrics, osmId) : new ClassicResultActuator(targetPoint, statMetrics, osmId);
+					actuator = isSpatial ? new SpatialResultActuator(targetPoint, statMetrics, osmId, (String) objRow.get("addr:housenumber"))
+							: new ClassicResultActuator(targetPoint, statMetrics, osmId);
 				}
 
 				Object[] args = null;

@@ -2,7 +2,6 @@ package net.osmand.server.api.searchtest;
 
 import net.osmand.data.Building;
 import net.osmand.data.LatLon;
-import net.osmand.data.MapObject;
 import net.osmand.data.Street;
 import net.osmand.search.core.ObjectType;
 import net.osmand.search.core.SearchResult;
@@ -14,18 +13,23 @@ import java.util.Map;
 
 public class SpatialResultActuator extends ResultActuator {
 	protected final long osmId;
+	protected final String houseNumber;
 
-	public SpatialResultActuator(LatLon targetPoint, Map<String, Object> statMetrics, long osmId) {
+	public SpatialResultActuator(LatLon targetPoint, Map<String, Object> statMetrics, long osmId, String houseNumber) {
 		super(targetPoint, statMetrics);
 		this.osmId = osmId;
+		this.houseNumber = houseNumber;
 		metrics.put("oid", osmId);
 	}
-	
+
 	protected static final int DIST_PRECISE_THRESHOLD_M = 20;
 	// the number interpolated on the line can be up to 300 m from the address point ("1512-1598" for 1526 at 230 m);
 	// in the US runs of 2026-09-14 the next interpolated top results were 500 m+ away and wrong
 	protected static final int DIST_INTERPOLATION_THRESHOLD_M = 300;
-	
+	// the dataset node is often a unit, shop or office of the house: node '1198' C9 is 105 m from the house 1198
+	// (Elmira), the shop '9333 Research Boulevard' is 210 m from the building (Austin); malls reach 700 m and stay failures
+	protected static final int DIST_SAME_NUMBER_THRESHOLD_M = 300;
+
 	protected Result findActualResult(List<SearchResult> searchResults) throws IOException {
 		// The first result that is the target: the same object or one at the point (deduplication may keep the id of the
 		// building). Categories and LOCATION rows take no place (findFirstResult skips LOCATION too: "Via Provinciale 39"
@@ -39,37 +43,32 @@ public class SpatialResultActuator extends ResultActuator {
 			if (!(sr.object instanceof Street) && osmId(sr) == osmId) {
 				return new Result(ResultType.ById, resPlace, sr);
 			}
-			int threshold = sr.object instanceof Building b && b.getLatLon2() != null ? DIST_INTERPOLATION_THRESHOLD_M
-					: DIST_PRECISE_THRESHOLD_M;
-			if (sr.location != null && MapUtils.getDistance(sr.location, targetPoint) < threshold) {
-				return new Result(ResultType.ByDist, resPlace, sr);
+			int threshold = DIST_PRECISE_THRESHOLD_M;
+			if (sr.object instanceof Building b) {
+				if (b.getLatLon2() != null) {
+					threshold = DIST_INTERPOLATION_THRESHOLD_M;
+				} else if (sameHouseNumber(b.getName())) {
+					threshold = DIST_SAME_NUMBER_THRESHOLD_M;
+				}
 			}
-			if (sr.object instanceof Building b && b.getLatLon2() == null && unitAtTarget(sr, b)) {
+			if (sr.location != null && MapUtils.getDistance(sr.location, targetPoint) < threshold) {
 				return new Result(ResultType.ByDist, resPlace, sr);
 			}
 		}
 		return null;
 	}
 
-	// The target is a unit of the found house: the query has no unit, so '1198 Maple Avenue' for the node 1198 C9
-	// gives the house 1198 105 m away (search prefers the exact number), while '1198-C9' of the same street is at the point.
-	private boolean unitAtTarget(SearchResult sr, Building found) {
-		if (sr.spatialResult == null || found.getName() == null) {
+	// '1198' for the node 1198 (its unit is a separate tag), the found unit '5461-C335' for the node 5461
+	private boolean sameHouseNumber(String name) {
+		if (houseNumber == null || name == null) {
 			return false;
 		}
-		String unitPrefix = found.getName() + "-";
-		for (MapObject o : sr.spatialResult.getObjects()) {
-			if (!(o instanceof Street s)) {
-				continue;
-			}
-			for (Building unit : s.getBuildings()) {
-				if (unit.getLatLon2() == null && unit.getName() != null && unit.getName().startsWith(unitPrefix)
-						&& unit.getLocation() != null
-						&& MapUtils.getDistance(unit.getLocation(), targetPoint) < DIST_PRECISE_THRESHOLD_M) {
-					return true;
-				}
-			}
-		}
-		return false;
+		String target = normalizeHouseNumber(houseNumber);
+		String found = normalizeHouseNumber(name);
+		return !found.isEmpty() && (target.equals(found) || found.startsWith(target + "-") || target.startsWith(found + "-"));
+	}
+
+	private static String normalizeHouseNumber(String hno) {
+		return hno.trim().toLowerCase().replaceAll("\\s+", "-");
 	}
 }
