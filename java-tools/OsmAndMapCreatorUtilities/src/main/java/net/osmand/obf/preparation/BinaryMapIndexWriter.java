@@ -1481,6 +1481,9 @@ public class BinaryMapIndexWriter {
 			if (st.isSyntheticTerminal()) {
 				tStop.setSyntheticTerminal(true);
 			}
+			if (st.isTransferOnly()) {
+				tStop.setTransferOnly(true);
+			}
 			tRoute.addDirectStops(tStop.build());
 		}
 		if (directRoute != null) {

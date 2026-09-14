@@ -5,6 +5,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Type;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -31,7 +32,10 @@ import com.google.gson.reflect.TypeToken;
 
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.list.array.TLongArrayList;
+import gnu.trove.map.hash.TLongIntHashMap;
+import gnu.trove.map.hash.TLongLongHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
+import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
 import net.osmand.data.TransportRoute;
@@ -80,6 +84,10 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	// (iterateMainEntity) so a real relation always takes priority over generating a route from
 	// the bare way directly (see issue #17773 design notes).
 	private Set<Long> ferryWaysInRelations = new HashSet<Long>();
+	// synthetic stops created at untagged endpoints of orphan route=ferry ways: osm db node id -> stop id
+	private final TLongLongHashMap syntheticFerryEndpoints = new TLongLongHashMap();
+	// synthetic stops not reachable on foot (junction of ferry ways in the water), see resolveTransferOnlyStops
+	private final TLongHashSet transferOnlyStops = new TLongHashSet();
 
 	private static final long TEST_ROUTE_ID_MISSING_STOPS = 192037l;
 	
@@ -350,6 +358,67 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			System.out.println("[FERRY_PT_PROBE][GEN] ferry way id=" + e.getId()
 					+ " EXCLUDED from orphan branch: already in ferryWaysInRelations");
 		}
+	}
+
+	/**
+	 * Must be called after all ways were processed (while the osm db is still available).
+	 * A synthetic ferry way endpoint is a transfer-only stop (a point in the water) when it is shared by 2+ route=ferry
+	 * ways and by no other way. An endpoint connected to any other way (pier, footway, road...) is on the shore, and an
+	 * endpoint of a single ferry way is kept walkable as well (ferry lines are often not snapped to the shore).
+	 */
+	public void resolveTransferOnlyStops(OsmDbAccessor accessor) throws SQLException {
+		if (syntheticFerryEndpoints.isEmpty()) {
+			return;
+		}
+		Connection conn = accessor.getDbConn();
+		Statement stat = conn.createStatement();
+		stat.executeUpdate("create temp table synthetic_ferry_node (id bigint primary key)");
+		PreparedStatement insert = conn.prepareStatement("insert or ignore into synthetic_ferry_node (id) values (?)");
+		for (long nodeId : syntheticFerryEndpoints.keys()) {
+			insert.setLong(1, nodeId);
+			insert.addBatch();
+		}
+		insert.executeBatch();
+		insert.close();
+		PreparedStatement selectTags = conn.prepareStatement("select tags from ways where id = ? and ord = 0");
+		TLongIntHashMap ferryWays = new TLongIntHashMap();
+		TLongHashSet nodesOnOtherWays = new TLongHashSet();
+		ResultSet rs = stat.executeQuery("select w.node, w.id from ways w inner join synthetic_ferry_node s on w.node = s.id");
+		while (rs.next()) {
+			long nodeId = rs.getLong(1);
+			selectTags.setLong(1, rs.getLong(2));
+			ResultSet tags = selectTags.executeQuery();
+			boolean ferry = tags.next() && isFerryWayTags(tags.getBytes(1));
+			tags.close();
+			if (ferry) {
+				ferryWays.adjustOrPutValue(nodeId, 1, 1);
+			} else {
+				nodesOnOtherWays.add(nodeId);
+			}
+		}
+		rs.close();
+		selectTags.close();
+		stat.close();
+		for (long nodeId : syntheticFerryEndpoints.keys()) {
+			if (ferryWays.get(nodeId) >= 2 && !nodesOnOtherWays.contains(nodeId)) {
+				transferOnlyStops.add(syntheticFerryEndpoints.get(nodeId));
+			}
+		}
+		log.info("Transfer-only synthetic ferry stops: " + transferOnlyStops.size() + " of " + syntheticFerryEndpoints.size());
+	}
+
+	// tags are stored in osm db as "key\0value\0key\0value\0..."
+	private static boolean isFerryWayTags(byte[] tags) {
+		if (tags == null) {
+			return false;
+		}
+		String[] kv = new String(tags, StandardCharsets.UTF_8).split("\0");
+		for (int i = 0; i + 1 < kv.length; i += 2) {
+			if ("route".equals(kv[i]) && "ferry".equals(kv[i + 1])) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	public void createDatabaseStructure(Connection conn, DBDialect dialect, String rtreeStopsFileName) throws SQLException, IOException {
@@ -644,6 +713,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 						st.setEnName(stopEnName);
 					}
 					st.setSyntheticTerminal(rset.getInt(8) != 0);
+					st.setTransferOnly(transferOnlyStops.contains(idStop));
 					directStops.add(st);
 				}
 				selectTransportRouteGeometry.setLong(1, idRoute);
@@ -975,6 +1045,9 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				// Nordöleden/Hyppeln investigation, issue #17773).
 				TransportStop stop = EntityParser.parseTransportStop(n);
 				stop.setSyntheticTerminal(isEndpoint && !isTaggedTerminal);
+				if (stop.isSyntheticTerminal()) {
+					syntheticFerryEndpoints.put(n.getId(), stop.getId());
+				}
 				forwardStops.add(stop);
 			}
 		}
