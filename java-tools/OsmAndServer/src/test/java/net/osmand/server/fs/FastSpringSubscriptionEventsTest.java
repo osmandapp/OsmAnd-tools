@@ -5,6 +5,7 @@ import static org.mockito.Mockito.*;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.function.Function;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -13,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.Spy;
 import org.mockito.junit.MockitoJUnitRunner;
+import org.springframework.http.ResponseEntity;
 
 import net.osmand.purchases.FastSpringHelper;
 import net.osmand.purchases.FastSpringHelper.FastSpringSubscription;
@@ -27,8 +29,10 @@ import net.osmand.server.controllers.pub.FastSpringController.FastSpringWebhookR
 @RunWith(MockitoJUnitRunner.class)
 public class FastSpringSubscriptionEventsTest {
 
-	private static final String SKU = "net.osmand.fastspring.subscription.pro.monthly";
-	private static final String ORDER = "MP_ORDER_ID_TEST000000";
+	private static final String SKU_MONTHLY = "net.osmand.fastspring.subscription.pro.monthly";
+	private static final String ORDER_MONTHLY = "MP_ORDER_ID_TEST000000";
+	private static final String SKU_ANNUAL = "net.osmand.fastspring.subscription.pro.annual";
+	private static final String ORDER_ANNUAL = "ORDER_ID_TEST000000000";
 	private static final String SUBSCRIPTION = "SUBSCRIPTION_ID_TEST00";
 
 	@Mock
@@ -40,22 +44,28 @@ public class FastSpringSubscriptionEventsTest {
 	@InjectMocks
 	FastSpringController controller;
 
-	private SupporterDeviceSubscription canceled(boolean recorded) throws IOException {
+	private SupporterDeviceSubscription handle(String webhook, String apiResponse, String sku, String orderId, boolean recorded,
+	                                           Function<FastSpringWebhookRequest, ResponseEntity<String>> endpoint) throws IOException {
 		SupporterDeviceSubscription s = new SupporterDeviceSubscription();
-		s.sku = SKU;
-		s.orderId = ORDER;
+		s.sku = sku;
+		s.orderId = orderId;
 		s.valid = true;
 		s.autorenewing = true;
 		if (recorded) {
-			when(subs.findByOrderIdAndSku(ORDER, SKU)).thenReturn(List.of(s));
+			when(subs.findByOrderIdAndSku(orderId, sku)).thenReturn(List.of(s));
 		}
-		FastSpringWebhookRequest request = FsJson.read("subscription-canceled.json", FastSpringWebhookRequest.class);
+		FastSpringWebhookRequest request = FsJson.read(webhook, FastSpringWebhookRequest.class);
 		try (MockedStatic<FastSpringHelper> fs = mockStatic(FastSpringHelper.class)) {
 			fs.when(() -> FastSpringHelper.getSubscription(SUBSCRIPTION))
-					.thenReturn(FsJson.read("subscriptions-get-canceled.json", FastSpringSubscription.class));
-			assertEquals(recorded ? 200 : 202, controller.handleSubscriptionCanceledEvent(request).getStatusCode().value());
+					.thenReturn(FsJson.read(apiResponse, FastSpringSubscription.class));
+			assertEquals(recorded ? 200 : 202, endpoint.apply(request).getStatusCode().value());
 		}
 		return s;
+	}
+
+	private SupporterDeviceSubscription canceled(boolean recorded) throws IOException {
+		return handle("subscription-canceled.json", "subscriptions-get-canceled.json", SKU_MONTHLY, ORDER_MONTHLY, recorded,
+				controller::handleSubscriptionCanceledEvent);
 	}
 
 	// the hook payload has no order id, the record is found by initialOrderId of the API response
@@ -74,5 +84,16 @@ public class FastSpringSubscriptionEventsTest {
 	public void canceledOfUnknownOrderIsRejectedForRetry() throws IOException {
 		canceled(false);
 		verify(subs, never()).saveAndFlush(any());
+	}
+
+	@Test
+	public void deactivatedRevokesSubscription() throws IOException {
+		SupporterDeviceSubscription s = handle("subscription-deactivated.json", "subscriptions-get-deactivated.json",
+				SKU_ANNUAL, ORDER_ANNUAL, true, controller::handleSubscriptionDeactivatedEvent);
+		assertFalse("deactivated subscription must be invalid", s.valid);
+		assertFalse(s.autorenewing);
+		assertEquals("expired", s.kind);
+		assertNotNull(s.checktime);
+		verify(subs).saveAndFlush(s);
 	}
 }
