@@ -60,8 +60,6 @@ public class FastSpringController {
 	private static final String EVENT_SUBSCRIPTION_CANCELED = "subscription.canceled";
 	private static final String EVENT_SUBSCRIPTION_DEACTIVATED = "subscription.deactivated";
 	private static final String EVENT_SUBSCRIPTION_CHARGE_COMPLETED = "subscription.charge.completed";
-	private static final Set<String> SUBSCRIPTION_EVENTS = Set.of(EVENT_SUBSCRIPTION_CANCELED, EVENT_SUBSCRIPTION_DEACTIVATED,
-			EVENT_SUBSCRIPTION_CHARGE_COMPLETED);
 	private static final Set<String> HANDLED_EVENTS = Set.of(EVENT_ORDER_COMPLETED, EVENT_RETURN_CREATED, EVENT_CHARGEBACK_CREATED,
 			EVENT_SUBSCRIPTION_CANCELED, EVENT_SUBSCRIPTION_DEACTIVATED, EVENT_SUBSCRIPTION_CHARGE_COMPLETED);
 
@@ -300,7 +298,7 @@ public class FastSpringController {
 			}
 			return null;
 		}
-		revokeSubscriptions(subs, orderId, affectedUserIds, UserSubscriptionService.KIND_REFUND);
+		revokeSubscriptions(subs, orderId, affectedUserIds, FastSpringHelper.KIND_REFUND);
 		return null;
 	}
 
@@ -351,7 +349,7 @@ public class FastSpringController {
 		String orderId = data.order;
 		Set<Integer> affectedUserIds = new HashSet<>();
 		boolean revokedAny = revokePurchases(deviceInAppPurchasesRepository.findByOrderId(orderId),
-				deviceSubscriptionsRepository.findByOrderId(orderId), orderId, affectedUserIds, UserSubscriptionService.KIND_CHARGEBACK);
+				deviceSubscriptionsRepository.findByOrderId(orderId), orderId, affectedUserIds, FastSpringHelper.KIND_CHARGEBACK);
 		if (!revokedAny) {
 			return ResponseEntity.internalServerError().body("FastSpring: nothing to revoke for orderId " + orderId);
 		}
@@ -428,7 +426,14 @@ public class FastSpringController {
 		} else if (EVENT_ORDER_COMPLETED.equals(event.type)) {
 			// https://developer.fastspring.com/reference/ordercompleted
 			return handleOrderCompletedEvent(event);
-		} else if (SUBSCRIPTION_EVENTS.contains(event.type)) {
+		} else if (EVENT_SUBSCRIPTION_CANCELED.equals(event.type)) {
+			// https://developer.fastspring.com/reference/subscription-canceled
+			return handleSubscriptionStateEvent(event);
+		} else if (EVENT_SUBSCRIPTION_DEACTIVATED.equals(event.type)) {
+			// https://developer.fastspring.com/reference/subscription-deactivated
+			return handleSubscriptionStateEvent(event);
+		} else if (EVENT_SUBSCRIPTION_CHARGE_COMPLETED.equals(event.type)) {
+			// https://developer.fastspring.com/reference/subscription-charge-completed
 			return handleSubscriptionStateEvent(event);
 		}
 		return null;

@@ -39,6 +39,10 @@ public class FastSpringHelper {
 	public static final String SUBSCRIPTION_STATE_CANCELED = "canceled";
 	public static final String SUBSCRIPTION_STATE_DEACTIVATED = "deactivated";
 
+	// values for the "kind" column, same convention as UpdateSubscription.deleteSubscription (expired/invalid/gone)
+	public static final String KIND_REFUND = "refund";
+	public static final String KIND_CHARGEBACK = "chargeback";
+
 	private static final String API_BASE = "https://api.fastspring.com";
 	private static final int CONNECT_TIMEOUT_MILLIS = 30 * 1000;
 	private static final int READ_TIMEOUT_MILLIS = 60 * 1000;

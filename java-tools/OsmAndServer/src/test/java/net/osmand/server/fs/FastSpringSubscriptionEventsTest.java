@@ -90,10 +90,10 @@ public class FastSpringSubscriptionEventsTest {
 	public void canceledDoesNotRestoreChargedBackSubscription() throws IOException {
 		SupporterDeviceSubscription s = record(SKU_MONTHLY, ORDER_MONTHLY);
 		s.valid = false;
-		s.kind = UserSubscriptionService.KIND_CHARGEBACK;
+		s.kind = FastSpringHelper.KIND_CHARGEBACK;
 		canceled(s, true);
 		assertFalse("charged back subscription must not become valid again", s.valid);
-		assertEquals(UserSubscriptionService.KIND_CHARGEBACK, s.kind);
+		assertEquals(FastSpringHelper.KIND_CHARGEBACK, s.kind);
 	}
 
 	// the hook may arrive before order.completed is recorded: reject so that FastSpring retries
