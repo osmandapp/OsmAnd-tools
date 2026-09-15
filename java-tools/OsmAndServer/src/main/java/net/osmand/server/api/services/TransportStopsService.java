@@ -2,6 +2,9 @@ package net.osmand.server.api.services;
 
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.*;
+import net.osmand.osm.PoiCategory;
+import net.osmand.osm.PoiFilter;
+import net.osmand.osm.PoiType;
 import net.osmand.osm.edit.Node;
 import net.osmand.router.TransportStopsRouteReader;
 import net.osmand.server.api.services.search.MapReadersService;
@@ -26,6 +29,14 @@ public class TransportStopsService {
 	private static final int SHOW_NEARBY_ROUTES_RADIUS_METERS = 150;
 	private static final int SEARCH_STOP_RADIUS_METERS = 50;
 	private static final String KEY_NEARBY_ROUTES = "nearbyRoutes";
+	// as in Android TransportStopHelper
+	private static final int SHOW_STOPS_RADIUS_METERS = 150;
+	private static final int SHOW_SUBWAY_STOPS_FROM_ENTRANCES_RADIUS_METERS = 400;
+	private static final int MAX_DISTANCE_BETWEEN_AMENITY_AND_LOCAL_STOPS = 20;
+	private static final String TRANSPORTATION_CATEGORY = "transportation";
+	private static final String PUBLIC_TRANSPORT_FILTER = "public_transport";
+	private static final String PUBLIC_TRANSPORT_STATION_SUBTYPE = "public_transport_station";
+	private static final List<String> SUBWAY_ENTRANCE_SUBTYPES = List.of("subway_entrance", PUBLIC_TRANSPORT_STATION_SUBTYPE);
 
 	private static List<LatLon> bboxAroundPoint(double lat, double lon, int radiusMeters) {
 		QuadRect rect = MapUtils.calculateLatLonBbox(lat, lon, radiusMeters);
@@ -109,7 +120,7 @@ public class TransportStopsService {
 	}
 
 	public GeojsonClasses.Feature getTransportStop(LatLon transportStopCoords, long stopId) throws IOException {
-		List<LatLon> bbox = bboxAroundPoint(transportStopCoords.getLatitude(), transportStopCoords.getLongitude(), SEARCH_STOP_RADIUS_METERS);
+		List<LatLon> bbox = bboxAroundPoint(transportStopCoords.getLatitude(), transportStopCoords.getLongitude(), SHOW_SUBWAY_STOPS_FROM_ENTRANCES_RADIUS_METERS);
 		TransportStopsReaderResult readerResult = getTransportStopsReader(bbox);
 		if (readerResult == null) {
 			return null;
@@ -124,6 +135,67 @@ public class TransportStopsService {
 			osmAndMapsService.unlockReaders(readerResult.readers);
 		}
 		return null;
+	}
+
+	public boolean isPublicTransportStop(Amenity amenity) {
+		PoiCategory category = amenity.getType();
+		if (!TRANSPORTATION_CATEGORY.equals(category.getKeyName())) {
+			return false;
+		}
+		PoiFilter filter = category.getPoiFilterByName(PUBLIC_TRANSPORT_FILTER);
+		if (filter == null) {
+			return false;
+		}
+		for (PoiType type : filter.getPoiTypes()) {
+			if (type.getKeyName().equals(amenity.getSubType())) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public Long findBestTransportStopId(Amenity amenity) throws IOException {
+		LatLon loc = amenity.getLocation();
+		boolean isSubwayEntrance = SUBWAY_ENTRANCE_SUBTYPES.contains(amenity.getSubType());
+		int radius = isSubwayEntrance ? SHOW_SUBWAY_STOPS_FROM_ENTRANCES_RADIUS_METERS : SHOW_STOPS_RADIUS_METERS;
+		TransportStopsReaderResult readerResult = getTransportStopsReader(bboxAroundPoint(loc.getLatitude(), loc.getLongitude(), radius));
+		if (readerResult == null) {
+			return null;
+		}
+		try {
+			List<TransportStop> stops = new ArrayList<>(readerResult.transportReaders.readMergedTransportStops(readerResult.request));
+			stops.sort(Comparator.comparingDouble(s -> MapUtils.getDistance(s.getLocation(), loc)));
+			for (TransportStop stop : stops) {
+				if (isSubwayEntrance ? isStopOfStation(stop, amenity) : isStopOfAmenity(stop, amenity)) {
+					return stop.getId();
+				}
+			}
+			return stops.isEmpty() ? null : stops.get(0).getId();
+		} finally {
+			osmAndMapsService.unlockReaders(readerResult.readers);
+		}
+	}
+
+	private static boolean isStopOfAmenity(TransportStop stop, Amenity amenity) {
+		LatLon loc = amenity.getLocation();
+		String stopName = stop.getName().toLowerCase();
+		String amenityName = amenity.getName().toLowerCase();
+		boolean sameName = stopName.contains(amenityName) || amenityName.contains(stopName);
+		return (sameName && MapUtils.getDistance(stop.getLocation(), loc) < MAX_DISTANCE_BETWEEN_AMENITY_AND_LOCAL_STOPS)
+				|| stop.getLocation().equals(loc);
+	}
+
+	private static boolean isStopOfStation(TransportStop stop, Amenity amenity) {
+		if (PUBLIC_TRANSPORT_STATION_SUBTYPE.equals(amenity.getSubType())
+				&& (stop.getName().equals(amenity.getName()) || stop.getEnName(false).equals(amenity.getEnName(false)))) {
+			return true;
+		}
+		for (TransportStopExit exit : stop.getExits()) {
+			if (MapUtils.getDistance(exit.getLocation(), amenity.getLocation()) < MapUtils.ROUNDING_ERROR) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	public Map<String, Object> getNearbyTransportStops(LatLon stopCoords, long excludeStopId) throws IOException {
@@ -239,11 +311,14 @@ public class TransportStopsService {
 	public record TransportStopInfo(long id, double lat, double lon) {
 	}
 
-	public record TransportStopRouteFeature(long id, String name, String type, String ref, String color, TransportStopInfo stop) {
+	public record TransportStopRouteFeature(long id, String name, String type, String ref, String color,
+	                                        TransportStopInfo stop) {
 	}
 
-	public record TransportStopWithDetails(long stopId, String name, LatLon coords) {}
+	public record TransportStopWithDetails(long stopId, String name, LatLon coords) {
+	}
 
-	public record TransportRouteFeature(long id, Integer intervalSeconds, List<TransportStopWithDetails> stops, List<List<LatLon>> nodes) {
+	public record TransportRouteFeature(long id, Integer intervalSeconds, List<TransportStopWithDetails> stops,
+	                                    List<List<LatLon>> nodes) {
 	}
 }
