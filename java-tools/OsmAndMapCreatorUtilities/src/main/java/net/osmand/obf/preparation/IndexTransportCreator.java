@@ -5,13 +5,13 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Type;
-import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -79,15 +79,9 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	private RTree transportStopsTree;
 	private Map<Long, Relation> masterRoutes = new HashMap<Long, Relation>();
 	private Connection gtfsConnection;
-	// osm ids (Way.getId()) of ways already covered by a real route=ferry relation -
-	// populated during the relations pre-pass (indexRelations), consulted during the ways pass
-	// (iterateMainEntity) so a real relation always takes priority over generating a route from
-	// the bare way directly (see issue #17773 design notes).
 	private Set<Long> ferryWaysInRelations = new HashSet<Long>();
-	// synthetic stops created at untagged endpoints of orphan route=ferry ways: osm db node id -> stop id
-	private final TLongLongHashMap syntheticFerryEndpoints = new TLongLongHashMap();
-	// synthetic stops not reachable on foot (junction of ferry ways in the water), see resolveTransferOnlyStops
-	private final TLongHashSet transferOnlyStops = new TLongHashSet();
+	private TLongLongHashMap syntheticFerryStops = new TLongLongHashMap(); // node id -> stop id
+	private TLongHashSet transferOnlyStops = new TLongHashSet();
 
 	private static final long TEST_ROUTE_ID_MISSING_STOPS = 192037l;
 	
@@ -168,7 +162,6 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 						nameEn = null;	
 					}
 					String deletedRoutesStr = rs.getString(7);
-					boolean syntheticTerminal = rs.getInt(8) != 0;
 					if (deletedRoutes == null) {
 						deletedRoutes = new TLongArrayList();
 					} else {
@@ -208,7 +201,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 						routesOffsets.add(routeOffset);
 					}
 					rset.close();
-					writer.writeTransportStop(id, x24, y24, name, nameEn, names, stringTable, routesOffsets, routesIds, deletedRoutes, exits, syntheticTerminal);
+					writer.writeTransportStop(id, x24, y24, name, nameEn, names, stringTable, routesOffsets, routesIds, deletedRoutes, exits);
 				} else {
 					log.error("Something goes wrong with transport id = " + id); //$NON-NLS-1$
 				}
@@ -252,7 +245,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					Map<Entity.EntityId, List<TransportStopExit>> exits = new HashMap<>();
 					exits.put(new EntityId(Entity.EntityType.NODE, stop.getId()), stop.getExits());
 					writer.writeTransportStop(id, x24, y24, stop.getName(), stop.getEnName(false), stop.getNamesMap(false), 
-							stringTable, routesOffsets, routesIds, deletedRoutes, exits, stop.isSyntheticTerminal());
+							stringTable, routesOffsets, routesIds, deletedRoutes, exits);
 				} else {
 					log.error("Something goes wrong with transport id = " + id);
 				}
@@ -273,13 +266,10 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 	public void indexRelations(Relation e, OsmDbAccessorContext ctx) throws SQLException {
 		if ("ferry".equals(e.getTag(OSMTagKey.ROUTE))) {
-			// remember way members of a real ferry route relation, so the ways pass
-			// (iterateMainEntity) does not also generate a synthetic route for them
 			ctx.loadEntityRelation(e);
 			for (RelationMember member : e.getMembers()) {
-				Entity entity = member.getEntity();
-				if (entity instanceof Way) {
-					ferryWaysInRelations.add(entity.getId());
+				if (member.getEntity() instanceof Way) {
+					ferryWaysInRelations.add(member.getEntity().getId());
 				}
 			}
 		}
@@ -330,95 +320,47 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	}
 
 	public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
-		if (e instanceof Relation && e.getTag(OSMTagKey.ROUTE) != null) {
-			ctx.loadEntityRelation((Relation) e);
+		boolean routeRelation = e instanceof Relation && e.getTag(OSMTagKey.ROUTE) != null;
+		// route=ferry way without a route relation becomes a route by itself
+		boolean ferryWay = e instanceof Way && "ferry".equals(e.getTag(OSMTagKey.ROUTE)) && !ferryWaysInRelations.contains(e.getId());
+		if (routeRelation || ferryWay) {
+			if (routeRelation) {
+				ctx.loadEntityRelation((Relation) e);
+			}
 			List<TransportRoute> troutes = new ArrayList<>();
-			indexTransportRoute((Relation) e, troutes, icc);
+			indexTransportRoute(e, troutes, icc);
 			for(TransportRoute route : troutes) {
 				insertTransportIntoIndex(route);
 			}
-		} else if (e instanceof Way && "ferry".equals(e.getTag(OSMTagKey.ROUTE))
-				&& !ferryWaysInRelations.contains(e.getId())) {
-			// orphan ferry way: no wrapping public-transport relation exists for it (see issue #17773)
-			// [FERRY_PT_PROBE][GEN] draft, investigating issue #17773 (Nordoleden way 16794766):
-			// confirm the dispatch branch itself is actually reached for this way before diving into
-			// indexTransportRouteFromWay's own bail-out points.
-			System.out.println("[FERRY_PT_PROBE][GEN] orphan-way branch DISPATCHED: way id=" + e.getId());
-			ctx.loadEntityWay((Way) e);
-			List<TransportRoute> troutes = new ArrayList<>();
-			indexTransportRouteFromWay((Way) e, troutes, icc);
-			for (TransportRoute route : troutes) {
-				insertTransportIntoIndex(route);
-			}
-		} else if (e instanceof Way && "ferry".equals(e.getTag(OSMTagKey.ROUTE))) {
-			// [FERRY_PT_PROBE][GEN] draft: this way HAS route=ferry but got excluded from the orphan
-			// branch because it's already claimed by a real route=ferry relation (ferryWaysInRelations)
-			// - confirms/refutes the "assumed orphan, not actually confirmed" caveat from the project
-			// doc for cases where the relation membership check disagrees with a manual osm.org look.
-			System.out.println("[FERRY_PT_PROBE][GEN] ferry way id=" + e.getId()
-					+ " EXCLUDED from orphan branch: already in ferryWaysInRelations");
 		}
 	}
 
-	/**
-	 * Must be called after all ways were processed (while the osm db is still available).
-	 * A synthetic ferry way endpoint is a transfer-only stop (a point in the water) when it is shared by 2+ route=ferry
-	 * ways and by no other way. An endpoint connected to any other way (pier, footway, road...) is on the shore, and an
-	 * endpoint of a single ferry way is kept walkable as well (ferry lines are often not snapped to the shore).
-	 */
+	// Call after all ways are processed. Synthetic ferry stop shared only by 2+ ferry ways is in the water:
+	// it's a transfer-only stop (a shore stop has some other way like pier or footway).
 	public void resolveTransferOnlyStops(OsmDbAccessor accessor) throws SQLException {
-		if (syntheticFerryEndpoints.isEmpty()) {
+		if (syntheticFerryStops.isEmpty()) {
 			return;
 		}
-		Connection conn = accessor.getDbConn();
-		Statement stat = conn.createStatement();
-		stat.executeUpdate("create temp table synthetic_ferry_node (id bigint primary key)");
-		PreparedStatement insert = conn.prepareStatement("insert or ignore into synthetic_ferry_node (id) values (?)");
-		for (long nodeId : syntheticFerryEndpoints.keys()) {
-			insert.setLong(1, nodeId);
-			insert.addBatch();
-		}
-		insert.executeBatch();
-		insert.close();
-		PreparedStatement selectTags = conn.prepareStatement("select tags from ways where id = ? and ord = 0");
+		String nodeIds = Arrays.toString(syntheticFerryStops.keys()).replaceAll("[\\[\\]]", "");
+		ResultSet rs = accessor.getDbConn().createStatement().executeQuery("select w.node, t.tags from ways w "
+				+ "join ways t on t.id = w.id and t.ord = 0 where w.node in (" + nodeIds + ")");
 		TLongIntHashMap ferryWays = new TLongIntHashMap();
-		TLongHashSet nodesOnOtherWays = new TLongHashSet();
-		ResultSet rs = stat.executeQuery("select w.node, w.id from ways w inner join synthetic_ferry_node s on w.node = s.id");
+		TLongHashSet otherWays = new TLongHashSet();
 		while (rs.next()) {
-			long nodeId = rs.getLong(1);
-			selectTags.setLong(1, rs.getLong(2));
-			ResultSet tags = selectTags.executeQuery();
-			boolean ferry = tags.next() && isFerryWayTags(tags.getBytes(1));
-			tags.close();
-			if (ferry) {
-				ferryWays.adjustOrPutValue(nodeId, 1, 1);
+			Way way = new Way(-1);
+			accessor.readTags(way, rs.getBytes(2));
+			if ("ferry".equals(way.getTag(OSMTagKey.ROUTE))) {
+				ferryWays.adjustOrPutValue(rs.getLong(1), 1, 1);
 			} else {
-				nodesOnOtherWays.add(nodeId);
+				otherWays.add(rs.getLong(1));
 			}
 		}
-		rs.close();
-		selectTags.close();
-		stat.close();
-		for (long nodeId : syntheticFerryEndpoints.keys()) {
-			if (ferryWays.get(nodeId) >= 2 && !nodesOnOtherWays.contains(nodeId)) {
-				transferOnlyStops.add(syntheticFerryEndpoints.get(nodeId));
+		rs.getStatement().close();
+		for (long nodeId : syntheticFerryStops.keys()) {
+			if (ferryWays.get(nodeId) >= 2 && !otherWays.contains(nodeId)) {
+				transferOnlyStops.add(syntheticFerryStops.get(nodeId));
 			}
 		}
-		log.info("Transfer-only synthetic ferry stops: " + transferOnlyStops.size() + " of " + syntheticFerryEndpoints.size());
-	}
-
-	// tags are stored in osm db as "key\0value\0key\0value\0..."
-	private static boolean isFerryWayTags(byte[] tags) {
-		if (tags == null) {
-			return false;
-		}
-		String[] kv = new String(tags, StandardCharsets.UTF_8).split("\0");
-		for (int i = 0; i + 1 < kv.length; i += 2) {
-			if ("route".equals(kv[i]) && "ferry".equals(kv[i + 1])) {
-				return true;
-			}
-		}
-		return false;
 	}
 
 	public void createDatabaseStructure(Connection conn, DBDialect dialect, String rtreeStopsFileName) throws SQLException, IOException {
@@ -436,7 +378,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		stat.executeUpdate("create index transport_route_geometry_route on transport_route_geometry (route)");
 		
 
-		stat.executeUpdate("create table transport_stop (id bigint primary key, latitude double, longitude double, name varchar(1024), name_en varchar(1024), names varchar(8096), deleted_routes varchar(1024), synthetic_terminal int default 0)");
+		stat.executeUpdate("create table transport_stop (id bigint primary key, latitude double, longitude double, name varchar(1024), name_en varchar(1024), names varchar(8096), deleted_routes varchar(1024))");
 		stat.executeUpdate("create index transport_stop_id on transport_stop (id)");
 		stat.executeUpdate("create index transport_stop_location on transport_stop (latitude, longitude)");
 
@@ -456,7 +398,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		}
 		transRouteStat = conn.prepareStatement("insert into transport_route(id, type, operator, ref, name, name_en, dist, color) values(?, ?, ?, ?, ?, ?, ?, ?)");
 		transRouteStopsStat = conn.prepareStatement("insert into transport_route_stop(route, stop, ord) values(?, ?, ?)");
-		transStopsStat = conn.prepareStatement("insert into transport_stop(id, latitude, longitude, name, name_en, names, deleted_routes, synthetic_terminal) values(?, ?, ?, ?, ?, ?, ?, ?)");
+		transStopsStat = conn.prepareStatement("insert into transport_stop(id, latitude, longitude, name, name_en, names, deleted_routes) values(?, ?, ?, ?, ?, ?, ?)");
 		transRouteGeometryStat = conn.prepareStatement("insert into transport_route_geometry(route, geometry, ind) values(?, ?, ?)");
 		pStatements.put(transRouteStat, 0);
 		pStatements.put(transRouteStopsStat, 0);
@@ -625,7 +567,6 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				Map<String, String> namesMap = s.getNamesMap(false);
 				transStopsStat.setString(6, namesMap.size() > 0 ? gson.toJson(namesMap) : "{}");
 				transStopsStat.setString(7, gson.toJson(s.getDeletedRoutesIds()));
-				transStopsStat.setInt(8, s.isSyntheticTerminal() ? 1 : 0);
 				int x = (int) MapUtils.getTileNumberX(24, s.getLocation().getLongitude());
 				int y = (int) MapUtils.getTileNumberY(24, s.getLocation().getLatitude());
 				addBatch(transStopsStat);
@@ -658,7 +599,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			PreparedStatement selectTransportRouteData = mapConnection.prepareStatement(
 					"SELECT id, dist, name, name_en, ref, operator, type, color FROM transport_route"); //$NON-NLS-1$
 			PreparedStatement selectTransportData = mapConnection.prepareStatement("SELECT S.stop, " + //$NON-NLS-1$
-					"  A.latitude,  A.longitude, A.name, A.name_en, A.names, A.deleted_routes, A.synthetic_terminal " + //$NON-NLS-1$
+					"  A.latitude,  A.longitude, A.name, A.name_en, A.names, A.deleted_routes " + //$NON-NLS-1$
 					"FROM transport_route_stop S INNER JOIN transport_stop A ON A.id = S.stop WHERE S.route = ? ORDER BY S.ord asc"); //$NON-NLS-1$
 			PreparedStatement selectTransportRouteGeometry = mapConnection.prepareStatement("SELECT S.geometry " + 
 					"FROM transport_route_geometry S WHERE S.route = ? order by S.ind"); //$NON-NLS-1$
@@ -712,7 +653,6 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					if (stopEnName != null) {
 						st.setEnName(stopEnName);
 					}
-					st.setSyntheticTerminal(rset.getInt(8) != 0);
 					st.setTransferOnly(transferOnlyStops.contains(idStop));
 					directStops.add(st);
 				}
@@ -735,7 +675,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			writer.endWriteTransportRoutes();
 
 			PreparedStatement selectTransportStop = mapConnection.prepareStatement(
-					"SELECT A.id,  A.latitude,  A.longitude, A.name, A.name_en, A.names, A.deleted_routes, A.synthetic_terminal FROM transport_stop A where A.id = ?"); //$NON-NLS-1$
+					"SELECT A.id,  A.latitude,  A.longitude, A.name, A.name_en, A.names, A.deleted_routes FROM transport_stop A where A.id = ?"); //$NON-NLS-1$
 			PreparedStatement selectTransportRouteStop = mapConnection.prepareStatement(
 					"SELECT DISTINCT S.route FROM transport_route_stop S join transport_route R  on R.id = S.route WHERE S.stop = ? ORDER BY R.type, R.ref "); //$NON-NLS-1$
 			long rootIndex = transportStopsTree.getFileHdr().getRootIndex();
@@ -819,12 +759,12 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	}
 
 
-	private void indexTransportRoute(Relation rel, List<TransportRoute> troutes, IndexCreationContext icc) throws SQLException {
+	private void indexTransportRoute(Entity rel, List<TransportRoute> troutes, IndexCreationContext icc) throws SQLException {
 		String ref = rel.getTag(OSMTagKey.REF);
 		String route = rel.getTag(OSMTagKey.ROUTE);
 		String operator = rel.getTag(OSMTagKey.OPERATOR);
 		String color = rel.getTag(OSMTagKey.COLOUR);
-		Relation master = masterRoutes.get(rel.getId());
+		Relation master = rel instanceof Relation ? masterRoutes.get(rel.getId()) : null;
 		if (master != null) {
 			if (ref == null) {
 				ref = master.getTag(OSMTagKey.REF);
@@ -854,12 +794,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					}
 					ref = newRef.length <= 5 ? new String(newRef).toUpperCase() : new String(newRef).substring(0, 4).toUpperCase();
 				} else {
-					// TODO(#17773): same pre-existing ref-derivation gap fixed in
-					// indexTransportRouteFromWay() below for the way-based path (found via Nordoleden,
-					// way 16794766) - mirrored here since this relation-based method has the identical
-					// duplicated logic and the same gap for a single-word name longer than 5 chars with
-					// no space/hyphen. Same fallback convention: first 4 letters, uppercased.
-					ref = name.substring(0, Math.min(4, name.length())).toUpperCase();
+					ref = name.substring(0, 4).toUpperCase();
 				}
 			}
 		}
@@ -880,33 +815,14 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		directRoute.setType(route);
 		directRoute.setRef(ref);
 		directRoute.setId(directRoute.getId() << 1);
-		transportRouteTagValues.registerTagValues(rel, directRoute.getId());
-		if (processTransportRelationV2(rel, directRoute, icc)) { // try new transport relations first
-			List<Entity> incompleteNodes = getIncompleteStops(rel, directRoute);
+		transportRouteTagValues.registerTagValues(directRoute.getId(), rel.getTags());
+		if (rel instanceof Relation && processTransportRelationV2((Relation) rel, directRoute, icc)) { // try new transport relations first
+			List<Entity> incompleteNodes = getIncompleteStops((Relation) rel, directRoute);
 			List<TransportStop> forwardStops = directRoute.getForwardStops();
-			// [FERRY_PT_PROBE][GEN] draft, investigating issue #17773 (Gullmarsleden relation
-			// 7841117 one-direction bug): unlike processTransportRelationV1() below (which always
-			// builds both directRoute AND backwardRoute) and the orphan-ferry-way branch further
-			// down (which always mirrors forwardStops into a reversed backwardRoute), this V2
-			// success path only ever adds directRoute to troutes - no backward TransportRoute is
-			// ever generated for a V2-parsed relation. For a route=ferry relation that is not
-			// itself split into two direction-specific member relations under a route_master, this
-			// means the crossing becomes navigable in only ONE direction (whichever order the stop/
-			// platform members happen to appear in the OSM relation), because there is no OBF
-			// object at all representing the reverse crossing. Logging every ferry relation that
-			// takes this path so we can confirm this is what happens for relation 7841117.
-			if ("ferry".equals(route)) {
-				System.out.println("[FERRY_PT_PROBE][GEN] V2 ferry relation id=" + rel.getId()
-						+ " ref=" + ref + " -> directRoute id=" + directRoute.getId()
-						+ ", forwardStops=" + forwardStops.size()
-						+ (forwardStops.isEmpty() ? "" : (" (" + forwardStops.get(0).getName()
-								+ " -> " + forwardStops.get(forwardStops.size() - 1).getName() + ")"))
-						+ " - NO backward TransportRoute will be generated for this relation.");
-			}
 			if (directRoute.getId().longValue() / 2  == TEST_ROUTE_ID_MISSING_STOPS) {
 				System.out.println(directRoute.getName() + ":");
 			}
-			if (hasRelationIncompleteWays(rel) && forwardStops.size() > 0 && directRoute.getForwardWays().size() > 1) {
+			if (hasRelationIncompleteWays((Relation) rel) && forwardStops.size() > 0 && directRoute.getForwardWays().size() > 1) {
 				// here ways are changed !!!
 				directRoute.mergeForwardWays();
 				for (Way w : directRoute.getForwardWays()) {
@@ -932,164 +848,35 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			if(!Algorithms.isEmpty(backwardRoute.getEnName(false))) {
 				backwardRoute.setEnName(reverseName(ref, backwardRoute.getEnName(false)));
 			}
-			if (processTransportRelationV1(rel, directRoute, backwardRoute)) { // old relation style otherwise
+			boolean processed = rel instanceof Way ? processFerryWay((Way) rel, directRoute, backwardRoute)
+					: processTransportRelationV1((Relation) rel, directRoute, backwardRoute); // old relation style otherwise
+			if (processed) {
 				backwardRoute.setId((backwardRoute.getId() << 1) + 1);
 				troutes.add(directRoute);
 				troutes.add(backwardRoute);
-				transportRouteTagValues.registerTagValues(rel, backwardRoute.getId());
+				transportRouteTagValues.registerTagValues(backwardRoute.getId(), rel.getTags());
 			}
 		}
 	}
 
-	// Build direct + backward TransportRoute for a route=ferry way that has no wrapping
-	// public-transport relation (issue #17773). Stops are derived by scanning the way's own
-	// node list in order: any node tagged amenity=ferry_terminal becomes a stop wherever it sits
-	// along the way (a real intermediate port, e.g. Hyppeln on Nordöleden way/16794766, not only
-	// at the ends); the way's first/last node additionally always becomes a stop even without
-	// that tag, since the end of the way is a de facto boarding point (e.g. Smögen end of
-	// way/189584079, which carries no amenity=ferry_terminal tag).
-	// No stitching of adjacent orphan ferry ways into one composite route: each way gets its own
-	// TransportRoute with a real, traceable id; the router's existing stop-based transfer search
-	// (TransportRoutingContext::getTransportStops / walkChangeRadius) already connects them at a
-	// shared node with a normal (zero-distance) transfer, same as any other pair of routes.
-	private void indexTransportRouteFromWay(Way way, List<TransportRoute> troutes, IndexCreationContext icc) throws SQLException {
-		String ref = way.getTag(OSMTagKey.REF);
-		String route = way.getTag(OSMTagKey.ROUTE);
-		String operator = way.getTag(OSMTagKey.OPERATOR);
-		String color = way.getTag(OSMTagKey.COLOUR);
-		// [FERRY_PT_PROBE][GEN] draft, investigating issue #17773 (Nordoleden way 16794766 producing
-		// zero TransportRoutes): is this orphan ferry way silently getting dropped, and if so at
-		// which exact bail-out point (ref derivation, acceptedRoutes, node count, or stop count)?
-		boolean isFerryWayProbe = "ferry".equals(way.getTag(OSMTagKey.ROUTE));
-		if (isFerryWayProbe) {
-			System.out.println("[FERRY_PT_PROBE][GEN] indexTransportRouteFromWay ENTRY: way id=" + way.getId()
-					+ " name=" + way.getTag(OSMTagKey.NAME) + " ref(raw tag)=" + ref + " route=" + route);
-		}
-		if (ref == null && route != null) {
-			String name = way.getTag(OSMTagKey.NAME);
-			if (name != null) {
-				if (name.length() <= 5) {
-					ref = name.toUpperCase();
-				} else if (name.contains(" ") || name.contains("-")) {
-					String[] subnames = name.split(" ");
-					char[] newRef = new char[subnames.length];
-					for (int i = 0; i < subnames.length; i++) {
-						if (!Algorithms.isEmpty(subnames[i])) {
-							newRef[i] = subnames[i].charAt(0);
-						}
-					}
-					ref = newRef.length <= 5 ? new String(newRef).toUpperCase() : new String(newRef).substring(0, 4).toUpperCase();
-				} else {
-					// TODO(#17773): pre-existing gap in ref-derivation, found via Nordoleden way
-					// 16794766 (name="Nordöleden" - a single word longer than 5 chars, no space, no
-					// hyphen) - neither branch above matched, ref stayed null, and the whole route was
-					// silently dropped a few lines below (route == null || ref == null). This is not
-					// ferry-specific - the identical duplicated logic in indexTransportRoute() (for
-					// relations) has the same gap - but this fixes only the way-based path used by the
-					// orphan-ferry-way branch for now. Fall back to the first 4 letters, same
-					// truncation-to-4 convention already used by the multi-word branch above.
-					ref = name.substring(0, Math.min(4, name.length())).toUpperCase();
-				}
-			}
-		}
-		if (isFerryWayProbe) {
-			System.out.println("[FERRY_PT_PROBE][GEN] indexTransportRouteFromWay after ref-derivation: way id="
-					+ way.getId() + " derived ref=" + ref);
-		}
-		if (route == null || ref == null) {
-			if (isFerryWayProbe) {
-				System.out.println("[FERRY_PT_PROBE][GEN] DROPPED way id=" + way.getId()
-						+ ": route==null=" + (route == null) + ", ref==null=" + (ref == null));
-			}
-			return;
-		}
-		if (!acceptedRoutes.contains(route)) {
-			if (isFerryWayProbe) {
-				System.out.println("[FERRY_PT_PROBE][GEN] DROPPED way id=" + way.getId()
-						+ ": route='" + route + "' not in acceptedRoutes=" + acceptedRoutes);
-			}
-			return;
-		}
-		if (color != null) {
-			String tmp = MapRenderingTypesEncoder.formatColorToPalette(color, false).replaceAll("_", "");
-			color = "subwayText" + Algorithms.capitalizeFirstLetter(tmp) + "Color";
-		}
-
+	// stops are ferry terminals along the way and way ends (synthetic stops if they aren't terminals)
+	private boolean processFerryWay(Way way, TransportRoute directRoute, TransportRoute backwardRoute) {
 		List<Node> nodes = way.getNodes();
-		if (isFerryWayProbe) {
-			System.out.println("[FERRY_PT_PROBE][GEN] way id=" + way.getId() + " nodes.size()=" + nodes.size()
-					+ " (null entries count=" + nodes.stream().filter(n -> n == null).count() + ")");
-		}
-		if (nodes.size() < 2) {
-			if (isFerryWayProbe) {
-				System.out.println("[FERRY_PT_PROBE][GEN] DROPPED way id=" + way.getId() + ": nodes.size() < 2");
-			}
-			return;
-		}
-		List<TransportStop> forwardStops = new ArrayList<>();
 		for (int i = 0; i < nodes.size(); i++) {
 			Node n = nodes.get(i);
-			if (n == null) {
-				continue;
-			}
-			boolean isEndpoint = i == 0 || i == nodes.size() - 1;
-			boolean isTaggedTerminal = "ferry_terminal".equals(n.getTag(OSMTagKey.AMENITY));
-			if (isTaggedTerminal || isEndpoint) {
-				// TODO(#17773): mark this stop synthetic ONLY when it was forced into existence
-				// purely because it's the way's first/last node, with no real backing OSM tag -
-				// never for a genuinely tagged terminal (even one that also happens to be a way
-				// endpoint). Deliberately opt-in / conservative: a real terminal must never end up
-				// flagged, per user decision - it will be used to hide synthetic-only points from
-				// the map/UI in a follow-up task, and to stop the "mid-crossing ferry stop"
-				// suppression in TransportRoutePlanner from discarding a legitimate finish (see
-				// Nordöleden/Hyppeln investigation, issue #17773).
+			boolean terminal = n != null && "ferry_terminal".equals(n.getTag(OSMTagKey.AMENITY));
+			if (n != null && (terminal || i == 0 || i == nodes.size() - 1)) {
 				TransportStop stop = EntityParser.parseTransportStop(n);
-				stop.setSyntheticTerminal(isEndpoint && !isTaggedTerminal);
-				if (stop.isSyntheticTerminal()) {
-					syntheticFerryEndpoints.put(n.getId(), stop.getId());
+				if (!terminal) {
+					syntheticFerryStops.put(n.getId(), stop.getId());
 				}
-				forwardStops.add(stop);
+				directRoute.getForwardStops().add(stop);
+				backwardRoute.getForwardStops().add(0, stop);
 			}
 		}
-		if (isFerryWayProbe) {
-			System.out.println("[FERRY_PT_PROBE][GEN] way id=" + way.getId() + " forwardStops.size()="
-					+ forwardStops.size());
-		}
-		if (forwardStops.size() < 2) {
-			if (isFerryWayProbe) {
-				System.out.println("[FERRY_PT_PROBE][GEN] DROPPED way id=" + way.getId() + ": forwardStops.size() < 2");
-			}
-			return;
-		}
-
-		TransportRoute directRoute = EntityParser.parserRoute(way, ref);
-		directRoute.setOperator(operator);
-		directRoute.setColor(color);
-		directRoute.setType(route);
-		directRoute.setRef(ref);
-		directRoute.setId(directRoute.getId() << 1);
-		directRoute.setForwardStops(forwardStops);
 		directRoute.addWay(way);
-		troutes.add(directRoute);
-		transportRouteTagValues.registerTagValues(directRoute.getId(), way.getTags());
-
-		List<TransportStop> backwardStops = new ArrayList<>(forwardStops);
-		Collections.reverse(backwardStops);
-		TransportRoute backwardRoute = new TransportRoute(directRoute, backwardStops, directRoute.getForwardWays());
-		backwardRoute.setId(directRoute.getId() + 1);
-		backwardRoute.setName(reverseName(ref, backwardRoute.getName()));
-		if (!Algorithms.isEmpty(backwardRoute.getEnName(false))) {
-			backwardRoute.setEnName(reverseName(ref, backwardRoute.getEnName(false)));
-		}
-		troutes.add(backwardRoute);
-		transportRouteTagValues.registerTagValues(backwardRoute.getId(), way.getTags());
-		if (isFerryWayProbe) {
-			// [FERRY_PT_PROBE][GEN] draft, investigating issue #17773: confirm success path was
-			// actually reached (not just "didn't hit a DROPPED branch") - final ids/ref/stop count.
-			System.out.println("[FERRY_PT_PROBE][GEN] SUCCESS way id=" + way.getId() + " ref=" + ref
-					+ " -> directRoute id=" + directRoute.getId() + ", backwardRoute id=" + backwardRoute.getId()
-					+ ", forwardStops.size()=" + forwardStops.size());
-		}
+		backwardRoute.addWay(way);
+		return directRoute.getForwardStops().size() >= 2;
 	}
 
 	private void insertMissingStop(TransportRoute directRoute, List<Entity> incompleteStops,
@@ -1348,32 +1135,14 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	private Pattern platforms = Pattern.compile("^(stop|platform)_(entry|exit)_only$");
 	private Matcher stopPlatformMatcher = platforms.matcher("");
 
-	// [FERRY_PT_PROBE][GEN] issue #17773 (Gullmarsleden relation 7841117 one-direction bug):
-	// matches "ferry=*" (the tag OSM uses on ferry WAYS, e.g. ferry=primary/ferry=yes) or
-	// "route=ferry" (the tag used on the ferry ROUTE RELATION itself). Used below to force
-	// ferry relations away from processTransportRelationV2() - see the call site for why.
-	private static boolean hasFerryTags(Entity e) {
-		// "ferry=*" or "route=ferry"
-		return e.getTag("ferry") != null || "ferry".equals(e.getTag(OSMTagKey.ROUTE));
-	}
-
 	private boolean processTransportRelationV2(Relation rel, TransportRoute route, IndexCreationContext icc) {
 		// first, verify we can accept this relation as new transport relation
 		// accepted roles restricted to: <empty>, stop, platform, ^(stop|platform)_(entry|exit)_only$
 		String version = rel.getTag("public_transport:version");
+		if ("ferry".equals(rel.getTag(OSMTagKey.ROUTE)) || rel.getTag("ferry") != null) {
+			return false; // ferries go both directions: build them with processTransportRelationV1
+		}
 		try {
-			if (hasFerryTags(rel)) {
-				// [FERRY_PT_PROBE][GEN] force ferry relations through processTransportRelationV1()
-				// instead: unlike this V2 path, which only ever builds ONE-DIRECTION TransportRoute
-				// (see the "NO backward TransportRoute" log added at the processTransportRelationV2()
-				// call site), processTransportRelationV1() always builds both a directRoute AND a
-				// backwardRoute. A ferry crossing is almost always physically bidirectional even when
-				// the OSM relation itself carries no forward/backward role info, so returning false
-				// here (falling through to the V1 branch in the caller) is the safe default for ferries
-				// specifically - this does not change V2 handling for any other route type (bus, tram,
-				// etc), where a relation genuinely having only one direction is common and correct.
-				return false;
-			}
 			if (Algorithms.isEmpty(version) || Integer.parseInt(version) < 2) {
 				for (RelationMember entry : rel.getMembers()) {
 					// ignore ways (cause with even with new relations there could be a mix of forward/backward ways)
