@@ -1479,6 +1479,9 @@ public class BinaryMapIndexWriter {
 			if (st.isTransferOnly()) {
 				tStop.setTransferOnly(true);
 			}
+			if (st.isSynthetic()) {
+				tStop.setSynthetic(true);
+			}
 			tRoute.addDirectStops(tStop.build());
 		}
 		if (directRoute != null) {
@@ -1615,7 +1618,8 @@ public class BinaryMapIndexWriter {
 	}
 
 	public void writeTransportStop(long id, int x24, int y24, String name, String nameEn, Map<String, String> names, Map<String, Integer> stringTable,
-			TLongArrayList routesOffsets, TLongArrayList routesIds, TLongArrayList deletedRoutes, Map<Entity.EntityId, List<TransportStopExit>> exits) throws IOException {
+			TLongArrayList routesOffsets, TLongArrayList routesIds, TLongArrayList deletedRoutes, Map<Entity.EntityId, List<TransportStopExit>> exits,
+			boolean synthetic) throws IOException {
 		checkPeekState(TRANSPORT_STOPS_TREE);
 
 		Bounds bounds = stackBounds.peek();
@@ -1634,6 +1638,9 @@ public class BinaryMapIndexWriter {
 		ts.setDx(x24 - bounds.leftX);
 		ts.setDy(y24 - bounds.topY);
 		ts.setId(id - stackBaseIds.peek());
+		if (synthetic) {
+			ts.setSynthetic(true);
+		}
 		mapDataBuf.clear();
 		for (Map.Entry<String, String> entry : names.entrySet()) {
 			writeRawVarint32(mapDataBuf, registerString(stringTable,entry.getKey()));
