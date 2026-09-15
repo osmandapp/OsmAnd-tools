@@ -29,6 +29,7 @@ public class BinaryMapIndexTestReader extends BinaryMapIndexReader {
 	private List<City> matchedCities = Collections.emptyList();
 	private List<City> streetCities = Collections.emptyList();
 	private List<RouteDataObject> routingData = Collections.emptyList();
+	private int minCommonNonIndexed = -1;
 
 	private BinaryMapIndexTestReader() throws IOException {
 		super(null, null, false);
@@ -46,6 +47,7 @@ public class BinaryMapIndexTestReader extends BinaryMapIndexReader {
 			return null;
 		}
 		BinaryMapIndexTestReader reader = new BinaryMapIndexTestReader();
+		reader.minCommonNonIndexed = sourceJson.optInt("minCommonNonIndexed", -1);
 		if (sourceJson.has("amenities")) {
 			JSONArray amenitiesArr = sourceJson.getJSONArray("amenities");
 			List<Amenity> amenities = new ArrayList<>();
@@ -350,5 +352,10 @@ public class BinaryMapIndexTestReader extends BinaryMapIndexReader {
 	@Override
 	public boolean containsAddressData() {
 		return true;
+	}
+
+	/** how often a common word has to occur before this map leaves it out of the name index, -1 if not set */
+	public int getMinCommonNonIndexed() {
+		return minCommonNonIndexed;
 	}
 }

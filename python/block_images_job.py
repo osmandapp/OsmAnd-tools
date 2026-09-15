@@ -7,6 +7,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'lib')))
 
 from python.lib.utils import parse_command_line_into_dict
 from python.lib.block_images_utils import BLOCK_BANNED, BLOCK_INVALID, BLOCK_PROHIBITED, block_images
+from python.lib.block_images_utils import ban_by_keyword, list_by_keyword
 from python.lib.block_images_utils import cleanup_files, cleanup_tables, list_blocked, unblock_reason, unblock_title
 
 
@@ -24,6 +25,8 @@ def main():
     if title := args.get("--add-invalid-file="): block_images({title}, BLOCK_INVALID)
     if title := args.get("--add-prohibited-file="): block_images({title}, BLOCK_PROHIBITED)
 
+    if keyword := args.get("--ban-by-keyword="): ban_by_keyword(keyword)
+
     if args.get("--cleanup-files"): cleanup_files()
     if args.get("--cleanup-tables"): cleanup_tables()
 
@@ -31,6 +34,7 @@ def main():
     if args.get("--list-banned"): list_blocked(BLOCK_BANNED)
     if args.get("--list-invalid"): list_blocked(BLOCK_INVALID)
     if args.get("--list-prohibited"): list_blocked(BLOCK_PROHIBITED)
+    if keyword := args.get("--list-by-keyword="): list_by_keyword(keyword)
 
 
 if __name__ == '__main__':

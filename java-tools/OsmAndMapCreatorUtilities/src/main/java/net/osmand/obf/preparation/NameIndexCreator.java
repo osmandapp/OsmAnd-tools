@@ -21,6 +21,7 @@ import java.util.TreeSet;
 import gnu.trove.list.array.TIntArrayList;
 import net.osmand.CollatorStringMatcher;
 import net.osmand.binary.CommonWords;
+import net.osmand.binary.CommonWordsMultiIndex;
 import net.osmand.binary.NameIndexReader;
 import net.osmand.data.City;
 import net.osmand.data.City.CityType;
@@ -30,6 +31,7 @@ import net.osmand.obf.preparation.IndexPoiCreator.PoiAdditionalType;
 import net.osmand.obf.preparation.IndexPoiCreator.PoiTileBox;
 import net.osmand.osm.AbstractPoiType;
 import net.osmand.osm.MapPoiTypes;
+import net.osmand.search.core.SearchPhrase;
 import net.osmand.search.core.TopIndexFilter;
 import net.osmand.util.Algorithms;
 import net.osmand.util.SearchAlgorithms;
@@ -49,6 +51,8 @@ public class NameIndexCreator<T> {
 	public static boolean NOT_INDEX_COMMON_IF_THERE_ARE_RARE = true;
 	public static boolean INDEX_RARE_WORDS_FOR_COMMON = false;
 	public static boolean INDEX_RARE_WORDS_FOR_NON_COMMON = false;
+	// the language group of the map chooses the keys of names (CommonWordsMultiIndex) instead of the rare word rule
+	public static boolean COMMON_WORDS_BY_LANGUAGE = true;
 
 	private static final int TOP_INDEX_BRAND_PREFIX_LENGTH =
 			MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX.length() + "brand_".length() + POI_CATEGORY_PREFIX_LENGTH;
@@ -62,18 +66,30 @@ public class NameIndexCreator<T> {
 	Map<String, Integer> commonNonIndexedFrequencies = new HashMap<String, Integer>();
 	
 	
+	// words of names that are not keys in this map: they stay references of the common words table
+	final Set<String> notKeyWords = new HashSet<>();
+	// map whose language group chooses the keys of names, null for the rare word rule
+	private String mapName;
+
 	public NameIndexCreator(CommonWords c) {
 		this.predefinedGlobalWords = c;
 	}
-	
+
+	// download name of the map ("Ukraine_kyiv-city_europe"), used when COMMON_WORDS_BY_LANGUAGE and a group covers it
+	public void setMapName(String mapName) {
+		boolean covered = COMMON_WORDS_BY_LANGUAGE && mapName != null && CommonWordsMultiIndex.getInstance().getGroupId(mapName) != null;
+		this.mapName = covered ? mapName : null;
+	}
+
 	public record PoiNameObject(PoiTileBox tileBox, int ind, int eloRating, 
-			String type, String subtype, Set<PoiAdditionalType> additionalTags, int[] bbox31) {
+			String type, String subtype, Set<PoiAdditionalType> additionalTags, int[] bbox31, boolean wikidata) {
 	}
 	
 	// common words
 	public record PrepareWordIndex (int index, String word, int frequency, int nonindexed) { }
 	
-	public record PrepareWordsIndex (Map<String, PrepareWordIndex> words, List<PrepareWordIndex> wordsLst) { }
+	// keysByLanguage: the language group of the map has chosen the keys, the rare word rule is not applied again
+	public record PrepareWordsIndex (Map<String, PrepareWordIndex> words, List<PrepareWordIndex> wordsLst, boolean keysByLanguage) { }
 	
 	
 	// suffix dictionary
@@ -183,7 +199,7 @@ public class NameIndexCreator<T> {
 								break;
 							}
 						}
-						if (rare && NOT_INDEX_COMMON_IF_THERE_ARE_RARE) {
+						if (rare && NOT_INDEX_COMMON_IF_THERE_ARE_RARE && !commonWords.keysByLanguage()) {
 							continue;
 						}
 					}
@@ -304,7 +320,7 @@ public class NameIndexCreator<T> {
 //			if (e.getValue() < MIN_LIMIT_COMMON_NON_INDEXED) {
 //				continue;
 //			}
-			if (common || freq || topXFrequent.contains(e.getKey())) {
+			if (common || freq || topXFrequent.contains(e.getKey()) || notKeyWords.contains(s)) {
 				commonStrings.add(s);
 			}
 		}
@@ -316,14 +332,14 @@ public class NameIndexCreator<T> {
 		for (String c : commonStrings) {
 			Integer matched = tokenFrequencies.get(c);
 			Integer nonIndexed = commonNonIndexedFrequencies.get(c);
-			if (matched < limitForNonIndexedCommon || matched < MIN_LIMIT_COMMON_NON_INDEXED) {
+			if (!notKeyWords.contains(c) && (matched < limitForNonIndexedCommon || matched < MIN_LIMIT_COMMON_NON_INDEXED)) {
 				nonIndexed = 0; // frequent - indexed common word 
 			}
 			PrepareWordIndex word = new PrepareWordIndex(ind++, c, matched, nonIndexed == null ? 0 : nonIndexed);
 			words.put(c, word);
 			wordsList.add(word);
 		}
-		commonWords = new PrepareWordsIndex(words, wordsList);
+		commonWords = new PrepareWordsIndex(words, wordsList, mapName != null);
 		return commonWords;
 	}
 	
@@ -412,6 +428,24 @@ public class NameIndexCreator<T> {
 		}
 		List<String> uniqueNames = SearchAlgorithms.splitAndNormalize(name, true);
 		List<String> allNames = SearchAlgorithms.splitAndNormalize(name, false);
+		// an object people know by any word of its name keeps every word as a key: a poi with a travel rating or a
+		// wikidata id ("national" finds Tongass National Forest), a city; towns and villages do not
+		boolean notable = obj instanceof PoiNameObject p && (p.eloRating() >= 0 || p.wikidata())
+				|| obj instanceof City c && c.getType() == CityType.CITY;
+		Set<String> keys = mapName == null ? null
+				: new HashSet<>(CommonWordsMultiIndex.getInstance().getWordsToIndex(mapName, uniqueNames, notable));
+		String legacyKey = null;
+		if (keys != null) {
+			// TODO remove when app versions with the legacy search (SearchCoreFactory) no longer download maps: it looks a
+			// name up by the one query word SearchPhrase picks, a word CommonWords does not know first, so the name keeps
+			// such a word ("amsterdam" of Amsterdam City Farm, frequent in the Netherlands); known words like "de" stay out
+			List<String> words = new ArrayList<>(uniqueNames);
+			words.remove(NameIndexReader.CITY_AS_STREET_COMMON);
+			String legacyWord = SearchPhrase.selectMainUnknownWordToSearch(words);
+			if (!legacyWord.isEmpty() && CommonWords.getInstance().getCommonSearch(legacyWord) == -1 && keys.add(legacyWord)) {
+				legacyKey = legacyWord;
+			}
+		}
 		boolean hasRareName = false;
 		for (String token : uniqueNames) {
 			if (!token.equalsIgnoreCase(NameIndexReader.CITY_AS_STREET_COMMON) &&
@@ -433,8 +467,21 @@ public class NameIndexCreator<T> {
 			if (Algorithms.isEmpty(prefix)) {
 				continue;
 			}
-			if (!indexNumbers && SearchAlgorithms.isNumber2Letters(token)) {
+			// a pure number is kept with the other words of the name ("6178/2.Sokak"), a number with letters is not:
+			// "33-я" of "вулиця 33-я Лінія" is the only word telling apart its Лінія streets
+			if (!indexNumbers && SearchAlgorithms.isNumber2Letters(token) && parsePureIntegerSuffix(token) != null) {
 				continue;
+			}
+			if (keys != null && !keys.contains(token)) {
+				// not a key of this name: kept as a reference in the common words table
+				notKeyWords.add(token);
+				tokenFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
+				commonNonIndexedFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
+				continue;
+			}
+			if (token.equals(legacyKey)) {
+				// the other words of the name still refer to it, as they did before it became a key
+				notKeyWords.add(token);
 			}
 			NamedObjectsByPrefix<T> entry = namesIndex.get(prefix);
 			if (entry == null) {
