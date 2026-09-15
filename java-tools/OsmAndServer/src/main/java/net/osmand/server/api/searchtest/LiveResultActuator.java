@@ -124,7 +124,6 @@ public class LiveResultActuator extends ResultActuator {
 		metrics.put("web_type", unitTest);
 		metrics.put("actual_count", expectedResults.size());
 		if (searchResults.isEmpty()) {
-			error = "Search result is empty";
 			return false;
 		}
 

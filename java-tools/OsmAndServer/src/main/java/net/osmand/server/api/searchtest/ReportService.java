@@ -64,16 +64,19 @@ public interface ReportService {
 					CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER) AS obj_id, error
 				FROM gen_result AS g WHERE case_id = ? ORDER BY g.id
 			)""";
+	// older runs stored an empty search result as an error: it is Not Found
+	String RUN_ERROR_SQL = "%1$s.error IS NOT NULL AND %1$s.error NOT IN " +
+			"('Search result is empty', 'First search result is missing', 'Result point location is null')";
 	String REPORT_SQL = GEN_SQL + """
 			 SELECT CASE
-			    WHEN r.error IS NOT NULL THEN 'Error'
+			    WHEN %s THEN 'Error'
 				WHEN g.gen_count <= 0 OR g.query IS NULL OR trim(g.query) = '' THEN 'Not Processed'
 				WHEN COALESCE(found, res_distance <= 50) THEN 'Found'
 			    WHEN SUBSTR(COALESCE(json_extract(r.row, '$.actual_place'), ''), 1, INSTR(json_extract(r.row, '$.actual_place'), ' -') - 1) IN ('2','3','4','5') THEN 'Partial'
 				ELSE 'Not Found'
 			END AS "group", UPPER(COALESCE(json_extract(r.row, '$.web_type'), 'absence')) AS type,
 			    g.ds_id || '.' || g.tc_id AS row_id, g.id as gen_id, g.lat_lon, g.query, g.obj_id as id, g.in_row, res_count, res_place, CAST((r.res_distance/10) AS INTEGER)*10 as res_dist,
-			    r.lat || ', ' || r.lon as search_lat_lon, r.bbox as search_bbox, res_lat_lon, r.row AS out_row, r.stat_bytes, r.stat_time, r.duration AS time FROM gen AS g, run_result AS r WHERE g.id = r.gen_id AND run_id = ? """;
+			    r.lat || ', ' || r.lon as search_lat_lon, r.bbox as search_bbox, res_lat_lon, r.row AS out_row, r.stat_bytes, r.stat_time, r.duration AS time FROM gen AS g, run_result AS r WHERE g.id = r.gen_id AND run_id = ? """.formatted(RUN_ERROR_SQL.formatted("r"));
 	String FULL_REPORT_SQL = REPORT_SQL + """
 			 UNION SELECT 'Generated' AS "group", CASE
 			    WHEN error IS NOT NULL THEN 'Error'
@@ -242,7 +245,7 @@ public interface ReportService {
 				"SELECT run.status, run.spatial, run.threads_count, run.maps_count, COALESCE(finish - start, max(run_result.timestamp) - start) AS time_duration," +
 						" count(*) AS total," +
 						" count(*) FILTER (WHERE gen_count > 0 and trim(query) <> '') AS processed," +
-						" count(*) FILTER (WHERE run_result.error IS NOT NULL) AS failed," +
+						" count(*) FILTER (WHERE " + RUN_ERROR_SQL.formatted("run_result") + ") AS failed," +
 						" count(*) FILTER (WHERE COALESCE(run_result.found, res_distance <= 50)) AS found_count," +
 						" count(*) FILTER (WHERE Not found AND SUBSTR(COALESCE(" + runResultActualPlaceSql + ", ''), 1, INSTR(" + runResultActualPlaceSql + ", ' -') - 1) IN ('2','3','4','5')) as partial_count," +
 						" sum(stat_bytes) FILTER (WHERE stat_bytes IS NOT NULL) AS total_bytes," +
