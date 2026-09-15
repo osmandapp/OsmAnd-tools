@@ -137,7 +137,7 @@ public class PolyglotEngine {
 				int count = output instanceof String[] ? ((String[]) output).length : -1;
 				String outputJson = output == null ? null : objectMapper.writeValueAsString(output);
 				results.add(new GenRow(entry.getKey(), parseLatLon(lat, lon), origRow, outputJson, count, errorMessage,
-						System.currentTimeMillis() - start));
+						System.currentTimeMillis() - start, null));
 			}
 
 			return results;
@@ -272,7 +272,7 @@ public class PolyglotEngine {
 		}
 	}
 
-	public record GenRow(Integer dsResultId, LatLon point, Map<String, Object> row, String output, int count, String error,
-						 long duration) {
+	public record GenRow(Integer dsResultId, LatLon point, Object row, String output, int count, String error,
+						 long duration, String unitTest) {
 	}
 }

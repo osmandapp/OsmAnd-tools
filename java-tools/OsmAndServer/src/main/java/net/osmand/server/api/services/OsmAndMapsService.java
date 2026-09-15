@@ -2,6 +2,7 @@ package net.osmand.server.api.services;
 
 
 import java.awt.image.BufferedImage;
+import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -116,6 +117,8 @@ public class OsmAndMapsService {
 
 	private static final int MEM_LIMIT = RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT * 8;
 	private static final int MEM_MAX_HITS_PER_RUN = 5;
+	// maps are picked by the start/end bbox, but a route with avoid_* / prefer_* params can detour out of it
+	private static final double ROUTING_MAPS_MARGIN_KM = 30;
 
 	private static final long INTERVAL_TO_MONITOR_ZIP = 5 * 60 * 1000;
 	private static final long INTERVAL_TO_CLEANUP_ROUTING_CACHE = 10 * 60 * 1000;
@@ -127,20 +130,20 @@ public class OsmAndMapsService {
 	private static final List<String> ALWAYS_IN_MEMORY = new ArrayList<String>();
 	static {
 		ALWAYS_IN_MEMORY.add("car:{}");
-		ALWAYS_IN_MEMORY.add("car:{}");
+//		ALWAYS_IN_MEMORY.add("car:{}");
 //		ALWAYS_IN_MEMORY.add("car:{avoid_motorway=true, prefer_unpaved=true}"); // test
 //		ALWAYS_IN_MEMORY.add("car:{prefer_unpaved=true}"); // test
 		ALWAYS_IN_MEMORY.add("motorcycle:{}");
-		ALWAYS_IN_MEMORY.add("motorcycle:{}");
+//		ALWAYS_IN_MEMORY.add("motorcycle:{}");
 //		ALWAYS_IN_MEMORY.add("motorcycle:{avoid_motorway=true, prefer_unpaved=true}"); // test
 //		ALWAYS_IN_MEMORY.add("motorcycle:{avoid_4wd_only=true, avoid_motorway=true, prefer_unpaved=true}"); // test
 //		ALWAYS_IN_MEMORY.add("motorcycle:{prefer_unpaved=true}"); // test
 
 		ALWAYS_IN_MEMORY.add("bicycle:{}");
-		ALWAYS_IN_MEMORY.add("bicycle:{}");
+//		ALWAYS_IN_MEMORY.add("bicycle:{}");
 		ALWAYS_IN_MEMORY.add("bicycle:{height_obstacles=true}");
 		ALWAYS_IN_MEMORY.add("pedestrian:{}");
-		ALWAYS_IN_MEMORY.add("pedestrian:{}");
+//		ALWAYS_IN_MEMORY.add("pedestrian:{}");
 	}
 
 
@@ -567,7 +570,7 @@ public class OsmAndMapsService {
 	}
 
 	@Scheduled(fixedRate = INTERVAL_TO_MONITOR_ZIP)
-	public synchronized void checkZippedFiles() throws IOException {
+	public void checkZippedFiles() throws IOException {
 		if (tileConfig != null && !Algorithms.isEmpty(tileConfig.obfZipLocation) && !Algorithms.isEmpty(tileConfig.obfLocation)) {
 			LOGGER.info("Checking new files at " + tileConfig.obfZipLocation + " " + tileConfig.obfLocation);
 			File[] zipFiles = new File(tileConfig.obfZipLocation).listFiles();
@@ -580,7 +583,7 @@ public class OsmAndMapsService {
 					if (!target.exists() || target.lastModified() < zipFile.lastModified()
 							|| zipFile.length() > target.length()) {
 						long val = System.currentTimeMillis();
-						ZipInputStream zis = new ZipInputStream(new FileInputStream(zipFile));
+						ZipInputStream zis = new ZipInputStream(new BufferedInputStream(new FileInputStream(zipFile), 1 << 20));
 						ZipEntry ze = zis.getNextEntry();
 						boolean success = false;
 						while (ze != null && !success) {
@@ -1049,7 +1052,8 @@ public class OsmAndMapsService {
 					di.selectedCache, di.waitTime / 1e3, di.routeParametersStr, start, end, di.routingCacheInfo));
 			if (ctx == null) {
 				validateAndInitConfig();
-				List<BinaryMapIndexReaderReference> list = getObfReaders(points, ObfReason.ROUTING.value());
+				List<BinaryMapIndexReaderReference> list = getObfReaders(withMargin(points, ROUTING_MAPS_MARGIN_KM),
+						ObfReason.ROUTING.value());
 				boolean[] incomplete = new boolean[1];
 				usedMapList = getReaders(list, incomplete);
 				if (incomplete[0]) {
@@ -1247,6 +1251,21 @@ public class OsmAndMapsService {
 		BinaryMapIndexReader reader = cache.getReader(target, true);
 		cache.writeToFile(targetIndex);
 		cs.rCtx = prepareRouterContext(rp, router, Collections.singletonList(reader), false);
+		HHRoutingContext<NetworkDBPoint> loaded = null;
+		synchronized (routingCaches) {
+			for (RoutingCacheContext c : routingCaches) {
+				if (c.hCtx != null && rProfile.equals(c.profile) && rParamsStr.equals(c.routeParamsStr)) {
+					loaded = c.hCtx;
+				}
+			}
+		}
+		if (loaded != null) {
+			// copy the points already loaded for the same profile instead of reading and filtering them again
+			long copyTime = System.currentTimeMillis();
+			cs.hhConfig.cacheCtx = HHRoutingContext.copy(loaded, cs.rCtx);
+			LOGGER.info(String.format("Copy routing context for %s profile (%s params): %s, %d ms", rProfile, rParamsStr,
+					cs.hhConfig.cacheCtx != null ? "done" : "failed", System.currentTimeMillis() - copyTime));
+		}
 		router.setHHRoutingConfig(cs.hhConfig); // after prepare
 		LOGGER.info(String.format("Use new routing context for %s profile (%s params)", rProfile, rParamsStr));
 		di.waitTime = System.currentTimeMillis() - waitTime;
@@ -1329,6 +1348,21 @@ public class OsmAndMapsService {
 		}
 	}
 
+	// bbox in 31-tile coordinates (top < bottom) expanded by marginKm on each side
+	private static QuadRect withMargin(QuadRect r, double marginKm) {
+		if (r == null) {
+			return null;
+		}
+		double top = MapUtils.get31LatitudeY((int) r.top);
+		double bottom = MapUtils.get31LatitudeY((int) r.bottom);
+		double dLat = marginKm / 111.0;
+		double dLon = marginKm / (111.0 * Math.cos(Math.toRadians((top + bottom) / 2)));
+		return new QuadRect(MapUtils.get31TileNumberX(MapUtils.get31LongitudeX((int) r.left) - dLon),
+				MapUtils.get31TileNumberY(Math.min(top + dLat, MapUtils.MAX_LATITUDE)),
+				MapUtils.get31TileNumberX(MapUtils.get31LongitudeX((int) r.right) + dLon),
+				MapUtils.get31TileNumberY(Math.max(bottom - dLat, MapUtils.MIN_LATITUDE)));
+	}
+
 	public QuadRect points(List<LatLon> intermediates, LatLon start, LatLon end) {
 		QuadRect upd = null;
 		upd = addPnt(start, upd);
@@ -1367,7 +1401,7 @@ public class OsmAndMapsService {
 	}
 
 
-	private void initNewObfFiles(File target, File targetTemp) throws IOException {
+	private synchronized void initNewObfFiles(File target, File targetTemp) throws IOException {
 		initObfReaders();
 		long val = System.currentTimeMillis();
 		BinaryMapIndexReaderReference ref = obfFiles.get(target.getAbsolutePath());

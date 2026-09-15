@@ -1,0 +1,268 @@
+{
+  "order": "ORDER_ID_IAP_TEST00000",
+  "id": "ORDER_ID_IAP_TEST00000",
+  "reference": "OSMANDBV000000-0000-00003",
+  "buyerReference": null,
+  "ipAddress": "0.0.0.0",
+  "completed": true,
+  "orderLevelCouponApplied": false,
+  "changed": 1789097070073,
+  "changedValue": 1789097070073,
+  "changedInSeconds": 1789097070,
+  "changedDisplay": "11/09/26",
+  "changedDisplayISO8601": "2026-09-11",
+  "changedDisplayEmailEnhancements": "Sep 11, 2026",
+  "changedDisplayEmailEnhancementsWithTime": "Sep 11, 2026 03:24:30 AM",
+  "language": "es",
+  "live": true,
+  "currency": "MXN",
+  "payoutCurrency": "USD",
+  "quote": null,
+  "invoiceUrl": "https://osmand.onfastspring.com/popup-osmand/account/order/OSMANDBV000000-0000-00003/invoice/INVOICE_TEST",
+  "siteId": "SITE_ID_TEST",
+  "account": "ACCOUNT_ID_TEST0000003",
+  "total": 1299,
+  "totalDisplay": "$1,299.00 MXN",
+  "totalInPayoutCurrency": 72.63,
+  "totalInPayoutCurrencyDisplay": "USD 72.63",
+  "tax": 0,
+  "taxDisplay": "$0.00 MXN",
+  "taxInPayoutCurrency": 0,
+  "taxInPayoutCurrencyDisplay": "USD 0.00",
+  "subtotal": 1299,
+  "subtotalDisplay": "$1,299.00 MXN",
+  "subtotalInPayoutCurrency": 72.63,
+  "subtotalInPayoutCurrencyDisplay": "USD 72.63",
+  "discount": 0,
+  "discountDisplay": "$0.00 MXN",
+  "discountInPayoutCurrency": 0,
+  "discountInPayoutCurrencyDisplay": "USD 0.00",
+  "discountWithTax": 0,
+  "discountWithTaxDisplay": "$0.00 MXN",
+  "discountWithTaxInPayoutCurrency": 0,
+  "discountWithTaxInPayoutCurrencyDisplay": "USD 0.00",
+  "billDescriptor": "osmand",
+  "oneClickPay": false,
+  "payment": {
+    "type": "mercadopago"
+  },
+  "customer": {
+    "first": "Test",
+    "last": "User",
+    "email": "user@example.com",
+    "company": null,
+    "phone": null,
+    "subscribed": true
+  },
+  "address": {
+    "country": "MX",
+    "display": "MX"
+  },
+  "recipients": [
+    {
+      "recipient": {
+        "first": "Test",
+        "last": "User",
+        "email": "user@example.com",
+        "company": null,
+        "phone": null,
+        "subscribed": true,
+        "account": "ACCOUNT_ID_TEST0000003",
+        "address": {
+          "country": "MX",
+          "display": "MX"
+        }
+      }
+    }
+  ],
+  "tags": {
+    "userEmail": "user@example.com"
+  },
+  "notes": [],
+  "items": [
+    {
+      "product": "osmand-maps",
+      "quantity": 1,
+      "display": "OsmAnd Maps+",
+      "sku": "net.osmand.fastspring.inapp.maps.plus",
+      "imageUrl": "https://example.com/ic_action_osmand_maps_plus.png",
+      "shortDisplay": "OsmAnd Maps+",
+      "subtotal": 1299,
+      "subtotalDisplay": "$1,299.00 MXN",
+      "subtotalInPayoutCurrency": 72.63,
+      "subtotalInPayoutCurrencyDisplay": "USD 72.63",
+      "discount": 0,
+      "discountDisplay": "$0.00 MXN",
+      "discountInPayoutCurrency": 0,
+      "discountInPayoutCurrencyDisplay": "USD 0.00",
+      "isAddon": true,
+      "fulfillments": {
+        "instructions": "<p>Has comprado OsmAnd Maps+ como compra integrada usando tu cuenta de OsmAnd Cloud.</p>"
+      },
+      "driver": {
+        "type": "cross-sell",
+        "path": "osmand-popup-osmand"
+      },
+      "withholdings": {
+        "taxWithholdings": false
+      },
+      "proratedItemChangeAmount": 0,
+      "proratedItemChangeAmountDisplay": "$0.00 MXN",
+      "proratedItemChangeAmountInPayoutCurrency": 0,
+      "proratedItemChangeAmountInPayoutCurrencyDisplay": "USD 0.00",
+      "proratedItemProratedCharge": 0,
+      "proratedItemProratedChargeDisplay": "$0.00 MXN",
+      "proratedItemProratedChargeInPayoutCurrency": 0,
+      "proratedItemProratedChargeInPayoutCurrencyDisplay": "USD 0.00",
+      "proratedItemCreditAmount": 0,
+      "proratedItemCreditAmountDisplay": "$0.00 MXN",
+      "proratedItemCreditAmountInPayoutCurrency": 0,
+      "proratedItemCreditAmountInPayoutCurrencyDisplay": "USD 0.00",
+      "proratedItemTaxAmount": 0,
+      "proratedItemTaxAmountDisplay": "$0.00 MXN",
+      "proratedItemTaxAmountInPayoutCurrency": 0,
+      "proratedItemTaxAmountInPayoutCurrencyDisplay": "USD 0.00",
+      "proratedItemTotal": 0,
+      "proratedItemTotalDisplay": "$0.00 MXN",
+      "proratedItemTotalInPayoutCurrency": 0,
+      "proratedItemTotalInPayoutCurrencyDisplay": "USD 0.00"
+    }
+  ],
+  "action": "order.get",
+  "result": "success",
+  "orders": [
+    {
+      "order": "ORDER_ID_IAP_TEST00000",
+      "id": "ORDER_ID_IAP_TEST00000",
+      "reference": "OSMANDBV000000-0000-00003",
+      "buyerReference": null,
+      "ipAddress": "0.0.0.0",
+      "completed": true,
+      "orderLevelCouponApplied": false,
+      "changed": 1789097070073,
+      "changedValue": 1789097070073,
+      "changedInSeconds": 1789097070,
+      "changedDisplay": "11/09/26",
+      "changedDisplayISO8601": "2026-09-11",
+      "changedDisplayEmailEnhancements": "Sep 11, 2026",
+      "changedDisplayEmailEnhancementsWithTime": "Sep 11, 2026 03:24:30 AM",
+      "language": "es",
+      "live": true,
+      "currency": "MXN",
+      "payoutCurrency": "USD",
+      "quote": null,
+      "invoiceUrl": "https://osmand.onfastspring.com/popup-osmand/account/order/OSMANDBV000000-0000-00003/invoice/INVOICE_TEST",
+      "siteId": "SITE_ID_TEST",
+      "account": "ACCOUNT_ID_TEST0000003",
+      "total": 1299,
+      "totalDisplay": "$1,299.00 MXN",
+      "totalInPayoutCurrency": 72.63,
+      "totalInPayoutCurrencyDisplay": "USD 72.63",
+      "tax": 0,
+      "taxDisplay": "$0.00 MXN",
+      "taxInPayoutCurrency": 0,
+      "taxInPayoutCurrencyDisplay": "USD 0.00",
+      "subtotal": 1299,
+      "subtotalDisplay": "$1,299.00 MXN",
+      "subtotalInPayoutCurrency": 72.63,
+      "subtotalInPayoutCurrencyDisplay": "USD 72.63",
+      "discount": 0,
+      "discountDisplay": "$0.00 MXN",
+      "discountInPayoutCurrency": 0,
+      "discountInPayoutCurrencyDisplay": "USD 0.00",
+      "discountWithTax": 0,
+      "discountWithTaxDisplay": "$0.00 MXN",
+      "discountWithTaxInPayoutCurrency": 0,
+      "discountWithTaxInPayoutCurrencyDisplay": "USD 0.00",
+      "billDescriptor": "osmand",
+      "oneClickPay": false,
+      "payment": {
+        "type": "mercadopago"
+      },
+      "customer": {
+        "first": "Test",
+        "last": "User",
+        "email": "user@example.com",
+        "company": null,
+        "phone": null,
+        "subscribed": true
+      },
+      "address": {
+        "country": "MX",
+        "display": "MX"
+      },
+      "recipients": [
+        {
+          "recipient": {
+            "first": "Test",
+            "last": "User",
+            "email": "user@example.com",
+            "company": null,
+            "phone": null,
+            "subscribed": true,
+            "account": "ACCOUNT_ID_TEST0000003",
+            "address": {
+              "country": "MX",
+              "display": "MX"
+            }
+          }
+        }
+      ],
+      "tags": {
+        "userEmail": "user@example.com"
+      },
+      "notes": [],
+      "items": [
+        {
+          "product": "osmand-maps",
+          "quantity": 1,
+          "display": "OsmAnd Maps+",
+          "sku": "net.osmand.fastspring.inapp.maps.plus",
+          "imageUrl": "https://example.com/ic_action_osmand_maps_plus.png",
+          "shortDisplay": "OsmAnd Maps+",
+          "subtotal": 1299,
+          "subtotalDisplay": "$1,299.00 MXN",
+          "subtotalInPayoutCurrency": 72.63,
+          "subtotalInPayoutCurrencyDisplay": "USD 72.63",
+          "discount": 0,
+          "discountDisplay": "$0.00 MXN",
+          "discountInPayoutCurrency": 0,
+          "discountInPayoutCurrencyDisplay": "USD 0.00",
+          "isAddon": true,
+          "fulfillments": {
+            "instructions": "<p>Has comprado OsmAnd Maps+ como compra integrada usando tu cuenta de OsmAnd Cloud.</p>"
+          },
+          "driver": {
+            "type": "cross-sell",
+            "path": "osmand-popup-osmand"
+          },
+          "withholdings": {
+            "taxWithholdings": false
+          },
+          "proratedItemChangeAmount": 0,
+          "proratedItemChangeAmountDisplay": "$0.00 MXN",
+          "proratedItemChangeAmountInPayoutCurrency": 0,
+          "proratedItemChangeAmountInPayoutCurrencyDisplay": "USD 0.00",
+          "proratedItemProratedCharge": 0,
+          "proratedItemProratedChargeDisplay": "$0.00 MXN",
+          "proratedItemProratedChargeInPayoutCurrency": 0,
+          "proratedItemProratedChargeInPayoutCurrencyDisplay": "USD 0.00",
+          "proratedItemCreditAmount": 0,
+          "proratedItemCreditAmountDisplay": "$0.00 MXN",
+          "proratedItemCreditAmountInPayoutCurrency": 0,
+          "proratedItemCreditAmountInPayoutCurrencyDisplay": "USD 0.00",
+          "proratedItemTaxAmount": 0,
+          "proratedItemTaxAmountDisplay": "$0.00 MXN",
+          "proratedItemTaxAmountInPayoutCurrency": 0,
+          "proratedItemTaxAmountInPayoutCurrencyDisplay": "USD 0.00",
+          "proratedItemTotal": 0,
+          "proratedItemTotalDisplay": "$0.00 MXN",
+          "proratedItemTotalInPayoutCurrency": 0,
+          "proratedItemTotalInPayoutCurrencyDisplay": "USD 0.00"
+        }
+      ],
+      "action": "order.get",
+      "result": "success"
+    }
+  ]
+}

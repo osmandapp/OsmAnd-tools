@@ -1260,6 +1260,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 
 		NameIndexCreator<MapObject> namesIndex = new NameIndexCreator<>(CommonWords.getAddrInstance());
+		namesIndex.setMapName(settings.nameIndexMapName != null ? settings.nameIndexMapName : regionName);
 
 		progress.startTask(settings.getString("IndexCreator.SERIALIZING_ADDRESS"), cityTowns.size() + villages.size() / 100 + 1); //$NON-NLS-1$
 		TLongObjectHashMap<Long> streetIds = new TLongObjectHashMap<Long>();
