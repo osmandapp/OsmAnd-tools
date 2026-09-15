@@ -92,6 +92,24 @@ def list_blocked(reason: str | bool | None = True) -> None:
     print(f"Total listed: {total}")
 
 
+def _get_images_by_keyword(keyword: str) -> list[str]:
+    query = "SELECT DISTINCT imageTitle FROM wikiimages WHERE imageTitle LIKE %(keyword)s ORDER BY imageTitle"
+    return [row[0] for row in ch_query_params(query, {"keyword": f"%{keyword}%"})]
+
+
+def list_by_keyword(keyword: str) -> None:
+    titles = _get_images_by_keyword(keyword)
+    for title in titles:
+        print(title)
+    print(f"Total listed: {len(titles)}")
+
+
+def ban_by_keyword(keyword: str) -> None:
+    titles = _get_images_by_keyword(keyword)
+    if titles:
+        block_images(set(titles), BLOCK_BANNED)
+
+
 def block_images(files: set[str], reason: str) -> None:
     all_titles = set(os.path.basename(path) for path in files)
     already_blocked = set(row[0] for row in ch_query_params(
