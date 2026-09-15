@@ -310,7 +310,7 @@ public class NameIndexCreator<T> {
 		// Here we could also compute and add some top 5 frequent
 		for (Map.Entry<String, Integer> e : tokenFrequencies.entrySet()) {
 			String s = e.getKey();
-			if (s.equalsIgnoreCase(NameIndexReader.CITY_AS_STREET_COMMON)) {
+			if (NameIndexReader.isIndexMarker(s)) {
 				commonStrings.add(s);
 				continue;
 			}
@@ -440,7 +440,7 @@ public class NameIndexCreator<T> {
 			// name up by the one query word SearchPhrase picks, a word CommonWords does not know first, so the name keeps
 			// such a word ("amsterdam" of Amsterdam City Farm, frequent in the Netherlands); known words like "de" stay out
 			List<String> words = new ArrayList<>(uniqueNames);
-			words.remove(NameIndexReader.CITY_AS_STREET_COMMON);
+			words.removeIf(NameIndexReader::isIndexMarker);
 			String legacyWord = SearchPhrase.selectMainUnknownWordToSearch(words);
 			if (!legacyWord.isEmpty() && CommonWords.getInstance().getCommonSearch(legacyWord) == -1 && keys.add(legacyWord)) {
 				legacyKey = legacyWord;
@@ -448,7 +448,7 @@ public class NameIndexCreator<T> {
 		}
 		boolean hasRareName = false;
 		for (String token : uniqueNames) {
-			if (!token.equalsIgnoreCase(NameIndexReader.CITY_AS_STREET_COMMON) &&
+			if (!NameIndexReader.isIndexMarker(token) &&
 					!predefinedGlobalWords.isCommon(token) && predefinedGlobalWords.getFrequentlyUsed(token) <= 0) {
 				hasRareName = true;
 				break;
@@ -458,7 +458,7 @@ public class NameIndexCreator<T> {
 			if (Algorithms.isEmpty(token)) {
 				continue;
 			}
-			if (token.equalsIgnoreCase(NameIndexReader.CITY_AS_STREET_COMMON)) {
+			if (NameIndexReader.isIndexMarker(token)) {
 				tokenFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
 				commonNonIndexedFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
 				continue;
@@ -526,6 +526,18 @@ public class NameIndexCreator<T> {
         return normalizedToken;
     }
 	
+
+	static int countWords(String name) {
+		int cnt = 0;
+		for (String w : SearchAlgorithms.splitAndNormalize(name, true)) {
+			// an ordinal is a number in every language ('25-та', '25-a', '1e', '2ème'); '8-березня', '1945年5月8日街' are words
+//			if (!SearchAlgorithms.isNumber2Letters(w))  // doesn't work
+			if (!SearchAlgorithms.startsWithDigit(w) || SearchAlgorithms.letters(w) > 3) {
+				cnt++;
+			}
+		}
+		return cnt;
+	}
 
 	private static String removeBraces(String localeName) {
 		int i = localeName.indexOf('(');
@@ -608,9 +620,18 @@ public class NameIndexCreator<T> {
 		// getOtherNames ignores "admin_level", "place"
 		boolean postcode = (o instanceof City c && c.getType() == CityType.POSTCODE);
 		nameIndex.addToNameIndex(removeBraces(name), o,  settings.charsToBuildAddressNameIndex, postcode);
+		int mainWords = countWords(removeBraces(name));
+		int variant = 0;
 		for (String oName : o.getOtherNames(true, name)) {
 			if (!oName.equalsIgnoreCase(name)) {
-				nameIndex.addToNameIndex(removeBraces(oName), o,  settings.charsToBuildAddressNameIndex, postcode);
+				String indexed = removeBraces(oName);
+				// an alternative name of a street with another number of words becomes its own object for the search
+				// (see NameIndexReader.ALT_NAME_COMMON_PREFIX): the same-length translations keep sharing the street
+				if (o instanceof Street && variant < NameIndexReader.ALT_NAME_VARIANTS && countWords(indexed) != mainWords) {
+					variant++;
+					indexed += " " + NameIndexReader.altNameMarker(variant);
+				}
+				nameIndex.addToNameIndex(indexed, o,  settings.charsToBuildAddressNameIndex, postcode);
 			}
 		}
 		if (fileOffset > Integer.MAX_VALUE) {

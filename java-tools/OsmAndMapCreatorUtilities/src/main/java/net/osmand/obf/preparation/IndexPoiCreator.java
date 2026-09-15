@@ -18,6 +18,7 @@ import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.IProgress;
 import net.osmand.IndexConstants;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.NameIndexReader;
 import net.osmand.binary.BinaryMapPoiReaderAdapter;
 import net.osmand.binary.CommonWords;
 import net.osmand.binary.GeocodingUtilities;
@@ -1201,19 +1202,22 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	public void putPoiObjectPrefix(NameIndexCreator<PoiNameObject> namesIndex, PoiNameObject obj, String name,
 			String nameEn, Set<String> names, Set<String> idNames, IndexCreatorSettings settings) {
 		NameIndexCreator.addPoiCategories(namesIndex, obj, poiTypes);
+		int mainWords = -1;
 		if (name != null) {
 			namesIndex.addToNameIndex(name, obj, settings.charsToBuildPoiNameIndex, false);
+			mainWords = NameIndexCreator.countWords(name);
 			if (Algorithms.isEmpty(nameEn)) {
 				nameEn = Junidecode.unidecode(name);
 			}
 		}
+		int[] variant = new int[1];
 		if (!Algorithms.objectEquals(nameEn, name) && !Algorithms.isEmpty(nameEn)) {
-			namesIndex.addToNameIndex(nameEn, obj, settings.charsToBuildPoiNameIndex, false);
+			namesIndex.addToNameIndex(altName(nameEn, mainWords, variant), obj, settings.charsToBuildPoiNameIndex, false);
 		}
 		if (names != null) {
 			for (String nk : names) {
 				if (!Algorithms.objectEquals(nk, name) && !Algorithms.isEmpty(nk)) {
-					namesIndex.addToNameIndex(nk, obj, settings.charsToBuildPoiNameIndex, false);
+					namesIndex.addToNameIndex(altName(nk, mainWords, variant), obj, settings.charsToBuildPoiNameIndex, false);
 				}
 			}
 		}
@@ -1224,6 +1228,16 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				}
 			}
 		}
+	}
+
+	/** another name with another number of words becomes its own object for the search (NameIndexReader.ALT_NAME_COMMON_PREFIX):
+	 *  alt_name 'Café des Deux Moulins' never takes the slots of 'Café des 2 Moulins' */
+	private static String altName(String other, int mainWords, int[] variant) {
+		if (mainWords < 0 || variant[0] >= NameIndexReader.ALT_NAME_VARIANTS || NameIndexCreator.countWords(other) == mainWords) {
+			return other;
+		}
+		variant[0]++;
+		return other + " " + NameIndexReader.altNameMarker(variant[0]);
 	}
 
 	private void writePoiBoxes(BinaryMapIndexWriter writer, Tree<PoiTileBox> tree,
