@@ -1214,6 +1214,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		if (!Algorithms.objectEquals(nameEn, name) && !Algorithms.isEmpty(nameEn)) {
 			namesIndex.addToNameIndex(altName(nameEn, mainWords, variant), obj, settings.charsToBuildPoiNameIndex, false);
 		}
+		if (name != null) {
+			namesIndex.addUngluedToNameIndex(name, obj, settings.charsToBuildPoiNameIndex);
+		}
 		if (names != null) {
 			for (String nk : names) {
 				if (!Algorithms.objectEquals(nk, name) && !Algorithms.isEmpty(nk)) {
