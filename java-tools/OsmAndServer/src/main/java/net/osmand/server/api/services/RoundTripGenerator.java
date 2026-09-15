@@ -7,6 +7,11 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.LatLon;
@@ -22,6 +27,9 @@ import net.osmand.util.MapUtils;
  * advance, so the radius is rescaled by the measured ratio of road length (or time) to the straight
  * polygon and the loop is routed again. Candidates in several directions are ranked by the length
  * error and by the share of roads driven twice, and returned variants must not share most roads.
+ * <p>
+ * Directions are searched in parallel: the HH search itself costs about 3 ms per leg, but the
+ * last-mile search around every waypoint costs ~160 ms and is what the request waits for.
  */
 public class RoundTripGenerator {
 
@@ -39,7 +47,7 @@ public class RoundTripGenerator {
 	private static final double[] DIRECTION_OFFSETS = { 0, 0, -30, 30, -60, 60, -90, 90 };
 
 	public interface LoopRouter {
-		/** @return route start -> via... -> start, null if it could not be built */
+		/** @return route start -> via... -> start, null if it could not be built. Called from several threads. */
 		List<RouteSegmentResult> route(LatLon start, List<LatLon> via) throws IOException, InterruptedException;
 	}
 
@@ -52,6 +60,7 @@ public class RoundTripGenerator {
 		public int seed;
 		public double speed = 10; // m/s, first guess of the length of a time-limited loop
 		public double maxSpeed = 30; // m/s, bounds how far a time-limited loop may reach (map selection)
+		public int parallelism = 1; // how many loops may be routed at once (one routing context each)
 	}
 
 	public static class RoundTrip {
@@ -94,9 +103,10 @@ public class RoundTripGenerator {
 	}
 
 	private final LoopRouter router;
-	public final List<RoundTrip> candidates = new ArrayList<>();
-	public int routings;
-	public long routingMs;
+	public final List<RoundTrip> candidates = Collections.synchronizedList(new ArrayList<>());
+	private final List<Double> ratios = Collections.synchronizedList(new ArrayList<>());
+	public volatile int routings;
+	public volatile long routingMs;
 
 	public RoundTripGenerator(LoopRouter router) {
 		this.router = router;
@@ -110,38 +120,71 @@ public class RoundTripGenerator {
 	}
 
 	public List<RoundTrip> generate(LatLon start, Params p) throws IOException, InterruptedException {
+		int threads = Math.max(1, Math.min(p.parallelism, DIRECTIONS));
+		if (threads == 1) {
+			for (int d = 0; d < DIRECTIONS; d++) {
+				routeDirection(start, p, d);
+			}
+		} else {
+			ExecutorService pool = Executors.newFixedThreadPool(threads);
+			try {
+				List<Future<RoundTrip>> futures = new ArrayList<>();
+				for (int d = 0; d < DIRECTIONS; d++) {
+					final int direction = d;
+					futures.add(pool.submit((Callable<RoundTrip>) () -> routeDirection(start, p, direction)));
+				}
+				for (Future<RoundTrip> f : futures) {
+					try {
+						f.get();
+					} catch (ExecutionException e) {
+						Throwable cause = e.getCause();
+						if (cause instanceof InterruptedException) {
+							throw (InterruptedException) cause;
+						}
+						if (cause instanceof IOException) {
+							throw (IOException) cause;
+						}
+						throw new IOException(cause);
+					}
+				}
+			} finally {
+				pool.shutdownNow();
+			}
+		}
+		return select(new ArrayList<>(candidates), p.variants);
+	}
+
+	/** Route one direction, rescaling the radius until the loop is long enough */
+	private RoundTrip routeDirection(LatLon start, Params p, int d) throws IOException, InterruptedException {
 		int k = shape(p);
 		boolean byTime = p.time > 0;
 		double target = byTime ? p.time : p.distance;
 		double maxPerimeter = maxReach(p) / 2 * polygonFactor(k);
-		List<Double> ratios = new ArrayList<>(); // measured length (or time) per meter of straight polygon
-		for (int d = 0; d < DIRECTIONS; d++) {
-			double heading = heading(p, d);
-			boolean clockwise = ((d + p.seed) & 1) == 0;
-			double ratio = ratios.isEmpty() ? (byTime ? INITIAL_DETOUR / p.speed : INITIAL_DETOUR) : median(ratios);
-			RoundTrip best = null;
-			for (int it = 0; it < MAX_ITERATIONS; it++) {
-				double perimeter = Math.min(target / ratio, maxPerimeter);
-				RoundTrip rt = route(start, heading, clockwise, perimeter / polygonFactor(k), k, byTime, target);
-				if (rt == null) {
-					break;
-				}
-				rt.iteration = it;
-				double measured = (byTime ? rt.time : rt.distance) / perimeter;
-				ratios.add(measured);
-				if (best == null || rt.lengthError < best.lengthError) {
-					best = rt;
-				}
-				if (rt.lengthError <= LENGTH_TOLERANCE) {
-					break;
-				}
-				ratio = measured;
+		double heading = heading(p, d);
+		boolean clockwise = ((d + p.seed) & 1) == 0;
+		double ratio = ratios.isEmpty() ? (byTime ? INITIAL_DETOUR / p.speed : INITIAL_DETOUR) : median(ratios);
+		RoundTrip best = null;
+		for (int it = 0; it < MAX_ITERATIONS; it++) {
+			double perimeter = Math.min(target / ratio, maxPerimeter);
+			RoundTrip rt = route(start, heading, clockwise, perimeter / polygonFactor(k), k, byTime, target);
+			if (rt == null) {
+				break;
 			}
-			if (best != null) {
-				candidates.add(best);
+			rt.iteration = it;
+			double measured = (byTime ? rt.time : rt.distance) / perimeter;
+			ratios.add(measured);
+			if (best == null || rt.lengthError < best.lengthError) {
+				best = rt;
 			}
+			if (rt.lengthError <= LENGTH_TOLERANCE) {
+				break;
+			}
+			ratio = measured;
 		}
-		return select(new ArrayList<>(candidates), p.variants);
+		if (best != null) {
+			candidates.add(best);
+		}
+		return best;
 	}
 
 	private RoundTrip route(LatLon start, double heading, boolean clockwise, double radius, int k, boolean byTime,
@@ -246,7 +289,10 @@ public class RoundTripGenerator {
 	}
 
 	private static double median(List<Double> values) {
-		List<Double> s = new ArrayList<>(values);
+		List<Double> s;
+		synchronized (values) {
+			s = new ArrayList<>(values);
+		}
 		Collections.sort(s);
 		return s.get(s.size() / 2);
 	}

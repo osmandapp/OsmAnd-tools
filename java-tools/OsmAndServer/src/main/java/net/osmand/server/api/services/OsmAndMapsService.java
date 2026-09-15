@@ -28,7 +28,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Map.Entry;
 import java.util.TreeMap;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -119,6 +121,7 @@ public class OsmAndMapsService {
 	private static final int MEM_MAX_HITS_PER_RUN = 5;
 	// maps are picked by the start/end bbox, but a route with avoid_* / prefer_* params can detour out of it
 	private static final double ROUTING_MAPS_MARGIN_KM = 30;
+	private static final int ROUND_TRIP_THREADS = 4; // routing contexts built for one round trip request
 
 	private static final long INTERVAL_TO_MONITOR_ZIP = 5 * 60 * 1000;
 	private static final long INTERVAL_TO_CLEANUP_ROUTING_CACHE = 10 * 60 * 1000;
@@ -1146,25 +1149,46 @@ public class OsmAndMapsService {
 			List<BinaryMapIndexReaderReference> list = getObfReaders(withMargin(points(corners, start, start),
 					ROUTING_MAPS_MARGIN_KM), ObfReason.ROUTING.value());
 			boolean[] incomplete = new boolean[1];
-			usedMapList = getReaders(list, incomplete);
-			if (incomplete[0]) {
-				props.put("error", "maps are not available");
-				return Collections.emptyList();
+			// One routing context per worker: a context is not thread-safe, but the candidate loops are
+			// independent of each other. The HH search costs ~3 ms per leg, the last-mile search around
+			// every waypoint ~160 ms - that is what the request waits for, and it parallelizes well.
+			List<RoutePlannerFrontEnd> routers = new ArrayList<>();
+			List<RoutingContext> contexts = new ArrayList<>();
+			BlockingQueue<Integer> freeContexts = new LinkedBlockingQueue<>();
+			for (int i = 0; i < ROUND_TRIP_THREADS; i++) {
+				List<BinaryMapIndexReader> readers = getReaders(list, incomplete);
+				if (incomplete[0] || readers.isEmpty()) {
+					if (i == 0) {
+						props.put("error", "maps are not available");
+						return Collections.emptyList();
+					}
+					break; // no more free readers - run with the workers we have
+				}
+				usedMapList.addAll(readers);
+				RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
+				RoutingContext ctx = prepareRouterContext(rp, router, readers, false);
+				if (!rp.noConditionals && rp.routeCalculationTime < 0) {
+					ctx.config.routeCalculationTime = getLocalTimeMillisByLatLon(start.getLatitude(),
+							start.getLongitude());
+				}
+				router.getHHRoutingConfig().cacheContext(null); // keep HH points between the legs and the loops
+				ctx.calculationProgress = new RouteCalculationProgress();
+				routers.add(router);
+				contexts.add(ctx);
+				freeContexts.add(i);
 			}
-			RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
-			RoutingContext ctx = prepareRouterContext(rp, router, usedMapList, false);
-			if (!rp.noConditionals && rp.routeCalculationTime < 0) {
-				ctx.config.routeCalculationTime = getLocalTimeMillisByLatLon(start.getLatitude(), start.getLongitude());
-			}
-			router.getHHRoutingConfig().cacheContext(null); // keep HH points between the legs and the loops
-			ctx.calculationProgress = progress;
+			params.parallelism = contexts.size();
 			RoundTripGenerator generator = new RoundTripGenerator((s, via) -> {
 				if (progress.isCancelled) {
 					throw new InterruptedException("Round trip is cancelled");
 				}
-				ctx.routingTime = 0;
-				RouteCalcResult rc = router.searchRoute(ctx, s, s, via, null);
-				return rc != null && rc.isCorrect() ? rc.getList() : null;
+				int i = freeContexts.take();
+				try {
+					RouteCalcResult rc = routers.get(i).searchRoute(contexts.get(i), s, s, via, null);
+					return rc != null && rc.isCorrect() ? rc.getList() : null;
+				} finally {
+					freeContexts.put(i);
+				}
 			});
 			List<RoundTripGenerator.RoundTrip> trips = generator.generate(start, params);
 			if (generator.candidates.isEmpty()) {
@@ -1174,6 +1198,7 @@ public class OsmAndMapsService {
 			TreeMap<String, Object> dev = new TreeMap<>();
 			dev.put("maps", usedMapList.size());
 			dev.put("reach", Math.round(reach));
+			dev.put("workers", contexts.size());
 			dev.put("routings", generator.routings);
 			dev.put("routingMs", generator.routingMs);
 			dev.put("totalMs", System.currentTimeMillis() - startTime);
