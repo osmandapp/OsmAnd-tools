@@ -23,6 +23,7 @@ import net.osmand.server.api.searchtest.repo.SearchTestRunRepository.Run;
 import net.osmand.search.core.ObjectType;
 import net.osmand.search.core.SearchResult;
 import net.osmand.search.core.spatial.SpatialSearchContext;
+import net.osmand.search.core.spatial.SpatialTextSearch;
 
 import net.osmand.search.core.spatial.SpatialTextSearch.SpatialSearchResults;
 import net.osmand.search.core.spatial.SpatialTextSearch.SpatialTextSearchSettings;
@@ -75,6 +76,10 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 	private final ConcurrentHashMap<Long, List<Object[]>> runResultBatches = new ConcurrentHashMap<>();
 	private final ConcurrentHashMap<Long, List<CompletableFuture<Void>>> runResultBatchTasks = new ConcurrentHashMap<>();
 	private final Set<Long> loggedStoppedRuns = ConcurrentHashMap.newKeySet();
+	// Spatial engines of a running run, one per worker thread. SpatialTextSearch keeps the name-index caches of every
+	// OBF it has read; the service's thread-local engines live as long as the executor threads, so those caches piled
+	// up run after run until the server had to be restarted. The run's engines are dropped when the run ends.
+	private final ConcurrentHashMap<Long, ConcurrentHashMap<Thread, SpatialTextSearch>> runSearchEngines = new ConcurrentHashMap<>();
 
 	@Autowired
 	private ObjectMapper objectMapper;
@@ -334,6 +339,7 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 				new AtomicReference<>(Run.Status.RUNNING));
 		AtomicInteger maxMapsCount = new AtomicInteger();
 		final int maxParallel = threadsCount > 0 ? threadsCount : 1;
+		runSearchEngines.put(run.id, new ConcurrentHashMap<>());
 		try {
 			if (maxParallel > 1) {
 				String sql = "SELECT count(*) FROM gen_result WHERE case_id = ? ORDER BY id";
@@ -395,9 +401,14 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 			loggedStoppedRuns.remove(run.id);
 			runResultBatches.remove(run.id);
 			runResultBatchTasks.remove(run.id);
-			LOGGER.info("PERF doMainRun runId={} caseId={} threads={} maps={} status={} elapsedMs={}",
+			Map<Thread, SpatialTextSearch> engines = runSearchEngines.remove(run.id);
+			// readers nobody holds now; the next run opens its files again
+			mapsService.closeMapReaders();
+			Runtime rt = Runtime.getRuntime();
+			LOGGER.info("PERF doMainRun runId={} caseId={} threads={} maps={} status={} elapsedMs={} droppedEngines={} heapUsedMb={}",
 					run.id, test.id, maxParallel, run.mapsCount, run.status,
-					(System.nanoTime() - startedNs) / 1_000_000);
+					(System.nanoTime() - startedNs) / 1_000_000, engines == null ? 0 : engines.size(),
+					(rt.totalMemory() - rt.freeMemory()) / (1024 * 1024));
 		}
 	}
 
@@ -497,7 +508,7 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 						if (isSpatial) {
 							// test rows are complete queries: suggestion settings match the last word as a prefix
 							SpatialSearchService.SpatialResults spatialResult = searchTestSpatial(ctx, options,
-									null, false, false);
+									null, false, false, runSearchEngine(run.id));
 							if (spatialResult != null) {
 								maxMapsCount.accumulateAndGet(spatialResult.obfCount(), Math::max);
 								actuator.setFormatter(spatialResult.formatter());
@@ -541,12 +552,20 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 
 	public SpatialSearchService.SpatialResults searchTestSpatial(ClassicSearchService.SearchContext ctx, ClassicSearchService.SearchOption options, List<BinaryMapIndexReader> readers, boolean printLogs)
 			throws IOException {
-		return searchTestSpatial(ctx, options, readers, printLogs, !options.queryIsCompleted());
+		return searchTestSpatial(ctx, options, readers, printLogs, !options.queryIsCompleted(),
+				spatialSearchService.getSpatialTextSearch());
+	}
+
+	private SpatialTextSearch runSearchEngine(Long runId) {
+		Map<Thread, SpatialTextSearch> engines = runSearchEngines.get(runId);
+		// a worker still going after its run has ended gets a throwaway engine, not a cache nobody drops
+		return engines == null ? new SpatialTextSearch()
+				: engines.computeIfAbsent(Thread.currentThread(), t -> new SpatialTextSearch());
 	}
 
 	private SpatialSearchService.SpatialResults searchTestSpatial(ClassicSearchService.SearchContext ctx,
 			ClassicSearchService.SearchOption options, List<BinaryMapIndexReader> readers, boolean printLogs,
-			boolean autocomplete) throws IOException {
+			boolean autocomplete, SpatialTextSearch engine) throws IOException {
 		long startedNs = System.nanoTime();
 		SpatialSearchService.SpatialResults res = null;
 		try {
@@ -573,7 +592,7 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 				}
 			}
 
-			res = searchTestSpatial(ctx, readers, printLogs, obfCount, autocomplete);
+			res = searchTestSpatial(ctx, readers, printLogs, obfCount, autocomplete, engine);
 		} catch (RuntimeException e) {
 			LOGGER.error(String.format("Spatial search failed for '%s': %s", ctx.text(), e), e);
 			throw e;
@@ -590,8 +609,8 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 	}
 
 	private SpatialSearchService.SpatialResults searchTestSpatial(ClassicSearchService.SearchContext ctx, List<BinaryMapIndexReader> readers,
-	                                                            boolean printLogs, int obfCount, boolean autocomplete)
-			throws IOException {
+	                                                            boolean printLogs, int obfCount, boolean autocomplete,
+	                                                            SpatialTextSearch engine) throws IOException {
 		if (readers == null || readers.isEmpty()) {
 			return null;
 		}
@@ -603,7 +622,7 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 		SpatialSearchContext.SpatialSearchStats stats = sscontext.getStats();
 		stats.printLogs = printLogs;
 
-		SpatialSearchResults results = spatialSearchService.getSpatialTextSearch().searchAPI(ctx.text(), sscontext);
+		SpatialSearchResults results = engine.searchAPI(ctx.text(), sscontext);
 		return new SpatialSearchService.SpatialResults(results, stats, obfCount,
 				new SpatialResultFormatter(sscontext, new LatLon(ctx.lat(), ctx.lon()), MapPoiTypes.getDefault()));
 	}
