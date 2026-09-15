@@ -1476,6 +1476,9 @@ public class BinaryMapIndexWriter {
 			if (st.getEnName(false) != null) {
 				tStop.setNameEn(registerString(stringTable, st.getEnName(false)));
 			}
+			if (st.isTransferOnly()) {
+				tStop.setTransferOnly(true);
+			}
 			tRoute.addDirectStops(tStop.build());
 		}
 		if (directRoute != null) {
