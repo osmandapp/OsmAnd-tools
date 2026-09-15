@@ -46,6 +46,7 @@ import net.osmand.router.RouteSegmentResult;
 import net.osmand.router.RoutingConfiguration;
 import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.api.services.OsmAndMapsService.RoutingServerConfigEntry;
+import net.osmand.server.api.services.RoundTripGenerator;
 import net.osmand.server.api.services.RoutingService;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import net.osmand.server.controllers.pub.GeojsonClasses.FeatureCollection;
@@ -60,6 +61,9 @@ public class RoutingController {
 	public static final String MSG_LONG_DIST = "Sorry, in our beta mode max routing distance is limited to ";
 	/** each alternative costs a detailed expansion, and no client asks for more than a couple */
 	private static final int MAX_ALTERNATIVES = 2;
+	private static final int MAX_ROUND_TRIP_KM = 300;
+	private static final int MAX_ROUND_TRIP_MIN = 600;
+	private static final int MAX_ROUND_TRIP_VARIANTS = 5;
 	protected static final Log LOGGER = LogFactory.getLog(RoutingController.class);
 
 	@Autowired
@@ -375,6 +379,82 @@ public class RoutingController {
 		}
 	}
 
+
+	/**
+	 * Round trip prototype (OsmAnd-Issues#2827): loops that start and end at the point, of the given length in km
+	 * or time in minutes. The response has the shape of /route: the best loop first, the other variants as
+	 * alternatives. Each loop line carries "roundTrip" properties, the main one also "roundTripDev".
+	 */
+	@RequestMapping(path = "/roundtrip", produces = {MediaType.APPLICATION_JSON_VALUE})
+	public ResponseEntity<String> roundTrip(HttpSession session, @RequestParam String point,
+			@RequestParam(defaultValue = "car") String routeMode,
+			@RequestParam(defaultValue = "0") double distance,
+			@RequestParam(defaultValue = "0") double time,
+			@RequestParam(defaultValue = "3") int variants,
+			@RequestParam(required = false) Double direction,
+			@RequestParam(defaultValue = "3") int shape,
+			@RequestParam(defaultValue = "0") int seed) {
+		String[] ll = point.split(",");
+		LatLon start = new LatLon(Double.parseDouble(ll[0]), Double.parseDouble(ll[1]));
+		RoundTripGenerator.Params params = new RoundTripGenerator.Params();
+		params.distance = Math.min(distance, MAX_ROUND_TRIP_KM) * 1000;
+		params.time = Math.min(time, MAX_ROUND_TRIP_MIN) * 60;
+		if (params.distance <= 0 && params.time <= 0) {
+			return ResponseEntity.badRequest().body("distance (km) or time (min) is required");
+		}
+		params.variants = Math.min(Math.max(variants, 1), MAX_ROUND_TRIP_VARIANTS);
+		params.direction = direction;
+		params.shape = shape;
+		params.seed = seed;
+		Map<String, Object> props = new TreeMap<>();
+		List<RoundTripGenerator.RoundTrip> trips = Collections.emptyList();
+		try {
+			trips = osmAndMapsService.roundTrip(routeMode, start, params, props, this.session.getRoutingProgress(session));
+		} catch (IOException | InterruptedException | RuntimeException e) {
+			LOGGER.error(e.getMessage(), e);
+			props.put("error", String.valueOf(e.getMessage()));
+		}
+		if (trips.isEmpty()) {
+			String msg = "No round trip found" + (props.containsKey("error") ? ": " + props.get("error") : ".");
+			return ResponseEntity.ok(gson.toJson(Map.of("features", new FeatureCollection(new Feature[0]), "msg", msg,
+					"props", props)));
+		}
+		List<Feature> features = new ArrayList<>();
+		RoundTripGenerator.RoundTrip main = trips.get(0);
+		List<LatLonEle> points = routingService.getElevationsBySegments(new ArrayList<>(), features, main.route);
+		routingService.interpolateEmptyElevationSegments(points);
+		List<Double> eleDiff = routingService.calculateElevationDiffs(points);
+		if (eleDiff.size() > 1 && !Double.isNaN(eleDiff.get(0)) && !Double.isNaN(eleDiff.get(1))) {
+			props.put("diffElevationUp", eleDiff.get(0));
+			props.put("diffElevationDown", eleDiff.get(1));
+		}
+		TreeMap<String, Object> overall = new TreeMap<>();
+		double routingTime = 0;
+		for (RouteSegmentResult r : main.route) {
+			routingTime += r.getRoutingTime();
+		}
+		overall.put("distance", main.distance);
+		overall.put("time", main.time);
+		overall.put("routingTime", routingTime);
+		props.put("overall", overall);
+		props.put("roundTrip", main.describe());
+		Feature route = new Feature(Geometry.lineStringElevation(points));
+		route.properties = props;
+		features.add(0, route);
+		List<List<RouteSegmentResult>> others = new ArrayList<>();
+		for (int i = 1; i < trips.size(); i++) {
+			others.add(trips.get(i).route);
+		}
+		for (Feature f : routingService.buildAlternativeFeatures(others)) {
+			// alternative n is trips[n]; turn features carry the number too, only the line has "overall"
+			if (f.properties.containsKey("overall") && f.properties.get("alternative") instanceof Integer n
+					&& n < trips.size()) {
+				f.properties.put("roundTrip", trips.get(n).describe());
+			}
+			features.add(f);
+		}
+		return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[0]))));
+	}
 
 	@PostMapping(path = {"/update-route-between-points"}, produces = "application/json")
 	@ResponseBody

@@ -1117,6 +1117,83 @@ public class OsmAndMapsService {
 	}
 
 	/**
+	 * Round trip prototype (OsmAnd-Issues#2827). All loop candidates are routed with Java HH routing in one
+	 * routing context, so the HH points are loaded once for dozens of legs. A* is not used at all: a
+	 * fallback per leg would take minutes.
+	 */
+	public List<RoundTripGenerator.RoundTrip> roundTrip(String routeMode, LatLon start, RoundTripGenerator.Params params,
+			Map<String, Object> props, RouteCalculationProgress progress) throws IOException, InterruptedException {
+		RouteParameters rp = parseRouteParameters(routeMode);
+		if (rp.onlineRouting != null || rp.disableHHRouting) {
+			props.put("error", "round trips are built with HH routing only");
+			return Collections.emptyList();
+		}
+		rp.useOnlyHHRouting = true;
+		rp.useNativeRouting = false;
+		GeneralRouter profileRouter = RoutingConfiguration.getDefault()
+				.build(rp.routeProfile, new RoutingMemoryLimits(MEM_LIMIT, MEM_LIMIT), rp.routeParams).router;
+		params.speed = profileRouter.getDefaultSpeed();
+		params.maxSpeed = Math.max(profileRouter.getMaxSpeed(), params.speed);
+		double reach = RoundTripGenerator.maxReach(params);
+		List<LatLon> corners = new ArrayList<>();
+		for (int bearing = 0; bearing < 360; bearing += 90) {
+			corners.add(MapUtils.rhumbDestinationPoint(start, reach, bearing));
+		}
+		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
+		long startTime = System.currentTimeMillis();
+		try {
+			validateAndInitConfig();
+			List<BinaryMapIndexReaderReference> list = getObfReaders(withMargin(points(corners, start, start),
+					ROUTING_MAPS_MARGIN_KM), ObfReason.ROUTING.value());
+			boolean[] incomplete = new boolean[1];
+			usedMapList = getReaders(list, incomplete);
+			if (incomplete[0]) {
+				props.put("error", "maps are not available");
+				return Collections.emptyList();
+			}
+			RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
+			RoutingContext ctx = prepareRouterContext(rp, router, usedMapList, false);
+			if (!rp.noConditionals && rp.routeCalculationTime < 0) {
+				ctx.config.routeCalculationTime = getLocalTimeMillisByLatLon(start.getLatitude(), start.getLongitude());
+			}
+			router.getHHRoutingConfig().cacheContext(null); // keep HH points between the legs and the loops
+			ctx.calculationProgress = progress;
+			RoundTripGenerator generator = new RoundTripGenerator((s, via) -> {
+				if (progress.isCancelled) {
+					throw new InterruptedException("Round trip is cancelled");
+				}
+				ctx.routingTime = 0;
+				RouteCalcResult rc = router.searchRoute(ctx, s, s, via, null);
+				return rc != null && rc.isCorrect() ? rc.getList() : null;
+			});
+			List<RoundTripGenerator.RoundTrip> trips = generator.generate(start, params);
+			if (generator.candidates.isEmpty()) {
+				// every leg failed - usually the maps carry no HH data for this profile
+				props.put("error", "no HH routing data for " + rp.routeProfile + " here");
+			}
+			TreeMap<String, Object> dev = new TreeMap<>();
+			dev.put("maps", usedMapList.size());
+			dev.put("reach", Math.round(reach));
+			dev.put("routings", generator.routings);
+			dev.put("routingMs", generator.routingMs);
+			dev.put("totalMs", System.currentTimeMillis() - startTime);
+			List<Map<String, Object>> candidates = new ArrayList<>();
+			for (RoundTripGenerator.RoundTrip c : generator.candidates) {
+				Map<String, Object> m = c.describe();
+				m.put("selected", trips.indexOf(c));
+				candidates.add(m);
+			}
+			dev.put("candidates", candidates);
+			props.put("roundTripDev", dev);
+			LOGGER.info(String.format("REQ roundtrip %s %s: %d variants, %d maps, %d routings, %d ms", routeMode, start,
+					trips.size(), usedMapList.size(), generator.routings, System.currentTimeMillis() - startTime));
+			return trips;
+		} finally {
+			unlockReaders(usedMapList);
+		}
+	}
+
+	/**
 	 * Only the Java HH planner produces alternatives, and only for a plain start -> end route.
 	 * Returns what stands in the way, or null when alternatives can be expected.
 	 */
