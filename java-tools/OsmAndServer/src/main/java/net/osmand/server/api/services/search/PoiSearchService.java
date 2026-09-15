@@ -35,6 +35,7 @@ import net.osmand.data.City.CityType;
 import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
 import net.osmand.data.QuadRect;
+import net.osmand.data.TransportStopMatcher;
 import net.osmand.osm.PoiType;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiCategory;
@@ -528,7 +529,7 @@ public class PoiSearchService {
 	private Feature getMapObjectFeature(SearchResult res, String timeZone) throws IOException {
 		Feature feature = searchResultConverter.getPoiFeature(res, timeZone);
 		Amenity amenity = (Amenity) res.object;
-		if (transportStopsService.isPublicTransportStop(amenity)) {
+		if (TransportStopMatcher.isPublicTransportStop(amenity)) {
 			Long stopId = transportStopsService.findBestTransportStopId(amenity);
 			if (stopId != null) {
 				feature.prop(SearchResultConverter.PoiTypeField.TRANSPORT_STOP_ID.getFieldName(), stopId);
