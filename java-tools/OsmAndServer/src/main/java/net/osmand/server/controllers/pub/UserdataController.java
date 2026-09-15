@@ -199,6 +199,7 @@ public class UserdataController {
 		// allow to register only with small case
 		email = email.toLowerCase().trim();
 		CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
+		boolean newUser = pu == null;
 		if (!email.contains("@")) {
 			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
 		}
@@ -223,7 +224,7 @@ public class UserdataController {
 			// see comment on constant
 			pu.token = (new Random().nextInt(8999) + 1000) + "";
 			// TODO iOS: add lang in OARegisterUserCommand.m before sendRequestWithUrl params[@"lang"] = ...
-			emailSender.sendOsmAndCloudRegistrationEmail(pu.email, pu.token, lang, true);
+			emailSender.sendOsmAndCloudRegistrationEmail(pu.email, pu.token, lang, newUser);
 		}
 		CloudUser saved = usersRepository.saveAndFlush(pu);
 	    if (orderid != null) {
