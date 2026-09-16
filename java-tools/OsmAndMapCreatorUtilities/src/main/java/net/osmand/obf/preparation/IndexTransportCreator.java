@@ -82,6 +82,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	private Set<Long> ferryWaysInRelations = new HashSet<Long>();
 	private TLongLongHashMap syntheticFerryStops = new TLongLongHashMap(); // stop id -> node id
 	private TLongHashSet transferOnlyStops = new TLongHashSet();
+	private TLongObjectHashMap<TLongIntHashMap> ferryCrossings = new TLongObjectHashMap<>(); // route id -> stop id -> ferry interval
 
 	private static final long TEST_ROUTE_ID_MISSING_STOPS = 192037l;
 	
@@ -201,8 +202,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 						routesOffsets.add(routeOffset);
 					}
 					rset.close();
-					writer.writeTransportStop(id, x24, y24, name, nameEn, names, stringTable, routesOffsets, routesIds, deletedRoutes, exits,
-							syntheticFerryStops.containsKey(id));
+					writer.writeTransportStop(id, x24, y24, name, nameEn, names, stringTable, routesOffsets, routesIds, deletedRoutes, exits);
 				} else {
 					log.error("Something goes wrong with transport id = " + id); //$NON-NLS-1$
 				}
@@ -246,7 +246,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					Map<Entity.EntityId, List<TransportStopExit>> exits = new HashMap<>();
 					exits.put(new EntityId(Entity.EntityType.NODE, stop.getId()), stop.getExits());
 					writer.writeTransportStop(id, x24, y24, stop.getName(), stop.getEnName(false), stop.getNamesMap(false), 
-							stringTable, routesOffsets, routesIds, deletedRoutes, exits, stop.isSynthetic());
+							stringTable, routesOffsets, routesIds, deletedRoutes, exits);
 				} else {
 					log.error("Something goes wrong with transport id = " + id);
 				}
@@ -530,6 +530,38 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	}
 
 
+	// a bus (or other non-ferry route) going over a ferry way waits for the ferry before the stop after the crossing
+	// (call before route ways are merged: merged ways lose their tags)
+	private void registerFerryCrossings(TransportRoute route) {
+		List<TransportStop> stops = route.getForwardStops();
+		if ("ferry".equals(route.getType()) || stops.size() < 2) {
+			return;
+		}
+		for (Way w : route.getForwardWays()) {
+			if ("ferry".equals(w.getTag(OSMTagKey.ROUTE)) && w.getFirstNode() != null && w.getLastNode() != null) {
+				int start = getNearestStopIndex(stops, w.getFirstNode().getLatLon());
+				int end = getNearestStopIndex(stops, w.getLastNode().getLatLon());
+				if (start != end) {
+					if (!ferryCrossings.containsKey(route.getId())) {
+						ferryCrossings.put(route.getId(), new TLongIntHashMap());
+					}
+					ferryCrossings.get(route.getId()).put(stops.get(Math.max(start, end)).getId(),
+							TransportRoute.parseIntervalTagToSeconds(w.getTag("interval")));
+				}
+			}
+		}
+	}
+
+	private static int getNearestStopIndex(List<TransportStop> stops, LatLon location) {
+		int nearest = 0;
+		for (int i = 1; i < stops.size(); i++) {
+			if (MapUtils.getDistance(stops.get(i).getLocation(), location) < MapUtils.getDistance(stops.get(nearest).getLocation(), location)) {
+				nearest = i;
+			}
+		}
+		return nearest;
+	}
+
 	private void addBatch(TransportRoute route, ByteArrayOutputStream ous, Way tr, int ind) throws SQLException {
 		if (tr.getNodes().size() == 0) {
 			return;
@@ -657,6 +689,10 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					}
 					st.setTransferOnly(transferOnlyStops.contains(idStop));
 					st.setSynthetic(syntheticFerryStops.containsKey(idStop));
+					TLongIntHashMap crossings = ferryCrossings.get(idRoute);
+					if (crossings != null && crossings.containsKey(idStop)) {
+						st.setFerryInterval(crossings.get(idStop));
+					}
 					directStops.add(st);
 				}
 				selectTransportRouteGeometry.setLong(1, idRoute);
@@ -664,6 +700,9 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				while (rset.next()) {
 					byte[] bytes = rset.getBytes(1);
 					directGeometry.add(bytes);
+				}
+				for (Map.Entry<String, String> tag : TransportRoute.getStopTags(directStops).entrySet()) {
+					transportRouteTagValues.addTagValue(idRoute, tag.getKey(), tag.getValue());
 				}
 				TransportSchedule schedule = readSchedule(ref, directStops);
 				long ptr = writer.writeTransportRoute(idRoute, routeName, routeEnName, ref, operator, type, dist, color, directStops,
@@ -822,6 +861,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		if (rel instanceof Relation && processTransportRelationV2((Relation) rel, directRoute, icc)) { // try new transport relations first
 			List<Entity> incompleteNodes = getIncompleteStops((Relation) rel, directRoute);
 			List<TransportStop> forwardStops = directRoute.getForwardStops();
+			registerFerryCrossings(directRoute);
 			if (directRoute.getId().longValue() / 2  == TEST_ROUTE_ID_MISSING_STOPS) {
 				System.out.println(directRoute.getName() + ":");
 			}
@@ -855,6 +895,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					: processTransportRelationV1((Relation) rel, directRoute, backwardRoute); // old relation style otherwise
 			if (processed) {
 				backwardRoute.setId((backwardRoute.getId() << 1) + 1);
+				registerFerryCrossings(directRoute);
+				registerFerryCrossings(backwardRoute);
 				troutes.add(directRoute);
 				troutes.add(backwardRoute);
 				transportRouteTagValues.registerTagValues(backwardRoute.getId(), rel.getTags());
