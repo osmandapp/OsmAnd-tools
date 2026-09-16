@@ -37,7 +37,11 @@ public class RoundTripGenerator {
 	public static final int MAX_SHAPE = 5;
 	public static final int DIRECTIONS = 8; // candidate loops, each one is routed up to MAX_ITERATIONS times
 	public static final int MAX_ITERATIONS = 3;
-	public static final double LENGTH_TOLERANCE = 0.08; // stop rescaling a loop within this share of the target
+	// Loops are aimed a little longer than asked: a loop a few percent over the length reads as "about right",
+	// under it as "short". Measured with 8% tolerance around the asked length, trimmed loops came out +6-8%.
+	public static final double TARGET_MARGIN = 1.04;
+	public static final double LENGTH_TOLERANCE = 0.025; // stop rescaling a loop within this share of the target
+	public static final double LENGTH_BAND = 0.03; // loops within this share of the target are preferred
 	public static final double INITIAL_DETOUR = 1.3; // road length / straight polygon length before anything is measured
 	public static final double MAX_DETOUR = 1.0; // the polygon is never longer than the requested length
 	public static final double OVERLAP_WEIGHT = 1.5; // score = length error + weight * overlap
@@ -155,13 +159,28 @@ public class RoundTripGenerator {
 				pool.shutdownNow();
 			}
 		}
-		return select(new ArrayList<>(candidates), p.variants);
+		List<RoundTrip> selected = select(new ArrayList<>(candidates), p.variants);
+		// A returned loop outside the length band gets one more attempt, rescaled by its own measured length:
+		// with 8 directions there are rarely three loops in the band, and only the returned ones pay for it.
+		double target = p.distance * TARGET_MARGIN;
+		for (int i = 0; i < selected.size(); i++) {
+			RoundTrip c = selected.get(i);
+			if (c.lengthError <= LENGTH_BAND || c.distance <= 0) {
+				continue;
+			}
+			RoundTrip retry = route(start, c.heading, c.clockwise, c.radius * target / c.distance, shape(p), target);
+			if (retry != null && retry.lengthError < c.lengthError) {
+				retry.iteration = c.iteration + 1;
+				selected.set(i, retry);
+			}
+		}
+		return selected;
 	}
 
 	/** Route one direction, rescaling the radius until the loop is long enough */
 	private RoundTrip routeDirection(LatLon start, Params p, int d) throws IOException, InterruptedException {
 		int k = shape(p);
-		double target = p.distance;
+		double target = p.distance * TARGET_MARGIN;
 		double maxPerimeter = maxReach(p) / 2 * polygonFactor(k);
 		double heading = heading(p, d);
 		boolean clockwise = ((d + p.seed) & 1) == 0;
@@ -315,7 +334,10 @@ public class RoundTripGenerator {
 	}
 
 	static List<RoundTrip> select(List<RoundTrip> candidates, int count) {
-		candidates.sort(Comparator.comparingDouble(RoundTrip::score));
+		// a loop within the length band beats any loop outside it, whatever their repeated roads: the score
+		// alone let a +9% loop with fewer repeats win over a +3% one
+		candidates.sort(Comparator.comparingInt((RoundTrip c) -> c.lengthError <= LENGTH_BAND ? 0 : 1)
+				.thenComparingDouble(RoundTrip::score));
 		List<RoundTrip> res = new ArrayList<>();
 		for (RoundTrip c : candidates) {
 			if (res.size() >= count) {
