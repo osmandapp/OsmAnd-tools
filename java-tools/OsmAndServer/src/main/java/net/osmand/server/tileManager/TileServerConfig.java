@@ -121,5 +121,8 @@ public class TileServerConfig {
 		public int maxZoomCache;
 		public int tileSizeLog;
 		public int metaTileSizeLog;
+		// depth test styles only, see DepthTestMaps
+		public transient String file;
+		public transient String depth;
 	}
 }

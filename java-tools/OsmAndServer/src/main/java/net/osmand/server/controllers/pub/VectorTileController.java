@@ -2,6 +2,7 @@ package net.osmand.server.controllers.pub;
 
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.util.Map;
 import java.util.TreeMap;
@@ -10,6 +11,8 @@ import java.util.concurrent.TimeUnit;
 import javax.imageio.ImageIO;
 
 import com.google.gson.JsonObject;
+import jakarta.annotation.PostConstruct;
+import net.osmand.server.tileManager.DepthTestMaps;
 import net.osmand.server.tileManager.TileMemoryCache;
 import net.osmand.server.tileManager.TileServerConfig;
 import net.osmand.server.tileManager.VectorMetatile;
@@ -21,6 +24,7 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.xml.sax.SAXException;
@@ -54,6 +58,28 @@ public class VectorTileController {
 	private final Object stylesJsonCacheLock = new Object();
 
 	Gson gson = new Gson();
+
+	@PostConstruct
+	public void initDepthTestStyles() {
+		VectorStyle template = config.getStyle("hd");
+		if (template != null) {
+			for (VectorStyle vs : DepthTestMaps.INSTANCE.createStyles(template)) {
+				config.style.put(vs.key, vs);
+			}
+		}
+	}
+
+	// depth test styles: drop rendered tiles and fetch new depth maps after a new build
+	@PostMapping(path = "/depth-test/clear-cache")
+	public ResponseEntity<String> clearDepthTestCache() throws IOException {
+		tileMemoryCache.removeByPrefix("depth-");
+		File[] dirs = config.cacheLocation == null ? null : new File(config.cacheLocation).listFiles((d, n) -> n.startsWith("depth-"));
+		for (File d : dirs == null ? new File[0] : dirs) {
+			Algorithms.removeAllFiles(d);
+		}
+		DepthTestMaps.INSTANCE.refresh();
+		return ResponseEntity.ok("{\"status\":\"ok\"}");
+	}
 
 	private ResponseEntity<?> errorConfig(String msg) {
 		return ResponseEntity.badRequest()
@@ -138,7 +164,7 @@ public class VectorTileController {
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		ImageIO.write(subimage, "png", baos);
 		return ResponseEntity.ok()
-				.header("Cache-Control", "public, max-age=2592000")
+				.header("Cache-Control", vectorStyle.depth != null ? "no-store" : "public, max-age=2592000")
 				.body(new ByteArrayResource(baos.toByteArray()));
 	}
 
