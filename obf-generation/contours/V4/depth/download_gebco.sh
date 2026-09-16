@@ -3,6 +3,8 @@
 #
 #   download_gebco.sh [-y YEAR] [-g elevation|tid|sub_ice] [-f geotiff|netcdf] [-j PARTS] [-o DIR] [--unzip]
 #
+# --unzip unzips the complete archive, deletes it and leaves an empty <archive>.done so a rerun skips it.
+#
 # Defaults: -y 2026 -g elevation -f geotiff -j 8 -o .
 # The CEDA server drops long connections, so the file is fetched in PARTS ranges that are resumed until
 # each one has its exact length; rerunning the script continues where it stopped.
@@ -17,7 +19,7 @@ while [ $# -gt 0 ]; do
 		-j) PARTS=$2; shift 2 ;;
 		-o) OUT=$2; shift 2 ;;
 		--unzip) DO_UNZIP=1; shift ;;
-		-h|--help) sed -n '2,9p' "$0"; exit 0 ;;
+		-h|--help) sed -n '2,11p' "$0"; exit 0 ;;
 		*) echo "Unknown option $1" >&2; exit 1 ;;
 	esac
 done
@@ -42,7 +44,9 @@ TOTAL=$(curl -sIL "$URL" | awk 'tolower($1)=="content-length:"{v=$2} END{gsub("\
 if [ "$TOTAL" -le 0 ]; then
 	echo "Cannot get size of $URL (file layout of GEBCO_$YEAR may differ, check https://www.gebco.net)" >&2; exit 1
 fi
-if [ "$(size_of "$NAME")" = "$TOTAL" ]; then
+if [ -f "$NAME.done" ]; then
+	echo "$NAME already downloaded and unzipped"; exit 0
+elif [ "$(size_of "$NAME")" = "$TOTAL" ]; then
 	echo "$NAME already complete ($TOTAL bytes)"
 else
 	echo "Downloading $NAME: $TOTAL bytes in $PARTS parts"
@@ -71,5 +75,7 @@ else
 fi
 
 if [ $DO_UNZIP -eq 1 ]; then
-	unzip -o "$NAME" && echo "Unzipped $NAME"
+	unzip -oq "$NAME"
+	rm -f "$NAME"; : > "$NAME.done"
+	echo "Unzipped and removed $NAME"
 fi

@@ -14,12 +14,15 @@ Current releases: GEBCO_2026 (15″) and EMODnet DTM 2024 (1/16′).
 
 ## Everything at once
 
-`download_all.sh -o DIR` fetches all sources below into `DIR/<source>/`; rerun to resume.
-Jenkins: `SRTM_DownloadDepthSources` (parameters OUT_DIR, SOURCES, JOBS, UNZIP, DRY_RUN).
+`download_all.sh -o DIR` fetches the depth sources below into `DIR/src/<source>/` (`--data`) and the OSM land
+polygons into `DIR/mask/` (`--mask`); without either flag it fetches both. Archives are unzipped as soon as they
+are complete and deleted, an empty `<archive>.done` marks them, so a rerun resumes and skips what is done.
+Jenkins: `SRTM_DownloadDepthSources` (parameters DOWNLOAD_DATA, DOWNLOAD_MASK).
 
 ```
-./download_all.sh -o /home/relief-data/depth-sources --dry-run      # sizes only
-./download_all.sh -o /home/relief-data/depth-sources --unzip
+./download_all.sh -o /data/depth --dry-run                    # sizes only
+./download_all.sh -o /data/depth                              # everything
+./download_all.sh -o /data/depth --mask                       # land polygons only, a fresh copy
 ./download_all.sh -o /data/depth --only emodnet,netherlands -j 4
 ```
 
@@ -30,16 +33,17 @@ Jenkins: `SRTM_DownloadDepthSources` (parameters OUT_DIR, SOURCES, JOBS, UNZIP, 
 | `emodnet` | EMODnet DTM 2024, 1/16′, 58 tiles | 11.43 GB |
 | `noaa_enc` | NOAA ENC, all US charts, S-57 | 0.83 GB |
 | `cudem` | NOAA CUDEM 1/3″ topobathy, 373 tiles | 8.25 GB |
-| `cudem_ninth` | NOAA CUDEM 1/9″, 930 tiles, only with `--cudem-ninth` or in `--only` | 187.38 GB |
+| `cudem_ninth` | NOAA CUDEM 1/9″, 930 tiles, disabled in `download_all.sh` for now | 187.38 GB |
 | `norway` | Kartverket "Sjøkart - Dybdedata", FGDB, open (Geonorge "no restrictions") | 2.33 GB |
 | `netherlands` | Rijkswaterstaat bottom height 20 m 2024, Zeeland, NCP 2019, CC0 | 0.26 GB |
+| `mask` | OSM land polygons (coastline only, rebuilt daily), osmdata.openstreetmap.de, ODbL | 0.92 GB |
 
 Not scriptable: Kartverket ENC (sold via PRIMAR), BSH NAUTHIS (WFS download disabled).
 
 ## GEBCO
 
 ```
-./download_gebco.sh -o /data/gebco --unzip                 # GEBCO_2026 elevation, 8 GeoTIFF tiles (~4.2 GB zip)
+./download_gebco.sh -o /data/gebco --unzip                 # GEBCO_2026 elevation, 8 GeoTIFF tiles (~4.2 GB zip, deleted after unzip)
 ./download_gebco.sh -g tid -o /data/gebco --unzip          # type identifier grid (~92 MB zip)
 ./download_gebco.sh -y 2026 -f netcdf -j 8 -o /data/gebco  # single netCDF instead of tiles
 ```

@@ -8,6 +8,7 @@
 #   download_emodnet.sh D5 D6 E6                        # North Sea, Baltic, Adriatic pilot tiles
 #   download_emodnet.sh --bbox 3 51 9 56                # every tile touching the box
 #   download_emodnet.sh --all -j 4                      # whole Europe (~11.4 GB zipped GeoTIFF for 2024)
+# --unzip unzips every complete tile archive, deletes it and leaves an empty <archive>.done so a rerun skips it.
 # Tile bounds come from the EMODnet metadata catalogue (sextant.ifremer.fr), sizes from the download server.
 set -euo pipefail
 
@@ -22,7 +23,7 @@ while [ $# -gt 0 ]; do
 		--list) LIST=1; shift ;;
 		--all) MODE=all; shift ;;
 		--bbox) MODE=bbox; BBOX=("$2" "$3" "$4" "$5"); shift 5 ;;
-		-h|--help) sed -n '2,12p' "$0"; exit 0 ;;
+		-h|--help) sed -n '2,13p' "$0"; exit 0 ;;
 		-*) echo "Unknown option $1" >&2; exit 1 ;;
 		*) TILES+=("$1"); shift ;;
 	esac
@@ -58,6 +59,7 @@ if [ $LIST -eq 1 ]; then
 	printf "%-4s %9s %9s %8s %8s %10s\n" tile minLon maxLon minLat maxLat MB
 	tile_bounds | while read -r t x0 x1 y0 y1; do
 		s=$(remote_size "${t}_${VER}.${FMT}.zip")
+		[ "$s" -gt 0 ] || s=$(remote_size "$(echo "${t}_${VER}.${FMT}.zip" | tr '[:upper:]' '[:lower:]')")
 		printf "%-4s %9.3f %9.3f %8.3f %8.3f %10.1f\n" "$t" "$x0" "$x1" "$y0" "$y1" "$(echo "$s / 1000000" | bc -l)"
 	done
 	exit 0
@@ -75,13 +77,22 @@ echo "Tiles (${#TILES[@]}): ${TILES[*]}"
 
 fetch() {
 	local tile=$1 name="${1}_${VER}.${FMT}.zip" want have
+	if [ -f "$name.done" ]; then echo "ok $name (unzipped earlier)"; return 0; fi
 	want=$(remote_size "$name")
+	if [ "$want" -le 0 ]; then # the Caribbean tile is lower case on the server
+		local lower; lower=$(echo "$name" | tr '[:upper:]' '[:lower:]')
+		want=$(remote_size "$lower")
+		[ "$want" -le 0 ] || name=$lower
+	fi
 	if [ "$want" -le 0 ]; then echo "MISSING $name on server" >&2; return 1; fi
 	for attempt in $(seq 1 50); do
 		have=$( [ -f "$name" ] && wc -c < "$name" | tr -d ' ' || echo 0 )
 		if [ "$have" -ge "$want" ]; then
 			echo "ok $name ($want bytes)"
-			[ "$DO_UNZIP" -eq 1 ] && unzip -oq "$name" -d "${tile}_${VER}"
+			if [ "$DO_UNZIP" -eq 1 ]; then
+				unzip -oq "$name" -d "${tile}_${VER}" || { echo "BROKEN $name, delete it and rerun" >&2; return 1; }
+				rm -f "$name"; : > "$name.done"
+			fi
 			return 0
 		fi
 		curl -sL --retry 5 --retry-delay 5 -C - -o "$name" "$SERVER/$name" || sleep 5
