@@ -232,7 +232,7 @@ if [ -n "$LEVELS" ]; then
 		mv "$TMP/depth.gpkg" "$OUT/$NAME.gpkg"
 		if [ -n "$MAP_CREATOR" ]; then
 			step "contours obf"
-			OBFS+=("$(obf "$OUT/$NAME.osm.gz")")
+			o=$(obf "$OUT/$NAME.osm.gz"); OBFS+=("$o")
 		fi
 	fi
 fi
@@ -257,7 +257,7 @@ if [ -n "$TIERS" ]; then
 			rm -f "$osm"; continue
 		fi
 		if [ -n "$MAP_CREATOR" ]; then
-			OBFS+=("$(obf "$osm" "$zooms")")
+			o=$(obf "$osm" "$zooms"); OBFS+=("$o")
 		fi
 	done
 fi

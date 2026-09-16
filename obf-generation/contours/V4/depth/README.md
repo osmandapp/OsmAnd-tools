@@ -61,22 +61,27 @@ Not scriptable: Kartverket ENC (sold via PRIMAR), BSH NAUTHIS (WFS download disa
 ./download_emodnet.sh --all -j 4 -o /data/emodnet          # all 58 tiles, ~11.4 GB zipped GeoTIFF
 ```
 
-## Building depth contours of a region
+## Building depth OBFs of a region
 
-`build_depth_region.sh` cuts a region out of a grid, sets land to 0 m by the land mask, contours it, drops short
-closed rings, simplifies and writes `NAME.osm.gz` (tags by `../translations/contours_depth.py`) plus `NAME.gpkg`
-for a quick look. The grid may be a `/vsicurl/` URL, only the region is read.
+`build_depth_region.sh` cuts a region out of a grid and builds depth contours and depth points from it, clipped by
+the land mask, as `.osm.gz` and, with `-c OsmAndMapCreator`, one `NAME.depth.obf`. The grid may be a `/vsicurl/` URL,
+only the region is read.
 
 ```
 ./build_depth_region.sh -D /data/depth -n Netherlands_contours -c /opt/OsmAndMapCreator -j 16   # a region from the script
 ./build_depth_region.sh -n Wadden -b "4.6 52.8 6.5 53.6" -i /data/depth/src/emodnet/emodnet_2024.vrt \
-    -m /data/depth/mask/land_polygons.gpkg -o /data/depth/build                                  # any box
+    -m /data/depth/mask/land_polygons.gpkg -o /data/depth/build -p "0.01:11-12 0.005:13-"         # any box
 ```
 
-Regions (bounds, grid, levels, tile size) are listed in the script: `Netherlands_contours`, `Europe_contours`
-(EMODnet 2024) and `World_contours` (GEBCO_2026, from 10 m down). `-c` adds `NAME.depth.obf` built by
-OsmAndMapCreator. A region larger than `-t` degrees is split into tiles built `-j` at a time (each tile's Java
-takes up to 2 GB), and their OBFs are merged with `merge-index`, one map section per tile.
+Regions (bounds of the published OBFs, grid, levels, point tiers, tile size) are listed in the script:
+`Netherlands_contours` (contours and points), `Europe_contours`, `Europe_points` (EMODnet 2024), `World_contours`,
+`World_Northern_hemisphere_points`, `World_Southern_hemisphere_points` (GEBCO_2026).
 
-Levels default to 2, 5, 10, 20, 30, 50, 100, 200, 500 m and every 1000 m (`-l`); `-u 2` upsamples a coarse grid
-(GEBCO) before contouring for smoother lines.
+- Contours: levels `-l` (2, 5, 10, 20, 30, 50, 100, 200, 500 m and every 1000 m by default; GEBCO from 10 m); levels
+  from 20 m down are traced on a smoothed grid (`-s`, `-d`), otherwise a flat bottom with sand waves gives hundreds
+  of zigzags; short closed rings are dropped.
+- Points `-p "SPACING:ZOOMS ..."`: the average water depth of every SPACING degree cell, cells centred on land
+  dropped; every tier is its own map section shown from its zooms (OsmAndMapCreator `--map-zooms`).
+- A region larger than `-t` degrees is split into tiles built `-j` at a time (each tile's Java takes up to 2 GB);
+  the OBFs of contours, point tiers and tiles are merged with `merge-index`.
+- `-k` skips a region whose `NAME.depth.obf` exists.
