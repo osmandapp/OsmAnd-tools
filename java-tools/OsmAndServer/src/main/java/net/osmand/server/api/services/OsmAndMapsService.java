@@ -1163,7 +1163,13 @@ public class OsmAndMapsService {
 	public List<RoundTripGenerator.RoundTrip> roundTrip(String routeMode, LatLon start, RoundTripGenerator.Params params,
 			Map<String, Object> props, RouteCalculationProgress progress) throws IOException, InterruptedException {
 		RouteParameters rp = parseRouteParameters(routeMode);
-		if (rp.onlineRouting != null || rp.disableHHRouting) {
+		if (rp.onlineRouting != null) {
+			props.put("error", "round trips cannot use online routing");
+			return Collections.emptyList();
+		}
+		if (rp.disableHHRouting && !params.allowAStar) {
+			// routing=astar_* asks for A* explicitly, which is only allowed together with astar=true,
+			// so that a plain request can never fall into minutes of A* by accident
 			props.put("error", "round trips are built with HH routing only");
 			return Collections.emptyList();
 		}
