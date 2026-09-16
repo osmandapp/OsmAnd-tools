@@ -11,7 +11,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -32,10 +31,7 @@ import com.google.gson.reflect.TypeToken;
 
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.list.array.TLongArrayList;
-import gnu.trove.map.hash.TLongIntHashMap;
-import gnu.trove.map.hash.TLongLongHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
-import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
 import net.osmand.data.TransportRoute;
@@ -79,10 +75,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	private RTree transportStopsTree;
 	private Map<Long, Relation> masterRoutes = new HashMap<Long, Relation>();
 	private Connection gtfsConnection;
-	private Set<Long> ferryWaysInRelations = new HashSet<Long>();
-	private TLongLongHashMap syntheticFerryStops = new TLongLongHashMap(); // stop id -> node id
-	private TLongHashSet transferOnlyStops = new TLongHashSet();
-	private TLongObjectHashMap<TLongIntHashMap> ferryCrossings = new TLongObjectHashMap<>(); // route id -> stop id -> ferry interval
+	private final TransportFerryIndexHelper ferries = new TransportFerryIndexHelper();
 
 	private static final long TEST_ROUTE_ID_MISSING_STOPS = 192037l;
 	
@@ -266,14 +259,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	}
 
 	public void indexRelations(Relation e, OsmDbAccessorContext ctx) throws SQLException {
-		if ("ferry".equals(e.getTag(OSMTagKey.ROUTE))) {
-			ctx.loadEntityRelation(e);
-			for (RelationMember member : e.getMembers()) {
-				if (member.getEntity() instanceof Way) {
-					ferryWaysInRelations.add(member.getEntity().getId());
-				}
-			}
-		}
+		ferries.indexRelation(e, ctx);
 		if (e.getTag(OSMTagKey.ROUTE_MASTER) != null) {
 			ctx.loadEntityRelation(e);
 			for (RelationMember child : ((Relation) e).getMembers()) {
@@ -322,9 +308,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 
 	public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
 		boolean routeRelation = e instanceof Relation && e.getTag(OSMTagKey.ROUTE) != null;
-		// route=ferry way without a route relation becomes a route by itself
-		boolean ferryWay = e instanceof Way && "ferry".equals(e.getTag(OSMTagKey.ROUTE)) && !ferryWaysInRelations.contains(e.getId());
-		if (routeRelation || ferryWay) {
+		if (routeRelation || ferries.isFerryWayRoute(e)) {
 			if (routeRelation) {
 				ctx.loadEntityRelation((Relation) e);
 			}
@@ -336,33 +320,9 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	// Call after all ways are processed. Synthetic ferry stop shared only by 2+ ferry ways is in the water:
-	// it's a transfer-only stop (a shore stop has some other way like pier or footway).
-	public void resolveTransferOnlyStops(OsmDbAccessor accessor) throws SQLException {
-		if (syntheticFerryStops.isEmpty()) {
-			return;
-		}
-		String nodeIds = Arrays.toString(syntheticFerryStops.values()).replaceAll("[\\[\\]]", "");
-		ResultSet rs = accessor.getDbConn().createStatement().executeQuery("select w.node, t.tags from ways w "
-				+ "join ways t on t.id = w.id and t.ord = 0 where w.node in (" + nodeIds + ")");
-		TLongIntHashMap ferryWays = new TLongIntHashMap();
-		TLongHashSet otherWays = new TLongHashSet();
-		while (rs.next()) {
-			Way way = new Way(-1);
-			accessor.readTags(way, rs.getBytes(2));
-			if ("ferry".equals(way.getTag(OSMTagKey.ROUTE))) {
-				ferryWays.adjustOrPutValue(rs.getLong(1), 1, 1);
-			} else {
-				otherWays.add(rs.getLong(1));
-			}
-		}
-		rs.getStatement().close();
-		for (long stopId : syntheticFerryStops.keys()) {
-			long nodeId = syntheticFerryStops.get(stopId);
-			if (ferryWays.get(nodeId) >= 2 && !otherWays.contains(nodeId)) {
-				transferOnlyStops.add(stopId);
-			}
-		}
+	// call after all ways are processed
+	public void resolveFerryJunctionStops(OsmDbAccessor accessor) throws SQLException {
+		ferries.resolveJunctionStops(accessor);
 	}
 
 	public void createDatabaseStructure(Connection conn, DBDialect dialect, String rtreeStopsFileName) throws SQLException, IOException {
@@ -530,38 +490,6 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	}
 
 
-	// a bus (or other non-ferry route) going over a ferry way waits for the ferry before the stop after the crossing
-	// (call before route ways are merged: merged ways lose their tags)
-	private void registerFerryCrossings(TransportRoute route) {
-		List<TransportStop> stops = route.getForwardStops();
-		if ("ferry".equals(route.getType()) || stops.size() < 2) {
-			return;
-		}
-		for (Way w : route.getForwardWays()) {
-			if ("ferry".equals(w.getTag(OSMTagKey.ROUTE)) && w.getFirstNode() != null && w.getLastNode() != null) {
-				int start = getNearestStopIndex(stops, w.getFirstNode().getLatLon());
-				int end = getNearestStopIndex(stops, w.getLastNode().getLatLon());
-				if (start != end) {
-					if (!ferryCrossings.containsKey(route.getId())) {
-						ferryCrossings.put(route.getId(), new TLongIntHashMap());
-					}
-					ferryCrossings.get(route.getId()).put(stops.get(Math.max(start, end)).getId(),
-							TransportRoute.parseIntervalTagToSeconds(w.getTag("interval")));
-				}
-			}
-		}
-	}
-
-	private static int getNearestStopIndex(List<TransportStop> stops, LatLon location) {
-		int nearest = 0;
-		for (int i = 1; i < stops.size(); i++) {
-			if (MapUtils.getDistance(stops.get(i).getLocation(), location) < MapUtils.getDistance(stops.get(nearest).getLocation(), location)) {
-				nearest = i;
-			}
-		}
-		return nearest;
-	}
-
 	private void addBatch(TransportRoute route, ByteArrayOutputStream ous, Way tr, int ind) throws SQLException {
 		if (tr.getNodes().size() == 0) {
 			return;
@@ -687,12 +615,6 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					if (stopEnName != null) {
 						st.setEnName(stopEnName);
 					}
-					st.setTransferOnly(transferOnlyStops.contains(idStop));
-					st.setSynthetic(syntheticFerryStops.containsKey(idStop));
-					TLongIntHashMap crossings = ferryCrossings.get(idRoute);
-					if (crossings != null && crossings.containsKey(idStop)) {
-						st.setFerryInterval(crossings.get(idStop));
-					}
 					directStops.add(st);
 				}
 				selectTransportRouteGeometry.setLong(1, idRoute);
@@ -701,9 +623,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					byte[] bytes = rset.getBytes(1);
 					directGeometry.add(bytes);
 				}
-				for (Map.Entry<String, String> tag : TransportRoute.getStopTags(directStops).entrySet()) {
-					transportRouteTagValues.addTagValue(idRoute, tag.getKey(), tag.getValue());
-				}
+				ferries.getRouteTags(idRoute, directStops).forEach((tag, value) -> transportRouteTagValues.addTagValue(idRoute, tag, value));
 				TransportSchedule schedule = readSchedule(ref, directStops);
 				long ptr = writer.writeTransportRoute(idRoute, routeName, routeEnName, ref, operator, type, dist, color, directStops,
 						directGeometry, stringTable, transportRoutes, schedule, transportRouteTagValues);
@@ -861,7 +781,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		if (rel instanceof Relation && processTransportRelationV2((Relation) rel, directRoute, icc)) { // try new transport relations first
 			List<Entity> incompleteNodes = getIncompleteStops((Relation) rel, directRoute);
 			List<TransportStop> forwardStops = directRoute.getForwardStops();
-			registerFerryCrossings(directRoute);
+			ferries.registerFerryCrossings(directRoute);
 			if (directRoute.getId().longValue() / 2  == TEST_ROUTE_ID_MISSING_STOPS) {
 				System.out.println(directRoute.getName() + ":");
 			}
@@ -891,37 +811,17 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			if(!Algorithms.isEmpty(backwardRoute.getEnName(false))) {
 				backwardRoute.setEnName(reverseName(ref, backwardRoute.getEnName(false)));
 			}
-			boolean processed = rel instanceof Way ? processFerryWay((Way) rel, directRoute, backwardRoute)
+			boolean processed = rel instanceof Way ? ferries.processFerryWay((Way) rel, directRoute, backwardRoute)
 					: processTransportRelationV1((Relation) rel, directRoute, backwardRoute); // old relation style otherwise
 			if (processed) {
 				backwardRoute.setId((backwardRoute.getId() << 1) + 1);
-				registerFerryCrossings(directRoute);
-				registerFerryCrossings(backwardRoute);
+				ferries.registerFerryCrossings(directRoute);
+				ferries.registerFerryCrossings(backwardRoute);
 				troutes.add(directRoute);
 				troutes.add(backwardRoute);
 				transportRouteTagValues.registerTagValues(backwardRoute.getId(), rel.getTags());
 			}
 		}
-	}
-
-	// stops are ferry terminals along the way and way ends (synthetic stops if they aren't terminals)
-	private boolean processFerryWay(Way way, TransportRoute directRoute, TransportRoute backwardRoute) {
-		List<Node> nodes = way.getNodes();
-		for (int i = 0; i < nodes.size(); i++) {
-			Node n = nodes.get(i);
-			boolean terminal = n != null && "ferry_terminal".equals(n.getTag(OSMTagKey.AMENITY));
-			if (n != null && (terminal || i == 0 || i == nodes.size() - 1)) {
-				TransportStop stop = EntityParser.parseTransportStop(n);
-				if (!terminal) {
-					syntheticFerryStops.put(stop.getId(), n.getId());
-				}
-				directRoute.getForwardStops().add(stop);
-				backwardRoute.getForwardStops().add(0, stop);
-			}
-		}
-		directRoute.addWay(way);
-		backwardRoute.addWay(way);
-		return directRoute.getForwardStops().size() >= 2;
 	}
 
 	private void insertMissingStop(TransportRoute directRoute, List<Entity> incompleteStops,

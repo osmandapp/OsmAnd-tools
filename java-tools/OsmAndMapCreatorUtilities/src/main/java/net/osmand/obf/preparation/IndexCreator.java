@@ -745,7 +745,7 @@ public class IndexCreator {
 			}
 		});
 		if (settings.indexTransport) {
-			indexTransportCreator.resolveTransferOnlyStops(accessor);
+			indexTransportCreator.resolveFerryJunctionStops(accessor);
 		}
 		setGeneralProgress(progress, "[85 / 100]");
 		progress.startTask(settings.getString("IndexCreator.PROCESS_OSM_REL"), accessor.getAllRelations());
