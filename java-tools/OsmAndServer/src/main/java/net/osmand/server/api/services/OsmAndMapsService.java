@@ -1120,6 +1120,42 @@ public class OsmAndMapsService {
 	}
 
 	/**
+	 * A routing context that shares nothing with the other workers. {@link GeneralRouter} is not thread
+	 * safe - {@code RouteAttributeEvalRule} evaluates through a shared BitSet, and routers built from the
+	 * default builder keep the same rule objects, which corrupts that BitSet when two threads route at
+	 * once (ArrayIndexOutOfBoundsException inside BitSet.and). Parsing routing.xml per worker costs
+	 * milliseconds and gives every worker its own rules.
+	 */
+	private RoutingContext prepareIsolatedRouterContext(RouteParameters rp, RoutePlannerFrontEnd router,
+	                                                    List<BinaryMapIndexReader> readers) throws IOException {
+		Builder builder;
+		try {
+			builder = RoutingConfiguration.parseDefault();
+		} catch (Exception e) {
+			throw new IOException("Cannot parse routing.xml for a round trip worker", e);
+		}
+		RoutePlannerFrontEnd.CALCULATE_MISSING_MAPS = false;
+		router.setHHRouteCpp(false);
+		router.setUseOnlyHHRouting(rp.useOnlyHHRouting);
+		router.setDefaultHHRoutingConfig();
+		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(MEM_LIMIT, MEM_LIMIT);
+		RoutingConfiguration config = builder.build(rp.routeProfile, memoryLimit, rp.routeParams);
+		config.memoryMaxHits = MEM_MAX_HITS_PER_RUN;
+		if (rp.minPointApproximation >= 0) {
+			config.minPointApproximation = rp.minPointApproximation;
+		}
+		if (!rp.noConditionals) {
+			config.routeCalculationTime = rp.routeCalculationTime >= 0
+					? rp.routeCalculationTime
+					: System.currentTimeMillis();
+		}
+		RoutingContext ctx = router.buildRoutingContext(config, null, readers.toArray(new BinaryMapIndexReader[0]),
+				rp.calcMode);
+		ctx.leftSideNavigation = false;
+		return ctx;
+	}
+
+	/**
 	 * Round trip prototype (OsmAnd-Issues#2827). All loop candidates are routed with Java HH routing in one
 	 * routing context, so the HH points are loaded once for dozens of legs. A* is not used at all: a
 	 * fallback per leg would take minutes.
@@ -1131,7 +1167,9 @@ public class OsmAndMapsService {
 			props.put("error", "round trips are built with HH routing only");
 			return Collections.emptyList();
 		}
-		rp.useOnlyHHRouting = true;
+		// without HH every leg falls back to A*, which is why round trips are an HH feature; the flag
+		// is there to measure what a profile without HH data (pedestrian) would cost
+		rp.useOnlyHHRouting = !params.allowAStar;
 		rp.useNativeRouting = false;
 		GeneralRouter profileRouter = RoutingConfiguration.getDefault()
 				.build(rp.routeProfile, new RoutingMemoryLimits(MEM_LIMIT, MEM_LIMIT), rp.routeParams).router;
@@ -1157,6 +1195,8 @@ public class OsmAndMapsService {
 			BlockingQueue<Integer> freeContexts = new LinkedBlockingQueue<>();
 			for (int i = 0; i < ROUND_TRIP_THREADS; i++) {
 				List<BinaryMapIndexReader> readers = getReaders(list, incomplete);
+				// whatever was locked has to be unlocked later, even when the set came back incomplete
+				usedMapList.addAll(readers);
 				if (incomplete[0] || readers.isEmpty()) {
 					if (i == 0) {
 						props.put("error", "maps are not available");
@@ -1164,9 +1204,8 @@ public class OsmAndMapsService {
 					}
 					break; // no more free readers - run with the workers we have
 				}
-				usedMapList.addAll(readers);
 				RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
-				RoutingContext ctx = prepareRouterContext(rp, router, readers, false);
+				RoutingContext ctx = prepareIsolatedRouterContext(rp, router, readers);
 				if (!rp.noConditionals && rp.routeCalculationTime < 0) {
 					ctx.config.routeCalculationTime = getLocalTimeMillisByLatLon(start.getLatitude(),
 							start.getLongitude());

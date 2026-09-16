@@ -393,7 +393,8 @@ public class RoutingController {
 			@RequestParam(defaultValue = "3") int variants,
 			@RequestParam(required = false) Double direction,
 			@RequestParam(defaultValue = "3") int shape,
-			@RequestParam(defaultValue = "0") int seed) {
+			@RequestParam(defaultValue = "0") int seed,
+			@RequestParam(defaultValue = "false") boolean astar) {
 		String[] ll = point.split(",");
 		LatLon start = new LatLon(Double.parseDouble(ll[0]), Double.parseDouble(ll[1]));
 		RoundTripGenerator.Params params = new RoundTripGenerator.Params();
@@ -406,6 +407,7 @@ public class RoutingController {
 		params.direction = direction;
 		params.shape = shape;
 		params.seed = seed;
+		params.allowAStar = astar;
 		Map<String, Object> props = new TreeMap<>();
 		List<RoundTripGenerator.RoundTrip> trips = Collections.emptyList();
 		try {

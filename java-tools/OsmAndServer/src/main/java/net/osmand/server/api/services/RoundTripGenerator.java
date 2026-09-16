@@ -61,6 +61,7 @@ public class RoundTripGenerator {
 		public double speed = 10; // m/s, first guess of the length of a time-limited loop
 		public double maxSpeed = 30; // m/s, bounds how far a time-limited loop may reach (map selection)
 		public int parallelism = 1; // how many loops may be routed at once (one routing context each)
+		public boolean allowAStar; // fall back to A* where the maps carry no HH data (pedestrian), much slower
 	}
 
 	public static class RoundTrip {
