@@ -81,7 +81,7 @@ while [ $# -gt 0 ]; do
 		-D) DATA=$2; shift 2 ;;
 		-t) TILE=$2; shift 2 ;;
 		-k) KEEP=1; shift ;;
-		-h|--help) sed -n '2,48p' "$0"; exit 0 ;;
+		-h|--help) sed -n '2,51p' "$0"; exit 0 ;;
 		*) echo "Unknown option $1" >&2; exit 1 ;;
 	esac
 done
