@@ -31,7 +31,6 @@ osmand:
   traffic.location: ${TRAFFIC_LOCATION:}
   wiki.location: ${osmand.files.location}/wikidata/wikidata_commons_osm.sqlitedb
   heightmap.location: ${HEIGHTMAP_LOCATION:}
-  # crash logs from the apps, one file per report; data.osmand.net copies them by rsync (web-server-config/servers/crash-reports)
   crash-reports.location: ${CRASH_REPORTS_LOCATION:}
 
 server:
