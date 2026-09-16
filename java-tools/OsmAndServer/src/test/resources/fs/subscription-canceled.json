@@ -1,0 +1,51 @@
+{
+  "events": [
+    {
+      "id": "EVENT_ID_TEST000000000",
+      "processed": false,
+      "created": 1788811865783,
+      "type": "subscription.canceled",
+      "live": true,
+      "data": {
+        "id": "SUBSCRIPTION_ID_TEST00",
+        "quote": null,
+        "subscription": "SUBSCRIPTION_ID_TEST00",
+        "active": true,
+        "state": "canceled",
+        "changed": 1788811865783,
+        "changedValue": 1788811865783,
+        "changedInSeconds": 1788811865,
+        "changedDisplay": "9/7/26",
+        "live": true,
+        "currency": "USD",
+        "account": "ACCOUNT_ID_TEST0000000",
+        "product": "osmand-pro-monthly",
+        "sku": "net.osmand.fastspring.subscription.pro.monthly",
+        "display": "OsmAnd Pro Monthly",
+        "quantity": 1,
+        "adhoc": false,
+        "autoRenew": true,
+        "price": 5.99,
+        "priceDisplay": "$5.99",
+        "discount": 0,
+        "subtotal": 4.99,
+        "next": 1791331200000,
+        "nextValue": 1791331200000,
+        "nextInSeconds": 1791331200,
+        "nextDisplay": "10/7/26",
+        "end": 1791244800000,
+        "canceledDate": 1788739200000,
+        "deactivationDate": 1791331200000,
+        "deactivationDateValue": 1791331200000,
+        "deactivationDateInSeconds": 1791331200,
+        "deactivationDateDisplay": "10/7/26",
+        "sequence": 1,
+        "periods": 1,
+        "remainingPeriods": 1,
+        "begin": 1788811772096,
+        "intervalUnit": "month",
+        "intervalLength": 1
+      }
+    }
+  ]
+}
