@@ -372,11 +372,11 @@ public class SearchController {
 		if (error != null) {
 			return error;
 		}
-		Feature poi = poiSearchService.getPoiByMapObject(id, new LatLon(lat, lon), tags, timeZone);
-		if (poi == null) {
+		List<Feature> poi = poiSearchService.getPoiByMapObject(id, new LatLon(lat, lon), tags, timeZone);
+		if (poi.isEmpty()) {
 			return ResponseEntity.badRequest().body("Error getting poi by map object!");
 		}
-		return ResponseEntity.ok(gson.toJson(poi));
+		return ResponseEntity.ok(gson.toJson(new FeatureCollection(poi.toArray(new Feature[0]))));
 	}
 
 	@GetMapping(path = {"/get-poi-by-name"}, produces = "application/json")

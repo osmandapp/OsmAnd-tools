@@ -538,34 +538,37 @@ public class PoiSearchService {
 		return feature;
 	}
 
-	// vector tile object: POI from the index by its osm id, else (no_indx types, buildings, ...) an amenity from its tags as the map creator does
-	public Feature getPoiByMapObject(long mapObjectId, LatLon loc, Map<String, String> tags, String timeZone) throws IOException {
+	// vector tile object: POI from the index by its osm id, else (no_indx types, buildings, ...) amenities from its tags as the map creator does
+	public List<Feature> getPoiByMapObject(long mapObjectId, LatLon loc, Map<String, String> tags, String timeZone) throws IOException {
 		RenderedObject renderedObject = new RenderedObject();
 		renderedObject.setId(mapObjectId);
 		long osmId = ObfConstants.getOsmObjectId(renderedObject);
 		EntityType entityType = ObfConstants.getOsmEntityType(renderedObject);
 		Feature feature = searchPoiByOsmId(loc, osmId, entityType, timeZone);
 		if (feature != null) {
-			return feature;
+			return List.of(feature);
 		}
 		if (tags.isEmpty()) {
-			return null;
+			return List.of();
 		}
 		MapPoiTypes poiTypes = poiTypesService.getMapPoiTypes(PoiTypesService.DEFAULT_SEARCH_LANG);
 		Node node = new Node(loc.getLatitude(), loc.getLongitude(), -1);
 		List<Amenity> amenities = EntityParser.parseAmenities(poiTypes, node, tags, new ArrayList<>(), false);
-		Amenity amenity;
 		if (amenities.isEmpty()) {
 			renderedObject.getTags().putAll(tags);
-			amenity = BaseDetailsObject.convertRenderedObjectToAmenity(renderedObject, poiTypes);
+			Amenity amenity = BaseDetailsObject.convertRenderedObjectToAmenity(renderedObject, poiTypes);
 			amenity.setLocation(loc.getLatitude(), loc.getLongitude());
 			setPoiTypeSubType(amenity, poiTypes, tags);
+			amenities = List.of(amenity);
 		} else {
-			amenity = amenities.get(0);
-			amenity.setId(ObfConstants.createMapObjectIdFromCleanOsmId(osmId, entityType));
+			amenities.forEach(a -> a.setId(ObfConstants.createMapObjectIdFromCleanOsmId(osmId, entityType)));
 		}
-		return getMapObjectFeature(
-				searchResultConverter.buildPoiSearchResult(amenity, PoiTypesService.DEFAULT_SEARCH_LANG, ""), timeZone);
+		List<Feature> features = new ArrayList<>();
+		for (Amenity amenity : amenities) {
+			features.add(getMapObjectFeature(
+					searchResultConverter.buildPoiSearchResult(amenity, PoiTypesService.DEFAULT_SEARCH_LANG, ""), timeZone));
+		}
+		return features;
 	}
 
 	// the converter keeps the raw tag value as the subtype, the icon and the type of a feature are read by the poi type key
