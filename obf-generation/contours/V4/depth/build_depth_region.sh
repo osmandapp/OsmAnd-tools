@@ -30,13 +30,14 @@
 #                no points there, the overview stays
 #   -e ENC_DIR   S-57 ENC cells (NOAA ENC_ROOT): inside the approach and harbour cells (bands 4-6) the charted contours
 #                and soundings (depth_enc_osm.py) replace the grid; soundings thinned as ENC_TIERS, the charted levels
-#                with no contourtype (0.9, 3.6 m...) only from zoom 15
+#                with no contourtype (0.9, 3.6 m...) only from zoom 15, depth areas as the fill (depth_areas_osm.py)
 #   -t TILE      split a region larger than TILE degrees into tiles built in parallel (JOBS at a time); with -c the
 #                tiles' .osm.gz become one map section of contours, one of the overview and one per point tier
 #                (generate-single-map) in
 #                NAME.depth.obf, without -c they stay in OUT_DIR/NAME.tiles
 #   -c MAP_CREATOR_DIR  unzipped OsmAndMapCreator: writes OUT_DIR/NAME.depth.obf (points need its --map-zooms)
 #   -k           keep: do nothing when OUT_DIR/NAME.depth.obf already exists
+#   env RENDERING_TYPES  rendering_types.xml for OsmAndMapCreator instead of its own (new tags before a nightly)
 #
 # Regions (-D DATA_DIR -n REGION), bounds of the published OBFs; options given on the command line win:
 #   Netherlands_contours              Rijkswaterstaat 20 m 2024 over NCP 2019 over EMODnet DTM 2024, contours every 5 m
@@ -67,7 +68,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 V4=$(cd "$HERE/.." && pwd)
 NAME=""; BBOX=""; GRID=""; LAND=""; OUT=""; CELL=""; UPSAMPLE=1; JOBS=4; SMOOTH=4; SMOOTH_FROM=""; MAP_CREATOR=""
 DATA=""; TILE=0; KEEP=0; LEVELS=""; TIERS=""; RESAMPLING=""; MIN_RING_CELLS=""; OVERVIEW=""
-EXCLUDE=""; EXCLUDE_LAYER=""; ENC=""; ENC_TIERS="0.02:10-11 0.008:12 0.003:13-14 0.001:15-"
+EXCLUDE=""; EXCLUDE_LAYER=""; ENC=""; ENC_AREAS=""; ENC_TIERS="0.02:10-11 0.008:12 0.003:13-14 0.001:15-"
 # steps FROM:TO:STEP... : comma-separated levels
 steps() { local s a b c out=""; for s; do IFS=: read -r a b c <<< "$s"; out+=$(seq "$a" "$c" "$b" | paste -sd, -),; done
 	echo "${out%,}"; }
@@ -168,7 +169,7 @@ obf() {
 	local osm=$1 zooms=${2:-} dir
 	dir=$(mktemp -d "$TMP/obf.XXXX")
 	(cd "$dir" && JAVA_OPTS="${JAVA_OPTS:--Xmx8g}" bash "$MAP_CREATOR/utilities.sh" generate-map "$osm" \
-		${zooms:+--map-zooms=$zooms} > obf.log 2>&1) || { tail -20 "$dir/obf.log" >&2; return 1; }
+		${zooms:+--map-zooms=$zooms} ${RENDERING_TYPES:+--rendering-types=$RENDERING_TYPES} > obf.log 2>&1) || { tail -20 "$dir/obf.log" >&2; return 1; }
 	ls "$dir"/*.obf 2>/dev/null | head -1 | grep . || { tail -20 "$dir/obf.log" >&2; return 1; }
 }
 
@@ -177,7 +178,7 @@ single() {
 	local output=$1; shift
 	local dir; dir=$(mktemp -d "$TMP/single.XXXX")
 	(cd "$dir" && JAVA_OPTS="${JAVA_OPTS:--Xmx16g}" bash "$MAP_CREATOR/utilities.sh" generate-single-map "$output" \
-		--name="$NAME" "$@" > single.log 2>&1) || { tail -20 "$dir/single.log" >&2; return 1; }
+		--name="$NAME" "$@" ${RENDERING_TYPES:+--rendering-types=$RENDERING_TYPES} > single.log 2>&1) || { tail -20 "$dir/single.log" >&2; return 1; }
 	# an old OsmAndMapCreator prints its usage for an unknown command and exits with 0
 	[ -f "$output" ] || { tail -20 "$dir/single.log" >&2; return 1; }
 	rm -rf "$dir"
@@ -201,9 +202,13 @@ ENC_OSM=()
 if [ -n "$ENC" ]; then
 	step "ENC cells of $ENC"
 	python3 "$HERE/depth_enc_osm.py" "$ENC" --bbox "$W" "$S" "$E" "$N" --contours "$OUT/${NAME}_enc.osm.gz" \
-		--minor "$OUT/${NAME}_enc_minor.osm.gz" --soundings "$TMP/enc_soundings.gpkg" --coverage "$TMP/enc_coverage.gpkg" 2>&1 | grep -v numpy
+		--minor "$OUT/${NAME}_enc_minor.osm.gz" --areas "$TMP/enc_areas.gpkg" --soundings "$TMP/enc_soundings.gpkg" --coverage "$TMP/enc_coverage.gpkg" 2>&1 | grep -v numpy
 	EXCLUDE="$TMP/enc_coverage.gpkg"; EXCLUDE_LAYER=coverage
 	ENC_OSM+=("$OUT/${NAME}_enc.osm.gz:" "$OUT/${NAME}_enc_minor.osm.gz:15-")
+	python3 "$HERE/depth_areas_osm.py" "$TMP/enc_areas.gpkg" "$OUT/${NAME}_enc_areas.osm.gz" --layer areas \
+		--field mindepth --land "$LAND" --bbox "$W" "$S" "$E" "$N" 2>&1 | grep -v numpy
+	# multipolygons: generate-map, not generate-single-map
+	ENC_AREAS="$OUT/${NAME}_enc_areas.osm.gz"
 	spacings=""; for tier in $ENC_TIERS; do spacings+="${tier%%:*} "; done
 	python3 "$HERE/depth_soundings_osm.py" "$TMP/enc_soundings.gpkg" "$OUT/${NAME}_enc_points" --layer soundings \
 		--field depth --tiers "$spacings" --land "$LAND" --bbox "$W" "$S" "$E" "$N" --first-id 900000000 2>&1 | grep -v numpy
@@ -263,12 +268,16 @@ if [ -n "$TILES" ]; then
 			step "points $i obf of ${#points[@]} tiles"
 			single "$TMP/points$i.obf" --map-zooms="${tier#*:}" "${points[@]}" & PIDS+=($!); OBFS+=("$TMP/points$i.obf")
 		done
+		if [ -n "$ENC_AREAS" ]; then
+			obf "$ENC_AREAS" > "$TMP/enc_areas.section" & PIDS+=($!)
+		fi
 		for e in ${ENC_OSM[@]+"${ENC_OSM[@]}"}; do
 			o="$TMP/$(basename "${e%%:*}" .osm.gz).obf"; z=${e#*:}
 			single "$o" ${z:+--map-zooms="$z"} "${e%%:*}" & PIDS+=($!); OBFS+=("$o")
 		done
 		[ ${#OBFS[@]} -gt 0 ] || { echo "no tile has depth data" >&2; exit 1; }
 		for pid in "${PIDS[@]}"; do wait "$pid" || exit 1; done
+		if [ -n "$ENC_AREAS" ]; then OBFS+=("$(cat "$TMP/enc_areas.section")"); fi
 		step "merge ${#OBFS[@]} map sections"
 		merge "$OUT/$NAME.depth.obf" "${OBFS[@]}"
 	else
@@ -405,6 +414,7 @@ if [ -n "$MAP_CREATOR" ]; then
 	for e in ${ENC_OSM[@]+"${ENC_OSM[@]}"}; do
 		z=${e#*:}; o=$(obf "${e%%:*}" "$z"); OBFS+=("$o")
 	done
+	if [ -n "$ENC_AREAS" ]; then o=$(obf "$ENC_AREAS"); OBFS+=("$o"); fi
 	if [ ${#OBFS[@]} -eq 0 ]; then
 		rm -rf "$TMP"; step "no depth data in $NAME, nothing written"; exit 0
 	fi

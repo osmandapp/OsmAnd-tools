@@ -14,10 +14,11 @@
 #                default "0.02:10-11 0.008:12 0.003:13-14 0.001:15-"
 #   -c MAP_CREATOR_DIR  unzipped OsmAndMapCreator: writes OUT_DIR/NAME.depth.obf
 #   -k           keep: do nothing when OUT_DIR/NAME.depth.obf already exists
+#   env RENDERING_TYPES  rendering_types.xml for OsmAndMapCreator instead of its own (new tags before a nightly)
 #
 # The contours are the charted ones (dybdekurve, 0 m = chart datum): only the SRS is dropped so that ogr2osm does not
 # swap lat/lon, then translations/contours_depth.py as for the gridded regions. The soundings (dybdepunkt) are thinned
-# per tier by depth_soundings_osm.py.
+# per tier by depth_soundings_osm.py, the depth areas (dybdeareal) become the fill by depth_areas_osm.py.
 set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -35,7 +36,7 @@ while [ $# -gt 0 ]; do
 		-c) MAP_CREATOR=$2; shift 2 ;;
 		-D) DATA=$2; shift 2 ;;
 		-k) KEEP=1; shift ;;
-		-h|--help) sed -n '2,23p' "$0"; exit 0 ;;
+		-h|--help) sed -n '2,21p' "$0"; exit 0 ;;
 		*) echo "Unknown option $1" >&2; exit 1 ;;
 	esac
 done
@@ -61,7 +62,7 @@ obf() {
 	local osm=$1 zooms=${2:-} dir
 	dir=$(mktemp -d "$TMP/obf.XXXX")
 	(cd "$dir" && JAVA_OPTS="${JAVA_OPTS:--Xmx16g}" bash "$MAP_CREATOR/utilities.sh" generate-map "$osm" \
-		${zooms:+--map-zooms=$zooms} > obf.log 2>&1) || { tail -20 "$dir/obf.log" >&2; return 1; }
+		${zooms:+--map-zooms=$zooms} ${RENDERING_TYPES:+--rendering-types=$RENDERING_TYPES} > obf.log 2>&1) || { tail -20 "$dir/obf.log" >&2; return 1; }
 	ls "$dir"/*.obf 2>/dev/null | head -1 | grep . || { tail -20 "$dir/obf.log" >&2; return 1; }
 }
 
@@ -82,10 +83,15 @@ spacings=""; for tier in $TIERS; do spacings+="${tier%%:*} "; done
 python3 "$HERE/depth_soundings_osm.py" "$FGDB" "$OUT/${NAME}_points" --tiers "$spacings" --land "$LAND_CUT" \
 	${BBOX:+--bbox $BBOX} --first-id 100000000 2>&1 | grep -v numpy
 
+step "depth areas"
+python3 "$HERE/depth_areas_osm.py" "$FGDB" "$OUT/${NAME}_areas.osm.gz" --layer dybdeareal --field minimumsdybde \
+	--land "$LAND_CUT" ${BBOX:+--bbox $BBOX} 2>&1 | grep -v numpy
+
 if [ -n "$MAP_CREATOR" ]; then
 	OBFS=(); PIDS=(); i=0
 	step "map sections"
 	obf "$OUT/$NAME.osm.gz" > "$TMP/section0" & PIDS+=($!)
+	obf "$OUT/${NAME}_areas.osm.gz" > "$TMP/section_areas" & PIDS+=($!)
 	for tier in $TIERS; do
 		i=$((i + 1))
 		obf "$OUT/${NAME}_points$i.osm.gz" "${tier#*:}" > "$TMP/section$i" & PIDS+=($!)
