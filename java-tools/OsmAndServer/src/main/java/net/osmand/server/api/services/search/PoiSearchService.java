@@ -42,6 +42,7 @@ import net.osmand.osm.PoiCategory;
 import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.EntityParser;
 import net.osmand.osm.edit.Node;
+import net.osmand.search.AmenitySearcher;
 import net.osmand.search.core.ObjectType;
 import net.osmand.search.core.SearchResult;
 import net.osmand.search.core.spatial.SpatialPoiSearch;
@@ -509,10 +510,9 @@ public class PoiSearchService {
 	}
 
 	private Feature searchPoiByOsmId(LatLon loc, long osmid, EntityType type, String timeZone) throws IOException {
-		final double WAY_SEARCH_RADIUS = 0.0055; // ~600 meters, way/relation amenity is located at its centroid
-		final double NODE_SEARCH_RADIUS = 0.0001; // ~11 meters
-		double radiusDegree = type == EntityType.NODE ? NODE_SEARCH_RADIUS : WAY_SEARCH_RADIUS;
-		SearchResult res = searchSinglePoi(loc, radiusDegree, new ResultMatcher<>() {
+		int radius = type == EntityType.NODE
+				? AmenitySearcher.AMENITY_SEARCH_RADIUS : AmenitySearcher.AMENITY_SEARCH_RADIUS_FOR_RELATION;
+		SearchResult res = searchSinglePoi(loc, radius, new ResultMatcher<>() {
 			@Override
 			public boolean publish(Amenity amenity) {
 				return ObfConstants.getOsmObjectId(amenity) == osmid;
@@ -561,8 +561,7 @@ public class PoiSearchService {
 	}
 
 	public Feature searchPoiByEnName(LatLon loc, String enName) throws IOException {
-		final double SEARCH_RADIUS_DEGREE = 0.0001;
-		SearchResult res = searchSinglePoi(loc, SEARCH_RADIUS_DEGREE, new ResultMatcher<>() {
+		SearchResult res = searchSinglePoi(loc, AmenitySearcher.AMENITY_SEARCH_RADIUS, new ResultMatcher<>() {
 			@Override
 			public boolean publish(Amenity amenity) {
 				return amenity.getEnName(false).equals(enName);
@@ -576,11 +575,12 @@ public class PoiSearchService {
 		return res != null ? searchResultConverter.getPoiFeature(res, null) : null;
 	}
 
-	private SearchResult searchSinglePoi(LatLon loc, double radiusDegree, ResultMatcher<Amenity> matcher)
+	private SearchResult searchSinglePoi(LatLon loc, int radiusMeters, ResultMatcher<Amenity> matcher)
 			throws IOException {
 		final int mapZoom = 15;
-		LatLon p1 = new LatLon(loc.getLatitude() + radiusDegree, loc.getLongitude() - radiusDegree);
-		LatLon p2 = new LatLon(loc.getLatitude() - radiusDegree, loc.getLongitude() + radiusDegree);
+		QuadRect rect = MapUtils.calculateLatLonBbox(loc.getLatitude(), loc.getLongitude(), radiusMeters);
+		LatLon p1 = new LatLon(rect.top, rect.left);
+		LatLon p2 = new LatLon(rect.bottom, rect.right);
 		BinaryMapIndexReader.SearchRequest<Amenity> req = BinaryMapIndexReader.buildSearchPoiRequest(
 				MapUtils.get31TileNumberX(p1.getLongitude()), MapUtils.get31TileNumberX(p2.getLongitude()),
 				MapUtils.get31TileNumberY(p1.getLatitude()), MapUtils.get31TileNumberY(p2.getLatitude()), mapZoom,
