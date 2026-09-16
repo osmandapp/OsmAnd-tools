@@ -167,6 +167,8 @@ fi
 mkdir -p "$OUT"; OUT=$(cd "$OUT" && pwd)
 if [ -n "$MAP_CREATOR" ]; then MAP_CREATOR=$(cd "$MAP_CREATOR" && pwd); fi
 TMP="$OUT/$NAME.tmp"; rm -rf "$TMP"; mkdir -p "$TMP"
+# a Python segfault inside GDAL prints the Python stack
+export PYTHONFAULTHANDLER=1
 export GDAL_NUM_THREADS=$JOBS GDAL_HTTP_MAX_RETRY=5 GDAL_HTTP_RETRY_DELAY=5 GDAL_DISABLE_READDIR_ON_OPEN=EMPTY_DIR
 started=$(date +%s)
 step() { echo "== $(( $(date +%s) - started ))s $*"; }
