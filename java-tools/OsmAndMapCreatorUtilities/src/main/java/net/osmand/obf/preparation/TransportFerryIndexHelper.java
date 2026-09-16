@@ -1,6 +1,6 @@
 package net.osmand.obf.preparation;
 
-import static net.osmand.router.TransportFerryHelper.CROSSING_INTERVALS_TAG;
+import static net.osmand.router.TransportFerryHelper.CROSSINGS_TAG;
 import static net.osmand.router.TransportFerryHelper.JUNCTION_STOPS_TAG;
 import static net.osmand.router.TransportFerryHelper.SYNTHETIC_STOPS_TAG;
 
@@ -36,7 +36,7 @@ public class TransportFerryIndexHelper {
 	private final Set<Long> relationWays = new HashSet<>();
 	private final TLongLongHashMap syntheticStops = new TLongLongHashMap(); // stop id -> node id
 	private final TLongHashSet junctionStops = new TLongHashSet();
-	private final TLongObjectHashMap<TLongIntHashMap> crossings = new TLongObjectHashMap<>(); // route id -> stop id -> interval
+	private final TLongObjectHashMap<TLongObjectHashMap<String>> crossings = new TLongObjectHashMap<>(); // route id -> stop id -> "interval:duration"
 
 	private static boolean isFerry(Entity e) {
 		return "ferry".equals(e.getTag(OSMTagKey.ROUTE));
@@ -91,13 +91,25 @@ public class TransportFerryIndexHelper {
 				int end = getNearestStop(stops, w.getLastNode().getLatLon());
 				if (start != end) {
 					if (!crossings.containsKey(route.getId())) {
-						crossings.put(route.getId(), new TLongIntHashMap());
+						crossings.put(route.getId(), new TLongObjectHashMap<>());
 					}
-					crossings.get(route.getId()).put(stops.get(Math.max(start, end)).getId(),
-							TransportRoute.parseIntervalTagToSeconds(w.getTag("interval")));
+					int interval = TransportRoute.parseIntervalTagToSeconds(w.getTag(TransportRoute.INTERVAL_KEY));
+					int duration = TransportRoute.parseDurationTagToSeconds(w.getTag(TransportRoute.DURATION_KEY), getLength(w));
+					crossings.get(route.getId()).put(stops.get(Math.max(start, end)).getId(), interval + ":" + duration);
 				}
 			}
 		}
+	}
+
+	private static double getLength(Way way) {
+		double length = 0;
+		List<Node> nodes = way.getNodes();
+		for (int i = 1; i < nodes.size(); i++) {
+			if (nodes.get(i - 1) != null && nodes.get(i) != null) {
+				length += MapUtils.getDistance(nodes.get(i - 1).getLatLon(), nodes.get(i).getLatLon());
+			}
+		}
+		return length;
 	}
 
 	private static int getNearestStop(List<TransportStop> stops, LatLon location) {
@@ -142,7 +154,7 @@ public class TransportFerryIndexHelper {
 	// ferry stop flags as route tags, see TransportFerryHelper
 	public Map<String, String> getRouteTags(long routeId, List<TransportStop> stops) {
 		Map<String, String> tags = new LinkedHashMap<>();
-		TLongIntHashMap routeCrossings = crossings.get(routeId);
+		TLongObjectHashMap<String> routeCrossings = crossings.get(routeId);
 		for (int i = 0; i < stops.size(); i++) {
 			long id = stops.get(i).getId();
 			if (syntheticStops.containsKey(id)) {
@@ -152,7 +164,7 @@ public class TransportFerryIndexHelper {
 				TransportFerryHelper.addStopTag(tags, JUNCTION_STOPS_TAG, i, null);
 			}
 			if (routeCrossings != null && routeCrossings.containsKey(id)) {
-				TransportFerryHelper.addStopTag(tags, CROSSING_INTERVALS_TAG, i, routeCrossings.get(id));
+				TransportFerryHelper.addStopTag(tags, CROSSINGS_TAG, i, routeCrossings.get(id));
 			}
 		}
 		return tags;
