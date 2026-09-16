@@ -23,7 +23,6 @@ public class TransportStopsService {
 	OsmAndMapsService osmAndMapsService;
 
 	private static final int TOTAL_LIMIT_TRANSPORT_STOPS = 1000;
-	private static final int SHOW_NEARBY_ROUTES_RADIUS_METERS = 150;
 	private static final int SEARCH_STOP_RADIUS_METERS = 50;
 	private static final String KEY_NEARBY_ROUTES = "nearbyRoutes";
 
@@ -109,7 +108,7 @@ public class TransportStopsService {
 	}
 
 	public GeojsonClasses.Feature getTransportStop(LatLon transportStopCoords, long stopId) throws IOException {
-		List<LatLon> bbox = bboxAroundPoint(transportStopCoords.getLatitude(), transportStopCoords.getLongitude(), SEARCH_STOP_RADIUS_METERS);
+		List<LatLon> bbox = bboxAroundPoint(transportStopCoords.getLatitude(), transportStopCoords.getLongitude(), TransportStopMatcher.SHOW_SUBWAY_STOPS_FROM_ENTRANCES_RADIUS_METERS);
 		TransportStopsReaderResult readerResult = getTransportStopsReader(bbox);
 		if (readerResult == null) {
 			return null;
@@ -126,8 +125,26 @@ public class TransportStopsService {
 		return null;
 	}
 
+	public Long findTransportStopId(Amenity amenity) throws IOException {
+		LatLon loc = amenity.getLocation();
+		int radius = TransportStopMatcher.getSearchRadius(amenity);
+		TransportStopsReaderResult readerResult = getTransportStopsReader(bboxAroundPoint(loc.getLatitude(), loc.getLongitude(), radius));
+		if (readerResult == null) {
+			return null;
+		}
+		try {
+			List<TransportStop> stops = new ArrayList<>(readerResult.transportReaders.readMergedTransportStops(readerResult.request));
+			// only the stop of the amenity itself, the routes of a nearby one are a separate block in the menu
+			List<TransportStop> localStops = TransportStopMatcher.aggregateStopsForAmenity(stops, amenity)
+					.getLocalTransportStops();
+			return localStops.isEmpty() ? null : localStops.get(0).getId();
+		} finally {
+			osmAndMapsService.unlockReaders(readerResult.readers);
+		}
+	}
+
 	public Map<String, Object> getNearbyTransportStops(LatLon stopCoords, long excludeStopId) throws IOException {
-		List<LatLon> bbox = bboxAroundPoint(stopCoords.getLatitude(), stopCoords.getLongitude(), SHOW_NEARBY_ROUTES_RADIUS_METERS);
+		List<LatLon> bbox = bboxAroundPoint(stopCoords.getLatitude(), stopCoords.getLongitude(), TransportStopMatcher.SHOW_STOPS_RADIUS_METERS);
 		TransportStopsReaderResult readerResult = getTransportStopsReader(bbox);
 		if (readerResult == null) {
 			return Map.of(KEY_NEARBY_ROUTES, Collections.<TransportStopRouteFeature>emptyList());
@@ -239,11 +256,14 @@ public class TransportStopsService {
 	public record TransportStopInfo(long id, double lat, double lon) {
 	}
 
-	public record TransportStopRouteFeature(long id, String name, String type, String ref, String color, TransportStopInfo stop) {
+	public record TransportStopRouteFeature(long id, String name, String type, String ref, String color,
+	                                        TransportStopInfo stop) {
 	}
 
-	public record TransportStopWithDetails(long stopId, String name, LatLon coords) {}
+	public record TransportStopWithDetails(long stopId, String name, LatLon coords) {
+	}
 
-	public record TransportRouteFeature(long id, Integer intervalSeconds, List<TransportStopWithDetails> stops, List<List<LatLon>> nodes) {
+	public record TransportRouteFeature(long id, Integer intervalSeconds, List<TransportStopWithDetails> stops,
+	                                    List<List<LatLon>> nodes) {
 	}
 }
