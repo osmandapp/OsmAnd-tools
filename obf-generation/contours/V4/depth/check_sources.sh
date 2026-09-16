@@ -5,7 +5,7 @@
 #
 # For every source: file count against the expected one, every raster opens (gdalinfo), CRS is EPSG:4326 where
 # expected, a known sea point is below 0 m (depths are negative), and leftover archives or partial files.
-# Writes DIR/src/gebco/gebco_2026.vrt, DIR/src/gebco_tid/gebco_2026_tid.vrt, DIR/src/emodnet/emodnet_2024.vrt,
+# Writes DIR/mask/land_polygons.gpkg (indexed copy of the land polygons) and DIR/src/gebco/gebco_2026.vrt, DIR/src/gebco_tid/gebco_2026_tid.vrt, DIR/src/emodnet/emodnet_2024.vrt,
 # DIR/src/cudem/cudem.vrt. Prints OK / WARN / FAIL lines and exits with 1 when anything failed.
 set -uo pipefail
 
@@ -88,6 +88,13 @@ else
 	n=$(ogrinfo -so -al "$SHP" 2>/dev/null | awk -F': ' '/Feature Count/{print $2}')
 	if [ "${n:-0}" -gt 500000 ]; then ok "mask: $n land polygons"; else fail "mask: ${n:-0} land polygons, expected over 500000"; fi
 	leftovers mask "$OUT/mask"
+	# a shapefile has no spatial index, so cutting a region out of it reads the whole file; a GeoPackage has one
+	GPKG="$OUT/mask/land_polygons.gpkg"
+	if [ ! -f "$GPKG" ] || [ "$SHP" -nt "$GPKG" ]; then
+		rm -f "$GPKG"
+		if ogr2ogr -f GPKG -nln land_polygons -nlt MULTIPOLYGON -gt 65536 "$GPKG" "$SHP" 2>/dev/null; then ok "mask: land_polygons.gpkg written"
+		else fail "mask: land_polygons.gpkg could not be written"; rm -f "$GPKG"; fi
+	else ok "mask: land_polygons.gpkg is up to date"; fi
 fi
 
 echo "== gebco"

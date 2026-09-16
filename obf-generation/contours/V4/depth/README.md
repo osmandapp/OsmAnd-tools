@@ -60,3 +60,17 @@ Not scriptable: Kartverket ENC (sold via PRIMAR), BSH NAUTHIS (WFS download disa
 ./download_emodnet.sh --bbox 3 51 9 56 -o /data/emodnet    # all tiles touching a box (W S E N)
 ./download_emodnet.sh --all -j 4 -o /data/emodnet          # all 58 tiles, ~11.4 GB zipped GeoTIFF
 ```
+
+## Building depth contours of a region
+
+`build_depth_region.sh` cuts a region out of a grid, sets land to 0 m by the land mask, contours it, drops short
+closed rings, simplifies and writes `NAME.osm.gz` (tags by `../translations/contours_depth.py`) plus `NAME.gpkg`
+for a quick look. The grid may be a `/vsicurl/` URL, only the region is read.
+
+```
+./build_depth_region.sh -n Netherlands_emodnet_2024 -b "2.5 51.0 7.3 53.8" \
+    -i /data/depth/src/emodnet/emodnet_2024.vrt -m /data/depth/mask/land_polygons.gpkg -o /data/depth/build -j 16
+```
+
+Levels default to 2, 5, 10, 20, 30, 50, 100, 200, 500 m and every 1000 m (`-l`); `-u 2` upsamples a coarse grid
+(GEBCO) before contouring for smoother lines.

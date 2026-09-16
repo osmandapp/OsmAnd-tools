@@ -1,35 +1,29 @@
 def filterTags(attrs):
-	if not attrs:
+	if not attrs or 'depth' not in attrs:
 		return
 	tags = {}
 
-	depth = attrs['depth'].split('.')[0]
-	if 'depth' in attrs:
-		tags['depth'] = depth
+	depth = int(float(attrs['depth']))
+	if depth == 0:
+		return tags
+	tags['depth'] = str(depth)
+	tags['contour'] = 'depth'
+	tags['name'] = str(depth)
 
-	if int(depth) != 0:
-		tags.update({'contour':'depth'})
-
-	if int(depth) != 0:
-		if int(depth) % 1000 == 0:
-			tags.update({'contourtype':'1000m'})
-			tags.update({'name':depth})
-		elif int(depth) % 200 == 0:
-			tags.update({'contourtype':'200m'})
-			tags.update({'name':depth})
-		elif int(depth) % 100 == 0:
-			tags.update({'contourtype':'100m'})
-			tags.update({'name':depth})
-		elif int(depth) % 50 == 0:
-			tags.update({'contourtype':'50m'})
-			tags.update({'name':depth})
-		elif int(depth) % 20 == 0:
-			tags.update({'contourtype':'20m'})
-			tags.update({'name':depth})
-		elif int(depth) % 10 == 0:
-			tags.update({'contourtype':'10m'})
-			tags.update({'name':depth})
-		elif int(depth) % 5 == 0:
-			tags.update({'contourtype':'5m'})
-			tags.update({'name':depth})
+	if depth % 1000 == 0:
+		tags['contourtype'] = '1000m'
+	elif depth % 200 == 0:
+		tags['contourtype'] = '200m'
+	elif depth % 100 == 0:
+		tags['contourtype'] = '100m'
+	elif depth % 50 == 0:
+		tags['contourtype'] = '50m'
+	elif depth % 20 == 0:
+		tags['contourtype'] = '20m'
+	elif depth % 10 == 0:
+		tags['contourtype'] = '10m'
+	elif depth % 5 == 0:
+		tags['contourtype'] = '5m'
+	elif depth == 2:
+		tags['contourtype'] = '2m'
 	return tags
