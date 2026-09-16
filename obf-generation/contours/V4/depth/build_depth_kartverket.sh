@@ -68,7 +68,7 @@ obf() {
 
 step "$NAME contours from $FGDB"
 ogr2ogr -f FlatGeobuf "$TMP/depth.fgb" "$FGDB" ${SPAT[@]+"${SPAT[@]}"} ${CLIP[@]+"${CLIP[@]}"} \
-	-explodecollections -nlt LINESTRING -a_srs None \
+	-explodecollections -nlt LINESTRING -a_srs None -lco SPATIAL_INDEX=NO \
 	-sql "SELECT SHAPE, dybde AS depth FROM dybdekurve WHERE dybde > 0"
 step "contours osm: $(ogrinfo -so -al "$TMP/depth.fgb" | awk -F': ' '/Feature Count/{print $2}') lines"
 python3 "$V4/ogr2osm.py" -f -t "$V4/translations/contours_depth.py" -o "$TMP/$NAME.osm" "$TMP/depth.fgb" >/dev/null

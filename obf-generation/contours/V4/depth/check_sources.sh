@@ -172,7 +172,7 @@ leftovers norway "$SRC/norway"
 echo "== netherlands"
 FILES=("$SRC"/netherlands/*.tif)
 [ -e "${FILES[0]}" ] || FILES=()
-count netherlands ${#FILES[@]} 3
+count netherlands ${#FILES[@]} 5
 if [ ${#FILES[@]} -gt 0 ]; then
 	rasters_open netherlands "${FILES[@]}"
 	for f in "${FILES[@]}"; do
