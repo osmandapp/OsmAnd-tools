@@ -30,6 +30,7 @@ import net.osmand.binary.BinaryMapPoiReaderAdapter;
 import net.osmand.binary.NameIndexReader;
 import net.osmand.binary.ObfConstants;
 import net.osmand.data.Amenity;
+import net.osmand.data.BaseDetailsObject;
 import net.osmand.data.City;
 import net.osmand.data.City.CityType;
 import net.osmand.data.LatLon;
@@ -551,13 +552,32 @@ public class PoiSearchService {
 		MapPoiTypes poiTypes = poiTypesService.getMapPoiTypes(PoiTypesService.DEFAULT_SEARCH_LANG);
 		Node node = new Node(loc.getLatitude(), loc.getLongitude(), -1);
 		List<Amenity> amenities = EntityParser.parseAmenities(poiTypes, node, tags, new ArrayList<>(), false);
+		Amenity amenity;
 		if (amenities.isEmpty()) {
-			return null;
+			renderedObject.getTags().putAll(tags);
+			amenity = BaseDetailsObject.convertRenderedObjectToAmenity(renderedObject, poiTypes);
+			amenity.setLocation(loc.getLatitude(), loc.getLongitude());
+			setPoiTypeSubType(amenity, poiTypes, tags);
+		} else {
+			amenity = amenities.get(0);
+			amenity.setId(ObfConstants.createMapObjectIdFromCleanOsmId(osmId, entityType));
 		}
-		Amenity amenity = amenities.get(0);
-		amenity.setId(ObfConstants.createMapObjectIdFromCleanOsmId(osmId, entityType));
 		return getMapObjectFeature(
 				searchResultConverter.buildPoiSearchResult(amenity, PoiTypesService.DEFAULT_SEARCH_LANG, ""), timeZone);
+	}
+
+	// the converter keeps the raw tag value as the subtype, the icon and the type of a feature are read by the poi type key
+	private static void setPoiTypeSubType(Amenity amenity, MapPoiTypes poiTypes, Map<String, String> tags) {
+		if (amenity.getType().getPoiTypeByKeyName(amenity.getSubType()) != null) {
+			return;
+		}
+		for (Map.Entry<String, String> tag : tags.entrySet()) {
+			PoiType poiType = poiTypes.getPoiTypeByTagValue(tag.getKey(), tag.getValue());
+			if (poiType != null && poiType.getCategory() == amenity.getType()) {
+				amenity.setSubType(poiType.getKeyName());
+				return;
+			}
+		}
 	}
 
 	public Feature searchPoiByEnName(LatLon loc, String enName) throws IOException {
