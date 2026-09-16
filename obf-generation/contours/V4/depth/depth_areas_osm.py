@@ -14,9 +14,11 @@ import argparse
 import gzip
 import math
 
-from osgeo import ogr
+from osgeo import gdal, ogr
 
 ogr.UseExceptions()
+# IsValid() reports every self-intersection of the gdal_contour bands as a warning; MakeValid() fixes them
+gdal.PushErrorHandler('CPLQuietErrorHandler')
 
 
 def areatype(depth):
@@ -36,11 +38,13 @@ def box(w, s, e, n):
 
 
 def polygons(g):
+    """The polygon parts as clones: a part got by GetGeometryRef dies with its parent, and the parent is often a
+    temporary (MakeValid, Intersection) - using the part after that crashes GDAL."""
     if g is None or g.IsEmpty():
         return []
     t = ogr.GT_Flatten(g.GetGeometryType())
     if t == ogr.wkbPolygon:
-        return [g]
+        return [g.Clone()]
     if t in (ogr.wkbMultiPolygon, ogr.wkbGeometryCollection):
         out = []
         for i in range(g.GetGeometryCount()):
@@ -110,7 +114,8 @@ def main():
                     for g in geoms:
                         for p in polygons(g.MakeValid() if not g.IsValid() else g):
                             mp.AddGeometry(p)
-                    area = mp.UnionCascaded().Intersection(cell)
+                    # gdal_contour bands can self-intersect; a union of invalid rings may crash an older GEOS
+                    area = (mp if mp.IsValid() else mp.MakeValid()).UnionCascaded().Intersection(cell)
                     if dry is not None and area.Intersects(dry):
                         area = area.Difference(dry)
                     area = area.SimplifyPreserveTopology(args.simplify)
