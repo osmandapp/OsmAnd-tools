@@ -73,7 +73,10 @@ for a quick look. The grid may be a `/vsicurl/` URL, only the region is read.
     -m /data/depth/mask/land_polygons.gpkg -o /data/depth/build                                  # any box
 ```
 
-Regions (bounds, grid) are listed in the script; `-c` adds `NAME.depth.obf` built by OsmAndMapCreator.
+Regions (bounds, grid, levels, tile size) are listed in the script: `Netherlands_contours`, `Europe_contours`
+(EMODnet 2024) and `World_contours` (GEBCO_2026, from 10 m down). `-c` adds `NAME.depth.obf` built by
+OsmAndMapCreator. A region larger than `-t` degrees is split into tiles built `-j` at a time (each tile's Java
+takes up to 2 GB), and their OBFs are merged with `merge-index`, one map section per tile.
 
 Levels default to 2, 5, 10, 20, 30, 50, 100, 200, 500 m and every 1000 m (`-l`); `-u 2` upsamples a coarse grid
 (GEBCO) before contouring for smoother lines.
