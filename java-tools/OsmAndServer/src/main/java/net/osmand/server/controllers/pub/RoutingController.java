@@ -34,9 +34,11 @@ import org.springframework.web.multipart.MultipartFile;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
+import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.GeocodingUtilities.GeocodingResult;
 import net.osmand.data.LatLon;
 import net.osmand.data.LatLonEle;
+import net.osmand.data.QuadRect;
 import net.osmand.gpx.GPXFile;
 import net.osmand.gpx.GPXUtilities;
 import net.osmand.router.GeneralRouter;
@@ -44,7 +46,12 @@ import net.osmand.router.GeneralRouter.RoutingParameterType;
 import net.osmand.router.RouteCalculationProgress;
 import net.osmand.router.RouteSegmentResult;
 import net.osmand.router.RoutingConfiguration;
+import net.osmand.router.BasemapLandTiles;
+import net.osmand.router.BoatRoutePlanner;
+import net.osmand.router.BoatRoutePlanner.BoatRoute;
+import net.osmand.router.SeaObstacles;
 import net.osmand.server.api.services.OsmAndMapsService;
+import net.osmand.server.api.services.OsmAndMapsService.BinaryMapIndexReaderReference;
 import net.osmand.server.api.services.OsmAndMapsService.RoutingServerConfigEntry;
 import net.osmand.server.api.services.RoutingService;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
@@ -312,7 +319,8 @@ public class RoutingController {
 				} else {
 					LatLon pnt = new LatLon(lat, vl);
 					if (!list.isEmpty()) {
-						disableOldRouting = disableOldRouting || MapUtils.getDistance(prev, pnt) > hhOnlyLimit * 1000;
+						// boats have no HH data, so the plain router is the only one they can use at any distance
+						disableOldRouting = !isBoat(routeMode) && (disableOldRouting || MapUtils.getDistance(prev, pnt) > hhOnlyLimit * 1000);
 					}
 					list.add(pnt);
 					prev = pnt;
@@ -323,17 +331,37 @@ public class RoutingController {
 		List<Feature> features = new ArrayList<>();
 		List<Feature> alternativeFeatures = new ArrayList<>();
 		Map<String, Object> props = new TreeMap<>();
+		// boat: per leg the water network joined to the requested points, or open water instead (see BoatRoutePlanner)
+		List<BoatRoute> boatLegs = null;
 		if (list.size() >= 2) {
 			try {
 				List<List<RouteSegmentResult>> altRoutes = new ArrayList<>();
-				List<RouteSegmentResult> res =
-						osmAndMapsService.routing(disableOldRouting, routeMode, props, list.get(0),
-								list.get(list.size() - 1), list.subList(1, list.size() - 1),
-								avoidRoads == null ? Collections.emptyList() : Arrays.asList(avoidRoads), progress,
-								altCount, altRoutes);
-				alternativeFeatures = routingService.buildAlternativeFeatures(altRoutes);
+				List<RouteSegmentResult> res;
+				if (isBoat(routeMode)) {
+					// the water network and open water together (BoatRoutePlanner); the basemap tells land from sea
+					// far from any shore and is locked once for the whole route
+					BinaryMapIndexReaderReference baseRef = osmAndMapsService.getBaseMap();
+					List<BinaryMapIndexReader> base = baseRef == null ? Collections.emptyList()
+							: osmAndMapsService.getReaders(Collections.singletonList(baseRef), null);
+					try {
+						boatLegs = osmAndMapsService.boatRouting(routeMode, props, list,
+								shores(base.isEmpty() ? null : base.get(0)), progress);
+					} finally {
+						osmAndMapsService.unlockReaders(base);
+					}
+					res = null;
+					resListElevation = boatLine(boatLegs, list, features, props);
+				} else {
+					res = osmAndMapsService.routing(disableOldRouting, routeMode, props, list.get(0),
+							list.get(list.size() - 1), list.subList(1, list.size() - 1),
+							avoidRoads == null ? Collections.emptyList() : Arrays.asList(avoidRoads), progress,
+							altCount, altRoutes);
+					alternativeFeatures = routingService.buildAlternativeFeatures(altRoutes);
+				}
 				if (res != null) {
 					resListElevation = routingService.getElevationsBySegments(resListElevation, features, res);
+				}
+				if (!resListElevation.isEmpty()) {
 					routingService.interpolateEmptyElevationSegments(resListElevation);
 					List<Double> eleDiff = routingService.calculateElevationDiffs(resListElevation);
 					if (!eleDiff.isEmpty() && !Double.isNaN(eleDiff.get(0)) && !Double.isNaN(eleDiff.get(1))) {
@@ -367,7 +395,7 @@ public class RoutingController {
 		// alternatives go last so that the main route stays the first feature
 		features.addAll(alternativeFeatures);
 
-		if (reportLimitError && dist >= hhOnlyLimit * 1000) {
+		if (reportLimitError && dist >= hhOnlyLimit * 1000 && !isBoat(routeMode)) {
 			return ResponseEntity.ok(gson.toJson(Map.of("features", new FeatureCollection(features.toArray(new Feature[features.size()])), "msg",
 					MSG_LONG_DIST + hhOnlyLimit + " km.")));
 		} else {
@@ -375,6 +403,100 @@ public class RoutingController {
 		}
 	}
 
+
+	/**
+	 * The line of a boat route through all its legs: network segments (with their turns in features), open water
+	 * joining them to the points, and a straight line for a leg with no route. Empty when no leg has a route. Sets
+	 * the overall distance and time of the whole route and the decision of every leg.
+	 */
+	private List<LatLonEle> boatLine(List<BoatRoute> legs, List<LatLon> points, List<Feature> features,
+			Map<String, Object> props) {
+		List<LatLonEle> line = new ArrayList<>();
+		List<Object> decisions = new ArrayList<>();
+		double distance = 0, time = 0;
+		boolean any = false;
+		for (int i = 0; i < legs.size(); i++) {
+			BoatRoute leg = legs.get(i);
+			decisions.add(leg.decision);
+			List<LatLonEle> legLine = new ArrayList<>();
+			if (leg.network != null) {
+				appendLatLons(legLine, leg.startConnector);
+				routingService.getElevationsBySegments(legLine, features, leg.network);
+				appendLatLons(legLine, leg.endConnector);
+			} else if (leg.openWater != null) {
+				appendLatLons(legLine, leg.openWater);
+			} else {
+				appendLatLons(legLine, Arrays.asList(points.get(i), points.get(i + 1)));
+				distance += MapUtils.getDistance(points.get(i), points.get(i + 1));
+			}
+			any |= leg.network != null || leg.openWater != null;
+			distance += leg.getDistance();
+			time += leg.getTime();
+			// neighbouring legs share their point
+			line.addAll(line.isEmpty() ? legLine : legLine.subList(1, legLine.size()));
+		}
+		props.put("boatDecision", legs.size() == 1 ? decisions.get(0) : decisions);
+		if (!any) {
+			props.remove("overall");
+			return new ArrayList<>();
+		}
+		@SuppressWarnings("unchecked")
+		Map<String, Object> overall = props.get("overall") instanceof Map ? (Map<String, Object>) props.get("overall")
+				: new TreeMap<>();
+		overall.put("distance", distance);
+		overall.put("time", time);
+		props.put("overall", overall);
+		return line;
+	}
+
+	private static void appendLatLons(List<LatLonEle> line, List<LatLon> points) {
+		if (points == null) {
+			return;
+		}
+		for (LatLon p : points) {
+			// connectors start or end at a network point already in the line
+			if (!line.isEmpty() && MapUtils.getDistance(line.get(line.size() - 1).getLatitude(),
+					line.get(line.size() - 1).getLongitude(), p.getLatitude(), p.getLongitude()) < 1) {
+				continue;
+			}
+			line.add(new LatLonEle(p.getLatitude(), p.getLongitude()));
+		}
+	}
+
+	private static boolean isBoat(String routeMode) {
+		return routeMode != null && routeMode.startsWith("boat");
+	}
+
+	/**
+	 * Coastline of a corridor from the server's maps, for BoatRoutePlanner (OsmAnd-Issues #3170). The basemap, locked
+	 * by the caller, adds generalized coastline offshore or where no detailed map is loaded, and its land tiles.
+	 */
+	private BoatRoutePlanner.ShoreProvider shores(BinaryMapIndexReader basemap) {
+		BasemapLandTiles landTiles = basemap == null ? null : new BasemapLandTiles(basemap);
+		return (minLat, minLon, maxLat, maxLon, offshore) -> {
+			QuadRect rect = new QuadRect(MapUtils.get31TileNumberX(minLon), MapUtils.get31TileNumberY(maxLat),
+					MapUtils.get31TileNumberX(maxLon), MapUtils.get31TileNumberY(minLat));
+			List<BinaryMapIndexReader> readers = null;
+			try {
+				readers = osmAndMapsService.getReaders(osmAndMapsService.getObfReaders(rect, "sea routing"), null);
+				List<BinaryMapIndexReader> use = new ArrayList<>(readers);
+				// generalized world coastline would close the narrow channels a detailed map keeps open, so only
+				// offshore - or when no detailed map is there and it is better than nothing
+				boolean withBasemap = basemap != null && (offshore || use.isEmpty());
+				if (withBasemap) {
+					use.add(basemap);
+				}
+				int zoom = offshore ? 9 : withBasemap ? 11 : 12;
+				SeaObstacles obstacles = SeaObstacles.readShores(use, minLat, minLon, maxLat, maxLon, zoom);
+				obstacles.setFarFromShore(landTiles);
+				return obstacles;
+			} finally {
+				if (readers != null) {
+					osmAndMapsService.unlockReaders(readers);
+				}
+			}
+		};
+	}
 
 	@PostMapping(path = {"/update-route-between-points"}, produces = "application/json")
 	@ResponseBody
@@ -385,7 +507,7 @@ public class RoutingController {
 		final int hhOnlyLimit = osmAndMapsService.getRoutingConfig().hhOnlyLimit;
 		LatLon startPoint = gson.fromJson(start, LatLon.class);
 		LatLon endPoint = gson.fromJson(end, LatLon.class);
-		boolean disableOldRouting = MapUtils.getDistance(startPoint, endPoint) > hhOnlyLimit * 1000;
+		boolean disableOldRouting = !isBoat(routeMode) && MapUtils.getDistance(startPoint, endPoint) > hhOnlyLimit * 1000;
 		RouteCalculationProgress progress = this.session.getRoutingProgress(session);
 		RoutingService.RouteResult routeResult =
 				routingService.updateRouteBetweenPoints(startPoint, endPoint, routeMode, hasRouting, disableOldRouting, progress);
