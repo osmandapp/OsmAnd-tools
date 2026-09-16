@@ -79,6 +79,10 @@ public class TileServerConfig {
 			}
 			this.style.put(vectorStyle.key, vectorStyle);
 		}
+		for (VectorStyle vs : DepthTestMaps.INSTANCE.createStyles(31 - Integer.numberOfLeadingZeros(512) - 8,
+				31 - Integer.numberOfLeadingZeros(Math.max(256, metatileSize)) - 8, maxZoomCache)) {
+			this.style.put(vs.key, vs);
+		}
 	}
 
 	public String createTileId(String style, int x, int y, int z, int metaSizeLog, int tileSizeLog) {
@@ -121,5 +125,8 @@ public class TileServerConfig {
 		public int maxZoomCache;
 		public int tileSizeLog;
 		public int metaTileSizeLog;
+		// depth test styles only, see DepthTestMaps
+		public transient String file;
+		public transient String depth;
 	}
 }
