@@ -62,7 +62,6 @@ public class RoutingController {
 	/** each alternative costs a detailed expansion, and no client asks for more than a couple */
 	private static final int MAX_ALTERNATIVES = 2;
 	private static final int MAX_ROUND_TRIP_KM = 300;
-	private static final int MAX_ROUND_TRIP_MIN = 600;
 	private static final int MAX_ROUND_TRIP_VARIANTS = 5;
 	protected static final Log LOGGER = LogFactory.getLog(RoutingController.class);
 
@@ -381,15 +380,14 @@ public class RoutingController {
 
 
 	/**
-	 * Round trip prototype (OsmAnd-Issues#2827): loops that start and end at the point, of the given length in km
-	 * or time in minutes. The response has the shape of /route: the best loop first, the other variants as
+	 * Round trip prototype (OsmAnd-Issues#2827): loops that start and end at the point, of the given length in km.
+	 * The response has the shape of /route: the best loop first, the other variants as
 	 * alternatives. Each loop line carries "roundTrip" properties, the main one also "roundTripDev".
 	 */
 	@RequestMapping(path = "/roundtrip", produces = {MediaType.APPLICATION_JSON_VALUE})
 	public ResponseEntity<String> roundTrip(HttpSession session, @RequestParam String point,
 			@RequestParam(defaultValue = "car") String routeMode,
 			@RequestParam(defaultValue = "0") double distance,
-			@RequestParam(defaultValue = "0") double time,
 			@RequestParam(defaultValue = "3") int variants,
 			@RequestParam(required = false) Double direction,
 			@RequestParam(defaultValue = "3") int shape,
@@ -399,9 +397,8 @@ public class RoutingController {
 		LatLon start = new LatLon(Double.parseDouble(ll[0]), Double.parseDouble(ll[1]));
 		RoundTripGenerator.Params params = new RoundTripGenerator.Params();
 		params.distance = Math.min(distance, MAX_ROUND_TRIP_KM) * 1000;
-		params.time = Math.min(time, MAX_ROUND_TRIP_MIN) * 60;
-		if (params.distance <= 0 && params.time <= 0) {
-			return ResponseEntity.badRequest().body("distance (km) or time (min) is required");
+		if (params.distance <= 0) {
+			return ResponseEntity.badRequest().body("distance (km) is required");
 		}
 		params.variants = Math.min(Math.max(variants, 1), MAX_ROUND_TRIP_VARIANTS);
 		params.direction = direction;

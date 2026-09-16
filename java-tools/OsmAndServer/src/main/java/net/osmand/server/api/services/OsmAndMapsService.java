@@ -1183,10 +1183,6 @@ public class OsmAndMapsService {
 		// is there to measure what a profile without HH data (pedestrian) would cost
 		rp.useOnlyHHRouting = !params.allowAStar;
 		rp.useNativeRouting = false;
-		GeneralRouter profileRouter = RoutingConfiguration.getDefault()
-				.build(rp.routeProfile, new RoutingMemoryLimits(MEM_LIMIT, MEM_LIMIT), rp.routeParams).router;
-		params.speed = profileRouter.getDefaultSpeed();
-		params.maxSpeed = Math.max(profileRouter.getMaxSpeed(), params.speed);
 		double reach = RoundTripGenerator.maxReach(params);
 		List<LatLon> corners = new ArrayList<>();
 		for (int bearing = 0; bearing < 360; bearing += 90) {

@@ -24,7 +24,7 @@ import net.osmand.util.MapUtils;
  * A loop is a regular polygon of waypoints on a circle that passes through the start. The circle
  * centre lies in the loop direction, so the route leaves towards it and comes back from the other
  * side. Each candidate is routed start -> w1 -> ... -> wk -> start. The road detour is not known in
- * advance, so the radius is rescaled by the measured ratio of road length (or time) to the straight
+ * advance, so the radius is rescaled by the measured ratio of road length to the straight
  * polygon and the loop is routed again. Candidates in several directions are ranked by the length
  * error and by the share of roads driven twice, and returned variants must not share most roads.
  * <p>
@@ -52,14 +52,11 @@ public class RoundTripGenerator {
 	}
 
 	public static class Params {
-		public double distance; // meters, used when time is 0
-		public double time; // seconds
+		public double distance; // meters
 		public int variants = 3;
 		public Double direction; // degrees, null means any
 		public int shape = 3; // waypoints between start and finish
 		public int seed;
-		public double speed = 10; // m/s, first guess of the length of a time-limited loop
-		public double maxSpeed = 30; // m/s, bounds how far a time-limited loop may reach (map selection)
 		public int parallelism = 1; // how many loops may be routed at once (one routing context each)
 		public boolean allowAStar; // fall back to A* where the maps carry no HH data (pedestrian), much slower
 	}
@@ -73,7 +70,7 @@ public class RoundTripGenerator {
 		public double distance;
 		public double time;
 		public double overlap; // share of the length driven more than once
-		public double lengthError; // |length - target| / target, length is time for time-limited loops
+		public double lengthError; // |length - target| / target
 		public int iteration;
 		Map<Piece, Double> pieces; // road piece -> its length
 
@@ -105,6 +102,7 @@ public class RoundTripGenerator {
 
 	private final LoopRouter router;
 	public final List<RoundTrip> candidates = Collections.synchronizedList(new ArrayList<>());
+	// measured road length per meter of straight polygon, shared by the directions routed in parallel
 	private final List<Double> ratios = Collections.synchronizedList(new ArrayList<>());
 	public volatile int routings;
 	public volatile long routingMs;
@@ -116,8 +114,7 @@ public class RoundTripGenerator {
 	/** Farthest a waypoint can get from the start (the diameter of the largest circle), to select maps */
 	public static double maxReach(Params p) {
 		int k = shape(p);
-		double length = p.time > 0 ? p.time * p.maxSpeed : p.distance / MAX_DETOUR;
-		return 2 * length / polygonFactor(k);
+		return 2 * (p.distance / MAX_DETOUR) / polygonFactor(k);
 	}
 
 	public List<RoundTrip> generate(LatLon start, Params p) throws IOException, InterruptedException {
@@ -158,21 +155,20 @@ public class RoundTripGenerator {
 	/** Route one direction, rescaling the radius until the loop is long enough */
 	private RoundTrip routeDirection(LatLon start, Params p, int d) throws IOException, InterruptedException {
 		int k = shape(p);
-		boolean byTime = p.time > 0;
-		double target = byTime ? p.time : p.distance;
+		double target = p.distance;
 		double maxPerimeter = maxReach(p) / 2 * polygonFactor(k);
 		double heading = heading(p, d);
 		boolean clockwise = ((d + p.seed) & 1) == 0;
-		double ratio = ratios.isEmpty() ? (byTime ? INITIAL_DETOUR / p.speed : INITIAL_DETOUR) : median(ratios);
+		double ratio = ratios.isEmpty() ? INITIAL_DETOUR : median(ratios);
 		RoundTrip best = null;
 		for (int it = 0; it < MAX_ITERATIONS; it++) {
 			double perimeter = Math.min(target / ratio, maxPerimeter);
-			RoundTrip rt = route(start, heading, clockwise, perimeter / polygonFactor(k), k, byTime, target);
+			RoundTrip rt = route(start, heading, clockwise, perimeter / polygonFactor(k), k, target);
 			if (rt == null) {
 				break;
 			}
 			rt.iteration = it;
-			double measured = (byTime ? rt.time : rt.distance) / perimeter;
+			double measured = rt.distance / perimeter;
 			ratios.add(measured);
 			if (best == null || rt.lengthError < best.lengthError) {
 				best = rt;
@@ -188,8 +184,8 @@ public class RoundTripGenerator {
 		return best;
 	}
 
-	private RoundTrip route(LatLon start, double heading, boolean clockwise, double radius, int k, boolean byTime,
-			double target) throws IOException, InterruptedException {
+	private RoundTrip route(LatLon start, double heading, boolean clockwise, double radius, int k, double target)
+			throws IOException, InterruptedException {
 		LatLon center = MapUtils.rhumbDestinationPoint(start, radius, heading);
 		List<LatLon> via = new ArrayList<>();
 		for (int i = 1; i <= k; i++) {
@@ -230,7 +226,7 @@ public class RoundTripGenerator {
 			}
 		}
 		rt.overlap = rt.distance > 0 ? repeated / rt.distance : 0;
-		rt.lengthError = Math.abs((byTime ? rt.time : rt.distance) - target) / target;
+		rt.lengthError = Math.abs(rt.distance - target) / target;
 		return rt;
 	}
 
