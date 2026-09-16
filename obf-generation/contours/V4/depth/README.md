@@ -79,6 +79,11 @@ Regions (bounds of the published OBFs, grid, levels, point tiers, tile size) are
 `Gulf_of_Mexico_north-west_contours` (NOAA CUDEM 1/3" near the coast over GEBCO_2026; `-i` takes several grids,
 comma-separated, a later one wins where it has data).
 
+`Norway_contours` is built from vectors, not a grid: `build_depth_kartverket.sh` (also called for that region name)
+takes the charted contours (`dybdekurve`) of Kartverket "Sjøkart - Dybdedata" as they are and thins its soundings
+(`dybdepunkt`) per zoom tier, keeping the shallowest one of every cell. `Europe_contours` and `Europe_points` leave
+the Kartverket coverage (`datakvalitet`, `-x`/`-X`) out, so the fjords do not get two sets of lines.
+
 - Contours: levels `-l` (2, 5, 10, 20, 30, 50, 100, 200, 500 m and every 1000 m by default; GEBCO from 10 m); levels
   from 20 m down are traced on a smoothed grid (`-s`, `-d`), otherwise a flat bottom with sand waves gives hundreds
   of zigzags; short closed rings are dropped.
@@ -86,4 +91,6 @@ comma-separated, a later one wins where it has data).
   dropped; every tier is its own map section shown from its zooms (OsmAndMapCreator `--map-zooms`).
 - A region larger than `-t` degrees is split into tiles built `-j` at a time (each tile's Java takes up to 2 GB);
   the OBFs of contours, point tiers and tiles are merged with `merge-index`.
+- Overview `-w CELL:ZOOMS` (World, Europe, Gulf: `0.02:5-8`): the contours start at zoom 9, so the levels of 200 m
+  and deeper are traced again on the grid averaged to CELL degrees as a map section of their own for the lower zooms.
 - `-k` skips a region whose `NAME.depth.obf` exists.

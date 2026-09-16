@@ -4,7 +4,7 @@
 #   build_depth_region.sh -D DATA_DIR -n REGION [-c MAP_CREATOR_DIR] [-k] [-j JOBS]
 #   build_depth_region.sh -n NAME -b "W S E N" -i GRID -m LAND -o OUT_DIR [-l LEVELS] [-p TIERS] [-r CELL]
 #                         [-u UPSAMPLE] [-s SMOOTH] [-d SMOOTH_FROM] [-a RESAMPLING] [-g MIN_RING_CELLS] [-t TILE]
-#                         [-w OVERVIEW] [-c MAP_CREATOR_DIR] [-k] [-j JOBS]
+#                         [-w OVERVIEW] [-x EXCLUDE [-X LAYER]] [-c MAP_CREATOR_DIR] [-k] [-j JOBS]
 #
 #   -D DATA_DIR  folder of download_all.sh: the grid is DATA_DIR/src/..., the land DATA_DIR/mask/land_polygons.gpkg,
 #                the output DATA_DIR/build; -n then names a region below, which sets the rest
@@ -26,6 +26,8 @@
 #   -g MIN_RING_CELLS  drop closed rings shorter than this many cells (default 8)
 #   -w OVERVIEW  "CELL:ZOOMS", e.g. "0.02:5-8": the levels of 200 m and deeper again from the grid averaged to CELL
 #                degrees, as their own map section shown at ZOOMS - the main contours start at zoom 9. Default none
+#   -x EXCLUDE   polygons (OGR source, layer -X or the first) where another region has better data: no contours and
+#                no points there, the overview stays
 #   -t TILE      split a region larger than TILE degrees into tiles built in parallel (JOBS at a time); with -c the
 #                tiles' .osm.gz become one map section of contours, one of the overview and one per point tier
 #                (generate-single-map) in
@@ -37,8 +39,10 @@
 #   Netherlands_contours              Rijkswaterstaat 20 m 2024 over NCP 2019 over EMODnet DTM 2024, contours every 5 m
 #                                     to 50 m and points, 0.0002 degree cells, 1 degree tiles
 #   Europe_contours                   EMODnet DTM 2024, contours every 5 m to 50 m, 10 m to 200 m, 50 m to 1000 m,
-#                                     then as the default, overview 0.02 degrees for zooms 5-8, 10 degree tiles
+#                                     then as the default, overview 0.02 degrees for zooms 5-8, 10 degree tiles;
+#                                     Europe_* leave out the Kartverket coverage (Norway_contours) when it is downloaded
 #   Europe_points                     EMODnet DTM 2024, points, 10 degree tiles
+#   Norway_contours                   Kartverket Sjøkart - Dybdedata (vector), see build_depth_kartverket.sh
 #   World_contours                    GEBCO_2026 (15"), contours every 10 m to 300 m, 50 m to 1000 m, then as the
 #                                     default - 2 and 5 m mean nothing in a 450 m grid, overview 0.02 degrees for
 #                                     zooms 5-8, 15 degree tiles
@@ -60,6 +64,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 V4=$(cd "$HERE/.." && pwd)
 NAME=""; BBOX=""; GRID=""; LAND=""; OUT=""; CELL=""; UPSAMPLE=1; JOBS=4; SMOOTH=4; SMOOTH_FROM=""; MAP_CREATOR=""
 DATA=""; TILE=0; KEEP=0; LEVELS=""; TIERS=""; RESAMPLING=""; MIN_RING_CELLS=""; OVERVIEW=""
+EXCLUDE=""; EXCLUDE_LAYER=""
 # steps FROM:TO:STEP... : comma-separated levels
 steps() { local s a b c out=""; for s; do IFS=: read -r a b c <<< "$s"; out+=$(seq "$a" "$c" "$b" | paste -sd, -),; done
 	echo "${out%,}"; }
@@ -87,14 +92,20 @@ while [ $# -gt 0 ]; do
 		-t) TILE=$2; shift 2 ;;
 		-k) KEEP=1; shift ;;
 		-w) OVERVIEW=$2; shift 2 ;;
-		-h|--help) sed -n '2,56p' "$0"; exit 0 ;;
+		-x) EXCLUDE=$2; shift 2 ;;
+		-X) EXCLUDE_LAYER=$2; shift 2 ;;
+		-h|--help) sed -n '2,60p' "$0"; exit 0 ;;
 		*) echo "Unknown option $1" >&2; exit 1 ;;
 	esac
 done
 if [ -n "$DATA" ]; then
 	EMODNET="$DATA/src/emodnet/emodnet_2024.vrt"; GEBCO="$DATA/src/gebco/gebco_2026.vrt"
 	GEBCO_TIERS="0.3:6-9 0.05:10-12 0.02:13-"; OVERVIEW_Z5_8="0.02:5-8"
+	KARTVERKET=$(ls -d "$DATA"/src/norway/*.gdb 2>/dev/null | head -1 || true)
 	case "$NAME" in
+		Norway_contours)
+			exec "$HERE/build_depth_kartverket.sh" -D "$DATA" -n "$NAME" ${MAP_CREATOR:+-c "$MAP_CREATOR"} \
+				$([ $KEEP -eq 1 ] && echo -k) ;;
 		Netherlands_contours)
 			NL="$DATA/src/netherlands"
 			: "${BBOX:=1.7 51.1 7.3 55.7}"; : "${GRID:=$EMODNET,$NL/bathymetrie_ncp_juni_2019.tif,$NL/bodemhoogte_20mtr_2024.tif}"
@@ -104,10 +115,12 @@ if [ -n "$DATA" ]; then
 		Europe_contours)
 			: "${BBOX:=-31.3 25.4 36.0 71.2}"; : "${GRID:=$EMODNET}"; : "${LEVELS:=$EUROPE_LEVELS}"
 			: "${OVERVIEW:=$OVERVIEW_Z5_8}"
+			if [ -n "$KARTVERKET" ]; then : "${EXCLUDE:=$KARTVERKET}"; : "${EXCLUDE_LAYER:=datakvalitet}"; fi
 			[ "$TILE" != 0 ] || TILE=10 ;;
 		Europe_points)
 			: "${BBOX:=-36.0 25.0 41.8 83.1}"; : "${GRID:=$EMODNET}"; : "${LEVELS:=none}"
-			: "${TIERS:=0.25:7-8 0.1:9 0.04:10 0.02:11-12 0.01:13-}"; [ "$TILE" != 0 ] || TILE=10 ;;
+			: "${TIERS:=0.25:7-8 0.1:9 0.04:10 0.02:11-12 0.01:13-}"; [ "$TILE" != 0 ] || TILE=10
+			if [ -n "$KARTVERKET" ]; then : "${EXCLUDE:=$KARTVERKET}"; : "${EXCLUDE_LAYER:=datakvalitet}"; fi ;;
 		World_contours)
 			: "${BBOX:=-180 -79 180 85}"; : "${GRID:=$GEBCO}"; : "${LEVELS:=$(steps 10:300:10 350:950:50),$DEEP_LEVELS}"
 			: "${OVERVIEW:=$OVERVIEW_Z5_8}"
@@ -200,12 +213,13 @@ for i in range(math.ceil((e - w) / t)):
 if [ -n "$TILES" ]; then
 	step "$NAME: $(echo "$TILES" | wc -l | tr -d ' ') tiles of $TILE degrees, $JOBS at a time"
 	TILE_OUT="$TMP/tiles"; mkdir -p "$TILE_OUT"
-	export SELF="$0" GRID LAND LEVELS TIERS CELL UPSAMPLE SMOOTH SMOOTH_FROM RESAMPLING MIN_RING_CELLS OVERVIEW MAP_CREATOR \
-		TILE_OUT
+	export SELF="$0" GRID LAND LEVELS TIERS CELL UPSAMPLE SMOOTH SMOOTH_FROM RESAMPLING MIN_RING_CELLS OVERVIEW EXCLUDE \
+		EXCLUDE_LAYER MAP_CREATOR TILE_OUT
 	echo "$TILES" | xargs -P "$JOBS" -L 1 bash -c '
 		name=$1; shift
 		args=(-n "$name" -b "$*" -i "$GRID" -m "$LAND" -o "$TILE_OUT" -l "${LEVELS:-none}" -p "$TIERS" -r "$CELL" \
-			-u "$UPSAMPLE" -s "$SMOOTH" -d "$SMOOTH_FROM" -a "$RESAMPLING" -g "$MIN_RING_CELLS" -w "$OVERVIEW" -j 1)
+			-u "$UPSAMPLE" -s "$SMOOTH" -d "$SMOOTH_FROM" -a "$RESAMPLING" -g "$MIN_RING_CELLS" -w "$OVERVIEW" \
+			-x "$EXCLUDE" -X "$EXCLUDE_LAYER" -j 1)
 		JAVA_OPTS="${JAVA_OPTS:--Xmx2g}" bash "$SELF" "${args[@]}" > "$TILE_OUT/$name.log" 2>&1 \
 			|| { echo "FAILED tile $name:"; tail -20 "$TILE_OUT/$name.log"; exit 255; }
 		echo "tile $name: $(tail -1 "$TILE_OUT/$name.log")"' _
@@ -248,10 +262,17 @@ gdalwarp -q -overwrite -t_srs EPSG:4326 -te "$W" "$S" "$E" "$N" -tr "$CELL" "$CE
 step "land mask"
 ogr2ogr -q -f GPKG -spat "$W" "$S" "$E" "$N" -clipsrc "$W" "$S" "$E" "$N" -nlt MULTIPOLYGON "$TMP/land.gpkg" "$LAND"
 LAND_LAYER=$(ogrinfo -q "$TMP/land.gpkg" | awk -F'[: ]+' 'NR==1{print $2}')
+# exclude RASTER : nodata where the EXCLUDE polygons are
+exclude() {
+	[ -n "$EXCLUDE" ] || return 0
+	[ -n "$EXCLUDE_LAYER" ] || EXCLUDE_LAYER=$(ogrinfo -ro -q "$EXCLUDE" | awk -F'[: ]+' 'NR==1{print $2}')
+	gdal_rasterize -q -burn nan -l "$EXCLUDE_LAYER" "$EXCLUDE" "$1"
+}
 OBFS=()
 
 if [ -n "$LEVELS" ]; then
 	cp "$TMP/grid.tif" "$TMP/contour_grid.tif"
+	exclude "$TMP/contour_grid.tif"
 	if [ "$UPSAMPLE" != 1 ]; then
 		gdalwarp -q -overwrite -tr "$FINE" "$FINE" -r cubicspline -multi -wo NUM_THREADS="$JOBS" \
 			-co COMPRESS=DEFLATE -co TILED=YES "$TMP/grid.tif" "$TMP/contour_grid.tif"
@@ -335,6 +356,7 @@ if [ -n "$TIERS" ]; then
 	gdal_rasterize -q -burn "$LAND_NODATA" -l "$LAND_LAYER" "$TMP/land.gpkg" "$TMP/grid.tif"
 	gdalwarp -q -overwrite -srcnodata "$LAND_NODATA" -dstnodata nan -co COMPRESS=DEFLATE -co TILED=YES \
 		"$TMP/grid.tif" "$TMP/water.tif"
+	exclude "$TMP/water.tif"
 	i=0
 	for tier in $TIERS; do
 		i=$((i + 1)); spacing=${tier%%:*}; zooms=${tier#*:}
