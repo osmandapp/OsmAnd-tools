@@ -3,7 +3,8 @@
 #
 #   build_depth_region.sh -D DATA_DIR -n REGION [-c MAP_CREATOR_DIR] [-k] [-j JOBS]
 #   build_depth_region.sh -n NAME -b "W S E N" -i GRID -m LAND -o OUT_DIR [-l LEVELS] [-p TIERS] [-r CELL]
-#                         [-u UPSAMPLE] [-s SMOOTH] [-d SMOOTH_FROM] [-t TILE] [-c MAP_CREATOR_DIR] [-k] [-j JOBS]
+#                         [-u UPSAMPLE] [-s SMOOTH] [-d SMOOTH_FROM] [-a RESAMPLING] [-g MIN_RING_CELLS] [-t TILE]
+#                         [-c MAP_CREATOR_DIR] [-k] [-j JOBS]
 #
 #   -D DATA_DIR  folder of download_all.sh: the grid is DATA_DIR/src/..., the land DATA_DIR/mask/land_polygons.gpkg,
 #                the output DATA_DIR/build; -n then names a region below, which sets the rest
@@ -11,8 +12,8 @@
 #                a /vsicurl/ URL works and reads only the region; several comma-separated grids are laid over each
 #                other in that order, a later one wins where it has data
 #   -m LAND      land polygons (OGR source, e.g. land_polygons.gpkg from check_sources.sh)
-#   -l LEVELS    contour depths in metres, default 2,5,10,20,30,50,100,200,500,1000,1500,2000,...,11000; "none" for
-#                a points-only region
+#   -l LEVELS    contour depths in metres, default 2,5,10,20,30,50,100,200,500, then every 200 m to 6000 and every
+#                500 m to 11000; "none" for a points-only region
 #   -p TIERS     depth points: "SPACING:ZOOMS ...", e.g. "0.3:6-9 0.05:10-12 0.02:13-" - the average depth of every
 #                SPACING degree cell, shown from ZOOMS; each tier is its own map section. Default none
 #   -r CELL      working cell in degrees, default the grid's own
@@ -20,6 +21,9 @@
 #   -s SMOOTH    low-pass for the deeper levels: average over SMOOTH x SMOOTH cells, then back (default 4, 1 = off);
 #                a flat bottom with sand waves near a level gives hundreds of tiny zigzags without it
 #   -d SMOOTH_FROM  levels from this depth down use the smoothed grid, shallower ones the full grid (default 20)
+#   -a RESAMPLING   gdalwarp resampling of the cut (default average); bilinear avoids the steps of a coarse grid
+#                   (GEBCO) cut to a much finer cell
+#   -g MIN_RING_CELLS  drop closed rings shorter than this many cells (default 8)
 #   -t TILE      split a region larger than TILE degrees into tiles built in parallel (JOBS at a time); with -c the
 #                tiles' .osm.gz become one map section of contours and one per point tier (generate-single-map) in
 #                NAME.depth.obf, without -c they stay in OUT_DIR/NAME.tiles
@@ -29,14 +33,15 @@
 # Regions (-D DATA_DIR -n REGION), bounds of the published OBFs; options given on the command line win:
 #   Netherlands_contours              Rijkswaterstaat 20 m 2024 over NCP 2019 over EMODnet DTM 2024, contours every 5 m
 #                                     to 50 m and points, 0.0002 degree cells, 1 degree tiles
-#   Europe_contours                   EMODnet DTM 2024, contours, 10 degree tiles
+#   Europe_contours                   EMODnet DTM 2024, contours every 5 m to 50 m, 10 m to 200 m, 50 m to 1000 m,
+#                                     then as the default, 10 degree tiles
 #   Europe_points                     EMODnet DTM 2024, points, 10 degree tiles
-#   World_contours                    GEBCO_2026 (15"), contours from 10 m down - 2 and 5 m mean nothing in a 450 m
-#                                     grid, 15 degree tiles
+#   World_contours                    GEBCO_2026 (15"), contours every 10 m to 300 m, 50 m to 1000 m, then as the
+#                                     default - 2 and 5 m mean nothing in a 450 m grid, 15 degree tiles
 #   World_Northern_hemisphere_points  GEBCO_2026, points, 15 degree tiles
 #   World_Southern_hemisphere_points  GEBCO_2026, points, 15 degree tiles
-#   Gulf_of_Mexico_north-west_contours  NOAA CUDEM 1/3" near the coast over GEBCO_2026, contours and points, 50 m
-#                                     cells, 3 degree tiles
+#   Gulf_of_Mexico_north-west_contours  NOAA CUDEM 1/3" near the coast over GEBCO_2026, contours as Europe and
+#                                     points, 50 m cells (GEBCO bilinear, rings under 40 cells dropped), 3 degree tiles
 #
 # Contours: cut the region (EPSG:4326) -> upsample -> smoothed copy -> set land to 0 m by the mask -> gdal_contour ->
 # drop short closed rings and simplify (depth_contours_filter.py) -> ogr2osm with translations/contours_depth.py.
@@ -49,8 +54,12 @@ set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 V4=$(cd "$HERE/.." && pwd)
 NAME=""; BBOX=""; GRID=""; LAND=""; OUT=""; CELL=""; UPSAMPLE=1; JOBS=4; SMOOTH=4; SMOOTH_FROM=""; MAP_CREATOR=""
-DATA=""; TILE=0; KEEP=0; LEVELS=""; TIERS=""
-DEEP_LEVELS="1000,1500,2000,3000,4000,5000,6000,7000,8000,9000,10000,11000"
+DATA=""; TILE=0; KEEP=0; LEVELS=""; TIERS=""; RESAMPLING=""; MIN_RING_CELLS=""
+# steps FROM:TO:STEP... : comma-separated levels
+steps() { local s a b c out=""; for s; do IFS=: read -r a b c <<< "$s"; out+=$(seq "$a" "$c" "$b" | paste -sd, -),; done
+	echo "${out%,}"; }
+DEEP_LEVELS=$(steps 1000:6000:200 6500:11000:500)
+EUROPE_LEVELS="2,$(steps 5:50:5 60:200:10 250:950:50),$DEEP_LEVELS"
 LAND_NODATA=-32767
 while [ $# -gt 0 ]; do
 	case "$1" in
@@ -66,11 +75,13 @@ while [ $# -gt 0 ]; do
 		-j) JOBS=$2; shift 2 ;;
 		-s) SMOOTH=$2; shift 2 ;;
 		-d) SMOOTH_FROM=$2; shift 2 ;;
+		-a) RESAMPLING=$2; shift 2 ;;
+		-g) MIN_RING_CELLS=$2; shift 2 ;;
 		-c) MAP_CREATOR=$2; shift 2 ;;
 		-D) DATA=$2; shift 2 ;;
 		-t) TILE=$2; shift 2 ;;
 		-k) KEEP=1; shift ;;
-		-h|--help) sed -n '2,42p' "$0"; exit 0 ;;
+		-h|--help) sed -n '2,48p' "$0"; exit 0 ;;
 		*) echo "Unknown option $1" >&2; exit 1 ;;
 	esac
 done
@@ -85,18 +96,20 @@ if [ -n "$DATA" ]; then
 			: "${SMOOTH_FROM:=5}"
 			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1 ;;
 		Europe_contours)
-			: "${BBOX:=-31.3 25.4 36.0 71.2}"; : "${GRID:=$EMODNET}"; [ "$TILE" != 0 ] || TILE=10 ;;
+			: "${BBOX:=-31.3 25.4 36.0 71.2}"; : "${GRID:=$EMODNET}"; : "${LEVELS:=$EUROPE_LEVELS}"
+			[ "$TILE" != 0 ] || TILE=10 ;;
 		Europe_points)
 			: "${BBOX:=-36.0 25.0 41.8 83.1}"; : "${GRID:=$EMODNET}"; : "${LEVELS:=none}"
 			: "${TIERS:=0.25:7-8 0.1:9 0.04:10 0.02:11-12 0.01:13-}"; [ "$TILE" != 0 ] || TILE=10 ;;
 		World_contours)
-			: "${BBOX:=-180 -79 180 85}"; : "${GRID:=$GEBCO}"; : "${LEVELS:=10,20,30,50,100,200,500,$DEEP_LEVELS}"
+			: "${BBOX:=-180 -79 180 85}"; : "${GRID:=$GEBCO}"; : "${LEVELS:=$(steps 10:300:10 350:950:50),$DEEP_LEVELS}"
 			[ "$TILE" != 0 ] || TILE=15 ;;
 		World_Northern_hemisphere_points)
 			: "${BBOX:=-180 0 180 85}"; : "${GRID:=$GEBCO}"; : "${LEVELS:=none}"; : "${TIERS:=$GEBCO_TIERS}"
 			[ "$TILE" != 0 ] || TILE=15 ;;
 		Gulf_of_Mexico_north-west_contours)
 			: "${BBOX:=-96.43 25.77 -84.92 29.40}"; : "${GRID:=$GEBCO,$DATA/src/cudem/cudem.vrt}"; : "${CELL:=0.0005}"
+			: "${LEVELS:=$EUROPE_LEVELS}"; : "${SMOOTH_FROM:=5}"; : "${RESAMPLING:=bilinear}"; : "${MIN_RING_CELLS:=40}"
 			: "${TIERS:=0.05:9-10 0.02:11-12 0.01:13 0.005:14-}"; [ "$TILE" != 0 ] || TILE=3 ;;
 		World_Southern_hemisphere_points)
 			: "${BBOX:=-180 -79 180 0}"; : "${GRID:=$GEBCO}"; : "${LEVELS:=none}"; : "${TIERS:=$GEBCO_TIERS}"
@@ -105,7 +118,7 @@ if [ -n "$DATA" ]; then
 	esac
 	: "${LAND:=$DATA/mask/land_polygons.gpkg}"; : "${OUT:=$DATA/build}"
 fi
-: "${LEVELS:=2,5,10,20,30,50,100,200,500,$DEEP_LEVELS}"; : "${SMOOTH_FROM:=20}"
+: "${LEVELS:=2,5,10,20,30,50,100,200,500,$DEEP_LEVELS}"; : "${SMOOTH_FROM:=20}"; : "${RESAMPLING:=average}"; : "${MIN_RING_CELLS:=8}"
 [ "$LEVELS" != none ] || LEVELS=""
 for v in NAME BBOX GRID LAND OUT; do
 	[ -n "${!v}" ] || { echo "Missing $v, see --help" >&2; exit 1; }
@@ -176,11 +189,11 @@ for i in range(math.ceil((e - w) / t)):
 if [ -n "$TILES" ]; then
 	step "$NAME: $(echo "$TILES" | wc -l | tr -d ' ') tiles of $TILE degrees, $JOBS at a time"
 	TILE_OUT="$TMP/tiles"; mkdir -p "$TILE_OUT"
-	export SELF="$0" GRID LAND LEVELS TIERS CELL UPSAMPLE SMOOTH SMOOTH_FROM MAP_CREATOR TILE_OUT
+	export SELF="$0" GRID LAND LEVELS TIERS CELL UPSAMPLE SMOOTH SMOOTH_FROM RESAMPLING MIN_RING_CELLS MAP_CREATOR TILE_OUT
 	echo "$TILES" | xargs -P "$JOBS" -L 1 bash -c '
 		name=$1; shift
 		args=(-n "$name" -b "$*" -i "$GRID" -m "$LAND" -o "$TILE_OUT" -l "${LEVELS:-none}" -p "$TIERS" -r "$CELL" \
-			-u "$UPSAMPLE" -s "$SMOOTH" -d "$SMOOTH_FROM" -j 1)
+			-u "$UPSAMPLE" -s "$SMOOTH" -d "$SMOOTH_FROM" -a "$RESAMPLING" -g "$MIN_RING_CELLS" -j 1)
 		JAVA_OPTS="${JAVA_OPTS:--Xmx2g}" bash "$SELF" "${args[@]}" > "$TILE_OUT/$name.log" 2>&1 \
 			|| { echo "FAILED tile $name:"; tail -20 "$TILE_OUT/$name.log"; exit 255; }
 		echo "tile $name: $(tail -1 "$TILE_OUT/$name.log")"' _
@@ -211,7 +224,7 @@ if [ -n "$TILES" ]; then
 fi
 
 step "cut $NAME ($W $S $E $N), cell $CELL deg, upsampled x$UPSAMPLE"
-gdalwarp -q -overwrite -t_srs EPSG:4326 -te "$W" "$S" "$E" "$N" -tr "$CELL" "$CELL" -r average -ot Float32 \
+gdalwarp -q -overwrite -t_srs EPSG:4326 -te "$W" "$S" "$E" "$N" -tr "$CELL" "$CELL" -r "$RESAMPLING" -ot Float32 \
 	-dstnodata nan -multi -wo NUM_THREADS="$JOBS" -co COMPRESS=DEFLATE -co TILED=YES ${GRID//,/ } "$TMP/grid.tif"
 step "land mask"
 ogr2ogr -q -f GPKG -spat "$W" "$S" "$E" "$N" -clipsrc "$W" "$S" "$E" "$N" -nlt MULTIPOLYGON "$TMP/land.gpkg" "$LAND"
@@ -258,7 +271,7 @@ if [ -n "$LEVELS" ]; then
 	rm -f "$TMP/contour_grid.tif" "$TMP/smooth.tif"
 
 	step "filter and simplify"
-	python3 "$HERE/depth_contours_filter.py" "$TMP/contours.gpkg" "$TMP/depth.fgb" --cell "$FINE"
+	python3 "$HERE/depth_contours_filter.py" "$TMP/contours.gpkg" "$TMP/depth.fgb" --cell "$FINE" --min-ring-cells "$MIN_RING_CELLS"
 	if [ "$(ogrinfo -so -al "$TMP/depth.fgb" | awk -F': ' '/Feature Count/{print $2}')" = 0 ]; then
 		step "no contours in $NAME"
 	else
