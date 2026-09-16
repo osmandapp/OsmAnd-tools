@@ -20,13 +20,15 @@
 #   -s SMOOTH    low-pass for the deeper levels: average over SMOOTH x SMOOTH cells, then back (default 4, 1 = off);
 #                a flat bottom with sand waves near a level gives hundreds of tiny zigzags without it
 #   -d SMOOTH_FROM  levels from this depth down use the smoothed grid, shallower ones the full grid (default 20)
-#   -t TILE      split a region larger than TILE degrees into tiles built in parallel (JOBS at a time); with -c their
-#                OBFs are merged into NAME.depth.obf, without -c the tiles' .osm.gz stay in OUT_DIR/NAME.tiles
+#   -t TILE      split a region larger than TILE degrees into tiles built in parallel (JOBS at a time); with -c the
+#                tiles' .osm.gz become one map section of contours and one per point tier (generate-single-map) in
+#                NAME.depth.obf, without -c they stay in OUT_DIR/NAME.tiles
 #   -c MAP_CREATOR_DIR  unzipped OsmAndMapCreator: writes OUT_DIR/NAME.depth.obf (points need its --map-zooms)
 #   -k           keep: do nothing when OUT_DIR/NAME.depth.obf already exists
 #
 # Regions (-D DATA_DIR -n REGION), bounds of the published OBFs; options given on the command line win:
-#   Netherlands_contours              EMODnet DTM 2024, contours and points
+#   Netherlands_contours              Rijkswaterstaat 20 m 2024 over NCP 2019 over EMODnet DTM 2024, contours every 5 m
+#                                     to 50 m and points, 0.0002 degree cells, 1 degree tiles
 #   Europe_contours                   EMODnet DTM 2024, contours, 10 degree tiles
 #   Europe_points                     EMODnet DTM 2024, points, 10 degree tiles
 #   World_contours                    GEBCO_2026 (15"), contours from 10 m down - 2 and 5 m mean nothing in a 450 m
@@ -46,7 +48,7 @@ set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 V4=$(cd "$HERE/.." && pwd)
-NAME=""; BBOX=""; GRID=""; LAND=""; OUT=""; CELL=""; UPSAMPLE=1; JOBS=4; SMOOTH=4; SMOOTH_FROM=20; MAP_CREATOR=""
+NAME=""; BBOX=""; GRID=""; LAND=""; OUT=""; CELL=""; UPSAMPLE=1; JOBS=4; SMOOTH=4; SMOOTH_FROM=""; MAP_CREATOR=""
 DATA=""; TILE=0; KEEP=0; LEVELS=""; TIERS=""
 DEEP_LEVELS="1000,1500,2000,3000,4000,5000,6000,7000,8000,9000,10000,11000"
 LAND_NODATA=-32767
@@ -77,7 +79,11 @@ if [ -n "$DATA" ]; then
 	GEBCO_TIERS="0.3:6-9 0.05:10-12 0.02:13-"
 	case "$NAME" in
 		Netherlands_contours)
-			: "${BBOX:=1.7 51.1 7.3 55.7}"; : "${GRID:=$EMODNET}"; : "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}" ;;
+			NL="$DATA/src/netherlands"
+			: "${BBOX:=1.7 51.1 7.3 55.7}"; : "${GRID:=$EMODNET,$NL/bathymetrie_ncp_juni_2019.tif,$NL/bodemhoogte_20mtr_2024.tif}"
+			: "${CELL:=0.0002}"; : "${LEVELS:=2,5,10,15,20,25,30,35,40,45,50,100,200}"
+			: "${SMOOTH_FROM:=5}"
+			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1 ;;
 		Europe_contours)
 			: "${BBOX:=-31.3 25.4 36.0 71.2}"; : "${GRID:=$EMODNET}"; [ "$TILE" != 0 ] || TILE=10 ;;
 		Europe_points)
@@ -99,7 +105,7 @@ if [ -n "$DATA" ]; then
 	esac
 	: "${LAND:=$DATA/mask/land_polygons.gpkg}"; : "${OUT:=$DATA/build}"
 fi
-: "${LEVELS:=2,5,10,20,30,50,100,200,500,$DEEP_LEVELS}"
+: "${LEVELS:=2,5,10,20,30,50,100,200,500,$DEEP_LEVELS}"; : "${SMOOTH_FROM:=20}"
 [ "$LEVELS" != none ] || LEVELS=""
 for v in NAME BBOX GRID LAND OUT; do
 	[ -n "${!v}" ] || { echo "Missing $v, see --help" >&2; exit 1; }
@@ -124,6 +130,15 @@ obf() {
 	(cd "$dir" && JAVA_OPTS="${JAVA_OPTS:--Xmx8g}" bash "$MAP_CREATOR/utilities.sh" generate-map "$osm" \
 		${zooms:+--map-zooms=$zooms} > obf.log 2>&1) || { tail -20 "$dir/obf.log" >&2; return 1; }
 	ls "$dir"/*.obf 2>/dev/null | head -1 | grep . || { tail -20 "$dir/obf.log" >&2; return 1; }
+}
+
+# single OUTPUT OSM_GZ... [--map-zooms=ZOOMS] : one map section of many osm files
+single() {
+	local output=$1; shift
+	local dir; dir=$(mktemp -d "$TMP/single.XXXX")
+	(cd "$dir" && JAVA_OPTS="${JAVA_OPTS:--Xmx16g}" bash "$MAP_CREATOR/utilities.sh" generate-single-map "$output" \
+		--name="$NAME" "$@" > single.log 2>&1) || { tail -20 "$dir/single.log" >&2; return 1; }
+	rm -rf "$dir"
 }
 
 # merge OUTPUT OBF... : one OBF of all their map sections
@@ -166,14 +181,26 @@ if [ -n "$TILES" ]; then
 		name=$1; shift
 		args=(-n "$name" -b "$*" -i "$GRID" -m "$LAND" -o "$TILE_OUT" -l "${LEVELS:-none}" -p "$TIERS" -r "$CELL" \
 			-u "$UPSAMPLE" -s "$SMOOTH" -d "$SMOOTH_FROM" -j 1)
-		[ -z "$MAP_CREATOR" ] || args+=(-c "$MAP_CREATOR")
 		JAVA_OPTS="${JAVA_OPTS:--Xmx2g}" bash "$SELF" "${args[@]}" > "$TILE_OUT/$name.log" 2>&1 \
 			|| { echo "FAILED tile $name:"; tail -20 "$TILE_OUT/$name.log"; exit 255; }
 		echo "tile $name: $(tail -1 "$TILE_OUT/$name.log")"' _
 	if [ -n "$MAP_CREATOR" ]; then
-		step "merge tile OBFs"
-		ls "$TILE_OUT"/*.depth.obf > /dev/null 2>&1 || { echo "no tile has depth data" >&2; exit 1; }
-		merge "$OUT/$NAME.depth.obf" "$TILE_OUT"/*.depth.obf
+		OBFS=()
+		contours=("$TILE_OUT"/*_[0-9][0-9]_[0-9][0-9].osm.gz)
+		if [ -f "${contours[0]}" ]; then
+			step "contours obf of ${#contours[@]} tiles"
+			single "$TMP/contours.obf" "${contours[@]}"; OBFS+=("$TMP/contours.obf")
+		fi
+		i=0
+		for tier in $TIERS; do
+			i=$((i + 1)); points=("$TILE_OUT"/*_points$i.osm.gz)
+			[ -f "${points[0]}" ] || continue
+			step "points $i obf of ${#points[@]} tiles"
+			single "$TMP/points$i.obf" --map-zooms="${tier#*:}" "${points[@]}"; OBFS+=("$TMP/points$i.obf")
+		done
+		[ ${#OBFS[@]} -gt 0 ] || { echo "no tile has depth data" >&2; exit 1; }
+		step "merge ${#OBFS[@]} map sections"
+		merge "$OUT/$NAME.depth.obf" "${OBFS[@]}"
 	else
 		rm -rf "$OUT/$NAME.tiles"; mkdir -p "$OUT/$NAME.tiles"
 		mv "$TILE_OUT"/*.osm.gz "$OUT/$NAME.tiles/" 2>/dev/null || true
