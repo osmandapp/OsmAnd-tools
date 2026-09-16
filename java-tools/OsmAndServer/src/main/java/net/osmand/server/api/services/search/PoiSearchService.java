@@ -530,7 +530,7 @@ public class PoiSearchService {
 	private Feature getMapObjectFeature(SearchResult res, String timeZone) throws IOException {
 		Feature feature = searchResultConverter.getPoiFeature(res, timeZone);
 		if (res.object instanceof Amenity amenity && TransportStopMatcher.isPublicTransportStop(amenity)) {
-			Long stopId = transportStopsService.findBestTransportStopId(amenity);
+			Long stopId = transportStopsService.findTransportStopId(amenity);
 			if (stopId != null) {
 				feature.prop(SearchResultConverter.PoiTypeField.TRANSPORT_STOP_ID.getFieldName(), stopId);
 			}
@@ -565,8 +565,9 @@ public class PoiSearchService {
 		}
 		List<Feature> features = new ArrayList<>();
 		for (Amenity amenity : amenities) {
-			features.add(getMapObjectFeature(
-					searchResultConverter.buildPoiSearchResult(amenity, PoiTypesService.DEFAULT_SEARCH_LANG, ""), timeZone));
+			Feature poiFeature = getMapObjectFeature(
+					searchResultConverter.buildPoiSearchResult(amenity, PoiTypesService.DEFAULT_SEARCH_LANG, ""), timeZone);
+			features.add(poiFeature.prop(SearchResultConverter.PoiTypeField.POI_FROM_TAGS.getFieldName(), true));
 		}
 		return features;
 	}

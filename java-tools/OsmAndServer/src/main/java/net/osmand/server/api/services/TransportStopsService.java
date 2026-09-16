@@ -125,7 +125,7 @@ public class TransportStopsService {
 		return null;
 	}
 
-	public Long findBestTransportStopId(Amenity amenity) throws IOException {
+	public Long findTransportStopId(Amenity amenity) throws IOException {
 		LatLon loc = amenity.getLocation();
 		int radius = TransportStopMatcher.getSearchRadius(amenity);
 		TransportStopsReaderResult readerResult = getTransportStopsReader(bboxAroundPoint(loc.getLatitude(), loc.getLongitude(), radius));
@@ -134,8 +134,10 @@ public class TransportStopsService {
 		}
 		try {
 			List<TransportStop> stops = new ArrayList<>(readerResult.transportReaders.readMergedTransportStops(readerResult.request));
-			TransportStop stop = TransportStopMatcher.findBestStopForAmenity(stops, amenity);
-			return stop != null ? stop.getId() : null;
+			// only the stop of the amenity itself, the routes of a nearby one are a separate block in the menu
+			List<TransportStop> localStops = TransportStopMatcher.aggregateStopsForAmenity(stops, amenity)
+					.getLocalTransportStops();
+			return localStops.isEmpty() ? null : localStops.get(0).getId();
 		} finally {
 			osmAndMapsService.unlockReaders(readerResult.readers);
 		}
