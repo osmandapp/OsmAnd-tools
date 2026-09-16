@@ -8,7 +8,8 @@
 #   -D DATA_DIR  folder of download_all.sh: the grid is DATA_DIR/src/..., the land DATA_DIR/mask/land_polygons.gpkg,
 #                the output DATA_DIR/build; -n then names a region below, which sets the rest
 #   -i GRID      raster or VRT with elevation in metres, negative below sea level (GEBCO, EMODnet, CUDEM...);
-#                a /vsicurl/ URL works and reads only the region
+#                a /vsicurl/ URL works and reads only the region; several comma-separated grids are laid over each
+#                other in that order, a later one wins where it has data
 #   -m LAND      land polygons (OGR source, e.g. land_polygons.gpkg from check_sources.sh)
 #   -l LEVELS    contour depths in metres, default 2,5,10,20,30,50,100,200,500,1000,1500,2000,...,11000; "none" for
 #                a points-only region
@@ -32,6 +33,8 @@
 #                                     grid, 15 degree tiles
 #   World_Northern_hemisphere_points  GEBCO_2026, points, 15 degree tiles
 #   World_Southern_hemisphere_points  GEBCO_2026, points, 15 degree tiles
+#   Gulf_of_Mexico_north-west_contours  NOAA CUDEM 1/3" near the coast over GEBCO_2026, contours and points, 50 m
+#                                     cells, 3 degree tiles
 #
 # Contours: cut the region (EPSG:4326) -> upsample -> smoothed copy -> set land to 0 m by the mask -> gdal_contour ->
 # drop short closed rings and simplify (depth_contours_filter.py) -> ogr2osm with translations/contours_depth.py.
@@ -86,6 +89,9 @@ if [ -n "$DATA" ]; then
 		World_Northern_hemisphere_points)
 			: "${BBOX:=-180 0 180 85}"; : "${GRID:=$GEBCO}"; : "${LEVELS:=none}"; : "${TIERS:=$GEBCO_TIERS}"
 			[ "$TILE" != 0 ] || TILE=15 ;;
+		Gulf_of_Mexico_north-west_contours)
+			: "${BBOX:=-96.43 25.77 -84.92 29.40}"; : "${GRID:=$GEBCO,$DATA/src/cudem/cudem.vrt}"; : "${CELL:=0.0005}"
+			: "${TIERS:=0.05:9-10 0.02:11-12 0.01:13 0.005:14-}"; [ "$TILE" != 0 ] || TILE=3 ;;
 		World_Southern_hemisphere_points)
 			: "${BBOX:=-180 -79 180 0}"; : "${GRID:=$GEBCO}"; : "${LEVELS:=none}"; : "${TIERS:=$GEBCO_TIERS}"
 			[ "$TILE" != 0 ] || TILE=15 ;;
@@ -130,7 +136,7 @@ merge() {
 }
 
 if [ -z "$CELL" ]; then
-	CELL=$(gdalinfo -json "$GRID" | python3 -c 'import json,sys; print(abs(json.load(sys.stdin)["geoTransform"][1]))')
+	CELL=$(gdalinfo -json "${GRID%%,*}" | python3 -c 'import json,sys; print(abs(json.load(sys.stdin)["geoTransform"][1]))')
 	# a projected grid (metres) gets the cell of the same size in degrees
 	if python3 -c "import sys; sys.exit(0 if float('$CELL') > 1 else 1)"; then
 		CELL=$(python3 -c "print(float('$CELL') / 111320)")
@@ -175,7 +181,7 @@ fi
 
 step "cut $NAME ($W $S $E $N), cell $CELL deg, upsampled x$UPSAMPLE"
 gdalwarp -q -overwrite -t_srs EPSG:4326 -te "$W" "$S" "$E" "$N" -tr "$CELL" "$CELL" -r average -ot Float32 \
-	-dstnodata nan -multi -wo NUM_THREADS="$JOBS" -co COMPRESS=DEFLATE -co TILED=YES "$GRID" "$TMP/grid.tif"
+	-dstnodata nan -multi -wo NUM_THREADS="$JOBS" -co COMPRESS=DEFLATE -co TILED=YES ${GRID//,/ } "$TMP/grid.tif"
 step "land mask"
 ogr2ogr -q -f GPKG -spat "$W" "$S" "$E" "$N" -clipsrc "$W" "$S" "$E" "$N" -nlt MULTIPOLYGON "$TMP/land.gpkg" "$LAND"
 LAND_LAYER=$(ogrinfo -q "$TMP/land.gpkg" | awk -F'[: ]+' 'NR==1{print $2}')

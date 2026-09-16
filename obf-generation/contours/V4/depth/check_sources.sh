@@ -75,10 +75,15 @@ sea() {
 	else fail "$1: $5 is $v m, a depth should be negative"; fi
 }
 
-vrt() { # vrt NAME OUTPUT FILE...
-	local name=$1 output=$2; shift 2
-	if gdalbuildvrt -q "$output" "$@" 2>/dev/null; then ok "$name: $(basename "$output")"
-	else fail "$name: gdalbuildvrt failed"; fi
+# vrt NAME OUTPUT [-allow_projection_difference] FILE... : every file must end up in the VRT - gdalbuildvrt skips a
+# file whose coordinate system differs from the first one's with only a warning
+vrt() {
+	local name=$1 output=$2 opts=(); shift 2
+	if [ "${1:-}" = -allow_projection_difference ]; then opts=("$1"); shift; fi
+	if ! gdalbuildvrt -q "${opts[@]}" "$output" "$@" 2>/dev/null; then fail "$name: gdalbuildvrt failed"; return; fi
+	local n; n=$(grep -c '<SourceFilename' "$output")
+	if [ "$n" -eq $# ]; then ok "$name: $(basename "$output") of $n files"
+	else fail "$name: $(basename "$output") has $n of $# files (different coordinate systems?)"; fi
 }
 
 echo "== mask"
@@ -148,7 +153,8 @@ count cudem ${#FILES[@]} "$( [ -n "$LIST" ] && grep -cE '\.tif$' "$LIST" || echo
 if [ ${#FILES[@]} -gt 0 ]; then
 	rasters_open cudem "${FILES[@]}"
 	epsg4326 cudem "${FILES[0]}"
-	vrt cudem "$SRC/cudem/cudem.vrt" "${FILES[@]}"
+	# the tiles are NAD83, some with NAVD88 heights declared and some without: the same horizontal system
+	vrt cudem "$SRC/cudem/cudem.vrt" -allow_projection_difference "${FILES[@]}"
 	sea cudem "$SRC/cudem/cudem.vrt" -94.8 29.2 "Galveston Bay entrance"
 fi
 
