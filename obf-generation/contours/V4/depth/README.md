@@ -75,7 +75,9 @@ only the region is read.
 
 Regions (bounds of the published OBFs, grid, levels, point tiers, tile size) are listed in the script:
 `Netherlands_contours` (contours and points), `Europe_contours`, `Europe_points` (EMODnet 2024), `World_contours`,
-`World_Northern_hemisphere_points`, `World_Southern_hemisphere_points` (GEBCO_2026).
+`World_Northern_hemisphere_points`, `World_Southern_hemisphere_points` (GEBCO_2026) and
+`Gulf_of_Mexico_north-west_contours` (NOAA CUDEM 1/3" near the coast over GEBCO_2026; `-i` takes several grids,
+comma-separated, a later one wins where it has data).
 
 - Contours: levels `-l` (2, 5, 10, 20, 30, 50, 100, 200, 500 m and every 1000 m by default; GEBCO from 10 m); levels
   from 20 m down are traced on a smoothed grid (`-s`, `-d`), otherwise a flat bottom with sand waves gives hundreds
