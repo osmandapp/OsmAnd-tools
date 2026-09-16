@@ -373,6 +373,9 @@ public class SearchController {
 			return error;
 		}
 		Feature poi = poiSearchService.getPoiByMapObject(id, new LatLon(lat, lon), tags, timeZone);
+		if (poi == null) {
+			return ResponseEntity.badRequest().body("Error getting poi by map object!");
+		}
 		return ResponseEntity.ok(gson.toJson(poi));
 	}
 
