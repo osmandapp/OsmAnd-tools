@@ -4,7 +4,7 @@
 #   build_depth_region.sh -D DATA_DIR -n REGION [-c MAP_CREATOR_DIR] [-k] [-j JOBS]
 #   build_depth_region.sh -n NAME -b "W S E N" -i GRID -m LAND -o OUT_DIR [-l LEVELS] [-p TIERS] [-r CELL]
 #                         [-u UPSAMPLE] [-s SMOOTH] [-d SMOOTH_FROM] [-a RESAMPLING] [-g MIN_RING_CELLS] [-t TILE]
-#                         [-w OVERVIEW] [-x EXCLUDE [-X LAYER]] [-c MAP_CREATOR_DIR] [-k] [-j JOBS]
+#                         [-w OVERVIEW] [-x EXCLUDE [-X LAYER]] [-e ENC_DIR] [-c MAP_CREATOR_DIR] [-k] [-j JOBS]
 #
 #   -D DATA_DIR  folder of download_all.sh: the grid is DATA_DIR/src/..., the land DATA_DIR/mask/land_polygons.gpkg,
 #                the output DATA_DIR/build; -n then names a region below, which sets the rest
@@ -28,6 +28,9 @@
 #                degrees, as their own map section shown at ZOOMS - the main contours start at zoom 9. Default none
 #   -x EXCLUDE   polygons (OGR source, layer -X or the first) where another region has better data: no contours and
 #                no points there, the overview stays
+#   -e ENC_DIR   S-57 ENC cells (NOAA ENC_ROOT): inside the approach and harbour cells (bands 4-6) the charted contours
+#                and soundings (depth_enc_osm.py) replace the grid; soundings thinned as ENC_TIERS, the charted levels
+#                with no contourtype (0.9, 3.6 m...) only from zoom 15
 #   -t TILE      split a region larger than TILE degrees into tiles built in parallel (JOBS at a time); with -c the
 #                tiles' .osm.gz become one map section of contours, one of the overview and one per point tier
 #                (generate-single-map) in
@@ -50,7 +53,7 @@
 #   World_Southern_hemisphere_points  GEBCO_2026, points, 15 degree tiles
 #   Gulf_of_Mexico_north-west_contours  NOAA CUDEM 1/3" near the coast over GEBCO_2026, contours as Europe and
 #                                     points, 50 m cells (GEBCO bilinear, rings under 40 cells dropped), overview as
-#                                     Europe, 3 degree tiles
+#                                     Europe, 3 degree tiles; NOAA ENC inside its approach and harbour charts
 #
 # Contours: cut the region (EPSG:4326) -> upsample -> smoothed copy -> set land to 0 m by the mask -> gdal_contour ->
 # drop short closed rings and simplify (depth_contours_filter.py) -> ogr2osm with translations/contours_depth.py.
@@ -64,7 +67,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 V4=$(cd "$HERE/.." && pwd)
 NAME=""; BBOX=""; GRID=""; LAND=""; OUT=""; CELL=""; UPSAMPLE=1; JOBS=4; SMOOTH=4; SMOOTH_FROM=""; MAP_CREATOR=""
 DATA=""; TILE=0; KEEP=0; LEVELS=""; TIERS=""; RESAMPLING=""; MIN_RING_CELLS=""; OVERVIEW=""
-EXCLUDE=""; EXCLUDE_LAYER=""
+EXCLUDE=""; EXCLUDE_LAYER=""; ENC=""; ENC_TIERS="0.02:10-11 0.008:12 0.003:13-14 0.001:15-"
 # steps FROM:TO:STEP... : comma-separated levels
 steps() { local s a b c out=""; for s; do IFS=: read -r a b c <<< "$s"; out+=$(seq "$a" "$c" "$b" | paste -sd, -),; done
 	echo "${out%,}"; }
@@ -94,7 +97,8 @@ while [ $# -gt 0 ]; do
 		-w) OVERVIEW=$2; shift 2 ;;
 		-x) EXCLUDE=$2; shift 2 ;;
 		-X) EXCLUDE_LAYER=$2; shift 2 ;;
-		-h|--help) sed -n '2,60p' "$0"; exit 0 ;;
+		-e) ENC=$2; shift 2 ;;
+		-h|--help) sed -n '2,64p' "$0"; exit 0 ;;
 		*) echo "Unknown option $1" >&2; exit 1 ;;
 	esac
 done
@@ -132,6 +136,7 @@ if [ -n "$DATA" ]; then
 			: "${BBOX:=-96.43 25.77 -84.92 29.40}"; : "${GRID:=$GEBCO,$DATA/src/cudem/cudem.vrt}"; : "${CELL:=0.0005}"
 			: "${LEVELS:=$EUROPE_LEVELS}"; : "${SMOOTH_FROM:=5}"; : "${RESAMPLING:=bilinear}"; : "${MIN_RING_CELLS:=40}"
 			: "${TIERS:=0.05:9-10 0.02:11-12 0.01:13 0.005:14-}"; : "${OVERVIEW:=$OVERVIEW_Z5_8}"
+			if [ -d "$DATA/src/noaa_enc/ENC_ROOT" ]; then : "${ENC:=$DATA/src/noaa_enc/ENC_ROOT}"; fi
 			[ "$TILE" != 0 ] || TILE=3 ;;
 		World_Southern_hemisphere_points)
 			: "${BBOX:=-180 -79 180 0}"; : "${GRID:=$GEBCO}"; : "${LEVELS:=none}"; : "${TIERS:=$GEBCO_TIERS}"
@@ -191,6 +196,21 @@ merge() {
 	rm -rf "$dir"
 }
 
+# ENC: charted contours and soundings where approach and harbour cells exist; the grid is left out there (-x)
+ENC_OSM=()
+if [ -n "$ENC" ]; then
+	step "ENC cells of $ENC"
+	python3 "$HERE/depth_enc_osm.py" "$ENC" --bbox "$W" "$S" "$E" "$N" --contours "$OUT/${NAME}_enc.osm.gz" \
+		--minor "$OUT/${NAME}_enc_minor.osm.gz" --soundings "$TMP/enc_soundings.gpkg" --coverage "$TMP/enc_coverage.gpkg" 2>&1 | grep -v numpy
+	EXCLUDE="$TMP/enc_coverage.gpkg"; EXCLUDE_LAYER=coverage
+	ENC_OSM+=("$OUT/${NAME}_enc.osm.gz:" "$OUT/${NAME}_enc_minor.osm.gz:15-")
+	spacings=""; for tier in $ENC_TIERS; do spacings+="${tier%%:*} "; done
+	python3 "$HERE/depth_soundings_osm.py" "$TMP/enc_soundings.gpkg" "$OUT/${NAME}_enc_points" --layer soundings \
+		--field depth --tiers "$spacings" --land "$LAND" --bbox "$W" "$S" "$E" "$N" --first-id 900000000 2>&1 | grep -v numpy
+	i=0
+	for tier in $ENC_TIERS; do i=$((i + 1)); ENC_OSM+=("$OUT/${NAME}_enc_points$i.osm.gz:${tier#*:}"); done
+fi
+
 if [ -z "$CELL" ]; then
 	CELL=$(gdalinfo -json "${GRID%%,*}" | python3 -c 'import json,sys; print(abs(json.load(sys.stdin)["geoTransform"][1]))')
 	# a projected grid (metres) gets the cell of the same size in degrees
@@ -242,6 +262,10 @@ if [ -n "$TILES" ]; then
 			[ -f "${points[0]}" ] || continue
 			step "points $i obf of ${#points[@]} tiles"
 			single "$TMP/points$i.obf" --map-zooms="${tier#*:}" "${points[@]}" & PIDS+=($!); OBFS+=("$TMP/points$i.obf")
+		done
+		for e in ${ENC_OSM[@]+"${ENC_OSM[@]}"}; do
+			o="$TMP/$(basename "${e%%:*}" .osm.gz).obf"; z=${e#*:}
+			single "$o" ${z:+--map-zooms="$z"} "${e%%:*}" & PIDS+=($!); OBFS+=("$o")
 		done
 		[ ${#OBFS[@]} -gt 0 ] || { echo "no tile has depth data" >&2; exit 1; }
 		for pid in "${PIDS[@]}"; do wait "$pid" || exit 1; done
@@ -378,6 +402,9 @@ if [ -n "$TIERS" ]; then
 fi
 
 if [ -n "$MAP_CREATOR" ]; then
+	for e in ${ENC_OSM[@]+"${ENC_OSM[@]}"}; do
+		z=${e#*:}; o=$(obf "${e%%:*}" "$z"); OBFS+=("$o")
+	done
 	if [ ${#OBFS[@]} -eq 0 ]; then
 		rm -rf "$TMP"; step "no depth data in $NAME, nothing written"; exit 0
 	fi
@@ -385,4 +412,4 @@ if [ -n "$MAP_CREATOR" ]; then
 	merge "$OUT/$NAME.depth.obf" "${OBFS[@]}"
 fi
 rm -rf "$TMP"
-step "done: $(cd "$OUT" && du -h "$NAME".* "$NAME"_points* "$NAME"_overview* 2>/dev/null | awk '{printf "%s (%s) ", $2, $1}')"
+step "done: $(cd "$OUT" && du -h "$NAME".* "$NAME"_points* "$NAME"_overview* "$NAME"_enc* 2>/dev/null | awk '{printf "%s (%s) ", $2, $1}')"
