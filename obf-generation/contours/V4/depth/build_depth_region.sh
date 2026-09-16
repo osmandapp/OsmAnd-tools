@@ -198,20 +198,22 @@ if [ -n "$TILES" ]; then
 			|| { echo "FAILED tile $name:"; tail -20 "$TILE_OUT/$name.log"; exit 255; }
 		echo "tile $name: $(tail -1 "$TILE_OUT/$name.log")"' _
 	if [ -n "$MAP_CREATOR" ]; then
-		OBFS=()
+		# map sections are built in parallel, each in its own JVM
+		OBFS=(); PIDS=()
 		contours=("$TILE_OUT"/*_[0-9][0-9]_[0-9][0-9].osm.gz)
 		if [ -f "${contours[0]}" ]; then
 			step "contours obf of ${#contours[@]} tiles"
-			single "$TMP/contours.obf" "${contours[@]}"; OBFS+=("$TMP/contours.obf")
+			single "$TMP/contours.obf" "${contours[@]}" & PIDS+=($!); OBFS+=("$TMP/contours.obf")
 		fi
 		i=0
 		for tier in $TIERS; do
 			i=$((i + 1)); points=("$TILE_OUT"/*_points$i.osm.gz)
 			[ -f "${points[0]}" ] || continue
 			step "points $i obf of ${#points[@]} tiles"
-			single "$TMP/points$i.obf" --map-zooms="${tier#*:}" "${points[@]}"; OBFS+=("$TMP/points$i.obf")
+			single "$TMP/points$i.obf" --map-zooms="${tier#*:}" "${points[@]}" & PIDS+=($!); OBFS+=("$TMP/points$i.obf")
 		done
 		[ ${#OBFS[@]} -gt 0 ] || { echo "no tile has depth data" >&2; exit 1; }
+		for pid in "${PIDS[@]}"; do wait "$pid" || exit 1; done
 		step "merge ${#OBFS[@]} map sections"
 		merge "$OUT/$NAME.depth.obf" "${OBFS[@]}"
 	else
