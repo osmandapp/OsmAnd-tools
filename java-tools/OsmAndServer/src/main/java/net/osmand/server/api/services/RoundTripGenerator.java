@@ -43,6 +43,12 @@ public class RoundTripGenerator {
 	public static final double OVERLAP_WEIGHT = 1.5; // score = length error + weight * overlap
 	public static final double MAX_SIMILARITY = 0.5; // variants sharing more of their roads are duplicates
 	public static final double MAX_LENGTH_ERROR = 0.35; // such candidates are only returned when nothing better exists
+	// A point on the circle is often reached by a detour: the route drives to it and comes back the same
+	// way (on a dual carriageway even along another road). Such a point is moved to where the detour
+	// starts and the loop is routed again. Measured before: 14.9% of loop length were such detours.
+	public static final double SPUR_JOIN_M = 30; // the route comes back this close to where it left
+	public static final double SPUR_MIN_REACH_M = 150; // after going at least this far from there
+	public static final double SPUR_MAX_LENGTH_M = 6000; // longer detours are a part of the loop, not a spur
 	// with a direction given the loops fan around it, both orientations of the direction itself come first
 	private static final double[] DIRECTION_OFFSETS = { 0, 0, -30, 30, -60, 60, -90, 90 };
 
@@ -193,12 +199,17 @@ public class RoundTripGenerator {
 			double angle = heading + 180 + (clockwise ? 1 : -1) * i * 360.0 / (k + 1);
 			via.add(MapUtils.rhumbDestinationPoint(center, radius, angle));
 		}
-		long t = System.currentTimeMillis();
-		List<RouteSegmentResult> res = router.route(start, via);
-		routingMs += System.currentTimeMillis() - t;
-		routings++;
+		List<RouteSegmentResult> res = routeCounted(start, via);
 		if (res == null || res.isEmpty()) {
 			return null;
+		}
+		List<LatLon> trimmed = trimSpurs(res, via);
+		if (trimmed != null) {
+			List<RouteSegmentResult> retry = routeCounted(start, trimmed);
+			if (retry != null && !retry.isEmpty()) {
+				res = retry;
+				via = trimmed;
+			}
 		}
 		RoundTrip rt = new RoundTrip();
 		rt.route = res;
@@ -228,6 +239,79 @@ public class RoundTripGenerator {
 		rt.overlap = rt.distance > 0 ? repeated / rt.distance : 0;
 		rt.lengthError = Math.abs(rt.distance - target) / target;
 		return rt;
+	}
+
+	private List<RouteSegmentResult> routeCounted(LatLon start, List<LatLon> via)
+			throws IOException, InterruptedException {
+		long t = System.currentTimeMillis();
+		try {
+			return router.route(start, via);
+		} finally {
+			routingMs += System.currentTimeMillis() - t;
+			routings++;
+		}
+	}
+
+	/**
+	 * Moves every waypoint that is reached by an out-and-back detour to the point where the detour
+	 * leaves the loop. The detour is found on the geometry, not on road ids, so that driving there and
+	 * back on the two carriageways of one street counts too.
+	 *
+	 * @return the new waypoints, null when no waypoint sits on a detour
+	 */
+	static List<LatLon> trimSpurs(List<RouteSegmentResult> route, List<LatLon> via) {
+		List<LatLon> pts = new ArrayList<>();
+		for (RouteSegmentResult s : route) {
+			int st = s.getStartPointIndex();
+			int en = s.getEndPointIndex();
+			int dir = st <= en ? 1 : -1;
+			for (int i = st; ; i += dir) {
+				if (pts.isEmpty() || i != st) {
+					pts.add(s.getPoint(i));
+				}
+				if (i == en) {
+					break;
+				}
+			}
+		}
+		if (pts.size() < 3) {
+			return null;
+		}
+		double[] cum = new double[pts.size()];
+		for (int i = 1; i < pts.size(); i++) {
+			cum[i] = cum[i - 1] + MapUtils.getDistance(pts.get(i - 1), pts.get(i));
+		}
+		List<LatLon> res = new ArrayList<>(via);
+		boolean changed = false;
+		for (int w = 0; w < via.size(); w++) {
+			int tip = 0;
+			double best = Double.MAX_VALUE;
+			for (int i = 0; i < pts.size(); i++) {
+				double d = MapUtils.getDistance(pts.get(i), via.get(w));
+				if (d < best) {
+					best = d;
+					tip = i;
+				}
+			}
+			// the widest pair around the tip: leaves at 'from', comes back next to it at 'to'
+			int from = -1;
+			for (int i = tip; i >= 0 && cum[tip] - cum[i] <= SPUR_MAX_LENGTH_M; i--) {
+				if (MapUtils.getDistance(pts.get(i), pts.get(tip)) < SPUR_MIN_REACH_M) {
+					continue;
+				}
+				for (int j = tip + 1; j < pts.size() && cum[j] - cum[i] <= SPUR_MAX_LENGTH_M; j++) {
+					if (MapUtils.getDistance(pts.get(i), pts.get(j)) < SPUR_JOIN_M) {
+						from = i; // keeps being overwritten while i goes back: the widest detour wins
+						break;
+					}
+				}
+			}
+			if (from >= 0) {
+				res.set(w, pts.get(from));
+				changed = true;
+			}
+		}
+		return changed ? res : null;
 	}
 
 	static List<RoundTrip> select(List<RoundTrip> candidates, int count) {
