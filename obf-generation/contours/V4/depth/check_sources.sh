@@ -70,7 +70,8 @@ epsg4326() {
 sea() {
 	local v
 	v=$(gdallocationinfo -valonly -wgs84 "$2" "$3" "$4" 2>/dev/null | head -1)
-	if [ -z "$v" ] || [ "$v" = "nan" ]; then warn "$1: no value at $5 ($3 $4)"
+	# -9999 and below are nodata markers of CUDEM and others, not depths
+	if [ -z "$v" ] || [ "$v" = "nan" ] || awk -v v="$v" 'BEGIN{exit !(v <= -9999)}'; then warn "$1: no value at $5 ($3 $4)"
 	elif awk -v v="$v" 'BEGIN{exit !(v < 0)}'; then ok "$1: $5 is $v m"
 	else fail "$1: $5 is $v m, a depth should be negative"; fi
 }

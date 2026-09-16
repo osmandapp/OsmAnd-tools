@@ -131,8 +131,12 @@ merge() {
 	local output=$1; shift
 	if [ $# -eq 1 ]; then mv "$1" "$output"; return; fi
 	rm -f "$output"
-	JAVA_OPTS="${JAVA_OPTS:--Xmx16g}" bash "$MAP_CREATOR/utilities.sh" merge-index "$output" "$@" > "$TMP/merge.log" 2>&1 \
-		|| { tail -20 "$TMP/merge.log" >&2; return 1; }
+	# in a folder of its own: merge-index keeps its POI database in the working folder under a name taken from the
+	# output, which parallel tiles of one region share
+	local dir; dir=$(mktemp -d "$TMP/merge.XXXX")
+	(cd "$dir" && JAVA_OPTS="${JAVA_OPTS:--Xmx16g}" bash "$MAP_CREATOR/utilities.sh" merge-index "$output" "$@" > merge.log 2>&1) \
+		|| { tail -20 "$dir/merge.log" >&2; return 1; }
+	rm -rf "$dir"
 }
 
 if [ -z "$CELL" ]; then
@@ -227,15 +231,15 @@ if [ -n "$LEVELS" ]; then
 	rm -f "$TMP/contour_grid.tif" "$TMP/smooth.tif"
 
 	step "filter and simplify"
-	python3 "$HERE/depth_contours_filter.py" "$TMP/contours.gpkg" "$TMP/depth.gpkg" --cell "$FINE"
-	if [ "$(ogrinfo -q -sql 'SELECT COUNT(*) FROM depth_contours' "$TMP/depth.gpkg" | awk -F'= ' '/COUNT/{print $2}')" = 0 ]; then
+	python3 "$HERE/depth_contours_filter.py" "$TMP/contours.gpkg" "$TMP/depth.fgb" --cell "$FINE"
+	if [ "$(ogrinfo -so -al "$TMP/depth.fgb" | awk -F': ' '/Feature Count/{print $2}')" = 0 ]; then
 		step "no contours in $NAME"
 	else
 		step "contours osm"
-		python3 "$V4/ogr2osm.py" -f -t "$V4/translations/contours_depth.py" -o "$TMP/$NAME.osm" "$TMP/depth.gpkg" >/dev/null
+		python3 "$V4/ogr2osm.py" -f -t "$V4/translations/contours_depth.py" -o "$TMP/$NAME.osm" "$TMP/depth.fgb" >/dev/null
 		gzip -f "$TMP/$NAME.osm"
 		mv "$TMP/$NAME.osm.gz" "$OUT/$NAME.osm.gz"
-		mv "$TMP/depth.gpkg" "$OUT/$NAME.gpkg"
+		mv "$TMP/depth.fgb" "$OUT/$NAME.fgb"
 		if [ -n "$MAP_CREATOR" ]; then
 			step "contours obf"
 			o=$(obf "$OUT/$NAME.osm.gz"); OBFS+=("$o")

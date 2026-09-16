@@ -3,7 +3,7 @@
 
     depth_contours_filter.py INPUT OUTPUT --cell DEGREES [--min-ring-cells N]
 
-INPUT has line features (lon/lat) with an `elev` field (metres, negative below sea level). OUTPUT (GeoPackage) keeps
+INPUT has line features (lon/lat) with an `elev` field (metres, negative below sea level). OUTPUT (FlatGeobuf) keeps
 the lines below 0 m with a `depth` field (positive metres), drops closed rings shorter than N grid cells -
 single cells and noise on flat shelves - and simplifies every line by half a grid cell.
 """
@@ -37,15 +37,15 @@ def main():
 
     src = ogr.Open(args.input)
     layer = src.GetLayer(0)
-    out = ogr.GetDriverByName('GPKG').CreateDataSource(args.output)
+    out = ogr.GetDriverByName('FlatGeobuf').CreateDataSource(args.output)
     # lon/lat of EPSG:4326, written without a spatial reference on purpose: ogr2osm reprojects a layer that has one
-    # to EPSG:4326 in its authority axis order under GDAL 3 and swaps latitude and longitude
+    # to EPSG:4326 in its authority axis order under GDAL 3 and swaps latitude and longitude. Not GeoPackage: it gives
+    # a layer without one an "Undefined geographic SRS", which ogr2osm reprojects the same way
     out_layer = out.CreateLayer('depth_contours', None, ogr.wkbLineString)
     out_layer.CreateField(ogr.FieldDefn('depth', ogr.OFTInteger))
 
     min_ring_m = args.min_ring_cells * args.cell * 111320
     kept = dropped = 0
-    out.StartTransaction()
     for feature in layer:
         elev = feature.GetField('elev')
         geom = feature.GetGeometryRef()
@@ -67,7 +67,7 @@ def main():
             f.SetGeometry(simple)
             out_layer.CreateFeature(f)
             kept += 1
-    out.CommitTransaction()
+    out = None
     print('contours kept %d, dropped %d (rings shorter than %.0f m or degenerate)' % (kept, dropped, min_ring_m))
 
 
