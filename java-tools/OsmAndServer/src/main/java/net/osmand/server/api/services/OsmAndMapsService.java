@@ -1135,9 +1135,15 @@ public class OsmAndMapsService {
 			throw new IOException("Cannot parse routing.xml for a round trip worker", e);
 		}
 		RoutePlannerFrontEnd.CALCULATE_MISSING_MAPS = false;
-		router.setHHRouteCpp(false);
-		router.setUseOnlyHHRouting(rp.useOnlyHHRouting);
-		router.setDefaultHHRoutingConfig();
+		if (rp.disableHHRouting) {
+			// routing=astar_* - without this the HH config is still set and HH answers every leg,
+			// which silently turns an A* comparison into a second HH run
+			router.disableHHRoutingConfig();
+		} else {
+			router.setHHRouteCpp(false);
+			router.setUseOnlyHHRouting(rp.useOnlyHHRouting);
+			router.setDefaultHHRoutingConfig();
+		}
 		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(MEM_LIMIT, MEM_LIMIT);
 		RoutingConfiguration config = builder.build(rp.routeProfile, memoryLimit, rp.routeParams);
 		config.memoryMaxHits = MEM_MAX_HITS_PER_RUN;
@@ -1216,7 +1222,10 @@ public class OsmAndMapsService {
 					ctx.config.routeCalculationTime = getLocalTimeMillisByLatLon(start.getLatitude(),
 							start.getLongitude());
 				}
-				router.getHHRoutingConfig().cacheContext(null); // keep HH points between the legs and the loops
+				if (router.getHHRoutingConfig() != null) {
+					// keep HH points between the legs and the loops; with routing=astar_* there is no config
+					router.getHHRoutingConfig().cacheContext(null);
+				}
 				ctx.calculationProgress = new RouteCalculationProgress();
 				routers.add(router);
 				contexts.add(ctx);
