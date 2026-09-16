@@ -50,10 +50,20 @@ leftovers() {
 	[ "$n" -eq 0 ] || warn "$1: $n archives or partial files left (download or unzip did not finish)"
 }
 
+# crs FILE : EPSG code of the raster's coordinate system - the last ID of its WKT, the first ones are its datum,
+# ellipsoid and units
+crs() {
+	gdalinfo -json "$1" 2>/dev/null | python3 -c '
+import json, re, sys
+wkt = json.load(sys.stdin).get("coordinateSystem", {}).get("wkt", "")
+ids = re.findall(r"ID\[\"EPSG\",(\d+)\]", wkt)
+print("EPSG:" + ids[-1] if ids else "unknown")' 2>/dev/null || echo unknown
+}
+
 # epsg4326 NAME FILE
 epsg4326() {
-	if gdalinfo "$2" 2>/dev/null | grep -q 'ID\["EPSG",4326\]'; then ok "$1: EPSG:4326"
-	else warn "$1: not EPSG:4326 ($(gdalinfo "$2" 2>/dev/null | grep -m1 -o 'ID\["EPSG",[0-9]*\]' || echo unknown))"; fi
+	local c; c=$(crs "$2")
+	if [ "$c" = "EPSG:4326" ]; then ok "$1: EPSG:4326"; else warn "$1: $c, not EPSG:4326"; fi
 }
 
 # sea NAME RASTER LON LAT PLACE : the value at a sea point is negative
@@ -139,7 +149,8 @@ echo "== norway"
 GDB=$(find "$SRC/norway" -maxdepth 3 -name '*.gdb' -type d 2>/dev/null | head -1)
 if [ -z "$GDB" ]; then fail "norway: no .gdb folder"
 else
-	n=$(ogrinfo -so "$GDB" 2>/dev/null | grep -c '^[0-9]*:')
+	# layers are listed as "1: name" by older GDAL and "Layer: name" by GDAL 3.x
+	n=$(ogrinfo -so "$GDB" 2>/dev/null | grep -cE '^([0-9]+|Layer): ')
 	if [ "$n" -gt 0 ]; then ok "norway: $(basename "$GDB") with $n layers"; else fail "norway: $(basename "$GDB") does not open"; fi
 fi
 leftovers norway "$SRC/norway"
@@ -151,7 +162,7 @@ count netherlands ${#FILES[@]} 3
 if [ ${#FILES[@]} -gt 0 ]; then
 	rasters_open netherlands "${FILES[@]}"
 	for f in "${FILES[@]}"; do
-		echo "     $(basename "$f"): $(gdalinfo "$f" 2>/dev/null | grep -m1 -o 'ID\["EPSG",[0-9]*\]' | head -1)"
+		echo "     $(basename "$f"): $(crs "$f")"
 	done
 fi
 
