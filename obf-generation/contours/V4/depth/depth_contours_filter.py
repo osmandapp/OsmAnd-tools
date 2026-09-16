@@ -3,14 +3,14 @@
 
     depth_contours_filter.py INPUT OUTPUT --cell DEGREES [--min-ring-cells N]
 
-INPUT has line features with an `elev` field (metres, negative below sea level). OUTPUT (GeoPackage) keeps
+INPUT has line features (lon/lat) with an `elev` field (metres, negative below sea level). OUTPUT (GeoPackage) keeps
 the lines below 0 m with a `depth` field (positive metres), drops closed rings shorter than N grid cells -
 single cells and noise on flat shelves - and simplifies every line by half a grid cell.
 """
 import argparse
 import math
 
-from osgeo import ogr, osr
+from osgeo import ogr
 
 ogr.UseExceptions()
 
@@ -37,11 +37,10 @@ def main():
 
     src = ogr.Open(args.input)
     layer = src.GetLayer(0)
-    srs = osr.SpatialReference()
-    srs.ImportFromEPSG(4326)
-    srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
     out = ogr.GetDriverByName('GPKG').CreateDataSource(args.output)
-    out_layer = out.CreateLayer('depth_contours', srs, ogr.wkbLineString)
+    # lon/lat of EPSG:4326, written without a spatial reference on purpose: ogr2osm reprojects a layer that has one
+    # to EPSG:4326 in its authority axis order under GDAL 3 and swaps latitude and longitude
+    out_layer = out.CreateLayer('depth_contours', None, ogr.wkbLineString)
     out_layer.CreateField(ogr.FieldDefn('depth', ogr.OFTInteger))
 
     min_ring_m = args.min_ring_cells * args.cell * 111320

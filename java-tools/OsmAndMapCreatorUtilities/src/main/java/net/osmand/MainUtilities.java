@@ -348,6 +348,9 @@ public class MainUtilities {
 			} else if (s.startsWith("--poi-top-index-list=")) {
 				settings.poiTopIndexUrl = s.substring(s.indexOf('=') + 1);
 				it.remove();
+			} else if (s.startsWith("--map-zooms=")) {
+				settings.mapZooms = s.substring(s.indexOf('=') + 1);
+				it.remove();
 			} else if (s.startsWith("--rendering-types=")) {
 				settings.renderingTypesFile = s.substring(s.indexOf('=') + 1);
 				it.remove();
@@ -380,7 +383,8 @@ public class MainUtilities {
 
 	public static void generateObf(List<String> subArgs, IndexCreatorSettings settings)
 			throws IOException, SQLException, InterruptedException, XmlPullParserException {
-		generateObf(subArgs, MapZooms.getDefault(), settings);
+		generateObf(subArgs, settings.mapZooms == null ? MapZooms.getDefault() : MapZooms.parseZooms(settings.mapZooms),
+				settings);
 	}
 
 	public static void generateObf(List<String> subArgs, MapZooms zooms, IndexCreatorSettings settings) throws IOException, SQLException,
@@ -466,7 +470,8 @@ public class MainUtilities {
 		System.out.println("This utility provides access to all other console utilities of OsmAnd,");
 		System.out.println("each utility has own argument list and own synopsys. Here is the list:");
 		System.out.println("\t\t generate-obf <path to osm file> <--srtm=opt-folder-with-srtm-data>: simple way to generate obf file in place. "
-				+ "\t\t\t	Another supported options generate-map, generate-address, generate-poi, generate-roads (generate obf partially)");
+				+ "\t\t\t	Another supported options generate-map, generate-address, generate-poi, generate-roads (generate obf partially)"
+				+ "; --map-zooms=13- or --map-zooms=9-10;11-12 sets the map section zoom levels");
 		System.out.println("\t\t inspector <params>: powerful tool to inspect obf files and convert them to osm");
 		System.out.println("\t\t check-ocean-tile <lat> <lon> <zoom=11>: checks ocean or land tile is in bz2 list");
 		System.out.println("\t\t generate-ocean-tile <coastline osm file> <optional output file>: creates ocean tiles 12 zoom");

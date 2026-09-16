@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Depth contours of one region from a depth grid, clipped by the OSM land mask, as .osm.gz for OBF generation.
 #
-#   build_depth_region.sh -D DATA_DIR -n REGION [-c MAP_CREATOR_DIR] [-j JOBS]
+#   build_depth_region.sh -D DATA_DIR -n REGION [-c MAP_CREATOR_DIR] [-k] [-j JOBS]
 #   build_depth_region.sh -n NAME -b "W S E N" -i GRID -m LAND -o OUT_DIR [-l LEVELS] [-r CELL] [-u UPSAMPLE]
 #                         [-s SMOOTH] [-d SMOOTH_FROM] [-c MAP_CREATOR_DIR] [-j JOBS]
 #
@@ -17,6 +17,7 @@
 #                a flat bottom with sand waves near a level gives hundreds of tiny zigzags without it
 #   -d SMOOTH_FROM  levels from this depth down use the smoothed grid, shallower ones the full grid (default 20)
 #   -c MAP_CREATOR_DIR  unzipped OsmAndMapCreator: also writes OUT_DIR/NAME.depth.obf
+#   -k           keep: do nothing when OUT_DIR/NAME.depth.obf already exists
 #   -t TILE      split a region larger than TILE degrees into tiles built in parallel (JOBS at a time); with -c their
 #                OBFs are merged into NAME.depth.obf, one map section per tile, without -c the tiles' .osm.gz stay
 #                in OUT_DIR/NAME.tiles (default 0, no split)
@@ -34,7 +35,7 @@ set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 V4=$(cd "$HERE/.." && pwd)
-NAME=""; BBOX=""; GRID=""; LAND=""; OUT=""; CELL=""; UPSAMPLE=1; JOBS=4; SMOOTH=4; SMOOTH_FROM=20; MAP_CREATOR=""; DATA=""; TILE=0
+NAME=""; BBOX=""; GRID=""; LAND=""; OUT=""; CELL=""; UPSAMPLE=1; JOBS=4; SMOOTH=4; SMOOTH_FROM=20; MAP_CREATOR=""; DATA=""; TILE=0; KEEP=0
 DEEP_LEVELS="1000,1500,2000,3000,4000,5000,6000,7000,8000,9000,10000,11000"
 LEVELS=""
 while [ $# -gt 0 ]; do
@@ -53,7 +54,8 @@ while [ $# -gt 0 ]; do
 		-c) MAP_CREATOR=$2; shift 2 ;;
 		-D) DATA=$2; shift 2 ;;
 		-t) TILE=$2; shift 2 ;;
-		-h|--help) sed -n '2,35p' "$0"; exit 0 ;;
+		-k) KEEP=1; shift ;;
+		-h|--help) sed -n '2,36p' "$0"; exit 0 ;;
 		*) echo "Unknown option $1" >&2; exit 1 ;;
 	esac
 done
@@ -77,6 +79,9 @@ for v in NAME BBOX GRID LAND OUT; do
 	[ -n "${!v}" ] || { echo "Missing $v, see --help" >&2; exit 1; }
 done
 read -r W S E N <<< "$BBOX"
+if [ $KEEP -eq 1 ] && [ -f "$OUT/$NAME.depth.obf" ]; then
+	echo "== $NAME.depth.obf exists, kept (no -k to rebuild)"; exit 0
+fi
 mkdir -p "$OUT"; OUT=$(cd "$OUT" && pwd)
 if [ -n "$MAP_CREATOR" ]; then MAP_CREATOR=$(cd "$MAP_CREATOR" && pwd); fi
 TMP="$OUT/$NAME.tmp"; rm -rf "$TMP"; mkdir -p "$TMP"
