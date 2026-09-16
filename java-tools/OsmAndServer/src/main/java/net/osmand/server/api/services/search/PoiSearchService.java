@@ -546,8 +546,11 @@ public class PoiSearchService {
 		long osmId = ObfConstants.getOsmObjectId(renderedObject);
 		EntityType entityType = ObfConstants.getOsmEntityType(renderedObject);
 		Feature feature = searchPoiByOsmId(loc, osmId, entityType, timeZone);
-		if (feature != null || tags.isEmpty()) {
+		if (feature != null) {
 			return feature;
+		}
+		if (tags.isEmpty()) {
+			return null;
 		}
 		MapPoiTypes poiTypes = poiTypesService.getMapPoiTypes(PoiTypesService.DEFAULT_SEARCH_LANG);
 		Node node = new Node(loc.getLatitude(), loc.getLongitude(), -1);
