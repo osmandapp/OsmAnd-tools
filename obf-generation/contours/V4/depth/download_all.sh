@@ -134,6 +134,8 @@ if want netherlands; then
 	echo "== netherlands"
 	R=https://downloads.rijkswaterstaatdata.nl
 	NL="$R/bodemhoogte_20mtr/bodemhoogte_20mtr_2024.tif $R/bodemhoogte_zeeland/bodemhoogte_zeeland.tif $R/bathymetrie_ncp/bathymetrie_ncp_juni_2019.tif"
+	# NSGI hydroid (LAT) and NAP geoid of PROJ: their difference is how far chart datum lies below NAP
+	NL="$NL https://cdn.proj.org/nl_nsgi_nllat2018.tif https://cdn.proj.org/nl_nsgi_nlgeo2018.tif"
 	if [ $DRY -eq 1 ]; then printf "%s\n" $NL | report netherlands
 	else for u in $NL; do fetch "$u" "$SRC/netherlands/$(basename "$u")"; done; fi
 fi

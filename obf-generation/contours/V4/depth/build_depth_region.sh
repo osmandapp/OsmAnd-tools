@@ -4,7 +4,7 @@
 #   build_depth_region.sh -D DATA_DIR -n REGION [-c MAP_CREATOR_DIR] [-k] [-j JOBS]
 #   build_depth_region.sh -n NAME -b "W S E N" -i GRID -m LAND -o OUT_DIR [-l LEVELS] [-p TIERS] [-r CELL]
 #                         [-u UPSAMPLE] [-s SMOOTH] [-d SMOOTH_FROM] [-a RESAMPLING] [-g MIN_RING_CELLS] [-t TILE]
-#                         [-w OVERVIEW] [-x EXCLUDE [-X LAYER]] [-e ENC_DIR] [-c MAP_CREATOR_DIR] [-k] [-j JOBS]
+#                         [-w OVERVIEW] [-x EXCLUDE [-X LAYER]] [-e ENC_DIR] [-F FILL] [-c MAP_CREATOR_DIR] [-k] [-j JOBS]
 #
 #   -D DATA_DIR  folder of download_all.sh: the grid is DATA_DIR/src/..., the land DATA_DIR/mask/land_polygons.gpkg,
 #                the output DATA_DIR/build; -n then names a region below, which sets the rest
@@ -31,6 +31,9 @@
 #   -e ENC_DIR   S-57 ENC cells (NOAA ENC_ROOT): inside the approach and harbour cells (bands 4-6) the charted contours
 #                and soundings (depth_enc_osm.py) replace the grid; soundings thinned as ENC_TIERS, the charted levels
 #                with no contourtype (0.9, 3.6 m...) only from zoom 15, depth areas as the fill (depth_areas_osm.py)
+#   -F FILL      depth areas (fill) from a grid: "GRID[,PLUS,MINUS]", elevation = GRID + PLUS - MINUS, so that a grid
+#                in a land datum is brought to chart datum (NAP + NLGEO2018 - NLLAT2018 = LAT); bands dries, 0-2, 2-5,
+#                5-10 m by depth_areas_osm.py
 #   -t TILE      split a region larger than TILE degrees into tiles built in parallel (JOBS at a time); with -c the
 #                tiles' .osm.gz become one map section of contours, one of the overview and one per point tier
 #                (generate-single-map) in
@@ -41,7 +44,8 @@
 #
 # Regions (-D DATA_DIR -n REGION), bounds of the published OBFs; options given on the command line win:
 #   Netherlands_contours              Rijkswaterstaat 20 m 2024 over NCP 2019 over EMODnet DTM 2024, contours every 5 m
-#                                     to 50 m and points, 0.0002 degree cells, 1 degree tiles
+#                                     to 50 m and points, 0.0002 degree cells, 1 degree tiles; fill from the 20 m grid
+#                                     in LAT (NLLAT2018)
 #   Europe_contours                   EMODnet DTM 2024, contours every 5 m to 50 m, 10 m to 200 m, 50 m to 1000 m,
 #                                     then as the default, overview 0.02 degrees for zooms 5-8, 10 degree tiles;
 #                                     Europe_* leave out the Kartverket coverage (Norway_contours) when it is downloaded
@@ -68,7 +72,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 V4=$(cd "$HERE/.." && pwd)
 NAME=""; BBOX=""; GRID=""; LAND=""; OUT=""; CELL=""; UPSAMPLE=1; JOBS=4; SMOOTH=4; SMOOTH_FROM=""; MAP_CREATOR=""
 DATA=""; TILE=0; KEEP=0; LEVELS=""; TIERS=""; RESAMPLING=""; MIN_RING_CELLS=""; OVERVIEW=""
-EXCLUDE=""; EXCLUDE_LAYER=""; ENC=""; ENC_AREAS=""; ENC_TIERS="0.02:10-11 0.008:12 0.003:13-14 0.001:15-"
+EXCLUDE=""; EXCLUDE_LAYER=""; ENC=""; ENC_AREAS=""; FILL=""; ENC_TIERS="0.02:10-11 0.008:12 0.003:13-14 0.001:15-"
 # steps FROM:TO:STEP... : comma-separated levels
 steps() { local s a b c out=""; for s; do IFS=: read -r a b c <<< "$s"; out+=$(seq "$a" "$c" "$b" | paste -sd, -),; done
 	echo "${out%,}"; }
@@ -99,7 +103,8 @@ while [ $# -gt 0 ]; do
 		-x) EXCLUDE=$2; shift 2 ;;
 		-X) EXCLUDE_LAYER=$2; shift 2 ;;
 		-e) ENC=$2; shift 2 ;;
-		-h|--help) sed -n '2,64p' "$0"; exit 0 ;;
+		-F) FILL=$2; shift 2 ;;
+		-h|--help) sed -n '2,68p' "$0"; exit 0 ;;
 		*) echo "Unknown option $1" >&2; exit 1 ;;
 	esac
 done
@@ -116,7 +121,10 @@ if [ -n "$DATA" ]; then
 			: "${BBOX:=1.7 51.1 7.3 55.7}"; : "${GRID:=$EMODNET,$NL/bathymetrie_ncp_juni_2019.tif,$NL/bodemhoogte_20mtr_2024.tif}"
 			: "${CELL:=0.0002}"; : "${LEVELS:=2,5,10,15,20,25,30,35,40,45,50,100,200}"
 			: "${SMOOTH_FROM:=5}"
-			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1 ;;
+			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1
+			if [ -f "$NL/nl_nsgi_nllat2018.tif" ]; then
+				: "${FILL:=$NL/bodemhoogte_20mtr_2024.tif,$NL/nl_nsgi_nlgeo2018.tif,$NL/nl_nsgi_nllat2018.tif}"
+			fi ;;
 		Europe_contours)
 			: "${BBOX:=-31.3 25.4 36.0 71.2}"; : "${GRID:=$EMODNET}"; : "${LEVELS:=$EUROPE_LEVELS}"
 			: "${OVERVIEW:=$OVERVIEW_Z5_8}"
@@ -239,12 +247,12 @@ if [ -n "$TILES" ]; then
 	step "$NAME: $(echo "$TILES" | wc -l | tr -d ' ') tiles of $TILE degrees, $JOBS at a time"
 	TILE_OUT="$TMP/tiles"; mkdir -p "$TILE_OUT"
 	export SELF="$0" GRID LAND LEVELS TIERS CELL UPSAMPLE SMOOTH SMOOTH_FROM RESAMPLING MIN_RING_CELLS OVERVIEW EXCLUDE \
-		EXCLUDE_LAYER MAP_CREATOR TILE_OUT
+		EXCLUDE_LAYER FILL MAP_CREATOR TILE_OUT
 	echo "$TILES" | xargs -P "$JOBS" -L 1 bash -c '
 		name=$1; shift
 		args=(-n "$name" -b "$*" -i "$GRID" -m "$LAND" -o "$TILE_OUT" -l "${LEVELS:-none}" -p "$TIERS" -r "$CELL" \
 			-u "$UPSAMPLE" -s "$SMOOTH" -d "$SMOOTH_FROM" -a "$RESAMPLING" -g "$MIN_RING_CELLS" -w "$OVERVIEW" \
-			-x "$EXCLUDE" -X "$EXCLUDE_LAYER" -j 1)
+			-x "$EXCLUDE" -X "$EXCLUDE_LAYER" -F "$FILL" -j 1)
 		JAVA_OPTS="${JAVA_OPTS:--Xmx2g}" bash "$SELF" "${args[@]}" > "$TILE_OUT/$name.log" 2>&1 \
 			|| { echo "FAILED tile $name:"; tail -20 "$TILE_OUT/$name.log"; exit 255; }
 		echo "tile $name: $(tail -1 "$TILE_OUT/$name.log")"' _
@@ -270,6 +278,11 @@ if [ -n "$TILES" ]; then
 		done
 		if [ -n "$ENC_AREAS" ]; then
 			obf "$ENC_AREAS" > "$TMP/enc_areas.section" & PIDS+=($!)
+		fi
+		areas=("$TILE_OUT"/*_areas.osm.gz)
+		if [ -f "${areas[0]}" ]; then
+			step "depth areas obf of ${#areas[@]} tiles"
+			single "$TMP/areas.obf" "${areas[@]}" & PIDS+=($!); OBFS+=("$TMP/areas.obf")
 		fi
 		for e in ${ENC_OSM[@]+"${ENC_OSM[@]}"}; do
 			o="$TMP/$(basename "${e%%:*}" .osm.gz).obf"; z=${e#*:}
@@ -382,6 +395,40 @@ if [ -n "$OVERVIEW" ] && [ -n "$OVERVIEW_LEVELS" ]; then
 		fi
 	fi
 	rm -f "$TMP/overview.tif" "$TMP/overview.gpkg" "$TMP/overview.fgb"
+fi
+
+# fill: depth bands of a grid brought to chart datum
+if [ -n "$FILL" ]; then
+	step "depth areas from $FILL"
+	IFS=, read -r fill_grid fill_plus fill_minus <<< "$FILL"
+	warp() { gdalwarp -q -overwrite -t_srs EPSG:4326 -te "$W" "$S" "$E" "$N" -tr "$CELL" "$CELL" -r "$2" -ot Float32 \
+		-dstnodata nan "$1" "$3"; }
+	warp "$fill_grid" average "$TMP/fill.tif"
+	# sum of the bands with NaN where any is missing: a VRT pixel function, no numpy needed
+	srcs="<SimpleSource><SourceFilename relativeToVRT=\"1\">fill.tif</SourceFilename><SourceBand>1</SourceBand></SimpleSource>"
+	if [ -n "$fill_plus" ]; then
+		warp "$fill_plus" bilinear "$TMP/fill_plus.tif"; warp "$fill_minus" bilinear "$TMP/fill_minus.tif"
+		srcs+="<SimpleSource><SourceFilename relativeToVRT=\"1\">fill_plus.tif</SourceFilename><SourceBand>1</SourceBand></SimpleSource>"
+		srcs+="<ComplexSource><SourceFilename relativeToVRT=\"1\">fill_minus.tif</SourceFilename><SourceBand>1</SourceBand><ScaleRatio>-1</ScaleRatio></ComplexSource>"
+	fi
+	size=$(gdalinfo -json "$TMP/fill.tif" | python3 -c 'import json,sys; print(*json.load(sys.stdin)["size"])')
+	gt=$(gdalinfo -json "$TMP/fill.tif" | python3 -c 'import json,sys; print(",".join(map(repr, json.load(sys.stdin)["geoTransform"])))')
+	cat > "$TMP/fill_sum.vrt" <<-VRT
+	<VRTDataset rasterXSize="${size% *}" rasterYSize="${size#* }"><SRS>EPSG:4326</SRS><GeoTransform>$gt</GeoTransform>
+	<VRTRasterBand dataType="Float32" band="1" subClass="VRTDerivedRasterBand"><NoDataValue>nan</NoDataValue>
+	<PixelFunctionType>sum</PixelFunctionType><PixelFunctionArguments propagateNoData="true"/>$srcs
+	</VRTRasterBand></VRTDataset>
+	VRT
+	gdal_translate -q "$TMP/fill_sum.vrt" "$TMP/fill_datum.tif"
+	gdal_rasterize -q -burn nan -l "$LAND_LAYER" "$TMP/land.gpkg" "$TMP/fill_datum.tif"
+	gdal_contour -q -p -amin emin -amax emax -fl -10 -5 -2 0 "$TMP/fill_datum.tif" "$TMP/bands.gpkg"
+	ogr2ogr -q -f GPKG -nln areas "$TMP/areas.gpkg" "$TMP/bands.gpkg" -sql "SELECT geom, -emax AS mindepth FROM contour"
+	python3 "$HERE/depth_areas_osm.py" "$TMP/areas.gpkg" "$OUT/${NAME}_areas.osm.gz" --layer areas --field mindepth \
+		--land "$TMP/land.gpkg" --bbox "$W" "$S" "$E" "$N" --simplify "$(python3 -c "print(float('$CELL') / 2)")" 2>&1 | grep -v numpy
+	if [ -n "$MAP_CREATOR" ] && [ "$(zcat < "$OUT/${NAME}_areas.osm.gz" | grep -c -m1 '<way')" != 0 ]; then
+		o=$(obf "$OUT/${NAME}_areas.osm.gz"); OBFS+=("$o")
+	fi
+	rm -f "$TMP"/fill*.tif "$TMP"/fill*.vrt "$TMP/bands.gpkg" "$TMP/areas.gpkg"
 fi
 
 if [ -n "$TIERS" ]; then
