@@ -68,9 +68,12 @@ closed rings, simplifies and writes `NAME.osm.gz` (tags by `../translations/cont
 for a quick look. The grid may be a `/vsicurl/` URL, only the region is read.
 
 ```
-./build_depth_region.sh -n Netherlands_emodnet_2024 -b "2.5 51.0 7.3 53.8" \
-    -i /data/depth/src/emodnet/emodnet_2024.vrt -m /data/depth/mask/land_polygons.gpkg -o /data/depth/build -j 16
+./build_depth_region.sh -D /data/depth -n Netherlands_contours -c /opt/OsmAndMapCreator -j 16   # a region from the script
+./build_depth_region.sh -n Wadden -b "4.6 52.8 6.5 53.6" -i /data/depth/src/emodnet/emodnet_2024.vrt \
+    -m /data/depth/mask/land_polygons.gpkg -o /data/depth/build                                  # any box
 ```
+
+Regions (bounds, grid) are listed in the script; `-c` adds `NAME.depth.obf` built by OsmAndMapCreator.
 
 Levels default to 2, 5, 10, 20, 30, 50, 100, 200, 500 m and every 1000 m (`-l`); `-u 2` upsamples a coarse grid
 (GEBCO) before contouring for smoother lines.
