@@ -26,6 +26,10 @@ Jenkins: `SRTM_DownloadDepthSources` (parameters DOWNLOAD_DATA, DOWNLOAD_MASK).
 ./download_all.sh -o /data/depth --only emodnet,netherlands -j 4
 ```
 
+`check_sources.sh DIR -j JOBS` checks the result: file counts, every raster opens, CRS, a known sea point is
+negative, leftover archives; it also writes a VRT per gridded source (`gebco_2026.vrt`, `gebco_2026_tid.vrt`,
+`emodnet_2024.vrt`, `cudem.vrt`). Needs GDAL; exits with 1 when a check fails.
+
 | Source | What | Download (2026-09-16) |
 |---|---|---|
 | `gebco` | GEBCO_2026 elevation, 15″, 8 GeoTIFF tiles | 4.24 GB (7.5 GB unzipped) |
