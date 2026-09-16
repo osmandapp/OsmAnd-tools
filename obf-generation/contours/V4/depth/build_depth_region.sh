@@ -4,7 +4,7 @@
 #   build_depth_region.sh -D DATA_DIR -n REGION [-c MAP_CREATOR_DIR] [-k] [-j JOBS]
 #   build_depth_region.sh -n NAME -b "W S E N" -i GRID -m LAND -o OUT_DIR [-l LEVELS] [-p TIERS] [-r CELL]
 #                         [-u UPSAMPLE] [-s SMOOTH] [-d SMOOTH_FROM] [-a RESAMPLING] [-g MIN_RING_CELLS] [-t TILE]
-#                         [-c MAP_CREATOR_DIR] [-k] [-j JOBS]
+#                         [-w OVERVIEW] [-c MAP_CREATOR_DIR] [-k] [-j JOBS]
 #
 #   -D DATA_DIR  folder of download_all.sh: the grid is DATA_DIR/src/..., the land DATA_DIR/mask/land_polygons.gpkg,
 #                the output DATA_DIR/build; -n then names a region below, which sets the rest
@@ -24,8 +24,11 @@
 #   -a RESAMPLING   gdalwarp resampling of the cut (default average); bilinear avoids the steps of a coarse grid
 #                   (GEBCO) cut to a much finer cell
 #   -g MIN_RING_CELLS  drop closed rings shorter than this many cells (default 8)
+#   -w OVERVIEW  "CELL:ZOOMS", e.g. "0.02:5-8": the levels of 200 m and deeper again from the grid averaged to CELL
+#                degrees, as their own map section shown at ZOOMS - the main contours start at zoom 9. Default none
 #   -t TILE      split a region larger than TILE degrees into tiles built in parallel (JOBS at a time); with -c the
-#                tiles' .osm.gz become one map section of contours and one per point tier (generate-single-map) in
+#                tiles' .osm.gz become one map section of contours, one of the overview and one per point tier
+#                (generate-single-map) in
 #                NAME.depth.obf, without -c they stay in OUT_DIR/NAME.tiles
 #   -c MAP_CREATOR_DIR  unzipped OsmAndMapCreator: writes OUT_DIR/NAME.depth.obf (points need its --map-zooms)
 #   -k           keep: do nothing when OUT_DIR/NAME.depth.obf already exists
@@ -34,14 +37,16 @@
 #   Netherlands_contours              Rijkswaterstaat 20 m 2024 over NCP 2019 over EMODnet DTM 2024, contours every 5 m
 #                                     to 50 m and points, 0.0002 degree cells, 1 degree tiles
 #   Europe_contours                   EMODnet DTM 2024, contours every 5 m to 50 m, 10 m to 200 m, 50 m to 1000 m,
-#                                     then as the default, 10 degree tiles
+#                                     then as the default, overview 0.02 degrees for zooms 5-8, 10 degree tiles
 #   Europe_points                     EMODnet DTM 2024, points, 10 degree tiles
 #   World_contours                    GEBCO_2026 (15"), contours every 10 m to 300 m, 50 m to 1000 m, then as the
-#                                     default - 2 and 5 m mean nothing in a 450 m grid, 15 degree tiles
+#                                     default - 2 and 5 m mean nothing in a 450 m grid, overview 0.02 degrees for
+#                                     zooms 5-8, 15 degree tiles
 #   World_Northern_hemisphere_points  GEBCO_2026, points, 15 degree tiles
 #   World_Southern_hemisphere_points  GEBCO_2026, points, 15 degree tiles
 #   Gulf_of_Mexico_north-west_contours  NOAA CUDEM 1/3" near the coast over GEBCO_2026, contours as Europe and
-#                                     points, 50 m cells (GEBCO bilinear, rings under 40 cells dropped), 3 degree tiles
+#                                     points, 50 m cells (GEBCO bilinear, rings under 40 cells dropped), overview as
+#                                     Europe, 3 degree tiles
 #
 # Contours: cut the region (EPSG:4326) -> upsample -> smoothed copy -> set land to 0 m by the mask -> gdal_contour ->
 # drop short closed rings and simplify (depth_contours_filter.py) -> ogr2osm with translations/contours_depth.py.
@@ -54,7 +59,7 @@ set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 V4=$(cd "$HERE/.." && pwd)
 NAME=""; BBOX=""; GRID=""; LAND=""; OUT=""; CELL=""; UPSAMPLE=1; JOBS=4; SMOOTH=4; SMOOTH_FROM=""; MAP_CREATOR=""
-DATA=""; TILE=0; KEEP=0; LEVELS=""; TIERS=""; RESAMPLING=""; MIN_RING_CELLS=""
+DATA=""; TILE=0; KEEP=0; LEVELS=""; TIERS=""; RESAMPLING=""; MIN_RING_CELLS=""; OVERVIEW=""
 # steps FROM:TO:STEP... : comma-separated levels
 steps() { local s a b c out=""; for s; do IFS=: read -r a b c <<< "$s"; out+=$(seq "$a" "$c" "$b" | paste -sd, -),; done
 	echo "${out%,}"; }
@@ -81,13 +86,14 @@ while [ $# -gt 0 ]; do
 		-D) DATA=$2; shift 2 ;;
 		-t) TILE=$2; shift 2 ;;
 		-k) KEEP=1; shift ;;
-		-h|--help) sed -n '2,51p' "$0"; exit 0 ;;
+		-w) OVERVIEW=$2; shift 2 ;;
+		-h|--help) sed -n '2,56p' "$0"; exit 0 ;;
 		*) echo "Unknown option $1" >&2; exit 1 ;;
 	esac
 done
 if [ -n "$DATA" ]; then
 	EMODNET="$DATA/src/emodnet/emodnet_2024.vrt"; GEBCO="$DATA/src/gebco/gebco_2026.vrt"
-	GEBCO_TIERS="0.3:6-9 0.05:10-12 0.02:13-"
+	GEBCO_TIERS="0.3:6-9 0.05:10-12 0.02:13-"; OVERVIEW_Z5_8="0.02:5-8"
 	case "$NAME" in
 		Netherlands_contours)
 			NL="$DATA/src/netherlands"
@@ -97,12 +103,14 @@ if [ -n "$DATA" ]; then
 			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1 ;;
 		Europe_contours)
 			: "${BBOX:=-31.3 25.4 36.0 71.2}"; : "${GRID:=$EMODNET}"; : "${LEVELS:=$EUROPE_LEVELS}"
+			: "${OVERVIEW:=$OVERVIEW_Z5_8}"
 			[ "$TILE" != 0 ] || TILE=10 ;;
 		Europe_points)
 			: "${BBOX:=-36.0 25.0 41.8 83.1}"; : "${GRID:=$EMODNET}"; : "${LEVELS:=none}"
 			: "${TIERS:=0.25:7-8 0.1:9 0.04:10 0.02:11-12 0.01:13-}"; [ "$TILE" != 0 ] || TILE=10 ;;
 		World_contours)
 			: "${BBOX:=-180 -79 180 85}"; : "${GRID:=$GEBCO}"; : "${LEVELS:=$(steps 10:300:10 350:950:50),$DEEP_LEVELS}"
+			: "${OVERVIEW:=$OVERVIEW_Z5_8}"
 			[ "$TILE" != 0 ] || TILE=15 ;;
 		World_Northern_hemisphere_points)
 			: "${BBOX:=-180 0 180 85}"; : "${GRID:=$GEBCO}"; : "${LEVELS:=none}"; : "${TIERS:=$GEBCO_TIERS}"
@@ -110,7 +118,8 @@ if [ -n "$DATA" ]; then
 		Gulf_of_Mexico_north-west_contours)
 			: "${BBOX:=-96.43 25.77 -84.92 29.40}"; : "${GRID:=$GEBCO,$DATA/src/cudem/cudem.vrt}"; : "${CELL:=0.0005}"
 			: "${LEVELS:=$EUROPE_LEVELS}"; : "${SMOOTH_FROM:=5}"; : "${RESAMPLING:=bilinear}"; : "${MIN_RING_CELLS:=40}"
-			: "${TIERS:=0.05:9-10 0.02:11-12 0.01:13 0.005:14-}"; [ "$TILE" != 0 ] || TILE=3 ;;
+			: "${TIERS:=0.05:9-10 0.02:11-12 0.01:13 0.005:14-}"; : "${OVERVIEW:=$OVERVIEW_Z5_8}"
+			[ "$TILE" != 0 ] || TILE=3 ;;
 		World_Southern_hemisphere_points)
 			: "${BBOX:=-180 -79 180 0}"; : "${GRID:=$GEBCO}"; : "${LEVELS:=none}"; : "${TIERS:=$GEBCO_TIERS}"
 			[ "$TILE" != 0 ] || TILE=15 ;;
@@ -151,6 +160,8 @@ single() {
 	local dir; dir=$(mktemp -d "$TMP/single.XXXX")
 	(cd "$dir" && JAVA_OPTS="${JAVA_OPTS:--Xmx16g}" bash "$MAP_CREATOR/utilities.sh" generate-single-map "$output" \
 		--name="$NAME" "$@" > single.log 2>&1) || { tail -20 "$dir/single.log" >&2; return 1; }
+	# an old OsmAndMapCreator prints its usage for an unknown command and exits with 0
+	[ -f "$output" ] || { tail -20 "$dir/single.log" >&2; return 1; }
 	rm -rf "$dir"
 }
 
@@ -189,11 +200,12 @@ for i in range(math.ceil((e - w) / t)):
 if [ -n "$TILES" ]; then
 	step "$NAME: $(echo "$TILES" | wc -l | tr -d ' ') tiles of $TILE degrees, $JOBS at a time"
 	TILE_OUT="$TMP/tiles"; mkdir -p "$TILE_OUT"
-	export SELF="$0" GRID LAND LEVELS TIERS CELL UPSAMPLE SMOOTH SMOOTH_FROM RESAMPLING MIN_RING_CELLS MAP_CREATOR TILE_OUT
+	export SELF="$0" GRID LAND LEVELS TIERS CELL UPSAMPLE SMOOTH SMOOTH_FROM RESAMPLING MIN_RING_CELLS OVERVIEW MAP_CREATOR \
+		TILE_OUT
 	echo "$TILES" | xargs -P "$JOBS" -L 1 bash -c '
 		name=$1; shift
 		args=(-n "$name" -b "$*" -i "$GRID" -m "$LAND" -o "$TILE_OUT" -l "${LEVELS:-none}" -p "$TIERS" -r "$CELL" \
-			-u "$UPSAMPLE" -s "$SMOOTH" -d "$SMOOTH_FROM" -a "$RESAMPLING" -g "$MIN_RING_CELLS" -j 1)
+			-u "$UPSAMPLE" -s "$SMOOTH" -d "$SMOOTH_FROM" -a "$RESAMPLING" -g "$MIN_RING_CELLS" -w "$OVERVIEW" -j 1)
 		JAVA_OPTS="${JAVA_OPTS:--Xmx2g}" bash "$SELF" "${args[@]}" > "$TILE_OUT/$name.log" 2>&1 \
 			|| { echo "FAILED tile $name:"; tail -20 "$TILE_OUT/$name.log"; exit 255; }
 		echo "tile $name: $(tail -1 "$TILE_OUT/$name.log")"' _
@@ -204,6 +216,11 @@ if [ -n "$TILES" ]; then
 		if [ -f "${contours[0]}" ]; then
 			step "contours obf of ${#contours[@]} tiles"
 			single "$TMP/contours.obf" "${contours[@]}" & PIDS+=($!); OBFS+=("$TMP/contours.obf")
+		fi
+		overview=("$TILE_OUT"/*_overview.osm.gz)
+		if [ -n "$OVERVIEW" ] && [ -f "${overview[0]}" ]; then
+			step "overview obf of ${#overview[@]} tiles"
+			single "$TMP/overview.obf" --map-zooms="${OVERVIEW#*:}" "${overview[@]}" & PIDS+=($!); OBFS+=("$TMP/overview.obf")
 		fi
 		i=0
 		for tier in $TIERS; do
@@ -289,6 +306,30 @@ if [ -n "$LEVELS" ]; then
 	fi
 fi
 
+# overview: the levels of 200 m and deeper from the grid averaged to a coarse cell, for the zooms below the contours
+OVERVIEW_LEVELS=$(echo "$LEVELS" | tr ',' '\n' | awk '$1 >= 200 && $1 % 200 == 0' | sort -rn | awk '{printf "%s ", -$1}')
+if [ -n "$OVERVIEW" ] && [ -n "$OVERVIEW_LEVELS" ]; then
+	ov_cell=${OVERVIEW%%:*}
+	step "overview contours every 200 m, $ov_cell deg cells, zooms ${OVERVIEW#*:}"
+	gdalwarp -q -overwrite -te "$W" "$S" "$E" "$N" -tr "$ov_cell" "$ov_cell" -r average -ot Float32 -srcnodata nan \
+		-dstnodata nan "$TMP/grid.tif" "$TMP/overview.tif"
+	gdal_rasterize -q -burn 0 -l "$LAND_LAYER" "$TMP/land.gpkg" "$TMP/overview.tif"
+	# shellcheck disable=SC2086
+	gdal_contour -q -a elev -fl $OVERVIEW_LEVELS "$TMP/overview.tif" "$TMP/overview.gpkg"
+	python3 "$HERE/depth_contours_filter.py" "$TMP/overview.gpkg" "$TMP/overview.fgb" --cell "$ov_cell" \
+		--min-ring-cells "$MIN_RING_CELLS"
+	if [ "$(ogrinfo -so -al "$TMP/overview.fgb" | awk -F': ' '/Feature Count/{print $2}')" != 0 ]; then
+		python3 "$V4/ogr2osm.py" -f -t "$V4/translations/contours_depth.py" -o "$TMP/${NAME}_overview.osm" \
+			"$TMP/overview.fgb" >/dev/null
+		gzip -f "$TMP/${NAME}_overview.osm"
+		mv "$TMP/${NAME}_overview.osm.gz" "$OUT/${NAME}_overview.osm.gz"
+		if [ -n "$MAP_CREATOR" ]; then
+			o=$(obf "$OUT/${NAME}_overview.osm.gz" "${OVERVIEW#*:}"); OBFS+=("$o")
+		fi
+	fi
+	rm -f "$TMP/overview.tif" "$TMP/overview.gpkg" "$TMP/overview.fgb"
+fi
+
 if [ -n "$TIERS" ]; then
 	# land as nodata, so that averages are over water only
 	gdal_rasterize -q -burn "$LAND_NODATA" -l "$LAND_LAYER" "$TMP/land.gpkg" "$TMP/grid.tif"
@@ -322,4 +363,4 @@ if [ -n "$MAP_CREATOR" ]; then
 	merge "$OUT/$NAME.depth.obf" "${OBFS[@]}"
 fi
 rm -rf "$TMP"
-step "done: $(cd "$OUT" && du -h "$NAME".* "$NAME"_points* 2>/dev/null | awk '{printf "%s (%s) ", $2, $1}')"
+step "done: $(cd "$OUT" && du -h "$NAME".* "$NAME"_points* "$NAME"_overview* 2>/dev/null | awk '{printf "%s (%s) ", $2, $1}')"
