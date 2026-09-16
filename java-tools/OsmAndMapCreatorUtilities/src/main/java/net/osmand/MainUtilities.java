@@ -176,6 +176,8 @@ public class MainUtilities {
 				settings.indexMap = true;
 				parseIndexCreatorArgs(subArgs, settings);
 				generateObf(subArgs, settings);
+			} else if (utl.equals("generate-single-map")) {
+				generateSingleMap(subArgs);
 			} else if (utl.equals("split-obf")) {
 				ObfRegionSplitter.main(subArgsArray);
 			} else if (utl.equals("merge-bulk-osmlive-day")) {
@@ -381,6 +383,34 @@ public class MainUtilities {
 	}
 
 
+	// generate-single-map <output obf> <osm files...> [--name=REGION] [index creator options]: one map section from
+	// many osm files, the way CombineSRTMIntoFile builds contour lines
+	private static void generateSingleMap(List<String> subArgs) throws Exception {
+		IndexCreatorSettings settings = new IndexCreatorSettings();
+		settings.indexMap = true;
+		parseIndexCreatorArgs(subArgs, settings);
+		String regionName = null;
+		List<File> files = new ArrayList<>();
+		for (String s : subArgs) {
+			if (s.startsWith("--name=")) {
+				regionName = s.substring("--name=".length());
+			} else {
+				files.add(new File(s));
+			}
+		}
+		File target = files.remove(0).getAbsoluteFile();
+		IndexCreator ic = new IndexCreator(target.getParentFile(), settings);
+		ic.setDialects(DBDialect.SQLITE, DBDialect.SQLITE);
+		ic.setRegionName(regionName != null ? regionName : target.getName().substring(0, target.getName().indexOf('.')));
+		ic.setMapFileName(target.getName());
+		File nodesDB = new File(target.getParentFile(), target.getName() + "." + IndexCreator.TEMP_NODES_DB);
+		ic.setNodesDBFile(nodesDB);
+		MapZooms zooms = settings.mapZooms == null ? MapZooms.getDefault() : MapZooms.parseZooms(settings.mapZooms);
+		ic.generateIndexes(files.toArray(new File[0]), new ConsoleProgressImplementation(1), null, zooms,
+				new MapRenderingTypesEncoder(settings.renderingTypesFile, target.getName()), log, true);
+		nodesDB.delete();
+	}
+
 	public static void generateObf(List<String> subArgs, IndexCreatorSettings settings)
 			throws IOException, SQLException, InterruptedException, XmlPullParserException {
 		generateObf(subArgs, settings.mapZooms == null ? MapZooms.getDefault() : MapZooms.parseZooms(settings.mapZooms),
@@ -472,6 +502,8 @@ public class MainUtilities {
 		System.out.println("\t\t generate-obf <path to osm file> <--srtm=opt-folder-with-srtm-data>: simple way to generate obf file in place. "
 				+ "\t\t\t	Another supported options generate-map, generate-address, generate-poi, generate-roads (generate obf partially)"
 				+ "; --map-zooms=13- or --map-zooms=9-10;11-12 sets the map section zoom levels");
+		System.out.println("\t\t generate-single-map <output obf> <osm files> <--name=region> <--map-zooms=...>: "
+				+ "one map section from many osm files (up to 2048), e.g. tiles of one region");
 		System.out.println("\t\t inspector <params>: powerful tool to inspect obf files and convert them to osm");
 		System.out.println("\t\t check-ocean-tile <lat> <lon> <zoom=11>: checks ocean or land tile is in bz2 list");
 		System.out.println("\t\t generate-ocean-tile <coastline osm file> <optional output file>: creates ocean tiles 12 zoom");
