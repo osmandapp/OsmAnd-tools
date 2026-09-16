@@ -27,6 +27,7 @@ import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
+import net.osmand.router.FerryRoutingHelper;
 import net.osmand.router.TransportFerryHelper;
 import net.osmand.util.MapUtils;
 
@@ -39,7 +40,7 @@ public class TransportFerryIndexHelper {
 	private final TLongObjectHashMap<TLongObjectHashMap<String>> crossings = new TLongObjectHashMap<>(); // route id -> stop id -> "interval:duration"
 
 	private static boolean isFerry(Entity e) {
-		return "ferry".equals(e.getTag(OSMTagKey.ROUTE));
+		return FerryRoutingHelper.FERRY.equals(e.getTag(OSMTagKey.ROUTE));
 	}
 
 	// relations pre-pass: ways of ferry relations don't become routes by themselves
@@ -94,7 +95,7 @@ public class TransportFerryIndexHelper {
 						crossings.put(route.getId(), new TLongObjectHashMap<>());
 					}
 					int interval = TransportRoute.parseIntervalTagToSeconds(w.getTag(TransportRoute.INTERVAL_KEY));
-					int duration = TransportRoute.parseDurationTagToSeconds(w.getTag(TransportRoute.DURATION_KEY), getLength(w));
+					int duration = FerryRoutingHelper.parseDuration(w.getTag(FerryRoutingHelper.DURATION_TAG), getLength(w));
 					crossings.get(route.getId()).put(stops.get(Math.max(start, end)).getId(), interval + ":" + duration);
 				}
 			}
