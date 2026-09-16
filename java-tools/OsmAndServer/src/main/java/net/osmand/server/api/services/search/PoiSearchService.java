@@ -529,8 +529,7 @@ public class PoiSearchService {
 
 	private Feature getMapObjectFeature(SearchResult res, String timeZone) throws IOException {
 		Feature feature = searchResultConverter.getPoiFeature(res, timeZone);
-		Amenity amenity = (Amenity) res.object;
-		if (TransportStopMatcher.isPublicTransportStop(amenity)) {
+		if (res.object instanceof Amenity amenity && TransportStopMatcher.isPublicTransportStop(amenity)) {
 			Long stopId = transportStopsService.findBestTransportStopId(amenity);
 			if (stopId != null) {
 				feature.prop(SearchResultConverter.PoiTypeField.TRANSPORT_STOP_ID.getFieldName(), stopId);
