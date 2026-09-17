@@ -42,6 +42,8 @@ negative, leftover archives; it also writes a VRT per gridded source (`gebco_202
 | `netherlands` | Rijkswaterstaat bottom height 20 m 2024, Zeeland, NCP 2019, CC0 | 0.26 GB |
 | `mask` | OSM land polygons (coastline only, rebuilt daily), osmdata.openstreetmap.de, ODbL | 0.92 GB |
 
+Licences of all sources, used and rejected: [LICENSES.md](LICENSES.md).
+
 Not scriptable: Kartverket ENC (sold via PRIMAR), BSH NAUTHIS (WFS download disabled).
 
 ## GEBCO
