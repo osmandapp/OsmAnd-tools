@@ -6,6 +6,8 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -162,7 +164,7 @@ public class CheckTurnLanesTest {
 		RoutePlannerFrontEnd fe = new RoutePlannerFrontEnd();
 		RoutingContext ctx = fe.buildRoutingContext(config, null, readers,
 				RoutePlannerFrontEnd.RouteCalculationMode.NORMAL);
-		ctx.leftSideNavigation = false;
+		ctx.leftSideNavigation = "true".equals(params.get("leftSide"));
 		List<RouteSegmentResult> route;
 		try {
 			route = fe.searchRoute(ctx, c.startPoint, c.endPoint, null).getList();
@@ -408,9 +410,16 @@ public class CheckTurnLanesTest {
 		if (keepAndTurnOfTheSameSide(expected, actual)) {
 			return Verdict.SIMILAR;
 		}
+		if (roundabout(expected) || roundabout(actual)) {
+			return Verdict.FAIL; // another exit is another road, not a neighbour on the ladder
+		}
 		int e = TurnType.orderFromLeftToRight(TurnType.fromString(expected, false).getValue());
 		int a = TurnType.orderFromLeftToRight(TurnType.fromString(actual, false).getValue());
 		return Math.abs(e - a) <= 1 ? Verdict.SIMILAR : Verdict.FAIL;
+	}
+
+	private static boolean roundabout(String turn) {
+		return turn != null && (turn.startsWith("RNDB") || turn.startsWith("RNLB"));
 	}
 
 	private static boolean keepAndTurnOfTheSameSide(String one, String other) {
@@ -429,13 +438,17 @@ public class CheckTurnLanesTest {
 			return Verdict.FAIL;
 		}
 		boolean sameLanes = true;
+		boolean similarArrows = false;
 		TreeSet<String> markedExpected = new TreeSet<>();
 		TreeSet<String> markedActual = new TreeSet<>();
 		TreeSet<Integer> activeExpected = new TreeSet<>();
 		TreeSet<Integer> activeActual = new TreeSet<>();
 		for (int i = 0; i < e.size(); i++) {
 			if (!e.get(i).arrows.equals(a.get(i).arrows)) {
-				return Verdict.FAIL;
+				if (!similarArrows(e.get(i).arrows, a.get(i).arrows)) {
+					return Verdict.FAIL;
+				}
+				similarArrows = true;
 			}
 			sameLanes &= Objects.equals(e.get(i).marked, a.get(i).marked);
 			if (e.get(i).marked != null) {
@@ -447,7 +460,7 @@ public class CheckTurnLanesTest {
 				activeActual.add(i);
 			}
 		}
-		if (sameLanes) {
+		if (sameLanes && !similarArrows) {
 			return Verdict.OK;
 		}
 		if (activeExpected.equals(activeActual)) {
@@ -483,7 +496,7 @@ public class CheckTurnLanesTest {
 				return "LANES";
 			}
 			for (int i = 0; i < expectedLanes.size(); i++) {
-				if (!expectedLanes.get(i).arrows.equals(actualLanes.get(i).arrows)) {
+				if (!similarArrows(expectedLanes.get(i).arrows, actualLanes.get(i).arrows)) {
 					return "ARROWS"; // the lane carries different arrows, so nothing lines up
 				}
 			}
@@ -496,6 +509,46 @@ public class CheckTurnLanesTest {
 			return "MARKS";
 		}
 		return "MUTE";
+	}
+
+	/**
+	 * A keep in a lane is the arrow of a lane that divides: KL,KR is the lane read as TSLL,C when the left branch bends
+	 * off and as C,TSLR when the right one does. Taken left to right, each keep may stand for the straight arrow or the
+	 * slight turn of its own side.
+	 */
+	private static boolean similarArrows(TreeSet<String> expected, TreeSet<String> actual) {
+		if (expected.equals(actual)) {
+			return true;
+		}
+		if (expected.size() != actual.size()) {
+			return false;
+		}
+		List<String> e = leftToRight(expected);
+		List<String> a = leftToRight(actual);
+		for (int i = 0; i < e.size(); i++) {
+			if (!e.get(i).equals(a.get(i)) && !keepOfTheSameSide(e.get(i), a.get(i))
+					&& !keepOfTheSameSide(a.get(i), e.get(i))) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private static boolean keepOfTheSameSide(String keep, String arrow) {
+		return ("KL".equals(keep) && ("TSLL".equals(arrow) || "C".equals(arrow)))
+				|| ("KR".equals(keep) && ("C".equals(arrow) || "TSLR".equals(arrow)));
+	}
+
+	private static List<String> leftToRight(TreeSet<String> arrows) {
+		List<String> sorted = new ArrayList<>(arrows);
+		Collections.sort(sorted, new Comparator<String>() {
+			@Override
+			public int compare(String x, String y) {
+				return Integer.compare(TurnType.orderFromLeftToRight(TurnType.fromString(x, false).getValue()),
+						TurnType.orderFromLeftToRight(TurnType.fromString(y, false).getValue()));
+			}
+		});
+		return sorted;
 	}
 
 	/** an expectation or a produced string, split into the three things it can carry */
