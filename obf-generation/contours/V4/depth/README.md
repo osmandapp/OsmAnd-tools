@@ -89,10 +89,28 @@ the Kartverket coverage (`datakvalitet`, `-x`/`-X`) out, so the fjords do not ge
 - Contours: levels `-l` (2, 5, 10, 20, 30, 50, 100, 200, 500 m and every 1000 m by default; GEBCO from 10 m); levels
   from 20 m down are traced on a smoothed grid (`-s`, `-d`), otherwise a flat bottom with sand waves gives hundreds
   of zigzags; short closed rings are dropped.
-- Points `-p "SPACING:ZOOMS ..."`: the average water depth of every SPACING degree cell, cells centred on land
-  dropped; every tier is its own map section shown from its zooms (OsmAndMapCreator `--map-zooms`).
+- Points `-p "SPACING:ZOOMS ..."`: the shallowest water depth of every SPACING degree cell, placed where it is (as
+  on charts, not a regular grid); every tier is its own map section shown from its zooms (OsmAndMapCreator
+  `--map-zooms`).
 - A region larger than `-t` degrees is split into tiles built `-j` at a time (each tile's Java takes up to 2 GB);
   the OBFs of contours, point tiers and tiles are merged with `merge-index`.
 - Overview `-w CELL:ZOOMS` (World, Europe, Gulf: `0.02:5-8`): the contours start at zoom 9, so the levels of 200 m
   and deeper are traced again on the grid averaged to CELL degrees as a map section of their own for the lower zooms.
 - `-k` skips a region whose `NAME.depth.obf` exists.
+
+### Maps without the detailed regions
+
+A regional map (Netherlands, Ireland, France, Great Britain, Norway, New Zealand, Gulf) shown together with
+`Europe_contours` or `World_contours` doubles the contours. The same build also writes `Europe_no_detailed.depth.obf`
+and `World_no_eu_detailed.depth.obf` (`-N`): the tiles' OSM with the coverage of the detailed regions cut out.
+
+- `depth_coverage.py SOURCE... OUT.gpkg`: where a source has data - a grid reduced to 0.001 degree cells and
+  polygonized, or vector layers (`--layer`, Kartverket `datakvalitet`, LINZ `area_1..5`), shrunk by a cell. Cached in
+  `DIR/src/coverage/NAME.gpkg`, rebuilt when a source changes.
+- `depth_osm_exclude.py IN.osm.gz OUT.osm.gz --exclude COVERAGE.gpkg...`: soundings inside dropped, contours cut at
+  the coverage edge.
+- `depth_exclude_check.py BEFORE_DIR AFTER_DIR --exclude ...`: nothing left inside, nothing lost outside.
+
+`Europe_no_detailed` leaves out Ireland, France, the Great Britain surveys, the Netherlands grids and Kartverket.
+`World_no_eu_detailed` leaves out EMODnet (its overview too, Europe has its own), the same regions, New Zealand
+(165..180 E) and the CUDEM of the Gulf box.
