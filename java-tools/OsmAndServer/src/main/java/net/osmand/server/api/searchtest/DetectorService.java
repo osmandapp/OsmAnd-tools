@@ -402,9 +402,43 @@ public interface DetectorService extends OBFService {
 			return street;
 		}
 		JSONObject json = street.toJSON(false);
-		json.remove("buildings");
 		json.remove("intersectedStreets");
-		return Street.parseJSON(city, json);
+		Street compactStreet = Street.parseJSON(city, json);
+		// the generated street bbox is built from its buildings (Street.getBboxPoints): keep the ones spanning it,
+		// otherwise the street collapses to a point and no longer intersects objects along it
+		for (Building building : getBboxBuildings(street.getBuildings())) {
+			compactStreet.addBuildingCheckById(Building.parseJSON(building.toJSON()));
+		}
+		return compactStreet;
+	}
+
+	private Collection<Building> getBboxBuildings(List<Building> buildings) {
+		Building minLat = null, maxLat = null, minLon = null, maxLon = null;
+		for (Building b : buildings) {
+			LatLon l = b.getLocation();
+			if (l == null) {
+				continue;
+			}
+			if (minLat == null || l.getLatitude() < minLat.getLocation().getLatitude()) {
+				minLat = b;
+			}
+			if (maxLat == null || l.getLatitude() > maxLat.getLocation().getLatitude()) {
+				maxLat = b;
+			}
+			if (minLon == null || l.getLongitude() < minLon.getLocation().getLongitude()) {
+				minLon = b;
+			}
+			if (maxLon == null || l.getLongitude() > maxLon.getLocation().getLongitude()) {
+				maxLon = b;
+			}
+		}
+		Set<Building> res = new LinkedHashSet<>();
+		for (Building b : new Building[] { minLat, maxLat, minLon, maxLon }) {
+			if (b != null) {
+				res.add(b);
+			}
+		}
+		return res;
 	}
 
 	private City collectCompactUnitTestCity(City city, Map<Long, City> cities) {
