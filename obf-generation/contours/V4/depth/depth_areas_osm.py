@@ -108,7 +108,8 @@ def main():
                 classes = {}
                 for f in layer:
                     depth, g = f.GetField(args.field), f.GetGeometryRef()
-                    at = areatype(depth) if depth is not None else None
+                    # a layer made from an empty query may have its depth as text
+                    at = areatype(float(depth)) if depth not in (None, '') else None
                     if at is None or g is None:
                         continue
                     classes.setdefault(at, []).append(g.Clone())

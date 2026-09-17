@@ -626,7 +626,7 @@ if [ -n "$FILL" ]; then
 		rm -f "$TMP/band.gpkg"
 		gdal_contour -q -p -amin emin -amax emax -fl "-$level" 100000 "$TMP/fill_level.vrt" "$TMP/band.gpkg"
 		ogr2ogr -q -f GPKG -append -nln areas "$TMP/areas.gpkg" "$TMP/band.gpkg" \
-			-sql "SELECT geom, $class AS mindepth FROM contour WHERE emin > -$level - 0.001 AND emax > -$level + 0.001"
+			-sql "SELECT geom, CAST($class AS REAL) AS mindepth FROM contour WHERE emin > -$level - 0.001 AND emax > -$level + 0.001"
 	done
 	rm -f "$TMP"/coverage_*.tif "$TMP/fill_level.vrt" "$TMP/fill_cut.tif" "$TMP/band.gpkg"
 	if [ -f "$TMP/areas.gpkg" ]; then
