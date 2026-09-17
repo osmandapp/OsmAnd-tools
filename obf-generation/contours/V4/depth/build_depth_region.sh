@@ -138,8 +138,10 @@ if [ -n "$DATA" ]; then
 			mkdir -p "$OUT"
 			python3 "$HERE/depth_bands_merge.py" "$DATA/src/nz/linz_hydro.gpkg" "$OUT/$NAME.bands.gpkg" \
 				--bbox ${BBOX:-165 -48 180 -33.5} 2>&1 | grep -v numpy
-			exec "$HERE/build_depth_kartverket.sh" -n "$NAME" -i "$OUT/$NAME.bands.gpkg" -m "$DATA/mask/land_polygons.gpkg" \
-				-o "$OUT" -j "$JOBS" ${MAP_CREATOR:+-c "$MAP_CREATOR"} ;;
+			"$HERE/build_depth_kartverket.sh" -n "$NAME" -i "$OUT/$NAME.bands.gpkg" -m "$DATA/mask/land_polygons.gpkg" \
+				-o "$OUT" -j "$JOBS" ${MAP_CREATOR:+-c "$MAP_CREATOR"}
+			# the merged bands (about 0.3 GB) are only an intermediate
+			rm -f "$OUT/$NAME.bands.gpkg"; exit 0 ;;
 		Netherlands_contours)
 			NL="$DATA/src/netherlands"
 			: "${BBOX:=1.7 51.1 7.3 55.7}"; : "${GRID:=$EMODNET,$NL/bathymetrie_ncp_juni_2019.tif,$NL/bodemhoogte_20mtr_2024.tif}"
