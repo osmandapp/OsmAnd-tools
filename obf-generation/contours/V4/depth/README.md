@@ -98,6 +98,19 @@ the Kartverket coverage (`datakvalitet`, `-x`/`-X`) out, so the fjords do not ge
   and deeper are traced again on the grid averaged to CELL degrees as a map section of their own for the lower zooms.
 - `-k` skips a region whose `NAME.depth.obf` exists.
 
+### All maps at once
+
+```
+./build_depth_all.sh -D /data/depth -c /opt/OsmAndMapCreator -j 4 [-P 6] [-k] Netherlands_contours Ireland_contours \
+    France_contours Great_Britain_contours Norway_contours New-zealand_contours Gulf_of_Mexico_north-west_contours \
+    Europe_contours Europe_points World_contours World_Northern_hemisphere_points World_Southern_hemisphere_points
+```
+
+The regions do not depend on each other, so they run at the same time (`-P` at most), each with `-j` tiles at a time
+and a log in `build/logs/REGION.log`; the console gets a start, done or FAILED line (with the end of the log) per
+region. Cores and memory grow with the number of regions: every region also runs its map sections in parallel, one
+Java each (`JAVA_OPTS`, `-Xmx16g` by default).
+
 ### Maps without the detailed regions
 
 A regional map (Netherlands, Ireland, France, Great Britain, Norway, New Zealand, Gulf) shown together with
