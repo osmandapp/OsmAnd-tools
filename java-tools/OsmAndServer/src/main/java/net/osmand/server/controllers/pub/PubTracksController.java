@@ -15,6 +15,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.GZIPOutputStream;
 
 import org.apache.commons.logging.Log;
@@ -36,12 +38,15 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import net.osmand.server.DatasourceConfiguration;
 import net.osmand.server.WebSecurityConfiguration;
@@ -50,7 +55,8 @@ import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
 /**
  * Reviews of OsmGpx tracks from the heatmap page. Anyone reads them and downloads the reviewed tracks; signed-in OsmAnd
  * users and admins write. Stored in osm_gpx_data.manual_review as {"admin": review, "users": {"cloud user id": review}};
- * what leaves the server has no admin e-mail and no user ids.
+ * what leaves the server has no admin e-mail and no user ids. Feedback about the page goes to osm_gpx_feedback without
+ * any account; only admins read it.
  */
 @RestController
 @RequestMapping("/api/pubtracks")
@@ -63,6 +69,11 @@ public class PubTracksController {
 	private static final int MAX_COMMENT = 2000;
 	private static final int MAX_IDS = 1000;
 	private static final int EXPORT_BATCH = 500;
+	private static final String FEEDBACK_TABLE = "osm_gpx_feedback";
+	private static final int MAX_TEXT = 5000;
+	private static final int MAX_EMAIL = 200;
+	private static final int MAX_PER_DAY = 20; // per address, anyone may write
+	private static final int MAX_LIST = 5000;
 	private static final String[] EXPORT_COLUMNS = {"id", "user", "date", "name", "description", "tags", "lat", "lon", "activity",
 			"activity_source", "file_activity", "speed_matches_activity", "speed", "max_speed", "distance", "points", "time_minutes",
 			"reviews", "track_stats", "geometry_b64"};
@@ -75,8 +86,13 @@ public class PubTracksController {
 	DatasourceConfiguration config;
 
 	private final Gson gson = new Gson();
+	private final Cache<String, AtomicInteger> feedbackPerIp = CacheBuilder.newBuilder().expireAfterWrite(24, TimeUnit.HOURS).build();
+	private volatile boolean feedbackTableReady;
 
 	public record ReviewRequest(Long id, String verdict, String activity, String comment) {
+	}
+
+	public record FeedbackRequest(String text, String email, Map<String, Object> view, Map<String, Object> filters, String url) {
 	}
 
 	/** whether the caller may send reviews; no ids */
@@ -113,7 +129,7 @@ public class PubTracksController {
 			}
 			if (!isBlank(req.comment())) {
 				String comment = req.comment().trim();
-				review.addProperty("comment", comment.length() > MAX_COMMENT ? comment.substring(0, MAX_COMMENT) : comment);
+				review.addProperty("comment", cut(comment, MAX_COMMENT));
 			}
 			review.addProperty("time", Instant.now().toString());
 		}
@@ -200,6 +216,63 @@ public class PubTracksController {
 		LOG.info("Exported reviewed OsmGpx tracks in " + batches + " batches");
 	}
 
+	/** saves a free-form message with the map view, the filter and the page url it was written at; the e-mail is only what was typed */
+	@PostMapping(path = "/feedback", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	public ResponseEntity<String> feedback(@RequestBody FeedbackRequest req, HttpServletRequest request) {
+		if (!config.osmgpxInitialized()) {
+			return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body("OsmGpx datasource is not initialized");
+		}
+		if (isBlank(req.text())) {
+			return ResponseEntity.badRequest().body("text is required");
+		}
+		String ip = request.getRemoteAddr();
+		if (feedbackPerIp.asMap().computeIfAbsent(ip, k -> new AtomicInteger()).incrementAndGet() > MAX_PER_DAY) {
+			return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body("Too many messages from your address today");
+		}
+		String email = isBlank(req.email()) ? null : cut(req.email().trim(), MAX_EMAIL);
+		Map<String, Object> context = new LinkedHashMap<>();
+		context.put("view", req.view());
+		context.put("filters", req.filters());
+		context.put("url", req.url());
+		ensureFeedbackTable();
+		jdbcTemplate.update("INSERT INTO " + FEEDBACK_TABLE + " (time, email, ip, text, context) VALUES (now(), ?, ?, ?, ?::jsonb)",
+				email, ip, cut(req.text().trim(), MAX_TEXT), gson.toJson(context));
+		return ResponseEntity.ok("{}");
+	}
+
+	/** every message, newest first, admins only */
+	@GetMapping(path = "/feedback", produces = MediaType.APPLICATION_JSON_VALUE)
+	public ResponseEntity<String> feedbackList(@RequestParam(defaultValue = "500") int limit, Authentication auth) {
+		if (!config.osmgpxInitialized()) {
+			return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body("OsmGpx datasource is not initialized");
+		}
+		if (!isAdmin(auth)) {
+			return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Admins only");
+		}
+		ensureFeedbackTable();
+		JsonArray res = new JsonArray();
+		jdbcTemplate.query("SELECT id, time, email, ip, text, context::text FROM " + FEEDBACK_TABLE + " ORDER BY id DESC LIMIT ?",
+				(RowCallbackHandler) rs -> {
+					JsonObject o = new JsonObject();
+					o.addProperty("id", rs.getLong("id"));
+					o.addProperty("time", rs.getTimestamp("time").toInstant().toString());
+					o.addProperty("email", rs.getString("email"));
+					o.addProperty("ip", rs.getString("ip"));
+					o.addProperty("text", rs.getString("text"));
+					o.add("context", rs.getString("context") == null ? null : new JsonParser().parse(rs.getString("context")));
+					res.add(o);
+				}, Math.max(1, Math.min(limit, MAX_LIST)));
+		return ResponseEntity.ok(gson.toJson(res));
+	}
+
+	private void ensureFeedbackTable() {
+		if (!feedbackTableReady) {
+			jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS " + FEEDBACK_TABLE + " (id bigserial PRIMARY KEY, time timestamptz NOT NULL,"
+					+ " email text, ip text, text text NOT NULL, context jsonb)");
+			feedbackTableReady = true;
+		}
+	}
+
 	/** {"admin": review without author, "users": [reviews without ids], "mine": the caller's review} */
 	private static JsonObject publicView(String stored, String mine) {
 		JsonObject res = new JsonObject();
@@ -254,6 +327,10 @@ public class PubTracksController {
 
 	private static boolean isAdmin(Authentication auth) {
 		return user(auth) != null && auth.getAuthorities().stream().anyMatch(a -> WebSecurityConfiguration.ROLE_ADMIN.equals(a.getAuthority()));
+	}
+
+	private static String cut(String s, int max) {
+		return s.length() > max ? s.substring(0, max) : s;
 	}
 
 	private static String csv(String v) {
