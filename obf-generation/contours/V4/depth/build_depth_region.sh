@@ -284,7 +284,7 @@ for i in range(math.ceil((e - w) / t)):
         if zones is not None and not any(a < x1 and c > x0 and b < y1 and d > y0 for a, b, c, d in zones):
             continue
         print('%s_%02d_%02d %g %g %g %g' % ('$NAME', i, j, x0, y0, x1, y1))
-" 2>&1 | grep -v -i numpy)
+" 2>&1 | { grep -v -i numpy || true; })
 if [ -n "$TILES" ]; then
 	step "$NAME: $(echo "$TILES" | wc -l | tr -d ' ') tiles of $TILE degrees, $JOBS at a time"
 	TILE_OUT="$TMP/tiles"; mkdir -p "$TILE_OUT"
