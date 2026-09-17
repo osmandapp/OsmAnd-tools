@@ -76,8 +76,8 @@
 # drop short closed rings and simplify (depth_contours_filter.py) -> ogr2osm with translations/contours_depth.py.
 # Land is set after smoothing so that it does not pull the sea shallower, and set to 0 m rather than nodata so the
 # contours run along the coast instead of stopping short of it.
-# Points: land becomes nodata -> average per tier cell (water only) -> cells centred on land dropped ->
-# depth_points_osm.py.
+# Points: land becomes nodata -> depth_points_osm.py --shoalest: per tier cell the shoalest water cell, placed where
+# it is.
 set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -515,13 +515,10 @@ if [ -n "$TIERS" ]; then
 	for tier in $TIERS; do
 		i=$((i + 1)); spacing=${tier%%:*}; zooms=${tier#*:}
 		step "points every $spacing deg from zoom $zooms"
-		# cells aligned to the spacing everywhere (-tap), so neighbouring tiles share one grid
-		gdalwarp -q -overwrite -tap -te "$W" "$S" "$E" "$N" -tr "$spacing" "$spacing" -r average -ot Float32 \
-			-srcnodata nan -dstnodata nan "$TMP/water.tif" "$TMP/tier.tif"
-		# a cell centred on land is dropped even if some water around it was averaged
-		gdal_rasterize -q -burn nan -l "$LAND_LAYER" "$TMP/land.gpkg" "$TMP/tier.tif"
+		# per spacing cell the shoalest water cell at its own position, as on charts (not a regular grid)
 		osm="$OUT/${NAME}_points$i.osm.gz"
-		python3 "$HERE/depth_points_osm.py" "$TMP/tier.tif" "$osm" --bbox "$W" "$S" "$E" "$N" --first-id $((i * 100000000))
+		python3 "$HERE/depth_points_osm.py" "$TMP/water.tif" "$osm" --bbox "$W" "$S" "$E" "$N" --shoalest "$spacing" \
+			--first-id $((i * 100000000))
 		if [ "$(zcat < "$osm" | grep -c -m1 '<node')" = 0 ]; then
 			rm -f "$osm"; continue
 		fi
