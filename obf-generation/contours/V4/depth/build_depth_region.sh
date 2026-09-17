@@ -21,7 +21,9 @@
 #   -s SMOOTH    low-pass for the deeper levels: average over SMOOTH x SMOOTH cells, then back (default 4, 1 = off);
 #                a flat bottom with sand waves near a level gives hundreds of tiny zigzags without it
 #   -d SMOOTH_FROM  levels from this depth down use the smoothed grid, shallower ones the full grid (default 20)
-#   -a RESAMPLING   gdalwarp resampling of the cut (default average); bilinear avoids the steps of a coarse grid
+#   -a RESAMPLING   gdalwarp resampling of the cut (default average); bilinear avoids the steps of a coarse grid;
+#                   auto: every grid on its own, average when its cells are about the cell or finer, bilinear when coarser
+#                   (EMODnet under a 20 m survey), then laid over each other
 #                   (GEBCO) cut to a much finer cell
 #   -g MIN_RING_CELLS  drop closed rings shorter than this many cells (default 8)
 #   -w OVERVIEW  "CELL:ZOOMS", e.g. "0.02:5-8": the levels of 200 m and deeper again from the grid averaged to CELL
@@ -31,9 +33,12 @@
 #   -e ENC_DIR   S-57 ENC cells (NOAA ENC_ROOT): inside the approach and harbour cells (bands 4-6) the charted contours
 #                and soundings (depth_enc_osm.py) replace the grid; soundings thinned as ENC_TIERS, the charted levels
 #                with no contourtype (0.9, 3.6 m...) only from zoom 15, depth areas as the fill (depth_areas_osm.py)
-#   -F FILL      depth areas (fill) from a grid: "GRID[,PLUS,MINUS]", elevation = GRID + PLUS - MINUS, so that a grid
-#                in a land datum is brought to chart datum (NAP + NLGEO2018 - NLLAT2018 = LAT); bands dries, 0-2, 2-5,
-#                5-10 m by depth_areas_osm.py
+#   -F FILL      depth areas (fill), for grids in chart datum: "GRID[,PLUS,MINUS]", elevation = GRID + PLUS - MINUS
+#                brings a grid in a land datum to chart datum (NAP + NLGEO2018 - NLLAT2018 = LAT); the shifted grid
+#                replaces GRID in -i, so the contours are in chart datum too. Only where GRID has data (no EMODnet
+#                fill), the bands dries, 0-2, 2-5,
+#                5-10 m come from the same rasters as the contours of those levels (smoothed from SMOOTH_FROM), so
+#                their edges lie on the contours; depth_areas_osm.py --nested
 #   -t TILE      split a region larger than TILE degrees into tiles built in parallel (JOBS at a time); with -c the
 #                tiles' .osm.gz become one map section of contours, one of the overview and one per point tier
 #                (generate-single-map) in
@@ -145,7 +150,7 @@ if [ -n "$DATA" ]; then
 		Netherlands_contours)
 			NL="$DATA/src/netherlands"
 			: "${BBOX:=1.7 51.1 7.3 55.7}"; : "${GRID:=$EMODNET,$NL/bathymetrie_ncp_juni_2019.tif,$NL/bodemhoogte_20mtr_2024.tif}"
-			: "${CELL:=0.0002}"; : "${LEVELS:=2,5,10,15,20,25,30,35,40,45,50,100,200}"
+			: "${RESAMPLING:=auto}"; : "${CELL:=0.0002}"; : "${LEVELS:=2,5,10,15,20,25,30,35,40,45,50,100,200}"
 			: "${SMOOTH_FROM:=5}"
 			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1
 			if [ -f "$NL/nl_nsgi_nllat2018.tif" ]; then
@@ -155,14 +160,14 @@ if [ -n "$DATA" ]; then
 			# INFOMAR grids are LAT already: the fill needs no datum shift
 			IE="$DATA/src/ireland/ireland.vrt"
 			: "${BBOX:=-11.8 51.2 -5.3 55.6}"; : "${GRID:=$EMODNET,$IE}"; : "${FILL:=$IE}"
-			: "${CELL:=0.0002}"; : "${LEVELS:=2,5,10,15,20,25,30,35,40,45,50,100,200}"; : "${SMOOTH_FROM:=5}"
+			: "${RESAMPLING:=auto}"; : "${CELL:=0.0002}"; : "${LEVELS:=2,5,10,15,20,25,30,35,40,45,50,100,200}"; : "${SMOOTH_FROM:=5}"
 			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1 ;;
 		France_contours)
 			# SHOM coastal DTMs in chart datum (PBMA), scattered along the Channel and Atlantic coast: only the 1 degree
 			# tiles touching one of them are built
 			FR="$DATA/src/france/france.vrt"
 			: "${BBOX:=-5.5 43.3 2.6 51.2}"; : "${GRID:=$EMODNET,$FR}"; : "${FILL:=$FR}"; : "${TILE_WITH:=$FR}"
-			: "${CELL:=0.0002}"; : "${LEVELS:=2,5,10,15,20,25,30,35,40,45,50,100,200}"; : "${SMOOTH_FROM:=5}"
+			: "${RESAMPLING:=auto}"; : "${CELL:=0.0002}"; : "${LEVELS:=2,5,10,15,20,25,30,35,40,45,50,100,200}"; : "${SMOOTH_FROM:=5}"
 			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1 ;;
 		Great_Britain_contours)
 			# UKHO surveys downloaded by hand (download_all.sh uk): only the 1 degree tiles touching one of them
@@ -172,7 +177,7 @@ if [ -n "$DATA" ]; then
 				exit 1
 			fi
 			: "${BBOX:=-8.7 49.8 2.0 60.9}"; : "${GRID:=$EMODNET,$UK}"; : "${FILL:=$UK}"; : "${TILE_WITH:=$UK}"
-			: "${CELL:=0.0002}"; : "${LEVELS:=2,5,10,15,20,25,30,35,40,45,50,100,200}"; : "${SMOOTH_FROM:=5}"
+			: "${RESAMPLING:=auto}"; : "${CELL:=0.0002}"; : "${LEVELS:=2,5,10,15,20,25,30,35,40,45,50,100,200}"; : "${SMOOTH_FROM:=5}"
 			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1 ;;
 		Denmark_contours)
 			# not published: 50 m against EMODnet's 115 m is a small gain, and a separate region would overlap
@@ -373,9 +378,52 @@ if [ -n "$TILES" ]; then
 	exit 0
 fi
 
+# fill: its grid brought to chart datum; that grid replaces the original in GRID, so contours and fill share a datum
+if [ -n "$FILL" ]; then
+	IFS=, read -r fill_grid fill_plus fill_minus <<< "$FILL"
+	warp() { gdalwarp -q -overwrite -t_srs EPSG:4326 -te "$W" "$S" "$E" "$N" -tr "$CELL" "$CELL" -r "$2" -ot Float32 \
+		-dstnodata nan "$1" "$3"; }
+	# a grid in chart datum is used as it is
+	if [ -n "$fill_plus" ]; then
+		step "fill grid to chart datum"
+		warp "$fill_grid" average "$TMP/fill.tif"
+		warp "$fill_plus" bilinear "$TMP/fill_plus.tif"; warp "$fill_minus" bilinear "$TMP/fill_minus.tif"
+		# sum of the bands with NaN where any is missing: a VRT pixel function, no numpy needed
+		srcs="<SimpleSource><SourceFilename relativeToVRT=\"1\">fill.tif</SourceFilename><SourceBand>1</SourceBand></SimpleSource>"
+		srcs+="<SimpleSource><SourceFilename relativeToVRT=\"1\">fill_plus.tif</SourceFilename><SourceBand>1</SourceBand></SimpleSource>"
+		srcs+="<ComplexSource><SourceFilename relativeToVRT=\"1\">fill_minus.tif</SourceFilename><SourceBand>1</SourceBand><ScaleRatio>-1</ScaleRatio></ComplexSource>"
+		size=$(gdalinfo -json "$TMP/fill.tif" | python3 -c 'import json,sys; print(*json.load(sys.stdin)["size"])')
+		gt=$(gdalinfo -json "$TMP/fill.tif" | python3 -c 'import json,sys; print(",".join(map(repr, json.load(sys.stdin)["geoTransform"])))')
+		cat > "$TMP/fill_sum.vrt" <<-VRT
+		<VRTDataset rasterXSize="${size% *}" rasterYSize="${size#* }"><SRS>EPSG:4326</SRS><GeoTransform>$gt</GeoTransform>
+		<VRTRasterBand dataType="Float32" band="1" subClass="VRTDerivedRasterBand"><NoDataValue>nan</NoDataValue>
+		<PixelFunctionType>sum</PixelFunctionType><PixelFunctionArguments propagateNoData="true"/>$srcs
+		</VRTRasterBand></VRTDataset>
+		VRT
+		gdal_translate -q -co COMPRESS=DEFLATE -co TILED=YES "$TMP/fill_sum.vrt" "$TMP/fill_datum.tif"
+		rm -f "$TMP/fill.tif" "$TMP/fill_plus.tif" "$TMP/fill_minus.tif" "$TMP/fill_sum.vrt"
+		grids=""; IFS=, read -ra parts <<< "$GRID"
+		for g in "${parts[@]}"; do [ "$g" = "$fill_grid" ] && g="$TMP/fill_datum.tif"; grids+="${grids:+,}$g"; done
+		GRID=$grids
+	fi
+fi
+
 step "cut $NAME ($W $S $E $N), cell $CELL deg, upsampled x$UPSAMPLE"
-gdalwarp -q -overwrite -t_srs EPSG:4326 -te "$W" "$S" "$E" "$N" -tr "$CELL" "$CELL" -r "$RESAMPLING" -ot Float32 \
-	-dstnodata nan -multi -wo NUM_THREADS="$JOBS" -co COMPRESS=DEFLATE -co TILED=YES ${GRID//,/ } "$TMP/grid.tif"
+if [ "$RESAMPLING" = auto ]; then
+	cuts=(); IFS=, read -ra grids <<< "$GRID"
+	for g in "${grids[@]}"; do
+		cell=$(gdalinfo -json "$g" | python3 -c 'import json,sys; c = abs(json.load(sys.stdin)["geoTransform"][1]); print(c / 111320 if c > 1 else c)')
+		r=$(python3 -c "print('bilinear' if float('$cell') > 1.5 * float('$CELL') else 'average')")
+		gdalwarp -q -overwrite -t_srs EPSG:4326 -te "$W" "$S" "$E" "$N" -tr "$CELL" "$CELL" -r "$r" -ot Float32 \
+			-dstnodata nan -multi -wo NUM_THREADS="$JOBS" "$g" "$TMP/cut${#cuts[@]}.tif"
+		cuts+=("$TMP/cut${#cuts[@]}.tif")
+	done
+	gdalwarp -q -overwrite -srcnodata nan -dstnodata nan -co COMPRESS=DEFLATE -co TILED=YES "${cuts[@]}" "$TMP/grid.tif"
+	rm -f "${cuts[@]}"
+else
+	gdalwarp -q -overwrite -t_srs EPSG:4326 -te "$W" "$S" "$E" "$N" -tr "$CELL" "$CELL" -r "$RESAMPLING" -ot Float32 \
+		-dstnodata nan -multi -wo NUM_THREADS="$JOBS" -co COMPRESS=DEFLATE -co TILED=YES ${GRID//,/ } "$TMP/grid.tif"
+fi
 step "land mask"
 ogr2ogr -q -f GPKG -spat "$W" "$S" "$E" "$N" -clipsrc "$W" "$S" "$E" "$N" -nlt MULTIPOLYGON "$TMP/land.gpkg" "$LAND"
 LAND_LAYER=$(ogrinfo -q "$TMP/land.gpkg" | awk -F'[: ]+' 'NR==1{print $2}')
@@ -425,8 +473,6 @@ if [ -n "$LEVELS" ]; then
 		# shellcheck disable=SC2086
 		gdal_contour -q -a elev -fl $(levels all) "$TMP/contour_grid.tif" "$TMP/contours.gpkg"
 	fi
-	rm -f "$TMP/contour_grid.tif" "$TMP/smooth.tif"
-
 	step "filter and simplify"
 	python3 "$HERE/depth_contours_filter.py" "$TMP/contours.gpkg" "$TMP/depth.fgb" --cell "$FINE" --min-ring-cells "$MIN_RING_CELLS"
 	if [ "$(ogrinfo -so -al "$TMP/depth.fgb" | awk -F': ' '/Feature Count/{print $2}')" = 0 ]; then
@@ -468,42 +514,53 @@ if [ -n "$OVERVIEW" ] && [ -n "$OVERVIEW_LEVELS" ]; then
 	rm -f "$TMP/overview.tif" "$TMP/overview.gpkg" "$TMP/overview.fgb"
 fi
 
-# fill: depth bands of a grid brought to chart datum
+# fill: "shallower than L" for L = 0, 2, 5, 10 m, each from the raster its contour came from (the smoothed one from
+# SMOOTH_FROM), only where the fill grid has data (not from EMODnet); depth_areas_osm.py --nested makes bands of them
 if [ -n "$FILL" ]; then
-	step "depth areas from $FILL"
-	IFS=, read -r fill_grid fill_plus fill_minus <<< "$FILL"
-	warp() { gdalwarp -q -overwrite -t_srs EPSG:4326 -te "$W" "$S" "$E" "$N" -tr "$CELL" "$CELL" -r "$2" -ot Float32 \
-		-dstnodata nan "$1" "$3"; }
-	warp "$fill_grid" average "$TMP/fill.tif"
-	if [ -z "$fill_plus" ]; then
-		# the grid is in chart datum already; a "sum" VRT of one source fails without a message on older GDAL
-		mv "$TMP/fill.tif" "$TMP/fill_datum.tif"
-	else
-		warp "$fill_plus" bilinear "$TMP/fill_plus.tif"; warp "$fill_minus" bilinear "$TMP/fill_minus.tif"
-		# sum of the bands with NaN where any is missing: a VRT pixel function, no numpy needed
-		srcs="<SimpleSource><SourceFilename relativeToVRT=\"1\">fill.tif</SourceFilename><SourceBand>1</SourceBand></SimpleSource>"
-		srcs+="<SimpleSource><SourceFilename relativeToVRT=\"1\">fill_plus.tif</SourceFilename><SourceBand>1</SourceBand></SimpleSource>"
-		srcs+="<ComplexSource><SourceFilename relativeToVRT=\"1\">fill_minus.tif</SourceFilename><SourceBand>1</SourceBand><ScaleRatio>-1</ScaleRatio></ComplexSource>"
-		size=$(gdalinfo -json "$TMP/fill.tif" | python3 -c 'import json,sys; print(*json.load(sys.stdin)["size"])')
-		gt=$(gdalinfo -json "$TMP/fill.tif" | python3 -c 'import json,sys; print(",".join(map(repr, json.load(sys.stdin)["geoTransform"])))')
-		cat > "$TMP/fill_sum.vrt" <<-VRT
+	step "depth areas where $(basename "$fill_grid") has data"
+	fill_src=$fill_grid; [ -f "$TMP/fill_datum.tif" ] && fill_src="$TMP/fill_datum.tif"
+	# shallower than 0 m dries (class -1), than 2 m is 0-2 (0), than 5 m is 2-5 (2), than 10 m is 5-10 (5)
+	for level_class in 0:-1 2:0 5:2 10:5; do
+		level=${level_class%%:*}; class=${level_class#*:}
+		raster="$TMP/contour_grid.tif"
+		if [ -f "$TMP/smooth.tif" ] && [ "$level" -ge "$SMOOTH_FROM" ]; then raster="$TMP/smooth.tif"; fi
+		if [ ! -f "$raster" ]; then
+			[ -f "$TMP/fill_cut.tif" ] || warp "$fill_src" average "$TMP/fill_cut.tif"
+			raster="$TMP/fill_cut.tif"
+		fi
+		# the fill grid on the cells of the raster, added x 0: nan outside the fill grid, the raster's value inside
+		size=$(gdalinfo -json "$raster" | python3 -c 'import json,sys; print(*json.load(sys.stdin)["size"])')
+		gt=$(gdalinfo -json "$raster" | python3 -c 'import json,sys; print(",".join(map(repr, json.load(sys.stdin)["geoTransform"])))')
+		if [ ! -f "$TMP/coverage_${size// /_}.tif" ]; then
+			# shellcheck disable=SC2086
+			gdalwarp -q -overwrite -t_srs EPSG:4326 -te "$W" "$S" "$E" "$N" -ts $size -r near -ot Float32 -dstnodata nan \
+				"$fill_src" "$TMP/coverage_${size// /_}.tif"
+		fi
+		cat > "$TMP/fill_level.vrt" <<-VRT
 		<VRTDataset rasterXSize="${size% *}" rasterYSize="${size#* }"><SRS>EPSG:4326</SRS><GeoTransform>$gt</GeoTransform>
 		<VRTRasterBand dataType="Float32" band="1" subClass="VRTDerivedRasterBand"><NoDataValue>nan</NoDataValue>
-		<PixelFunctionType>sum</PixelFunctionType><PixelFunctionArguments propagateNoData="true"/>$srcs
+		<PixelFunctionType>sum</PixelFunctionType><PixelFunctionArguments propagateNoData="true"/>
+		<SimpleSource><SourceFilename relativeToVRT="0">$raster</SourceFilename><SourceBand>1</SourceBand></SimpleSource>
+		<ComplexSource><SourceFilename relativeToVRT="0">$TMP/coverage_${size// /_}.tif</SourceFilename><SourceBand>1</SourceBand><ScaleRatio>0</ScaleRatio></ComplexSource>
 		</VRTRasterBand></VRTDataset>
 		VRT
-		gdal_translate -q "$TMP/fill_sum.vrt" "$TMP/fill_datum.tif"
+		# polygons between two levels only: the upper one is out of reach
+		rm -f "$TMP/band.gpkg"
+		gdal_contour -q -p -amin emin -amax emax -fl "-$level" 100000 "$TMP/fill_level.vrt" "$TMP/band.gpkg"
+		ogr2ogr -q -f GPKG -append -nln areas "$TMP/areas.gpkg" "$TMP/band.gpkg" -sql "SELECT geom, $class AS mindepth FROM contour"
+	done
+	rm -f "$TMP"/coverage_*.tif "$TMP/fill_level.vrt" "$TMP/fill_cut.tif" "$TMP/band.gpkg"
+	if [ -f "$TMP/areas.gpkg" ]; then
+		python3 "$HERE/depth_areas_osm.py" "$TMP/areas.gpkg" "$OUT/${NAME}_areas.osm.gz" --layer areas --field mindepth \
+			--nested --land "$TMP/land.gpkg" --bbox "$W" "$S" "$E" "$N" \
+			--simplify "$(python3 -c "print(float('$CELL') / 2)")" 2>&1 | grep -v numpy
+		if [ -n "$MAP_CREATOR" ] && [ "$(zcat < "$OUT/${NAME}_areas.osm.gz" | grep -c -m1 '<way')" != 0 ]; then
+			o=$(obf "$OUT/${NAME}_areas.osm.gz"); OBFS+=("$o")
+		fi
 	fi
-	gdal_rasterize -q -burn nan -l "$LAND_LAYER" "$TMP/land.gpkg" "$TMP/fill_datum.tif"
-	gdal_contour -q -p -amin emin -amax emax -fl -10 -5 -2 0 "$TMP/fill_datum.tif" "$TMP/bands.gpkg"
-	ogr2ogr -q -f GPKG -nln areas "$TMP/areas.gpkg" "$TMP/bands.gpkg" -sql "SELECT geom, -emax AS mindepth FROM contour"
-	python3 "$HERE/depth_areas_osm.py" "$TMP/areas.gpkg" "$OUT/${NAME}_areas.osm.gz" --layer areas --field mindepth \
-		--land "$TMP/land.gpkg" --bbox "$W" "$S" "$E" "$N" --simplify "$(python3 -c "print(float('$CELL') / 2)")" 2>&1 | grep -v numpy
-	if [ -n "$MAP_CREATOR" ] && [ "$(zcat < "$OUT/${NAME}_areas.osm.gz" | grep -c -m1 '<way')" != 0 ]; then
-		o=$(obf "$OUT/${NAME}_areas.osm.gz"); OBFS+=("$o")
-	fi
-	rm -f "$TMP"/fill*.tif "$TMP"/fill*.vrt "$TMP/bands.gpkg" "$TMP/areas.gpkg"
+	rm -f "$TMP/fill_datum.tif" "$TMP/areas.gpkg"
 fi
+rm -f "$TMP/contour_grid.tif" "$TMP/smooth.tif"
 
 if [ -n "$TIERS" ]; then
 	# land as nodata, so that averages are over water only

@@ -2,13 +2,16 @@
 """Depth areas (fill) as OSM multipolygons from charted depth area polygons, cut out of OSM land.
 
     depth_areas_osm.py SOURCE OUTPUT.osm.gz --layer LAYER --field MIN_DEPTH_FIELD --land LAND
-                       [--bbox W S E N] [--cell 0.25] [--simplify 0.00002] [--first-id N]
+                       [--nested] [--bbox W S E N] [--cell 0.25] [--simplify 0.00002] [--first-id N]
 
 Every polygon is classed by its shallowest depth like the style colours it: areatype=-1 dries (below 0 m), 0 for
 0-2 m, 2 for 2-5 m, 5 for 5-10 m; deeper ones are left out, the sea colour shows there. Polygons of one class are
 merged per CELL degree square (fewer vertices than the charted bands, which the classes join), OSM land is cut out
 (a dry band must not lie on the beach) and the result is written as closed ways or multipolygon relations tagged
 contourarea=depth, areatype=...
+
+--nested: every polygon is "shallower than" its class limit, as polygons of a grid above a level are, so a class
+contains the shallower ones. Classes are cut one by one from the shallowest, each minus all shallower classes.
 """
 import argparse
 import gzip
@@ -71,6 +74,7 @@ def main():
     parser.add_argument('--cell', type=float, default=0.25)
     parser.add_argument('--simplify', type=float, default=0.00002, help='degrees, about 2 m')
     parser.add_argument('--first-id', type=int, default=700000000)
+    parser.add_argument('--nested', action='store_true', help='a class holds the shallower ones: cut them out')
     args = parser.parse_args()
 
     src = ogr.Open(args.source)
@@ -114,13 +118,19 @@ def main():
                 # clipped to the cell first: a complete land polygon is a continent, its union alone takes seconds
                 dry = multipolygon(p for f in land for p in polygons(f.GetGeometryRef().Intersection(cell)))
                 dry = dry.UnionCascaded() if dry.GetGeometryCount() else None
-                for at, geoms in classes.items():
+                shallower = None
+                for at, geoms in sorted(classes.items(), key=lambda c: int(c[0])):
                     mp = multipolygon(p for g in geoms for p in polygons(g if g.IsValid() else g.MakeValid()))
                     # gdal_contour bands can self-intersect; a union of invalid rings may crash an older GEOS.
                     # MakeValid may return a collection, UnionCascaded takes a multipolygon only
                     if not mp.IsValid():
                         mp = multipolygon(polygons(mp.MakeValid()))
                     area = mp.UnionCascaded().Intersection(cell)
+                    if args.nested:
+                        own = area
+                        if shallower is not None:
+                            area = area.Difference(shallower)
+                        shallower = own if shallower is None else shallower.Union(own)
                     if dry is not None and area.Intersects(dry):
                         area = area.Difference(dry)
                     area = area.SimplifyPreserveTopology(args.simplify)
