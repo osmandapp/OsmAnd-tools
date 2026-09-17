@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Clean depth contours made by gdal_contour before they go to OSM.
 
-    depth_contours_filter.py INPUT OUTPUT --cell DEGREES [--min-ring-cells N] [--bbox W S E N]
+    depth_contours_filter.py INPUT OUTPUT --cell DEGREES [--min-ring-cells N] [--bbox W S E N] [--min-line-m M]
 
-INPUT has line features (lon/lat) with an `elev` field (metres, negative below sea level). OUTPUT (FlatGeobuf) keeps
-the lines below 0 m with a `depth` field (positive metres), drops closed rings shorter than N grid cells -
-single cells and noise on flat shelves - and simplifies every line by half a grid cell.
+INPUT has line features (lon/lat) with an `elev` field (metres, negative below sea level) or a positive `depth` field
+(charted contours). OUTPUT (FlatGeobuf) keeps the lines below 0 m with a `depth` field (positive metres), drops closed
+rings shorter than N grid cells - single cells, and the bumps and hollows a multibeam survey leaves on a chart - and
+open pieces shorter than MIN_LINE_M, then simplifies every line by half a grid cell.
 """
 import argparse
 import math
@@ -34,6 +35,7 @@ def main():
     parser.add_argument('--bbox', nargs=4, type=float, metavar=('W', 'S', 'E', 'N'),
                         help='cut the lines to this box before simplifying: the grid of a tile reaches past its box, '
                              'so the lines of two tiles meet exactly at their common edge')
+    parser.add_argument('--min-line-m', type=float, default=0, help='drop open pieces shorter than this many metres')
     parser.add_argument('--min-ring-cells', type=float, default=8,
                         help='closed rings shorter than this many cells are dropped')
     args = parser.parse_args()
@@ -53,8 +55,12 @@ def main():
         box = ogr.CreateGeometryFromWkt('POLYGON((%r %r,%r %r,%r %r,%r %r,%r %r))' % (w, s, e, s, e, n, w, n, w, s))
     min_ring_m = args.min_ring_cells * args.cell * 111320
     kept = dropped = 0
+    fields = [layer.GetLayerDefn().GetFieldDefn(i).GetName() for i in range(layer.GetLayerDefn().GetFieldCount())]
+    depth_field = 'elev' if 'elev' in fields else 'depth'
     for feature in layer:
-        elev = feature.GetField('elev')
+        elev = feature.GetField(depth_field)
+        if depth_field == 'depth' and elev is not None:
+            elev = -elev
         geom = feature.GetGeometryRef()
         if elev is None or elev >= 0 or geom is None:
             continue
@@ -68,6 +74,9 @@ def main():
         for part in parts:
             closed = part.GetPointCount() > 2 and part.GetPoint_2D(0) == part.GetPoint_2D(part.GetPointCount() - 1)
             if closed and length_m(part) < min_ring_m:
+                dropped += 1
+                continue
+            if not closed and length_m(part) < args.min_line_m:
                 dropped += 1
                 continue
             simple = part.SimplifyPreserveTopology(args.cell / 2)

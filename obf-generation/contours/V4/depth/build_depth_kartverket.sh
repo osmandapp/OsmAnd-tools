@@ -10,8 +10,8 @@
 #   -n NAME      default Norway_contours
 #   -b BBOX      only this box (lon/lat), default all of the data
 #   -i FGDB      the Dybdedata file geodatabase (or any OGR source with its dybdekurve and dybdepunkt layers). The
-#                map keeps 2 m and every 5 m as its contours, the metre levels down to 10 m as a section of
-#                env MINOR_ZOOMS (default "15-"), and leaves out the metre levels deeper than 10 m
+#                map keeps 2 m and every 5 m as its contours and leaves the 1 m steps of a harbour survey out;
+#                env MINOR_ZOOMS="15-" keeps the metre levels down to 10 m as a map section of those zooms
 #   -m LAND      land polygons; soundings on land are dropped, contours are kept as they are
 #   -p TIERS     soundings "SPACING:ZOOMS ...", the shallowest sounding of every SPACING degree cell shown from ZOOMS,
 #                default "0.02:10-11 0.008:12 0.0025:13-14 0.001:15-"
@@ -122,7 +122,7 @@ if [ -z "$BBOX" ] && [ "$TILE" != 0 ]; then
 	)
 	step "$NAME: $(echo "$TILES" | wc -l | tr -d ' ') tiles of $TILE degrees with data, $JOBS at a time"
 	TILE_OUT="$TMP/tiles"; mkdir -p "$TILE_OUT"
-	export SELF="$0" FGDB LAND TIERS TILE_OUT MINOR_ZOOMS
+	export SELF="$0" FGDB LAND TIERS TILE_OUT MINOR_ZOOMS MIN_RING_CELLS MIN_LINE_M
 	echo "$TILES" | xargs -P "$JOBS" -L 1 bash -c '
 		name=$1; shift
 		bash "$SELF" -n "$name" -b "$*" -i "$FGDB" -m "$LAND" -o "$TILE_OUT" -p "$TIERS" -t 0 > "$TILE_OUT/$name.log" 2>&1 \
@@ -168,13 +168,14 @@ fi
 SPAT=(); CLIP=()
 if [ -n "$BBOX" ]; then read -r W S E N <<< "$BBOX"; SPAT=(-spat "$W" "$S" "$E" "$N"); CLIP=(-clipsrc "$W" "$S" "$E" "$N"); fi
 
-# The map's contours are the standard levels: 2 m and every 5 m. A detailed survey is charted in 1 m steps
-# (Kartverket in harbours): the metre levels down to 10 m (1, 3, 4, 6, 7, 8, 9) go to NAME_minor.osm.gz, a map section
-# of MINOR_ZOOMS (zoom 15 and above by default), and the metre levels deeper than 10 m are left out - they are a mess
-# at every zoom.
+# The map's contours are the standard levels: 2 m and every 5 m. A detailed survey is charted in 1 m steps (Kartverket
+# in harbours); those levels are a mess at every zoom, so they are left out. env MINOR_ZOOMS="15-" keeps the ones down
+# to 10 m (1, 3, 4, 6, 7, 8, 9) in NAME_minor.osm.gz instead, as a map section of those zooms.
 step "$NAME contours from $FGDB"
 rm -f "$OUT/$NAME.osm.gz" "$OUT/${NAME}_minor.osm.gz"
-MINOR_ZOOMS="${MINOR_ZOOMS-15-}"
+MINOR_ZOOMS="${MINOR_ZOOMS-}"  # env MINOR_ZOOMS="15-" to keep the metre levels as a section of those zooms
+# a ring of 16 cells of 0.00005 degrees is about 80 m, a chart's smallest closed contour
+MIN_RING_CELLS="${MIN_RING_CELLS:-16}"; MIN_LINE_M="${MIN_LINE_M:-30}"
 for part in main ${MINOR_ZOOMS:+minor}; do
 	if [ "$part" = main ]; then where="dybde = 2 OR dybde % 5 = 0"; out="$OUT/$NAME.osm.gz"
 	else where="dybde <= 10 AND dybde <> 2 AND dybde % 5 <> 0"; out="$OUT/${NAME}_minor.osm.gz"; fi
@@ -186,6 +187,10 @@ for part in main ${MINOR_ZOOMS:+minor}; do
 	lines=${lines:-0}
 	step "$part contours osm: $lines lines"
 	if [ "$lines" != 0 ]; then
+		# a multibeam survey leaves small rings and scraps of line on the chart; on the map they read as broken lines
+		python3 "$HERE/depth_contours_filter.py" "$TMP/depth.fgb" "$TMP/clean.fgb" --cell 0.00005 \
+			--min-ring-cells "$MIN_RING_CELLS" --min-line-m "$MIN_LINE_M" 2>&1 | grep -v numpy
+		mv "$TMP/clean.fgb" "$TMP/depth.fgb"
 		python3 "$V4/ogr2osm.py" -f -t "$V4/translations/contours_depth.py" -o "$TMP/$NAME.osm" "$TMP/depth.fgb" >/dev/null
 		gzip -f "$TMP/$NAME.osm"; mv "$TMP/$NAME.osm.gz" "$out"
 	fi

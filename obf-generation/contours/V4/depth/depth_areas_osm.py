@@ -121,12 +121,13 @@ def main():
                 dry = dry.UnionCascaded() if dry.GetGeometryCount() else None
                 shallower = None
                 for at, geoms in sorted(classes.items(), key=lambda c: int(c[0])):
+                    # every part is made valid on its own: MakeValid() of the whole multipolygon treats the parts
+                    # that touch or overlap (the bands of a chart do) as an error and cuts holes where they meet
                     mp = multipolygon(p for g in geoms for p in polygons(g if g.IsValid() else g.MakeValid()))
-                    # gdal_contour bands can self-intersect; a union of invalid rings may crash an older GEOS.
-                    # MakeValid may return a collection, UnionCascaded takes a multipolygon only
-                    if not mp.IsValid():
-                        mp = multipolygon(polygons(mp.MakeValid()))
-                    area = mp.UnionCascaded().Intersection(cell)
+                    area = mp.UnionCascaded()
+                    if area is None or area.IsEmpty() or not area.IsValid():
+                        area = mp.Buffer(0)  # the same union, the slow way, for a GEOS that gave up
+                    area = area.Intersection(cell)
                     if args.nested:
                         own = area
                         if shallower is not None:
