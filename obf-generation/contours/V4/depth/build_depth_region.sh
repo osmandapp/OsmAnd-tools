@@ -622,10 +622,11 @@ if [ -n "$FILL" ]; then
 		<ComplexSource><SourceFilename relativeToVRT="0">$TMP/coverage_${size// /_}.tif</SourceFilename><SourceBand>1</SourceBand><ScaleRatio>0</ScaleRatio></ComplexSource>
 		</VRTRasterBand></VRTDataset>
 		VRT
-		# polygons between two levels only: the upper one is out of reach
+		# the band above the level (the upper level is out of reach); an older GDAL also writes the band below it
 		rm -f "$TMP/band.gpkg"
 		gdal_contour -q -p -amin emin -amax emax -fl "-$level" 100000 "$TMP/fill_level.vrt" "$TMP/band.gpkg"
-		ogr2ogr -q -f GPKG -append -nln areas "$TMP/areas.gpkg" "$TMP/band.gpkg" -sql "SELECT geom, $class AS mindepth FROM contour"
+		ogr2ogr -q -f GPKG -append -nln areas "$TMP/areas.gpkg" "$TMP/band.gpkg" \
+			-sql "SELECT geom, $class AS mindepth FROM contour WHERE emin > -$level - 0.001 AND emax > -$level + 0.001"
 	done
 	rm -f "$TMP"/coverage_*.tif "$TMP/fill_level.vrt" "$TMP/fill_cut.tif" "$TMP/band.gpkg"
 	if [ -f "$TMP/areas.gpkg" ]; then
