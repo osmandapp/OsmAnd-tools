@@ -13,6 +13,11 @@
 #   norway       Kartverket "Sjøkart - Dybdedata", whole country, FGDB       ~2.3 GB zip
 #   netherlands  Rijkswaterstaat bottom grids 20 m 2024, Zeeland, NCP 2019   ~0.3 GB
 #   ireland      INFOMAR bathymetry 25 m (Irish waters) and 10 m (inshore), LAT, from the GSI ImageServer
+#   denmark      Danmarks Dybdemodel 50 m 2024, one GeoTIFF (depths positive, mean sea level) ~0.13 GB; not in the
+#                published regions: 50 m against EMODnet's 115 m is a small gain
+#   france       SHOM coastal DTMs 5-20 m, chart datum (PBMA), 11 zones as GeoTIFF         ~1.0 GB 7z
+#   nz           LINZ hydrographic chart vector data: depth contours, soundings, depth areas in 5 scale bands, WFS
+#                into one GeoPackage; needs env LINZ_API_KEY (free LINZ Data Service key)
 # --mask  OSM land polygons (osmdata.openstreetmap.de, coastline only) into DIR/mask/  ~0.9 GB zip
 # Without --data and --mask both are downloaded.
 #
@@ -20,7 +25,6 @@
 # a rerun from downloading them again. Every step can be rerun: finished files are skipped, broken ones resumed.
 # Germany (BSH NAUTHIS) is not included: its WFS download service is disabled (checked 2026-09-16).
 # Finland (Traficom depth WFS) is not included: its licence allows non-commercial, non-navigational use only.
-# Denmark (Danmarks Dybdemodel 50 m) is not included: Dataforsyningen downloads need a login.
 set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -33,7 +37,7 @@ while [ $# -gt 0 ]; do
 		--only) ONLY=$2; DATA=1; shift 2 ;;
 		-j) JOBS=$2; shift 2 ;;
 		--dry-run) DRY=1; shift ;;
-		-h|--help) sed -n '2,25p' "$0"; exit 0 ;;
+		-h|--help) sed -n '2,27p' "$0"; exit 0 ;;
 		*) echo "Unknown option $1" >&2; exit 1 ;;
 	esac
 done
@@ -183,6 +187,68 @@ if want ireland; then
 	else
 		arcgis_image "$B/IE_GSI_MI_Bathymetry_25m_IE_Waters_WGS84_LAT_GRID/ImageServer" "$SRC/ireland/25m"
 		arcgis_image "$B/IE_GSI_MI_Bathymetry_10m_Inshore_IE_WGS84_LAT_GRID/ImageServer" "$SRC/ireland/10m"
+	fi
+fi
+if want denmark; then
+	echo "== denmark"
+	# the public weblink behind "Gå til download" on dataforsyningen.dk/data/4817, no login needed
+	U="https://ftp.sdfe.dk/main.html?download&weblink=b4324b6389898704fd8ec7484882dbf3&subfolder=2024&realfilename=ddm%5F50m%2Edybde%2Etiff"
+	if [ $DRY -eq 1 ]; then echo "$U" | report denmark
+	else fetch "$U" "$SRC/denmark/ddm_50m.dybde.tiff"; fi
+fi
+if want france; then
+	echo "== france"
+	B=https://services.data.shom.fr/INSPIRE/telechargement/prepackageGroup
+	# GROUP/PACKAGE of the SHOM coastal DTMs in chart datum (PBMA); the package names in their ISO metadata are
+	# sometimes wrong, these are the ones the download service lists
+	FR="MNT_COTIER_DETROIT_PDC_20m_TANDEM_PACK_DL/MNT_COTIER_DETROIT_PAS-DE-CALAIS_TANDEM_PBMA
+MNT_COTIER_MORBIHAN_TANDEM_20m_PBMA_4326_PACK_DL/MNT_COTIER_MORBIHAN_TANDEM_PBMA
+MNT_COTIER_GIRONDE_AMONT_20m_PACK_DL/MNT_COTIER_ESTUAIRE_GIRONDE_AMONT_HOMONIM_PBMA
+MNT_COTIER_GIRONDE_AVAL_20m_PACK_DL/MNT_COTIER_ESTUAIRE_GIRONDE_AVAL_HOMONIM_PBMA
+MNT_COTIER_ILE_DE_RE_5m_PBMA_PACK_DL/MNT_COTIER_ILE_DE_RE_HOMONIM_PBMA
+MNT_COTIER_PORT_SM_PAPI_SM_5m_PACK_DL/MNT_COTIER_PORT_SAINT-MALO_PAPI_PBMA
+MNT_COTIER_PORT_BSM_TANDEM_10m_PBMA_4326_PACK_DL/MNT_COTIER_PORT_BSM_TANDEM_PBMA
+MNT_COTIER_BAIE_SJL_TANDEM_20m_PACK_DL/MNT_COTIER_BAIE_SAINT_JEAN_DE_LUZ_TANDEM_PBMA
+MNT_COTIER_PERTUIS_HOMONIM_20m_PBMA_4326_PACK_DL/MNT_COTIER_PERTUIS_HOMONIM_PBMA
+MNT_COTIER_ARCACHON_HOMONIM_20m_PACK_DL/MNT_COTIER_ARCACHON_HOMONIM_PBMA
+MNT_COTIER_GNB_PAPI_SM_20m_PACK_DL/MNT_COTIER_GOLFE_NORMAND_BRETON_PAPI_PBMA"
+	if [ $DRY -eq 1 ]; then for gp in $FR; do echo "$B/${gp%%/*}/prepackage/${gp#*/}/file/${gp#*/}.7z"; done | report france
+	else
+		mkdir -p "$SRC/france"
+		for gp in $FR; do
+			pkg=${gp#*/}; tif="$SRC/france/$pkg.tif"
+			if [ -f "$tif" ]; then echo "ok $pkg.tif"; continue; fi
+			fetch "$B/${gp%%/*}/prepackage/$pkg/file/$pkg.7z" "$SRC/france/$pkg.7z"
+			# the ESRI ASCII grid: exact 0.0002 degree cells, but no CRS in the file (WGS84 per the metadata)
+			rm -rf "$SRC/france/$pkg.x"; mkdir -p "$SRC/france/$pkg.x"
+			if command -v 7z >/dev/null; then 7z x -bd -y -o"$SRC/france/$pkg.x" "$SRC/france/$pkg.7z" '*.asc' -r >/dev/null
+			else bsdtar -xf "$SRC/france/$pkg.7z" -C "$SRC/france/$pkg.x" --include '*.asc'; fi
+			asc=$(find "$SRC/france/$pkg.x" -name '*.asc' | head -1)
+			[ -n "$asc" ] || { echo "FAILED france: no .asc in $pkg.7z" >&2; exit 1; }
+			gdal_translate -q -a_srs EPSG:4326 -co COMPRESS=DEFLATE -co PREDICTOR=3 -co TILED=YES "$asc" "$tif.tmp.tif" \
+				&& mv "$tif.tmp.tif" "$tif" && rm -rf "$SRC/france/$pkg.x" "$SRC/france/$pkg.7z" && echo "ok $pkg.tif"
+		done
+	fi
+fi
+if want nz; then
+	echo "== nz"
+	if [ -z "${LINZ_API_KEY:-}" ]; then echo "FAILED nz: set LINZ_API_KEY" >&2
+	elif [ $DRY -eq 1 ]; then echo "nz           LINZ WFS, 15 layers, about 0.3 GB"
+	else
+		mkdir -p "$SRC/nz"; rm -f "$SRC/nz/linz_hydro.tmp.gpkg"
+		# band 1 is the largest scale (harbour charts), 5 the smallest; every band: contours, soundings, depth areas
+		b=0
+		for layers in "50672 50858 50671" "50554 50866 50553" "50448 50506 50447" "50849 50418 50852" "51638 51612 51639"; do
+			b=$((b + 1)); read -r contour sounding area <<< "$layers"
+			for pair in "contour:$contour" "sounding:$sounding" "area:$area"; do
+				ogr2ogr -f GPKG -update -append "$SRC/nz/linz_hydro.tmp.gpkg" "WFS:https://data.linz.govt.nz/services;key=$LINZ_API_KEY/wfs" \
+					"layer-${pair#*:}" -nln "${pair%%:*}_$b" -oo EXPOSE_GML_ID=NO \
+					--config OGR_WFS_PAGING_ALLOWED ON --config OGR_WFS_PAGE_SIZE 10000 \
+					|| { echo "FAILED nz layer-${pair#*:}" >&2; exit 1; }
+				echo "ok ${pair%%:*}_$b (layer-${pair#*:})"
+			done
+		done
+		mv "$SRC/nz/linz_hydro.tmp.gpkg" "$SRC/nz/linz_hydro.gpkg"
 	fi
 fi
 echo "Done: $OUT"

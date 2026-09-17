@@ -37,7 +37,8 @@
 #   -t TILE      split a region larger than TILE degrees into tiles built in parallel (JOBS at a time); with -c the
 #                tiles' .osm.gz become one map section of contours, one of the overview and one per point tier
 #                (generate-single-map) in
-#                NAME.depth.obf, without -c they stay in OUT_DIR/NAME.tiles
+#                NAME.depth.obf, without -c they stay in OUT_DIR/NAME.tiles; env TILE_WITH=RASTER keeps only the tiles
+#                touching one of that VRT's files
 #   -c MAP_CREATOR_DIR  unzipped OsmAndMapCreator: writes OUT_DIR/NAME.depth.obf (points need its --map-zooms)
 #   -k           keep: do nothing when OUT_DIR/NAME.depth.obf already exists
 #   env RENDERING_TYPES  rendering_types.xml for OsmAndMapCreator instead of its own (new tags before a nightly)
@@ -48,6 +49,11 @@
 #                                     in LAT (NLLAT2018)
 #   Ireland_contours                  INFOMAR 10 m inshore over 25 m over EMODnet DTM 2024, LAT, as Netherlands_contours;
 #                                     fill from the INFOMAR grids
+#   France_contours                   SHOM coastal DTMs 5-20 m (11 zones) over EMODnet DTM 2024, chart datum, as
+#                                     Netherlands_contours, only the 1 degree tiles touching a zone; fill from SHOM
+#   Denmark_contours                  (not published, small gain) Danmarks Dybdemodel 50 m 2024 over EMODnet DTM 2024,
+#                                     mean sea level, contours as
+#                                     Netherlands_contours, 0.0005 degree cells (bilinear), 1 degree tiles, no fill
 #   Europe_contours                   EMODnet DTM 2024, contours every 5 m to 50 m, 10 m to 200 m, 50 m to 1000 m,
 #                                     then as the default, overview 0.02 degrees for zooms 5-8, 10 degree tiles;
 #                                     Europe_* leave out the Kartverket coverage (Norway_contours) when it is downloaded
@@ -73,7 +79,7 @@ set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 V4=$(cd "$HERE/.." && pwd)
 NAME=""; BBOX=""; GRID=""; LAND=""; OUT=""; CELL=""; UPSAMPLE=1; JOBS=4; SMOOTH=4; SMOOTH_FROM=""; MAP_CREATOR=""
-DATA=""; TILE=0; KEEP=0; LEVELS=""; TIERS=""; RESAMPLING=""; MIN_RING_CELLS=""; OVERVIEW=""
+DATA=""; TILE=0; TILE_WITH=""; KEEP=0; LEVELS=""; TIERS=""; RESAMPLING=""; MIN_RING_CELLS=""; OVERVIEW=""
 EXCLUDE=""; EXCLUDE_LAYER=""; ENC=""; ENC_AREAS=""; FILL=""; ENC_TIERS="0.02:10-11 0.008:12 0.003:13-14 0.001:15-"
 # steps FROM:TO:STEP... : comma-separated levels
 steps() { local s a b c out=""; for s; do IFS=: read -r a b c <<< "$s"; out+=$(seq "$a" "$c" "$b" | paste -sd, -),; done
@@ -106,7 +112,7 @@ while [ $# -gt 0 ]; do
 		-X) EXCLUDE_LAYER=$2; shift 2 ;;
 		-e) ENC=$2; shift 2 ;;
 		-F) FILL=$2; shift 2 ;;
-		-h|--help) sed -n '2,70p' "$0"; exit 0 ;;
+		-h|--help) sed -n '2,76p' "$0"; exit 0 ;;
 		*) echo "Unknown option $1" >&2; exit 1 ;;
 	esac
 done
@@ -133,6 +139,21 @@ if [ -n "$DATA" ]; then
 			: "${BBOX:=-11.8 51.2 -5.3 55.6}"; : "${GRID:=$EMODNET,$IE}"; : "${FILL:=$IE}"
 			: "${CELL:=0.0002}"; : "${LEVELS:=2,5,10,15,20,25,30,35,40,45,50,100,200}"; : "${SMOOTH_FROM:=5}"
 			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1 ;;
+		France_contours)
+			# SHOM coastal DTMs in chart datum (PBMA), scattered along the Channel and Atlantic coast: only the 1 degree
+			# tiles touching one of them are built
+			FR="$DATA/src/france/france.vrt"
+			: "${BBOX:=-5.5 43.3 2.6 51.2}"; : "${GRID:=$EMODNET,$FR}"; : "${FILL:=$FR}"; : "${TILE_WITH:=$FR}"
+			: "${CELL:=0.0002}"; : "${LEVELS:=2,5,10,15,20,25,30,35,40,45,50,100,200}"; : "${SMOOTH_FROM:=5}"
+			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1 ;;
+		Denmark_contours)
+			# not published: 50 m against EMODnet's 115 m is a small gain, and a separate region would overlap
+			# Europe_contours. Mean sea level, not chart datum: no fill, a drying band would be wrong on the tidal west
+			# coast
+			DK="$DATA/src/denmark/denmark.vrt"
+			: "${BBOX:=7.5 54.4 15.6 57.9}"; : "${GRID:=$EMODNET,$DK}"; : "${CELL:=0.0005}"; : "${RESAMPLING:=bilinear}"
+			: "${LEVELS:=2,5,10,15,20,25,30,35,40,45,50,100,200}"; : "${SMOOTH_FROM:=5}"
+			: "${TIERS:=0.02:10-11 0.01:12 0.005:13-}"; [ "$TILE" != 0 ] || TILE=1 ;;
 		Europe_contours)
 			: "${BBOX:=-31.3 25.4 36.0 71.2}"; : "${GRID:=$EMODNET}"; : "${LEVELS:=$EUROPE_LEVELS}"
 			: "${OVERVIEW:=$OVERVIEW_Z5_8}"
@@ -248,11 +269,22 @@ import math
 w, s, e, n, t = $W, $S, $E, $N, float('$TILE')
 if t <= 0 or (e - w <= t and n - s <= t):
     raise SystemExit
+# TILE_WITH: only the tiles touching one of the files of this raster (a VRT of scattered zones)
+zones = None
+if '$TILE_WITH':
+    from osgeo import gdal
+    zones = []
+    for f in gdal.Open('$TILE_WITH').GetFileList()[1:]:
+        ds = gdal.Open(f); g = ds.GetGeoTransform()
+        zones.append((g[0], g[3] + g[5] * ds.RasterYSize, g[0] + g[1] * ds.RasterXSize, g[3]))
 for i in range(math.ceil((e - w) / t)):
     for j in range(math.ceil((n - s) / t)):
         x0, y0 = w + i * t, s + j * t
-        print('%s_%02d_%02d %g %g %g %g' % ('$NAME', i, j, x0, y0, min(x0 + t, e), min(y0 + t, n)))
-")
+        x1, y1 = min(x0 + t, e), min(y0 + t, n)
+        if zones is not None and not any(a < x1 and c > x0 and b < y1 and d > y0 for a, b, c, d in zones):
+            continue
+        print('%s_%02d_%02d %g %g %g %g' % ('$NAME', i, j, x0, y0, x1, y1))
+" 2>&1 | grep -v -i numpy)
 if [ -n "$TILES" ]; then
 	step "$NAME: $(echo "$TILES" | wc -l | tr -d ' ') tiles of $TILE degrees, $JOBS at a time"
 	TILE_OUT="$TMP/tiles"; mkdir -p "$TILE_OUT"

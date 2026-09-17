@@ -44,13 +44,13 @@ ODbL 1.0, © OpenStreetMap contributors. Used only to cut land out, as the rest 
 CC BY 4.0, commercial use allowed. Attribution: "Contains Irish Public Sector Data (Geological Survey Ireland & Marine
 Institute) licensed under a Creative Commons Attribution 4.0 International (CC BY 4.0) license". Depths refer to LAT.
 
-## Checked, not used
-
 **Danmarks Dybdemodel 50 m** - https://gst.dk/ansvarsomraader/soekort-og-marine-data/soeopmaaling-og-dybdedata/danmarks-dybdemodel
 Licence fits: free, worldwide, commercial use allowed ("bruges kommercielt og ikke-kommercielt"). Conditions: not
 for navigation, no implied endorsement, credit "Indeholder data fra Geodatastyrelsen, Danmarks Dybdemodel, 50 m
-opløsning", the download date and "Model og data er ikke egnet til navigation". Not scripted because Dataforsyningen
-downloads need a login. Depths refer to mean sea level (DKSML 2022), not chart datum.
+opløsning", the download date and "Model og data er ikke egnet til navigation". Depths refer to mean sea level
+(DKSML 2022), not chart datum, as positive numbers.
+
+## Checked, not used
 
 **Traficom (Finland) depth contours, areas and soundings** -
 https://traficom.fi/fi/ajankohtaista/paikkatietoaineistot/merikartoitusaineistot
@@ -79,6 +79,14 @@ used for navigation ... nor will any product created by the User from the Data" 
 a third party as such (§2), every derived product must carry a fixed CHS notice (§7), and CHS may end the licence by
 public notice, after which all copies are destroyed within 15 days (§12, §14). Commercial use is not forbidden, but
 §3 conflicts with a nautical map; needs a legal read. Open WCS without a key; chart datum, negative below it.
+
+**SHOM bathymetric DTMs (France): façades 100 m HOMONIM, coastal topo-bathy 5-20 m, Litto3D** -
+https://services.data.shom.fr/INSPIRE/telechargement/ (each product has its own DOI)
+Etalab Licence Ouverte v2.0 (open licence, commercial use allowed). Cite each product as its metadata says, e.g.
+"Shom, 2015. MNT Bathymétrique de façade Atlantique (Projet Homonim). http://dx.doi.org/10.17183/MNT_ATL100m_HOMONIM_WGS84".
+Metadata: "Ne pas utiliser pour la navigation"; the grids give the most probable depth, not the safe-side chart depth.
+Open download, no key. Façades come in PBMA (≈ LAT) and NM (mean sea level) versions, 0.001°, one 7z per façade
+(Atlantique 464 MB); Litto3D is Lambert-93 with IGN69 heights, not chart datum. Not wired into the build yet.
 
 **UKHO ADMIRALTY seabed mapping surveys (United Kingdom)** - https://seabed.admiralty.co.uk/
 UKHO Bathymetry Data Licence v1.0: commercial use allowed, "including it in your own product or application".

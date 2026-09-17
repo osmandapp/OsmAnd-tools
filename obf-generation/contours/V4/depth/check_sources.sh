@@ -6,7 +6,7 @@
 # For every source: file count against the expected one, every raster opens (gdalinfo), CRS is EPSG:4326 where
 # expected, a known sea point is below 0 m (depths are negative), and leftover archives or partial files.
 # Writes DIR/mask/land_polygons.gpkg (indexed copy of the land polygons) and DIR/src/gebco/gebco_2026.vrt, DIR/src/gebco_tid/gebco_2026_tid.vrt, DIR/src/emodnet/emodnet_2024.vrt,
-# DIR/src/cudem/cudem.vrt, DIR/src/ireland/ireland.vrt. Prints OK / WARN / FAIL lines and exits with 1 when anything failed.
+# DIR/src/cudem/cudem.vrt, DIR/src/ireland/ireland.vrt, DIR/src/denmark/denmark.vrt, DIR/src/france/france.vrt. Prints OK / WARN / FAIL lines and exits with 1 when anything failed.
 set -uo pipefail
 
 OUT=""; JOBS=4
@@ -194,6 +194,33 @@ else
 	else fail "ireland: gdalbuildvrt failed"; fi
 fi
 leftovers ireland "$SRC/ireland"
+
+echo "== france"
+FILES=("$SRC"/france/*.tif)
+[ -e "${FILES[0]}" ] || FILES=()
+count france ${#FILES[@]} 11
+if [ ${#FILES[@]} -gt 0 ]; then
+	rasters_open france "${FILES[@]}"
+	# zones of 5, 10 and 20 m: the VRT keeps the finest cell
+	if gdalbuildvrt -q -resolution highest "$SRC/france/france.vrt" "${FILES[@]}" 2>/dev/null; then
+		ok "france: france.vrt of ${#FILES[@]} files"
+		sea france "$SRC/france/france.vrt" -1.67 43.40 "Saint-Jean-de-Luz bay"
+	else fail "france: gdalbuildvrt failed"; fi
+fi
+leftovers france "$SRC/france"
+
+echo "== denmark"
+DK="$SRC/denmark/ddm_50m.dybde.tiff"
+if [ ! -f "$DK" ]; then fail "denmark: ddm_50m.dybde.tiff not found"
+else
+	rasters_open denmark "$DK"
+	c=$(crs "$DK"); if [ "$c" = "EPSG:3034" ]; then ok "denmark: $c"; else warn "denmark: $c, expected EPSG:3034"; fi
+	# the model gives depths as positive numbers: the VRT turns them negative like every other grid
+	if gdal_translate -q -of VRT -scale 0 1 0 -1 "$DK" "$SRC/denmark/denmark.vrt" 2>/dev/null; then
+		ok "denmark: denmark.vrt with depths negative"
+		sea denmark "$SRC/denmark/denmark.vrt" 11.0 56.3 "Kattegat"
+	else fail "denmark: denmark.vrt could not be written"; fi
+fi
 
 echo
 if [ $FAILED -eq 0 ]; then echo "All checks passed"; else echo "Some checks FAILED"; fi
