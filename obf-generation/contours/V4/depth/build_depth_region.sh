@@ -44,7 +44,7 @@
 #                tiles' .osm.gz become one map section of contours, one of the overview and one per point tier
 #                (generate-single-map) in
 #                NAME.depth.obf, without -c they stay in OUT_DIR/NAME.tiles; env TILE_WITH=RASTER keeps only the tiles
-#                touching one of that VRT's files
+#                touching one of that VRT's files; env BBOX="W S E N" with -D builds a region only inside that box (a test)
 #   -N NO_DETAILED  "OUTPUT_NAME:COVERAGE[,COVERAGE...][:OVERVIEW_COVERAGE,...]", tiles with -c only: a second map
 #                OUT_DIR/OUTPUT_NAME.depth.obf of the same tiles with the coverages of detailed maps cut out
 #                (depth_osm_exclude.py: soundings inside dropped, contours cut at the edge); the overview section is
@@ -97,7 +97,7 @@ set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 V4=$(cd "$HERE/.." && pwd)
-NAME=""; BBOX=""; GRID=""; LAND=""; OUT=""; CELL=""; UPSAMPLE=1; JOBS=4; SMOOTH=4; SMOOTH_FROM=""; MAP_CREATOR=""
+NAME=""; BBOX="${BBOX:-}"; GRID=""; LAND=""; OUT=""; CELL=""; UPSAMPLE=1; JOBS=4; SMOOTH=4; SMOOTH_FROM=""; MAP_CREATOR=""
 DATA=""; TILE=0; TILE_WITH="${TILE_WITH:-}"; KEEP=0; LEVELS=""; TIERS=""; RESAMPLING=""; MIN_RING_CELLS=""; OVERVIEW=""
 NO_DETAILED=""; EXCLUDE=""; EXCLUDE_LAYER=""; ENC=""; ENC_AREAS=""; FILL=""; ENC_TIERS="0.02:10-11 0.008:12 0.003:13-14 0.001:15-"
 # steps FROM:TO:STEP... : comma-separated levels
@@ -159,14 +159,24 @@ if [ -n "$DATA" ]; then
 		print(h.hexdigest())
 		PY
 		)
-		if [ "$(cat "$COVERAGE.sig" 2>/dev/null)" != "$sig" ]; then rm -f "$COVERAGE"; fi
-		if [ ! -f "$COVERAGE" ]; then
+		mkdir -p "$DATA/src/coverage"
+		# Europe_contours and World_contours may run at the same time: one of them builds a coverage, the other waits
+		# (a lock left by a killed build, whose process is gone, is taken over)
+		until mkdir "$COVERAGE.lock" 2>/dev/null; do
+			pid=$(cat "$COVERAGE.lock/pid" 2>/dev/null || true)
+			if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then rm -rf "$COVERAGE.lock"; continue; fi
+			sleep 5
+		done
+		echo $$ > "$COVERAGE.lock/pid"
+		if [ "$(cat "$COVERAGE.sig" 2>/dev/null)" != "$sig" ] || [ ! -f "$COVERAGE" ]; then
 			echo "== coverage $name"
-			mkdir -p "$DATA/src/coverage"
+			rm -f "$COVERAGE" "$COVERAGE.sig"
 			# shellcheck disable=SC2086
-			python3 "$HERE/depth_coverage.py" $opts "$@" "$COVERAGE.tmp.gpkg" 2>&1 | grep -v numpy
+			python3 "$HERE/depth_coverage.py" $opts "$@" "$COVERAGE.tmp.gpkg" 2>&1 | grep -v numpy \
+				|| { rm -rf "$COVERAGE.lock"; exit 1; }
 			mv "$COVERAGE.tmp.gpkg" "$COVERAGE"; echo "$sig" > "$COVERAGE.sig"
 		fi
+		rm -rf "$COVERAGE.lock"
 	}
 	detailed_europe() {
 		local c=""
@@ -447,6 +457,8 @@ if [ -n "$TILES" ]; then
 				|| { echo "FAILED cutting the detailed coverage" >&2; exit 1; }
 			sections "$nd_dir" "$OUT/$nd_name.depth.obf"
 		fi
+		# the ENC contours, soundings and areas are only map sections here
+		rm -f "$OUT/${NAME}"_enc*.osm.gz
 	else
 		rm -rf "$OUT/$NAME.tiles"; mkdir -p "$OUT/$NAME.tiles"
 		mv "$TILE_OUT"/*.osm.gz "$OUT/$NAME.tiles/" 2>/dev/null || true
