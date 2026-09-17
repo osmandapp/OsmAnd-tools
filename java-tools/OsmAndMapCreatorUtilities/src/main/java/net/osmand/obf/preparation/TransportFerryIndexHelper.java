@@ -37,7 +37,7 @@ public class TransportFerryIndexHelper {
 	private final Set<Long> relationWays = new HashSet<>();
 	private final TLongLongHashMap syntheticStops = new TLongLongHashMap(); // stop id -> node id
 	private final TLongHashSet junctionStops = new TLongHashSet();
-	private final TLongObjectHashMap<TLongObjectHashMap<String>> crossings = new TLongObjectHashMap<>(); // route id -> stop id -> "interval:duration"
+	private final TLongObjectHashMap<TLongObjectHashMap<String>> crossings = new TLongObjectHashMap<>(); // route id -> stop id -> "interval:duration:length"
 
 	private static boolean isFerry(Entity e) {
 		return FerryRoutingHelper.FERRY.equals(e.getTag(OSMTagKey.ROUTE));
@@ -94,9 +94,11 @@ public class TransportFerryIndexHelper {
 					if (!crossings.containsKey(route.getId())) {
 						crossings.put(route.getId(), new TLongObjectHashMap<>());
 					}
+					double length = getLength(w);
 					int interval = TransportRoute.parseIntervalTagToSeconds(w.getTag(TransportRoute.INTERVAL_KEY));
-					int duration = FerryRoutingHelper.parseDuration(w.getTag(FerryRoutingHelper.DURATION_TAG), getLength(w));
-					crossings.get(route.getId()).put(stops.get(Math.max(start, end)).getId(), interval + ":" + duration);
+					int duration = FerryRoutingHelper.parseDuration(w.getTag(FerryRoutingHelper.DURATION_TAG), length);
+					crossings.get(route.getId()).put(stops.get(Math.max(start, end)).getId(),
+							interval + ":" + duration + ":" + (int) length);
 				}
 			}
 		}

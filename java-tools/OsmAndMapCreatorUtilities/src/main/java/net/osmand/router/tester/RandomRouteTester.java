@@ -476,7 +476,7 @@ public class RandomRouteTester {
 		Map<String, String> routeParameters = getDefaultParameters(ptRouter);
 		routeParameters.putAll(entry.mapParams());
 
-		TransportRoutingConfiguration cfg = new TransportRoutingConfiguration(ptRouter, routeParameters);
+		TransportRoutingConfiguration cfg = new TransportRoutingConfiguration(builder, ptRouter, routeParameters);
 
 		TransportRoutingContext ctx = new TransportRoutingContext(cfg, nativeLibrary,
 				obfReaders.toArray(new BinaryMapIndexReader[0]));
