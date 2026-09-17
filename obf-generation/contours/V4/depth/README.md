@@ -113,9 +113,11 @@ Java each (`JAVA_OPTS`, `-Xmx16g` by default).
 
 ### Maps without the detailed regions
 
-A regional map (Netherlands, Ireland, France, Great Britain, Norway, New Zealand, Gulf) shown together with
-`Europe_contours` or `World_contours` doubles the contours. The same build also writes `Europe_no_detailed.depth.obf`
-and `World_no_eu_detailed.depth.obf` (`-N`): the tiles' OSM with the coverage of the detailed regions cut out.
+A regional map (Netherlands, Ireland, France, Great Britain, Norway, New Zealand, Gulf) shown together with the whole
+EMODnet or GEBCO doubles the contours, so the published `Europe_contours` and `World_contours` are the maps with the
+coverage of the detailed regions cut out of the tiles' OSM (`-N`), and the whole grid goes beside them as
+`Europe_full_coverage_contours` and `World_full_coverage_contours`. A regional map is meant to be used together with
+`Europe_contours`: where a region has no data of its own (Brest, outside the SHOM zones), EMODnet fills in.
 
 - `depth_coverage.py SOURCE... OUT.gpkg`: where a source has data - a grid reduced to 0.001 degree cells and
   polygonized, or vector layers (`--layer`, Kartverket `datakvalitet`, LINZ `area_1..5`), shrunk by a cell. Cached in
@@ -124,6 +126,6 @@ and `World_no_eu_detailed.depth.obf` (`-N`): the tiles' OSM with the coverage of
   the coverage edge.
 - `depth_exclude_check.py BEFORE_DIR AFTER_DIR --exclude ...`: nothing left inside, nothing lost outside.
 
-`Europe_no_detailed` leaves out Ireland, France, the Great Britain surveys, the Netherlands grids and Kartverket.
-`World_no_eu_detailed` leaves out EMODnet (its overview too, Europe has its own), the same regions, New Zealand
+`Europe_contours` leaves out Ireland, France, the Great Britain surveys, the Netherlands grids and Kartverket.
+`World_contours` leaves out EMODnet (its overview too, Europe has its own), the same regions, New Zealand
 (165..180 E) and the CUDEM of the Gulf box.

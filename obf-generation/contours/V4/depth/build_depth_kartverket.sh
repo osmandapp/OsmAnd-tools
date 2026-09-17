@@ -9,7 +9,9 @@
 #                DATA_DIR/mask/land_polygons.gpkg, the output DATA_DIR/build
 #   -n NAME      default Norway_contours
 #   -b BBOX      only this box (lon/lat), default all of the data
-#   -i FGDB      the Dybdedata file geodatabase (or any OGR source with its dybdekurve and dybdepunkt layers)
+#   -i FGDB      the Dybdedata file geodatabase (or any OGR source with its dybdekurve and dybdepunkt layers). The
+#                map keeps 2 m and every 5 m as its contours, the metre levels down to 10 m as a section of
+#                env MINOR_ZOOMS (default "15-"), and leaves out the metre levels deeper than 10 m
 #   -m LAND      land polygons; soundings on land are dropped, contours are kept as they are
 #   -p TIERS     soundings "SPACING:ZOOMS ...", the shallowest sounding of every SPACING degree cell shown from ZOOMS,
 #                default "0.02:10-11 0.008:12 0.0025:13-14 0.001:15-"
@@ -120,7 +122,7 @@ if [ -z "$BBOX" ] && [ "$TILE" != 0 ]; then
 	)
 	step "$NAME: $(echo "$TILES" | wc -l | tr -d ' ') tiles of $TILE degrees with data, $JOBS at a time"
 	TILE_OUT="$TMP/tiles"; mkdir -p "$TILE_OUT"
-	export SELF="$0" FGDB LAND TIERS TILE_OUT
+	export SELF="$0" FGDB LAND TIERS TILE_OUT MINOR_ZOOMS
 	echo "$TILES" | xargs -P "$JOBS" -L 1 bash -c '
 		name=$1; shift
 		bash "$SELF" -n "$name" -b "$*" -i "$FGDB" -m "$LAND" -o "$TILE_OUT" -p "$TIERS" -t 0 > "$TILE_OUT/$name.log" 2>&1 \
@@ -128,10 +130,15 @@ if [ -z "$BBOX" ] && [ "$TILE" != 0 ]; then
 		echo "tile $name: $(tail -1 "$TILE_OUT/$name.log")"' _
 	if [ -n "$MAP_CREATOR" ]; then
 		OBFS=(); PIDS=()
-		contours=("$TILE_OUT"/*_[0-9][0-9]_[0-9][0-9].osm.gz)
+		contours=("$TILE_OUT"/*_[0-9][0-9]_[0-9][0-9].osm.gz)  # *_minor.osm.gz does not match
 		if [ -f "${contours[0]}" ]; then
 			step "contours obf of ${#contours[@]} tiles"
 			single "$TMP/contours.obf" "${contours[@]}" & PIDS+=($!); OBFS+=("$TMP/contours.obf")
+		fi
+		minor=("$TILE_OUT"/*_minor.osm.gz)
+		if [ -f "${minor[0]}" ]; then
+			step "minor contours obf of ${#minor[@]} tiles"
+			single "$TMP/minor.obf" --map-zooms="$MINOR_ZOOMS" "${minor[@]}" & PIDS+=($!); OBFS+=("$TMP/minor.obf")
 		fi
 		areas=("$TILE_OUT"/*_areas.osm.gz)
 		if [ -f "${areas[0]}" ]; then
@@ -161,19 +168,29 @@ fi
 SPAT=(); CLIP=()
 if [ -n "$BBOX" ]; then read -r W S E N <<< "$BBOX"; SPAT=(-spat "$W" "$S" "$E" "$N"); CLIP=(-clipsrc "$W" "$S" "$E" "$N"); fi
 
+# The map's contours are the standard levels: 2 m and every 5 m. A detailed survey is charted in 1 m steps
+# (Kartverket in harbours): the metre levels down to 10 m (1, 3, 4, 6, 7, 8, 9) go to NAME_minor.osm.gz, a map section
+# of MINOR_ZOOMS (zoom 15 and above by default), and the metre levels deeper than 10 m are left out - they are a mess
+# at every zoom.
 step "$NAME contours from $FGDB"
-ogr2ogr -f FlatGeobuf "$TMP/depth.fgb" "$FGDB" ${SPAT[@]+"${SPAT[@]}"} ${CLIP[@]+"${CLIP[@]}"} \
-	-nlt MULTILINESTRING -a_srs None -lco SPATIAL_INDEX=NO \
-	-sql "SELECT SHAPE, dybde AS depth FROM dybdekurve WHERE dybde > 0"
-# a tile without contours leaves no readable FlatGeobuf (header only or no file)
-lines=$(ogrinfo -so -al "$TMP/depth.fgb" 2>/dev/null | awk -F': ' '/Feature Count/{print $2}') || lines=0
-lines=${lines:-0}
-step "contours osm: $lines lines"
-rm -f "$OUT/$NAME.osm.gz"
-if [ "$lines" != 0 ]; then
-	python3 "$V4/ogr2osm.py" -f -t "$V4/translations/contours_depth.py" -o "$TMP/$NAME.osm" "$TMP/depth.fgb" >/dev/null
-	gzip -f "$TMP/$NAME.osm"; mv "$TMP/$NAME.osm.gz" "$OUT/$NAME.osm.gz"
-fi
+rm -f "$OUT/$NAME.osm.gz" "$OUT/${NAME}_minor.osm.gz"
+MINOR_ZOOMS="${MINOR_ZOOMS-15-}"
+for part in main ${MINOR_ZOOMS:+minor}; do
+	if [ "$part" = main ]; then where="dybde = 2 OR dybde % 5 = 0"; out="$OUT/$NAME.osm.gz"
+	else where="dybde <= 10 AND dybde <> 2 AND dybde % 5 <> 0"; out="$OUT/${NAME}_minor.osm.gz"; fi
+	ogr2ogr -f FlatGeobuf "$TMP/depth.fgb" "$FGDB" ${SPAT[@]+"${SPAT[@]}"} ${CLIP[@]+"${CLIP[@]}"} \
+		-nlt MULTILINESTRING -a_srs None -lco SPATIAL_INDEX=NO \
+		-sql "SELECT SHAPE, dybde AS depth FROM dybdekurve WHERE dybde > 0 AND ($where)"
+	# a tile without contours leaves no readable FlatGeobuf (header only or no file)
+	lines=$(ogrinfo -so -al "$TMP/depth.fgb" 2>/dev/null | awk -F': ' '/Feature Count/{print $2}') || lines=0
+	lines=${lines:-0}
+	step "$part contours osm: $lines lines"
+	if [ "$lines" != 0 ]; then
+		python3 "$V4/ogr2osm.py" -f -t "$V4/translations/contours_depth.py" -o "$TMP/$NAME.osm" "$TMP/depth.fgb" >/dev/null
+		gzip -f "$TMP/$NAME.osm"; mv "$TMP/$NAME.osm.gz" "$out"
+	fi
+	rm -f "$TMP/depth.fgb"
+done
 
 step "soundings"
 LAND_CUT="$LAND"
@@ -196,6 +213,7 @@ if [ -n "$MAP_CREATOR" ]; then
 	OBFS=(); PIDS=(); i=0
 	step "map sections"
 	if [ -f "$OUT/$NAME.osm.gz" ]; then obf "$OUT/$NAME.osm.gz" > "$TMP/section0" & PIDS+=($!); fi
+	if [ -f "$OUT/${NAME}_minor.osm.gz" ]; then obf "$OUT/${NAME}_minor.osm.gz" "$MINOR_ZOOMS" > "$TMP/section_minor" & PIDS+=($!); fi
 	if [ -f "$OUT/${NAME}_areas.osm.gz" ]; then obf "$OUT/${NAME}_areas.osm.gz" > "$TMP/section_areas" & PIDS+=($!); fi
 	for tier in $TIERS; do
 		i=$((i + 1))

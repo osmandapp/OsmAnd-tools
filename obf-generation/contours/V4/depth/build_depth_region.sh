@@ -48,8 +48,9 @@
 #   -N NO_DETAILED  "OUTPUT_NAME:COVERAGE[,COVERAGE...][:OVERVIEW_COVERAGE,...]", tiles with -c only: a second map
 #                OUT_DIR/OUTPUT_NAME.depth.obf of the same tiles with the coverages of detailed maps cut out
 #                (depth_osm_exclude.py: soundings inside dropped, contours cut at the edge); the overview section is
-#                cut by OVERVIEW_COVERAGEs only, kept whole without them. Europe_contours makes Europe_no_detailed,
-#                World_contours World_no_eu_detailed, with coverages cached in DATA_DIR/src/coverage (depth_coverage.py)
+#                cut by OVERVIEW_COVERAGEs only, kept whole without them. The region Europe_contours writes the cut map
+#                as Europe_contours (the one to use with the detailed maps) and the whole EMODnet as
+#                Europe_full_coverage_contours; World_contours the same. Coverages are cached in DATA_DIR/src/coverage
 #   -c MAP_CREATOR_DIR  unzipped OsmAndMapCreator: writes OUT_DIR/NAME.depth.obf (points need its --map-zooms)
 #   -k           keep: do nothing when OUT_DIR/NAME.depth.obf already exists
 #   env RENDERING_TYPES  rendering_types.xml for OsmAndMapCreator instead of its own (new tags before a nightly)
@@ -70,20 +71,22 @@
 #   Europe_contours                   EMODnet DTM 2024, contours every 5 m to 50 m, 10 m to 200 m, 50 m to 1000 m,
 #                                     then as the default, overview 0.02 degrees for zooms 5-8, 10 degree tiles;
 #                                     Europe_* leave out the Kartverket coverage (Norway_contours) when it is downloaded;
-#                                     also Europe_no_detailed.depth.obf: without Ireland, France, Great Britain (surveys),
-#                                     Netherlands and Norway coverage
+#                                     written as Europe_contours without the coverage of Ireland, France, the Great
+#                                     Britain surveys, the Netherlands and Norway, and as Europe_full_coverage_contours
+#                                     with all of EMODnet
 #   Europe_points                     EMODnet DTM 2024, points, 10 degree tiles
 #   Norway_contours                   Kartverket Sjøkart - Dybdedata (vector), see build_depth_kartverket.sh
 #   New-zealand_contours              LINZ chart vector data, 5 scale bands merged by depth_bands_merge.py (the largest
 #                                     scale wins), then as Norway_contours; main islands only (165..180 E)
 #   World_contours                    GEBCO_2026 (15"), contours every 10 m to 300 m, 50 m to 1000 m, then as the
 #                                     default - 2 and 5 m mean nothing in a 450 m grid, overview 0.02 degrees for
-#                                     zooms 5-8, 15 degree tiles; also World_no_eu_detailed.depth.obf: without EMODnet
-#                                     (Europe_*, overview too), the Europe_no_detailed regions, New Zealand and the
-#                                     CUDEM of Gulf_of_Mexico_north-west
+#                                     zooms 5-8, 15 degree tiles; written as World_contours without EMODnet (Europe_*,
+#                                     overview too), the detailed regions, New Zealand and the CUDEM of the Gulf, and as
+#                                     World_full_coverage_contours with everything
 #   World_Northern_hemisphere_points  GEBCO_2026, points, 15 degree tiles
 #   World_Southern_hemisphere_points  GEBCO_2026, points, 15 degree tiles
-#   Gulf_of_Mexico_north-west_contours  NOAA CUDEM 1/3" near the coast over GEBCO_2026, contours as Europe and
+#   Gulf_of_Mexico_north-west_contours  the US coast of the Gulf (-98..-80.5, 24..31.5): NOAA CUDEM 1/3" near the
+#                                     coast over GEBCO_2026, contours as Europe and
 #                                     points, 50 m cells (GEBCO bilinear, rings under 40 cells dropped), overview as
 #                                     Europe, 3 degree tiles; NOAA ENC inside its approach and harbour charts
 #
@@ -99,7 +102,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 V4=$(cd "$HERE/.." && pwd)
 NAME=""; BBOX="${BBOX:-}"; GRID=""; LAND=""; OUT=""; CELL=""; UPSAMPLE=1; JOBS=4; SMOOTH=4; SMOOTH_FROM=""; MAP_CREATOR=""
 DATA=""; TILE=0; TILE_WITH="${TILE_WITH:-}"; KEEP=0; LEVELS=""; TIERS=""; RESAMPLING=""; MIN_RING_CELLS=""; OVERVIEW=""
-NO_DETAILED=""; EXCLUDE=""; EXCLUDE_LAYER=""; ENC=""; ENC_AREAS=""; FILL=""; ENC_TIERS="0.02:10-11 0.008:12 0.003:13-14 0.001:15-"
+NO_DETAILED=""; FULL_NAME=""; EXCLUDE=""; EXCLUDE_LAYER=""; ENC=""; ENC_AREAS=""; FILL=""; ENC_TIERS="0.02:10-11 0.008:12 0.003:13-14 0.001:15-"
 # steps FROM:TO:STEP... : comma-separated levels
 steps() { local s a b c out=""; for s; do IFS=: read -r a b c <<< "$s"; out+=$(seq "$a" "$c" "$b" | paste -sd, -),; done
 	echo "${out%,}"; }
@@ -139,6 +142,8 @@ done
 if [ -n "$DATA" ]; then
 	EMODNET="$DATA/src/emodnet/emodnet_2024.vrt"; GEBCO="$DATA/src/gebco/gebco_2026.vrt"
 	GEBCO_TIERS="0.3:6-9 0.05:10-12 0.02:13-"; OVERVIEW_Z5_8="0.02:5-8"
+	# the whole US coast of the Gulf; World_contours cuts the CUDEM of this box out of itself
+	GULF_BBOX="-98 24 -80.5 31.5"
 	KARTVERKET=$(ls -d "$DATA"/src/norway/*.gdb 2>/dev/null | head -1 || true)
 	NL="$DATA/src/netherlands"
 	# coverage NAME "OPTIONS" SOURCE... : DATA/src/coverage/NAME.gpkg of depth_coverage.py, rebuilt when the sources
@@ -248,7 +253,10 @@ if [ -n "$DATA" ]; then
 			: "${BBOX:=-31.3 25.4 36.0 71.2}"; : "${GRID:=$EMODNET}"; : "${LEVELS:=$EUROPE_LEVELS}"
 			: "${OVERVIEW:=$OVERVIEW_Z5_8}"
 			if [ -n "$KARTVERKET" ]; then : "${EXCLUDE:=$KARTVERKET}"; : "${EXCLUDE_LAYER:=datakvalitet}"; fi
-			if [ -z "$NO_DETAILED" ]; then detailed_europe; NO_DETAILED="Europe_no_detailed:$DETAILED_EUROPE"; fi
+			# the map with the detailed regions cut out is the one to use, so it keeps the region name; the whole
+			# EMODnet is published beside it under _full_coverage_
+			if [ -z "$NO_DETAILED" ]; then detailed_europe; NO_DETAILED="Europe_contours:$DETAILED_EUROPE"; fi
+			: "${FULL_NAME:=Europe_full_coverage_contours}"
 			[ "$TILE" != 0 ] || TILE=10 ;;
 		Europe_points)
 			: "${BBOX:=-36.0 25.0 41.8 83.1}"; : "${GRID:=$EMODNET}"; : "${LEVELS:=none}"
@@ -263,15 +271,16 @@ if [ -n "$DATA" ]; then
 				# the box of New-zealand_contours: LINZ also has the Pacific islands and the Ross Sea
 				coverage new-zealand "--bbox 165 -48 180 -33.5 --layer area_1 --layer area_2 --layer area_3 --layer area_4 --layer area_5" \
 					"$DATA/src/nz/linz_hydro.gpkg"; nz=$COVERAGE
-				coverage gulf-cudem "--bbox -96.43 25.77 -84.92 29.40" "$DATA/src/cudem/cudem.vrt"; gulf=$COVERAGE
-				NO_DETAILED="World_no_eu_detailed:$emodnet,$DETAILED_EUROPE,$nz,$gulf:$emodnet"
+				coverage gulf-cudem "--bbox $GULF_BBOX" "$DATA/src/cudem/cudem.vrt"; gulf=$COVERAGE
+				NO_DETAILED="World_contours:$emodnet,$DETAILED_EUROPE,$nz,$gulf:$emodnet"
 			fi
+			: "${FULL_NAME:=World_full_coverage_contours}"
 			[ "$TILE" != 0 ] || TILE=15 ;;
 		World_Northern_hemisphere_points)
 			: "${BBOX:=-180 0 180 85}"; : "${GRID:=$GEBCO}"; : "${LEVELS:=none}"; : "${TIERS:=$GEBCO_TIERS}"
 			[ "$TILE" != 0 ] || TILE=15 ;;
 		Gulf_of_Mexico_north-west_contours)
-			: "${BBOX:=-96.43 25.77 -84.92 29.40}"; : "${GRID:=$GEBCO,$DATA/src/cudem/cudem.vrt}"; : "${CELL:=0.0005}"
+			: "${BBOX:=$GULF_BBOX}"; : "${GRID:=$GEBCO,$DATA/src/cudem/cudem.vrt}"; : "${CELL:=0.0005}"
 			: "${LEVELS:=$EUROPE_LEVELS}"; : "${SMOOTH_FROM:=5}"; : "${RESAMPLING:=bilinear}"; : "${MIN_RING_CELLS:=40}"
 			: "${TIERS:=0.05:9-10 0.02:11-12 0.01:13 0.005:14-}"; : "${OVERVIEW:=$OVERVIEW_Z5_8}"
 			if [ -d "$DATA/src/noaa_enc/ENC_ROOT" ]; then : "${ENC:=$DATA/src/noaa_enc/ENC_ROOT}"; fi
@@ -290,8 +299,10 @@ for v in NAME BBOX GRID LAND OUT; do
 done
 [ -n "$LEVELS$TIERS" ] || { echo "Nothing to build: no contour levels and no point tiers" >&2; exit 1; }
 read -r W S E N <<< "$BBOX"
-if [ $KEEP -eq 1 ] && [ -f "$OUT/$NAME.depth.obf" ]; then
-	echo "== $NAME.depth.obf exists, kept (no -k to rebuild)"; exit 0
+: "${FULL_NAME:=$NAME}"  # the OBF of the whole region; with -N the cut one gets $NAME and this gets another
+if [ $KEEP -eq 1 ] && [ -f "$OUT/$FULL_NAME.depth.obf" ] \
+		&& { [ -z "$NO_DETAILED" ] || [ -f "$OUT/${NO_DETAILED%%:*}.depth.obf" ]; }; then
+	echo "== $FULL_NAME.depth.obf exists, kept (no -k to rebuild)"; exit 0
 fi
 mkdir -p "$OUT"; OUT=$(cd "$OUT" && pwd)
 if [ -n "$MAP_CREATOR" ]; then MAP_CREATOR=$(cd "$MAP_CREATOR" && pwd); fi
@@ -441,7 +452,7 @@ if [ -n "$TILES" ]; then
 			step "merge ${#OBFS[@]} map sections into $(basename "$output")"
 			merge "$output" "${OBFS[@]}"
 		}
-		sections "$TILE_OUT" "$OUT/$NAME.depth.obf"
+		sections "$TILE_OUT" "$OUT/$FULL_NAME.depth.obf"
 		if [ -n "$NO_DETAILED" ]; then
 			IFS=: read -r nd_name nd_cover nd_overview <<< "$NO_DETAILED"
 			step "$nd_name: the tiles without the detailed coverage"
@@ -464,7 +475,7 @@ if [ -n "$TILES" ]; then
 		mv "$TILE_OUT"/*.osm.gz "$OUT/$NAME.tiles/" 2>/dev/null || true
 	fi
 	rm -rf "$TMP"
-	step "done: $(cd "$OUT" && du -sh "$NAME".* | awk '{printf "%s (%s) ", $2, $1}')"
+	step "done: $(cd "$OUT" && du -sh "$FULL_NAME".depth.obf ${NO_DETAILED:+"${NO_DETAILED%%:*}.depth.obf"} 2>/dev/null | awk '{printf "%s (%s) ", $2, $1}')"
 	exit 0
 fi
 
@@ -672,9 +683,10 @@ if [ -n "$TIERS" ]; then
 	for tier in $TIERS; do
 		i=$((i + 1)); spacing=${tier%%:*}; zooms=${tier#*:}
 		step "points every $spacing deg from zoom $zooms"
-		# per spacing cell the shoalest water cell at its own position, as on charts (not a regular grid)
+		# per spacing cell the shoalest water cell at its own position and thinned where the bottom is even, as on
+		# charts (not a regular grid)
 		osm="$OUT/${NAME}_points$i.osm.gz"
-		python3 "$HERE/depth_points_osm.py" "$TMP/water.tif" "$osm" --bbox "$W" "$S" "$E" "$N" --shoalest "$spacing" \
+		python3 "$HERE/depth_points_osm.py" "$TMP/water.tif" "$osm" --bbox "$W" "$S" "$E" "$N" --shoalest "$spacing" --thin \
 			--first-id $((i * 100000000))
 		if [ "$(zcat < "$osm" | grep -c -m1 '<node')" = 0 ]; then
 			rm -f "$osm"; continue
@@ -694,7 +706,7 @@ if [ -n "$MAP_CREATOR" ]; then
 		rm -rf "$TMP"; step "no depth data in $NAME, nothing written"; exit 0
 	fi
 	step "merge ${#OBFS[@]} map sections"
-	merge "$OUT/$NAME.depth.obf" "${OBFS[@]}"
+	merge "$OUT/$FULL_NAME.depth.obf" "${OBFS[@]}"
 fi
 rm -rf "$TMP"
-step "done: $(cd "$OUT" && du -h "$NAME".* "$NAME"_points* "$NAME"_overview* "$NAME"_enc* 2>/dev/null | awk '{printf "%s (%s) ", $2, $1}')"
+step "done: $(cd "$OUT" && du -h "$FULL_NAME".* "$NAME".* "$NAME"_points* "$NAME"_overview* 2>/dev/null | sort -u -k2 | awk '{printf "%s (%s) ", $2, $1}')"
