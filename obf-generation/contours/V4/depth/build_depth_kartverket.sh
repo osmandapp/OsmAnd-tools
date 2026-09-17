@@ -165,7 +165,9 @@ step "$NAME contours from $FGDB"
 ogr2ogr -f FlatGeobuf "$TMP/depth.fgb" "$FGDB" ${SPAT[@]+"${SPAT[@]}"} ${CLIP[@]+"${CLIP[@]}"} \
 	-nlt MULTILINESTRING -a_srs None -lco SPATIAL_INDEX=NO \
 	-sql "SELECT SHAPE, dybde AS depth FROM dybdekurve WHERE dybde > 0"
-lines=$(ogrinfo -so -al "$TMP/depth.fgb" | awk -F': ' '/Feature Count/{print $2}')
+# a tile without contours leaves no readable FlatGeobuf (header only or no file)
+lines=$(ogrinfo -so -al "$TMP/depth.fgb" 2>/dev/null | awk -F': ' '/Feature Count/{print $2}') || lines=0
+lines=${lines:-0}
 step "contours osm: $lines lines"
 rm -f "$OUT/$NAME.osm.gz"
 if [ "$lines" != 0 ]; then
