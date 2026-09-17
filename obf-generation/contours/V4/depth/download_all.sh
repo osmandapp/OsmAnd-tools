@@ -85,9 +85,20 @@ unzip_rm() {
 	rm -f "$zip"; : > "$zip.done"
 	echo "unzipped and removed $(basename "$zip")"
 }
+# arcgis_nodata TIF : INFOMAR writes no data as 0 and, in parts of the 25 m grid, as 3.4e38; both become NaN, the
+# GeoTIFF compressed. A tile whose nodata is already NaN is left as it is
+arcgis_nodata() {
+	local tif=$1
+	if gdalinfo "$tif" 2>/dev/null | grep -q 'NoData Value=nan'; then return 0; fi
+	gdalwarp -q -overwrite -srcnodata 0 -dstnodata nan "$tif" "$tif.zero.tif" \
+		&& gdalwarp -q -overwrite -srcnodata 3.3999999521443642e+38 -dstnodata nan -co COMPRESS=DEFLATE -co PREDICTOR=3 \
+			-co TILED=YES "$tif.zero.tif" "$tif.nan.tif" \
+		&& mv "$tif.nan.tif" "$tif" && rm -f "$tif.zero.tif" \
+		|| { rm -f "$tif.zero.tif" "$tif.nan.tif"; echo "FAILED nodata $(basename "$tif")" >&2; return 1; }
+}
 # arcgis_tile URL DIR NAME W S E N COLS ROWS : one tile of an ArcGIS ImageServer grid as a compressed GeoTIFF with
-# nodata 0 (INFOMAR writes no data as 0). A preview at a quarter of the cells comes first: most tiles of the extent
-# are open ocean or land, those are left as NAME.empty
+# nodata NaN (arcgis_nodata). A preview at a quarter of the cells comes first: most tiles of the extent are open ocean
+# or land, those are left as NAME.empty
 arcgis_tile() {
 	local url=$1 dir=$2 name=$3 w=$4 s=$5 e=$6 n=$7 cols=$8 rows=$9 get
 	if [ -f "$dir/$name.tif" ] || [ -f "$dir/$name.empty" ]; then return 0; fi
@@ -102,8 +113,8 @@ arcgis_tile() {
 	fi
 	rm -f "$dir/$name".preview*
 	curl -sfL --retry 5 --retry-delay 5 -o "$dir/$name.part" "$get&size=$cols,$rows" || { echo "FAILED $name" >&2; return 1; }
-	gdal_translate -q -a_nodata 0 -co COMPRESS=DEFLATE -co PREDICTOR=3 -co TILED=YES "$dir/$name.part" "$dir/$name.tmp.tif" \
-		&& mv "$dir/$name.tmp.tif" "$dir/$name.tif" && rm -f "$dir/$name.part" && echo "ok $name"
+	mv "$dir/$name.part" "$dir/$name.tmp.tif" && arcgis_nodata "$dir/$name.tmp.tif" \
+		&& mv "$dir/$name.tmp.tif" "$dir/$name.tif" && echo "ok $name"
 }
 
 # arcgis_image URL DIR : the whole grid of an ArcGIS ImageServer at its own cell size, 4000 cells a tile
@@ -119,7 +130,7 @@ for i in range(math.ceil((e["xmax"] - e["xmin"]) / px / n)):
         print("%03d_%03d %.12f %.12f %.12f %.12f %d %d" % (i, j, x0, y1 - n * px, x0 + n * px, y1, n, n))' \
 	| xargs -P "$JOBS" -L 1 bash -c 'arcgis_tile "$0" "$@"' "$url" "$dir"
 }
-export -f fetch remote_size local_size unzip_rm arcgis_tile
+export -f fetch remote_size local_size unzip_rm arcgis_nodata arcgis_tile
 
 report() { # dry run: print total size of URL list on stdin
 	xargs -P 8 -I{} bash -c 'remote_size "$1"' _ {} | awk -v n="$1" '{s+=$1;c++} END{printf "%-12s %5d files %9.2f GB\n", n, c, s/1e9}'
@@ -199,6 +210,9 @@ if want ireland; then
 	else
 		arcgis_image "$B/IE_GSI_MI_Bathymetry_25m_IE_Waters_WGS84_LAT_GRID/ImageServer" "$SRC/ireland/25m"
 		arcgis_image "$B/IE_GSI_MI_Bathymetry_10m_Inshore_IE_WGS84_LAT_GRID/ImageServer" "$SRC/ireland/10m"
+		# tiles downloaded before the 3.4e38 fix
+		find "$SRC/ireland/25m" "$SRC/ireland/10m" -name '*.tif' ! -name '*.tmp.tif' -print0 \
+			| xargs -0 -P "$JOBS" -n 1 bash -c 'arcgis_nodata "$0"'
 	fi
 fi
 if want denmark; then

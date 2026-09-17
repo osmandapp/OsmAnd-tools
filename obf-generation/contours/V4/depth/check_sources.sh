@@ -182,7 +182,8 @@ fi
 
 echo "== ireland"
 # INFOMAR tiles without data were left as .empty; the 10 m inshore grid goes on top of the 25 m one
-FILES=(); while IFS= read -r f; do FILES+=("$f"); done < <(find "$SRC/ireland/25m" "$SRC/ireland/10m" -name '*.tif' 2>/dev/null | sort)
+# 25 m first: in a VRT the later files lie on top, so the 10 m grid wins where both have data
+FILES=(); while IFS= read -r f; do FILES+=("$f"); done < <(find "$SRC/ireland/25m" -name '*.tif' 2>/dev/null | sort; find "$SRC/ireland/10m" -name '*.tif' 2>/dev/null | sort)
 if [ ${#FILES[@]} -eq 0 ]; then fail "ireland: no files"
 else
 	ok "ireland: $(find "$SRC/ireland/25m" -name '*.tif' | wc -l | tr -d ' ') tiles of 25 m, $(find "$SRC/ireland/10m" -name '*.tif' | wc -l | tr -d ' ') of 10 m"
