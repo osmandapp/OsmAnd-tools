@@ -16,8 +16,10 @@
 #   denmark      Danmarks Dybdemodel 50 m 2024, one GeoTIFF (depths positive, mean sea level) ~0.13 GB; not in the
 #                published regions: 50 m against EMODnet's 115 m is a small gain
 #   france       SHOM coastal DTMs 5-20 m, chart datum (PBMA), 11 zones as GeoTIFF         ~1.0 GB 7z
-#   uk           UKHO ADMIRALTY seabed surveys: no scripted download (login); survey selections downloaded from
-#                seabed.admiralty.co.uk go into DIR/src/uk/incoming, every BAG becomes a 0.0002 degree GeoTIFF
+#   uk           UKHO ADMIRALTY seabed surveys: with env UKHO_TOKEN (the Bearer token of a signed-in
+#                seabed.admiralty.co.uk session) the surveys of UKHO_SURVEYS (default ukho_surveys_clyde.txt) are
+#                downloaded; zips downloaded by hand can be put into DIR/src/uk/incoming. Every BAG becomes a 0.0002
+#                degree GeoTIFF
 #   nz           LINZ hydrographic chart vector data: depth contours, soundings, depth areas in 5 scale bands, WFS
 #                into one GeoPackage; needs env LINZ_API_KEY (free LINZ Data Service key)
 # --mask  OSM land polygons (osmdata.openstreetmap.de, coastline only) into DIR/mask/  ~0.9 GB zip
@@ -39,7 +41,7 @@ while [ $# -gt 0 ]; do
 		--only) ONLY=$2; DATA=1; shift 2 ;;
 		-j) JOBS=$2; shift 2 ;;
 		--dry-run) DRY=1; shift ;;
-		-h|--help) sed -n '2,29p' "$0"; exit 0 ;;
+		-h|--help) sed -n '2,31p' "$0"; exit 0 ;;
 		*) echo "Unknown option $1" >&2; exit 1 ;;
 	esac
 done
@@ -245,7 +247,22 @@ if want uk; then
 	# the Seabed Mapping Service needs a login, so the zips of survey selections are put into src/uk/incoming by hand.
 	# Only the BAG grids are used (surveys that come as CSV points only are older); a BAG is averaged to 0.0002
 	# degree cells and deleted, which turns a 78 MB 2 m survey into a 1.7 MB GeoTIFF. Depths are negative, LAT.
-	mkdir -p "$SRC/uk/incoming" "$SRC/uk/grid"
+	mkdir -p "$SRC/uk/incoming" "$SRC/uk/grid" "$SRC/uk/downloaded"
+	if [ -n "${UKHO_TOKEN:-}" ] && [ $DRY -eq 0 ]; then
+		# the token of the site's sign-in lasts about an hour: a 401 stops here, a rerun with a new token resumes
+		grep -v '^#' "${UKHO_SURVEYS:-$HERE/ukho_surveys_clyde.txt}" | cut -f1 | while IFS= read -r id; do
+			[ -n "$id" ] && [ ! -f "$SRC/uk/downloaded/$id" ] || continue
+			code=$(curl -sL --retry 3 -X POST -o "$SRC/uk/incoming/$id.zip.part" -w '%{http_code}' \
+				-H "Authorization: Bearer $UKHO_TOKEN" -H 'Content-Type: application/json' \
+				-d "{\"featureIds\":[\"$id\"]}" https://seabedmappingservice-live.azurewebsites.net/api/features)
+			if [ "$code" = 401 ]; then echo "FAILED uk: token expired, get a new UKHO_TOKEN and rerun" >&2; exit 1; fi
+			if [ "$code" != 200 ] || ! unzip -tq "$SRC/uk/incoming/$id.zip.part" >/dev/null 2>&1; then
+				echo "FAILED uk: survey $id (HTTP $code)" >&2; rm -f "$SRC/uk/incoming/$id.zip.part"; continue
+			fi
+			mv "$SRC/uk/incoming/$id.zip.part" "$SRC/uk/incoming/$id.zip"; : > "$SRC/uk/downloaded/$id"
+			echo "ok survey $id"
+		done || exit 1
+	fi
 	for z in "$SRC"/uk/incoming/*.zip; do
 		[ -f "$z" ] || continue
 		unzip -oq "$z" '*.bag' -d "$SRC/uk/incoming" && rm -f "$z"

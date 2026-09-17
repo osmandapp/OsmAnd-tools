@@ -213,10 +213,18 @@ echo "== uk"
 FILES=(); while IFS= read -r f; do FILES+=("$f"); done < <(find "$SRC/uk/grid" -name '*.tif' 2>/dev/null | sort)
 n=$(find "$SRC/uk/incoming" -name '*.bag' 2>/dev/null | wc -l | tr -d ' ')
 [ "$n" -eq 0 ] || warn "uk: $n BAG files in incoming not converted (rerun download_all.sh --only uk)"
-if [ ${#FILES[@]} -eq 0 ]; then warn "uk: no surveys in src/uk/grid (downloaded by hand from seabed.admiralty.co.uk)"
+if [ ${#FILES[@]} -eq 0 ]; then fail "uk: no surveys in src/uk/grid (downloaded by hand from seabed.admiralty.co.uk)"
 else
 	rasters_open uk "${FILES[@]}"
 	vrt uk "$SRC/uk/uk.vrt" "${FILES[@]}"
+fi
+
+echo "== nz"
+NZ="$SRC/nz/linz_hydro.gpkg"
+if [ ! -f "$NZ" ]; then fail "nz: linz_hydro.gpkg not found (download_all.sh --only nz, needs LINZ_API_KEY)"
+else
+	n=$(ogrinfo -ro -q "$NZ" 2>/dev/null | grep -cE '^[0-9]+: (contour|sounding|area)_[1-5]')
+	if [ "$n" -eq 15 ]; then ok "nz: linz_hydro.gpkg with 15 layers"; else fail "nz: linz_hydro.gpkg has $n of 15 layers"; fi
 fi
 
 echo "== denmark"

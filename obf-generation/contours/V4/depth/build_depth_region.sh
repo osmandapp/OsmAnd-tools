@@ -131,6 +131,9 @@ if [ -n "$DATA" ]; then
 		New-zealand_contours)
 			# LINZ chart vector data: the scale bands merged (the largest scale wins), then built as Norway
 			: "${OUT:=$DATA/build}"
+			if [ ! -f "$DATA/src/nz/linz_hydro.gpkg" ]; then
+				echo "$NAME: no src/nz/linz_hydro.gpkg (download_all.sh --only nz, needs LINZ_API_KEY)" >&2; exit 1
+			fi
 			if [ $KEEP -eq 1 ] && [ -f "$OUT/$NAME.depth.obf" ]; then echo "== $NAME.depth.obf exists, kept"; exit 0; fi
 			mkdir -p "$OUT"
 			python3 "$HERE/depth_bands_merge.py" "$DATA/src/nz/linz_hydro.gpkg" "$OUT/$NAME.bands.gpkg" \
@@ -162,6 +165,10 @@ if [ -n "$DATA" ]; then
 		Great_Britain_contours)
 			# UKHO surveys downloaded by hand (download_all.sh uk): only the 1 degree tiles touching one of them
 			UK="$DATA/src/uk/uk.vrt"
+			if [ ! -f "$UK" ]; then
+				echo "$NAME: no src/uk/uk.vrt (surveys into src/uk/incoming, download_all.sh --only uk, check_sources.sh)" >&2
+				exit 1
+			fi
 			: "${BBOX:=-8.7 49.8 2.0 60.9}"; : "${GRID:=$EMODNET,$UK}"; : "${FILL:=$UK}"; : "${TILE_WITH:=$UK}"
 			: "${CELL:=0.0002}"; : "${LEVELS:=2,5,10,15,20,25,30,35,40,45,50,100,200}"; : "${SMOOTH_FROM:=5}"
 			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1 ;;
