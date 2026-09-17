@@ -456,10 +456,17 @@ if [ -n "$TILES" ]; then
 	exit 0
 fi
 
+# the grid is cut with a margin of 8 smoothing cells around the box: the smoothing and the contours near an edge then
+# see the same cells in both tiles that share it, and the contours are cut to the box (depth_contours_filter.py --bbox)
+# so that their ends meet. The margin is a whole number of smoothing cells, so the smoothed cells line up across tiles
+read -r GW GS GE GN <<< "$(python3 -c "
+m = float('$CELL') * float('$SMOOTH') * 8
+print(*(round(v, 10) for v in ($W - m, $S - m, $E + m, $N + m)))")"
+
 # fill: its grid brought to chart datum; that grid replaces the original in GRID, so contours and fill share a datum
 if [ -n "$FILL" ]; then
 	IFS=, read -r fill_grid fill_plus fill_minus <<< "$FILL"
-	warp() { gdalwarp -q -overwrite -t_srs EPSG:4326 -te "$W" "$S" "$E" "$N" -tr "$CELL" "$CELL" -r "$2" -ot Float32 \
+	warp() { gdalwarp -q -overwrite -t_srs EPSG:4326 -te "$GW" "$GS" "$GE" "$GN" -tr "$CELL" "$CELL" -r "$2" -ot Float32 \
 		-dstnodata nan "$1" "$3"; }
 	# a grid in chart datum is used as it is
 	if [ -n "$fill_plus" ]; then
@@ -492,18 +499,18 @@ if [ "$RESAMPLING" = auto ]; then
 	for g in "${grids[@]}"; do
 		cell=$(gdalinfo -json "$g" | python3 -c 'import json,sys; c = abs(json.load(sys.stdin)["geoTransform"][1]); print(c / 111320 if c > 1 else c)')
 		r=$(python3 -c "print('bilinear' if float('$cell') > 1.5 * float('$CELL') else 'average')")
-		gdalwarp -q -overwrite -t_srs EPSG:4326 -te "$W" "$S" "$E" "$N" -tr "$CELL" "$CELL" -r "$r" -ot Float32 \
+		gdalwarp -q -overwrite -t_srs EPSG:4326 -te "$GW" "$GS" "$GE" "$GN" -tr "$CELL" "$CELL" -r "$r" -ot Float32 \
 			-dstnodata nan -multi -wo NUM_THREADS="$JOBS" "$g" "$TMP/cut${#cuts[@]}.tif"
 		cuts+=("$TMP/cut${#cuts[@]}.tif")
 	done
 	gdalwarp -q -overwrite -srcnodata nan -dstnodata nan -co COMPRESS=DEFLATE -co TILED=YES "${cuts[@]}" "$TMP/grid.tif"
 	rm -f "${cuts[@]}"
 else
-	gdalwarp -q -overwrite -t_srs EPSG:4326 -te "$W" "$S" "$E" "$N" -tr "$CELL" "$CELL" -r "$RESAMPLING" -ot Float32 \
+	gdalwarp -q -overwrite -t_srs EPSG:4326 -te "$GW" "$GS" "$GE" "$GN" -tr "$CELL" "$CELL" -r "$RESAMPLING" -ot Float32 \
 		-dstnodata nan -multi -wo NUM_THREADS="$JOBS" -co COMPRESS=DEFLATE -co TILED=YES ${GRID//,/ } "$TMP/grid.tif"
 fi
 step "land mask"
-ogr2ogr -q -f GPKG -spat "$W" "$S" "$E" "$N" -clipsrc "$W" "$S" "$E" "$N" -nlt MULTIPOLYGON "$TMP/land.gpkg" "$LAND"
+ogr2ogr -q -f GPKG -spat "$GW" "$GS" "$GE" "$GN" -clipsrc "$GW" "$GS" "$GE" "$GN" -nlt MULTIPOLYGON "$TMP/land.gpkg" "$LAND"
 LAND_LAYER=$(ogrinfo -q "$TMP/land.gpkg" | awk -F'[: ]+' 'NR==1{print $2}')
 # exclude RASTER : nodata where the EXCLUDE polygons are
 exclude() {
@@ -523,9 +530,10 @@ if [ -n "$LEVELS" ]; then
 	if [ "$SMOOTH" != 1 ]; then
 		step "smoothed copy for levels from $SMOOTH_FROM m: average over $SMOOTH cells"
 		COARSE=$(python3 -c "print(float('$FINE') * float('$SMOOTH'))")
-		gdalwarp -q -overwrite -tr "$COARSE" "$COARSE" -r average -multi -wo NUM_THREADS="$JOBS" \
+		# -tap: smoothing cells on multiples of COARSE everywhere, the same in neighbouring tiles
+		gdalwarp -q -overwrite -tap -tr "$COARSE" "$COARSE" -r average -multi -wo NUM_THREADS="$JOBS" \
 			"$TMP/contour_grid.tif" "$TMP/coarse.tif"
-		gdalwarp -q -overwrite -te "$W" "$S" "$E" "$N" -tr "$FINE" "$FINE" -r cubicspline -multi -wo NUM_THREADS="$JOBS" \
+		gdalwarp -q -overwrite -te "$GW" "$GS" "$GE" "$GN" -tr "$FINE" "$FINE" -r cubicspline -multi -wo NUM_THREADS="$JOBS" \
 			-co COMPRESS=DEFLATE -co TILED=YES "$TMP/coarse.tif" "$TMP/smooth.tif"
 		rm -f "$TMP/coarse.tif"
 	fi
@@ -552,7 +560,8 @@ if [ -n "$LEVELS" ]; then
 		gdal_contour -q -a elev -fl $(levels all) "$TMP/contour_grid.tif" "$TMP/contours.gpkg"
 	fi
 	step "filter and simplify"
-	python3 "$HERE/depth_contours_filter.py" "$TMP/contours.gpkg" "$TMP/depth.fgb" --cell "$FINE" --min-ring-cells "$MIN_RING_CELLS"
+	python3 "$HERE/depth_contours_filter.py" "$TMP/contours.gpkg" "$TMP/depth.fgb" --cell "$FINE" --min-ring-cells "$MIN_RING_CELLS" \
+		--bbox "$W" "$S" "$E" "$N"
 	if [ "$(ogrinfo -so -al "$TMP/depth.fgb" | awk -F': ' '/Feature Count/{print $2}')" = 0 ]; then
 		step "no contours in $NAME"
 	else
@@ -611,7 +620,7 @@ if [ -n "$FILL" ]; then
 		gt=$(gdalinfo -json "$raster" | python3 -c 'import json,sys; print(",".join(map(repr, json.load(sys.stdin)["geoTransform"])))')
 		if [ ! -f "$TMP/coverage_${size// /_}.tif" ]; then
 			# shellcheck disable=SC2086
-			gdalwarp -q -overwrite -t_srs EPSG:4326 -te "$W" "$S" "$E" "$N" -ts $size -r near -ot Float32 -dstnodata nan \
+			gdalwarp -q -overwrite -t_srs EPSG:4326 -te "$GW" "$GS" "$GE" "$GN" -ts $size -r near -ot Float32 -dstnodata nan \
 				"$fill_src" "$TMP/coverage_${size// /_}.tif"
 		fi
 		cat > "$TMP/fill_level.vrt" <<-VRT

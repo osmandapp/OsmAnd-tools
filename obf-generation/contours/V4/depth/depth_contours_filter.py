@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Clean depth contours made by gdal_contour before they go to OSM.
 
-    depth_contours_filter.py INPUT OUTPUT --cell DEGREES [--min-ring-cells N]
+    depth_contours_filter.py INPUT OUTPUT --cell DEGREES [--min-ring-cells N] [--bbox W S E N]
 
 INPUT has line features (lon/lat) with an `elev` field (metres, negative below sea level). OUTPUT (FlatGeobuf) keeps
 the lines below 0 m with a `depth` field (positive metres), drops closed rings shorter than N grid cells -
@@ -31,6 +31,9 @@ def main():
     parser.add_argument('input')
     parser.add_argument('output')
     parser.add_argument('--cell', type=float, required=True, help='grid cell size in degrees')
+    parser.add_argument('--bbox', nargs=4, type=float, metavar=('W', 'S', 'E', 'N'),
+                        help='cut the lines to this box before simplifying: the grid of a tile reaches past its box, '
+                             'so the lines of two tiles meet exactly at their common edge')
     parser.add_argument('--min-ring-cells', type=float, default=8,
                         help='closed rings shorter than this many cells are dropped')
     args = parser.parse_args()
@@ -44,6 +47,10 @@ def main():
     out_layer = out.CreateLayer('depth_contours', None, ogr.wkbLineString)
     out_layer.CreateField(ogr.FieldDefn('depth', ogr.OFTInteger))
 
+    box = None
+    if args.bbox:
+        w, s, e, n = args.bbox
+        box = ogr.CreateGeometryFromWkt('POLYGON((%r %r,%r %r,%r %r,%r %r,%r %r))' % (w, s, e, s, e, n, w, n, w, s))
     min_ring_m = args.min_ring_cells * args.cell * 111320
     kept = dropped = 0
     for feature in layer:
@@ -51,8 +58,13 @@ def main():
         geom = feature.GetGeometryRef()
         if elev is None or elev >= 0 or geom is None:
             continue
-        parts = [geom] if geom.GetGeometryType() in (ogr.wkbLineString, ogr.wkbLineString25D) \
-            else [geom.GetGeometryRef(i) for i in range(geom.GetGeometryCount())]
+        if box is not None:
+            geom = geom.Intersection(box)
+            if geom is None or geom.IsEmpty():
+                continue
+        parts = [geom] if ogr.GT_Flatten(geom.GetGeometryType()) == ogr.wkbLineString \
+            else [geom.GetGeometryRef(i) for i in range(geom.GetGeometryCount())
+                  if ogr.GT_Flatten(geom.GetGeometryRef(i).GetGeometryType()) == ogr.wkbLineString]
         for part in parts:
             closed = part.GetPointCount() > 2 and part.GetPoint_2D(0) == part.GetPoint_2D(part.GetPointCount() - 1)
             if closed and length_m(part) < min_ring_m:
