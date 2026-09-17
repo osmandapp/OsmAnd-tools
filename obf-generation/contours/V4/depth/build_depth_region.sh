@@ -46,6 +46,8 @@
 #   Netherlands_contours              Rijkswaterstaat 20 m 2024 over NCP 2019 over EMODnet DTM 2024, contours every 5 m
 #                                     to 50 m and points, 0.0002 degree cells, 1 degree tiles; fill from the 20 m grid
 #                                     in LAT (NLLAT2018)
+#   Ireland_contours                  INFOMAR 10 m inshore over 25 m over EMODnet DTM 2024, LAT, as Netherlands_contours;
+#                                     fill from the INFOMAR grids
 #   Europe_contours                   EMODnet DTM 2024, contours every 5 m to 50 m, 10 m to 200 m, 50 m to 1000 m,
 #                                     then as the default, overview 0.02 degrees for zooms 5-8, 10 degree tiles;
 #                                     Europe_* leave out the Kartverket coverage (Norway_contours) when it is downloaded
@@ -104,7 +106,7 @@ while [ $# -gt 0 ]; do
 		-X) EXCLUDE_LAYER=$2; shift 2 ;;
 		-e) ENC=$2; shift 2 ;;
 		-F) FILL=$2; shift 2 ;;
-		-h|--help) sed -n '2,68p' "$0"; exit 0 ;;
+		-h|--help) sed -n '2,70p' "$0"; exit 0 ;;
 		*) echo "Unknown option $1" >&2; exit 1 ;;
 	esac
 done
@@ -114,7 +116,7 @@ if [ -n "$DATA" ]; then
 	KARTVERKET=$(ls -d "$DATA"/src/norway/*.gdb 2>/dev/null | head -1 || true)
 	case "$NAME" in
 		Norway_contours)
-			exec "$HERE/build_depth_kartverket.sh" -D "$DATA" -n "$NAME" ${MAP_CREATOR:+-c "$MAP_CREATOR"} \
+			exec "$HERE/build_depth_kartverket.sh" -D "$DATA" -n "$NAME" -j "$JOBS" ${MAP_CREATOR:+-c "$MAP_CREATOR"} \
 				$([ $KEEP -eq 1 ] && echo -k) ;;
 		Netherlands_contours)
 			NL="$DATA/src/netherlands"
@@ -125,6 +127,12 @@ if [ -n "$DATA" ]; then
 			if [ -f "$NL/nl_nsgi_nllat2018.tif" ]; then
 				: "${FILL:=$NL/bodemhoogte_20mtr_2024.tif,$NL/nl_nsgi_nlgeo2018.tif,$NL/nl_nsgi_nllat2018.tif}"
 			fi ;;
+		Ireland_contours)
+			# INFOMAR grids are LAT already: the fill needs no datum shift
+			IE="$DATA/src/ireland/ireland.vrt"
+			: "${BBOX:=-11.8 51.2 -5.3 55.6}"; : "${GRID:=$EMODNET,$IE}"; : "${FILL:=$IE}"
+			: "${CELL:=0.0002}"; : "${LEVELS:=2,5,10,15,20,25,30,35,40,45,50,100,200}"; : "${SMOOTH_FROM:=5}"
+			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1 ;;
 		Europe_contours)
 			: "${BBOX:=-31.3 25.4 36.0 71.2}"; : "${GRID:=$EMODNET}"; : "${LEVELS:=$EUROPE_LEVELS}"
 			: "${OVERVIEW:=$OVERVIEW_Z5_8}"
@@ -221,7 +229,7 @@ if [ -n "$ENC" ]; then
 	ENC_AREAS="$OUT/${NAME}_enc_areas.osm.gz"
 	spacings=""; for tier in $ENC_TIERS; do spacings+="${tier%%:*} "; done
 	python3 "$HERE/depth_soundings_osm.py" "$TMP/enc_soundings.gpkg" "$OUT/${NAME}_enc_points" --layer soundings \
-		--field depth --tiers "$spacings" --land "$LAND" --bbox "$W" "$S" "$E" "$N" --first-id 900000000 2>&1 | grep -v numpy
+		--field depth --tiers "$spacings" --land "$LAND" --land-cell 0.0001 --bbox "$W" "$S" "$E" "$N" --first-id 900000000 2>&1 | grep -v numpy
 	i=0
 	for tier in $ENC_TIERS; do i=$((i + 1)); ENC_OSM+=("$OUT/${NAME}_enc_points$i.osm.gz:${tier#*:}"); done
 fi

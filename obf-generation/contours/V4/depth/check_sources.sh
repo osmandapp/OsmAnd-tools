@@ -6,7 +6,7 @@
 # For every source: file count against the expected one, every raster opens (gdalinfo), CRS is EPSG:4326 where
 # expected, a known sea point is below 0 m (depths are negative), and leftover archives or partial files.
 # Writes DIR/mask/land_polygons.gpkg (indexed copy of the land polygons) and DIR/src/gebco/gebco_2026.vrt, DIR/src/gebco_tid/gebco_2026_tid.vrt, DIR/src/emodnet/emodnet_2024.vrt,
-# DIR/src/cudem/cudem.vrt. Prints OK / WARN / FAIL lines and exits with 1 when anything failed.
+# DIR/src/cudem/cudem.vrt, DIR/src/ireland/ireland.vrt. Prints OK / WARN / FAIL lines and exits with 1 when anything failed.
 set -uo pipefail
 
 OUT=""; JOBS=4
@@ -179,6 +179,21 @@ if [ ${#FILES[@]} -gt 0 ]; then
 		echo "     $(basename "$f"): $(crs "$f")"
 	done
 fi
+
+echo "== ireland"
+# INFOMAR tiles without data were left as .empty; the 10 m inshore grid goes on top of the 25 m one
+FILES=(); while IFS= read -r f; do FILES+=("$f"); done < <(find "$SRC/ireland/25m" "$SRC/ireland/10m" -name '*.tif' 2>/dev/null | sort)
+if [ ${#FILES[@]} -eq 0 ]; then fail "ireland: no files"
+else
+	ok "ireland: $(find "$SRC/ireland/25m" -name '*.tif' | wc -l | tr -d ' ') tiles of 25 m, $(find "$SRC/ireland/10m" -name '*.tif' | wc -l | tr -d ' ') of 10 m"
+	rasters_open ireland "${FILES[@]}"
+	epsg4326 ireland "${FILES[0]}"
+	if gdalbuildvrt -q -resolution highest "$SRC/ireland/ireland.vrt" "${FILES[@]}" 2>/dev/null; then
+		ok "ireland: ireland.vrt of ${#FILES[@]} files"
+		sea ireland "$SRC/ireland/ireland.vrt" -6.05 53.33 "Dublin Bay"
+	else fail "ireland: gdalbuildvrt failed"; fi
+fi
+leftovers ireland "$SRC/ireland"
 
 echo
 if [ $FAILED -eq 0 ]; then echo "All checks passed"; else echo "Some checks FAILED"; fi

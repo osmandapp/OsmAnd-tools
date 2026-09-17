@@ -53,6 +53,13 @@ def polygons(g):
     return []
 
 
+def multipolygon(parts):
+    mp = ogr.Geometry(ogr.wkbMultiPolygon)
+    for p in parts:
+        mp.AddGeometry(p)
+    return mp
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('source')
@@ -104,18 +111,16 @@ def main():
                 if not classes:
                     continue
                 land.SetSpatialFilterRect(x0, y0, x1, y1)
-                dry = ogr.Geometry(ogr.wkbMultiPolygon)
-                for f in land:
-                    for p in polygons(f.GetGeometryRef()):
-                        dry.AddGeometry(p)
-                dry = dry.UnionCascaded().Intersection(cell) if dry.GetGeometryCount() else None
+                # clipped to the cell first: a complete land polygon is a continent, its union alone takes seconds
+                dry = multipolygon(p for f in land for p in polygons(f.GetGeometryRef().Intersection(cell)))
+                dry = dry.UnionCascaded() if dry.GetGeometryCount() else None
                 for at, geoms in classes.items():
-                    mp = ogr.Geometry(ogr.wkbMultiPolygon)
-                    for g in geoms:
-                        for p in polygons(g.MakeValid() if not g.IsValid() else g):
-                            mp.AddGeometry(p)
-                    # gdal_contour bands can self-intersect; a union of invalid rings may crash an older GEOS
-                    area = (mp if mp.IsValid() else mp.MakeValid()).UnionCascaded().Intersection(cell)
+                    mp = multipolygon(p for g in geoms for p in polygons(g if g.IsValid() else g.MakeValid()))
+                    # gdal_contour bands can self-intersect; a union of invalid rings may crash an older GEOS.
+                    # MakeValid may return a collection, UnionCascaded takes a multipolygon only
+                    if not mp.IsValid():
+                        mp = multipolygon(polygons(mp.MakeValid()))
+                    area = mp.UnionCascaded().Intersection(cell)
                     if dry is not None and area.Intersects(dry):
                         area = area.Difference(dry)
                     area = area.SimplifyPreserveTopology(args.simplify)

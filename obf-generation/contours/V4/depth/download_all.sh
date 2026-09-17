@@ -12,12 +12,15 @@
 #   (cudem_ninth NOAA CUDEM 1/9" topobathy, 930 tiles, ~187 GB: disabled until there is disk space)
 #   norway       Kartverket "Sjøkart - Dybdedata", whole country, FGDB       ~2.3 GB zip
 #   netherlands  Rijkswaterstaat bottom grids 20 m 2024, Zeeland, NCP 2019   ~0.3 GB
+#   ireland      INFOMAR bathymetry 25 m (Irish waters) and 10 m (inshore), LAT, from the GSI ImageServer
 # --mask  OSM land polygons (osmdata.openstreetmap.de, coastline only) into DIR/mask/  ~0.9 GB zip
 # Without --data and --mask both are downloaded.
 #
 # Archives are unzipped as soon as they are complete and then deleted; an empty <archive>.done marker keeps
 # a rerun from downloading them again. Every step can be rerun: finished files are skipped, broken ones resumed.
 # Germany (BSH NAUTHIS) is not included: its WFS download service is disabled (checked 2026-09-16).
+# Finland (Traficom depth WFS) is not included: its licence allows non-commercial, non-navigational use only.
+# Denmark (Danmarks Dybdemodel 50 m) is not included: Dataforsyningen downloads need a login.
 set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -30,7 +33,7 @@ while [ $# -gt 0 ]; do
 		--only) ONLY=$2; DATA=1; shift 2 ;;
 		-j) JOBS=$2; shift 2 ;;
 		--dry-run) DRY=1; shift ;;
-		-h|--help) sed -n '2,22p' "$0"; exit 0 ;;
+		-h|--help) sed -n '2,25p' "$0"; exit 0 ;;
 		*) echo "Unknown option $1" >&2; exit 1 ;;
 	esac
 done
@@ -72,7 +75,41 @@ unzip_rm() {
 	rm -f "$zip"; : > "$zip.done"
 	echo "unzipped and removed $(basename "$zip")"
 }
-export -f fetch remote_size local_size unzip_rm
+# arcgis_tile URL DIR NAME W S E N COLS ROWS : one tile of an ArcGIS ImageServer grid as a compressed GeoTIFF with
+# nodata 0 (INFOMAR writes no data as 0). A preview at a quarter of the cells comes first: most tiles of the extent
+# are open ocean or land, those are left as NAME.empty
+arcgis_tile() {
+	local url=$1 dir=$2 name=$3 w=$4 s=$5 e=$6 n=$7 cols=$8 rows=$9 get
+	if [ -f "$dir/$name.tif" ] || [ -f "$dir/$name.empty" ]; then return 0; fi
+	get="$url/exportImage?bbox=$w,$s,$e,$n&bboxSR=4326&imageSR=4326&format=tiff&pixelType=F32"
+	get+="&interpolation=RSP_NearestNeighbor&f=image"
+	curl -sfL --retry 5 --retry-delay 5 -o "$dir/$name.preview" "$get&size=$((cols / 4)),$((rows / 4))" \
+		|| { echo "FAILED preview $name" >&2; return 1; }
+	gdal_translate -q -a_nodata 0 "$dir/$name.preview" "$dir/$name.preview.tif" || { echo "FAILED preview $name" >&2; return 1; }
+	# no statistics = no cell with data
+	if ! gdalinfo -stats "$dir/$name.preview.tif" 2>/dev/null | grep -q STATISTICS_MAXIMUM; then
+		rm -f "$dir/$name".preview*; : > "$dir/$name.empty"; return 0
+	fi
+	rm -f "$dir/$name".preview*
+	curl -sfL --retry 5 --retry-delay 5 -o "$dir/$name.part" "$get&size=$cols,$rows" || { echo "FAILED $name" >&2; return 1; }
+	gdal_translate -q -a_nodata 0 -co COMPRESS=DEFLATE -co PREDICTOR=3 -co TILED=YES "$dir/$name.part" "$dir/$name.tmp.tif" \
+		&& mv "$dir/$name.tmp.tif" "$dir/$name.tif" && rm -f "$dir/$name.part" && echo "ok $name"
+}
+
+# arcgis_image URL DIR : the whole grid of an ArcGIS ImageServer at its own cell size, 4000 cells a tile
+arcgis_image() {
+	local url=$1 dir=$2
+	mkdir -p "$dir"
+	curl -sfL --retry 5 "$url?f=json" | python3 -c '
+import json, math, sys
+d = json.load(sys.stdin); e, px, n = d["extent"], d["pixelSizeX"], 4000
+for i in range(math.ceil((e["xmax"] - e["xmin"]) / px / n)):
+    for j in range(math.ceil((e["ymax"] - e["ymin"]) / px / n)):
+        x0, y1 = e["xmin"] + i * n * px, e["ymax"] - j * n * px
+        print("%03d_%03d %.12f %.12f %.12f %.12f %d %d" % (i, j, x0, y1 - n * px, x0 + n * px, y1, n, n))' \
+	| xargs -P "$JOBS" -L 1 bash -c 'arcgis_tile "$0" "$@"' "$url" "$dir"
+}
+export -f fetch remote_size local_size unzip_rm arcgis_tile
 
 report() { # dry run: print total size of URL list on stdin
 	xargs -P 8 -I{} bash -c 'remote_size "$1"' _ {} | awk -v n="$1" '{s+=$1;c++} END{printf "%-12s %5d files %9.2f GB\n", n, c, s/1e9}'
@@ -138,5 +175,14 @@ if want netherlands; then
 	NL="$NL https://cdn.proj.org/nl_nsgi_nllat2018.tif https://cdn.proj.org/nl_nsgi_nlgeo2018.tif"
 	if [ $DRY -eq 1 ]; then printf "%s\n" $NL | report netherlands
 	else for u in $NL; do fetch "$u" "$SRC/netherlands/$(basename "$u")"; done; fi
+fi
+if want ireland; then
+	echo "== ireland"
+	B=https://gsi.geodata.gov.ie/imagehost/rest/services/Marine
+	if [ $DRY -eq 1 ]; then echo "ireland      ArcGIS ImageServer tiles, size known after the download"
+	else
+		arcgis_image "$B/IE_GSI_MI_Bathymetry_25m_IE_Waters_WGS84_LAT_GRID/ImageServer" "$SRC/ireland/25m"
+		arcgis_image "$B/IE_GSI_MI_Bathymetry_10m_Inshore_IE_WGS84_LAT_GRID/ImageServer" "$SRC/ireland/10m"
+	fi
 fi
 echo "Done: $OUT"
