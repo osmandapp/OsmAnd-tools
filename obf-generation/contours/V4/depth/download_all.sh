@@ -16,6 +16,8 @@
 #   denmark      Danmarks Dybdemodel 50 m 2024, one GeoTIFF (depths positive, mean sea level) ~0.13 GB; not in the
 #                published regions: 50 m against EMODnet's 115 m is a small gain
 #   france       SHOM coastal DTMs 5-20 m, chart datum (PBMA), 11 zones as GeoTIFF         ~1.0 GB 7z
+#   uk           UKHO ADMIRALTY seabed surveys: no scripted download (login); survey selections downloaded from
+#                seabed.admiralty.co.uk go into DIR/src/uk/incoming, every BAG becomes a 0.0002 degree GeoTIFF
 #   nz           LINZ hydrographic chart vector data: depth contours, soundings, depth areas in 5 scale bands, WFS
 #                into one GeoPackage; needs env LINZ_API_KEY (free LINZ Data Service key)
 # --mask  OSM land polygons (osmdata.openstreetmap.de, coastline only) into DIR/mask/  ~0.9 GB zip
@@ -37,7 +39,7 @@ while [ $# -gt 0 ]; do
 		--only) ONLY=$2; DATA=1; shift 2 ;;
 		-j) JOBS=$2; shift 2 ;;
 		--dry-run) DRY=1; shift ;;
-		-h|--help) sed -n '2,27p' "$0"; exit 0 ;;
+		-h|--help) sed -n '2,29p' "$0"; exit 0 ;;
 		*) echo "Unknown option $1" >&2; exit 1 ;;
 	esac
 done
@@ -54,18 +56,20 @@ want() { # want NAME -> true if this source is selected
 remote_size() { curl -sIL "$1" | awk 'tolower($1)=="content-length:"{v=$2} /^HTTP/{c=$2} END{gsub("\r","",v); print (c==200 ? v+0 : 0)}'; }
 local_size() { if [ -f "$1" ]; then wc -c < "$1" | tr -d ' '; else echo 0; fi; }
 
-# fetch URL FILE : resumable single-file download with size check
+# fetch URL FILE : resumable single-file download with size check; the download goes to FILE.part and is renamed
+# when complete, so an existing FILE is complete and is not checked against the server again
 fetch() {
 	local url=$1 file=$2 total have
 	if [ -f "$file.done" ]; then echo "ok $(basename "$file") (unzipped earlier)"; return 0; fi
+	if [ -f "$file" ]; then echo "ok $(basename "$file") (downloaded earlier)"; return 0; fi
 	total=$(remote_size "$url")
 	if [ "$total" -le 0 ]; then echo "FAILED (no size) $url" >&2; return 1; fi
+	mkdir -p "$(dirname "$file")"
 	for attempt in $(seq 1 50); do
-		have=$(local_size "$file")
-		if [ "$have" -eq "$total" ]; then echo "ok $(basename "$file") ($total bytes)"; return 0; fi
-		if [ "$have" -gt "$total" ]; then rm -f "$file"; fi
-		mkdir -p "$(dirname "$file")"
-		curl -sL --retry 5 --retry-delay 5 -C - -o "$file" "$url" || sleep 5
+		have=$(local_size "$file.part")
+		if [ "$have" -eq "$total" ]; then mv "$file.part" "$file"; echo "downloaded $(basename "$file") ($total bytes)"; return 0; fi
+		if [ "$have" -gt "$total" ]; then rm -f "$file.part"; fi
+		curl -sL --retry 5 --retry-delay 5 -C - -o "$file.part" "$url" || sleep 5
 	done
 	echo "FAILED after retries $url" >&2; return 1
 }
@@ -124,13 +128,19 @@ if [ $MASK -eq 1 ]; then
 	U=https://osmdata.openstreetmap.de/download/land-polygons-complete-4326.zip
 	if [ $DRY -eq 1 ]; then echo $U | report mask
 	else
-		# a fresh copy every run: the land polygons are rebuilt daily from the OSM coastline, so a partial file
-		# from an earlier run may belong to another version
-		rm -f "$OUT/mask/$(basename $U).done" "$OUT/mask/$(basename $U).tmp"
-		fetch $U "$OUT/mask/$(basename $U).tmp"
-		mv "$OUT/mask/$(basename $U).tmp" "$OUT/mask/$(basename $U)"
-		rm -rf "$OUT/mask/land-polygons-complete-4326"
-		unzip_rm "$OUT/mask/$(basename $U)" "$OUT/mask"
+		# the land polygons are rebuilt daily from the OSM coastline: download again only when the server copy has
+		# changed since the one unzipped here (its Last-Modified is kept next to it)
+		stamp="$OUT/mask/$(basename $U).last-modified"
+		remote=$(curl -sIL "$U" | awk 'tolower($1)=="last-modified:"{sub(/^[^:]*: */, ""); gsub("\r", ""); v=$0} END{print v}')
+		if [ -n "$remote" ] && [ -f "$OUT/mask/$(basename $U).done" ] && [ "$remote" = "$(cat "$stamp" 2>/dev/null)" ]; then
+			echo "ok $(basename $U) (unchanged since $remote)"
+		else
+			rm -f "$OUT/mask/$(basename $U).done" "$OUT/mask/$(basename $U).part"
+			fetch $U "$OUT/mask/$(basename $U)"
+			rm -rf "$OUT/mask/land-polygons-complete-4326"
+			unzip_rm "$OUT/mask/$(basename $U)" "$OUT/mask"
+			[ -z "$remote" ] || echo "$remote" > "$stamp"
+		fi
 	fi
 fi
 if want gebco; then
@@ -229,6 +239,29 @@ MNT_COTIER_GNB_PAPI_SM_20m_PACK_DL/MNT_COTIER_GOLFE_NORMAND_BRETON_PAPI_PBMA"
 				&& mv "$tif.tmp.tif" "$tif" && rm -rf "$SRC/france/$pkg.x" "$SRC/france/$pkg.7z" && echo "ok $pkg.tif"
 		done
 	fi
+fi
+if want uk; then
+	echo "== uk"
+	# the Seabed Mapping Service needs a login, so the zips of survey selections are put into src/uk/incoming by hand.
+	# Only the BAG grids are used (surveys that come as CSV points only are older); a BAG is averaged to 0.0002
+	# degree cells and deleted, which turns a 78 MB 2 m survey into a 1.7 MB GeoTIFF. Depths are negative, LAT.
+	mkdir -p "$SRC/uk/incoming" "$SRC/uk/grid"
+	for z in "$SRC"/uk/incoming/*.zip; do
+		[ -f "$z" ] || continue
+		unzip -oq "$z" '*.bag' -d "$SRC/uk/incoming" && rm -f "$z"
+	done
+	find "$SRC/uk/incoming" -name '*.bag' | while IFS= read -r bag; do
+		tif="$SRC/uk/grid/$(basename "$bag" .bag).tif"
+		# the compound CRS of a BAG (UTM + ALAT heights) is not parsed by PROJ: the UTM zone is given explicitly
+		zone=$(gdalinfo "$bag" 2>/dev/null | grep -o 'UTM zone [0-9]*[NS]' | head -1 | awk '{print $3}')
+		[ -n "$zone" ] || { echo "FAILED uk: no UTM zone in $(basename "$bag")" >&2; continue; }
+		epsg=$(( ${zone%[NS]} + $([ "${zone: -1}" = N ] && echo 32600 || echo 32700) ))
+		gdalwarp -q -overwrite -s_srs "EPSG:$epsg" -t_srs EPSG:4326 -tr 0.0002 0.0002 -r average -b 1 -ot Float32 \
+			-srcnodata 1000000 -dstnodata nan -co COMPRESS=DEFLATE -co TILED=YES "$bag" "$tif.tmp.tif" 2>/dev/null \
+			&& mv "$tif.tmp.tif" "$tif" && rm -f "$bag" && echo "ok $(basename "$tif")" \
+			|| echo "FAILED uk: $(basename "$bag")" >&2
+	done
+	find "$SRC/uk/incoming" -mindepth 1 -type d -empty -delete
 fi
 if want nz; then
 	echo "== nz"

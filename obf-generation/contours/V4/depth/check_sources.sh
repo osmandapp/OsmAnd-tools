@@ -6,7 +6,7 @@
 # For every source: file count against the expected one, every raster opens (gdalinfo), CRS is EPSG:4326 where
 # expected, a known sea point is below 0 m (depths are negative), and leftover archives or partial files.
 # Writes DIR/mask/land_polygons.gpkg (indexed copy of the land polygons) and DIR/src/gebco/gebco_2026.vrt, DIR/src/gebco_tid/gebco_2026_tid.vrt, DIR/src/emodnet/emodnet_2024.vrt,
-# DIR/src/cudem/cudem.vrt, DIR/src/ireland/ireland.vrt, DIR/src/denmark/denmark.vrt, DIR/src/france/france.vrt. Prints OK / WARN / FAIL lines and exits with 1 when anything failed.
+# DIR/src/cudem/cudem.vrt, DIR/src/ireland/ireland.vrt, DIR/src/denmark/denmark.vrt, DIR/src/france/france.vrt, DIR/src/uk/uk.vrt. Prints OK / WARN / FAIL lines and exits with 1 when anything failed.
 set -uo pipefail
 
 OUT=""; JOBS=4
@@ -208,6 +208,16 @@ if [ ${#FILES[@]} -gt 0 ]; then
 	else fail "france: gdalbuildvrt failed"; fi
 fi
 leftovers france "$SRC/france"
+
+echo "== uk"
+FILES=(); while IFS= read -r f; do FILES+=("$f"); done < <(find "$SRC/uk/grid" -name '*.tif' 2>/dev/null | sort)
+n=$(find "$SRC/uk/incoming" -name '*.bag' 2>/dev/null | wc -l | tr -d ' ')
+[ "$n" -eq 0 ] || warn "uk: $n BAG files in incoming not converted (rerun download_all.sh --only uk)"
+if [ ${#FILES[@]} -eq 0 ]; then warn "uk: no surveys in src/uk/grid (downloaded by hand from seabed.admiralty.co.uk)"
+else
+	rasters_open uk "${FILES[@]}"
+	vrt uk "$SRC/uk/uk.vrt" "${FILES[@]}"
+fi
 
 echo "== denmark"
 DK="$SRC/denmark/ddm_50m.dybde.tiff"

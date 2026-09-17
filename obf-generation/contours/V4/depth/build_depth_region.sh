@@ -51,6 +51,8 @@
 #                                     fill from the INFOMAR grids
 #   France_contours                   SHOM coastal DTMs 5-20 m (11 zones) over EMODnet DTM 2024, chart datum, as
 #                                     Netherlands_contours, only the 1 degree tiles touching a zone; fill from SHOM
+#   Great_Britain_contours            UKHO ADMIRALTY surveys (BAG, averaged to 0.0002 degrees) over EMODnet DTM 2024,
+#                                     LAT, as France_contours: only the 1 degree tiles touching a survey
 #   Denmark_contours                  (not published, small gain) Danmarks Dybdemodel 50 m 2024 over EMODnet DTM 2024,
 #                                     mean sea level, contours as
 #                                     Netherlands_contours, 0.0005 degree cells (bilinear), 1 degree tiles, no fill
@@ -59,6 +61,8 @@
 #                                     Europe_* leave out the Kartverket coverage (Norway_contours) when it is downloaded
 #   Europe_points                     EMODnet DTM 2024, points, 10 degree tiles
 #   Norway_contours                   Kartverket Sjøkart - Dybdedata (vector), see build_depth_kartverket.sh
+#   New-zealand_contours              LINZ chart vector data, 5 scale bands merged by depth_bands_merge.py (the largest
+#                                     scale wins), then as Norway_contours; main islands only (165..180 E)
 #   World_contours                    GEBCO_2026 (15"), contours every 10 m to 300 m, 50 m to 1000 m, then as the
 #                                     default - 2 and 5 m mean nothing in a 450 m grid, overview 0.02 degrees for
 #                                     zooms 5-8, 15 degree tiles
@@ -79,7 +83,7 @@ set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 V4=$(cd "$HERE/.." && pwd)
 NAME=""; BBOX=""; GRID=""; LAND=""; OUT=""; CELL=""; UPSAMPLE=1; JOBS=4; SMOOTH=4; SMOOTH_FROM=""; MAP_CREATOR=""
-DATA=""; TILE=0; TILE_WITH=""; KEEP=0; LEVELS=""; TIERS=""; RESAMPLING=""; MIN_RING_CELLS=""; OVERVIEW=""
+DATA=""; TILE=0; TILE_WITH="${TILE_WITH:-}"; KEEP=0; LEVELS=""; TIERS=""; RESAMPLING=""; MIN_RING_CELLS=""; OVERVIEW=""
 EXCLUDE=""; EXCLUDE_LAYER=""; ENC=""; ENC_AREAS=""; FILL=""; ENC_TIERS="0.02:10-11 0.008:12 0.003:13-14 0.001:15-"
 # steps FROM:TO:STEP... : comma-separated levels
 steps() { local s a b c out=""; for s; do IFS=: read -r a b c <<< "$s"; out+=$(seq "$a" "$c" "$b" | paste -sd, -),; done
@@ -112,7 +116,7 @@ while [ $# -gt 0 ]; do
 		-X) EXCLUDE_LAYER=$2; shift 2 ;;
 		-e) ENC=$2; shift 2 ;;
 		-F) FILL=$2; shift 2 ;;
-		-h|--help) sed -n '2,76p' "$0"; exit 0 ;;
+		-h|--help) sed -n '2,80p' "$0"; exit 0 ;;
 		*) echo "Unknown option $1" >&2; exit 1 ;;
 	esac
 done
@@ -124,6 +128,15 @@ if [ -n "$DATA" ]; then
 		Norway_contours)
 			exec "$HERE/build_depth_kartverket.sh" -D "$DATA" -n "$NAME" -j "$JOBS" ${MAP_CREATOR:+-c "$MAP_CREATOR"} \
 				$([ $KEEP -eq 1 ] && echo -k) ;;
+		New-zealand_contours)
+			# LINZ chart vector data: the scale bands merged (the largest scale wins), then built as Norway
+			: "${OUT:=$DATA/build}"
+			if [ $KEEP -eq 1 ] && [ -f "$OUT/$NAME.depth.obf" ]; then echo "== $NAME.depth.obf exists, kept"; exit 0; fi
+			mkdir -p "$OUT"
+			python3 "$HERE/depth_bands_merge.py" "$DATA/src/nz/linz_hydro.gpkg" "$OUT/$NAME.bands.gpkg" \
+				--bbox ${BBOX:-165 -48 180 -33.5} 2>&1 | grep -v numpy
+			exec "$HERE/build_depth_kartverket.sh" -n "$NAME" -i "$OUT/$NAME.bands.gpkg" -m "$DATA/mask/land_polygons.gpkg" \
+				-o "$OUT" -j "$JOBS" ${MAP_CREATOR:+-c "$MAP_CREATOR"} ;;
 		Netherlands_contours)
 			NL="$DATA/src/netherlands"
 			: "${BBOX:=1.7 51.1 7.3 55.7}"; : "${GRID:=$EMODNET,$NL/bathymetrie_ncp_juni_2019.tif,$NL/bodemhoogte_20mtr_2024.tif}"
@@ -144,6 +157,12 @@ if [ -n "$DATA" ]; then
 			# tiles touching one of them are built
 			FR="$DATA/src/france/france.vrt"
 			: "${BBOX:=-5.5 43.3 2.6 51.2}"; : "${GRID:=$EMODNET,$FR}"; : "${FILL:=$FR}"; : "${TILE_WITH:=$FR}"
+			: "${CELL:=0.0002}"; : "${LEVELS:=2,5,10,15,20,25,30,35,40,45,50,100,200}"; : "${SMOOTH_FROM:=5}"
+			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1 ;;
+		Great_Britain_contours)
+			# UKHO surveys downloaded by hand (download_all.sh uk): only the 1 degree tiles touching one of them
+			UK="$DATA/src/uk/uk.vrt"
+			: "${BBOX:=-8.7 49.8 2.0 60.9}"; : "${GRID:=$EMODNET,$UK}"; : "${FILL:=$UK}"; : "${TILE_WITH:=$UK}"
 			: "${CELL:=0.0002}"; : "${LEVELS:=2,5,10,15,20,25,30,35,40,45,50,100,200}"; : "${SMOOTH_FROM:=5}"
 			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1 ;;
 		Denmark_contours)
@@ -273,6 +292,7 @@ if t <= 0 or (e - w <= t and n - s <= t):
 zones = None
 if '$TILE_WITH':
     from osgeo import gdal
+    gdal.UseExceptions()
     zones = []
     for f in gdal.Open('$TILE_WITH').GetFileList()[1:]:
         ds = gdal.Open(f); g = ds.GetGeoTransform()
@@ -284,7 +304,7 @@ for i in range(math.ceil((e - w) / t)):
         if zones is not None and not any(a < x1 and c > x0 and b < y1 and d > y0 for a, b, c, d in zones):
             continue
         print('%s_%02d_%02d %g %g %g %g' % ('$NAME', i, j, x0, y0, x1, y1))
-" 2>&1 | { grep -v -i numpy || true; })
+")
 if [ -n "$TILES" ]; then
 	step "$NAME: $(echo "$TILES" | wc -l | tr -d ' ') tiles of $TILE degrees, $JOBS at a time"
 	TILE_OUT="$TMP/tiles"; mkdir -p "$TILE_OUT"
