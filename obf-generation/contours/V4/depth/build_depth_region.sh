@@ -340,19 +340,21 @@ merge() {
 ENC_OSM=()
 if [ -n "$ENC" ]; then
 	step "ENC cells of $ENC"
-	python3 "$HERE/depth_enc_osm.py" "$ENC" --bbox "$W" "$S" "$E" "$N" --contours "$OUT/${NAME}_enc.osm.gz" \
-		--minor "$OUT/${NAME}_enc_minor.osm.gz" --areas "$TMP/enc_areas.gpkg" --soundings "$TMP/enc_soundings.gpkg" --coverage "$TMP/enc_coverage.gpkg" 2>&1 | grep -v numpy
+	# with -c the ENC .osm.gz are only map sections: kept in TMP, removed with it
+	ENC_OUT="$OUT"; [ -z "$MAP_CREATOR" ] || ENC_OUT="$TMP"
+	python3 "$HERE/depth_enc_osm.py" "$ENC" --bbox "$W" "$S" "$E" "$N" --contours "$ENC_OUT/${NAME}_enc.osm.gz" \
+		--minor "$ENC_OUT/${NAME}_enc_minor.osm.gz" --areas "$TMP/enc_areas.gpkg" --soundings "$TMP/enc_soundings.gpkg" --coverage "$TMP/enc_coverage.gpkg" 2>&1 | grep -v numpy
 	EXCLUDE="$TMP/enc_coverage.gpkg"; EXCLUDE_LAYER=coverage
-	ENC_OSM+=("$OUT/${NAME}_enc.osm.gz:" "$OUT/${NAME}_enc_minor.osm.gz:15-")
-	python3 "$HERE/depth_areas_osm.py" "$TMP/enc_areas.gpkg" "$OUT/${NAME}_enc_areas.osm.gz" --layer areas \
+	ENC_OSM+=("$ENC_OUT/${NAME}_enc.osm.gz:" "$ENC_OUT/${NAME}_enc_minor.osm.gz:15-")
+	python3 "$HERE/depth_areas_osm.py" "$TMP/enc_areas.gpkg" "$ENC_OUT/${NAME}_enc_areas.osm.gz" --layer areas \
 		--field mindepth --land "$LAND" --bbox "$W" "$S" "$E" "$N" 2>&1 | grep -v numpy
 	# multipolygons: generate-map, not generate-single-map
-	ENC_AREAS="$OUT/${NAME}_enc_areas.osm.gz"
+	ENC_AREAS="$ENC_OUT/${NAME}_enc_areas.osm.gz"
 	spacings=""; for tier in $ENC_TIERS; do spacings+="${tier%%:*} "; done
-	python3 "$HERE/depth_soundings_osm.py" "$TMP/enc_soundings.gpkg" "$OUT/${NAME}_enc_points" --layer soundings \
+	python3 "$HERE/depth_soundings_osm.py" "$TMP/enc_soundings.gpkg" "$ENC_OUT/${NAME}_enc_points" --layer soundings \
 		--field depth --tiers "$spacings" --land "$LAND" --land-cell 0.0001 --bbox "$W" "$S" "$E" "$N" --first-id 900000000 2>&1 | grep -v numpy
 	i=0
-	for tier in $ENC_TIERS; do i=$((i + 1)); ENC_OSM+=("$OUT/${NAME}_enc_points$i.osm.gz:${tier#*:}"); done
+	for tier in $ENC_TIERS; do i=$((i + 1)); ENC_OSM+=("$ENC_OUT/${NAME}_enc_points$i.osm.gz:${tier#*:}"); done
 fi
 
 if [ -z "$CELL" ]; then
@@ -457,8 +459,6 @@ if [ -n "$TILES" ]; then
 				|| { echo "FAILED cutting the detailed coverage" >&2; exit 1; }
 			sections "$nd_dir" "$OUT/$nd_name.depth.obf"
 		fi
-		# the ENC contours, soundings and areas are only map sections here
-		rm -f "$OUT/${NAME}"_enc*.osm.gz
 	else
 		rm -rf "$OUT/$NAME.tiles"; mkdir -p "$OUT/$NAME.tiles"
 		mv "$TILE_OUT"/*.osm.gz "$OUT/$NAME.tiles/" 2>/dev/null || true
