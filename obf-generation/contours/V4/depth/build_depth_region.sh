@@ -414,22 +414,25 @@ if [ -n "$FILL" ]; then
 	warp() { gdalwarp -q -overwrite -t_srs EPSG:4326 -te "$W" "$S" "$E" "$N" -tr "$CELL" "$CELL" -r "$2" -ot Float32 \
 		-dstnodata nan "$1" "$3"; }
 	warp "$fill_grid" average "$TMP/fill.tif"
-	# sum of the bands with NaN where any is missing: a VRT pixel function, no numpy needed
-	srcs="<SimpleSource><SourceFilename relativeToVRT=\"1\">fill.tif</SourceFilename><SourceBand>1</SourceBand></SimpleSource>"
-	if [ -n "$fill_plus" ]; then
+	if [ -z "$fill_plus" ]; then
+		# the grid is in chart datum already; a "sum" VRT of one source fails without a message on older GDAL
+		mv "$TMP/fill.tif" "$TMP/fill_datum.tif"
+	else
 		warp "$fill_plus" bilinear "$TMP/fill_plus.tif"; warp "$fill_minus" bilinear "$TMP/fill_minus.tif"
+		# sum of the bands with NaN where any is missing: a VRT pixel function, no numpy needed
+		srcs="<SimpleSource><SourceFilename relativeToVRT=\"1\">fill.tif</SourceFilename><SourceBand>1</SourceBand></SimpleSource>"
 		srcs+="<SimpleSource><SourceFilename relativeToVRT=\"1\">fill_plus.tif</SourceFilename><SourceBand>1</SourceBand></SimpleSource>"
 		srcs+="<ComplexSource><SourceFilename relativeToVRT=\"1\">fill_minus.tif</SourceFilename><SourceBand>1</SourceBand><ScaleRatio>-1</ScaleRatio></ComplexSource>"
+		size=$(gdalinfo -json "$TMP/fill.tif" | python3 -c 'import json,sys; print(*json.load(sys.stdin)["size"])')
+		gt=$(gdalinfo -json "$TMP/fill.tif" | python3 -c 'import json,sys; print(",".join(map(repr, json.load(sys.stdin)["geoTransform"])))')
+		cat > "$TMP/fill_sum.vrt" <<-VRT
+		<VRTDataset rasterXSize="${size% *}" rasterYSize="${size#* }"><SRS>EPSG:4326</SRS><GeoTransform>$gt</GeoTransform>
+		<VRTRasterBand dataType="Float32" band="1" subClass="VRTDerivedRasterBand"><NoDataValue>nan</NoDataValue>
+		<PixelFunctionType>sum</PixelFunctionType><PixelFunctionArguments propagateNoData="true"/>$srcs
+		</VRTRasterBand></VRTDataset>
+		VRT
+		gdal_translate -q "$TMP/fill_sum.vrt" "$TMP/fill_datum.tif"
 	fi
-	size=$(gdalinfo -json "$TMP/fill.tif" | python3 -c 'import json,sys; print(*json.load(sys.stdin)["size"])')
-	gt=$(gdalinfo -json "$TMP/fill.tif" | python3 -c 'import json,sys; print(",".join(map(repr, json.load(sys.stdin)["geoTransform"])))')
-	cat > "$TMP/fill_sum.vrt" <<-VRT
-	<VRTDataset rasterXSize="${size% *}" rasterYSize="${size#* }"><SRS>EPSG:4326</SRS><GeoTransform>$gt</GeoTransform>
-	<VRTRasterBand dataType="Float32" band="1" subClass="VRTDerivedRasterBand"><NoDataValue>nan</NoDataValue>
-	<PixelFunctionType>sum</PixelFunctionType><PixelFunctionArguments propagateNoData="true"/>$srcs
-	</VRTRasterBand></VRTDataset>
-	VRT
-	gdal_translate -q "$TMP/fill_sum.vrt" "$TMP/fill_datum.tif"
 	gdal_rasterize -q -burn nan -l "$LAND_LAYER" "$TMP/land.gpkg" "$TMP/fill_datum.tif"
 	gdal_contour -q -p -amin emin -amax emax -fl -10 -5 -2 0 "$TMP/fill_datum.tif" "$TMP/bands.gpkg"
 	ogr2ogr -q -f GPKG -nln areas "$TMP/areas.gpkg" "$TMP/bands.gpkg" -sql "SELECT geom, -emax AS mindepth FROM contour"
