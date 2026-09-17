@@ -265,15 +265,20 @@ if want uk; then
 	fi
 	for z in "$SRC"/uk/incoming/*.zip; do
 		[ -f "$z" ] || continue
-		unzip -oq "$z" '*.bag' -d "$SRC/uk/incoming" && rm -f "$z"
+		# a survey delivered as CSV points only has no BAG: nothing to take from its zip
+		unzip -oq "$z" '*.bag' -d "$SRC/uk/incoming" 2>/dev/null || echo "WARN uk: no BAG in $(basename "$z")"
+		rm -f "$z"
 	done
 	find "$SRC/uk/incoming" -name '*.bag' | while IFS= read -r bag; do
 		tif="$SRC/uk/grid/$(basename "$bag" .bag).tif"
-		# the compound CRS of a BAG (UTM + ALAT heights) is not parsed by PROJ: the UTM zone is given explicitly
-		zone=$(gdalinfo "$bag" 2>/dev/null | grep -o 'UTM zone [0-9]*[NS]' | head -1 | awk '{print $3}')
-		[ -n "$zone" ] || { echo "FAILED uk: no UTM zone in $(basename "$bag")" >&2; continue; }
-		epsg=$(( ${zone%[NS]} + $([ "${zone: -1}" = N ] && echo 32600 || echo 32700) ))
-		gdalwarp -q -overwrite -s_srs "EPSG:$epsg" -t_srs EPSG:4326 -tr 0.0002 0.0002 -r average -b 1 -ot Float32 \
+		# the compound CRS of a BAG (UTM + ALAT heights) is not parsed by PROJ: the horizontal one is given explicitly,
+		# a UTM zone or, for the BAGs in degrees, WGS 84
+		info=$(gdalinfo "$bag" 2>/dev/null || true)
+		zone=$(echo "$info" | grep -o 'UTM zone [0-9]*[NS]' | head -1 | awk '{print $3}' || true)
+		if [ -n "$zone" ]; then srs="EPSG:$(( ${zone%[NS]} + $([ "${zone: -1}" = N ] && echo 32600 || echo 32700) ))"
+		elif echo "$info" | grep -q 'GEOGCRS\["WGS 84"' && ! echo "$info" | grep -q PROJCRS; then srs=EPSG:4326
+		else echo "FAILED uk: unknown CRS in $(basename "$bag")" >&2; continue; fi
+		gdalwarp -q -overwrite -s_srs "$srs" -t_srs EPSG:4326 -tr 0.0002 0.0002 -r average -b 1 -ot Float32 \
 			-srcnodata 1000000 -dstnodata nan -co COMPRESS=DEFLATE -co TILED=YES "$bag" "$tif.tmp.tif" 2>/dev/null \
 			&& mv "$tif.tmp.tif" "$tif" && rm -f "$bag" && echo "ok $(basename "$tif")" \
 			|| echo "FAILED uk: $(basename "$bag")" >&2
