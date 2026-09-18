@@ -54,23 +54,12 @@ public class EmailSenderService {
 	}
     
     public void sendOsmAndCloudRegistrationEmail(String email, String token, String lang, boolean newUser) {
-		String suffix = newUser ? "_NEW@" : "_OLD@";
-	    boolean ok = new EmailSenderTemplate()
-			    .load("cloud/register", lang)
-			    .set("SUBJECT", "@SUBJECT" + suffix)
-			    .set("HEADING", "@HEADING" + suffix)
-			    .set("INTRO", "@INTRO" + suffix)
-			    .set("SECNOTE", "@SECNOTE" + suffix)
-			    .set("REASON", "@REASON" + suffix)
-			    .set("TOKEN", token)
-			    .to(email)
-			    .send()
-			    .isSuccess();
-	    LOGGER.info("sendOsmAndCloudRegistrationEmail to: " + shorten(email) + " (" + ok + ") [" + lang + "] new=" + newUser);
+		sendOsmAndCloudAccountEmail(email, token, lang, newUser ? CloudAccountAction.SETUP : CloudAccountAction.LOGIN);
 	}
 
 	public enum CloudAccountAction {
 		SETUP("cloud/account/setup"),
+		LOGIN("cloud/account/login"),
 		PASSWORD("cloud/account/password"),
 		EMAIL_CHANGE_REQUEST("cloud/account/change-request"),
 		EMAIL_CHANGE("cloud/account/change"),
