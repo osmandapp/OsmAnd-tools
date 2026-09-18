@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Pattern;
 import java.util.zip.GZIPOutputStream;
 
 import org.apache.commons.logging.Log;
@@ -75,6 +76,8 @@ public class PubTracksController {
 	private static final int MAX_EMAIL = 200;
 	private static final int MAX_PER_DAY = 20; // per address, anyone may write
 	private static final int MAX_LIST = 5000;
+	private static final Pattern NUMBER = Pattern.compile("[-+]?\\d+(\\.\\d+)?([eE][-+]?\\d+)?"); // negative coordinates are not formulas
+	private static final int MAX_CONTEXT = 8000; // serialized view, filters and url; the page sends about 2 KB
 	private static final String[] EXPORT_COLUMNS = {"id", "user", "date", "name", "description", "tags", "lat", "lon", "activity",
 			"activity_source", "file_activity", "speed_matches_activity", "speed", "max_speed", "distance", "points", "time_minutes",
 			"reviews", "track_stats", "geometry_b64"};
@@ -244,9 +247,13 @@ public class PubTracksController {
 		context.put("view", req.view());
 		context.put("filters", req.filters());
 		context.put("url", req.url());
+		String contextJson = gson.toJson(context);
+		if (contextJson.length() > MAX_CONTEXT) {
+			return ResponseEntity.badRequest().body("context is too large");
+		}
 		ensureFeedbackTable();
 		jdbcTemplate.update("INSERT INTO " + FEEDBACK_TABLE + " (time, email, ip, text, context) VALUES (now(), ?, ?, ?, ?::jsonb)",
-				email, ip, cut(req.text().trim(), MAX_TEXT), gson.toJson(context));
+				email, ip, cut(req.text().trim(), MAX_TEXT), contextJson);
 		return ResponseEntity.ok("{}");
 	}
 
@@ -305,7 +312,7 @@ public class PubTracksController {
 		return e == null || e.isJsonNull() ? null : e.isJsonPrimitive() ? e.getAsString() : e.toString();
 	}
 
-	private void ensureFeedbackTable() {
+	private synchronized void ensureFeedbackTable() {
 		if (!feedbackTableReady) {
 			jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS " + FEEDBACK_TABLE + " (id bigserial PRIMARY KEY, time timestamptz NOT NULL,"
 					+ " email text, ip text, text text NOT NULL, context jsonb)");
@@ -370,11 +377,19 @@ public class PubTracksController {
 	}
 
 	private static String cut(String s, int max) {
-		return s.length() > max ? s.substring(0, max) : s;
+		if (s.length() <= max) {
+			return s;
+		}
+		return s.substring(0, Character.isHighSurrogate(s.charAt(max - 1)) ? max - 1 : max);
 	}
 
+	/** quoted; text with a leading =, +, - or @ gets an apostrophe so a spreadsheet shows it instead of running it as a formula */
 	private static String csv(String v) {
-		return v == null ? "" : "\"" + v.replace("\"", "\"\"") + "\"";
+		if (v == null) {
+			return "";
+		}
+		boolean formula = !v.isEmpty() && "=+-@".indexOf(v.charAt(0)) >= 0 && !NUMBER.matcher(v).matches();
+		return "\"" + (formula ? "'" + v : v).replace("\"", "\"\"") + "\"";
 	}
 
 	private static boolean isBlank(String s) {
