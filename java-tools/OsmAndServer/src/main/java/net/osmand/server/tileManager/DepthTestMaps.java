@@ -12,6 +12,11 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -51,7 +56,9 @@ public class DepthTestMaps {
 
 	private final File dir = new File(System.getProperty("java.io.tmpdir"), "osmand-depth-test");
 	private final HttpClient http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
-	private volatile String status = "Depth test maps are not downloaded yet";
+	private static final int DOWNLOADS_AT_A_TIME = 3;
+	/** Per set: what is missing, or null once that set can be rendered. A set does not wait for the other one. */
+	private final Map<String, String> status = new ConcurrentHashMap<>();
 	private Thread downloader;
 	private NativeJavaRendering lib;
 	private Object renderLock;
@@ -106,9 +113,10 @@ public class DepthTestMaps {
 
 	/** Called under the rendering lock: returns an error while the maps are not ready. */
 	public synchronized String activate(NativeJavaRendering lib, Object renderLock, String set, String obfLocation) {
-		if (status != null) {
+		String left = status.get(set);
+		if (left != null) {
 			startDownload();
-			return status;
+			return left;
 		}
 		this.lib = lib;
 		this.renderLock = renderLock;
@@ -190,43 +198,73 @@ public class DepthTestMaps {
 		if (downloader != null && downloader.isAlive()) {
 			return;
 		}
+		for (String set : new String[] { NEW, OLD }) {
+			status.putIfAbsent(set, "Depth test maps of the " + set + " set are not downloaded yet");
+		}
 		downloader = new Thread(() -> {
-			try {
-				int i = 0;
-				for (String set : new String[] { OLD, NEW }) {
-					for (String m : MAPS) {
-						i++;
-						File f = map(set, m);
-						if (!f.exists()) {
-							status = String.format("Downloading depth test maps %d of %d: %s %s", i, MAPS.length * 2, set, m);
-							f.getParentFile().mkdirs();
-							File tmp = new File(f.getPath() + ".tmp");
-							try {
-								download(String.format(set.equals(OLD) ? OLD_MAP_URL : NEW_MAP_URL, m), tmp, set.equals(OLD));
-							} catch (IOException e) {
-								tmp.delete();
-								if (!set.equals(OLD)) {
-									throw e;
-								}
-								// Ireland, France, Great Britain, Norway, New Zealand are not published yet: the old
-								// style simply has no map there
-								LOGGER.info("Depth test map " + m + " is not published: " + e.getMessage());
-								continue;
-							}
-							Files.move(tmp.toPath(), f.toPath(), StandardCopyOption.REPLACE_EXISTING);
-						}
-					}
+			// the new set first: it is the one a test looks at, and it is ready while the published maps still download
+			for (String set : new String[] { NEW, OLD }) {
+				try {
+					downloadSet(set);
+					status.remove(set);
+					LOGGER.info("Depth test maps of the " + set + " set are ready");
+				} catch (Exception e) {
+					status.put(set, "Depth test maps download failed: " + e.getMessage());
+					LOGGER.error("Depth test maps of the " + set + " set: " + e.getMessage(), e);
 				}
-				status = null;
-				LOGGER.info("Depth test maps are ready");
-			} catch (Exception e) {
-				status = "Depth test maps download failed: " + e.getMessage();
-				LOGGER.error(status, e);
-				return;
 			}
 			refreshNew();
 		}, "depth-test-download");
 		downloader.start();
+	}
+
+	/** Downloads the maps of one set that are missing, DOWNLOADS_AT_A_TIME at a time. */
+	private void downloadSet(String set) throws Exception {
+		List<String> missing = new ArrayList<>();
+		for (String m : MAPS) {
+			if (!map(set, m).exists()) {
+				missing.add(m);
+			}
+		}
+		if (missing.isEmpty()) {
+			return;
+		}
+		int[] left = { missing.size() };
+		ExecutorService pool = Executors.newFixedThreadPool(Math.min(DOWNLOADS_AT_A_TIME, missing.size()));
+		List<Future<?>> tasks = new ArrayList<>();
+		try {
+			for (String m : missing) {
+				tasks.add(pool.submit(() -> {
+					File f = map(set, m);
+					f.getParentFile().mkdirs();
+					File tmp = new File(f.getPath() + ".tmp");
+					try {
+						download(String.format(set.equals(OLD) ? OLD_MAP_URL : NEW_MAP_URL, m), tmp, set.equals(OLD));
+					} catch (IOException e) {
+						tmp.delete();
+						if (!set.equals(OLD)) {
+							throw e;
+						}
+						// Ireland, France, Great Britain, Norway, New Zealand are not published yet: the old style
+						// simply has no map there
+						LOGGER.info("Depth test map " + m + " is not published: " + e.getMessage());
+						return null;
+					}
+					Files.move(tmp.toPath(), f.toPath(), StandardCopyOption.REPLACE_EXISTING);
+					synchronized (left) {
+						left[0]--;
+						status.put(set, String.format("Downloading the %s depth test maps: %d of %d left, now %s",
+								set, left[0], missing.size(), m));
+					}
+					return null;
+				}));
+			}
+			for (Future<?> t : tasks) {
+				t.get();
+			}
+		} finally {
+			pool.shutdownNow();
+		}
 	}
 
 	private File map(String set, String name) {
