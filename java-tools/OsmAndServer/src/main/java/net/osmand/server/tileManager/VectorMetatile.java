@@ -190,7 +190,7 @@ public class VectorMetatile implements TileCacheProvider, Comparable<VectorMetat
 				return null;
 			}
 			if (this.style.depth != null) {
-				String err = DepthTestMaps.INSTANCE.activate(nativelib, this.cfg, this.cfg.obfLocation);
+				String err = DepthTestMaps.INSTANCE.activate(nativelib, this.cfg, this.style.depth, this.cfg.obfLocation);
 				if (err != null) {
 					return ResponseEntity.status(503).body(err);
 				}

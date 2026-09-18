@@ -12,6 +12,8 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -26,10 +28,15 @@ import net.osmand.server.tileManager.TileServerConfig.VectorStyle;
 import net.osmand.util.Algorithms;
 
 /**
- * Test only (OsmAnd-Issues#3341): the depth OBFs of the builder with the current styles, as depth-marine,
- * depth-default and depth-nautical. The maps are downloaded into the temp folder at start and again when their size
- * on the builder changed; env DEPTH_TEST_MAPS_DIR points at a folder of maps built locally instead.
- * The native library has one set of files, so the base depth maps are closed before these render.
+ * Test only (OsmAnd-Issues#3341): depth OBFs rendered with the styles of this jar, in two sets to compare -
+ * "depth-*" the maps of the builder and "work-*" the ones built locally. Three folders are used:
+ * <ul>
+ * <li>OBF_LOCATION - the ordinary maps (a basemap and the regions to look at); their own .depth.obf are closed;
+ * <li>DEPTH_MAPS_DIR - the depth maps of the builder, downloaded here at start and again when their size changed
+ *     (default: a folder in the temp directory);
+ * <li>DEPTH_WORK_DIR - the depth OBFs built locally, any file name; nothing is downloaded there.
+ * </ul>
+ * The native library holds one set of files, so a style closes the other set before it renders.
  */
 public class DepthTestMaps {
 
@@ -37,6 +44,8 @@ public class DepthTestMaps {
 
 	public static final DepthTestMaps INSTANCE = new DepthTestMaps();
 
+	public static final String SERVER = "depth";
+	public static final String WORK = "work";
 	// every published depth map, the _full_coverage_ ones left out: they are Europe_contours and World_contours
 	// with the detailed regions not cut out, so they would double the contours of the regional maps
 	private static final String[] MAPS = { "Netherlands_contours", "Ireland_contours", "France_contours",
@@ -48,23 +57,22 @@ public class DepthTestMaps {
 	private static final String MAP_URL = "https://builder.osmand.net/depth-data/build/%s.depth.obf";
 	private static final int DOWNLOADS_AT_A_TIME = 3;
 
-	// DEPTH_TEST_MAPS_DIR: a folder with maps/NAME.depth.obf built locally; nothing is downloaded or refreshed from
-	// the builder then, so the local files stay
-	private final String localDir = System.getenv("DEPTH_TEST_MAPS_DIR");
-	private final File dir = localDir != null ? new File(localDir)
+	private final File serverDir = System.getenv("DEPTH_MAPS_DIR") != null ? new File(System.getenv("DEPTH_MAPS_DIR"))
 			: new File(System.getProperty("java.io.tmpdir"), "osmand-depth-test");
+	private final File workDir = System.getenv("DEPTH_WORK_DIR") != null ? new File(System.getenv("DEPTH_WORK_DIR")) : null;
 	private final HttpClient http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
-	private volatile String status = "Depth test maps are not downloaded yet";
+	/** Per set: what is still missing, or null once the set can be rendered; the work set is ready at once. */
+	private final Map<String, String> status = new ConcurrentHashMap<>();
 	private Thread downloader;
 	private NativeJavaRendering lib;
 	private Object renderLock;
-	private boolean opened;
+	private String active;
 	private boolean baseClosed;
 
-	/** The current styles from the classpath, written next to the maps so that the renderer can load them by path. */
+	/** The styles of this jar, written beside the maps: depth-* for the server set, work-* for the local one. */
 	public List<VectorStyle> createStyles(int tileSizeLog, int metaTileSizeLog, int maxZoomCache) {
 		List<VectorStyle> styles = new ArrayList<>();
-		File styleDir = new File(dir, "styles");
+		File styleDir = new File(serverDir, "styles");
 		try {
 			styleDir.mkdirs();
 			for (String f : STYLE_FILES) {
@@ -76,37 +84,41 @@ public class DepthTestMaps {
 					Files.copy(is, new File(styleDir, f + ".render.xml").toPath(), StandardCopyOption.REPLACE_EXISTING);
 				}
 			}
-			for (String s : STYLES) {
-				VectorStyle vs = new VectorStyle();
-				vs.key = "depth-" + s;
-				vs.name = vs.key;
-				vs.file = new File(styleDir, s + ".render.xml").getAbsolutePath();
-				vs.depth = s;
-				vs.maxZoomCache = maxZoomCache;
-				vs.tileSizeLog = tileSizeLog;
-				vs.metaTileSizeLog = metaTileSizeLog;
-				vs.storage = NativeJavaRendering.parseStorage(vs.file);
-				for (RenderingRuleProperty p : vs.storage.PROPS.getPoperties()) {
-					if (!Algorithms.isEmpty(p.getName()) && !Algorithms.isEmpty(p.getCategory())
-							&& !"ui_hidden".equals(p.getCategory())) {
-						vs.properties.add(p);
+			for (String set : workDir == null ? new String[] { SERVER } : new String[] { SERVER, WORK }) {
+				for (String s : STYLES) {
+					VectorStyle vs = new VectorStyle();
+					vs.key = set + "-" + s;
+					vs.name = vs.key;
+					vs.file = new File(styleDir, s + ".render.xml").getAbsolutePath();
+					vs.depth = set;
+					vs.maxZoomCache = maxZoomCache;
+					vs.tileSizeLog = tileSizeLog;
+					vs.metaTileSizeLog = metaTileSizeLog;
+					vs.storage = NativeJavaRendering.parseStorage(vs.file);
+					for (RenderingRuleProperty p : vs.storage.PROPS.getPoperties()) {
+						if (!Algorithms.isEmpty(p.getName()) && !Algorithms.isEmpty(p.getCategory())
+								&& !"ui_hidden".equals(p.getCategory())) {
+							vs.properties.add(p);
+						}
 					}
+					styles.add(vs);
 				}
-				styles.add(vs);
 			}
 		} catch (Exception e) {
 			LOGGER.error("Depth test styles: " + e.getMessage(), e);
 		}
-		LOGGER.info("Depth test styles: " + styles.size() + " in " + dir.getAbsolutePath());
+		LOGGER.info("Depth test styles: " + styles.size() + ", maps of the builder in " + serverDir.getAbsolutePath()
+				+ (workDir == null ? ", no work folder" : ", work maps in " + workDir.getAbsolutePath()));
 		startDownload();
 		return styles;
 	}
 
-	/** Called under the rendering lock: returns an error while the maps are not ready. */
-	public synchronized String activate(NativeJavaRendering lib, Object renderLock, String obfLocation) {
-		if (status != null) {
+	/** Called under the rendering lock: returns an error while that set is not ready. */
+	public synchronized String activate(NativeJavaRendering lib, Object renderLock, String set, String obfLocation) {
+		String left = status.get(set);
+		if (left != null) {
 			startDownload();
-			return status;
+			return left;
 		}
 		this.lib = lib;
 		this.renderLock = renderLock;
@@ -117,18 +129,45 @@ public class DepthTestMaps {
 			}
 			baseClosed = true;
 		}
-		if (!opened) {
-			for (File f : mapFiles()) {
-				lib.initMapFile(f.getAbsolutePath(), true);
+		if (!set.equals(active)) {
+			if (active != null) {
+				for (File f : mapFiles(active)) {
+					lib.closeMapFile(f.getAbsolutePath());
+				}
 			}
-			opened = true;
+			int n = 0;
+			for (File f : mapFiles(set)) {
+				lib.initMapFile(f.getAbsolutePath(), true);
+				n++;
+			}
+			active = set;
+			LOGGER.info("Depth test set " + set + ": " + n + " maps opened");
 		}
 		return null;
 	}
 
+	/** The maps of a set: the published names in the server folder, every OBF of the work folder. */
+	private List<File> mapFiles(String set) {
+		List<File> files = new ArrayList<>();
+		if (WORK.equals(set)) {
+			File[] all = workDir == null ? null : workDir.listFiles((d, n) -> n.endsWith(".obf"));
+			for (File f : all == null ? new File[0] : all) {
+				files.add(f);
+			}
+			return files;
+		}
+		for (String m : MAPS) {
+			File f = map(m);
+			if (f.exists()) {  // a region that is not published yet
+				files.add(f);
+			}
+		}
+		return files;
+	}
+
 	/** Downloads the maps whose size on the builder changed (after a new build). */
 	public synchronized void refresh() {
-		if (localDir != null || (downloader != null && downloader.isAlive())) {
+		if (downloader != null && downloader.isAlive()) {
 			return;
 		}
 		downloader = new Thread(this::refreshChanged, "depth-test-refresh");
@@ -159,12 +198,12 @@ public class DepthTestMaps {
 		Object lock = renderLock != null ? renderLock : this;
 		synchronized (lock) {
 			synchronized (this) {
-				boolean wasOpen = opened && lib != null;
-				if (wasOpen) {
+				boolean opened = SERVER.equals(active) && lib != null;
+				if (opened) {
 					lib.closeMapFile(f.getAbsolutePath());
 				}
 				Files.move(tmp.toPath(), f.toPath(), StandardCopyOption.REPLACE_EXISTING);
-				if (wasOpen) {
+				if (opened) {
 					lib.initMapFile(f.getAbsolutePath(), true);
 				}
 			}
@@ -172,24 +211,23 @@ public class DepthTestMaps {
 		LOGGER.info("Depth test map updated: " + f.getName());
 	}
 
-	/** At start: downloads the missing maps, DOWNLOADS_AT_A_TIME at a time, then looks for newly built ones. */
+	/** At start: downloads the missing maps of the builder, DOWNLOADS_AT_A_TIME at a time. */
 	private synchronized void startDownload() {
 		if (downloader != null && downloader.isAlive()) {
 			return;
 		}
+		status.putIfAbsent(SERVER, "The depth maps of the builder are not downloaded yet");
 		downloader = new Thread(() -> {
 			try {
 				downloadMissing();
-				status = null;
-				LOGGER.info("Depth test maps are ready");
+				status.remove(SERVER);
+				LOGGER.info("Depth test maps of the builder are ready");
 			} catch (Exception e) {
-				status = "Depth test maps download failed: " + e.getMessage();
-				LOGGER.error(status, e);
+				status.put(SERVER, "Depth test maps download failed: " + e.getMessage());
+				LOGGER.error("Depth test maps: " + e.getMessage(), e);
 				return;
 			}
-			if (localDir == null) {
-				refreshChanged();
-			}
+			refreshChanged();
 		}, "depth-test-download");
 		downloader.start();
 	}
@@ -201,8 +239,8 @@ public class DepthTestMaps {
 				missing.add(m);
 			}
 		}
-		if (missing.isEmpty() || localDir != null) {
-			return;  // a local folder holds what it holds: whatever is missing is simply not shown
+		if (missing.isEmpty()) {
+			return;
 		}
 		int[] left = { missing.size() };
 		ExecutorService pool = Executors.newFixedThreadPool(Math.min(DOWNLOADS_AT_A_TIME, missing.size()));
@@ -217,8 +255,8 @@ public class DepthTestMaps {
 					Files.move(tmp.toPath(), f.toPath(), StandardCopyOption.REPLACE_EXISTING);
 					synchronized (left) {
 						left[0]--;
-						status = String.format("Downloading the depth test maps: %d of %d left, now %s",
-								left[0], missing.size(), m);
+						status.put(SERVER, String.format("Downloading the depth maps of the builder: %d of %d left, now %s",
+								left[0], missing.size(), m));
 					}
 					return null;
 				}));
@@ -232,27 +270,7 @@ public class DepthTestMaps {
 	}
 
 	private File map(String name) {
-		return new File(dir, "maps/" + name + ".depth.obf");
-	}
-
-	/** The maps to render: the published names, or, with DEPTH_TEST_MAPS_DIR, every OBF of the folder - pieces
-	 * built for one place can then be dropped in under any name. */
-	private List<File> mapFiles() {
-		List<File> files = new ArrayList<>();
-		if (localDir != null) {
-			File[] all = new File(dir, "maps").listFiles((d, n) -> n.endsWith(".obf"));
-			for (File f : all == null ? new File[0] : all) {
-				files.add(f);
-			}
-			return files;
-		}
-		for (String m : MAPS) {
-			File f = map(m);
-			if (f.exists()) {  // a region that is not published yet
-				files.add(f);
-			}
-		}
-		return files;
+		return new File(serverDir, "maps/" + name + ".depth.obf");
 	}
 
 	private void download(String url, File target) throws IOException, InterruptedException {

@@ -4,9 +4,12 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.TimeUnit;
 
 import javax.imageio.ImageIO;
 
@@ -50,8 +53,8 @@ public class VectorTileController {
 
 	private final TileMemoryCache<VectorMetatile> tileMemoryCache = new TileMemoryCache<>();
 
-	// depth test branch: no long cache, so new styles show up after a restart
-	private static final CacheControl STYLES_HTTP_CACHE = CacheControl.noCache();
+	private static final CacheControl STYLES_HTTP_CACHE =
+			CacheControl.maxAge(30, TimeUnit.DAYS).cachePublic();
 
 	private volatile String stylesJsonCache;
 	private final Object stylesJsonCacheLock = new Object();
@@ -68,6 +71,18 @@ public class VectorTileController {
 		}
 		DepthTestMaps.INSTANCE.refresh();
 		return ResponseEntity.ok("{\"status\":\"ok\"}");
+	}
+
+	// the page that shows two depth sets side by side, see resources/depth-test/compare.html
+	@RequestMapping(path = "/depth-test/compare", produces = MediaType.TEXT_HTML_VALUE)
+	public ResponseEntity<String> depthTestCompare() throws IOException {
+		try (InputStream in = getClass().getResourceAsStream("/depth-test/compare.html")) {
+			if (in == null) {
+				return ResponseEntity.notFound().build();
+			}
+			return ResponseEntity.ok().cacheControl(CacheControl.noCache())
+					.body(new String(in.readAllBytes(), StandardCharsets.UTF_8));
+		}
 	}
 
 	private ResponseEntity<?> errorConfig(String msg) {
