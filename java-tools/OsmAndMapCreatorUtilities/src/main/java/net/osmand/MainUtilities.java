@@ -16,6 +16,8 @@ import net.osmand.router.*;
 import net.osmand.router.tester.RandomRouteTester;
 import net.osmand.routes.RouteRelationExtractor;
 import net.osmand.search.core.spatial.SpatialTextSearch;
+import net.osmand.tester.CheckTurnLanesTest;
+import net.osmand.tester.GenerateTurnLanesTest;
 import net.osmand.tester.RandomClickGenerator;
 import net.osmand.travel.TravelGuideCreatorMain;
 import net.osmand.travel.WikivoyageDataGenerator;
@@ -65,6 +67,10 @@ public class MainUtilities {
 			String[] subArgsArray = subArgs.toArray(new String[subArgs.size()]);
 			if (utl.equals("check-ocean-tile")) {
 				OceanTilesCreator.checkOceanTile(subArgsArray);
+			} else if (utl.equals("check-turn-lanes-test")) {
+				CheckTurnLanesTest.main(subArgsArray);
+			} else if (utl.equals("generate-turn-lanes-test")) {
+				GenerateTurnLanesTest.main(subArgsArray);
 			} else if (utl.equals("inspector")) {
 				BinaryInspector.main(subArgsArray);
 			} else if (utl.equals("compare")) {
