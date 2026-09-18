@@ -118,11 +118,8 @@ public class DepthTestMaps {
 			baseClosed = true;
 		}
 		if (!opened) {
-			for (String m : MAPS) {
-				File f = map(m);
-				if (f.exists()) {  // a region that is not published yet, or a local folder with one region only
-					lib.initMapFile(f.getAbsolutePath(), true);
-				}
+			for (File f : mapFiles()) {
+				lib.initMapFile(f.getAbsolutePath(), true);
 			}
 			opened = true;
 		}
@@ -236,6 +233,26 @@ public class DepthTestMaps {
 
 	private File map(String name) {
 		return new File(dir, "maps/" + name + ".depth.obf");
+	}
+
+	/** The maps to render: the published names, or, with DEPTH_TEST_MAPS_DIR, every OBF of the folder - pieces
+	 * built for one place can then be dropped in under any name. */
+	private List<File> mapFiles() {
+		List<File> files = new ArrayList<>();
+		if (localDir != null) {
+			File[] all = new File(dir, "maps").listFiles((d, n) -> n.endsWith(".obf"));
+			for (File f : all == null ? new File[0] : all) {
+				files.add(f);
+			}
+			return files;
+		}
+		for (String m : MAPS) {
+			File f = map(m);
+			if (f.exists()) {  // a region that is not published yet
+				files.add(f);
+			}
+		}
+		return files;
 	}
 
 	private void download(String url, File target) throws IOException, InterruptedException {

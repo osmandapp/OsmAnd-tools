@@ -6,7 +6,7 @@
 # For every source: file count against the expected one, every raster opens (gdalinfo), CRS is EPSG:4326 where
 # expected, a known sea point is below 0 m (depths are negative), and leftover archives or partial files.
 # Writes DIR/mask/land_polygons.gpkg (indexed copy of the land polygons) and DIR/src/gebco/gebco_2026.vrt, DIR/src/gebco_tid/gebco_2026_tid.vrt, DIR/src/emodnet/emodnet_2024.vrt,
-# DIR/src/cudem/cudem.vrt, DIR/src/ireland/ireland.vrt, DIR/src/denmark/denmark.vrt, DIR/src/france/france.vrt, DIR/src/uk/uk.vrt. Prints OK / WARN / FAIL lines and exits with 1 when anything failed.
+# DIR/src/cudem/cudem.vrt. Prints OK / WARN / FAIL lines and exits with 1 when anything failed.
 set -uo pipefail
 
 OUT=""; JOBS=4
@@ -172,73 +172,12 @@ leftovers norway "$SRC/norway"
 echo "== netherlands"
 FILES=("$SRC"/netherlands/*.tif)
 [ -e "${FILES[0]}" ] || FILES=()
-count netherlands ${#FILES[@]} 5
+count netherlands ${#FILES[@]} 3
 if [ ${#FILES[@]} -gt 0 ]; then
 	rasters_open netherlands "${FILES[@]}"
 	for f in "${FILES[@]}"; do
 		echo "     $(basename "$f"): $(crs "$f")"
 	done
-fi
-
-echo "== ireland"
-# INFOMAR tiles without data were left as .empty; the 10 m inshore grid goes on top of the 25 m one
-# 25 m first: in a VRT the later files lie on top, so the 10 m grid wins where both have data
-FILES=(); while IFS= read -r f; do FILES+=("$f"); done < <(find "$SRC/ireland/25m" -name '*.tif' 2>/dev/null | sort; find "$SRC/ireland/10m" -name '*.tif' 2>/dev/null | sort)
-if [ ${#FILES[@]} -eq 0 ]; then fail "ireland: no files"
-else
-	ok "ireland: $(find "$SRC/ireland/25m" -name '*.tif' | wc -l | tr -d ' ') tiles of 25 m, $(find "$SRC/ireland/10m" -name '*.tif' | wc -l | tr -d ' ') of 10 m"
-	rasters_open ireland "${FILES[@]}"
-	epsg4326 ireland "${FILES[0]}"
-	if gdalbuildvrt -q -resolution highest "$SRC/ireland/ireland.vrt" "${FILES[@]}" 2>/dev/null; then
-		ok "ireland: ireland.vrt of ${#FILES[@]} files"
-		sea ireland "$SRC/ireland/ireland.vrt" -6.05 53.33 "Dublin Bay"
-	else fail "ireland: gdalbuildvrt failed"; fi
-fi
-leftovers ireland "$SRC/ireland"
-
-echo "== france"
-FILES=("$SRC"/france/*.tif)
-[ -e "${FILES[0]}" ] || FILES=()
-count france ${#FILES[@]} 11
-if [ ${#FILES[@]} -gt 0 ]; then
-	rasters_open france "${FILES[@]}"
-	# zones of 5, 10 and 20 m: the VRT keeps the finest cell
-	if gdalbuildvrt -q -resolution highest "$SRC/france/france.vrt" "${FILES[@]}" 2>/dev/null; then
-		ok "france: france.vrt of ${#FILES[@]} files"
-		sea france "$SRC/france/france.vrt" -1.67 43.40 "Saint-Jean-de-Luz bay"
-	else fail "france: gdalbuildvrt failed"; fi
-fi
-leftovers france "$SRC/france"
-
-echo "== uk"
-FILES=(); while IFS= read -r f; do FILES+=("$f"); done < <(find "$SRC/uk/grid" -name '*.tif' 2>/dev/null | sort)
-n=$(find "$SRC/uk/incoming" -name '*.bag' 2>/dev/null | wc -l | tr -d ' ')
-[ "$n" -eq 0 ] || warn "uk: $n BAG files in incoming not converted (rerun download_all.sh --only uk)"
-if [ ${#FILES[@]} -eq 0 ]; then fail "uk: no surveys in src/uk/grid (downloaded by hand from seabed.admiralty.co.uk)"
-else
-	rasters_open uk "${FILES[@]}"
-	vrt uk "$SRC/uk/uk.vrt" "${FILES[@]}"
-fi
-
-echo "== nz"
-NZ="$SRC/nz/linz_hydro.gpkg"
-if [ ! -f "$NZ" ]; then fail "nz: linz_hydro.gpkg not found (download_all.sh --only nz, needs LINZ_API_KEY)"
-else
-	n=$(ogrinfo -ro -q "$NZ" 2>/dev/null | grep -cE '^[0-9]+: (contour|sounding|area)_[1-5]')
-	if [ "$n" -eq 15 ]; then ok "nz: linz_hydro.gpkg with 15 layers"; else fail "nz: linz_hydro.gpkg has $n of 15 layers"; fi
-fi
-
-echo "== denmark"
-DK="$SRC/denmark/ddm_50m.dybde.tiff"
-if [ ! -f "$DK" ]; then fail "denmark: ddm_50m.dybde.tiff not found"
-else
-	rasters_open denmark "$DK"
-	c=$(crs "$DK"); if [ "$c" = "EPSG:3034" ]; then ok "denmark: $c"; else warn "denmark: $c, expected EPSG:3034"; fi
-	# the model gives depths as positive numbers: the VRT turns them negative like every other grid
-	if gdal_translate -q -of VRT -scale 0 1 0 -1 "$DK" "$SRC/denmark/denmark.vrt" 2>/dev/null; then
-		ok "denmark: denmark.vrt with depths negative"
-		sea denmark "$SRC/denmark/denmark.vrt" 11.0 56.3 "Kattegat"
-	else fail "denmark: denmark.vrt could not be written"; fi
 fi
 
 echo

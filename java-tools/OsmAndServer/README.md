@@ -52,9 +52,10 @@ Leaflet maps side by side. The map files are the only difference then, and a ver
 
 ### Building a depth map to test
 
-See `obf-generation/contours/V4/depth/README.md`. A region of one's own, without the whole planet:
+The generation scripts live on master, `obf-generation/contours/V4/depth` (see their own README). A region of one's
+own, without the whole planet:
 
-    BBOX="-97.6 25.8 -93.5 30.2" bash obf-generation/contours/V4/depth/build_depth_region.sh \
+    BBOX="-97.6 25.8 -93.5 30.2" bash build_depth_region.sh \
         -D <data dir> -n Gulf_of_Mexico_north-west_contours -o <out dir> -c <OsmAndMapCreator> -j 4
 
 `<data dir>` is the folder of `download_all.sh`; a VRT whose `SourceFilename`s are `/vsicurl/` URLs of the builder

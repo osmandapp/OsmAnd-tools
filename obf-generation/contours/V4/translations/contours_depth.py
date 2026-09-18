@@ -26,7 +26,4 @@ def filterTags(attrs):
 		tags['contourtype'] = '5m'
 	elif depth == 2:
 		tags['contourtype'] = '2m'
-	else:
-		# 1 m steps of a charted source (Kartverket has them in harbours): minor contours, from zoom 13 only
-		tags['contourtype'] = '1m'
 	return tags
