@@ -211,6 +211,7 @@ done
 
 step "depth areas"
 python3 "$HERE/depth_areas_osm.py" "$FGDB" "$OUT/${NAME}_areas.osm.gz" --layer dybdeareal --field minimumsdybde \
+	--field-max maksimumsdybde \
 	--land "$LAND_CUT" ${BBOX:+--bbox $BBOX} 2>&1 | grep -v numpy
 [ "$(zcat < "$OUT/${NAME}_areas.osm.gz" | grep -c -m1 '<way')" != 0 ] || rm -f "$OUT/${NAME}_areas.osm.gz"
 
