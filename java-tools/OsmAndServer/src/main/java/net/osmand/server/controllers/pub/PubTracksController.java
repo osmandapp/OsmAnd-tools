@@ -50,6 +50,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import net.osmand.server.DatasourceConfiguration;
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
+import net.osmand.server.api.services.EmailSenderService;
 
 /**
  * Reviews of OsmGpx tracks from the heatmap page. Anyone reads them and downloads the reviewed tracks; signed-in OsmAnd
@@ -85,6 +86,9 @@ public class PubTracksController {
 
 	@Autowired
 	DatasourceConfiguration config;
+
+	@Autowired
+	EmailSenderService emailSender;
 
 	private final Gson gson = new Gson();
 	private volatile boolean feedbackTableReady;
@@ -237,7 +241,10 @@ public class PubTracksController {
 		if (sent >= MAX_PER_DAY) {
 			return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body("Too many messages from your address today");
 		}
-		String email = isBlank(req.email()) ? null : cut(req.email().trim(), MAX_EMAIL);
+		String email = isBlank(req.email()) ? null : req.email().trim();
+		if (email != null && (email.length() > MAX_EMAIL || !emailSender.isEmail(email))) {
+			return ResponseEntity.badRequest().body("e-mail looks wrong");
+		}
 		Map<String, Object> context = new LinkedHashMap<>();
 		context.put("view", req.view());
 		context.put("filters", req.filters());
