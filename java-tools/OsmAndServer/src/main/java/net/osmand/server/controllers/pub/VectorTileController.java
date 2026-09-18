@@ -4,6 +4,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -99,7 +100,15 @@ public class VectorTileController {
 
 	private String computeStylesJson() {
 		synchronized (config.style) {
-			for (VectorStyle vectorStyle : config.style.values()) {
+			// the depth test styles are for the comparison page, which asks for their tiles by name; they have no
+			// place in the style list of the web map
+			Map<String, VectorStyle> shown = new LinkedHashMap<>();
+			for (Map.Entry<String, VectorStyle> e : config.style.entrySet()) {
+				if (e.getValue().depth == null) {
+					shown.put(e.getKey(), e.getValue());
+				}
+			}
+			for (VectorStyle vectorStyle : shown.values()) {
 				vectorStyle.properties.clear();
 				for (RenderingRuleProperty p : vectorStyle.storage.PROPS.getPoperties()) {
 					if (!Algorithms.isEmpty(p.getName()) && !Algorithms.isEmpty(p.getCategory())
@@ -109,7 +118,7 @@ public class VectorTileController {
 					}
 				}
 			}
-			return gson.toJson(config.style);
+			return gson.toJson(shown);
 		}
 	}
 
