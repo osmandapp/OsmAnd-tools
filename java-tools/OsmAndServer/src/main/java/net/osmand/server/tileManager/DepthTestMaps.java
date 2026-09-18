@@ -38,8 +38,12 @@ public class DepthTestMaps {
 
 	public static final String OLD = "old";
 	public static final String NEW = "new";
-	private static final String[] MAPS = { "Netherlands_contours", "Europe_contours", "Europe_points", "World_contours",
-			"World_Northern_hemisphere_points", "World_Southern_hemisphere_points", "Gulf_of_Mexico_north-west_contours" };
+	// every published depth map, the _full_coverage_ ones left out: they are Europe_contours and World_contours
+	// with the detailed regions not cut out, so they would double the contours of the regional maps
+	private static final String[] MAPS = { "Netherlands_contours", "Ireland_contours", "France_contours",
+			"Great_Britain_contours", "Norway_contours", "New-zealand_contours", "Gulf_of_Mexico_north-west_contours",
+			"Europe_contours", "Europe_points", "World_contours", "World_Northern_hemisphere_points",
+			"World_Southern_hemisphere_points" };
 	private static final String[] STYLES = { "marine", "default", "nautical" };
 	private static final String[] STYLE_FILES = { "default", "marine", "nautical", "depthcontourlines.addon" };
 	private static final String OLD_MAP_URL = "https://download.osmand.net/download?depth=yes&file=%s_2.depth.obf.zip";
@@ -118,11 +122,17 @@ public class DepthTestMaps {
 		if (!set.equals(active)) {
 			if (active != null) {
 				for (String m : MAPS) {
-					lib.closeMapFile(map(active, m).getAbsolutePath());
+					File f = map(active, m);
+					if (f.exists()) {
+						lib.closeMapFile(f.getAbsolutePath());
+					}
 				}
 			}
 			for (String m : MAPS) {
-				lib.initMapFile(map(set, m).getAbsolutePath(), true);
+				File f = map(set, m);
+				if (f.exists()) {  // a region published only later has no old map
+					lib.initMapFile(f.getAbsolutePath(), true);
+				}
 			}
 			active = set;
 		}
@@ -191,7 +201,18 @@ public class DepthTestMaps {
 							status = String.format("Downloading depth test maps %d of %d: %s %s", i, MAPS.length * 2, set, m);
 							f.getParentFile().mkdirs();
 							File tmp = new File(f.getPath() + ".tmp");
-							download(String.format(set.equals(OLD) ? OLD_MAP_URL : NEW_MAP_URL, m), tmp, set.equals(OLD));
+							try {
+								download(String.format(set.equals(OLD) ? OLD_MAP_URL : NEW_MAP_URL, m), tmp, set.equals(OLD));
+							} catch (IOException e) {
+								tmp.delete();
+								if (!set.equals(OLD)) {
+									throw e;
+								}
+								// Ireland, France, Great Britain, Norway, New Zealand are not published yet: the old
+								// style simply has no map there
+								LOGGER.info("Depth test map " + m + " is not published: " + e.getMessage());
+								continue;
+							}
 							Files.move(tmp.toPath(), f.toPath(), StandardCopyOption.REPLACE_EXISTING);
 						}
 					}
