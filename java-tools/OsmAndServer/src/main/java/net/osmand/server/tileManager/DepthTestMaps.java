@@ -54,7 +54,11 @@ public class DepthTestMaps {
 	private static final String OLD_MAP_URL = "https://download.osmand.net/download?depth=yes&file=%s_2.depth.obf.zip";
 	private static final String NEW_MAP_URL = "https://builder.osmand.net/depth-data/build/%s.depth.obf";
 
-	private final File dir = new File(System.getProperty("java.io.tmpdir"), "osmand-depth-test");
+	// DEPTH_TEST_MAPS_DIR: a prepared folder of maps (new/ and old/) to test a locally built OBF; nothing is
+	// refreshed from the builder then, so the local file stays
+	private final String localDir = System.getenv("DEPTH_TEST_MAPS_DIR");
+	private final File dir = localDir != null ? new File(localDir)
+			: new File(System.getProperty("java.io.tmpdir"), "osmand-depth-test");
 	private final HttpClient http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
 	private static final int DOWNLOADS_AT_A_TIME = 3;
 	/** Per set: what is missing, or null once that set can be rendered. A set does not wait for the other one. */
@@ -149,7 +153,7 @@ public class DepthTestMaps {
 
 	/** Downloads new depth maps whose size on the builder changed (after a new build). */
 	public synchronized void refresh() {
-		if (downloader != null && downloader.isAlive()) {
+		if (localDir != null || (downloader != null && downloader.isAlive())) {
 			return;
 		}
 		downloader = new Thread(this::refreshNew, "depth-test-refresh");
@@ -213,7 +217,9 @@ public class DepthTestMaps {
 					LOGGER.error("Depth test maps of the " + set + " set: " + e.getMessage(), e);
 				}
 			}
-			refreshNew();
+			if (localDir == null) {
+				refreshNew();
+			}
 		}, "depth-test-download");
 		downloader.start();
 	}
