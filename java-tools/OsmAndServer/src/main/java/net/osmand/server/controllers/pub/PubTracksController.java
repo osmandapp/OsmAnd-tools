@@ -9,12 +9,14 @@ import java.sql.Array;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.zip.GZIPOutputStream;
 
 import org.apache.commons.logging.Log;
@@ -35,6 +37,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -63,6 +66,9 @@ public class PubTracksController {
 	private static final int MAX_COMMENT = 2000;
 	private static final int MAX_IDS = 1000;
 	private static final int EXPORT_BATCH = 500;
+	private static final Pattern NUMBER = Pattern.compile("[-+]?\\d+(\\.\\d+)?([eE][-+]?\\d+)?"); // negative coordinates are not formulas
+	// any review of the track (admin or a user) was saved at or after the $s instant; review times are ISO-8601 strings, so they compare as text
+	private static final String REVIEWED_SINCE = "jsonb_path_exists(m.manual_review, '$.**.time ? (@ >= $s)', jsonb_build_object('s', ?::text))";
 	private static final String[] EXPORT_COLUMNS = {"id", "user", "date", "name", "description", "tags", "lat", "lon", "activity",
 			"activity_source", "file_activity", "speed_matches_activity", "speed", "max_speed", "distance", "points", "time_minutes",
 			"reviews", "track_stats", "geometry_b64"};
@@ -113,7 +119,7 @@ public class PubTracksController {
 			}
 			if (!isBlank(req.comment())) {
 				String comment = req.comment().trim();
-				review.addProperty("comment", comment.length() > MAX_COMMENT ? comment.substring(0, MAX_COMMENT) : comment);
+				review.addProperty("comment", cut(comment, MAX_COMMENT));
 			}
 			review.addProperty("time", Instant.now().toString());
 		}
@@ -162,26 +168,30 @@ public class PubTracksController {
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 
-	/** every reviewed track as one csv row, gzip; gpx=true adds the original GPX file (gzip, base64) */
+	/** every reviewed track as one csv row, gzip; gpx=true adds the original GPX file (gzip, base64); since keeps tracks with a review from that moment on */
 	@GetMapping(path = "/reviews.csv.gz")
-	public void export(@RequestParam(defaultValue = "false") boolean gpx, HttpServletResponse response) throws IOException {
+	public void export(@RequestParam(defaultValue = "false") boolean gpx, @RequestParam(required = false) String since,
+			HttpServletResponse response) throws IOException {
 		if (!config.osmgpxInitialized()) {
 			response.sendError(HttpStatus.SERVICE_UNAVAILABLE.value(), "OsmGpx datasource is not initialized");
 			return;
 		}
+		Instant from = parseSince(since);
 		response.setContentType("application/gzip");
 		response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"osmgpx-reviews.csv.gz\"");
 		String select = "SELECT m.id, m.\"user\", m.date, m.name, m.description, m.tags, m.lat, m.lon, m.activity, m.activity_source, "
 				+ "m.file_activity, m.speed_matches_activity, m.speed, m.max_speed, m.distance, m.points, m.time_minutes, "
 				+ "m.manual_review::text AS manual_review, m.track_stats::text AS track_stats, m.simplified_geometry"
 				+ (gpx ? ", f.data AS gpx FROM " + TABLE + " m LEFT JOIN osm_gpx_files f ON f.id = m.id" : " FROM " + TABLE + " m")
-				+ " WHERE m.manual_review IS NOT NULL AND m.id > ? ORDER BY m.id LIMIT " + EXPORT_BATCH;
+				+ " WHERE m.manual_review IS NOT NULL AND m.id > ?" + (from == null ? "" : " AND " + REVIEWED_SINCE)
+				+ " ORDER BY m.id LIMIT " + EXPORT_BATCH;
 		int batches = 0;
 		try (Writer w = new OutputStreamWriter(new GZIPOutputStream(response.getOutputStream(), 1 << 16), StandardCharsets.UTF_8)) {
 			w.write(String.join(",", EXPORT_COLUMNS) + (gpx ? ",gpx_gz_b64" : "") + "\n");
 			long lastId = -1;
 			while (true) {
 				long[] last = {-1};
+				Object[] args = from == null ? new Object[] {lastId} : new Object[] {lastId, from.toString()};
 				jdbcTemplate.query(select, (RowCallbackHandler) rs -> {
 					try {
 						writeRow(w, rs, gpx);
@@ -189,7 +199,7 @@ public class PubTracksController {
 						throw new UncheckedIOException(e);
 					}
 					last[0] = rs.getLong("id");
-				}, lastId);
+				}, args);
 				if (last[0] < 0) {
 					break;
 				}
@@ -198,6 +208,15 @@ public class PubTracksController {
 			}
 		}
 		LOG.info("Exported reviewed OsmGpx tracks in " + batches + " batches");
+	}
+
+	/** null when absent; a malformed value answers 400 */
+	private static Instant parseSince(String since) {
+		try {
+			return since == null ? null : Instant.parse(since);
+		} catch (DateTimeParseException e) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "since must be an ISO-8601 instant");
+		}
 	}
 
 	/** {"admin": review without author, "users": [reviews without ids], "mine": the caller's review} */
@@ -256,8 +275,20 @@ public class PubTracksController {
 		return user(auth) != null && auth.getAuthorities().stream().anyMatch(a -> WebSecurityConfiguration.ROLE_ADMIN.equals(a.getAuthority()));
 	}
 
+	private static String cut(String s, int max) {
+		if (s.length() <= max) {
+			return s;
+		}
+		return s.substring(0, Character.isHighSurrogate(s.charAt(max - 1)) ? max - 1 : max);
+	}
+
+	/** quoted; text with a leading =, +, - or @ gets an apostrophe so a spreadsheet shows it instead of running it as a formula */
 	private static String csv(String v) {
-		return v == null ? "" : "\"" + v.replace("\"", "\"\"") + "\"";
+		if (v == null) {
+			return "";
+		}
+		boolean formula = !v.isEmpty() && "=+-@".indexOf(v.charAt(0)) >= 0 && !NUMBER.matcher(v).matches();
+		return "\"" + (formula ? "'" + v : v).replace("\"", "\"\"") + "\"";
 	}
 
 	private static boolean isBlank(String s) {
