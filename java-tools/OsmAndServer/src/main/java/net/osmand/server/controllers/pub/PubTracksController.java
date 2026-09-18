@@ -9,6 +9,7 @@ import java.sql.Array;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -178,11 +179,17 @@ public class PubTracksController {
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 
-	/** every reviewed track as one csv row, gzip; gpx=true adds the original GPX file (gzip, base64) */
+	/** every reviewed track as one csv row, gzip; gpx=true adds the original GPX file (gzip, base64); since keeps tracks with a review from that moment on */
 	@GetMapping(path = "/reviews.csv.gz")
-	public void export(@RequestParam(defaultValue = "false") boolean gpx, HttpServletResponse response) throws IOException {
+	public void export(@RequestParam(defaultValue = "false") boolean gpx, @RequestParam(required = false) String since,
+			HttpServletResponse response) throws IOException {
 		if (!config.osmgpxInitialized()) {
 			response.sendError(HttpStatus.SERVICE_UNAVAILABLE.value(), "OsmGpx datasource is not initialized");
+			return;
+		}
+		Instant from = parseSince(since);
+		if (since != null && from == null) {
+			response.sendError(HttpStatus.BAD_REQUEST.value(), "since must be an ISO-8601 instant");
 			return;
 		}
 		response.setContentType("application/gzip");
@@ -191,13 +198,16 @@ public class PubTracksController {
 				+ "m.file_activity, m.speed_matches_activity, m.speed, m.max_speed, m.distance, m.points, m.time_minutes, "
 				+ "m.manual_review::text AS manual_review, m.track_stats::text AS track_stats, m.simplified_geometry"
 				+ (gpx ? ", f.data AS gpx FROM " + TABLE + " m LEFT JOIN osm_gpx_files f ON f.id = m.id" : " FROM " + TABLE + " m")
-				+ " WHERE m.manual_review IS NOT NULL AND m.id > ? ORDER BY m.id LIMIT " + EXPORT_BATCH;
+				+ " WHERE m.manual_review IS NOT NULL AND m.id > ?"
+				+ (from == null ? "" : " AND jsonb_path_exists(m.manual_review, '$.**.time ? (@ >= $s)', jsonb_build_object('s', ?::text))")
+				+ " ORDER BY m.id LIMIT " + EXPORT_BATCH;
 		int batches = 0;
 		try (Writer w = new OutputStreamWriter(new GZIPOutputStream(response.getOutputStream(), 1 << 16), StandardCharsets.UTF_8)) {
 			w.write(String.join(",", EXPORT_COLUMNS) + (gpx ? ",gpx_gz_b64" : "") + "\n");
 			long lastId = -1;
 			while (true) {
 				long[] last = {-1};
+				Object[] args = from == null ? new Object[] {lastId} : new Object[] {lastId, from.toString()};
 				jdbcTemplate.query(select, (RowCallbackHandler) rs -> {
 					try {
 						writeRow(w, rs, gpx);
@@ -205,7 +215,7 @@ public class PubTracksController {
 						throw new UncheckedIOException(e);
 					}
 					last[0] = rs.getLong("id");
-				}, lastId);
+				}, args);
 				if (last[0] < 0) {
 					break;
 				}
@@ -240,29 +250,90 @@ public class PubTracksController {
 		return ResponseEntity.ok("{}");
 	}
 
-	/** every message, newest first, admins only */
+	/** messages newest first, admins only; since keeps those from that moment on */
 	@GetMapping(path = "/feedback", produces = MediaType.APPLICATION_JSON_VALUE)
-	public ResponseEntity<String> feedbackList(@RequestParam(defaultValue = "500") int limit, Authentication auth) {
+	public ResponseEntity<String> feedbackList(@RequestParam(defaultValue = "500") int limit, @RequestParam(required = false) String since,
+			Authentication auth) {
 		if (!config.osmgpxInitialized()) {
 			return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body("OsmGpx datasource is not initialized");
 		}
 		if (!isAdmin(auth)) {
 			return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Admins only");
 		}
-		ensureFeedbackTable();
+		Instant from = parseSince(since);
+		if (since != null && from == null) {
+			return ResponseEntity.badRequest().body("since must be an ISO-8601 instant");
+		}
 		JsonArray res = new JsonArray();
-		jdbcTemplate.query("SELECT id, time, email, ip, text, context::text FROM " + FEEDBACK_TABLE + " ORDER BY id DESC LIMIT ?",
-				(RowCallbackHandler) rs -> {
-					JsonObject o = new JsonObject();
-					o.addProperty("id", rs.getLong("id"));
-					o.addProperty("time", rs.getTimestamp("time").toInstant().toString());
-					o.addProperty("email", rs.getString("email"));
-					o.addProperty("ip", rs.getString("ip"));
-					o.addProperty("text", rs.getString("text"));
-					o.add("context", rs.getString("context") == null ? null : new JsonParser().parse(rs.getString("context")));
-					res.add(o);
-				}, Math.max(1, Math.min(limit, MAX_LIST)));
+		feedbackRows(from, limit, rs -> {
+			JsonObject o = new JsonObject();
+			o.addProperty("id", rs.getLong("id"));
+			o.addProperty("time", rs.getTimestamp("time").toInstant().toString());
+			o.addProperty("email", rs.getString("email"));
+			o.addProperty("ip", rs.getString("ip"));
+			o.addProperty("text", rs.getString("text"));
+			o.add("context", rs.getString("context") == null ? null : new JsonParser().parse(rs.getString("context")));
+			res.add(o);
+		});
 		return ResponseEntity.ok(gson.toJson(res));
+	}
+
+	/** the same messages as one csv, admins only */
+	@GetMapping(path = "/feedback.csv")
+	public void feedbackCsv(@RequestParam(defaultValue = "5000") int limit, @RequestParam(required = false) String since, Authentication auth,
+			HttpServletResponse response) throws IOException {
+		if (!config.osmgpxInitialized()) {
+			response.sendError(HttpStatus.SERVICE_UNAVAILABLE.value(), "OsmGpx datasource is not initialized");
+			return;
+		}
+		if (!isAdmin(auth)) {
+			response.sendError(HttpStatus.FORBIDDEN.value(), "Admins only");
+			return;
+		}
+		Instant from = parseSince(since);
+		if (since != null && from == null) {
+			response.sendError(HttpStatus.BAD_REQUEST.value(), "since must be an ISO-8601 instant");
+			return;
+		}
+		response.setContentType("text/csv; charset=utf-8");
+		response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"heatmap-feedback.csv\"");
+		try (Writer w = new OutputStreamWriter(response.getOutputStream(), StandardCharsets.UTF_8)) {
+			w.write("id,time,email,ip,text,url,view,filters\n");
+			feedbackRows(from, limit, rs -> {
+				JsonObject c = rs.getString("context") == null ? new JsonObject() : new JsonParser().parse(rs.getString("context")).getAsJsonObject();
+				String[] values = {rs.getString("id"), rs.getTimestamp("time").toInstant().toString(), rs.getString("email"), rs.getString("ip"),
+						rs.getString("text"), jsonText(c.get("url")), jsonText(c.get("view")), jsonText(c.get("filters"))};
+				StringBuilder line = new StringBuilder();
+				for (String v : values) {
+					line.append(line.length() == 0 ? "" : ",").append(csv(v));
+				}
+				try {
+					w.write(line.append('\n').toString());
+				} catch (IOException e) {
+					throw new UncheckedIOException(e);
+				}
+			});
+		}
+	}
+
+	private void feedbackRows(Instant from, int limit, RowCallbackHandler row) {
+		ensureFeedbackTable();
+		String where = from == null ? "" : " WHERE time >= ?::timestamptz";
+		Object[] args = from == null ? new Object[] {Math.max(1, Math.min(limit, MAX_LIST))}
+				: new Object[] {from.toString(), Math.max(1, Math.min(limit, MAX_LIST))};
+		jdbcTemplate.query("SELECT id, time, email, ip, text, context::text FROM " + FEEDBACK_TABLE + where + " ORDER BY id DESC LIMIT ?", row, args);
+	}
+
+	private static Instant parseSince(String since) {
+		try {
+			return since == null ? null : Instant.parse(since);
+		} catch (DateTimeParseException e) {
+			return null;
+		}
+	}
+
+	private static String jsonText(JsonElement e) {
+		return e == null || e.isJsonNull() ? null : e.isJsonPrimitive() ? e.getAsString() : e.toString();
 	}
 
 	private void ensureFeedbackTable() {
