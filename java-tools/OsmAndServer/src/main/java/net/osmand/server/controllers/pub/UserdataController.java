@@ -480,7 +480,8 @@ public class UserdataController {
 		if (pu == null) {
 			return ResponseEntity.badRequest().body("User not found");
 		}
-		return userdataService.sendCode(data.action, data.lang, pu);
+		return userdataService.sendCode(EmailSenderService.CloudAccountAction.fromCodeRequest(data.action, false),
+				data.lang, pu);
 	}
 
 	public static class UserFilesResults {

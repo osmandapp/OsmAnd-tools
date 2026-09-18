@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import net.osmand.server.api.repo.*;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.controllers.user.ShareFileController;
+import net.osmand.server.utils.FileSizeFormatter;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
@@ -289,7 +290,7 @@ public class ShareFileService {
 			String meta = file.type == null ? ext : file.type;
 			CloudUserFilesRepository.UserFile userFile = getUserFile(file);
 			if (userFile != null && userFile.filesize > 0) {
-				meta = meta + " · " + readableFileSize(userFile.filesize);
+				meta = meta + " · " + FileSizeFormatter.format(userFile.filesize);
 			}
 			String url = file.uuid == null ? "https://osmand.net/map" : SHARE_LINK_PREFIX + file.uuid;
 			emailSender.sendShareFileAccessEmail(requester.email, approved, ownerName, name, ext, meta, url);
@@ -298,15 +299,6 @@ public class ShareFileService {
 		}
 	}
 
-	private String readableFileSize(long size) {
-		if (size < 1024) {
-			return size + " B";
-		}
-		if (size < 1024 * 1024) {
-			return String.format(Locale.US, "%.0f KB", size / 1024.0);
-		}
-		return String.format(Locale.US, "%.1f MB", size / (1024.0 * 1024.0));
-	}
 
 	public UserdataController.UserFilesResults getSharedWithMe(int userid, String type) {
 		List<ShareFileRepository.ShareFilesAccess> list = shareFileRepository.findShareFilesAccessListByUserId(userid);

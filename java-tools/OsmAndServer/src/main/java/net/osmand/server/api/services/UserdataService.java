@@ -1481,32 +1481,17 @@ public class UserdataService {
     }
 
     @Transactional
-    public ResponseEntity<String> sendCode(String action, String lang, CloudUsersRepository.CloudUser pu) {
-        return sendCode(action, lang, pu, false);
-    }
-
-    @Transactional
-    public ResponseEntity<String> sendCode(String action, String lang, CloudUsersRepository.CloudUser pu,
-            boolean toNewEmail) {
-        if (!("setup".equals(action) || "change".equals(action) || "delete".equals(action))) {
+    public ResponseEntity<String> sendCode(EmailSenderService.CloudAccountAction action, String lang,
+            CloudUsersRepository.CloudUser pu) {
+        if (action == null) {
             return ok();
         }
         if (pu == null) {
             return ResponseEntity.badRequest().body("Email is not registered");
         }
         String token = (new Random().nextInt(8999) + 1000) + "";
-        EmailSenderService.CloudAccountAction emailAction;
-        if ("delete".equals(action)) {
-            emailAction = EmailSenderService.CloudAccountAction.DELETE;
-        } else if ("change".equals(action)) {
-            emailAction = toNewEmail
-                    ? EmailSenderService.CloudAccountAction.EMAIL_CHANGE
-                    : EmailSenderService.CloudAccountAction.EMAIL_CHANGE_REQUEST;
-        } else {
-            emailAction = EmailSenderService.CloudAccountAction.SETUP;
-        }
-        emailSender.sendOsmAndCloudAccountEmail(pu.email, token, lang, emailAction,
-                toNewEmail ? pu.email : null);
+        emailSender.sendOsmAndCloudAccountEmail(pu.email, token, lang, action,
+                action == EmailSenderService.CloudAccountAction.EMAIL_CHANGE ? pu.email : null);
         pu.token = token;
         pu.tokenTime = new Date();
         usersRepository.saveAndFlush(pu);

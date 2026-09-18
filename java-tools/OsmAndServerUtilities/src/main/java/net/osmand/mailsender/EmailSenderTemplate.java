@@ -72,7 +72,7 @@ Special variables:
 
 Template variables:
 
-	The template engine supports 1st and 2nd level variables (e.g. FIRST=1 SECOND=@FIRST@ THIRD=@SECOND@)
+	Variables may reference other variables up to 4 levels deep (e.g. FIRST=1 SECOND=@FIRST@ THIRD=@SECOND@)
 
 Public methods:
 
@@ -352,7 +352,7 @@ public class EmailSenderTemplate {
 	}
 
 	private final String HTML_COMMENT_MATCH = "(?s).*<!--.*?-->*.";
-	private final String HTML_COMMENT_REPLACE = "(?s)<!--.*?-->"; // (?s) Pattern.DOTALL (multiline)
+	private static final Pattern HTML_COMMENT_REPLACE = Pattern.compile("(?s)<!--.*?-->"); // (?s) Pattern.DOTALL (multiline)
 	private final String HTML_NEWLINE_TO_BR = "HTML_NEWLINE_TO_BR"; // user-defined var from templates
 	private final String TRANSACTIONAL = "TRANSACTIONAL";
 	private final String USE_BASE = "USE_BASE";
@@ -482,9 +482,9 @@ public class EmailSenderTemplate {
 
 	private String stripCommentsKeepingMso(String text) {
 		if (!"true".equals(vars.get(USE_BASE))) {
-			return text.replaceAll(HTML_COMMENT_REPLACE, "");
+			return HTML_COMMENT_REPLACE.matcher(text).replaceAll("");
 		}
-		Matcher m = Pattern.compile(HTML_COMMENT_REPLACE).matcher(text);
+		Matcher m = HTML_COMMENT_REPLACE.matcher(text);
 		StringBuilder out = new StringBuilder();
 		int last = 0;
 		while (m.find()) {

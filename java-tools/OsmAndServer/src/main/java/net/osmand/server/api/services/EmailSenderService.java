@@ -1,6 +1,7 @@
 package net.osmand.server.api.services;
 
 import java.util.Arrays;
+import java.util.regex.Pattern;
 
 import net.osmand.mailsender.EmailSenderTemplate;
 import org.apache.commons.logging.Log;
@@ -71,6 +72,23 @@ public class EmailSenderService {
 		CloudAccountAction(String template) {
 			this.template = template;
 		}
+
+		// action names the clients send to /send-code; null for an unknown action
+		public static CloudAccountAction fromCodeRequest(String action, boolean toNewEmail) {
+			if (action == null) {
+				return null;
+			}
+			switch (action) {
+				case "setup":
+					return SETUP;
+				case "change":
+					return toNewEmail ? EMAIL_CHANGE : EMAIL_CHANGE_REQUEST;
+				case "delete":
+					return DELETE;
+				default:
+					return null;
+			}
+		}
 	}
 
 	public void sendOsmAndCloudAccountEmail(String email, String token, String lang, CloudAccountAction action) {
@@ -100,10 +118,12 @@ public class EmailSenderService {
 	}
 
 	// The same for a plain-text header such as Subject, where entities would show literally: no line breaks,
-	// and '@' replaced with the full-width look-alike so it cannot form an @VAR@ token.
+	// and only an '@' that starts an @VAR@ token is replaced with the full-width look-alike (a@b.gpx stays as is).
 	static String plainText(String s) {
-		return s == null ? "" : s.replaceAll("[\\r\\n]+", " ").replace('@', '＠');
+		return s == null ? "" : TEMPLATE_TOKEN_START.matcher(s.replaceAll("[\\r\\n]+", " ")).replaceAll("＠");
 	}
+
+	private static final Pattern TEMPLATE_TOKEN_START = Pattern.compile("@(?=[A-Z0-9_]+@)");
 
 	// cloud/purchase/receipt. renewalLabel/renewalDate == null means a lifetime purchase: the Renews/Expires row is hidden.
 	public void sendPurchaseReceiptEmail(String email, String orderId, String orderDate, String orderTotal,
@@ -111,17 +131,17 @@ public class EmailSenderService {
 		String productShort = productName.startsWith("OsmAnd ") ? productName.substring("OsmAnd ".length()) : productName;
 		EmailSenderTemplate sender = new EmailSenderTemplate()
 				.load("cloud/purchase/receipt")
-				.set("EMAIL", email)
-				.set("ORDER_ID", orderId == null ? "" : orderId)
-				.set("ORDER_DATE", orderDate)
-				.set("ORDER_TOTAL", orderTotal)
-				.set("PRODUCT_NAME", productName)
-				.set("PRODUCT_SHORT", productShort)
-				.set("PLAN_NAME", planName);
+				.set("EMAIL", htmlText(email))
+				.set("ORDER_ID", htmlText(orderId))
+				.set("ORDER_DATE", htmlText(orderDate))
+				.set("ORDER_TOTAL", htmlText(orderTotal))
+				.set("PRODUCT_NAME", htmlText(productName))
+				.set("PRODUCT_SHORT", htmlText(productShort))
+				.set("PLAN_NAME", htmlText(planName));
 		if (renewalLabel != null && renewalDate != null) {
 			sender.set("RENEWAL_ROW", "@RENEWAL_ROW_T@")
-					.set("RENEWAL_LABEL", renewalLabel)
-					.set("RENEWAL_DATE", renewalDate);
+					.set("RENEWAL_LABEL", htmlText(renewalLabel))
+					.set("RENEWAL_DATE", htmlText(renewalDate));
 		}
 		boolean ok = sender.to(email).send().isSuccess();
 		LOGGER.info("sendPurchaseReceiptEmail order " + orderId + " to: " + shorten(email) + " (" + ok + ")");
