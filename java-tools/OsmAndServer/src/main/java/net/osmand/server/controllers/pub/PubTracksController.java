@@ -16,8 +16,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPOutputStream;
 
@@ -39,9 +37,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -74,7 +71,7 @@ public class PubTracksController {
 	private static final String FEEDBACK_TABLE = "osm_gpx_feedback";
 	private static final int MAX_TEXT = 5000;
 	private static final int MAX_EMAIL = 200;
-	private static final int MAX_PER_DAY = 20; // per address, anyone may write
+	private static final int MAX_PER_DAY = 20; // per address in the last 24 hours, anyone may write
 	private static final int MAX_LIST = 5000;
 	private static final Pattern NUMBER = Pattern.compile("[-+]?\\d+(\\.\\d+)?([eE][-+]?\\d+)?"); // negative coordinates are not formulas
 	private static final int MAX_CONTEXT = 8000; // serialized view, filters and url; the page sends about 2 KB
@@ -90,7 +87,6 @@ public class PubTracksController {
 	DatasourceConfiguration config;
 
 	private final Gson gson = new Gson();
-	private final Cache<String, AtomicInteger> feedbackPerIp = CacheBuilder.newBuilder().expireAfterWrite(24, TimeUnit.HOURS).build();
 	private volatile boolean feedbackTableReady;
 
 	public record ReviewRequest(Long id, String verdict, String activity, String comment) {
@@ -191,10 +187,6 @@ public class PubTracksController {
 			return;
 		}
 		Instant from = parseSince(since);
-		if (since != null && from == null) {
-			response.sendError(HttpStatus.BAD_REQUEST.value(), "since must be an ISO-8601 instant");
-			return;
-		}
 		response.setContentType("application/gzip");
 		response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"osmgpx-reviews.csv.gz\"");
 		String select = "SELECT m.id, m.\"user\", m.date, m.name, m.description, m.tags, m.lat, m.lon, m.activity, m.activity_source, "
@@ -239,7 +231,10 @@ public class PubTracksController {
 			return ResponseEntity.badRequest().body("text is required");
 		}
 		String ip = request.getRemoteAddr();
-		if (feedbackPerIp.asMap().computeIfAbsent(ip, k -> new AtomicInteger()).incrementAndGet() > MAX_PER_DAY) {
+		ensureFeedbackTable();
+		int sent = jdbcTemplate.queryForObject("SELECT count(*) FROM " + FEEDBACK_TABLE + " WHERE ip = ? AND time > now() - interval '24 hours'",
+				Integer.class, ip);
+		if (sent >= MAX_PER_DAY) {
 			return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body("Too many messages from your address today");
 		}
 		String email = isBlank(req.email()) ? null : cut(req.email().trim(), MAX_EMAIL);
@@ -251,7 +246,6 @@ public class PubTracksController {
 		if (contextJson.length() > MAX_CONTEXT) {
 			return ResponseEntity.badRequest().body("context is too large");
 		}
-		ensureFeedbackTable();
 		jdbcTemplate.update("INSERT INTO " + FEEDBACK_TABLE + " (time, email, ip, text, context) VALUES (now(), ?, ?, ?, ?::jsonb)",
 				email, ip, cut(req.text().trim(), MAX_TEXT), contextJson);
 		return ResponseEntity.ok("{}");
@@ -270,10 +264,6 @@ public class PubTracksController {
 			return;
 		}
 		Instant from = parseSince(since);
-		if (since != null && from == null) {
-			response.sendError(HttpStatus.BAD_REQUEST.value(), "since must be an ISO-8601 instant");
-			return;
-		}
 		response.setContentType("text/csv; charset=utf-8");
 		response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"heatmap-feedback.csv\"");
 		ensureFeedbackTable();
@@ -284,14 +274,9 @@ public class PubTracksController {
 			w.write("id,time,email,ip,text,url,view,filters\n");
 			jdbcTemplate.query("SELECT id, time, email, ip, text, context::text FROM " + FEEDBACK_TABLE + where + " ORDER BY id DESC LIMIT ?", (RowCallbackHandler) rs -> {
 				JsonObject c = rs.getString("context") == null ? new JsonObject() : new JsonParser().parse(rs.getString("context")).getAsJsonObject();
-				String[] values = {rs.getString("id"), rs.getTimestamp("time").toInstant().toString(), rs.getString("email"), rs.getString("ip"),
-						rs.getString("text"), jsonText(c.get("url")), jsonText(c.get("view")), jsonText(c.get("filters"))};
-				StringBuilder line = new StringBuilder();
-				for (String v : values) {
-					line.append(line.length() == 0 ? "" : ",").append(csv(v));
-				}
 				try {
-					w.write(line.append('\n').toString());
+					w.write(csvLine(rs.getString("id"), rs.getTimestamp("time").toInstant().toString(), rs.getString("email"), rs.getString("ip"),
+							rs.getString("text"), jsonText(c.get("url")), jsonText(c.get("view")), jsonText(c.get("filters"))).append('\n').toString());
 				} catch (IOException e) {
 					throw new UncheckedIOException(e);
 				}
@@ -300,11 +285,12 @@ public class PubTracksController {
 	}
 
 
+	/** null when absent; a malformed value answers 400 */
 	private static Instant parseSince(String since) {
 		try {
 			return since == null ? null : Instant.parse(since);
 		} catch (DateTimeParseException e) {
-			return null;
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "since must be an ISO-8601 instant");
 		}
 	}
 
@@ -316,6 +302,7 @@ public class PubTracksController {
 		if (!feedbackTableReady) {
 			jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS " + FEEDBACK_TABLE + " (id bigserial PRIMARY KEY, time timestamptz NOT NULL,"
 					+ " email text, ip text, text text NOT NULL, context jsonb)");
+			jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS " + FEEDBACK_TABLE + "_ip_time ON " + FEEDBACK_TABLE + " (ip, time)");
 			feedbackTableReady = true;
 		}
 	}
@@ -351,16 +338,12 @@ public class PubTracksController {
 	private void writeRow(Writer w, ResultSet rs, boolean gpx) throws IOException, SQLException {
 		Array tags = rs.getArray("tags");
 		byte[] geometry = rs.getBytes("simplified_geometry");
-		String[] values = {rs.getString("id"), rs.getString("user"), rs.getString("date"), rs.getString("name"),
+		StringBuilder line = csvLine(rs.getString("id"), rs.getString("user"), rs.getString("date"), rs.getString("name"),
 				rs.getString("description"), tags == null ? null : String.join("|", (String[]) tags.getArray()), rs.getString("lat"),
 				rs.getString("lon"), rs.getString("activity"), rs.getString("activity_source"), rs.getString("file_activity"),
 				rs.getString("speed_matches_activity"), rs.getString("speed"), rs.getString("max_speed"), rs.getString("distance"),
 				rs.getString("points"), rs.getString("time_minutes"), gson.toJson(publicView(rs.getString("manual_review"), null)),
-				rs.getString("track_stats"), geometry == null ? null : Base64.getEncoder().encodeToString(geometry)};
-		StringBuilder line = new StringBuilder();
-		for (String v : values) {
-			line.append(line.length() == 0 ? "" : ",").append(csv(v));
-		}
+				rs.getString("track_stats"), geometry == null ? null : Base64.getEncoder().encodeToString(geometry));
 		if (gpx) {
 			byte[] data = rs.getBytes("gpx");
 			line.append(',').append(data == null ? "" : Base64.getEncoder().encodeToString(data));
@@ -381,6 +364,14 @@ public class PubTracksController {
 			return s;
 		}
 		return s.substring(0, Character.isHighSurrogate(s.charAt(max - 1)) ? max - 1 : max);
+	}
+
+	private static StringBuilder csvLine(String... values) {
+		StringBuilder line = new StringBuilder();
+		for (String v : values) {
+			line.append(line.isEmpty() ? "" : ",").append(csv(v));
+		}
+		return line;
 	}
 
 	/** quoted; text with a leading =, +, - or @ gets an apostrophe so a spreadsheet shows it instead of running it as a formula */
