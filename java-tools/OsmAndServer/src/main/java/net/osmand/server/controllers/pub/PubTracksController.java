@@ -45,18 +45,15 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import net.osmand.server.DatasourceConfiguration;
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
-import net.osmand.server.api.services.EmailSenderService;
 
 /**
  * Reviews of OsmGpx tracks from the heatmap page. Anyone reads them and downloads the reviewed tracks; signed-in OsmAnd
  * users and admins write. Stored in osm_gpx_data.manual_review as {"admin": review, "users": {"cloud user id": review}};
- * what leaves the server has no admin e-mail and no user ids. Feedback about the page goes to osm_gpx_feedback without
- * any account; only admins read it.
+ * what leaves the server has no admin e-mail and no user ids.
  */
 @RestController
 @RequestMapping("/api/pubtracks")
@@ -69,13 +66,9 @@ public class PubTracksController {
 	private static final int MAX_COMMENT = 2000;
 	private static final int MAX_IDS = 1000;
 	private static final int EXPORT_BATCH = 500;
-	private static final String FEEDBACK_TABLE = "osm_gpx_feedback";
-	private static final int MAX_TEXT = 5000;
-	private static final int MAX_EMAIL = 200;
-	private static final int MAX_PER_DAY = 20; // per address in the last 24 hours, anyone may write
-	private static final int MAX_LIST = 5000;
 	private static final Pattern NUMBER = Pattern.compile("[-+]?\\d+(\\.\\d+)?([eE][-+]?\\d+)?"); // negative coordinates are not formulas
-	private static final int MAX_CONTEXT = 8000; // serialized view, filters and url; the page sends about 2 KB
+	// any review of the track (admin or a user) was saved at or after the $s instant; review times are ISO-8601 strings, so they compare as text
+	private static final String REVIEWED_SINCE = "jsonb_path_exists(m.manual_review, '$.**.time ? (@ >= $s)', jsonb_build_object('s', ?::text))";
 	private static final String[] EXPORT_COLUMNS = {"id", "user", "date", "name", "description", "tags", "lat", "lon", "activity",
 			"activity_source", "file_activity", "speed_matches_activity", "speed", "max_speed", "distance", "points", "time_minutes",
 			"reviews", "track_stats", "geometry_b64"};
@@ -87,16 +80,9 @@ public class PubTracksController {
 	@Autowired
 	DatasourceConfiguration config;
 
-	@Autowired
-	EmailSenderService emailSender;
-
 	private final Gson gson = new Gson();
-	private volatile boolean feedbackTableReady;
 
 	public record ReviewRequest(Long id, String verdict, String activity, String comment) {
-	}
-
-	public record FeedbackRequest(String text, String email, Map<String, Object> view, Map<String, Object> filters, String url) {
 	}
 
 	/** whether the caller may send reviews; no ids */
@@ -197,8 +183,7 @@ public class PubTracksController {
 				+ "m.file_activity, m.speed_matches_activity, m.speed, m.max_speed, m.distance, m.points, m.time_minutes, "
 				+ "m.manual_review::text AS manual_review, m.track_stats::text AS track_stats, m.simplified_geometry"
 				+ (gpx ? ", f.data AS gpx FROM " + TABLE + " m LEFT JOIN osm_gpx_files f ON f.id = m.id" : " FROM " + TABLE + " m")
-				+ " WHERE m.manual_review IS NOT NULL AND m.id > ?"
-				+ (from == null ? "" : " AND jsonb_path_exists(m.manual_review, '$.**.time ? (@ >= $s)', jsonb_build_object('s', ?::text))")
+				+ " WHERE m.manual_review IS NOT NULL AND m.id > ?" + (from == null ? "" : " AND " + REVIEWED_SINCE)
 				+ " ORDER BY m.id LIMIT " + EXPORT_BATCH;
 		int batches = 0;
 		try (Writer w = new OutputStreamWriter(new GZIPOutputStream(response.getOutputStream(), 1 << 16), StandardCharsets.UTF_8)) {
@@ -225,92 +210,12 @@ public class PubTracksController {
 		LOG.info("Exported reviewed OsmGpx tracks in " + batches + " batches");
 	}
 
-	/** saves a free-form message with the map view, the filter and the page url it was written at; the e-mail is only what was typed */
-	@PostMapping(path = "/feedback", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
-	public ResponseEntity<String> feedback(@RequestBody FeedbackRequest req, HttpServletRequest request) {
-		if (!config.osmgpxInitialized()) {
-			return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body("OsmGpx datasource is not initialized");
-		}
-		if (isBlank(req.text())) {
-			return ResponseEntity.badRequest().body("text is required");
-		}
-		String ip = request.getRemoteAddr();
-		ensureFeedbackTable();
-		int sent = jdbcTemplate.queryForObject("SELECT count(*) FROM " + FEEDBACK_TABLE + " WHERE ip = ? AND time > now() - interval '24 hours'",
-				Integer.class, ip);
-		if (sent >= MAX_PER_DAY) {
-			return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body("Too many messages from your address today");
-		}
-		String email = isBlank(req.email()) ? null : req.email().trim();
-		if (email != null && (email.length() > MAX_EMAIL || !emailSender.isEmail(email))) {
-			return ResponseEntity.badRequest().body("e-mail looks wrong");
-		}
-		Map<String, Object> context = new LinkedHashMap<>();
-		context.put("view", req.view());
-		context.put("filters", req.filters());
-		context.put("url", req.url());
-		String contextJson = gson.toJson(context);
-		if (contextJson.length() > MAX_CONTEXT) {
-			return ResponseEntity.badRequest().body("context is too large");
-		}
-		jdbcTemplate.update("INSERT INTO " + FEEDBACK_TABLE + " (time, email, ip, text, context) VALUES (now(), ?, ?, ?, ?::jsonb)",
-				email, ip, cut(req.text().trim(), MAX_TEXT), contextJson);
-		return ResponseEntity.ok("{}");
-	}
-
-	/** every message as one csv row, newest first, admins only; since keeps those from that moment on */
-	@GetMapping(path = "/feedback.csv")
-	public void feedbackCsv(@RequestParam(defaultValue = "5000") int limit, @RequestParam(required = false) String since, Authentication auth,
-			HttpServletResponse response) throws IOException {
-		if (!config.osmgpxInitialized()) {
-			response.sendError(HttpStatus.SERVICE_UNAVAILABLE.value(), "OsmGpx datasource is not initialized");
-			return;
-		}
-		if (!isAdmin(auth)) {
-			response.sendError(HttpStatus.FORBIDDEN.value(), "Admins only");
-			return;
-		}
-		Instant from = parseSince(since);
-		response.setContentType("text/csv; charset=utf-8");
-		response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"heatmap-feedback.csv\"");
-		ensureFeedbackTable();
-		String where = from == null ? "" : " WHERE time >= ?::timestamptz";
-		Object[] args = from == null ? new Object[] {Math.max(1, Math.min(limit, MAX_LIST))}
-				: new Object[] {from.toString(), Math.max(1, Math.min(limit, MAX_LIST))};
-		try (Writer w = new OutputStreamWriter(response.getOutputStream(), StandardCharsets.UTF_8)) {
-			w.write("id,time,email,ip,text,url,view,filters\n");
-			jdbcTemplate.query("SELECT id, time, email, ip, text, context::text FROM " + FEEDBACK_TABLE + where + " ORDER BY id DESC LIMIT ?", (RowCallbackHandler) rs -> {
-				JsonObject c = rs.getString("context") == null ? new JsonObject() : new JsonParser().parse(rs.getString("context")).getAsJsonObject();
-				try {
-					w.write(csvLine(rs.getString("id"), rs.getTimestamp("time").toInstant().toString(), rs.getString("email"), rs.getString("ip"),
-							rs.getString("text"), jsonText(c.get("url")), jsonText(c.get("view")), jsonText(c.get("filters"))).append('\n').toString());
-				} catch (IOException e) {
-					throw new UncheckedIOException(e);
-				}
-			}, args);
-		}
-	}
-
-
 	/** null when absent; a malformed value answers 400 */
 	private static Instant parseSince(String since) {
 		try {
 			return since == null ? null : Instant.parse(since);
 		} catch (DateTimeParseException e) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "since must be an ISO-8601 instant");
-		}
-	}
-
-	private static String jsonText(JsonElement e) {
-		return e == null || e.isJsonNull() ? null : e.isJsonPrimitive() ? e.getAsString() : e.toString();
-	}
-
-	private synchronized void ensureFeedbackTable() {
-		if (!feedbackTableReady) {
-			jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS " + FEEDBACK_TABLE + " (id bigserial PRIMARY KEY, time timestamptz NOT NULL,"
-					+ " email text, ip text, text text NOT NULL, context jsonb)");
-			jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS " + FEEDBACK_TABLE + "_ip_time ON " + FEEDBACK_TABLE + " (ip, time)");
-			feedbackTableReady = true;
 		}
 	}
 
@@ -345,12 +250,16 @@ public class PubTracksController {
 	private void writeRow(Writer w, ResultSet rs, boolean gpx) throws IOException, SQLException {
 		Array tags = rs.getArray("tags");
 		byte[] geometry = rs.getBytes("simplified_geometry");
-		StringBuilder line = csvLine(rs.getString("id"), rs.getString("user"), rs.getString("date"), rs.getString("name"),
+		String[] values = {rs.getString("id"), rs.getString("user"), rs.getString("date"), rs.getString("name"),
 				rs.getString("description"), tags == null ? null : String.join("|", (String[]) tags.getArray()), rs.getString("lat"),
 				rs.getString("lon"), rs.getString("activity"), rs.getString("activity_source"), rs.getString("file_activity"),
 				rs.getString("speed_matches_activity"), rs.getString("speed"), rs.getString("max_speed"), rs.getString("distance"),
 				rs.getString("points"), rs.getString("time_minutes"), gson.toJson(publicView(rs.getString("manual_review"), null)),
-				rs.getString("track_stats"), geometry == null ? null : Base64.getEncoder().encodeToString(geometry));
+				rs.getString("track_stats"), geometry == null ? null : Base64.getEncoder().encodeToString(geometry)};
+		StringBuilder line = new StringBuilder();
+		for (String v : values) {
+			line.append(line.length() == 0 ? "" : ",").append(csv(v));
+		}
 		if (gpx) {
 			byte[] data = rs.getBytes("gpx");
 			line.append(',').append(data == null ? "" : Base64.getEncoder().encodeToString(data));
@@ -371,14 +280,6 @@ public class PubTracksController {
 			return s;
 		}
 		return s.substring(0, Character.isHighSurrogate(s.charAt(max - 1)) ? max - 1 : max);
-	}
-
-	private static StringBuilder csvLine(String... values) {
-		StringBuilder line = new StringBuilder();
-		for (String v : values) {
-			line.append(line.isEmpty() ? "" : ",").append(csv(v));
-		}
-		return line;
 	}
 
 	/** quoted; text with a leading =, +, - or @ gets an apostrophe so a spreadsheet shows it instead of running it as a formula */
