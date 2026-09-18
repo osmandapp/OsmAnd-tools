@@ -115,8 +115,9 @@ Java each (`JAVA_OPTS`, `-Xmx16g` by default).
 
 A regional map (Netherlands, Ireland, France, Great Britain, Norway, New Zealand, Gulf) shown together with the whole
 EMODnet or GEBCO doubles the contours, so the published `Europe_contours` and `World_contours` are the maps with the
-coverage of the detailed regions cut out of the tiles' OSM (`-N`), and the whole grid goes beside them as
-`Europe_full_coverage_contours` and `World_full_coverage_contours`. A regional map is meant to be used together with
+coverage of the detailed regions cut out of the tiles' OSM (`-N`). The map of the whole grid,
+`Europe_full_coverage_contours` and `World_full_coverage_contours`, is not published and is built only with
+`FULL_COVERAGE=1` in the environment - it doubles the map sections of the two largest regions. A regional map is meant to be used together with
 `Europe_contours`: where a region has no data of its own (Brest, outside the SHOM zones), EMODnet fills in.
 
 - `depth_coverage.py SOURCE... OUT.gpkg`: where a source has data - a grid reduced to 0.001 degree cells and
