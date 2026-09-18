@@ -45,15 +45,12 @@
 #                (generate-single-map) in
 #                NAME.depth.obf, without -c they stay in OUT_DIR/NAME.tiles; env TILE_WITH=RASTER keeps only the tiles
 #                touching one of that VRT's files; env BBOX="W S E N" with -D builds a region only inside that box (a test)
-#   -N NO_DETAILED  "OUTPUT_NAME:COVERAGE[,COVERAGE...][:OVERVIEW_COVERAGE,...]", tiles with -c only: the map
-#                OUT_DIR/OUTPUT_NAME.depth.obf of the tiles with the coverages of detailed maps cut out
+#   -N NO_DETAILED  "OUTPUT_NAME:COVERAGE[,COVERAGE...][:OVERVIEW_COVERAGE,...]", tiles with -c only: a second map
+#                OUT_DIR/OUTPUT_NAME.depth.obf of the same tiles with the coverages of detailed maps cut out
 #                (depth_osm_exclude.py: soundings inside dropped, contours cut at the edge); the overview section is
 #                cut by OVERVIEW_COVERAGEs only, kept whole without them. The region Europe_contours writes the cut map
-#                as Europe_contours (the one to use with the detailed maps), World_contours the same. Coverages are
-#                cached in DATA_DIR/src/coverage
-#   env FULL_COVERAGE=1  with -N also the map of the whole coverage, nothing cut out, as OUT_DIR/FULL_NAME.depth.obf
-#                (Europe_full_coverage_contours, World_full_coverage_contours). It is not published, so the server
-#                leaves it out: building it doubles the map sections of the two largest regions
+#                as Europe_contours (the one to use with the detailed maps) and the whole EMODnet as
+#                Europe_full_coverage_contours; World_contours the same. Coverages are cached in DATA_DIR/src/coverage
 #   -c MAP_CREATOR_DIR  unzipped OsmAndMapCreator: writes OUT_DIR/NAME.depth.obf (points need its --map-zooms)
 #   -k           keep: do nothing when OUT_DIR/NAME.depth.obf already exists
 #   env RENDERING_TYPES  rendering_types.xml for OsmAndMapCreator instead of its own (new tags before a nightly)
@@ -75,8 +72,8 @@
 #                                     then as the default, overview 0.02 degrees for zooms 5-8, 10 degree tiles;
 #                                     Europe_* leave out the Kartverket coverage (Norway_contours) when it is downloaded;
 #                                     written as Europe_contours without the coverage of Ireland, France, the Great
-#                                     Britain surveys, the Netherlands and Norway (with FULL_COVERAGE=1 also
-#                                     Europe_full_coverage_contours, all of EMODnet)
+#                                     Britain surveys, the Netherlands and Norway, and as Europe_full_coverage_contours
+#                                     with all of EMODnet
 #   Europe_points                     EMODnet DTM 2024, points, 10 degree tiles
 #   Norway_contours                   Kartverket Sjøkart - Dybdedata (vector), see build_depth_kartverket.sh
 #   New-zealand_contours              LINZ chart vector data, 5 scale bands merged by depth_bands_merge.py (the largest
@@ -84,8 +81,8 @@
 #   World_contours                    GEBCO_2026 (15"), contours every 10 m to 300 m, 50 m to 1000 m, then as the
 #                                     default - 2 and 5 m mean nothing in a 450 m grid, overview 0.02 degrees for
 #                                     zooms 5-8, 15 degree tiles; written as World_contours without EMODnet (Europe_*,
-#                                     overview too), the detailed regions, New Zealand and the CUDEM of the Gulf (with
-#                                     FULL_COVERAGE=1 also World_full_coverage_contours, with everything)
+#                                     overview too), the detailed regions, New Zealand and the CUDEM of the Gulf, and as
+#                                     World_full_coverage_contours with everything
 #   World_Northern_hemisphere_points  GEBCO_2026, points, 15 degree tiles
 #   World_Southern_hemisphere_points  GEBCO_2026, points, 15 degree tiles
 #   Gulf_of_Mexico_north-west_contours  the US coast of the Gulf (-98..-80.5, 24..31.5): NOAA CUDEM 1/3" near the
@@ -138,7 +135,7 @@ while [ $# -gt 0 ]; do
 		-e) ENC=$2; shift 2 ;;
 		-F) FILL=$2; shift 2 ;;
 		-N) NO_DETAILED=$2; shift 2 ;;
-		-h|--help) sed -n '2,100p' "$0"; exit 0 ;;
+		-h|--help) sed -n '2,95p' "$0"; exit 0 ;;
 		*) echo "Unknown option $1" >&2; exit 1 ;;
 	esac
 done
@@ -257,7 +254,7 @@ if [ -n "$DATA" ]; then
 			: "${OVERVIEW:=$OVERVIEW_Z5_8}"
 			if [ -n "$KARTVERKET" ]; then : "${EXCLUDE:=$KARTVERKET}"; : "${EXCLUDE_LAYER:=datakvalitet}"; fi
 			# the map with the detailed regions cut out is the one to use, so it keeps the region name; the whole
-			# EMODnet is built beside it under _full_coverage_ only with FULL_COVERAGE=1
+			# EMODnet is published beside it under _full_coverage_
 			if [ -z "$NO_DETAILED" ]; then detailed_europe; NO_DETAILED="Europe_contours:$DETAILED_EUROPE"; fi
 			: "${FULL_NAME:=Europe_full_coverage_contours}"
 			[ "$TILE" != 0 ] || TILE=10 ;;
@@ -303,16 +300,9 @@ done
 [ -n "$LEVELS$TIERS" ] || { echo "Nothing to build: no contour levels and no point tiers" >&2; exit 1; }
 read -r W S E N <<< "$BBOX"
 : "${FULL_NAME:=$NAME}"  # the OBF of the whole region; with -N the cut one gets $NAME and this gets another
-# the maps this run writes: without -N the region itself; with -N the cut map, and the map of the whole coverage only
-# when env FULL_COVERAGE is set (Europe_full_coverage_contours, World_full_coverage_contours)
-FULL_COVERAGE="${FULL_COVERAGE:-}"
-BUILT=()
-if [ -z "$NO_DETAILED" ] || [ -n "$FULL_COVERAGE" ]; then BUILT+=("$FULL_NAME.depth.obf"); fi
-if [ -n "$NO_DETAILED" ]; then BUILT+=("${NO_DETAILED%%:*}.depth.obf"); fi
-if [ $KEEP -eq 1 ]; then
-	missing=""
-	for f in "${BUILT[@]}"; do [ -f "$OUT/$f" ] || missing=$f; done
-	[ -n "$missing" ] || { echo "== ${BUILT[*]} exist, kept (no -k to rebuild)"; exit 0; }
+if [ $KEEP -eq 1 ] && [ -f "$OUT/$FULL_NAME.depth.obf" ] \
+		&& { [ -z "$NO_DETAILED" ] || [ -f "$OUT/${NO_DETAILED%%:*}.depth.obf" ]; }; then
+	echo "== $FULL_NAME.depth.obf exists, kept (no -k to rebuild)"; exit 0
 fi
 mkdir -p "$OUT"; OUT=$(cd "$OUT" && pwd)
 if [ -n "$MAP_CREATOR" ]; then MAP_CREATOR=$(cd "$MAP_CREATOR" && pwd); fi
@@ -462,9 +452,7 @@ if [ -n "$TILES" ]; then
 			step "merge ${#OBFS[@]} map sections into $(basename "$output")"
 			merge "$output" "${OBFS[@]}"
 		}
-		if [ -z "$NO_DETAILED" ] || [ -n "$FULL_COVERAGE" ]; then
-			sections "$TILE_OUT" "$OUT/$FULL_NAME.depth.obf"
-		fi
+		sections "$TILE_OUT" "$OUT/$FULL_NAME.depth.obf"
 		if [ -n "$NO_DETAILED" ]; then
 			IFS=: read -r nd_name nd_cover nd_overview <<< "$NO_DETAILED"
 			step "$nd_name: the tiles without the detailed coverage"
@@ -487,7 +475,7 @@ if [ -n "$TILES" ]; then
 		mv "$TILE_OUT"/*.osm.gz "$OUT/$NAME.tiles/" 2>/dev/null || true
 	fi
 	rm -rf "$TMP"
-	step "done: $(cd "$OUT" && du -sh ${BUILT[@]+"${BUILT[@]}"} 2>/dev/null | awk '{printf "%s (%s) ", $2, $1}')"
+	step "done: $(cd "$OUT" && du -sh "$FULL_NAME".depth.obf ${NO_DETAILED:+"${NO_DETAILED%%:*}.depth.obf"} 2>/dev/null | awk '{printf "%s (%s) ", $2, $1}')"
 	exit 0
 fi
 
