@@ -262,9 +262,9 @@ public class GenerateTurnLanesTest {
 	private static boolean hasNoneLanes(Graph graph, long key) {
 		for (long p : graph.at.get(key)) {
 			RouteDataObject road = graph.roads.get(roadOf(p));
-			if (TurnType.hasNoneLane(road.getValue("turn:lanes"))
-					|| TurnType.hasNoneLane(road.getValue("turn:lanes:forward"))
-					|| TurnType.hasNoneLane(road.getValue("turn:lanes:backward"))) {
+			if (hasNoneLane(road.getValue("turn:lanes"))
+					|| hasNoneLane(road.getValue("turn:lanes:forward"))
+					|| hasNoneLane(road.getValue("turn:lanes:backward"))) {
 				return true;
 			}
 		}
@@ -635,6 +635,19 @@ public class GenerateTurnLanesTest {
 	}
 
 	/** the turn:lanes a segment is driven with: the unsuffixed tag on a one-way, the direction's own otherwise */
+	/** an unpainted lane: "none" or nothing at all between the bars. Not every branch has this on TurnType. */
+	private static boolean hasNoneLane(String turnLanes) {
+		if (turnLanes == null) {
+			return false;
+		}
+		for (String lane : turnLanes.split("\\|", -1)) {
+			if (lane.isEmpty() || "none".equals(lane)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	private static String turnLanesOf(RouteSegmentResult segment) {
 		RouteDataObject road = segment.getObject();
 		if (road.getOneway() == 0) {
@@ -684,6 +697,9 @@ public class GenerateTurnLanesTest {
 		}
 		Map<String, String> results = new LinkedHashMap<>();
 		Map<Long, Integer> seen = new HashMap<>();
+		// the route opens with a "carry on" that the test sees like any other instruction: a later
+		// one on this same road has to name its start point, or the two cannot be told apart
+		seen.put(ObfConstants.getOsmObjectId(route.get(0).getObject()), route.get(0).getStartPointIndex());
 		boolean readFromNone = false;
 		for (int i = 1; i < route.size(); i++) {
 			RouteSegmentResult segment = route.get(i);
@@ -692,15 +708,16 @@ public class GenerateTurnLanesTest {
 				continue;
 			}
 			// the markings that gave this instruction are on the road the turn is taken from
-			if (TurnType.hasNoneLane(turnLanesOf(route.get(i - 1)))) {
+			if (hasNoneLane(turnLanesOf(route.get(i - 1)))) {
 				readFromNone = true;
 			}
 			long id = ObfConstants.getOsmObjectId(segment.getObject());
+			// RouteResultPreparationTest compares three forms - the instruction with its lanes, the
+			// lanes alone, the manoeuvre alone - and a turn without lanes can only take the last one:
+			// the first would have to carry the "null" that test's own string concatenation produces
 			String lanes = turn.getLanes() == null ? null : TurnType.lanesToString(turn.getLanes());
-			String value = turn.toXmlString() + (lanes == null ? "" : ":" + lanes);
-			if (turn.isSkipToSpeak()) {
-				value = "[MUTE] " + value;
-			}
+			String value = lanes == null ? turn.toXmlString()
+					: (turn.isSkipToSpeak() ? "[MUTE] " : "") + turn.toXmlString() + ":" + lanes;
 			Integer had = seen.put(id, segment.getStartPointIndex());
 			// a road carrying two instructions needs the start point to tell them apart
 			String key = had == null ? String.valueOf(id) : id + ":" + segment.getStartPointIndex();

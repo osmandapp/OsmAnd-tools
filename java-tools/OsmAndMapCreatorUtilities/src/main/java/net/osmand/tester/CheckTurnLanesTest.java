@@ -7,14 +7,14 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Objects;
+import java.util.Set;
 import java.util.TreeSet;
 
 import com.google.gson.GsonBuilder;
@@ -33,18 +33,15 @@ import net.osmand.router.RoutingConfiguration;
 import net.osmand.router.RoutingConfiguration.RoutingMemoryLimits;
 import net.osmand.router.RoutingContext;
 import net.osmand.router.TurnType;
-import net.osmand.router.lanes.LanePanelAI;
-import net.osmand.router.lanes.TurnPrepareAI;
-import net.osmand.router.lanes.TurnTypeAI;
 import net.osmand.util.MapUtils;
-import net.osmand.router.lanes.TurnTypeAI.TurnIndication;
 
 /**
- * Runs the recorded turn-lane cases of one obf through {@link TurnPrepareAI} and writes what it
- * said against what the file expects.
+ * Runs the recorded turn-lane cases of one obf through the turn preparation of the checkout this is
+ * built against and writes what it said against what the file expects.
  *
- * The verdicts are the test's own, read from {@link TurnLanesVerdictAI}, so a row marked OK here is
- * a row TurnPrepareTestAI would pass.
+ * The verdict is the one {@code RouteResultPreparationTest} gives, so a row marked OK here is a row
+ * that test passes. That is the point of the pair: {@code GenerateTurnLanesTest} records the cases
+ * on one branch, this one replays them on another, and every FAIL is a difference between the two.
  */
 public class CheckTurnLanesTest {
 
@@ -53,13 +50,12 @@ public class CheckTurnLanesTest {
 	private static String profile = "car";
 
 	/**
-	 * The same three answers TurnPrepareTestAI gives, and the same reading of what "the same" means.
-	 * It is a copy of that test's judgement rather than a shared class: the judgement belongs to the
-	 * test, and the pass under test should not carry it.
+	 * What {@code RouteResultPreparationTest} would say about the row, and nothing finer: the test
+	 * either passes an expectation or fails it, and a report that graded differences of its own
+	 * would be describing something nobody runs.
 	 */
 	public enum Verdict {
-		/** the record names the road but says nothing about it: reached, never judged */
-		SKIP, OK, SIMILAR, FAIL
+		OK, FAIL
 	}
 
 	public static void main(String[] args) throws IOException, InterruptedException {
@@ -90,13 +86,15 @@ public class CheckTurnLanesTest {
 			}
 			junctions.add(junctionOf(c.testName));
 			Map<String, double[]> where = new LinkedHashMap<>();
-			Map<String, String> actual = run(readers, c, where);
+			Drive drive = run(readers, c, where);
 			for (Entry<String, String> expected : c.expectedResults.entrySet()) {
 				String key = expected.getKey();
-				String said = actual == null ? null : actual.get(lookup(key, actual));
-				Verdict verdict = verdict(expected.getValue(), said);
+				List<Said> said = drive == null ? null : drive.turns.get(lookup(key, drive.turns));
+				boolean reached = drive != null && drive.reached(key);
+				Verdict verdict = verdict(expected.getValue(), said, reached);
 				totals.put(verdict, (totals.containsKey(verdict) ? totals.get(verdict) : 0) + 1);
-				Row row = new Row(verdict, c.testName, key, link(c), expected.getValue(), said);
+				String shown = said != null ? display(said) : reached ? "NULL" : null;
+				Row row = new Row(verdict, c.testName, key, link(c), expected.getValue(), shown);
 				row.at = where.containsKey(key) ? where.get(key)
 						: where.get(key.indexOf(':') > 0 ? key.substring(0, key.indexOf(':')) : key);
 				rows.add(row);
@@ -153,7 +151,47 @@ public class CheckTurnLanesTest {
 
 	// ------------------------------------------------------------------ what the pass says
 
-	private static Map<String, String> run(BinaryMapIndexReader[] readers, Case c,
+	/** what one drive said: the instruction of every road that carries one, and every road it touched */
+	private static class Drive {
+		/** by road, and by road and start point: a record naming only the road answers for all of them */
+		final Map<String, List<Said>> turns = new LinkedHashMap<>();
+		final Set<String> onTheRoute = new HashSet<>();
+
+		/** a record naming a start point is reached by that point, one naming only the road by any of it */
+		boolean reached(String key) {
+			return onTheRoute.contains(key)
+					|| onTheRoute.contains(key.indexOf(':') > 0 ? key.substring(0, key.indexOf(':')) : key);
+		}
+	}
+
+	/** one instruction in the three pieces the test compares against */
+	static class Said {
+		final boolean mute;
+		final String turn;
+		final String lanes;
+
+		Said(boolean mute, String turn, String lanes) {
+			this.mute = mute;
+			this.turn = turn;
+			this.lanes = lanes;
+		}
+
+		/**
+		 * The whole instruction, the lane row alone, or the manoeuvre alone - the test takes any of
+		 * the three. A turn without lanes has null for the row, and the test's own concatenation puts
+		 * that null into the first form, so only the manoeuvre alone can answer for it.
+		 */
+		boolean matches(String expected) {
+			return expected.equals((mute ? MUTE : "") + turn + ":" + lanes)
+					|| (lanes != null && expected.equals(lanes)) || expected.equals(turn);
+		}
+
+		String display() {
+			return (mute ? MUTE : "") + turn + (lanes == null ? "" : ":" + lanes);
+		}
+	}
+
+	private static Drive run(BinaryMapIndexReader[] readers, Case c,
 			Map<String, double[]> where) throws IOException, InterruptedException {
 		Map<String, String> params = c.params == null ? new HashMap<String, String>()
 				: new HashMap<>(c.params);
@@ -174,28 +212,35 @@ public class CheckTurnLanesTest {
 		if (route == null || route.isEmpty()) {
 			return null;
 		}
-		new TurnPrepareAI().prepareTurnResults(ctx, route);
-		Map<String, String> actual = new LinkedHashMap<>();
+		// searchRoute has already run the preparation of this checkout over the route
+		Drive drive = new Drive();
 		for (RouteSegmentResult segment : route) {
-			TurnTypeAI turn = segment.getTurnTypeAI();
+			long id = ObfConstants.getOsmObjectId(segment.getObject());
+			drive.onTheRoute.add(id + ":" + segment.getStartPointIndex());
+			drive.onTheRoute.add(String.valueOf(id));
+			TurnType turn = segment.getTurnType();
 			if (turn == null) {
 				continue;
 			}
-			long id = ObfConstants.getOsmObjectId(segment.getObject());
-			String said = format(turn);
+			Said said = new Said(turn.isSkipToSpeak(), turn.toXmlString(),
+					turn.getLanes() == null ? null : TurnType.lanesToString(turn.getLanes()));
 			double[] at = {segment.getStartPoint().getLatitude(), segment.getStartPoint().getLongitude()};
-			actual.put(id + ":" + segment.getStartPointIndex(), said);
-			where.put(id + ":" + segment.getStartPointIndex(), at);
-			if (!actual.containsKey(String.valueOf(id))) {
-				actual.put(String.valueOf(id), said);
+			String point = id + ":" + segment.getStartPointIndex();
+			drive.turns.put(point, new ArrayList<>(Collections.singletonList(said)));
+			where.put(point, at);
+			List<Said> road = drive.turns.get(String.valueOf(id));
+			if (road == null) {
+				drive.turns.put(String.valueOf(id), new ArrayList<>(Collections.singletonList(said)));
 				where.put(String.valueOf(id), at);
+			} else {
+				road.add(said);
 			}
 		}
-		return actual;
+		return drive;
 	}
 
 	/** a record naming a start point is answered by that point, one naming only the road by any of it */
-	private static String lookup(String key, Map<String, String> actual) {
+	private static String lookup(String key, Map<String, List<Said>> actual) {
 		return actual.containsKey(key) ? key : key.indexOf(':') > 0 ? key.substring(0, key.indexOf(':')) : key;
 	}
 
@@ -267,13 +312,12 @@ public class CheckTurnLanesTest {
 				.append(".bar{display:flex;width:50%;height:10px;border-radius:5px;overflow:hidden;")
 				.append("margin:0 0 20px;background:#eee}\n")
 				.append(".bar span{display:block}\n")
-				.append(".bar .bOK{background:#1a7f37}.bar .bSIMILAR{background:#d4a72c}")
-				.append(".bar .bFAIL{background:#c0392b}.bar .bSKIP{background:#bbb}\n")
+				.append(".bar .bOK{background:#1a7f37}.bar .bFAIL{background:#c0392b}\n")
 				.append("table{border-collapse:collapse;width:100%}\n")
 				.append("th,td{border-bottom:1px solid #e3e3e3;padding:6px 10px;text-align:left;vertical-align:top}\n")
 				.append("th{font-weight:600;color:#555;border-bottom:2px solid #ccc;white-space:nowrap}\n")
 				.append("td.st{font-weight:600;white-space:nowrap}\n")
-				.append(".OK{color:#1a7f37}.SIMILAR{color:#9a6700}.FAIL{color:#c0392b}.SKIP{color:#777}\n")
+				.append(".OK{color:#1a7f37}.FAIL{color:#c0392b}\n")
 				.append("td.lanes{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;white-space:nowrap}\n")
 				.append("td.lanes .a{color:#555}\n")
 				.append("td.seg{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:#555}\n")
@@ -283,9 +327,7 @@ public class CheckTurnLanesTest {
 		sb.append("<p class=\"sum\">").append(junctions).append(" junctions, ").append(cases)
 				.append(" cases, ").append(rows.size()).append(" expectations — ")
 				.append(share("OK", totals, Verdict.OK, rows.size()))
-				.append(" · ").append(share("SIMILAR", totals, Verdict.SIMILAR, rows.size()))
 				.append(" · ").append(share("FAIL", totals, Verdict.FAIL, rows.size()))
-				.append(" · ").append(share("SKIP", totals, Verdict.SKIP, rows.size()))
 				.append("</p>\n");
 		sb.append(bar(totals, rows.size()));
 		sb.append("<table>\n<tr><th>Status</th><th>Name</th><th>Segment</th>")
@@ -325,7 +367,7 @@ public class CheckTurnLanesTest {
 	/** the same numbers as a line the eye reads before the words */
 	private static String bar(Map<Verdict, Integer> totals, int of) {
 		StringBuilder sb = new StringBuilder("<div class=\"bar\">");
-		for (Verdict verdict : new Verdict[] {Verdict.OK, Verdict.SIMILAR, Verdict.FAIL, Verdict.SKIP}) {
+		for (Verdict verdict : new Verdict[] {Verdict.OK, Verdict.FAIL}) {
 			int n = count(totals, verdict);
 			if (n == 0) {
 				continue;
@@ -349,328 +391,45 @@ public class CheckTurnLanesTest {
 
 	// ------------------------------------------------------------------ verdicts
 
-	static Verdict verdict(String expected, String actual) {
-		if (expected == null) {
-			// null and "" are not the same sentence: null says "this road is on the route" and nothing more, while ""
-			// says "and it carries no instruction"
-			return Verdict.SKIP;
-		}
-		if (expected.isEmpty()) {
-			// whether a plain "carry on" is worth an instruction at all is a judgement, not a fact: one side shows
-			// the lanes and says nothing, the other says nothing at all
-			return actual == null ? Verdict.OK : onlyCarriesOn(actual) ? Verdict.SIMILAR : Verdict.FAIL;
-		}
-		if (actual == null) {
-			return onlyCarriesOn(expected) ? Verdict.SIMILAR : Verdict.FAIL;
-		}
-		if (expected.equals(actual)) {
-			return Verdict.OK;
-		}
-		Parsed e = Parsed.of(expected);
-		Parsed a = Parsed.of(actual);
-		Verdict worst = Verdict.OK;
-		if (e.turn != null) {
-			worst = worse(worst, compareTurns(e.turn, a.turn));
-		}
-		if (e.lanes != null) {
-			worst = worse(worst, compareLanes(e.lanes, a.lanes));
-		}
-		if (worst == Verdict.OK && e.mute != a.mute) {
-			worst = Verdict.SIMILAR; // only the voice differs
-		}
-		return worst;
-	}
-
-	/** an instruction that announces nothing: carry on, or keep to one side, on lanes that carry on */
-	static boolean onlyCarriesOn(String value) {
-		Parsed parsed = Parsed.of(value);
-		if (parsed.turn != null && !parsed.turn.equals("C") && !parsed.turn.equals("KL")
-				&& !parsed.turn.equals("KR")) {
-			return false;
-		}
-		if (parsed.lanes == null) {
-			return true;
-		}
-		for (LaneShape lane : LaneShape.parse(parsed.lanes)) {
-			if (lane.marked != null && !lane.marked.equals("C")) {
-				return false;
-			}
-		}
-		return true;
-	}
-
 	/**
-	 * Neighbours on the left-to-right ladder are one judgement apart: straight and keep right are the same
-	 * road read by two people.
+	 * The judgement of {@code RouteResultPreparationTest} and nothing besides: a record passes when
+	 * the drive reached the road and the expectation is one of the three forms that test accepts -
+	 * the whole instruction, the lane row alone, or the manoeuvre alone.
 	 */
-	private static Verdict compareTurns(String expected, String actual) {
-		if (expected.equals(actual)) {
-			return Verdict.OK;
+	/** several instructions on one road are shown as they were driven */
+	private static String display(List<Said> said) {
+		StringBuilder sb = new StringBuilder();
+		for (Said one : said) {
+			sb.append(sb.length() > 0 ? " / " : "").append(one.display());
 		}
-		if (keepAndTurnOfTheSameSide(expected, actual)) {
-			return Verdict.SIMILAR;
-		}
-		if (roundabout(expected) || roundabout(actual)) {
-			return Verdict.FAIL; // another exit is another road, not a neighbour on the ladder
-		}
-		int e = TurnType.orderFromLeftToRight(TurnType.fromString(expected, false).getValue());
-		int a = TurnType.orderFromLeftToRight(TurnType.fromString(actual, false).getValue());
-		return Math.abs(e - a) <= 1 ? Verdict.SIMILAR : Verdict.FAIL;
+		return sb.toString();
 	}
 
-	private static boolean roundabout(String turn) {
-		return turn != null && (turn.startsWith("RNDB") || turn.startsWith("RNLB"));
-	}
-
-	private static boolean keepAndTurnOfTheSameSide(String one, String other) {
-		return pairOf("KL", "TL", one, other) || pairOf("KR", "TR", one, other);
-	}
-
-	private static boolean pairOf(String keep, String turn, String one, String other) {
-		return (keep.equals(one) && turn.equals(other)) || (keep.equals(other) && turn.equals(one));
-	}
-
-	/** The lane structure is a fact of the map and has to match. */
-	private static Verdict compareLanes(String expected, String actual) {
-		List<LaneShape> e = LaneShape.parse(expected);
-		List<LaneShape> a = LaneShape.parse(actual);
-		if (e.size() != a.size()) {
+	static Verdict verdict(String expected, List<Said> said, boolean reached) {
+		if (!reached) {
+			// "Segment ... was not reached in ..."
 			return Verdict.FAIL;
 		}
-		boolean sameLanes = true;
-		boolean similarArrows = false;
-		TreeSet<String> markedExpected = new TreeSet<>();
-		TreeSet<String> markedActual = new TreeSet<>();
-		TreeSet<Integer> activeExpected = new TreeSet<>();
-		TreeSet<Integer> activeActual = new TreeSet<>();
-		for (int i = 0; i < e.size(); i++) {
-			if (!e.get(i).arrows.equals(a.get(i).arrows)) {
-				if (!similarArrows(e.get(i).arrows, a.get(i).arrows)) {
-					return Verdict.FAIL;
-				}
-				similarArrows = true;
-			}
-			sameLanes &= Objects.equals(e.get(i).marked, a.get(i).marked);
-			if (e.get(i).marked != null) {
-				markedExpected.add(e.get(i).marked);
-				activeExpected.add(i);
-			}
-			if (a.get(i).marked != null) {
-				markedActual.add(a.get(i).marked);
-				activeActual.add(i);
-			}
-		}
-		if (sameLanes && !similarArrows) {
+		if (expected == null) {
+			// the record names the road and says nothing about it: reaching it is the whole test
 			return Verdict.OK;
 		}
-		if (activeExpected.equals(activeActual)) {
-			// the same lanes are active and only the arrow drawn as taken inside one of them differs.
-			return Verdict.SIMILAR;
+		if (said == null) {
+			// on the route but carrying no instruction: the test reads that as "NULL"
+			return isEmpty(expected) ? Verdict.OK : Verdict.FAIL;
 		}
-		// marking a different NUMBER of lanes that lead the same way is a judgement; marking lanes that lead
-		// somewhere else is an error, and a driver following it ends up in the wrong lane
-		return markedExpected.equals(markedActual) ? Verdict.SIMILAR : Verdict.FAIL;
-	}
-
-	static String reason(String expected, String actual) {
-		if (expected == null) {
-			return "";
-		}
-		if (actual == null) {
-			return onlyCarriesOn(expected) ? "CARRYON" : "MISSING";
-		}
-		if (isEmpty(expected)) {
-			return onlyCarriesOn(actual) ? "CARRYON" : "EXTRA";
-		}
-		Parsed e = Parsed.of(expected);
-		Parsed a = Parsed.of(actual);
-		Verdict turns = e.turn == null ? Verdict.OK : compareTurns(e.turn, a.turn);
-		Verdict lanes = e.lanes == null ? Verdict.OK : compareLanes(e.lanes, a.lanes);
-		if (turns == Verdict.FAIL) {
-			return "TURN " + a.turn;
-		}
-		if (lanes == Verdict.FAIL) {
-			List<LaneShape> expectedLanes = LaneShape.parse(e.lanes);
-			List<LaneShape> actualLanes = LaneShape.parse(a.lanes);
-			if (expectedLanes.size() != actualLanes.size()) {
-				return "LANES";
-			}
-			for (int i = 0; i < expectedLanes.size(); i++) {
-				if (!similarArrows(expectedLanes.get(i).arrows, actualLanes.get(i).arrows)) {
-					return "ARROWS"; // the lane carries different arrows, so nothing lines up
-				}
-			}
-			return "MARKS"; // the same lanes, the wrong ones marked
-		}
-		if (turns == Verdict.SIMILAR) {
-			return "TURN+-1";
-		}
-		if (lanes == Verdict.SIMILAR) {
-			return "MARKS";
-		}
-		return "MUTE";
-	}
-
-	/**
-	 * A keep in a lane is the arrow of a lane that divides: KL,KR is the lane read as TSLL,C when the left branch bends
-	 * off and as C,TSLR when the right one does. Taken left to right, each keep may stand for the straight arrow or the
-	 * slight turn of its own side.
-	 */
-	private static boolean similarArrows(TreeSet<String> expected, TreeSet<String> actual) {
-		if (expected.equals(actual)) {
-			return true;
-		}
-		if (expected.size() != actual.size()) {
-			return false;
-		}
-		List<String> e = leftToRight(expected);
-		List<String> a = leftToRight(actual);
-		for (int i = 0; i < e.size(); i++) {
-			if (!e.get(i).equals(a.get(i)) && !keepOfTheSameSide(e.get(i), a.get(i))
-					&& !keepOfTheSameSide(a.get(i), e.get(i))) {
-				return false;
+		// a record naming only the road is asserted against every instruction that road carries
+		for (Said one : said) {
+			if (!one.matches(expected)) {
+				return Verdict.FAIL;
 			}
 		}
-		return true;
+		return Verdict.OK;
 	}
 
-	private static boolean keepOfTheSameSide(String keep, String arrow) {
-		return ("KL".equals(keep) && ("TSLL".equals(arrow) || "C".equals(arrow)))
-				|| ("KR".equals(keep) && ("C".equals(arrow) || "TSLR".equals(arrow)));
-	}
-
-	private static List<String> leftToRight(TreeSet<String> arrows) {
-		List<String> sorted = new ArrayList<>(arrows);
-		Collections.sort(sorted, new Comparator<String>() {
-			@Override
-			public int compare(String x, String y) {
-				return Integer.compare(TurnType.orderFromLeftToRight(TurnType.fromString(x, false).getValue()),
-						TurnType.orderFromLeftToRight(TurnType.fromString(y, false).getValue()));
-			}
-		});
-		return sorted;
-	}
-
-	/** an expectation or a produced string, split into the three things it can carry */
-	private static final class Parsed {
-		final boolean mute;
-		final String turn;
-		final String lanes;
-
-		private Parsed(boolean mute, String turn, String lanes) {
-			this.mute = mute;
-			this.turn = turn;
-			this.lanes = lanes;
-		}
-
-		static Parsed of(String value) {
-			boolean mute = value.startsWith(MUTE);
-			String body = mute ? value.substring(MUTE.length()) : value;
-			int colon = body.indexOf(':');
-			if (colon >= 0) {
-				return new Parsed(mute, body.substring(0, colon), body.substring(colon + 1));
-			}
-			boolean looksLikeLanes = body.indexOf('|') >= 0 || body.indexOf('+') >= 0 || body.indexOf(',') >= 0;
-			return looksLikeLanes ? new Parsed(mute, null, body) : new Parsed(mute, body, null);
-		}
-	}
-
-	/** one lane of either format: which arrows it carries, and which of them the route takes */
-	private static final class LaneShape {
-		final TreeSet<String> arrows = new TreeSet<>();
-		String marked;
-
-		static List<LaneShape> parse(String lanes) {
-			List<LaneShape> parsed = new ArrayList<>();
-			if (lanes == null || lanes.isEmpty()) {
-				return parsed;
-			}
-			for (String lane : lanes.split("\\|", -1)) {
-				LaneShape shape = new LaneShape();
-				for (String arrow : lane.split(",", -1)) {
-					boolean taken = arrow.startsWith("+");
-					String code = taken ? arrow.substring(1) : arrow;
-					shape.arrows.add(code);
-					if (taken) {
-						shape.marked = code;
-					}
-				}
-				parsed.add(shape);
-			}
-			return parsed;
-		}
-	}
-
-	private static Verdict worse(Verdict a, Verdict b) {
-		return a.ordinal() >= b.ordinal() ? a : b;
-	}
 
 	private static boolean isEmpty(String s) {
 		return s == null || s.isEmpty();
-	}
-
-	private static String quote(String s) {
-		return s == null ? "NULL" : "'" + s + "'";
-	}
-
-	private static String format(TurnTypeAI turn) {
-		StringBuilder sb = new StringBuilder();
-		if (turn.skipToSpeak()) {
-			sb.append(MUTE);
-		}
-		String maneuver = turn.getOldTurnType().toXmlString();
-		sb.append(maneuver);
-		String lanes = lanesOf(turn);
-		if (!lanes.isEmpty()) {
-			sb.append(':').append(lanes);
-		}
-		return sb.toString();
-	}
-
-	/** The lane row. */
-	private static String lanesOf(TurnTypeAI turn) {
-		LanePanelAI panel = turn.panel();
-		if (panel.isEmpty()) {
-			return "";
-		}
-		StringBuilder sb = new StringBuilder();
-		for (LanePanelAI.Lane lane : panel.lanes()) {
-			if (lane.index() > 0) {
-				sb.append('|');
-			}
-			List<TurnIndication> arrows = lane.arrows();
-			if (arrows.isEmpty()) {
-				sb.append(lane.isActive() ? "+C" : "C");
-				continue;
-			}
-			for (int i = 0; i < arrows.size(); i++) {
-				boolean taken = lane.isActive() && (arrows.get(i) == lane.taken()
-						|| (lane.taken() == null && i == 0));
-				sb.append(i > 0 ? "," : "").append(taken ? "+" : "").append(code(arrows.get(i)));
-			}
-		}
-		return sb.toString();
-	}
-
-	private static String code(TurnIndication arrow) {
-		switch (arrow) {
-			case LEFT:
-				return "TL";
-			case SLIGHT_LEFT:
-				return "TSLL";
-			case SHARP_LEFT:
-				return "TSHL";
-			case RIGHT:
-				return "TR";
-			case SLIGHT_RIGHT:
-				return "TSLR";
-			case SHARP_RIGHT:
-				return "TSHR";
-			case REVERSE:
-				return "TU";
-			default:
-				return "C";
-		}
 	}
 
 	private static String shorten(String name) {
