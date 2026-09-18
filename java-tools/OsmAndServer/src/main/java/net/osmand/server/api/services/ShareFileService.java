@@ -272,8 +272,6 @@ public class ShareFileService {
 		return true;
 	}
 
-	private static final String SHARE_LINK_PREFIX = "https://osmand.net/map/share/join/";
-
 	private void notifyAccessRequest(ShareFileRepository.ShareFilesAccess access, boolean approved) {
 		try {
 			ShareFileRepository.ShareFile file = access.file;
@@ -282,18 +280,9 @@ public class ShareFileService {
 				return;
 			}
 			CloudUsersRepository.CloudUser owner = usersRepository.findById(file.ownerid);
-			String ownerName = owner != null && owner.nickname != null ? owner.nickname : "The file owner";
-			String name = file.name == null ? "" : file.name;
-			int dotIdx = name.lastIndexOf('.');
-			String ext = dotIdx > 0 && dotIdx < name.length() - 1
-					? name.substring(dotIdx + 1).toUpperCase(Locale.ROOT) : "FILE";
-			String meta = file.type == null ? ext : file.type;
 			CloudUserFilesRepository.UserFile userFile = getUserFile(file);
-			if (userFile != null && userFile.filesize > 0) {
-				meta = meta + " · " + FileSizeFormatter.format(userFile.filesize);
-			}
-			String url = file.uuid == null ? "https://osmand.net/map" : SHARE_LINK_PREFIX + file.uuid;
-			emailSender.sendShareFileAccessEmail(requester.email, approved, ownerName, name, ext, meta, url);
+			emailSender.sendShareFileAccessEmail(requester.email, approved, owner == null ? null : owner.nickname,
+					file.name, file.type, userFile == null ? 0 : userFile.filesize, file.uuid);
 		} catch (Exception e) {
 			LOGGER.error("Failed to send share access email: " + e.getMessage(), e);
 		}

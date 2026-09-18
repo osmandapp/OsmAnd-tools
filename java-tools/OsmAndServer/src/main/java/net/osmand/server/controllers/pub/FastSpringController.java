@@ -451,51 +451,12 @@ public class FastSpringController {
 	                                 List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions) {
 		FastSpringWebhookRequest.Data data = event.data;
 		try {
-			String productName;
-			String planName;
-			String renewalLabel;
-			Date renewalDate;
-			if (!subscriptions.isEmpty()) {
-				DeviceSubscriptionsRepository.SupporterDeviceSubscription sub = subscriptions.get(0);
-				PurchasesDataLoader.Subscription skuData = purchasesDataLoader.getSubscriptions().get(sub.sku);
-				productName = skuData != null ? skuData.name() : sub.sku;
-				planName = skuData != null ? subscriptionPlanName(skuData) : "Subscription";
-				renewalLabel = Boolean.TRUE.equals(sub.autorenewing) ? "Renews on" : "Expires on";
-				renewalDate = sub.expiretime;
-			} else if (!purchases.isEmpty()) {
-				DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase iap = purchases.get(0);
-				PurchasesDataLoader.InApp skuData = purchasesDataLoader.getInApps().get(iap.sku);
-				productName = skuData != null ? skuData.name() : iap.sku;
-				planName = "One-time purchase";
-				renewalLabel = "Expires on";
-				renewalDate = skuData != null ? skuData.getExpireDate(iap.purchaseTime) : null;
-			} else {
-				return;
-			}
 			Date orderDate = event.created != null ? new Date(event.created) : new Date();
-			emailSender.sendPurchaseReceiptEmail(email, data.order, formatReceiptDate(orderDate),
-					data.totalDisplay != null ? data.totalDisplay : "—", productName, planName,
-					renewalDate == null ? null : renewalLabel,
-					renewalDate == null ? null : formatReceiptDate(renewalDate));
+			emailSender.sendPurchaseReceiptEmail(email, data.language, data.order, orderDate, data.totalDisplay,
+					purchases, subscriptions);
 		} catch (Exception e) {
 			LOGGER.error("FastSpring: failed to send receipt for orderId " + data.order + ": " + e.getMessage(), e);
 		}
-	}
-
-	private static String subscriptionPlanName(PurchasesDataLoader.Subscription skuData) {
-		int months = "year".equals(skuData.durationUnit()) ? skuData.duration() * 12 : skuData.duration();
-		if (months == 1) {
-			return "Monthly subscription";
-		} else if (months == 12) {
-			return "Annual subscription";
-		} else if (months % 12 == 0) {
-			return (months / 12) + "-year subscription";
-		}
-		return months + "-month subscription";
-	}
-
-	private static String formatReceiptDate(Date date) {
-		return new java.text.SimpleDateFormat("MMM d, yyyy", Locale.ENGLISH).format(date);
 	}
 
 	public static class FastSpringWebhookRequest {
@@ -513,6 +474,7 @@ public class FastSpringController {
 			public String order; // orderId
 			public String reference; // purchaseToken
 			public String totalDisplay;
+			public String language; // two-letter ISO code of the order's language
 			public Customer customer;
 			public Tags tags;
 			public List<Item> items;
