@@ -64,11 +64,9 @@ public class VectorTileController {
 	// depth test styles: drop rendered tiles and fetch new depth maps after a new build
 	@RequestMapping(path = "/depth-test/clear-cache", method = { RequestMethod.GET, RequestMethod.POST })
 	public ResponseEntity<String> clearDepthTestCache() throws IOException {
-		tileMemoryCache.removeByPrefix("depth-");
-		File[] dirs = config.cacheLocation == null ? null : new File(config.cacheLocation).listFiles((d, n) -> n.startsWith("depth-"));
-		for (File d : dirs == null ? new File[0] : dirs) {
-			Algorithms.removeAllFiles(d);
-		}
+		tileMemoryCache.removeByPrefix(DepthTestMaps.SERVER + "-");
+		tileMemoryCache.removeByPrefix(DepthTestMaps.WORK + "-");
+		DepthTestMaps.INSTANCE.dropCachedTiles(config.cacheLocation);
 		DepthTestMaps.INSTANCE.refresh();
 		return ResponseEntity.ok("{\"status\":\"ok\"}");
 	}

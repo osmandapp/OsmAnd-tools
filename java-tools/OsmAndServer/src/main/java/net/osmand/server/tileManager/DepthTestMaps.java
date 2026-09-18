@@ -165,6 +165,18 @@ public class DepthTestMaps {
 		return files;
 	}
 
+	/** Removes the tiles rendered by an earlier run: its maps may have been other ones. */
+	public void dropCachedTiles(String cacheLocation) throws IOException {
+		File[] dirs = cacheLocation == null ? null : new File(cacheLocation)
+				.listFiles((d, n) -> n.startsWith(SERVER + "-") || n.startsWith(WORK + "-"));
+		for (File d : dirs == null ? new File[0] : dirs) {
+			Algorithms.removeAllFiles(d);
+		}
+		if (dirs != null && dirs.length > 0) {
+			LOGGER.info("Depth test: dropped the tiles of " + dirs.length + " styles from the previous run");
+		}
+	}
+
 	/** Downloads the maps whose size on the builder changed (after a new build). */
 	public synchronized void refresh() {
 		if (downloader != null && downloader.isAlive()) {

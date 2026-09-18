@@ -1,5 +1,7 @@
 package net.osmand.server.tileManager;
 
+import java.io.IOException;
+
 import net.osmand.NativeJavaRendering;
 import net.osmand.render.RenderingRuleProperty;
 import net.osmand.render.RenderingRulesStorage;
@@ -82,6 +84,12 @@ public class TileServerConfig {
 		for (VectorStyle vs : DepthTestMaps.INSTANCE.createStyles(31 - Integer.numberOfLeadingZeros(512) - 8,
 				31 - Integer.numberOfLeadingZeros(Math.max(256, metatileSize)) - 8, maxZoomCache)) {
 			this.style.put(vs.key, vs);
+		}
+		// the maps behind these styles change between runs, so the tiles of the previous one are not ours to keep
+		try {
+			DepthTestMaps.INSTANCE.dropCachedTiles(cacheLocation);
+		} catch (IOException e) {
+			LOGGER.error("Depth test tiles of the previous run: " + e.getMessage());
 		}
 	}
 
