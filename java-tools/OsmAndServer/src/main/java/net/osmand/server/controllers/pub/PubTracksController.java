@@ -250,35 +250,7 @@ public class PubTracksController {
 		return ResponseEntity.ok("{}");
 	}
 
-	/** messages newest first, admins only; since keeps those from that moment on */
-	@GetMapping(path = "/feedback", produces = MediaType.APPLICATION_JSON_VALUE)
-	public ResponseEntity<String> feedbackList(@RequestParam(defaultValue = "500") int limit, @RequestParam(required = false) String since,
-			Authentication auth) {
-		if (!config.osmgpxInitialized()) {
-			return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body("OsmGpx datasource is not initialized");
-		}
-		if (!isAdmin(auth)) {
-			return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Admins only");
-		}
-		Instant from = parseSince(since);
-		if (since != null && from == null) {
-			return ResponseEntity.badRequest().body("since must be an ISO-8601 instant");
-		}
-		JsonArray res = new JsonArray();
-		feedbackRows(from, limit, rs -> {
-			JsonObject o = new JsonObject();
-			o.addProperty("id", rs.getLong("id"));
-			o.addProperty("time", rs.getTimestamp("time").toInstant().toString());
-			o.addProperty("email", rs.getString("email"));
-			o.addProperty("ip", rs.getString("ip"));
-			o.addProperty("text", rs.getString("text"));
-			o.add("context", rs.getString("context") == null ? null : new JsonParser().parse(rs.getString("context")));
-			res.add(o);
-		});
-		return ResponseEntity.ok(gson.toJson(res));
-	}
-
-	/** the same messages as one csv, admins only */
+	/** every message as one csv row, newest first, admins only; since keeps those from that moment on */
 	@GetMapping(path = "/feedback.csv")
 	public void feedbackCsv(@RequestParam(defaultValue = "5000") int limit, @RequestParam(required = false) String since, Authentication auth,
 			HttpServletResponse response) throws IOException {
@@ -297,9 +269,13 @@ public class PubTracksController {
 		}
 		response.setContentType("text/csv; charset=utf-8");
 		response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"heatmap-feedback.csv\"");
+		ensureFeedbackTable();
+		String where = from == null ? "" : " WHERE time >= ?::timestamptz";
+		Object[] args = from == null ? new Object[] {Math.max(1, Math.min(limit, MAX_LIST))}
+				: new Object[] {from.toString(), Math.max(1, Math.min(limit, MAX_LIST))};
 		try (Writer w = new OutputStreamWriter(response.getOutputStream(), StandardCharsets.UTF_8)) {
 			w.write("id,time,email,ip,text,url,view,filters\n");
-			feedbackRows(from, limit, rs -> {
+			jdbcTemplate.query("SELECT id, time, email, ip, text, context::text FROM " + FEEDBACK_TABLE + where + " ORDER BY id DESC LIMIT ?", (RowCallbackHandler) rs -> {
 				JsonObject c = rs.getString("context") == null ? new JsonObject() : new JsonParser().parse(rs.getString("context")).getAsJsonObject();
 				String[] values = {rs.getString("id"), rs.getTimestamp("time").toInstant().toString(), rs.getString("email"), rs.getString("ip"),
 						rs.getString("text"), jsonText(c.get("url")), jsonText(c.get("view")), jsonText(c.get("filters"))};
@@ -312,17 +288,10 @@ public class PubTracksController {
 				} catch (IOException e) {
 					throw new UncheckedIOException(e);
 				}
-			});
+			}, args);
 		}
 	}
 
-	private void feedbackRows(Instant from, int limit, RowCallbackHandler row) {
-		ensureFeedbackTable();
-		String where = from == null ? "" : " WHERE time >= ?::timestamptz";
-		Object[] args = from == null ? new Object[] {Math.max(1, Math.min(limit, MAX_LIST))}
-				: new Object[] {from.toString(), Math.max(1, Math.min(limit, MAX_LIST))};
-		jdbcTemplate.query("SELECT id, time, email, ip, text, context::text FROM " + FEEDBACK_TABLE + where + " ORDER BY id DESC LIMIT ?", row, args);
-	}
 
 	private static Instant parseSince(String since) {
 		try {
