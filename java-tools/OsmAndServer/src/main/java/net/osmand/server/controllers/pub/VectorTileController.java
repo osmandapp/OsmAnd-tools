@@ -2,7 +2,11 @@ package net.osmand.server.controllers.pub;
 
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
@@ -10,6 +14,7 @@ import java.util.concurrent.TimeUnit;
 import javax.imageio.ImageIO;
 
 import com.google.gson.JsonObject;
+import net.osmand.server.tileManager.DepthTestMaps;
 import net.osmand.server.tileManager.TileMemoryCache;
 import net.osmand.server.tileManager.TileServerConfig;
 import net.osmand.server.tileManager.VectorMetatile;
@@ -21,6 +26,7 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.xml.sax.SAXException;
@@ -55,6 +61,30 @@ public class VectorTileController {
 
 	Gson gson = new Gson();
 
+	// depth test styles: drop rendered tiles and fetch new depth maps after a new build
+	@RequestMapping(path = "/depth-test/clear-cache", method = { RequestMethod.GET, RequestMethod.POST })
+	public ResponseEntity<String> clearDepthTestCache() throws IOException {
+		tileMemoryCache.removeByPrefix("depth-");
+		File[] dirs = config.cacheLocation == null ? null : new File(config.cacheLocation).listFiles((d, n) -> n.startsWith("depth-"));
+		for (File d : dirs == null ? new File[0] : dirs) {
+			Algorithms.removeAllFiles(d);
+		}
+		DepthTestMaps.INSTANCE.refresh();
+		return ResponseEntity.ok("{\"status\":\"ok\"}");
+	}
+
+	// the page that shows two depth sets side by side, see resources/depth-test/compare.html
+	@RequestMapping(path = "/depth-test/compare", produces = MediaType.TEXT_HTML_VALUE)
+	public ResponseEntity<String> depthTestCompare() throws IOException {
+		try (InputStream in = getClass().getResourceAsStream("/depth-test/compare.html")) {
+			if (in == null) {
+				return ResponseEntity.notFound().build();
+			}
+			return ResponseEntity.ok().cacheControl(CacheControl.noCache())
+					.body(new String(in.readAllBytes(), StandardCharsets.UTF_8));
+		}
+	}
+
 	private ResponseEntity<?> errorConfig(String msg) {
 		return ResponseEntity.badRequest()
 				.body(msg);
@@ -85,7 +115,15 @@ public class VectorTileController {
 
 	private String computeStylesJson() {
 		synchronized (config.style) {
-			for (VectorStyle vectorStyle : config.style.values()) {
+			// the depth test styles are for the comparison page, which asks for their tiles by name; they have no
+			// place in the style list of the web map
+			Map<String, VectorStyle> shown = new LinkedHashMap<>();
+			for (Map.Entry<String, VectorStyle> e : config.style.entrySet()) {
+				if (e.getValue().depth == null) {
+					shown.put(e.getKey(), e.getValue());
+				}
+			}
+			for (VectorStyle vectorStyle : shown.values()) {
 				vectorStyle.properties.clear();
 				for (RenderingRuleProperty p : vectorStyle.storage.PROPS.getPoperties()) {
 					if (!Algorithms.isEmpty(p.getName()) && !Algorithms.isEmpty(p.getCategory())
@@ -95,7 +133,7 @@ public class VectorTileController {
 					}
 				}
 			}
-			return gson.toJson(config.style);
+			return gson.toJson(shown);
 		}
 	}
 
@@ -138,7 +176,7 @@ public class VectorTileController {
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		ImageIO.write(subimage, "png", baos);
 		return ResponseEntity.ok()
-				.header("Cache-Control", "public, max-age=2592000")
+				.header("Cache-Control", vectorStyle.depth != null ? "no-store" : "public, max-age=2592000")
 				.body(new ByteArrayResource(baos.toByteArray()));
 	}
 
