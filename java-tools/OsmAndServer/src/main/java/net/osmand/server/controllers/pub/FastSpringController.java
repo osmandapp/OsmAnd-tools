@@ -148,6 +148,21 @@ public class FastSpringController {
 
 			userSubService.verifyAndRefreshProOrderId(user);
 
+			// Send only once the order rows are committed: if the transaction rolls back (e.g. another event in the
+			// same batch throws), FastSpring retries the event and a receipt sent earlier would go out twice.
+			Runnable receipt = () -> sendPurchaseReceipt(email, event, purchases, subscriptions);
+			if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+				org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+						new org.springframework.transaction.support.TransactionSynchronization() {
+							@Override
+							public void afterCommit() {
+								receipt.run();
+							}
+						});
+			} else {
+				receipt.run();
+			}
+
 			if (sendOsmAndAndSpecialGiftEmail) {
 				LOGGER.info("FastSpring: Sending special gift email to " + EmailSenderService.shorten(email) + " for orderId: " + data.order + ", purchaseToken: " + data.reference);
 				emailSender.sendOsmAndSpecialGiftEmail(email);
@@ -508,6 +523,58 @@ public class FastSpringController {
 		}
 	}
 
+	private void sendPurchaseReceipt(String email, FastSpringWebhookRequest.Event event,
+	                                 List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> purchases,
+	                                 List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions) {
+		FastSpringWebhookRequest.Data data = event.data;
+		try {
+			String productName;
+			String planName;
+			String renewalLabel;
+			Date renewalDate;
+			if (!subscriptions.isEmpty()) {
+				DeviceSubscriptionsRepository.SupporterDeviceSubscription sub = subscriptions.get(0);
+				PurchasesDataLoader.Subscription skuData = purchasesDataLoader.getSubscriptions().get(sub.sku);
+				productName = skuData != null ? skuData.name() : sub.sku;
+				planName = skuData != null ? subscriptionPlanName(skuData) : "Subscription";
+				renewalLabel = Boolean.TRUE.equals(sub.autorenewing) ? "Renews on" : "Expires on";
+				renewalDate = sub.expiretime;
+			} else if (!purchases.isEmpty()) {
+				DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase iap = purchases.get(0);
+				PurchasesDataLoader.InApp skuData = purchasesDataLoader.getInApps().get(iap.sku);
+				productName = skuData != null ? skuData.name() : iap.sku;
+				planName = "One-time purchase";
+				renewalLabel = "Expires on";
+				renewalDate = skuData != null ? skuData.getExpireDate(iap.purchaseTime) : null;
+			} else {
+				return;
+			}
+			Date orderDate = event.created != null ? new Date(event.created) : new Date();
+			emailSender.sendPurchaseReceiptEmail(email, data.order, formatReceiptDate(orderDate),
+					data.totalDisplay != null ? data.totalDisplay : "—", productName, planName,
+					renewalDate == null ? null : renewalLabel,
+					renewalDate == null ? null : formatReceiptDate(renewalDate));
+		} catch (Exception e) {
+			LOGGER.error("FastSpring: failed to send receipt for orderId " + data.order + ": " + e.getMessage(), e);
+		}
+	}
+
+	private static String subscriptionPlanName(PurchasesDataLoader.Subscription skuData) {
+		int months = "year".equals(skuData.durationUnit()) ? skuData.duration() * 12 : skuData.duration();
+		if (months == 1) {
+			return "Monthly subscription";
+		} else if (months == 12) {
+			return "Annual subscription";
+		} else if (months % 12 == 0) {
+			return (months / 12) + "-year subscription";
+		}
+		return months + "-month subscription";
+	}
+
+	private static String formatReceiptDate(Date date) {
+		return new java.text.SimpleDateFormat("MMM d, yyyy", Locale.ENGLISH).format(date);
+	}
+
 	public static class FastSpringWebhookRequest {
 
 		public List<Event> events;
@@ -523,6 +590,7 @@ public class FastSpringController {
 			public String order; // orderId
 			public String subscription; // subscriptionId, present on subscription.* events
 			public String reference; // purchaseToken
+			public String totalDisplay;
 			public Customer customer;
 			public Tags tags;
 			public List<Item> items;

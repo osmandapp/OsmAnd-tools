@@ -13,8 +13,11 @@ public class EmailSenderService {
 		EmailSenderService sender = new EmailSenderService();
 		String email = "dmarc-reports@osmand.net";
 		sender.sendOsmAndCloudPromoEmail(email, "promo");
-		sender.sendOsmAndCloudWebEmail(email, "token", "en", "delete");
+		sender.sendOsmAndCloudWebEmail(email, "token", "delete", "en");
 		sender.sendOsmAndCloudRegistrationEmail(email, "token", "en", true);
+		for (CloudAccountAction action : CloudAccountAction.values()) {
+			sender.sendOsmAndCloudAccountEmail(email, "token", "en", action, "new@osmand.net");
+		}
 		sender.sendPromocodesEmails(email, "promocode/android", "ANDROID");
 		sender.sendPromocodesEmails(email, "promocode/ios", "IOS");
 	}
@@ -51,15 +54,101 @@ public class EmailSenderService {
 	}
     
     public void sendOsmAndCloudRegistrationEmail(String email, String token, String lang, boolean newUser) {
-		String subject = newUser ? "@SUBJECT_NEW@" : "@SUBJECT_OLD@";
+		String suffix = newUser ? "_NEW@" : "_OLD@";
 	    boolean ok = new EmailSenderTemplate()
 			    .load("cloud/register", lang)
-			    .set("SUBJECT", subject)
+			    .set("SUBJECT", "@SUBJECT" + suffix)
+			    .set("HEADING", "@HEADING" + suffix)
+			    .set("INTRO", "@INTRO" + suffix)
+			    .set("SECNOTE", "@SECNOTE" + suffix)
+			    .set("REASON", "@REASON" + suffix)
 			    .set("TOKEN", token)
 			    .to(email)
 			    .send()
 			    .isSuccess();
-	    LOGGER.info("sendOsmAndCloudRegistrationEmail to: " + shorten(email) + " (" + ok + ") [" + lang + "]");
+	    LOGGER.info("sendOsmAndCloudRegistrationEmail to: " + shorten(email) + " (" + ok + ") [" + lang + "] new=" + newUser);
+	}
+
+	public enum CloudAccountAction {
+		SETUP("cloud/account/setup"),
+		PASSWORD("cloud/account/password"),
+		EMAIL_CHANGE_REQUEST("cloud/account/change-request"),
+		EMAIL_CHANGE("cloud/account/change"),
+		DELETE("cloud/account/delete"),
+		EMAIL_CHANGED("cloud/account/email-changed");
+
+		public final String template;
+
+		CloudAccountAction(String template) {
+			this.template = template;
+		}
+	}
+
+	public void sendOsmAndCloudAccountEmail(String email, String token, String lang, CloudAccountAction action) {
+		sendOsmAndCloudAccountEmail(email, token, lang, action, null);
+	}
+
+	public void sendShareFileAccessEmail(String email, boolean approved, String ownerName, String fileName,
+			String fileExt, String fileMeta, String fileUrl) {
+		boolean ok = new EmailSenderTemplate()
+				.load(approved ? "cloud/share/approved" : "cloud/share/declined")
+				.set("OWNER_NAME", htmlText(ownerName))
+				.set("FILE_NAME", htmlText(fileName))
+				.set("FILE_NAME_PLAIN", plainText(fileName))
+				.set("FILE_EXT", htmlText(fileExt))
+				.set("FILE_META", htmlText(fileMeta))
+				.set("FILE_URL", htmlText(fileUrl))
+				.to(email)
+				.send()
+				.isSuccess();
+		LOGGER.info("sendShareFileAccessEmail approved=" + approved + " to: " + shorten(email) + " (" + ok + ")");
+	}
+
+	// User-supplied text placed into an HTML template: escape markup, and '@' as &#64;, so the value can neither
+	// inject HTML into an OsmAnd-branded email nor be expanded (or rejected) by the template's @VAR@ substitution.
+	static String htmlText(String s) {
+		return s == null ? "" : org.springframework.web.util.HtmlUtils.htmlEscape(s).replace("@", "&#64;");
+	}
+
+	// The same for a plain-text header such as Subject, where entities would show literally: no line breaks,
+	// and '@' replaced with the full-width look-alike so it cannot form an @VAR@ token.
+	static String plainText(String s) {
+		return s == null ? "" : s.replaceAll("[\\r\\n]+", " ").replace('@', '＠');
+	}
+
+	// cloud/purchase/receipt. renewalLabel/renewalDate == null means a lifetime purchase: the Renews/Expires row is hidden.
+	public void sendPurchaseReceiptEmail(String email, String orderId, String orderDate, String orderTotal,
+			String productName, String planName, String renewalLabel, String renewalDate) {
+		String productShort = productName.startsWith("OsmAnd ") ? productName.substring("OsmAnd ".length()) : productName;
+		EmailSenderTemplate sender = new EmailSenderTemplate()
+				.load("cloud/purchase/receipt")
+				.set("EMAIL", email)
+				.set("ORDER_ID", orderId == null ? "" : orderId)
+				.set("ORDER_DATE", orderDate)
+				.set("ORDER_TOTAL", orderTotal)
+				.set("PRODUCT_NAME", productName)
+				.set("PRODUCT_SHORT", productShort)
+				.set("PLAN_NAME", planName);
+		if (renewalLabel != null && renewalDate != null) {
+			sender.set("RENEWAL_ROW", "@RENEWAL_ROW_T@")
+					.set("RENEWAL_LABEL", renewalLabel)
+					.set("RENEWAL_DATE", renewalDate);
+		}
+		boolean ok = sender.to(email).send().isSuccess();
+		LOGGER.info("sendPurchaseReceiptEmail order " + orderId + " to: " + shorten(email) + " (" + ok + ")");
+	}
+
+	public void sendOsmAndCloudAccountEmail(String email, String token, String lang, CloudAccountAction action,
+			String newEmail) {
+		EmailSenderTemplate sender = new EmailSenderTemplate()
+				.load(action.template, lang)
+				.set("TOKEN", token == null ? "" : token);
+		if (newEmail != null) {
+			sender.set("NEW_EMAIL", htmlText(newEmail));
+		}
+		boolean ok = sender.to(email).send().isSuccess();
+		LOGGER.info("sendOsmAndCloudAccountEmail " + action.name() + " to: " + shorten(email)
+				+ " (" + ok + ") [" + lang + "]");
 	}
     
     public boolean sendPromocodesEmails(String mailTo, String templateId, String promocodes) {
@@ -102,6 +191,15 @@ public class EmailSenderService {
 			return false;
 		}
 		return true;
+	}
+
+	// n***@example.com - enough for the owner to recognise the address without exposing it in full
+	public static String maskEmail(String email) {
+		int at = email == null ? -1 : email.indexOf('@');
+		if (at <= 0) {
+			return "***";
+		}
+		return email.charAt(0) + "***" + email.substring(at);
 	}
 
 	// hide full email from logs
