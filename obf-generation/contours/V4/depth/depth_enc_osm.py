@@ -14,7 +14,8 @@ band covers an area (M_COVR, CATCOV=1), the contours and soundings of the less d
   the levels with no such type (0.9, 3.6 m...) get contourtype=minor and go to --minor, meant for a map section of
   zoom 15 and above only
 - soundings (SOUNDG): point layer "soundings" with a positive "depth" field, for depth_soundings_osm.py
-- areas (DEPARE, DRGARE): polygon layer "areas" with the shallowest depth "mindepth" (DRVAL1), for depth_areas_osm.py
+- areas (DEPARE, DRGARE): polygon layer "areas" with the shallowest depth "mindepth" (DRVAL1) and the deepest one
+  "maxdepth" (DRVAL2), for depth_areas_osm.py
 - coverage: polygon layer "coverage" of all read cells, to leave the gridded contours out there (-x/-X)
 """
 import argparse
@@ -116,6 +117,7 @@ def main():
     area_ds = gpkg.CreateDataSource(args.areas)
     area_lyr = area_ds.CreateLayer('areas', srs, ogr.wkbMultiPolygon)
     area_lyr.CreateField(ogr.FieldDefn('mindepth', ogr.OFTReal))
+    area_lyr.CreateField(ogr.FieldDefn('maxdepth', ogr.OFTReal))
 
     node_id = args.first_id
     ways = soundings = areas = 0
@@ -162,7 +164,7 @@ def main():
                         node_id, ''.join('<nd ref="-%d"/>' % r for r in refs), tags))
             for name in ('DEPARE', 'DRGARE'):
                 for feat in ds.GetLayerByName(name) or []:
-                    depth, g = feat.GetField('DRVAL1'), feat.GetGeometryRef()
+                    depth, deepest, g = feat.GetField('DRVAL1'), feat.GetField('DRVAL2'), feat.GetGeometryRef()
                     if depth is None or g is None or ogr.GT_Flatten(g.GetGeometryType()) not in (ogr.wkbPolygon, ogr.wkbMultiPolygon):
                         continue
                     g = polygons(g.Intersection(own))
@@ -170,6 +172,8 @@ def main():
                         continue
                     a = ogr.Feature(area_lyr.GetLayerDefn())
                     a.SetField('mindepth', depth)
+                    if deepest is not None:
+                        a.SetField('maxdepth', deepest)
                     a.SetGeometry(g)
                     area_lyr.CreateFeature(a)
                     areas += 1

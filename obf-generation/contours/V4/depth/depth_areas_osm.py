@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """Depth areas (fill) as OSM multipolygons from charted depth area polygons, cut out of OSM land.
 
-    depth_areas_osm.py SOURCE OUTPUT.osm.gz --layer LAYER --field MIN_DEPTH_FIELD --land LAND
-                       [--nested] [--bbox W S E N] [--cell 0.25] [--simplify 0.00002] [--first-id N]
+    depth_areas_osm.py SOURCE OUTPUT.osm.gz --layer LAYER --field MIN_DEPTH_FIELD [--field-max MAX_DEPTH_FIELD]
+                       --land LAND [--nested] [--bbox W S E N] [--cell 0.25] [--simplify 0.00002] [--first-id N]
 
 Every polygon is classed by its shallowest depth like the style colours it: areatype=-1 dries (below 0 m), 0 for
-0-2 m, 2 for 2-5 m, 5 for 5-10 m; deeper ones are left out, the sea colour shows there. Polygons of one class are
+0-2 m, 2 for 2-5 m, 5 for 5-10 m; deeper ones are left out, the sea colour shows there.
+
+With --field-max the band of the area (its shallowest and deepest depth) picks the class it covers most, so that a
+chart drawn in feet does not paint a whole zone with the colour of its shallow edge: the US 30-60 ft zone
+(9.1-18.2 m) is deeper than 10 m for most of its range and is left out instead of being coloured 5-10 m. Polygons of one class are
 merged per CELL degree square (fewer vertices than the charted bands, which the classes join), OSM land is cut out
 (a dry band must not lie on the beach) and the result is written as closed ways or multipolygon relations tagged
 contourarea=depth, areatype=...
@@ -24,16 +28,22 @@ ogr.UseExceptions()
 gdal.PushErrorHandler('CPLQuietErrorHandler')
 
 
-def areatype(depth):
-    if depth < 0:
-        return '-1'
-    if depth < 2:
-        return '0'
-    if depth < 5:
-        return '2'
-    if depth < 10:
-        return '5'
-    return None
+CLASSES = (('-1', -1e9, 0.0), ('0', 0.0, 2.0), ('2', 2.0, 5.0), ('5', 5.0, 10.0), (None, 10.0, 1e9))
+
+
+def areatype(depth, deepest=None):
+    """The class of an area: by its shallowest depth, or, with the deepest one, the class its band covers most"""
+    if deepest is None or deepest <= depth:
+        for at, lo, hi in CLASSES:
+            if depth < hi:
+                return at
+        return None
+    best, best_over = None, 0.0
+    for at, lo, hi in CLASSES:
+        over = min(deepest, hi) - max(depth, lo)
+        if over > best_over:
+            best, best_over = at, over
+    return best
 
 
 def box(w, s, e, n):
@@ -69,6 +79,7 @@ def main():
     parser.add_argument('output')
     parser.add_argument('--layer', required=True)
     parser.add_argument('--field', required=True, help='shallowest depth of the area, metres, negative dries')
+    parser.add_argument('--field-max', help='deepest depth of the area, metres: the class is the one its band covers most')
     parser.add_argument('--land', required=True)
     parser.add_argument('--bbox', nargs=4, type=float, metavar=('W', 'S', 'E', 'N'))
     parser.add_argument('--cell', type=float, default=0.25)
@@ -108,8 +119,10 @@ def main():
                 classes = {}
                 for f in layer:
                     depth, g = f.GetField(args.field), f.GetGeometryRef()
+                    deepest = f.GetField(args.field_max) if args.field_max else None
                     # a layer made from an empty query may have its depth as text
-                    at = areatype(float(depth)) if depth not in (None, '') else None
+                    at = areatype(float(depth), float(deepest) if deepest not in (None, '') else None) \
+                        if depth not in (None, '') else None
                     if at is None or g is None:
                         continue
                     classes.setdefault(at, []).append(g.Clone())

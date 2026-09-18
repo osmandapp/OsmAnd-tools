@@ -363,12 +363,12 @@ if [ -n "$ENC" ]; then
 	step "ENC cells of $ENC"
 	# with -c the ENC .osm.gz are only map sections: kept in TMP, removed with it
 	ENC_OUT="$OUT"; [ -z "$MAP_CREATOR" ] || ENC_OUT="$TMP"
-	python3 "$HERE/depth_enc_osm.py" "$ENC" --bbox "$W" "$S" "$E" "$N" --contours "$ENC_OUT/${NAME}_enc.osm.gz" \
+	python3 "$HERE/depth_enc_osm.py" "$ENC" --bbox "$W" "$S" "$E" "$N" --bands "${ENC_BANDS:-4,5,6}" --contours "$ENC_OUT/${NAME}_enc.osm.gz" \
 		--minor "$ENC_OUT/${NAME}_enc_minor.osm.gz" --areas "$TMP/enc_areas.gpkg" --soundings "$TMP/enc_soundings.gpkg" --coverage "$TMP/enc_coverage.gpkg" 2>&1 | grep -v numpy
 	EXCLUDE="$TMP/enc_coverage.gpkg"; EXCLUDE_LAYER=coverage
 	ENC_OSM+=("$ENC_OUT/${NAME}_enc.osm.gz:" "$ENC_OUT/${NAME}_enc_minor.osm.gz:15-")
 	python3 "$HERE/depth_areas_osm.py" "$TMP/enc_areas.gpkg" "$ENC_OUT/${NAME}_enc_areas.osm.gz" --layer areas \
-		--field mindepth --land "$LAND" --bbox "$W" "$S" "$E" "$N" 2>&1 | grep -v numpy
+		--field mindepth --field-max maxdepth --land "$LAND" --bbox "$W" "$S" "$E" "$N" 2>&1 | grep -v numpy
 	# multipolygons: generate-map, not generate-single-map
 	ENC_AREAS="$ENC_OUT/${NAME}_enc_areas.osm.gz"
 	spacings=""; for tier in $ENC_TIERS; do spacings+="${tier%%:*} "; done
