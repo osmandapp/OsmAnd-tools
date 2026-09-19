@@ -269,6 +269,8 @@ public class ObfChecker {
 				"--avoid-brp-java",
 				"--avoid-brp-cpp",
 				"--avoid-hh-cpp",
+				"--avoid-brp-shared", // one planner is enough to check a map
+				"--avoid-hh-shared",
 
 				"--use-hh-points", // load random points from HH-sections only
 				"--max-shift=1000", // random shift to activate A* calculations (m)
