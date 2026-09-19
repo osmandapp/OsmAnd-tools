@@ -115,8 +115,10 @@ public class RandomRouteTester {
 	private enum PrimaryRouting {
 		BRP_JAVA,
 		BRP_CPP,
+		BRP_SHARED,
 		HH_JAVA,
 		HH_CPP,
+		HH_SHARED,
 	}
 
 	public enum RandomPointsSource {
@@ -127,6 +129,8 @@ public class RandomRouteTester {
 	private final long started;
 	private NativeLibrary nativeLibrary = null;
 	private final List<BinaryMapIndexReader> obfReaders = new ArrayList<>();
+	private final List<File> obfFiles = new ArrayList<>();
+	private List<net.osmand.shared.binary.BinaryMapIndexReader> sharedReaders = null;
 
 	private final RandomRouteGenerator generator;
 	private final GeneratorConfig config = new GeneratorConfig();
@@ -201,6 +205,10 @@ public class RandomRouteTester {
 				optPrimaryRouting = PrimaryRouting.BRP_JAVA;
 			} else if ("brp-cpp".equals(opts.getOpt("--primary"))) {
 				optPrimaryRouting = PrimaryRouting.BRP_CPP;
+			} else if ("brp-shared".equals(opts.getOpt("--primary"))) {
+				optPrimaryRouting = PrimaryRouting.BRP_SHARED;
+			} else if ("hh-shared".equals(opts.getOpt("--primary"))) {
+				optPrimaryRouting = PrimaryRouting.HH_SHARED;
 			} else if ("hh-java".equals(opts.getOpt("--primary"))) {
 				optPrimaryRouting = PrimaryRouting.HH_JAVA;
 			} else if ("hh-cpp".equals(opts.getOpt("--primary"))) {
@@ -242,11 +250,13 @@ public class RandomRouteTester {
 					"--profile=public_transport,settings,key:value run PT test",
 					"--stop-at-first-route stop iterations and return 1st calculated route",
 					"",
-					"--primary=(brp-java|brp-cpp|hh-java|hh-cpp) compare others against this",
+					"--primary=(brp-java|brp-cpp|brp-shared|hh-java|hh-cpp|hh-shared) compare others against this",
 					"--avoid-brp-java avoid BinaryRoutePlanner (java)",
 					"--avoid-brp-cpp avoid BinaryRoutePlanner (cpp)",
+					"--avoid-brp-shared avoid BinaryRoutePlanner (OsmAnd-shared)",
 					"--avoid-hh-java avoid HHRoutePlanner (java)",
 					"--avoid-hh-cpp avoid HHRoutePlanner (cpp)",
+					"--avoid-hh-shared avoid HHRoutePlanner (OsmAnd-shared)",
 					"",
 					"--use-hh-points use random HH-points instead of highway-points",
 					"--car-2phase use COMPLEX mode for car (Android default)",
@@ -306,8 +316,6 @@ public class RandomRouteTester {
 	}
 
 	private void initObfReaders() throws IOException {
-		List<File> obfFiles = new ArrayList<>();
-
 		File obfDirectory = new File(optMapsDir);
 
 		if (obfDirectory.isDirectory()) {
@@ -368,6 +376,8 @@ public class RandomRouteTester {
 			if (entry.isPublicTransport()) {
 				opts.setOpt("--avoid-hh-java", "true");
 				opts.setOpt("--avoid-hh-cpp", "true");
+				opts.setOpt("--avoid-brp-shared", "true"); // public transport is not in the shared copy
+				opts.setOpt("--avoid-hh-shared", "true");
 			}
 
 			try {
@@ -393,6 +403,14 @@ public class RandomRouteTester {
 							} else {
 								entry.routeResults.add(runBinaryRoutePlannerCpp(entry));
 							}
+							break;
+						case BRP_SHARED:
+							opts.setOpt("--avoid-brp-shared", "true");
+							entry.routeResults.add(runBinaryRoutePlannerShared(entry));
+							break;
+						case HH_SHARED:
+							opts.setOpt("--avoid-hh-shared", "true");
+							entry.routeResults.add(runHHRoutePlannerShared(entry));
 							break;
 						case HH_JAVA:
 							opts.setOpt("--avoid-hh-java", "true");
@@ -422,11 +440,17 @@ public class RandomRouteTester {
 						entry.routeResults.add(runBinaryRoutePlannerCpp(entry));
 					}
 				}
+				if (!opts.getBoolean("--avoid-brp-shared")) {
+					entry.routeResults.add(runBinaryRoutePlannerShared(entry));
+				}
 				if (!opts.getBoolean("--avoid-hh-java")) {
 					entry.routeResults.add(runHHRoutePlannerJava(entry));
 				}
 				if (!opts.getBoolean("--avoid-hh-cpp")) {
 					entry.routeResults.add(runHHRoutePlannerCpp(entry));
+				}
+				if (!opts.getBoolean("--avoid-hh-shared")) {
+					entry.routeResults.add(runHHRoutePlannerShared(entry));
 				}
 			} catch (IOException | InterruptedException | SQLException e) {
 				throw new RuntimeException(e);
@@ -586,6 +610,136 @@ public class RandomRouteTester {
 
 		long runTime = System.currentTimeMillis() - started;
 		return new RandomRouteResult(useNative ? "brp-cpp" : "brp-java", entry, runTime, ctx, routeSegments);
+	}
+
+	private RandomRouteResult runBinaryRoutePlannerShared(RandomRouteEntry entry) throws IOException {
+		return runSharedRoutePlanner(entry, false);
+	}
+
+	private RandomRouteResult runHHRoutePlannerShared(RandomRouteEntry entry) throws IOException {
+		return runSharedRoutePlanner(entry, true);
+	}
+
+	/** The readers of the shared copy over the same obf files; it opens its own and keeps them. */
+	private List<net.osmand.shared.binary.BinaryMapIndexReader> sharedReaders() throws IOException {
+		if (sharedReaders == null) {
+			sharedReaders = new ArrayList<>();
+			for (File source : obfFiles) {
+				sharedReaders.add(new net.osmand.shared.binary.BinaryMapIndexReader(source.getAbsolutePath()));
+			}
+		}
+		return sharedReaders;
+	}
+
+	/**
+	 * The route of the OsmAnd-shared copy of the planner - the one iOS runs - over its own readers
+	 * of the same maps, by the A* search or over the hub graph as the java and C++ runs above.
+	 */
+	private RandomRouteResult runSharedRoutePlanner(RandomRouteEntry entry, boolean hh) throws IOException {
+		long started = System.currentTimeMillis();
+
+		net.osmand.shared.routing.HHRoutePlanner.DEBUG_VERBOSE_LEVEL = hh ? 1 : 0;
+		net.osmand.shared.routing.HHRoutingConfig.STATS_VERBOSE_LEVEL = hh ? 1 : 0;
+
+		net.osmand.shared.routing.RoutePlannerFrontEnd fe = new net.osmand.shared.routing.RoutePlannerFrontEnd();
+		net.osmand.shared.routing.RoutePlannerFrontEnd.CALCULATE_MISSING_MAPS = false;
+		if (hh) {
+			fe.setDefaultHHRoutingConfig();
+			fe.setUseOnlyHHRouting(true);
+		} else {
+			fe.setHHRoutingConfig(null);
+		}
+
+		net.osmand.shared.routing.RoutingConfiguration.Builder builder =
+				net.osmand.shared.routing.RoutingConfiguration.getDefault();
+
+		net.osmand.shared.routing.RoutingConfiguration.RoutingMemoryLimits memoryLimits =
+				new net.osmand.shared.routing.RoutingConfiguration.RoutingMemoryLimits(MEM_LIMIT, MEM_LIMIT);
+
+		net.osmand.shared.routing.RoutingConfiguration config =
+				buildSharedRoutingConfiguration(builder, entry, memoryLimits);
+
+		net.osmand.shared.routing.RouteCalculationMode mode =
+				(!hh && this.config.CAR_2PHASE_MODE && "car".equals(entry.profile)) ?
+						net.osmand.shared.routing.RouteCalculationMode.COMPLEX :
+						net.osmand.shared.routing.RouteCalculationMode.NORMAL;
+
+		if (this.config.USE_TIME_CONDITIONAL_ROUTING == 1) {
+			config.routeCalculationTime = System.currentTimeMillis();
+		} else if (this.config.USE_TIME_CONDITIONAL_ROUTING != 0) {
+			config.routeCalculationTime = this.config.USE_TIME_CONDITIONAL_ROUTING;
+		}
+
+		// noinspection ConstantConditions
+		if (GeneratorConfig.ambiguousConditionalTags != null) {
+			config.ambiguousConditionalTags = new LinkedHashMap<>(GeneratorConfig.ambiguousConditionalTags);
+		}
+
+		net.osmand.shared.routing.RoutingContext ctx = fe.buildRoutingContext(config, sharedReaders(), mode);
+		applySharedImpassableRoads(ctx, entry);
+
+		net.osmand.shared.routing.RouteCalcResult res = fe.searchRoute(ctx,
+				sharedLatLon(entry.start), sharedLatLon(entry.finish), sharedLatLons(entry.via));
+		List<net.osmand.shared.routing.RouteSegmentResult> routeSegments =
+				res != null ? res.getList() : new ArrayList<>();
+
+		long runTime = System.currentTimeMillis() - started;
+		return new RandomRouteResult(hh ? "hh-shared" : "brp-shared", entry, runTime, ctx, routeSegments);
+	}
+
+	private net.osmand.shared.data.KLatLon sharedLatLon(net.osmand.data.LatLon l) {
+		return l == null ? null : new net.osmand.shared.data.KLatLon(l.getLatitude(), l.getLongitude());
+	}
+
+	private List<net.osmand.shared.data.KLatLon> sharedLatLons(List<net.osmand.data.LatLon> list) {
+		if (list == null) {
+			return null;
+		}
+		List<net.osmand.shared.data.KLatLon> res = new ArrayList<>();
+		for (net.osmand.data.LatLon l : list) {
+			res.add(sharedLatLon(l));
+		}
+		return res;
+	}
+
+	private void applySharedImpassableRoads(net.osmand.shared.routing.RoutingContext ctx, RandomRouteEntry entry) {
+		if (entry.avoidRoads.isEmpty()
+				|| !(ctx.getRouter() instanceof net.osmand.shared.routing.GeneralRouter router)) {
+			return;
+		}
+		router.setImpassableRoads(new HashSet<>(entry.avoidRoads));
+	}
+
+	private net.osmand.shared.routing.RoutingConfiguration buildSharedRoutingConfiguration(
+			net.osmand.shared.routing.RoutingConfiguration.Builder builder, RandomRouteEntry entry,
+			net.osmand.shared.routing.RoutingConfiguration.RoutingMemoryLimits memoryLimits) {
+		net.osmand.shared.routing.GeneralRouter router = builder.getRouter(entry.profile);
+		Map<String, String> routeParameters = getSharedDefaultParameters(router);
+		for (Map.Entry<String, String> e : entry.mapParams().entrySet()) {
+			if ("false".equalsIgnoreCase(e.getValue())) {
+				routeParameters.remove(e.getKey());
+			} else {
+				routeParameters.put(e.getKey(), e.getValue());
+			}
+		}
+		return builder.build(entry.profile, memoryLimits, new LinkedHashMap<>(routeParameters));
+	}
+
+	private Map<String, String> getSharedDefaultParameters(net.osmand.shared.routing.GeneralRouter router) {
+		Map<String, String> params = new LinkedHashMap<>();
+		for (Map.Entry<String, net.osmand.shared.routing.GeneralRouter.RoutingParameter> entry
+				: router.getParameters().entrySet()) {
+			String key = entry.getKey();
+			net.osmand.shared.routing.GeneralRouter.RoutingParameter rp = entry.getValue();
+			if (rp.getType() == net.osmand.shared.routing.GeneralRouter.RoutingParameterType.BOOLEAN) {
+				if (rp.getDefaultBoolean()) {
+					params.put(key, "true");
+				}
+			} else if (rp.getDefaultNumeric() > 0) {
+				params.put(key, rp.getDefaultString());
+			}
+		}
+		return params;
 	}
 
 	private RandomRouteResult runHHRoutePlannerJava(RandomRouteEntry entry) throws SQLException, IOException, InterruptedException {
