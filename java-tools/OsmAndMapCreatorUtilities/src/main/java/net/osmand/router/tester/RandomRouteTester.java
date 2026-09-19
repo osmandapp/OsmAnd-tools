@@ -19,6 +19,7 @@ import java.util.Set;
 import net.osmand.MainUtilities.CommandLineOpts;
 import net.osmand.PlatformUtil;
 import net.osmand.NativeLibrary;
+import net.osmand.router.FastRoutingState;
 import net.osmand.router.GeneralRouter;
 import net.osmand.router.HHRouteDataStructure;
 import net.osmand.router.HHRoutePlanner;
@@ -369,6 +370,12 @@ public class RandomRouteTester {
 		config.OPTIONAL_SLOW_DOWN_THREADS = 0;
 	}
 
+	private void addResult(RandomRouteEntry entry, RandomRouteResult result) {
+		if (result != null) {
+			entry.routeResults.add(result);
+		}
+	}
+
 	private void collectRoutes() {
 		for (int i = 0; i < testList.size(); i++) {
 			RandomRouteEntry entry = testList.get(i);
@@ -410,15 +417,15 @@ public class RandomRouteTester {
 							break;
 						case HH_SHARED:
 							opts.setOpt("--avoid-hh-shared", "true");
-							entry.routeResults.add(runHHRoutePlannerShared(entry));
+							addResult(entry, runHHRoutePlannerShared(entry));
 							break;
 						case HH_JAVA:
 							opts.setOpt("--avoid-hh-java", "true");
-							entry.routeResults.add(runHHRoutePlannerJava(entry));
+							addResult(entry, runHHRoutePlannerJava(entry));
 							break;
 						case HH_CPP:
 							opts.setOpt("--avoid-hh-cpp", "true");
-							entry.routeResults.add(runHHRoutePlannerCpp(entry));
+							addResult(entry, runHHRoutePlannerCpp(entry));
 							break;
 						default:
 							throw new RuntimeException("Wrong primary routing defined");
@@ -444,13 +451,13 @@ public class RandomRouteTester {
 					entry.routeResults.add(runBinaryRoutePlannerShared(entry));
 				}
 				if (!opts.getBoolean("--avoid-hh-java")) {
-					entry.routeResults.add(runHHRoutePlannerJava(entry));
+					addResult(entry, runHHRoutePlannerJava(entry));
 				}
 				if (!opts.getBoolean("--avoid-hh-cpp")) {
-					entry.routeResults.add(runHHRoutePlannerCpp(entry));
+					addResult(entry, runHHRoutePlannerCpp(entry));
 				}
 				if (!opts.getBoolean("--avoid-hh-shared")) {
-					entry.routeResults.add(runHHRoutePlannerShared(entry));
+					addResult(entry, runHHRoutePlannerShared(entry));
 				}
 			} catch (IOException | InterruptedException | SQLException e) {
 				throw new RuntimeException(e);
@@ -683,8 +690,14 @@ public class RandomRouteTester {
 		List<net.osmand.shared.routing.RouteSegmentResult> routeSegments =
 				res != null ? res.getList() : new ArrayList<>();
 
+		String type = hh ? "hh-shared" : "brp-shared";
+		if (hh && ctx.calculationProgress != null
+				&& noHHRoutingData(ctx.calculationProgress.getFastRoutingStatus().name(), type, entry)) {
+			return null;
+		}
+
 		long runTime = System.currentTimeMillis() - started;
-		return new RandomRouteResult(hh ? "hh-shared" : "brp-shared", entry, runTime, ctx, routeSegments);
+		return new RandomRouteResult(type, entry, runTime, ctx, routeSegments);
 	}
 
 	private net.osmand.shared.data.KLatLon sharedLatLon(net.osmand.data.LatLon l) {
@@ -795,8 +808,25 @@ public class RandomRouteTester {
 		RouteResultPreparation.RouteCalcResult res = fe.searchRoute(ctx, entry.start, entry.finish, entry.via, null);
 		List<RouteSegmentResult> routeSegments = res != null ? res.getList() : new ArrayList<>();
 
+		String type = useNative ? "hh-cpp" : "hh-java";
+		if (noHHRoutingData(ctx.calculationProgress.getFastRoutingStatus().name(), type, entry)) {
+			return null;
+		}
+
 		long runTime = System.currentTimeMillis() - started;
-		return new RandomRouteResult(useNative ? "hh-cpp" : "hh-java", entry, runTime, ctx, routeSegments);
+		return new RandomRouteResult(type, entry, runTime, ctx, routeSegments);
+	}
+
+	/**
+	 * Whether the maps have no hub graph for this profile - a pedestrian one, or maps older than the
+	 * HH sections. There is no route to compare then, and the run is left out of the results.
+	 */
+	private boolean noHHRoutingData(String status, String type, RandomRouteEntry entry) {
+		if (!FastRoutingState.Status.FAILED_NO_HH_ROUTING_DATA.name().equals(status)) {
+			return false;
+		}
+		System.err.printf("%s: no HH routing data for %s, skipped\n", type, entry.profile);
+		return true;
 	}
 
 	private void loadNativeLibrary() {
