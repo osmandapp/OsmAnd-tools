@@ -1,8 +1,8 @@
 package net.osmand.obf.preparation;
 
 import static net.osmand.router.TransportFerryHelper.CROSSINGS_TAG;
-import static net.osmand.router.TransportFerryHelper.JUNCTION_STOPS_TAG;
-import static net.osmand.router.TransportFerryHelper.SYNTHETIC_STOPS_TAG;
+import static net.osmand.router.TransportFerryHelper.FERRY_STOPS_TAG;
+import static net.osmand.router.TransportFerryHelper.JUNCTION_VALUE;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -161,10 +161,7 @@ public class TransportFerryIndexHelper {
 		for (int i = 0; i < stops.size(); i++) {
 			long id = stops.get(i).getId();
 			if (syntheticStops.containsKey(id)) {
-				TransportFerryHelper.addStopTag(tags, SYNTHETIC_STOPS_TAG, i, null);
-			}
-			if (junctionStops.contains(id)) {
-				TransportFerryHelper.addStopTag(tags, JUNCTION_STOPS_TAG, i, null);
+				TransportFerryHelper.addStopTag(tags, FERRY_STOPS_TAG, i, junctionStops.contains(id) ? JUNCTION_VALUE : null);
 			}
 			if (routeCrossings != null && routeCrossings.containsKey(id)) {
 				TransportFerryHelper.addStopTag(tags, CROSSINGS_TAG, i, routeCrossings.get(id));
