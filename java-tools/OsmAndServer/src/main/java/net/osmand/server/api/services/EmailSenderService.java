@@ -11,6 +11,7 @@ import java.util.regex.Pattern;
 import net.osmand.mailsender.EmailSenderTemplate;
 import net.osmand.server.PurchasesDataLoader;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
+import net.osmand.server.api.repo.CloudUsersRepository;
 import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.utils.FileSizeFormatter;
@@ -147,8 +148,13 @@ public class EmailSenderService {
 		sendOsmAndCloudAccountEmail(email, token, lang, action, null);
 	}
 
-	public void sendShareFileAccessEmail(String email, String lang, boolean approved, String ownerNickname,
-			String fileName, String fileType, long fileSize, UUID fileUuid) {
+	public void sendShareFileAccessEmail(String email, String lang, boolean approved,
+			CloudUsersRepository.CloudUser owner, String fileName, String fileType, long fileSize, UUID fileUuid) {
+		String ownerName = owner.nickname;
+		if (Algorithms.isEmpty(ownerName)) {
+			int at = Algorithms.isEmpty(owner.email) ? -1 : owner.email.indexOf('@');
+			ownerName = at > 0 ? owner.email.substring(0, at) : null;
+		}
 		String name = fileName == null ? "" : fileName;
 		int dotIdx = name.lastIndexOf('.');
 		String ext = dotIdx > 0 && dotIdx < name.length() - 1
@@ -161,8 +167,7 @@ public class EmailSenderService {
 		String template = approved ? "cloud/share/approved" : "cloud/share/declined";
 		boolean ok = new EmailSenderTemplate()
 				.load(template, lang)
-				.set("OWNER_NAME", Algorithms.isEmpty(ownerNickname)
-						? "@OWNER_DEFAULT@" : htmlText(ownerNickname))
+				.set("OWNER_NAME", Algorithms.isEmpty(ownerName) ? "@OWNER_DEFAULT@" : htmlText(ownerName))
 				.set("FILE_NAME", htmlText(name))
 				.set("FILE_NAME_PLAIN", plainText(name))
 				.set("FILE_EXT", htmlText(ext))
