@@ -51,7 +51,7 @@ to destroy job hanging illusion.
 
 # 1. How to use TopPlaces job
 
-- Frontend URL: https://maptile.osmand.net:4000/
+- Frontend URL: https://test.osmand.net/admin/top-photos
 - Jenkins job URL: https://data.osmand.net:8080/view/Wiki/job/Wiki_TopPlacePhotos/
 - Set required environment variables (e.g., `MODEL`, `MAX_PLACES_PER_QUAD`, `PARALLEL`, `PHOTOS_PER_PLACE`, `MIN_ELO`, `SAVE_SCORE_ENV`) are described above.
 - Either `QUAD` or `SELECTED_PLACE_IDS` must be provided.
