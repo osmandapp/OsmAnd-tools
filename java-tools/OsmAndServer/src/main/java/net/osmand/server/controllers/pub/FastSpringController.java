@@ -148,20 +148,7 @@ public class FastSpringController {
 
 			userSubService.verifyAndRefreshProOrderId(user);
 
-			// Send only once the order rows are committed: if the transaction rolls back (e.g. another event in the
-			// same batch throws), FastSpring retries the event and a receipt sent earlier would go out twice.
-			Runnable receipt = () -> sendPurchaseReceipt(email, event, purchases, subscriptions);
-			if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
-				org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
-						new org.springframework.transaction.support.TransactionSynchronization() {
-							@Override
-							public void afterCommit() {
-								receipt.run();
-							}
-						});
-			} else {
-				receipt.run();
-			}
+			emailSender.sendAfterCommit(() -> sendPurchaseReceipt(email, event, purchases, subscriptions));
 
 			if (sendOsmAndAndSpecialGiftEmail) {
 				LOGGER.info("FastSpring: Sending special gift email to " + EmailSenderService.shorten(email) + " for orderId: " + data.order + ", purchaseToken: " + data.reference);

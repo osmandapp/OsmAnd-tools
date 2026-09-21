@@ -1586,23 +1586,6 @@ public class UserdataService {
         return ok();
     }
 
-    // language of the user's most recently used device (the app sends it on device-register, the web on login);
-    // null when no device reported one, then the template falls back to English
-    public String userLang(int userid) {
-        String lang = null;
-        Date latest = null;
-        for (CloudUserDevicesRepository.CloudUserDevice device : devicesRepository.findByUserid(userid)) {
-            if (Algorithms.isEmpty(device.lang)) {
-                continue;
-            }
-            if (lang == null || (device.udpatetime != null && (latest == null || device.udpatetime.after(latest)))) {
-                lang = device.lang;
-                latest = device.udpatetime;
-            }
-        }
-        return lang;
-    }
-
     public void updateDeviceLangInfo(CloudUserDevicesRepository.CloudUserDevice dev, String lang, String brand, String model) {
         if (dev != null) {
             dev.lang = (lang == null) ? dev.lang : lang;

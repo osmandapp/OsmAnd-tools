@@ -281,7 +281,7 @@ public class ShareFileService {
 			}
 			CloudUsersRepository.CloudUser owner = usersRepository.findById(file.ownerid);
 			CloudUserFilesRepository.UserFile userFile = getUserFile(file);
-			emailSender.sendShareFileAccessEmail(requester.email, userdataService.userLang(requester.id), approved,
+			emailSender.sendShareFileAccessEmail(requester.email, emailSender.userLang(requester.id), approved,
 					owner == null ? null : owner.nickname, file.name, file.type,
 					userFile == null ? 0 : userFile.filesize, file.uuid);
 		} catch (Exception e) {

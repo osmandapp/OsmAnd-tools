@@ -10,6 +10,7 @@ import java.util.regex.Pattern;
 
 import net.osmand.mailsender.EmailSenderTemplate;
 import net.osmand.server.PurchasesDataLoader;
+import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.utils.FileSizeFormatter;
@@ -18,6 +19,8 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class EmailSenderService {
@@ -26,6 +29,39 @@ public class EmailSenderService {
 
 	@Autowired
 	protected PurchasesDataLoader purchasesDataLoader;
+
+	@Autowired
+	protected CloudUserDevicesRepository devicesRepository;
+
+	public void sendAfterCommit(Runnable send) {
+		if (TransactionSynchronizationManager.isSynchronizationActive()) {
+			TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+				@Override
+				public void afterCommit() {
+					send.run();
+				}
+			});
+		} else {
+			send.run();
+		}
+	}
+
+	// language of the user's most recently used device (the app sends it on device-register, the web on login);
+	// null when no device reported one, then the template falls back to English
+	public String userLang(int userid) {
+		String lang = null;
+		Date latest = null;
+		for (CloudUserDevicesRepository.CloudUserDevice device : devicesRepository.findByUserid(userid)) {
+			if (device.lang == null || device.lang.isEmpty()) {
+				continue;
+			}
+			if (lang == null || (device.udpatetime != null && (latest == null || device.udpatetime.after(latest)))) {
+				lang = device.lang;
+				latest = device.udpatetime;
+			}
+		}
+		return lang;
+	}
 
 	public static void test(String[] args) {
 		EmailSenderService sender = new EmailSenderService();
@@ -90,7 +126,6 @@ public class EmailSenderService {
 			this.template = template;
 		}
 
-		// action names the clients send to /send-code; null for an unknown action
 		public static CloudAccountAction fromCodeRequest(String action, boolean toNewEmail) {
 			if (action == null) {
 				return null;
@@ -139,21 +174,16 @@ public class EmailSenderService {
 		LOGGER.info("sendShareFileAccessEmail approved=" + approved + " to: " + shorten(email) + " (" + ok + ")");
 	}
 
-	// User-supplied text placed into an HTML template: escape markup, and '@' as &#64;, so the value can neither
-	// inject HTML into an OsmAnd-branded email nor be expanded (or rejected) by the template's @VAR@ substitution.
 	static String htmlText(String s) {
 		return s == null ? "" : org.springframework.web.util.HtmlUtils.htmlEscape(s).replace("@", "&#64;");
 	}
 
-	// The same for a plain-text header such as Subject, where entities would show literally: no line breaks,
-	// and only an '@' that starts an @VAR@ token is replaced with the full-width look-alike (a@b.gpx stays as is).
 	static String plainText(String s) {
 		return s == null ? "" : TEMPLATE_TOKEN_START.matcher(s.replaceAll("[\\r\\n]+", " ")).replaceAll("＠");
 	}
 
 	private static final Pattern TEMPLATE_TOKEN_START = Pattern.compile("@(?=[A-Z0-9_]+@)");
 
-	// cloud/purchase/receipt. The Renews/Expires row is hidden for a lifetime purchase (no renewal date).
 	public void sendPurchaseReceiptEmail(String email, String lang, String orderId, Date orderDate, String orderTotal,
 			List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> purchases,
 			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions) {
@@ -211,6 +241,31 @@ public class EmailSenderService {
 		}
 		boolean ok = sender.to(email).send().isSuccess();
 		LOGGER.info("sendPurchaseReceiptEmail order " + orderId + " to: " + shorten(email) + " (" + ok + ") [" + lang + "]");
+	}
+
+	public void sendPurchaseLinkedEmail(String email, String lang,
+			List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> purchases,
+			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions) {
+		String productName;
+		if (subscriptions != null && !subscriptions.isEmpty()) {
+			DeviceSubscriptionsRepository.SupporterDeviceSubscription sub = subscriptions.get(0);
+			PurchasesDataLoader.Subscription skuData = purchasesDataLoader.getSubscriptions().get(sub.sku);
+			productName = skuData != null ? skuData.name() : sub.sku;
+		} else if (purchases != null && !purchases.isEmpty()) {
+			DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase iap = purchases.get(0);
+			PurchasesDataLoader.InApp skuData = purchasesDataLoader.getInApps().get(iap.sku);
+			productName = skuData != null ? skuData.name() : iap.sku;
+		} else {
+			return;
+		}
+		boolean ok = new EmailSenderTemplate()
+				.load("cloud/purchase/linked", lang)
+				.set("EMAIL", htmlText(email))
+				.set("PRODUCT_NAME", htmlText(productName))
+				.to(email)
+				.send()
+				.isSuccess();
+		LOGGER.info("sendPurchaseLinkedEmail to: " + shorten(email) + " (" + ok + ") [" + lang + "]");
 	}
 
 	private static String formatReceiptDate(Date date, String lang) {
