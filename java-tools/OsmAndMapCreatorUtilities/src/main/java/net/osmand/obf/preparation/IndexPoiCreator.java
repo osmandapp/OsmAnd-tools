@@ -1216,6 +1216,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 		if (name != null) {
 			namesIndex.addUngluedToNameIndex(name, obj, settings.charsToBuildPoiNameIndex);
+			namesIndex.addAbbreviatedToNameIndex(name, obj, settings.charsToBuildPoiNameIndex);
 		}
 		if (names != null) {
 			for (String nk : names) {

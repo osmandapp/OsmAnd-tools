@@ -20,6 +20,7 @@ import java.util.TreeSet;
 
 import gnu.trove.list.array.TIntArrayList;
 import net.osmand.CollatorStringMatcher;
+import net.osmand.binary.Abbreviations;
 import net.osmand.binary.CommonWords;
 import net.osmand.binary.CommonWordsMultiIndex;
 import net.osmand.binary.NameIndexReader;
@@ -503,14 +504,33 @@ public class NameIndexCreator<T> {
 	}
 
 	
+	/**
+	 * The map spells a word out ("Place"), the query abbreviates it ("Pl"): index the abbreviated spelling too, the
+	 * same way a glued name is also indexed unglued. Written into the map, an abbreviation works in the app that is
+	 * already installed - the runtime table {@link Abbreviations#getSearchabbreviations()} only knows what the app
+	 * shipped with.
+	 */
+	public void addAbbreviatedToNameIndex(String name, T obj, int maxPrefixLength) {
+		String abbreviated = abbreviateName(name);
+		if (abbreviated == null) {
+			return;
+		}
+		addExtraSpellingToNameIndex(name, abbreviated, obj, maxPrefixLength);
+	}
+
 	public void addUngluedToNameIndex(String name, T obj, int maxPrefixLength) {
 		String unglued = unglueName(name);
 		if (unglued == null) {
 			return;
 		}
+		addExtraSpellingToNameIndex(name, unglued, obj, maxPrefixLength);
+	}
+
+	/** index the words of another spelling of the same name, without touching the words the name already has */
+	private void addExtraSpellingToNameIndex(String name, String spelling, T obj, int maxPrefixLength) {
 		List<String> nameWords = SearchAlgorithms.splitAndNormalize(name, false);
-		List<String> ungluedWords = SearchAlgorithms.splitAndNormalize(unglued, false);
-		for (String word : new TreeSet<>(ungluedWords)) {
+		List<String> spellingWords = SearchAlgorithms.splitAndNormalize(spelling, false);
+		for (String word : new TreeSet<>(spellingWords)) {
 			String prefix = nameIndexPreparePrefix(word, maxPrefixLength);
 			if (nameWords.contains(word) || Algorithms.isEmpty(prefix)) {
 				continue;
@@ -521,7 +541,7 @@ public class NameIndexCreator<T> {
 				entry.prefix = prefix;
 				namesIndex.put(prefix, entry);
 			}
-			entry.addToken(obj, word, ungluedWords);
+			entry.addToken(obj, word, spellingWords);
 		}
 	}
 
@@ -638,6 +658,35 @@ public class NameIndexCreator<T> {
 
 
 	private static final int MIN_WORD_LENGTH = 2;
+	/**
+	 * Abbreviations a query uses for a word the map spells out, which the app cannot expand on its own: they are
+	 * absent from {@link Abbreviations#getSearchabbreviations()}, so nothing but the map can make them searchable -
+	 * and a map carries them to the app that is already installed. Only such abbreviations belong here: writing the
+	 * ones the app does expand ("av", "st") would add a word to nearly every street for nothing.
+	 */
+	private static final Map<String, String> EXTRA_ABBREVIATIONS = Map.of(
+			"place", "pl",
+			"parkway", "pkwy",
+			"mount", "mt");
+
+	/** "Trinity Place" -> "Trinity Pl", null when no word of the name has such an abbreviation */
+	static String abbreviateName(String name) {
+		List<String> words = new ArrayList<>();
+		boolean abbreviated = false;
+		for (String word : SearchAlgorithms.canonicalizePunctuation(name).split(" ")) {
+			if (word.isEmpty()) {
+				continue;
+			}
+			String abbr = EXTRA_ABBREVIATIONS.get(word.toLowerCase());
+			if (abbr == null) {
+				words.add(word);
+			} else {
+				words.add(abbr);
+				abbreviated = true;
+			}
+		}
+		return abbreviated ? String.join(" ", words) : null;
+	}
 
 	static String unglueName(String name) {
 		List<String> words = new ArrayList<>();
@@ -697,6 +746,7 @@ public class NameIndexCreator<T> {
 		int mainWords = countWords(removeBraces(name));
 		int variant = 0;
 		nameIndex.addUngluedToNameIndex(removeBraces(name), o, settings.charsToBuildAddressNameIndex);
+		nameIndex.addAbbreviatedToNameIndex(removeBraces(name), o, settings.charsToBuildAddressNameIndex);
 		for (String oName : o.getOtherNames(true, name)) {
 			if (!oName.equalsIgnoreCase(name)) {
 				String indexed = removeBraces(oName);
