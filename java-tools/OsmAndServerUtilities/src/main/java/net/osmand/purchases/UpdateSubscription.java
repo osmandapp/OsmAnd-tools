@@ -80,6 +80,7 @@ public class UpdateSubscription {
 	private static final long MINIMUM_WAIT_TO_REVALIDATE_VALID = 14 * DAY;
 	public static final long MINIMUM_WAIT_TO_REVALIDATE = 12 * HOUR;
 	private static final long MAX_WAITING_TIME_TO_EXPIRE = 15 * DAY;
+	private static final long MAX_WAITING_TIME_TO_RENEW = 60 * DAY;
 	private static final long MAX_WAITING_TIME_TO_MAKE_INVALID = 3 * DAY;
 	int changes = 0;
 	int checkChanges = 0;
@@ -815,7 +816,11 @@ public class UpdateSubscription {
 		}
 
 		if (subscription.getExpiryTimeMillis() != null) {
-			boolean expired = tm - subscription.getExpiryTimeMillis() > MAX_WAITING_TIME_TO_EXPIRE;
+			long sinceExpiry = tm - subscription.getExpiryTimeMillis();
+			// a renewing subscription waits for payment up to 60 days: Google account hold (https://developer.android.com/google/play/billing/lifecycle/subscriptions),
+			// Apple billing retry (https://developer.apple.com/documentation/storekit/reducing-involuntary-subscriber-churn)
+			boolean expired = sinceExpiry > MAX_WAITING_TIME_TO_EXPIRE
+					&& (!Boolean.TRUE.equals(subscription.getAutoRenewing()) || sinceExpiry > MAX_WAITING_TIME_TO_RENEW);
 			updStat.setBoolean(ind++, !expired);
 			if (expired) {
 				updated = true;
