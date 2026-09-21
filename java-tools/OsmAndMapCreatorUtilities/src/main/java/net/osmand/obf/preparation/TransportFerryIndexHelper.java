@@ -3,6 +3,7 @@ package net.osmand.obf.preparation;
 import static net.osmand.router.TransportFerryHelper.CROSSINGS_TAG;
 import static net.osmand.router.TransportFerryHelper.FERRY_STOPS_TAG;
 import static net.osmand.router.TransportFerryHelper.JUNCTION_VALUE;
+import static net.osmand.router.TransportFerryHelper.SYNTHETIC_STOP_TAG;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -69,6 +70,7 @@ public class TransportFerryIndexHelper {
 				TransportStop stop = EntityParser.parseTransportStop(n);
 				if (!terminal) {
 					syntheticStops.put(stop.getId(), n.getId());
+					stop.setName(SYNTHETIC_STOP_TAG, "yes"); // the map hides the stop without its routes
 				}
 				directRoute.getForwardStops().add(stop);
 				backwardRoute.getForwardStops().add(0, stop);
