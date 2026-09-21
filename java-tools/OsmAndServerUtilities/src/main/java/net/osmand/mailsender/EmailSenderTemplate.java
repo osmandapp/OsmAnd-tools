@@ -208,9 +208,7 @@ public class EmailSenderTemplate {
 		String lang = safeLang(langNullable);
 		include("defaults", lang, false); // settings (email-headers, vars, etc)
 
-		peekTemplateVars(template, lang);
-
-		if ("true".equals(vars.get(USE_BASE))) {
+		if (checkUseBase(template, lang)) {
 			include("base", lang, false); // optional
 			include("base-locale", lang, false); // optional
 			include("header", lang, false); // optional
@@ -226,17 +224,20 @@ public class EmailSenderTemplate {
 		return this;
 	}
 
-	private void peekTemplateVars(String template, String lang) {
+	private boolean checkUseBase(String template, String lang) {
 		File file = findTemplateFile(template, lang);
 		if (file == null) {
-			return;
+			return false;
 		}
 		try (Scanner reader = new Scanner(file)) {
 			while (reader.hasNextLine()) {
-				parseCommandArgumentsFromComment(reader.nextLine());
+				if (USE_BASE_FLAG.matcher(reader.nextLine()).matches()) {
+					return true;
+				}
 			}
 		} catch (FileNotFoundException ignored) {
 		}
+		return false;
 	}
 
 	public EmailSenderTemplate load(String template) {
@@ -356,6 +357,7 @@ public class EmailSenderTemplate {
 	private final String HTML_NEWLINE_TO_BR = "HTML_NEWLINE_TO_BR"; // user-defined var from templates
 	private final String TRANSACTIONAL = "TRANSACTIONAL";
 	private final String USE_BASE = "USE_BASE";
+	private static final Pattern USE_BASE_FLAG = Pattern.compile("\\s*<!--\\s*Set\\s+USE_BASE\\s*=\\s*true\\s*-->\\s*");
 
 	private void parseCommandArgumentsFromComment(String line) {
 		// <!--  Name  OsmAnd and co    -->

@@ -112,8 +112,8 @@ public class EmailSenderService {
 		sendOsmAndCloudAccountEmail(email, token, lang, action, null);
 	}
 
-	public void sendShareFileAccessEmail(String email, boolean approved, String ownerNickname, String fileName,
-			String fileType, long fileSize, UUID fileUuid) {
+	public void sendShareFileAccessEmail(String email, String lang, boolean approved, String ownerNickname,
+			String fileName, String fileType, long fileSize, UUID fileUuid) {
 		String name = fileName == null ? "" : fileName;
 		int dotIdx = name.lastIndexOf('.');
 		String ext = dotIdx > 0 && dotIdx < name.length() - 1
@@ -123,8 +123,9 @@ public class EmailSenderService {
 			meta = meta + " · " + FileSizeFormatter.format(fileSize);
 		}
 		String url = fileUuid == null ? "https://osmand.net/map" : SHARE_LINK_PREFIX + fileUuid;
+		String template = approved ? "cloud/share/approved" : "cloud/share/declined";
 		boolean ok = new EmailSenderTemplate()
-				.load(approved ? "cloud/share/approved" : "cloud/share/declined")
+				.load(template, lang)
 				.set("OWNER_NAME", Algorithms.isEmpty(ownerNickname)
 						? "@OWNER_DEFAULT@" : htmlText(ownerNickname))
 				.set("FILE_NAME", htmlText(name))

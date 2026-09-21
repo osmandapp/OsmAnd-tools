@@ -281,8 +281,9 @@ public class ShareFileService {
 			}
 			CloudUsersRepository.CloudUser owner = usersRepository.findById(file.ownerid);
 			CloudUserFilesRepository.UserFile userFile = getUserFile(file);
-			emailSender.sendShareFileAccessEmail(requester.email, approved, owner == null ? null : owner.nickname,
-					file.name, file.type, userFile == null ? 0 : userFile.filesize, file.uuid);
+			emailSender.sendShareFileAccessEmail(requester.email, userdataService.userLang(requester.id), approved,
+					owner == null ? null : owner.nickname, file.name, file.type,
+					userFile == null ? 0 : userFile.filesize, file.uuid);
 		} catch (Exception e) {
 			LOGGER.error("Failed to send share access email: " + e.getMessage(), e);
 		}
