@@ -1117,6 +1117,51 @@ public class OsmAndMapsService {
 	}
 
 	/**
+	 * A boat route that mixes the water network with open water (OsmAnd-Issues #3170): the same routing context as
+	 * {@link #routing}, with {@link net.osmand.router.BoatRoutePlanner} deciding where to join open water. One leg
+	 * per pair of neighbouring points.
+	 */
+	public List<net.osmand.router.BoatRoutePlanner.BoatRoute> boatRouting(String routeMode, Map<String, Object> props,
+			List<LatLon> routePoints, net.osmand.router.BoatRoutePlanner.ShoreProvider shores,
+			RouteCalculationProgress progress) throws IOException, InterruptedException {
+		LatLon start = routePoints.get(0), end = routePoints.get(routePoints.size() - 1);
+		QuadRect points = points(routePoints.subList(1, routePoints.size() - 1), start, end);
+		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
+		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
+		RoutingContext ctx = null;
+		try {
+			RouteParameters rp = parseRouteParameters(routeMode);
+			DebugInfo di = new DebugInfo();
+			ctx = lockCacheRoutingContext(router, rp, di);
+			LOGGER.info(String.format("REQ boat routing (%s - %.1f sec, %s): %s -> %s - cache %s", di.selectedCache,
+					di.waitTime / 1e3, di.routeParametersStr, start, end, di.routingCacheInfo));
+			if (ctx == null) {
+				validateAndInitConfig();
+				List<BinaryMapIndexReaderReference> list = getObfReaders(withMargin(points, ROUTING_MAPS_MARGIN_KM),
+						ObfReason.ROUTING.value());
+				boolean[] incomplete = new boolean[1];
+				usedMapList = getReaders(list, incomplete);
+				ctx = prepareRouterContext(rp, router, usedMapList, false);
+			}
+			ctx.routingTime = 0;
+			ctx.calculationProgress = progress;
+			List<net.osmand.router.BoatRoutePlanner.BoatRoute> legs = new net.osmand.router.BoatRoutePlanner(shores)
+					.route(router, ctx, routePoints);
+			List<RouteSegmentResult> network = new ArrayList<>();
+			for (net.osmand.router.BoatRoutePlanner.BoatRoute leg : legs) {
+				if (leg.network != null) {
+					network.addAll(leg.network);
+				}
+			}
+			putResultProps(ctx, network, props);
+			return legs;
+		} finally {
+			unlockReaders(usedMapList);
+			unlockCacheRoutingContext(ctx);
+		}
+	}
+
+	/**
 	 * Only the Java HH planner produces alternatives, and only for a plain start -> end route.
 	 * Returns what stands in the way, or null when alternatives can be expected.
 	 */
