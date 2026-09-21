@@ -16,8 +16,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
@@ -40,7 +38,6 @@ import net.osmand.util.Algorithms;
 @RequestMapping("/admin/top-photos")
 public class TopPhotosController {
 
-	private static final Log LOG = LogFactory.getLog(TopPhotosController.class);
 	private static final int PLACES_LIMIT = 200;
 	private static final int IMAGES_LIMIT = 35;
 	private static final int STAT_LIMIT = 300;
@@ -85,11 +82,6 @@ public class TopPhotosController {
 	@GetMapping("/diff")
 	public String diff() {
 		return "admin/top-photos/diff";
-	}
-
-	@GetMapping("/sql")
-	public String sql() {
-		return "admin/top-photos/sql";
 	}
 
 	// ---------- places (index page)
@@ -491,25 +483,6 @@ public class TopPhotosController {
 				ORDER BY abs(left.score - right.score) DESC
 				LIMIT %d""".formatted(DIFF_LIMIT);
 		return json(() -> rows(query));
-	}
-
-	// ---------- free SELECT (sql page)
-
-	@GetMapping(path = "/api/execute-sql", produces = MediaType.APPLICATION_JSON_VALUE)
-	@ResponseBody
-	public ResponseEntity<Object> executeSql(@RequestParam(required = false) String sql) {
-		if (sql == null || !sql.trim().toLowerCase().startsWith("select ")) {
-			return ResponseEntity.ok(Map.of("error", "Prohibited SQL: '" + sql + "'"));
-		}
-		if (!config.wikiInitialized()) {
-			return notInitialized();
-		}
-		try {
-			return ResponseEntity.ok(rows(sql));
-		} catch (RuntimeException e) {
-			LOG.warn("Top photos SQL failed: " + sql, e);
-			return ResponseEntity.ok(Map.of("error", String.valueOf(e.getMessage())));
-		}
 	}
 
 	// ---------- helpers
