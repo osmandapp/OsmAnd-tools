@@ -28,7 +28,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Map.Entry;
 import java.util.TreeMap;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -87,6 +89,7 @@ import net.osmand.router.HHRouteDataStructure.HHRoutingConfig;
 import net.osmand.router.HHRouteDataStructure.HHRoutingContext;
 import net.osmand.router.HHRouteDataStructure.NetworkDBPoint;
 import net.osmand.router.RouteCalculationProgress;
+import net.osmand.router.RoundTripGenerator;
 import net.osmand.router.RoutePlannerFrontEnd;
 import net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
@@ -119,6 +122,7 @@ public class OsmAndMapsService {
 	private static final int MEM_MAX_HITS_PER_RUN = 5;
 	// maps are picked by the start/end bbox, but a route with avoid_* / prefer_* params can detour out of it
 	private static final double ROUTING_MAPS_MARGIN_KM = 30;
+	private static final int ROUND_TRIP_THREADS = 4; // routing contexts built for one round trip request
 
 	private static final long INTERVAL_TO_MONITOR_ZIP = 5 * 60 * 1000;
 	private static final long INTERVAL_TO_CLEANUP_ROUTING_CACHE = 10 * 60 * 1000;
@@ -1114,6 +1118,155 @@ public class OsmAndMapsService {
 			unlockCacheRoutingContext(ctx);
 		}
 		return routeRes;
+	}
+
+	/**
+	 * A routing context that shares nothing with the other workers. {@link GeneralRouter} is not thread
+	 * safe - {@code RouteAttributeEvalRule} evaluates through a shared BitSet, and routers built from the
+	 * default builder keep the same rule objects, which corrupts that BitSet when two threads route at
+	 * once (ArrayIndexOutOfBoundsException inside BitSet.and). Parsing routing.xml per worker costs
+	 * milliseconds and gives every worker its own rules.
+	 */
+	private RoutingContext prepareIsolatedRouterContext(RouteParameters rp, RoutePlannerFrontEnd router,
+	                                                    List<BinaryMapIndexReader> readers) throws IOException {
+		Builder builder;
+		try {
+			builder = RoutingConfiguration.parseDefault();
+		} catch (Exception e) {
+			throw new IOException("Cannot parse routing.xml for a round trip worker", e);
+		}
+		RoutePlannerFrontEnd.CALCULATE_MISSING_MAPS = false;
+		if (rp.disableHHRouting) {
+			// routing=astar_* - without this the HH config is still set and HH answers every leg,
+			// which silently turns an A* comparison into a second HH run
+			router.disableHHRoutingConfig();
+		} else {
+			router.setHHRouteCpp(false);
+			router.setUseOnlyHHRouting(rp.useOnlyHHRouting);
+			router.setDefaultHHRoutingConfig();
+		}
+		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(MEM_LIMIT, MEM_LIMIT);
+		RoutingConfiguration config = builder.build(rp.routeProfile, memoryLimit, rp.routeParams);
+		config.memoryMaxHits = MEM_MAX_HITS_PER_RUN;
+		if (rp.minPointApproximation >= 0) {
+			config.minPointApproximation = rp.minPointApproximation;
+		}
+		if (!rp.noConditionals) {
+			config.routeCalculationTime = rp.routeCalculationTime >= 0
+					? rp.routeCalculationTime
+					: System.currentTimeMillis();
+		}
+		RoutingContext ctx = router.buildRoutingContext(config, null, readers.toArray(new BinaryMapIndexReader[0]),
+				rp.calcMode);
+		ctx.leftSideNavigation = false;
+		return ctx;
+	}
+
+	/**
+	 * Round trip prototype (OsmAnd-Issues#2827). All loop candidates are routed with Java HH routing in one
+	 * routing context, so the HH points are loaded once for dozens of legs. A* is not used at all: a
+	 * fallback per leg would take minutes.
+	 */
+	public List<RoundTripGenerator.RoundTrip> roundTrip(String routeMode, LatLon start, RoundTripGenerator.Params params,
+			Map<String, Object> props, RouteCalculationProgress progress) throws IOException, InterruptedException {
+		RouteParameters rp = parseRouteParameters(routeMode);
+		if (rp.onlineRouting != null) {
+			props.put("error", "round trips cannot use online routing");
+			return Collections.emptyList();
+		}
+		if (rp.disableHHRouting && !params.allowAStar) {
+			// routing=astar_* asks for A* explicitly, which is only allowed together with astar=true,
+			// so that a plain request can never fall into minutes of A* by accident
+			props.put("error", "round trips are built with HH routing only");
+			return Collections.emptyList();
+		}
+		// without HH every leg falls back to A*, which is why round trips are an HH feature; the flag
+		// is there to measure what a profile without HH data (pedestrian) would cost
+		rp.useOnlyHHRouting = !params.allowAStar;
+		rp.useNativeRouting = false;
+		double reach = RoundTripGenerator.maxReach(params);
+		List<LatLon> corners = new ArrayList<>();
+		for (int bearing = 0; bearing < 360; bearing += 90) {
+			corners.add(MapUtils.rhumbDestinationPoint(start, reach, bearing));
+		}
+		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
+		long startTime = System.currentTimeMillis();
+		try {
+			validateAndInitConfig();
+			List<BinaryMapIndexReaderReference> list = getObfReaders(withMargin(points(corners, start, start),
+					ROUTING_MAPS_MARGIN_KM), ObfReason.ROUTING.value());
+			boolean[] incomplete = new boolean[1];
+			// One routing context per worker: a context is not thread-safe, but the candidate loops are
+			// independent of each other. The HH search costs ~3 ms per leg, the last-mile search around
+			// every waypoint ~160 ms - that is what the request waits for, and it parallelizes well.
+			List<RoutePlannerFrontEnd> routers = new ArrayList<>();
+			List<RoutingContext> contexts = new ArrayList<>();
+			BlockingQueue<Integer> freeContexts = new LinkedBlockingQueue<>();
+			for (int i = 0; i < ROUND_TRIP_THREADS; i++) {
+				List<BinaryMapIndexReader> readers = getReaders(list, incomplete);
+				// whatever was locked has to be unlocked later, even when the set came back incomplete
+				usedMapList.addAll(readers);
+				if (incomplete[0] || readers.isEmpty()) {
+					if (i == 0) {
+						props.put("error", "maps are not available");
+						return Collections.emptyList();
+					}
+					break; // no more free readers - run with the workers we have
+				}
+				RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
+				RoutingContext ctx = prepareIsolatedRouterContext(rp, router, readers);
+				if (!rp.noConditionals && rp.routeCalculationTime < 0) {
+					ctx.config.routeCalculationTime = getLocalTimeMillisByLatLon(start.getLatitude(),
+							start.getLongitude());
+				}
+				if (router.getHHRoutingConfig() != null) {
+					// keep HH points between the legs and the loops; with routing=astar_* there is no config
+					router.getHHRoutingConfig().cacheContext(null);
+				}
+				ctx.calculationProgress = new RouteCalculationProgress();
+				routers.add(router);
+				contexts.add(ctx);
+				freeContexts.add(i);
+			}
+			params.parallelism = contexts.size();
+			RoundTripGenerator generator = new RoundTripGenerator((s, via) -> {
+				if (progress.isCancelled) {
+					throw new InterruptedException("Round trip is cancelled");
+				}
+				int i = freeContexts.take();
+				try {
+					RouteCalcResult rc = routers.get(i).searchRoute(contexts.get(i), s, s, via, null);
+					return rc != null && rc.isCorrect() ? rc.getList() : null;
+				} finally {
+					freeContexts.put(i);
+				}
+			});
+			List<RoundTripGenerator.RoundTrip> trips = generator.generate(start, params);
+			if (generator.candidates.isEmpty()) {
+				// every leg failed - usually the maps carry no HH data for this profile
+				props.put("error", "no HH routing data for " + rp.routeProfile + " here");
+			}
+			TreeMap<String, Object> dev = new TreeMap<>();
+			dev.put("maps", usedMapList.size());
+			dev.put("reach", Math.round(reach));
+			dev.put("workers", contexts.size());
+			dev.put("routings", generator.routings);
+			dev.put("routingMs", generator.routingMs);
+			dev.put("totalMs", System.currentTimeMillis() - startTime);
+			List<Map<String, Object>> candidates = new ArrayList<>();
+			for (RoundTripGenerator.RoundTrip c : generator.candidates) {
+				Map<String, Object> m = c.describe();
+				m.put("selected", trips.indexOf(c));
+				candidates.add(m);
+			}
+			dev.put("candidates", candidates);
+			props.put("roundTripDev", dev);
+			LOGGER.info(String.format("REQ roundtrip %s %s: %d variants, %d maps, %d routings, %d ms", routeMode, start,
+					trips.size(), usedMapList.size(), generator.routings, System.currentTimeMillis() - startTime));
+			return trips;
+		} finally {
+			unlockReaders(usedMapList);
+		}
 	}
 
 	/**
