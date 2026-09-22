@@ -558,11 +558,14 @@ public class SpatialSearchPipelineTest {
 
 	protected SpatialTestSearchEngine createSearchEngine(SpatialTextSearch.SpatialTextSearchSettings spatialSettings, 
 												  LatLon point, List<BinaryMapIndexReader> readers, boolean translation) {
+		// the same instance the binary readers resolve POI types of map objects through
+		return new SpatialTestSearchEngine(spatialSettings, point, readers, MapPoiTypes.getDefault());
+	}
+
+	private MapPoiTypes createPoiTypes(boolean translation) {
 		MapPoiTypes poiTypes = new MapPoiTypes(null);
 		poiTypes.setPoiTranslator(translation ? new SpatialTestSearchEngine.TestPoiTranslator() : translatorFor(phrasesLang));
-		// binary readers resolve POI types of map objects through the default
-		MapPoiTypes.setDefault(poiTypes);
-		return new SpatialTestSearchEngine(spatialSettings, point, readers, poiTypes);
+		return poiTypes;
 	}
 	
 	@Test
@@ -597,6 +600,8 @@ public class SpatialSearchPipelineTest {
 
 		SpatialTestSearchEngine defaultEngine = null;
 		try {
+			// readers capture the default MapPoiTypes on open, set this test's one before loading them
+			MapPoiTypes.setDefault(createPoiTypes(translation));
 			boolean useData = settingsJson.optBoolean("useData", true);
 			if (useData) {
 				loadReaders(sourceJson, point, readers);
