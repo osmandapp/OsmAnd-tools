@@ -557,7 +557,7 @@ public class SpatialSearchPipelineTest {
 	}
 
 	protected SpatialTestSearchEngine createSearchEngine(SpatialTextSearch.SpatialTextSearchSettings spatialSettings, 
-												  LatLon point, List<BinaryMapIndexReader> readers, boolean translation) {
+												  LatLon point, List<BinaryMapIndexReader> readers) {
 		// the same instance the binary readers resolve POI types of map objects through
 		return new SpatialTestSearchEngine(spatialSettings, point, readers, MapPoiTypes.getDefault());
 	}
@@ -617,7 +617,7 @@ public class SpatialSearchPipelineTest {
 			}
 
 		SpatialTextSearch.SpatialTextSearchSettings settings = SpatialSearchTestFile.parseSettings(settingsJson);
-		defaultEngine = createSearchEngine(settings, point, readers, translation);
+		defaultEngine = createSearchEngine(settings, point, readers);
 		int shift = 4;
 		for (int k = 0; k < phrases.size(); k++) {
 			SpatialSearchTestFile.Phrase phraseAndSettings = phrases.get(k);
@@ -630,7 +630,7 @@ public class SpatialSearchPipelineTest {
 					continue;
 				}
 				JSONObject mergedJson = SpatialSearchTestFile.merge(settingsJson, phraseAndSettings.settings());
-				engine = createSearchEngine(SpatialSearchTestFile.parseSettings(mergedJson), SpatialSearchTestFile.parseLocation(mergedJson), readers, translation);
+				engine = createSearchEngine(SpatialSearchTestFile.parseSettings(mergedJson), SpatialSearchTestFile.parseLocation(mergedJson), readers);
 			}
 			
 			List<String> actualResults = engine.search(text, false);
