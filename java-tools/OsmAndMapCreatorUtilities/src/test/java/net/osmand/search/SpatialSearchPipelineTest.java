@@ -244,7 +244,7 @@ public class SpatialSearchPipelineTest {
 
 	/** POI categories named as the app names them in that language ("phrasesLang": "de" makes "parkplatz" a
 	 *  category and not only a name); English where the language has no phrase */
-	private static synchronized MapPoiTypes.PoiTranslator translatorFor(String lang) {
+	private static synchronized MapPoiTypes.PoiTranslator androidPhrasesTranslator(String lang) {
 		if (Algorithms.isEmpty(lang)) {
 			return defaultPoiTranslator;
 		}
@@ -564,7 +564,8 @@ public class SpatialSearchPipelineTest {
 
 	private MapPoiTypes createPoiTypes(boolean translation) {
 		MapPoiTypes poiTypes = new MapPoiTypes(null);
-		poiTypes.setPoiTranslator(translation ? new SpatialTestSearchEngine.TestPoiTranslator() : translatorFor(phrasesLang));
+		poiTypes.setPoiTranslator(
+				translation ? new SpatialTestSearchEngine.BogusPoiTranslator() : androidPhrasesTranslator(phrasesLang));
 		return poiTypes;
 	}
 	
