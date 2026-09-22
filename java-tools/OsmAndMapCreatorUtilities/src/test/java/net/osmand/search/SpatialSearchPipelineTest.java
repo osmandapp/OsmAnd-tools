@@ -100,7 +100,7 @@ public class SpatialSearchPipelineTest {
 			SEARCH_RESOURCES_PATH_ENV = "SEARCH_RESOURCES_PATH",
 			LIVE_TESTING_DIR_ENV = "LIVE_TESTING_DIR";
 	private static final String RESOURCES_PATH = getResourcesPath();
-	private static final String SEARCH_RESOURCES_PATH = getSearchResourcesPath();
+	protected static final String SEARCH_RESOURCES_PATH = getSearchResourcesPath();
 	private static final boolean LIVE_TESTING = !Algorithms.isEmpty(System.getenv(LIVE_TESTING_DIR_ENV));
 	private static final File GEN_DIR = getGenDir();
 	private static final File SRC_DIR = getSourceDir();
@@ -492,7 +492,7 @@ public class SpatialSearchPipelineTest {
 		file.setLastModified(gzFile.lastModified());
 	}
 
-	private void loadReaders(JSONObject sourceJson, LatLon point, List<BinaryMapIndexReader> readers) throws IOException, SQLException {
+	protected void loadReaders(JSONObject sourceJson, LatLon point, List<BinaryMapIndexReader> readers) throws IOException, SQLException {
 		if (!GEN_DIR.isDirectory() && !GEN_DIR.mkdirs()) {
 			throw new IOException("Cannot create generated OBF directory " + GEN_DIR);
 		}
@@ -1212,5 +1212,10 @@ public class SpatialSearchPipelineTest {
 			downloadName = downloadName.substring(0, downloadName.length() - 2);
 		}
 		return downloadName;
+	}
+
+	protected static String getOption(String name) {
+		String value = System.getenv(name);
+		return Algorithms.isEmpty(value) ? System.getProperty(name) : value;
 	}
 }

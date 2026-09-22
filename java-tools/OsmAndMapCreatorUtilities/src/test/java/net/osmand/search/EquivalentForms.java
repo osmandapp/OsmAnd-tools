@@ -12,7 +12,7 @@ import java.util.TreeMap;
 
 import net.osmand.binary.Abbreviations;
 import net.osmand.osm.MapPoiTypes;
-import net.osmand.search.SpatialEquivalenceTest.SpatialResultRow;
+import net.osmand.search.SpatialSearchEquivalenceTest.SpatialResultRow;
 import net.osmand.util.Algorithms;
 
 /**

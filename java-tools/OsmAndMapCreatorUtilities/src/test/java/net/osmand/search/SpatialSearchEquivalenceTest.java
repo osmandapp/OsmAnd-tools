@@ -16,7 +16,6 @@ import org.junit.runners.Parameterized;
 
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.Amenity;
-import net.osmand.data.Building;
 import net.osmand.data.City;
 import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
@@ -49,7 +48,7 @@ import net.osmand.util.MapUtils;
  * All forms are run and all failures are reported; {@code EQUIVALENCE_STOP_ON_FAIL=true} (environment variable or system
  * property) stops on the first failing form and skips the tests after it.
  */
-public class SpatialEquivalenceTest extends SpatialSearchPipelineTest {
+public class SpatialSearchEquivalenceTest extends SpatialSearchPipelineTest {
 	private static final String KIND_KEY = "equivalenceKind";
 	private static final String TARGET_KEY = "equivalenceTarget";
 	private static final String TOLERANCE_KEY = "equivalenceTolerance";
@@ -62,7 +61,7 @@ public class SpatialEquivalenceTest extends SpatialSearchPipelineTest {
 	private final File testFile;
 	private final String testName;
 
-	public SpatialEquivalenceTest(String name, File file) {
+	public SpatialSearchEquivalenceTest(String name, File file) {
 		super(name, file);
 		this.testFile = file;
 		this.testName = name;
