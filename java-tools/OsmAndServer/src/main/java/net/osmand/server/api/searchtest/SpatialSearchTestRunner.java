@@ -125,7 +125,7 @@ public final class SpatialSearchTestRunner {
 		}
 		if (translationPoiTypes == null) {
 			translationPoiTypes = new MapPoiTypes(null);
-			translationPoiTypes.setPoiTranslator(new SpatialTestSearchEngine.TestPoiTranslator());
+			translationPoiTypes.setPoiTranslator(new SpatialTestSearchEngine.BogusPoiTranslator());
 			translationPoiTypes.init();
 		}
 		return translationPoiTypes;
