@@ -39,6 +39,7 @@ server:
     timeout: 7d
     cookie.secure: true
     cookie.same-site: none
+    cookie.max-age: 7d # persistent cookie: keep web login after the browser is closed
     # store-dir: ${osmand.files.location}/session/
     # persistent: true
   tomcat.threads.max: 5
