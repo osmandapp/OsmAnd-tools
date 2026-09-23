@@ -700,7 +700,7 @@ public class IndexUploader {
 //		double l = MapUtils.convert31XToMeters(minX, maxX);
 //		double h = MapUtils.convert31YToMeters(minY, maxY);
 //		if(obj.isArea() && (l >= 100 || h >= 100)) {
-		if(obj.isArea()) {
+		if(obj.isArea() && !isBuilding(obj)) {
 			// pixels on 16 zoom
 			if(polygonArea(obj) > 1000){
 				return true;
@@ -722,6 +722,16 @@ public class IndexUploader {
 					return true;
 				}
 			}
+		return false;
+	}
+
+	private static boolean isBuilding(BinaryMapDataObject obj) {
+		for (int i = 0; i < obj.getTypes().length; i++) {
+			TagValuePair tv = obj.getMapIndex().decodeType(obj.getTypes()[i]);
+			if (tv.tag.equals("building") || tv.tag.startsWith("building:") || tv.tag.endsWith(":building")) {
+				return true;
+			}
+		}
 		return false;
 	}
 
