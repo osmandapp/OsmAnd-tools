@@ -31,14 +31,16 @@ PENDING_BLOCKED = "blocked_images_pending"  # banned in the admin, moved into bl
 
 
 def process_pending_blocked_images() -> None:
-    count = ch_query(f"SELECT COUNT(*) FROM {PENDING_BLOCKED}")[0][0]
-    if count > 0:
-        ch_query(f"INSERT INTO blocked_images (imageTitle, blockReason) SELECT imageTitle, blockReason FROM {PENDING_BLOCKED}")
-        ch_query(f"TRUNCATE TABLE {PENDING_BLOCKED}")
-    print(f"Moved pending blocked images into blocked_images ({count})")
+    pending = ch_query(f"SELECT imageTitle, blockReason FROM {PENDING_BLOCKED}")
+    for reason in set(reason for _, reason in pending):
+        block_images(set(title for title, r in pending if r == reason), reason)
+    if pending:
+        ch_query_params(f"DELETE FROM {PENDING_BLOCKED} WHERE imageTitle IN %(titles)s", {'titles': [title for title, _ in pending]})
+    print(f"Moved pending blocked images into blocked_images ({len(pending)})")
 
 
 def cleanup_tables() -> None:
+    process_pending_blocked_images()
     for t in CLEANUP_TABLES:
         sync = t["sync"]
         field = t["field"]
