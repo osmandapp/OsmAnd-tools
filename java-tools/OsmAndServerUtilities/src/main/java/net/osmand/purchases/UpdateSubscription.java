@@ -82,6 +82,15 @@ public class UpdateSubscription {
 	private static final long MAX_WAITING_TIME_TO_EXPIRE = 15 * DAY;
 	private static final long MAX_WAITING_TIME_TO_RENEW = 60 * DAY;
 	private static final long MAX_WAITING_TIME_TO_MAKE_INVALID = 3 * DAY;
+
+	// a renewing subscription waits for payment up to 60 days: Google account hold (https://developer.android.com/google/play/billing/lifecycle/subscriptions),
+	// Apple billing retry (https://developer.apple.com/documentation/storekit/reducing-involuntary-subscriber-churn)
+	static boolean isExpired(long expiryMillis, Boolean autoRenewing, long now) {
+		long sinceExpiry = now - expiryMillis;
+		return sinceExpiry > MAX_WAITING_TIME_TO_EXPIRE
+				&& (!Boolean.TRUE.equals(autoRenewing) || sinceExpiry > MAX_WAITING_TIME_TO_RENEW);
+	}
+
 	int changes = 0;
 	int checkChanges = 0;
 	int deletions = 0;
@@ -160,7 +169,7 @@ public class UpdateSubscription {
 		if (revalidateInvalid) {
 			requestValid = "(valid=false)";
 		}
-		selQuery = "SELECT sku, purchaseToken, orderid, prevvalidpurchasetoken, payload, checktime, timestamp, starttime, expiretime, valid, introcycles "
+		selQuery = "SELECT sku, purchaseToken, orderid, prevvalidpurchasetoken, payload, checktime, timestamp, starttime, expiretime, valid, autorenewing, introcycles "
 				+ "FROM supporters_device_sub S where " + requestValid + " order by timestamp asc";
 		if (subType == SubscriptionType.IOS) {
 			updQuery = "UPDATE supporters_device_sub SET "
@@ -269,6 +278,7 @@ public class UpdateSubscription {
 			Timestamp expireTime = rs.getTimestamp("expiretime");
 			int introcycles = rs.getInt("introcycles");
 			boolean valid = rs.getBoolean("valid");
+			Boolean autoRenewing = rs.getObject("autorenewing") == null ? null : rs.getBoolean("autorenewing");
 			long currentTime = System.currentTimeMillis();
 			SubscriptionType type = SubscriptionType.getSubType(purchaseToken, sku);
 			if (this.subType != type) {
@@ -314,18 +324,18 @@ public class UpdateSubscription {
 						huaweiIAPHelper = new HuaweiIAPHelper();
 					}
 					sub = processHuaweiSubscription(huaweiIAPHelper, purchaseToken, sku, orderId,
-							regTime, startTime, expireTime, currentTime, pms);
+							regTime, startTime, expireTime, currentTime, autoRenewing, pms);
 				} else if (subType == SubscriptionType.AMAZON) {
 					if (amazonIAPHelper == null) {
 						amazonIAPHelper = new AmazonIAPHelper();
 					}
 					sub = processAmazonSubscription(amazonIAPHelper, purchaseToken, sku, orderId,
-							regTime, startTime, expireTime, currentTime, pms);
+							regTime, startTime, expireTime, currentTime, autoRenewing, pms);
 				} else if (subType == SubscriptionType.ANDROID) {
 					sub = processAndroidSubscription(purchases, purchaseToken, sku, orderId,
-							regTime, startTime, expireTime, currentTime, pms);
+							regTime, startTime, expireTime, currentTime, autoRenewing, pms);
 				} else if (subType == SubscriptionType.FASTSPRING) {
-					sub = processFastSpringSubscription(sku, orderId, startTime, expireTime, currentTime, pms);
+					sub = processFastSpringSubscription(sku, orderId, startTime, expireTime, currentTime, autoRenewing, pms);
 				} else if (subType == SubscriptionType.PROMO) {
 					processPromoSubscription(orderId, sku, expireTime, currentTime);
 				}
@@ -469,7 +479,7 @@ public class UpdateSubscription {
 	}
 
 	private SubscriptionPurchase processHuaweiSubscription(HuaweiIAPHelper huaweiIAPHelper, String purchaseToken, String sku, String orderId,
-			Timestamp regTime, Timestamp startTime, Timestamp expireTime, long currentTime, UpdateParams pms) throws SQLException, SubscriptionUpdateException {
+			Timestamp regTime, Timestamp startTime, Timestamp expireTime, long currentTime, Boolean autoRenewing, UpdateParams pms) throws SQLException, SubscriptionUpdateException {
 		HuaweiSubscription subscription = null;
 		String reason = "";
 		String kind = null;
@@ -488,7 +498,7 @@ public class UpdateSubscription {
 			if (e instanceof HuaweiJsonResponseException) {
 				errorCode = ((HuaweiJsonResponseException) e).responseCode;
 			}
-			if (expireTime != null && currentTime - expireTime.getTime() > MAX_WAITING_TIME_TO_EXPIRE) {
+			if (expireTime != null && isExpired(expireTime.getTime(), autoRenewing, currentTime)) {
 				reason = String.format(" subscription expired more than %.1f days ago (%s)",
 						(currentTime - expireTime.getTime()) / (DAY * 1.0d), e.getMessage());
 				kind = EXPIRED_STATE;
@@ -539,7 +549,7 @@ public class UpdateSubscription {
 	}
 
 	private SubscriptionPurchase processAmazonSubscription(AmazonIAPHelper amazonIAPHelper, String purchaseToken, String sku, String orderId,
-			Timestamp regTime, Timestamp startTime, Timestamp expireTime, long currentTime, UpdateParams pms) throws SQLException, SubscriptionUpdateException {
+			Timestamp regTime, Timestamp startTime, Timestamp expireTime, long currentTime, Boolean autoRenewing, UpdateParams pms) throws SQLException, SubscriptionUpdateException {
 		AmazonSubscription subscription = null;
 		String reason = "";
 		String kind = null;
@@ -556,7 +566,7 @@ public class UpdateSubscription {
 			if (e instanceof AmazonIOException) {
 				errorCode = ((AmazonIOException) e).responseCode;
 			}
-			if (expireTime != null && currentTime - expireTime.getTime() > MAX_WAITING_TIME_TO_EXPIRE) {
+			if (expireTime != null && isExpired(expireTime.getTime(), autoRenewing, currentTime)) {
 				reason = String.format(" subscription expired more than %.1f days ago (%s)",
 						(currentTime - expireTime.getTime()) / (DAY * 1.0d), e.getMessage());
 				kind = EXPIRED_STATE;
@@ -605,7 +615,7 @@ public class UpdateSubscription {
 	}
 
 	private SubscriptionPurchase processAndroidSubscription(AndroidPublisher.Purchases purchases, String purchaseToken, String sku, String orderId,
-			Timestamp regTime, Timestamp startTime, Timestamp expireTime, long currentTime, UpdateParams pms) throws SQLException, SubscriptionUpdateException {
+			Timestamp regTime, Timestamp startTime, Timestamp expireTime, long currentTime, Boolean autoRenewing, UpdateParams pms) throws SQLException, SubscriptionUpdateException {
 		SubscriptionPurchase subscription = null;
 		String reason = "";
 		String kind = null;
@@ -623,7 +633,7 @@ public class UpdateSubscription {
 			if (e instanceof GoogleJsonResponseException) {
 				errorCode = ((GoogleJsonResponseException) e).getStatusCode();
 			}
-			if (expireTime != null && currentTime - expireTime.getTime() > MAX_WAITING_TIME_TO_EXPIRE) {
+			if (expireTime != null && isExpired(expireTime.getTime(), autoRenewing, currentTime)) {
 				reason = String.format(" subscription expired more than %.1f days ago (%s)",
 						(currentTime - expireTime.getTime()) / (DAY * 1.0d), e.getMessage());
 				kind = EXPIRED_STATE;
@@ -665,7 +675,7 @@ public class UpdateSubscription {
 	}
 
 	private SubscriptionPurchase processFastSpringSubscription(String sku, String orderId, Timestamp startTime, Timestamp expireTime,
-	                                                          long currentTime, UpdateParams pms) throws SQLException, SubscriptionUpdateException {
+	                                                          long currentTime, Boolean autoRenewing, UpdateParams pms) throws SQLException, SubscriptionUpdateException {
 		SubscriptionPurchase subscription = null;
 		String reason = "";
 		String kind = null;
@@ -684,7 +694,7 @@ public class UpdateSubscription {
 				}
 			}
 		} catch (Exception e) {
-			if (expireTime != null && currentTime - expireTime.getTime() > MAX_WAITING_TIME_TO_EXPIRE) {
+			if (expireTime != null && isExpired(expireTime.getTime(), autoRenewing, currentTime)) {
 				reason = String.format(" subscription expired more than %.1f days ago (%s)",
 						(currentTime - expireTime.getTime()) / (DAY * 1.0d), e.getMessage());
 				kind = EXPIRED_STATE;
@@ -816,11 +826,7 @@ public class UpdateSubscription {
 		}
 
 		if (subscription.getExpiryTimeMillis() != null) {
-			long sinceExpiry = tm - subscription.getExpiryTimeMillis();
-			// a renewing subscription waits for payment up to 60 days: Google account hold (https://developer.android.com/google/play/billing/lifecycle/subscriptions),
-			// Apple billing retry (https://developer.apple.com/documentation/storekit/reducing-involuntary-subscriber-churn)
-			boolean expired = sinceExpiry > MAX_WAITING_TIME_TO_EXPIRE
-					&& (!Boolean.TRUE.equals(subscription.getAutoRenewing()) || sinceExpiry > MAX_WAITING_TIME_TO_RENEW);
+			boolean expired = isExpired(subscription.getExpiryTimeMillis(), subscription.getAutoRenewing(), tm);
 			updStat.setBoolean(ind++, !expired);
 			if (expired) {
 				updated = true;
