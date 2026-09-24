@@ -119,6 +119,7 @@ public class IndexRouteRelationCreator {
 	private static final Set<String> SHIELD_FG_ICONS = Set.of("shield_fg", "shield_fg_2");
 	private static final String RELATION_ID = OSMSettings.OSMTagKey.RELATION_ID.getValue();
 
+	public static final long MAX_RELATION_ID_BITS = 27;
 	private static long INTERNAL_NEGATIVE_BASE_ID = -(1 << 20); // used for Node(s) inside Way(s)
 	private static final RouteActivityHelper routeActivityHelper = RouteActivityHelper.INSTANCE;
 	private static final Log log = LogFactory.getLog(IndexRouteRelationCreator.class);
@@ -669,7 +670,7 @@ public class IndexRouteRelationCreator {
 	}
 
 	private static long calcEntityIdFromRelationId(long relationId, long counter, int hash) {
-		final long MAX_RELATION_ID_BITS = 27;
+//		final long MAX_RELATION_ID_BITS = 27;
 		final long MAX_COUNTER_BITS = 9;
 		final long MAX_HASH_BITS = 6;
 
