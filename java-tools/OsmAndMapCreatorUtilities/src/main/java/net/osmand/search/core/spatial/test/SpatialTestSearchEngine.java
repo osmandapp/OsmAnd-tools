@@ -49,7 +49,7 @@ public class SpatialTestSearchEngine {
 	}
 
 	/** the translations the translation tests were written with */
-	public static class TestPoiTranslator implements MapPoiTypes.PoiTranslator {
+	public static class BogusPoiTranslator implements MapPoiTypes.PoiTranslator {
 
         @Override
         public String getTranslation(String keyName) {
