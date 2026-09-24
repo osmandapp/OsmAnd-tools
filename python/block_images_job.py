@@ -9,6 +9,7 @@ from python.lib.utils import parse_command_line_into_dict
 from python.lib.block_images_utils import BLOCK_BANNED, BLOCK_INVALID, BLOCK_PROHIBITED, block_images
 from python.lib.block_images_utils import ban_by_keyword, list_by_keyword
 from python.lib.block_images_utils import cleanup_files, cleanup_tables, list_blocked, unblock_reason, unblock_title
+from python.lib.block_images_utils import process_pending_blocked_images
 
 
 def main():
@@ -26,6 +27,8 @@ def main():
     if title := args.get("--add-prohibited-file="): block_images({title}, BLOCK_PROHIBITED)
 
     if keyword := args.get("--ban-by-keyword="): ban_by_keyword(keyword)
+
+    if args.get("--process-pending-blocked-images"): process_pending_blocked_images()
 
     if args.get("--cleanup-files"): cleanup_files()
     if args.get("--cleanup-tables"): cleanup_tables()

@@ -27,6 +27,15 @@ CLEANUP_TABLES = [
 ]
 
 SELECT_BLOCKED = "SELECT imageTitle FROM blocked_images"
+PENDING_BLOCKED = "blocked_images_pending"  # banned in the admin, moved into blocked_images by the job before cleanup
+
+
+def process_pending_blocked_images() -> None:
+    count = ch_query(f"SELECT COUNT(*) FROM {PENDING_BLOCKED}")[0][0]
+    if count > 0:
+        ch_query(f"INSERT INTO blocked_images (imageTitle, blockReason) SELECT imageTitle, blockReason FROM {PENDING_BLOCKED}")
+        ch_query(f"TRUNCATE TABLE {PENDING_BLOCKED}")
+    print(f"Moved pending blocked images into blocked_images ({count})")
 
 
 def cleanup_tables() -> None:

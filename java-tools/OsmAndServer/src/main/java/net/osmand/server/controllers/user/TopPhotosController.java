@@ -209,11 +209,10 @@ public class TopPhotosController {
 		});
 	}
 
-	/** the same row the block_images_job writes; the job removes the files and the table rows on its next run */
 	@PostMapping(path = "/api/ban-image", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public ResponseEntity<Object> banImage(@RequestParam String imageTitle) {
-		String query = "INSERT INTO wiki.blocked_images (imageTitle, blockReason) VALUES (?, 'banned')";
+		String query = "INSERT INTO wiki.blocked_images_pending (imageTitle, blockReason) VALUES (?, 'banned')";
 		return json(() -> {
 			jdbcTemplate.update(query, imageTitle);
 			return Map.of("success", true);
@@ -243,7 +242,8 @@ public class TopPhotosController {
 			String query = """
 					SELECT F.*, score AS _score
 					FROM top_images_final AS F
-					         LEFT ANTI JOIN wiki.blocked_images AS B ON F.imageTitle = B.imageTitle
+					         LEFT ANTI JOIN (SELECT imageTitle FROM wiki.blocked_images
+					                         UNION ALL SELECT imageTitle FROM wiki.blocked_images_pending) AS B ON F.imageTitle = B.imageTitle
 					WHERE wikidata_id = ?%s
 					ORDER BY score DESC""".formatted(byTitle ? " AND F.imageTitle = ?" : "");
 			return json(() -> rows(query, byTitle ? new Object[] { placeId, imageTitle } : new Object[] { placeId }));
@@ -260,7 +260,8 @@ public class TopPhotosController {
 				                         similarity AS dup_sim
 				                    WHERE wikidata_id = ?
 				                    GROUP BY imageTitle) AS D ON S.imageTitle = D.imageTitle
-				         LEFT ANTI JOIN wiki.blocked_images AS B ON S.imageTitle = B.imageTitle
+				         LEFT ANTI JOIN (SELECT imageTitle FROM wiki.blocked_images
+				                         UNION ALL SELECT imageTitle FROM wiki.blocked_images_pending) AS B ON S.imageTitle = B.imageTitle
 				WHERE S.run_id = ? AND S.proc_id = ?%s
 				ORDER BY S.score DESC, image_size DESC""".formatted(byTitle ? " AND S.imageTitle = ?" : "");
 		return json(() -> rows(query,

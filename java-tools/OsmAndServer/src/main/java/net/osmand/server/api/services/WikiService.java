@@ -64,7 +64,7 @@ public class WikiService {
 	private static final int LIMIT_OBJS_QUERY = 1000;
 	private static final int LIMIT_PHOTOS_QUERY = 100;
 	private static final String SIMILARITY_CF = "0.975";
-	private static final String NOT_BLOCKED = " LEFT ANTI JOIN wiki.blocked_images AS B ON %s = B.imageTitle ";
+	private static final String NOT_BLOCKED = " LEFT ANTI JOIN wiki.blocked_images_pending AS B ON %s = B.imageTitle ";
 
 	private static final String MEDIA_ID_KEY = "mediaId";
 	private static final String DATE_KEY = "date";
