@@ -73,27 +73,7 @@ public class OrderManagementController {
 		purchases.forEach(OrderManagementController::shortenToken);
 		if (purchases.isEmpty()) {
 			List<CloudUsersRepository.CloudUser> users = usersRepository.findByEmailStartingWith(text, PageRequest.of(0, limit));
-			if (!users.isEmpty()) {
-				users.forEach(u -> {
-					AdminService.Purchase p = new AdminService.Purchase();
-					p.email = u.email;
-					p.sku = null;
-					p.orderId = u.orderid;
-					p.purchaseToken = null;
-					p.userId = u.id;
-					p.starttime = null;
-					p.expiretime = null;
-					p.checktime = null;
-					p.autorenewing = null;
-					p.paymentstate = null;
-					p.valid = null;
-					p.platform = null;
-					p.purchaseTime = null;
-					p.osmandCloud = false;
-					p.cloudUserInfo = orderManagementService.getCloudInfo(u);
-					purchases.add(p);
-				});
-			}
+			users.forEach(u -> purchases.add(orderManagementService.toPurchase(u)));
 		}
 		return purchases;
 	}
