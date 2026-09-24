@@ -16,12 +16,13 @@ CSV columns: num,start,end,segment,osmand,valhalla,status,obf,link
             bug       as many lanes, but no active lane in common: TL|TL|+C|C,TR vs TL|TL|C|+TR,C
             diff      different lanes otherwise (+C|+C|+C|TR vs +C|C|C|TR shares an active lane: diff)
             missing   Valhalla gives nothing on that way (other route, or no route at all)
-Only expectations with lanes on either side are written, --all writes every expectation.
+Only expectations with lanes on either side are written, --all writes every expectation. Bug rows come first.
 """
 import argparse
 import csv
 import json
 import os
+import re
 import sys
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -246,26 +247,50 @@ def main():
     with ThreadPoolExecutor(args.threads) as pool:
         all_records = list(pool.map(one, cases))
 
-    counts, num = {}, 0
+    counts, rows = {}, []
+    for case, records in zip(cases, all_records):
+        expected = case.get('expectedResults', {})
+        got = match(expected, records)
+        start = '%.5f,%.5f' % (case['startPoint']['latitude'], case['startPoint']['longitude'])
+        end = '%.5f,%.5f' % (case['endPoint']['latitude'], case['endPoint']['longitude'])
+        for key, osmand in expected.items():
+            valhalla, location = got.get(key) or (None, None)
+            if not args.all and ':' not in strip_mute(osmand) and ':' not in (valhalla or ''):
+                continue
+            st = status(osmand, valhalla, args.turn_tolerance)
+            counts[st] = counts.get(st, 0) + 1
+            rows.append([start, end, key, osmand, valhalla or '', st, case.get('params', {}).get('map', ''),
+                         link(case, location)])
+    # bugs first, the rest in the order of the cases
+    rows.sort(key=lambda r: r[5] != 'bug')
     with open(out, 'w', newline='') as f:
         w = csv.writer(f)
         w.writerow(['num', 'start', 'end', 'segment', 'osmand', 'valhalla', 'status', 'obf', 'link'])
-        for case, records in zip(cases, all_records):
-            expected = case.get('expectedResults', {})
-            got = match(expected, records)
-            start = '%.5f,%.5f' % (case['startPoint']['latitude'], case['startPoint']['longitude'])
-            end = '%.5f,%.5f' % (case['endPoint']['latitude'], case['endPoint']['longitude'])
-            for key, osmand in expected.items():
-                valhalla, location = got.get(key) or (None, None)
-                if not args.all and ':' not in strip_mute(osmand) and ':' not in (valhalla or ''):
-                    continue
-                st = status(osmand, valhalla, args.turn_tolerance)
-                counts[st] = counts.get(st, 0) + 1
-                num += 1
-                w.writerow([num, start, end, key, osmand, valhalla or '', st, case.get('params', {}).get('map', ''),
-                            link(case, location)])
-    print('%s: %d rows, %s' % (out, num, ', '.join('%s %d' % kv for kv in sorted(counts.items()))))
+        for num, row in enumerate(rows, 1):
+            w.writerow([num] + row)
+    print('%s: %d rows' % (out, len(rows)))
     print('no Valhalla route for %d of %d cases' % (sum(r is None for r in all_records), len(cases)))
+    summary(cases, rows, counts)
+
+
+def summary(cases, rows, counts):
+    # testName is "<name> <way id> <n>", the n-th drive through one junction
+    junctions = len(set(re.sub(r' \d+$', '', c.get('testName', '')) for c in cases))
+    expectations = sum(len(c.get('expectedResults', {})) for c in cases)
+    total = len(rows)
+
+    def line(title, statuses, tail=''):
+        n = sum(counts.get(st, 0) for st in statuses)
+        parts = ', '.join('%s %d' % (st, counts[st]) for st in statuses if counts.get(st)) if len(statuses) > 1 else ''
+        print('%-5s - %d (%.1f%%)%s%s' % (title, n, 100.0 * n / total if total else 0, tail,
+                                         '   ' + parts if parts else ''))
+
+    print()
+    print('%d junctions, %d cases, %d points (of %d expectations; the rest have no lanes on either side)'
+          % (junctions, len(cases), total, expectations))
+    line('Bug', ['bug'], ' from %d points' % total)
+    line('OK', ['ok', 'lanes-ok'])
+    line('Other', sorted(st for st in counts if st not in ('bug', 'ok', 'lanes-ok')))
 
 
 if __name__ == '__main__':

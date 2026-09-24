@@ -483,7 +483,14 @@ public class GenerateTurnLanesTest {
 		RandomAccessFile raf = new RandomAccessFile(obf, "r");
 		BinaryMapIndexReader reader = new BinaryMapIndexReader(raf, obf);
 		BinaryMapIndexReader[] readers = {reader};
+		int done = 0, percent = -1, points = 0;
 		for (long centre : picked) {
+			// one line per percent, auto_test.sh shows the last one
+			if (done * 100 / picked.size() != percent) {
+				percent = done * 100 / picked.size();
+				System.out.printf("progress %d%% (%d/%d junctions, %d points)%n", percent, done, picked.size(), points);
+			}
+			done++;
 			int rank = rankOf(graph, centre);
 			Set<Long> cluster = cluster(graph, centre, clusterOf(rank));
 			boolean leftSide = leftHandAt(regions, lat(centre), lon(centre));
@@ -532,6 +539,7 @@ public class GenerateTurnLanesTest {
 				entry.put("params", params);
 				entry.put("expectedResults", results);
 				cases.add(entry);
+				points += results.size();
 				written++;
 			}
 		}

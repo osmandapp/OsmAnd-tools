@@ -17,6 +17,7 @@ Ctrl+C stops the server.
 import argparse
 import json
 import os
+import resource
 import shutil
 import socket
 import subprocess
@@ -88,6 +89,21 @@ def is_built(pbf, data):
     return src.get('pbf') == pbf and src.get('mtime') == os.path.getmtime(pbf)
 
 
+def raise_open_files(want=65536):
+    """macOS terminals start with 256 open files, valhalla_service with a thread per core runs out of them
+    ("Too many open files"). The limit is inherited by the Valhalla binaries run from here."""
+    soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    for limit in (want, 10240):  # 10240 is OPEN_MAX, all macOS lets a process have when the hard limit is unlimited
+        limit = limit if hard == resource.RLIM_INFINITY else min(limit, hard)
+        if limit <= soft:
+            return
+        try:
+            resource.setrlimit(resource.RLIMIT_NOFILE, (limit, hard))
+            return
+        except (ValueError, OSError):
+            pass
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('pbf', help='OSM extract (.osm.pbf) to route on')
@@ -98,6 +114,7 @@ def main():
     parser.add_argument('--clean', action='store_true',
                         help='remove the tiles built for the .pbf and exit; the .pbf itself may be gone already')
     args = parser.parse_args()
+    raise_open_files()
 
     root = os.path.abspath(args.dir)
     pbf = os.path.abspath(args.pbf)
