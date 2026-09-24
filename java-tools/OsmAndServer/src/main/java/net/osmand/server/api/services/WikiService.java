@@ -64,6 +64,7 @@ public class WikiService {
 	private static final int LIMIT_OBJS_QUERY = 1000;
 	private static final int LIMIT_PHOTOS_QUERY = 100;
 	private static final String SIMILARITY_CF = "0.975";
+	private static final String NOT_BLOCKED = " AND imageTitle NOT IN (SELECT imageTitle FROM wiki.blocked_images) ";
 
 	private static final String MEDIA_ID_KEY = "mediaId";
 	private static final String DATE_KEY = "date";
@@ -96,12 +97,12 @@ public class WikiService {
 	public FeatureCollection getImages(String northWest, String southEast) {
 		return getPoiData(northWest, southEast, " SELECT id, mediaId, namespace, imageTitle, imgLat, imgLon "
 				+ " FROM wikigeoimages WHERE namespace = 6 AND imgLat BETWEEN ? AND ? AND imgLon BETWEEN ? AND ? "
-				+ " ORDER BY views desc LIMIT " + LIMIT_OBJS_QUERY,"imgLat", "imgLon", null);
+				+ NOT_BLOCKED + " ORDER BY views desc LIMIT " + LIMIT_OBJS_QUERY,"imgLat", "imgLon", null);
 	}
 	
 	public FeatureCollection getImagesById(long id, double lat, double lon) {
 		String query = String.format("SELECT wikidata_id, mediaId, imageTitle, date, author, license " +
-				"FROM top_images_final WHERE wikidata_id = %d and dup_sim < " + SIMILARITY_CF +
+				"FROM top_images_final WHERE wikidata_id = %d and dup_sim < " + SIMILARITY_CF + NOT_BLOCKED +
 				"ORDER BY score DESC LIMIT " + LIMIT_PHOTOS_QUERY, id);
 		
 		List<Feature> features = jdbcTemplate.query(query, (rs, rowNum) -> {
@@ -629,6 +630,7 @@ public class WikiService {
 				"FROM wiki.categoryimages " +
 				"WHERE catName = ? AND imgName != '' " +
 				"AND (imgName ILIKE '%.jpg' OR imgName ILIKE '%.png' OR imgName ILIKE '%.jpeg') " +
+				"AND imgName NOT IN (SELECT imageTitle FROM wiki.blocked_images) " +
 				"ORDER BY views DESC, imgName ASC LIMIT ";
 		
 		boolean hasWikidataId = !Algorithms.isEmpty(wikidataId);
@@ -636,12 +638,12 @@ public class WikiService {
 
 		if (hasWikidataId && !hasCategory) {
 			String wikidataParam = stripWikidataPrefix(wikidataId);
-			processImageQuery(WIKIDATA_QUERY + SIMILARITY_CF + " ORDER BY score DESC, imageTitle ASC LIMIT " + LIMIT_PHOTOS_QUERY,
+			processImageQuery(WIKIDATA_QUERY + SIMILARITY_CF + NOT_BLOCKED + " ORDER BY score DESC, imageTitle ASC LIMIT " + LIMIT_PHOTOS_QUERY,
 					ps -> ps.setString(1, wikidataParam), rowCallbackHandler);
 		} else if (hasWikidataId) {
 			String wikidataParam = stripWikidataPrefix(wikidataId);
 			Set<Long> wikidataMediaIds = new HashSet<>();
-			processImageQuery(WIKIDATA_QUERY + SIMILARITY_CF + " ORDER BY score DESC, imageTitle ASC LIMIT " + LIMIT_PHOTOS_QUERY,
+			processImageQuery(WIKIDATA_QUERY + SIMILARITY_CF + NOT_BLOCKED + " ORDER BY score DESC, imageTitle ASC LIMIT " + LIMIT_PHOTOS_QUERY,
 					ps -> ps.setString(1, wikidataParam), rs -> {
 						wikidataMediaIds.add(rs.getLong(MEDIA_ID_KEY));
 						rowCallbackHandler.processRow(rs);
@@ -795,7 +797,7 @@ public class WikiService {
 
 	private Map<String, Object> fetchWikidataPhoto(Long mediaId) {
 		String query = "SELECT mediaId, imageTitle, date, author, license, description " +
-				"FROM top_images_final WHERE mediaId = ? LIMIT 1";
+				"FROM top_images_final WHERE mediaId = ?" + NOT_BLOCKED + "LIMIT 1";
 		try {
 			return jdbcTemplate.queryForObject(query, (rs, rowNum) -> {
 				Map<String, Object> imageDetails = new HashMap<>();

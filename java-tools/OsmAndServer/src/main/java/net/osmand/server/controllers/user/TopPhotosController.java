@@ -49,6 +49,7 @@ public class TopPhotosController {
 			"reality_score", "technical_score", "overview_score");
 	private static final Set<String> DEV_COLUMNS = Set.of("safe", "value", "reality", "technical", "overview");
 	private static final DateTimeFormatter CLICKHOUSE_DATETIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+	private static final String NOT_BLOCKED = " AND %s NOT IN (SELECT imageTitle FROM wiki.blocked_images)";
 
 	@Autowired
 	@Qualifier("wikiJdbcTemplate")
@@ -209,6 +210,17 @@ public class TopPhotosController {
 		});
 	}
 
+	/** the same row the block_images_job writes; the job removes the files and the table rows on its next run */
+	@PostMapping(path = "/api/ban-image", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<Object> banImage(@RequestParam String imageTitle) {
+		String query = "INSERT INTO wiki.blocked_images (imageTitle, blockReason) VALUES (?, 'banned')";
+		return json(() -> {
+			jdbcTemplate.update(query, imageTitle);
+			return Map.of("success", true);
+		});
+	}
+
 	// ---------- photos of one place (per-place page)
 
 	@GetMapping(path = "/api/run-places", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -233,8 +245,8 @@ public class TopPhotosController {
 			String query = """
 					SELECT *, score AS _score
 					FROM top_images_final
-					WHERE wikidata_id = ?%s
-					ORDER BY score DESC""".formatted(titleCondition);
+					WHERE wikidata_id = ?%s%s
+					ORDER BY score DESC""".formatted(titleCondition, NOT_BLOCKED.formatted("imageTitle"));
 			return json(() -> rows(query, byTitle ? new Object[] { placeId, imageTitle } : new Object[] { placeId }));
 		}
 		String query = """
@@ -249,8 +261,8 @@ public class TopPhotosController {
 				                         similarity AS dup_sim
 				                    WHERE wikidata_id = ?
 				                    GROUP BY imageTitle) AS D ON S.imageTitle = D.imageTitle
-				WHERE S.run_id = ? AND S.proc_id = ?%s
-				ORDER BY S.score DESC, image_size DESC""".formatted(titleCondition);
+				WHERE S.run_id = ? AND S.proc_id = ?%s%s
+				ORDER BY S.score DESC, image_size DESC""".formatted(titleCondition, NOT_BLOCKED.formatted("S.imageTitle"));
 		return json(() -> rows(query,
 				byTitle ? new Object[] { placeId, runId, placeId, imageTitle } : new Object[] { placeId, runId, placeId }));
 	}
