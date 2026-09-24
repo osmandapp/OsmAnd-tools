@@ -395,7 +395,7 @@ public class UserSubscriptionService {
 			if (s.expiretime == null) {
 				LOG.error(String.format("FastSpring subscription %s - %s has no expiretime (state %s)", s.sku, s.orderId, fsSub.state));
 			} else {
-				s.valid = now < s.expiretime.getTime();
+				s.valid = !UpdateSubscription.isExpired(s.expiretime.getTime(), fsSub.isAutoRenewing(), now);
 			}
 			s.autorenewing = fsSub.isAutoRenewing();
 		}

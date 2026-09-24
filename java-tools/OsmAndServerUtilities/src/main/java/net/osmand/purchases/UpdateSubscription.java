@@ -85,7 +85,7 @@ public class UpdateSubscription {
 
 	// a renewing subscription waits for payment up to 60 days: Google account hold (https://developer.android.com/google/play/billing/lifecycle/subscriptions),
 	// Apple billing retry (https://developer.apple.com/documentation/storekit/reducing-involuntary-subscriber-churn)
-	static boolean isExpired(long expiryMillis, Boolean autoRenewing, long now) {
+	public static boolean isExpired(long expiryMillis, Boolean autoRenewing, long now) {
 		long sinceExpiry = now - expiryMillis;
 		return sinceExpiry > MAX_WAITING_TIME_TO_EXPIRE
 				&& (!Boolean.TRUE.equals(autoRenewing) || sinceExpiry > MAX_WAITING_TIME_TO_RENEW);
