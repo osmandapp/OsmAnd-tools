@@ -71,14 +71,19 @@ public class NameIndexCreator<T> {
 	// map whose language group chooses the keys of names, null for the rare word rule
 	private String mapName;
 
+	final AlternativeNameIndexGenerator<T> alternativeNames = new AlternativeNameIndexGenerator<>(this);
+
 	public NameIndexCreator(CommonWords c) {
 		this.predefinedGlobalWords = c;
 	}
 
 	// download name of the map ("Ukraine_kyiv-city_europe"), used when COMMON_WORDS_BY_LANGUAGE and a group covers it
 	public void setMapName(String mapName) {
-		boolean covered = COMMON_WORDS_BY_LANGUAGE && mapName != null && CommonWordsMultiIndex.getInstance().getGroupId(mapName) != null;
+		// language group of the map (CommonWordsMultiIndex.DEFAULT_GROUPS), null when no group covers it
+		String languageGroup = mapName == null ? null : CommonWordsMultiIndex.getInstance().getGroupId(mapName);
+		boolean covered = COMMON_WORDS_BY_LANGUAGE && languageGroup != null;
 		this.mapName = covered ? mapName : null;
+		alternativeNames.setLanguageGroup(languageGroup, mapName);
 	}
 
 	public record PoiNameObject(PoiTileBox tileBox, int ind, int eloRating, 
@@ -503,26 +508,19 @@ public class NameIndexCreator<T> {
 	}
 
 	
-	public void addUngluedToNameIndex(String name, T obj, int maxPrefixLength) {
-		String unglued = unglueName(name);
-		if (unglued == null) {
-			return;
+	// alternative names (unglued words, synonyms by location and language) - see AlternativeNameIndexGenerator
+	public void addAlternativeNamesToNameIndex(String name, String lang, T obj, int maxPrefixLength) {
+		alternativeNames.addAlternativeNames(name, lang, obj, maxPrefixLength);
+	}
+
+	void addAlternativeToken(String prefix, T obj, String word, List<String> alternativeWords) {
+		NamedObjectsByPrefix<T> entry = namesIndex.get(prefix);
+		if (entry == null) {
+			entry = new NamedObjectsByPrefix<T>();
+			entry.prefix = prefix;
+			namesIndex.put(prefix, entry);
 		}
-		List<String> nameWords = SearchAlgorithms.splitAndNormalize(name, false);
-		List<String> ungluedWords = SearchAlgorithms.splitAndNormalize(unglued, false);
-		for (String word : new TreeSet<>(ungluedWords)) {
-			String prefix = nameIndexPreparePrefix(word, maxPrefixLength);
-			if (nameWords.contains(word) || Algorithms.isEmpty(prefix)) {
-				continue;
-			}
-			NamedObjectsByPrefix<T> entry = namesIndex.get(prefix);
-			if (entry == null) {
-				entry = new NamedObjectsByPrefix<T>();
-				entry.prefix = prefix;
-				namesIndex.put(prefix, entry);
-			}
-			entry.addToken(obj, word, ungluedWords);
-		}
+		entry.addToken(obj, word, alternativeWords);
 	}
 
 	private static String substringByCodePoints(String value, int codePointCount) {
@@ -637,58 +635,6 @@ public class NameIndexCreator<T> {
     }
 
 
-	private static final int MIN_WORD_LENGTH = 2;
-
-	static String unglueName(String name) {
-		List<String> words = new ArrayList<>();
-		boolean glued = false;
-		for (String word : SearchAlgorithms.canonicalizePunctuation(name).split(" ")) {
-			if (word.isEmpty()) {
-				continue;
-			}
-			List<String> parts = unglueWord(word);
-			if (parts == null) {
-				words.add(word);
-			} else {
-				words.addAll(parts);
-				glued = true;
-			}
-		}
-		String unglued = String.join(" ", words).trim();
-		return glued && !unglued.isEmpty() ? unglued : null;
-	}
-
-	private static List<String> unglueWord(String word) {
-		boolean apostropheGlues = isLatin(word);
-		if (word.chars().anyMatch(Character::isDigit) || word.chars().noneMatch(c -> isGlue((char) c, apostropheGlues))) {
-			return null;
-		}
-		List<String> parts = new ArrayList<>();
-		boolean letterDropped = false;
-		int start = 0;
-		for (int i = 0; i <= word.length(); i++) {
-			if (i == word.length() || isGlue(word.charAt(i), apostropheGlues)) {
-				String part = word.substring(start, i);
-				if (part.length() >= MIN_WORD_LENGTH) {
-					parts.add(part);
-				} else if (!part.isEmpty()) {
-					letterDropped = true;
-				}
-				start = i + 1;
-			}
-		}
-		return parts.size() > 1 || letterDropped ? parts : null;
-	}
-
-	private static boolean isGlue(char c, boolean apostropheGlues) {
-		return c == '.' || (c == '\'' && apostropheGlues);
-	}
-
-	private static boolean isLatin(String word) {
-		return word.codePoints().filter(Character::isLetter)
-				.allMatch(c -> Character.UnicodeScript.of(c) == Character.UnicodeScript.LATIN);
-	}
-
     public static void putAddrNamedMapObject(NameIndexCreator<MapObject> nameIndex, MapObject o, long fileOffset, IndexCreatorSettings settings) {
 		String name = o.getName();
 		// getOtherNames ignores "admin_level", "place"
@@ -696,7 +642,12 @@ public class NameIndexCreator<T> {
 		nameIndex.addToNameIndex(removeBraces(name), o,  settings.charsToBuildAddressNameIndex, postcode);
 		int mainWords = countWords(removeBraces(name));
 		int variant = 0;
-		nameIndex.addUngluedToNameIndex(removeBraces(name), o, settings.charsToBuildAddressNameIndex);
+		nameIndex.addAlternativeNamesToNameIndex(removeBraces(name), null, o, settings.charsToBuildAddressNameIndex);
+		// language of every other name (key of the names map), null for the transliterated english name
+		Map<String, String> langs = new HashMap<>();
+		for (Map.Entry<String, String> e : o.getNamesMap(true).entrySet()) {
+			langs.putIfAbsent(e.getValue(), e.getKey());
+		}
 		for (String oName : o.getOtherNames(true, name)) {
 			if (!oName.equalsIgnoreCase(name)) {
 				String indexed = removeBraces(oName);
@@ -707,6 +658,7 @@ public class NameIndexCreator<T> {
 					indexed += " " + NameIndexReader.altNameMarker(variant);
 				}
 				nameIndex.addToNameIndex(indexed, o,  settings.charsToBuildAddressNameIndex, postcode);
+				nameIndex.addAlternativeNamesToNameIndex(indexed, langs.get(oName), o, settings.charsToBuildAddressNameIndex);
 			}
 		}
 		if (fileOffset > Integer.MAX_VALUE) {

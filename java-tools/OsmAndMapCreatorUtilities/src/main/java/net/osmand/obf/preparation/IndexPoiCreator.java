@@ -28,6 +28,7 @@ import net.osmand.data.Amenity;
 import net.osmand.data.Boundary;
 import net.osmand.data.City;
 import net.osmand.data.LatLon;
+import net.osmand.data.MapObject;
 import net.osmand.data.Multipolygon;
 import net.osmand.data.MultipolygonBuilder;
 import net.osmand.data.QuadRect;
@@ -1110,7 +1111,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 				prevTree = subtree;
 			}
-			Set<String> otherNames = null;
+			Map<String, String> otherNames = null; // name -> language of the name tag
 			Set<String> idNames = null;
 			Iterator<Entry<PoiAdditionalType, String>> it = additionalTags.entrySet().iterator();
 			while (it.hasNext()) {
@@ -1119,9 +1120,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				if ((ObfConstants.isTagIndexedForSearchAsName(tag))
 						&& !"name:en".equals(tag)) {
 					if (otherNames == null) {
-						otherNames = new TreeSet<String>();
+						otherNames = new TreeMap<String, String>();
 					}
-					otherNames.add(e.getValue());
+					otherNames.putIfAbsent(e.getValue(), MapObject.isNameLangTag(tag) ? tag.substring("name:".length()) : null);
 				}
 				if (settings.charsToBuildPoiIdNameIndex > 0 && ObfConstants.isTagIndexedForSearchAsId(tag)) {
 					if (idNames == null) {
@@ -1200,7 +1201,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 	
 	public void putPoiObjectPrefix(NameIndexCreator<PoiNameObject> namesIndex, PoiNameObject obj, String name,
-			String nameEn, Set<String> names, Set<String> idNames, IndexCreatorSettings settings) {
+			String nameEn, Map<String, String> names, Set<String> idNames, IndexCreatorSettings settings) {
 		NameIndexCreator.addPoiCategories(namesIndex, obj, poiTypes);
 		int mainWords = -1;
 		if (name != null) {
@@ -1212,15 +1213,19 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 		int[] variant = new int[1];
 		if (!Algorithms.objectEquals(nameEn, name) && !Algorithms.isEmpty(nameEn)) {
-			namesIndex.addToNameIndex(altName(nameEn, mainWords, variant), obj, settings.charsToBuildPoiNameIndex, false);
+			String indexed = altName(nameEn, mainWords, variant);
+			namesIndex.addToNameIndex(indexed, obj, settings.charsToBuildPoiNameIndex, false);
+			namesIndex.addAlternativeNamesToNameIndex(indexed, "en", obj, settings.charsToBuildPoiNameIndex);
 		}
 		if (name != null) {
-			namesIndex.addUngluedToNameIndex(name, obj, settings.charsToBuildPoiNameIndex);
+			namesIndex.addAlternativeNamesToNameIndex(name, null, obj, settings.charsToBuildPoiNameIndex);
 		}
 		if (names != null) {
-			for (String nk : names) {
-				if (!Algorithms.objectEquals(nk, name) && !Algorithms.isEmpty(nk)) {
-					namesIndex.addToNameIndex(altName(nk, mainWords, variant), obj, settings.charsToBuildPoiNameIndex, false);
+			for (Map.Entry<String, String> nk : names.entrySet()) {
+				if (!Algorithms.objectEquals(nk.getKey(), name) && !Algorithms.isEmpty(nk.getKey())) {
+					String indexed = altName(nk.getKey(), mainWords, variant);
+					namesIndex.addToNameIndex(indexed, obj, settings.charsToBuildPoiNameIndex, false);
+					namesIndex.addAlternativeNamesToNameIndex(indexed, nk.getValue(), obj, settings.charsToBuildPoiNameIndex);
 				}
 			}
 		}

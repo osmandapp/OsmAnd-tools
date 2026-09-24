@@ -100,6 +100,6 @@ public class UnglueNameTest {
 	}
 
 	private static void check(String name, String expected) {
-		assertEquals(name, expected, NameIndexCreator.unglueName(name));
+		assertEquals(name, expected, new AlternativeNameIndexGenerator<>(null).new UnglueRule().alternativeName(name, null, null));
 	}
 }

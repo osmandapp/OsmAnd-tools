@@ -646,8 +646,8 @@ public class SpatialSearchPipelineTest {
 					}
 				}
 				// String present = result.toString();
-				expected = cutPoiTypeId(expected.replaceFirst("^@", ""));
-				String present = actual == null ? ("#MISSING " + (i + 1)) : cutPoiTypeId(actual);
+				expected = cutInternalId(cutPoiTypeId(expected.replaceFirst("^@", "")));
+				String present = actual == null ? ("#MISSING " + (i + 1)) : cutInternalId(cutPoiTypeId(actual));
 				if (!Algorithms.stringsEqual(expected, present)) {
 					engine.search(text, true);
 					System.out.printf("Phrase #%s: %s%n", k + 1, text);
@@ -671,6 +671,32 @@ public class SpatialSearchPipelineTest {
 				reader.close();
 			}
         }
+	}
+
+	/**
+	 * Internal id of a matched object, 15797 of "'Hotel Sacher' 628990501 15797 (48.2040 16.3701)": it is the offset
+	 * in the file and moves whenever the size of the index changes, so "translation" tests compare it out.
+	 */
+	private static String cutInternalId(String result) {
+		if (result == null) {
+			return null;
+		}
+		StringBuilder res = new StringBuilder();
+		int start = 0;
+		int coordinates;
+		while ((coordinates = result.indexOf(" (", start)) != -1) {
+			String part = result.substring(start, coordinates);
+			int internalId = part.lastIndexOf(' ');
+			int osmId = internalId > 0 ? part.lastIndexOf(' ', internalId - 1) : -1;
+			// "... 'Hotel Sacher' 628990501 15797" -> "... 'Hotel Sacher' 628990501"
+			if (osmId > 0 && part.charAt(osmId - 1) == '\'' && osmId + 1 < internalId && internalId + 1 < part.length()
+					&& Algorithms.isInt(part.substring(osmId + 1, internalId)) && Algorithms.isInt(part.substring(internalId + 1))) {
+				part = part.substring(0, internalId);
+			}
+			res.append(part).append(" (");
+			start = coordinates + 2;
+		}
+		return res.append(result.substring(start)).toString();
 	}
 
 	/**
