@@ -259,8 +259,7 @@ public class TopPhotosController {
 				                         similarity AS dup_sim
 				                    WHERE wikidata_id = ?
 				                    GROUP BY imageTitle) AS D ON S.imageTitle = D.imageTitle
-				         LEFT ANTI JOIN (SELECT imageTitle FROM wiki.blocked_images
-				                         UNION ALL SELECT imageTitle FROM wiki.blocked_images_pending) AS B ON S.imageTitle = B.imageTitle
+				         LEFT ANTI JOIN wiki.blocked_images_pending AS B ON S.imageTitle = B.imageTitle
 				WHERE S.run_id = ? AND S.proc_id = ?%s
 				ORDER BY S.score DESC, image_size DESC""".formatted(byTitle ? " AND S.imageTitle = ?" : "");
 		return json(() -> rows(query,
