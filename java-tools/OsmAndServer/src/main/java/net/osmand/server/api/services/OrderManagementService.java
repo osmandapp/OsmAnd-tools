@@ -92,7 +92,7 @@ public class OrderManagementService {
 						"       i.userid, i.timestamp, " +
 						"       NULL AS starttime, NULL AS expiretime, i.checktime, " +
 						"       NULL AS autorenewing, NULL AS paymentstate, i.valid, " +
-						"       FALSE AS osmand_cloud, " +
+						"       (i.orderid = u.orderid) AS osmand_cloud, " +
 						"       i.purchase_time, " +
 						"       COALESCE(i.purchase_time, i.checktime) AS sort_key " +
 						"  FROM supporters_device_iap i " +
@@ -142,47 +142,16 @@ public class OrderManagementService {
 			List<CloudUsersRepository.CloudUser> users = usersRepository.findByEmailStartingWith(q, PageRequest.of(0, limit));
 			if (users != null) {
 				users.forEach(u -> {
-					AdminService.CloudUserInfo cloudInfo = getCloudInfo(u);
 					if (u.orderid != null) {
-						List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> sList = subscriptionsRepository.findByOrderId(u.orderid);
-						if (sList != null && !sList.isEmpty()) {
-							sList.forEach(s -> {
-								AdminService.Purchase p = new AdminService.Purchase();
-								p.email = u.email;
-								p.sku = s.sku;
-								p.orderId = s.orderId;
-								p.purchaseToken = s.purchaseToken;
-								p.userId = u.id;
-								p.starttime = s.starttime;
-								p.expiretime = s.expiretime;
-								p.checktime = s.checktime;
-								p.autorenewing = s.autorenewing;
-								p.paymentstate = s.paymentstate;
-								p.valid = s.valid;
-								p.platform = null;
-								p.purchaseTime = null;
-								p.osmandCloud = true;
-								p.cloudUserInfo = cloudInfo;
-								result.add(p);
-							});
+						List<AdminService.Purchase> found = new ArrayList<>();
+						subscriptionsRepository.findByOrderId(u.orderid).forEach(s -> found.add(toPurchase(s, u)));
+						deviceInAppPurchasesRepository.findByOrderId(u.orderid).forEach(i -> found.add(toPurchase(i, u)));
+						if (found.isEmpty()) {
+							result.add(toPurchase(u));
 						} else {
-							AdminService.Purchase p = new AdminService.Purchase();
-							p.email = u.email;
-							p.sku = null;
-							p.orderId = u.orderid;
-							p.purchaseToken = null;
-							p.userId = u.id;
-							p.starttime = null;
-							p.expiretime = null;
-							p.checktime = null;
-							p.autorenewing = null;
-							p.paymentstate = null;
-							p.valid = null;
-							p.platform = null;
-							p.purchaseTime = null;
-							p.osmandCloud = true;
-							p.cloudUserInfo = cloudInfo;
-							result.add(p);
+							AdminService.CloudUserInfo cloudInfo = getCloudInfo(u);
+							found.forEach(p -> p.cloudUserInfo = cloudInfo);
+							result.addAll(found);
 						}
 					}
 				});
@@ -357,52 +326,58 @@ public class OrderManagementService {
 		List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subs =
 				subscriptionsRepository.findByOrderIdAndSku(orderId, sku);
 		if (subs != null) {
-			subs.forEach(s -> {
-				CloudUsersRepository.CloudUser user = usersRepository.findById(s.userId);
-				AdminService.Purchase p = new AdminService.Purchase();
-				p.email = user.email;
-				p.sku = s.sku;
-				p.orderId = s.orderId;
-				p.purchaseToken = s.purchaseToken;
-				p.userId = s.userId;
-				p.timestamp = s.timestamp;
-				p.starttime = s.starttime;
-				p.expiretime = s.expiretime;
-				p.checktime = s.checktime;
-				p.autorenewing = s.autorenewing;
-				p.paymentstate = s.paymentstate;
-				p.valid = s.valid;
-				p.platform = null;
-				p.purchaseTime = null;
-				p.osmandCloud = s.orderId.equals(user.orderid);
-				result.add(p);
-			});
+			subs.forEach(s -> result.add(toPurchase(s, usersRepository.findById(s.userId))));
 		}
 		List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> iaps =
 				deviceInAppPurchasesRepository.findByOrderIdAndSku(orderId, sku);
 		if (iaps != null) {
-			iaps.forEach(i -> {
-				CloudUsersRepository.CloudUser user = usersRepository.findById(i.userId);
-				AdminService.Purchase p = new AdminService.Purchase();
-				p.email = user.email;
-				p.sku = i.sku;
-				p.orderId = i.orderId;
-				p.purchaseToken = i.purchaseToken;
-				p.userId = i.userId;
-				p.timestamp = i.timestamp;
-				p.starttime = null;
-				p.expiretime = null;
-				p.checktime = i.checktime;
-				p.autorenewing = null;
-				p.paymentstate = null;
-				p.valid = i.valid;
-				p.platform = PurchaseHelper.getPlatformBySku(i.sku);
-				p.purchaseTime = i.purchaseTime;
-				p.osmandCloud = false;
-				result.add(p);
-			});
+			iaps.forEach(i -> result.add(toPurchase(i, usersRepository.findById(i.userId))));
 		}
 		return result;
+	}
+
+	public AdminService.Purchase toPurchase(CloudUsersRepository.CloudUser user) {
+		AdminService.Purchase p = new AdminService.Purchase();
+		p.email = user.email;
+		p.orderId = user.orderid;
+		p.userId = user.id;
+		p.osmandCloud = user.orderid != null;
+		p.cloudUserInfo = getCloudInfo(user);
+		return p;
+	}
+
+	private AdminService.Purchase toPurchase(DeviceSubscriptionsRepository.SupporterDeviceSubscription s, CloudUsersRepository.CloudUser user) {
+		AdminService.Purchase p = new AdminService.Purchase();
+		p.email = user.email;
+		p.sku = s.sku;
+		p.orderId = s.orderId;
+		p.purchaseToken = s.purchaseToken;
+		p.userId = user.id;
+		p.timestamp = s.timestamp;
+		p.starttime = s.starttime;
+		p.expiretime = s.expiretime;
+		p.checktime = s.checktime;
+		p.autorenewing = s.autorenewing;
+		p.paymentstate = s.paymentstate;
+		p.valid = s.valid;
+		p.osmandCloud = s.orderId.equals(user.orderid);
+		return p;
+	}
+
+	private AdminService.Purchase toPurchase(DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase i, CloudUsersRepository.CloudUser user) {
+		AdminService.Purchase p = new AdminService.Purchase();
+		p.email = user.email;
+		p.sku = i.sku;
+		p.orderId = i.orderId;
+		p.purchaseToken = i.purchaseToken;
+		p.userId = user.id;
+		p.timestamp = i.timestamp;
+		p.checktime = i.checktime;
+		p.valid = i.valid;
+		p.platform = PurchaseHelper.getPlatformBySku(i.sku);
+		p.purchaseTime = i.purchaseTime;
+		p.osmandCloud = i.orderId.equals(user.orderid);
+		return p;
 	}
 
 	public List<OrderInfoRepository.OrderInfoDto> listOrderVersions(String sku, String orderId) {
