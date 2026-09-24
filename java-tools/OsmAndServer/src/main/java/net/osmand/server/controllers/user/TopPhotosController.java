@@ -242,8 +242,7 @@ public class TopPhotosController {
 			String query = """
 					SELECT F.*, score AS _score
 					FROM top_images_final AS F
-					         LEFT ANTI JOIN (SELECT imageTitle FROM wiki.blocked_images
-					                         UNION ALL SELECT imageTitle FROM wiki.blocked_images_pending) AS B ON F.imageTitle = B.imageTitle
+					         LEFT ANTI JOIN wiki.blocked_images_pending AS B ON F.imageTitle = B.imageTitle
 					WHERE wikidata_id = ?%s
 					ORDER BY score DESC""".formatted(byTitle ? " AND F.imageTitle = ?" : "");
 			return json(() -> rows(query, byTitle ? new Object[] { placeId, imageTitle } : new Object[] { placeId }));
