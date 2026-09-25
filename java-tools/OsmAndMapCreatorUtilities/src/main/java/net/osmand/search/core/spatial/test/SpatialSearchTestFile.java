@@ -6,6 +6,7 @@ import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -100,6 +101,11 @@ public final class SpatialSearchTestFile {
 		settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES = json.optInt("LIMIT_GOAL_LEVEL_2",
 				settings.LIMIT_STOP_GOALS_LEVEL_1__WHEN_REACHED_RES);
 		settings.DEV_USE_PIPELINE = json.optBoolean("DEV_USE_PIPELINE", settings.DEV_USE_PIPELINE);
+		JSONArray array = json.optJSONArray("MAX_PIPELINE_RES_TO_STOP");
+		if (array != null) {
+			settings.MAX_PIPELINE_RES_TO_STOP = ArrayUtils.toPrimitive(array.toList().toArray(new Integer[0]));
+		}
+		
 		return settings;
 	}
 
