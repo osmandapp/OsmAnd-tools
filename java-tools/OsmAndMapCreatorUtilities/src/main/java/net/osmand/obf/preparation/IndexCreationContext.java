@@ -194,7 +194,7 @@ public class IndexCreationContext {
 			}
 		}
 		if(upd) {
-			name = Abbreviations.replaceAll(name);
+			name = Abbreviations.replaceAll(name, "en");
 		}
 		return name;
 	}

@@ -3,8 +3,14 @@ package net.osmand.obf.preparation;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.TreeSet;
+import java.util.regex.Pattern;
 
 import net.osmand.binary.CommonWordsMultiIndex;
+import net.osmand.binary.SearchVariantRules;
+import net.osmand.binary.SearchVariantRules.Variant;
+import net.osmand.data.City;
+import net.osmand.data.Street;
+import net.osmand.obf.preparation.NameIndexCreator.PoiNameObject;
 import net.osmand.util.Algorithms;
 import net.osmand.util.SearchAlgorithms;
 
@@ -23,11 +29,11 @@ import net.osmand.util.SearchAlgorithms;
  * <li>spelling variants: "ß" / "ss" (de), "ё" / "е" (ru), "ij" / "y" (nl);</li>
  * <li>numerals: "3rd" / "third", "1-й" / "перший".</li>
  * </ul>
- * Such synonyms could come from a resource next to {@code common_words_groups.tsv}, lines
- * {@code synonym <group> <word> <synonym,synonym...>}, loaded once like {@link CommonWordsMultiIndex#getInstance()}.
+ * Localized expressions come from {@code rules.xml} and its locale overlays in OsmAnd-java resources.
  * The index size has to be measured per rule: every alternative word is one more key of the object.
  */
 public class AlternativeNameIndexGenerator<T> {
+	private static final Pattern NAME_LANGUAGE = Pattern.compile("[A-Za-z]{2,3}([_-][A-Za-z0-9]{2,8})*");
 
 	public interface AlternativeNameRule {
 		// alternative name of the name, null when the rule does not apply; lang is the language of the name ("fr" of
@@ -37,10 +43,7 @@ public class AlternativeNameIndexGenerator<T> {
 
 	private final NameIndexCreator<T> nameIndex;
 	// every rule applied to a name, in this order
-	private final AlternativeNameRule[] rules = {
-		new UnglueRule(),
-		// TODO new AbbreviationRule(), new SpellingRule(), new NumeralRule() by the language group (see the class comment)
-	};
+	private final AlternativeNameRule[] rules = { new UnglueRule() };
 	// language group of the map (CommonWordsMultiIndex.DEFAULT_GROUPS), null when no group covers it
 	private String languageGroup;
 	private String mapName;
@@ -79,6 +82,42 @@ public class AlternativeNameIndexGenerator<T> {
 			}
 			addAlternativeName(nameWords, alternative, obj, maxPrefixLength);
 		}
+		String owner = ownerType(obj);
+		if (owner != null) {
+			String locale = lang == null ? languageGroup : nameLanguage(lang);
+			for (Variant rule : SearchVariantRules.forLocale(locale).index()) {
+				if (!rule.appliesTo(owner)) {
+					continue;
+				}
+				String alternative = rule.apply(name);
+				if (alternative != null) {
+					if (nameWords == null) {
+						nameWords = SearchAlgorithms.splitAndNormalize(name, false);
+					}
+					addAlternativeName(nameWords, alternative, obj, maxPrefixLength);
+				}
+			}
+		}
+	}
+
+	private String nameLanguage(String nameTag) {
+		String suffix = nameTag.substring(nameTag.lastIndexOf(':') + 1);
+		return (nameTag.indexOf(':') >= 0 || suffix.length() <= 3)
+				&& NAME_LANGUAGE.matcher(suffix).matches() ? suffix : null;
+	}
+
+	private String ownerType(T obj) {
+		if (obj instanceof Street) {
+			return "street";
+		}
+		if (obj instanceof City city) {
+			return switch (city.getType()) {
+				case BOUNDARY -> "boundary";
+				case POSTCODE -> "postcode";
+				default -> "locality";
+			};
+		}
+		return obj instanceof PoiNameObject ? "poi" : null;
 	}
 
 	private void addAlternativeName(List<String> nameWords, String alternative, T obj, int maxPrefixLength) {
@@ -93,7 +132,7 @@ public class AlternativeNameIndexGenerator<T> {
 	}
 
 	// words glued by a dot or, in latin names, an apostrophe ("L'Atelier d'Anaïs" -> "Atelier Anaïs")
-	class UnglueRule implements AlternativeNameRule {
+    static class UnglueRule implements AlternativeNameRule {
 
 		private static final int MIN_WORD_LENGTH = 2;
 

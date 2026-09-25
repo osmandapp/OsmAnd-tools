@@ -1012,7 +1012,7 @@ public interface AnalystService extends InspectorService, GenDbService {
         }
         String preparedValue = isPoi ? value : removeGenerateDbAddressBraces(value);
         List<String> splitValues = SearchAlgorithms.splitAndNormalize(preparedValue, true);
-        SearchAlgorithms.removeCommonWords(CommonWords.getInstance(), splitValues);
+        SearchAlgorithms.removeCommonWords(CommonWords.getInstance(), splitValues, "");
         for (String token : splitValues) {
             if (!Algorithms.isEmpty(token)) {
                 tokens.add(token);
