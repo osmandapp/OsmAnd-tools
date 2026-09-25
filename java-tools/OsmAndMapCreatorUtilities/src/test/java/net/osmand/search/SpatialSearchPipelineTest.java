@@ -120,8 +120,9 @@ public class SpatialSearchPipelineTest {
 			BinaryMerger.class);
 	// every rules file of OsmAnd-java resources: a new language file has to be added here to invalidate cached OBFs
 	private static final List<String> OBF_RULE_RESOURCES = List.of("rules.xml", "rules_en.xml", "rules_de.xml",
-			"rules_it.xml", "rules_fr.xml", "rules_es.xml", "rules_nl.xml", "rules_pt.xml", "rules_ca.xml",
-			"rules_ru.xml", "rules_bg.xml", "rules_sr.xml", "rules_mk.xml");
+			"rules_it.xml", "rules_fr.xml", "rules_es.xml", "rules_es_CO.xml", "rules_es_PE.xml", "rules_nl.xml",
+			"rules_pt.xml", "rules_ca.xml", "rules_ru.xml", "rules_uk.xml", "rules_bg.xml", "rules_sr.xml",
+			"rules_mk.xml");
 	private static final String HASH_VERSION = "2";
 	private static final String OBF_HASH_FILE_NAME = ".obf.hash";
 	private static final int MAX_KNOWN_HASHES = 4; // one per build that writes its own class files
