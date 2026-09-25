@@ -637,7 +637,8 @@ public class UpdateSubscription {
 				reason = String.format(" subscription expired more than %.1f days ago (%s)",
 						(currentTime - expireTime.getTime()) / (DAY * 1.0d), e.getMessage());
 				kind = EXPIRED_STATE;
-			} else if (!purchaseToken.contains(".AO") || errorCode == 400) {
+			} else if (errorCode == 400 || (errorCode != 0 && !purchaseToken.contains(".AO"))) {
+				// a request that got no response from Google says nothing about the token
 				reason = String.format(" subscription is invalid - possibly fraud %s, %s (%s)", orderId, purchaseToken, e.getMessage());
 				if (regTime != null && currentTime - regTime.getTime() > MAX_WAITING_TIME_TO_MAKE_INVALID) {
 					kind = "invalid";
