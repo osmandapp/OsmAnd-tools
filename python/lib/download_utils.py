@@ -43,7 +43,7 @@ cache_folder = f"{CACHE_DIR}/images-{IMAGE_SIZE}/"
 
 OFFSET_BATCH = int(os.getenv('OFFSET_BATCH', '0'))
 DOWNLOAD_IF_EXISTS = os.getenv('DOWNLOAD_IF_EXISTS', 'false').lower() == 'true'
-FAILED_RETRY_DAYS = int(os.getenv('FAILED_RETRY_DAYS', '30'))
+FAILED_RETRY_DAYS = int(os.getenv('FAILED_RETRY_DAYS', '90'))
 PROCESS_PLACES = int(os.getenv('PROCESS_PLACES', '1000'))
 PLACES_PER_THREAD = int(os.getenv('PLACES_PER_THREAD', '10000'))
 ERROR_LIMIT_PERCENT = int(os.getenv('ERROR_LIMIT_PERCENT', '50'))
