@@ -2,6 +2,7 @@ package net.osmand.obf.preparation;
 
 import net.osmand.binary.Abbreviations;
 import net.osmand.binary.BinaryMapDataObject;
+import net.osmand.binary.SearchLocales;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
 import net.osmand.map.OsmandRegions;
@@ -35,6 +36,9 @@ public class IndexCreationContext {
     public boolean basemap;
 
     private boolean decryptAbbreviations = false;
+	// rules locale of the English region names are expanded for ("en_US"); needDecryptAbbreviations allows only English
+	private String decryptAbbreviationsLocale = DECRYPT_ABBREVIATIONS_LANGUAGE;
+	private static final String DECRYPT_ABBREVIATIONS_LANGUAGE = "en";
     private boolean translitJapaneseNames = false;
 	private boolean translitChineseNames = false;
 	private final IndexCreator indexCreator;
@@ -52,6 +56,9 @@ public class IndexCreationContext {
 			this.translitJapaneseNames = regionName.toLowerCase().startsWith(JAPAN);
 			this.translitChineseNames = regionName.toLowerCase().startsWith(CHINA);
 			this.decryptAbbreviations = needDecryptAbbreviations(getRegionLang(allRegions, regionName));
+			if (decryptAbbreviations) {
+				decryptAbbreviationsLocale = englishLocale(regionName);
+			}
             WorldRegion region = this.allRegions.getRegionDataByDownloadName(regionName);
             if (region != null) {
 				bboxFilter.initRegionQuads(region);
@@ -180,23 +187,29 @@ public class IndexCreationContext {
 	}
 
 	public String decryptAbbreviations(String name, LatLon loc, boolean addRegionTag) {
-		boolean upd = false;
+		String locale = null;
 		if (decryptAbbreviations) {
-			upd = true;
+			locale = decryptAbbreviationsLocale;
 		} else if (addRegionTag && loc != null) {
 			Set<String> dwNames = calcDownloadNames(null, false, allRegions,
 					new QuadRect(loc.getLongitude(), loc.getLatitude(), loc.getLongitude(), loc.getLatitude()));
 			for (String dwName : dwNames) {
 				if (needDecryptAbbreviations(getRegionLang(allRegions, dwName))) {
-					upd = true;
+					locale = englishLocale(dwName);
 					break;
 				}
 			}
 		}
-		if(upd) {
-			name = Abbreviations.replaceAll(name, "en");
+		if (locale != null) {
+			name = Abbreviations.replaceAll(name, locale);
 		}
 		return name;
+	}
+
+	// locale of an English region ("en_US"); plain English when the region is not in SearchLocales or not English there
+	private static String englishLocale(String regionName) {
+		String locale = SearchLocales.forMap(regionName);
+		return SearchLocales.language(locale).equals(DECRYPT_ABBREVIATIONS_LANGUAGE) ? locale : DECRYPT_ABBREVIATIONS_LANGUAGE;
 	}
 
 	public Set<String> calcRegionTag(Entity entity, boolean add) {

@@ -3,9 +3,9 @@ package net.osmand.obf.preparation;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.TreeSet;
-import java.util.regex.Pattern;
 
 import net.osmand.binary.CommonWordsMultiIndex;
+import net.osmand.binary.SearchLocales;
 import net.osmand.binary.SearchVariantRules;
 import net.osmand.binary.SearchVariantRules.Variant;
 import net.osmand.data.City;
@@ -33,8 +33,6 @@ import net.osmand.util.SearchAlgorithms;
  * The index size has to be measured per rule: every alternative word is one more key of the object.
  */
 public class AlternativeNameIndexGenerator<T> {
-	private static final Pattern NAME_LANGUAGE = Pattern.compile("[A-Za-z]{2,3}([_-][A-Za-z0-9]{2,8})*");
-
 	public interface AlternativeNameRule {
 		// alternative name of the name, null when the rule does not apply; lang is the language of the name ("fr" of
 		// name:fr, null for the main name and alt_name), group is the language group of the map, both can be null
@@ -47,6 +45,8 @@ public class AlternativeNameIndexGenerator<T> {
 	// language group of the map (CommonWordsMultiIndex.DEFAULT_GROUPS), null when no group covers it
 	private String languageGroup;
 	private String mapName;
+	// rules locale of the map (SearchLocales.forMap: "en_US", "it_IT"), "" when no locale covers it
+	private String mapLocale = "";
 
 	public AlternativeNameIndexGenerator(NameIndexCreator<T> nameIndex) {
 		this.nameIndex = nameIndex;
@@ -63,6 +63,11 @@ public class AlternativeNameIndexGenerator<T> {
 	void setLanguageGroup(String languageGroup, String mapName) {
 		this.languageGroup = languageGroup;
 		this.mapName = mapName;
+		this.mapLocale = SearchLocales.forMap(mapName);
+	}
+
+	public String getMapLocale() {
+		return mapLocale;
 	}
 
 	// name can carry the marker of an alternative name (NameIndexReader.altNameMarker): the marker is a word of the name,
@@ -84,7 +89,8 @@ public class AlternativeNameIndexGenerator<T> {
 		}
 		String owner = ownerType(obj);
 		if (owner != null) {
-			String locale = lang == null ? languageGroup : nameLanguage(lang);
+			// name and alt_name are in the language of the map, name:de in German in the country of the map
+			String locale = SearchLocales.forName(lang, mapLocale);
 			for (Variant rule : SearchVariantRules.forLocale(locale).index()) {
 				if (!rule.appliesTo(owner)) {
 					continue;
@@ -98,12 +104,6 @@ public class AlternativeNameIndexGenerator<T> {
 				}
 			}
 		}
-	}
-
-	private String nameLanguage(String nameTag) {
-		String suffix = nameTag.substring(nameTag.lastIndexOf(':') + 1);
-		return (nameTag.indexOf(':') >= 0 || suffix.length() <= 3)
-				&& NAME_LANGUAGE.matcher(suffix).matches() ? suffix : null;
 	}
 
 	private String ownerType(T obj) {
