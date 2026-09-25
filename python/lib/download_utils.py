@@ -34,6 +34,7 @@ READ_TIMEOUT = 60
 
 MAX_IMG_DIMENSION = int(os.getenv('MAX_IMG_DIMENSION', 720))
 IMAGE_SIZE = 1280
+MAX_ORIGINAL_BYTES = int(os.getenv('MAX_ORIGINAL_MB', '32')) * 1024 * 1024
 
 CACHE_DIR = os.getenv('CACHE_DIR', './wiki')
 cache_folder = f"{CACHE_DIR}/images-{IMAGE_SIZE}/"
@@ -165,17 +166,18 @@ def download_image_as_base64(file_name):
     return base64_encoded
 
 
-def resize_image(image: Image):
+def resize_image(image: Image, max_dimension: int = MAX_IMG_DIMENSION):
     width, height = image.size
-    if width > MAX_IMG_DIMENSION or height > MAX_IMG_DIMENSION:
+    if width > max_dimension or height > max_dimension:
+        is_png = image.format == 'PNG'
         if width > height:
-            new_width = MAX_IMG_DIMENSION
-            new_height = int((MAX_IMG_DIMENSION / width) * height)
+            new_width = max_dimension
+            new_height = int((max_dimension / width) * height)
         else:
-            new_height = MAX_IMG_DIMENSION
-            new_width = int((MAX_IMG_DIMENSION / height) * width)
+            new_height = max_dimension
+            new_width = int((max_dimension / height) * width)
         image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
-        if image.mode != 'RGB' and image.format != 'PNG':
+        if image.mode != 'RGB' and not is_png:
             image = image.convert('RGB')
         return image, True
     return image, False
@@ -199,6 +201,40 @@ def download_pil_image(file_name):
     except Exception as e:
         print(f"SKIPPED {file_name}. Error processing image: {e}", flush=True)
         return None
+
+
+def _download_original(file_name, file_path, proxies=None) -> bool:
+    url = _generate_image_url(file_name, width=0)
+    headers = {"User-Agent": USER_AGENT}
+    try:
+        with requests.get(url, headers=headers, proxies=proxies, timeout=(CONNECT_TIMEOUT, READ_TIMEOUT), stream=True) as response:
+            if response.status_code != 200:
+                print(f"Original HTTP-{response.status_code} {url}")
+                return False
+            content_length = int(response.headers.get('Content-Length', 0))
+            if content_length > MAX_ORIGINAL_BYTES:
+                print(f"Original too big {content_length} bytes {url}")
+                return False
+            content = response.content
+    except Exception as e:
+        print(f"Original exception {url}: {e}")
+        return False
+
+    try:
+        img = Image.open(BytesIO(content))
+        img.load()
+        img, resized = resize_image(img, IMAGE_SIZE)
+    except Exception as e:
+        print(f"Original is not an image {url}: {e}")
+        return False
+
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    if resized:
+        img.save(file_path, format=file_name_image_format_lowercase(file_name).upper())
+    else:
+        with open(file_path, "wb") as image_file:
+            image_file.write(content)
+    return True
 
 
 def download_image(file_name, override: bool = False, proxy_manager=None):
@@ -248,13 +284,18 @@ def download_image(file_name, override: bool = False, proxy_manager=None):
             # else:
             #     print("+") # debug
             return True
+        elif 500 <= status_code <= 599 or (status_code == 429 and 'failing image' in response.text):
+            if _download_original(file_name, file_path, proxies):
+                print(f"{file_path} is downloaded from the original after HTTP-{status_code}. Time:{(time.time() - start_time):.2f}s")
+                return True
+            break
         elif status_code == 429:
             reuse_same_proxy = True
             seconds = int(attempt * (MAX_SLEEP / MAX_TRIES))
             print(f"Sleep {seconds}s HTTP-{status_code} {url} proxy {proxy} [{attempt}]")
             time.sleep(seconds)
             continue
-        elif status_code == 404 or (500 <= status_code <= 599):
+        elif status_code == 404:
             break
 
         print(f"Retry HTTP-{status_code} {url} proxy {proxy} [{attempt}]")

@@ -41,6 +41,7 @@ Below is a listing of all global parameters. Each parameter is accompanied by it
 | ASTRO_IMAGES_ONLY      | bool | false             | Download images for lat==lon==0 objects only (image-downloader)              |
 | MAX_TRIES              | int  | 10                | Number of attempts of image-downloader (useful with proxies)                 |
 | MAX_SLEEP              | int  | 60                | Maximum sleep between HTTP-429 errors (image-downloader)                     |
+| MAX_ORIGINAL_MB        | int  | 32                | Skip the original image above this size when the thumbnail fails (image-downloader) |
 
 
 ### Threading Model
