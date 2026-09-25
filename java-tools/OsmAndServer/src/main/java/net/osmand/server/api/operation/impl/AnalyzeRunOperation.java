@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -19,6 +18,7 @@ import net.osmand.server.api.operation.AdminOperation;
 import net.osmand.server.api.operation.OperationContext;
 import net.osmand.server.api.operation.OperationRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository;
+import net.osmand.server.utils.FileSizeFormatter;
 
 @Component
 @AdminOperation(name = "analyze-run")
@@ -79,10 +79,10 @@ public class AnalyzeRunOperation extends AbstractParallelOperation<AnalyzeRunOpe
 					}
 				}
 			});
-			r.put("filesize", size(filesize.get()));
-			r.put("zipfilesize", size(zipfilesize.get()));
-			r.put("allVersionsFilesize", size(allFilesize.get()));
-			r.put("allVersionsZipfilesize", size(allZipfilesize.get()));
+			r.put("filesize", FileSizeFormatter.format(filesize.get()));
+			r.put("zipfilesize", FileSizeFormatter.format(zipfilesize.get()));
+			r.put("allVersionsFilesize", FileSizeFormatter.format(allFilesize.get()));
+			r.put("allVersionsZipfilesize", FileSizeFormatter.format(allZipfilesize.get()));
 		}
 		return r;
 	}
@@ -110,12 +110,6 @@ public class AnalyzeRunOperation extends AbstractParallelOperation<AnalyzeRunOpe
 			out.add(ids.subList(i, Math.min(ids.size(), i + BATCH)));
 		}
 		return out;
-	}
-
-	private static String size(long bytes) {
-		return bytes < 1024 * 1024
-				? String.format(Locale.US, "%.1f KB", bytes / 1024.0)
-				: String.format(Locale.US, "%.1f MB", bytes / (1024.0 * 1024));
 	}
 
 	private void collect(OperationRepository.RunItem run, Map<String, Set<Long>> groups) {

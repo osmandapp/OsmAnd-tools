@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import net.osmand.server.api.repo.*;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.controllers.user.ShareFileController;
+import net.osmand.server.utils.FileSizeFormatter;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
@@ -43,6 +44,9 @@ public class ShareFileService {
 
 	@Autowired
 	UserdataService userdataService;
+
+	@Autowired
+	EmailSenderService emailSender;
 
 	protected static final Log LOGGER = LogFactory.getLog(ShareFileService.class);
 
@@ -258,10 +262,35 @@ public class ShareFileService {
 			if (access != null) {
 				access.access = (accessType);
 				shareFileRepository.saveAndFlush(access);
+				if (PermissionType.READ.name().equals(accessType)) {
+					notifyAccessRequest(access, true);
+				} else if (PermissionType.BLOCKED.name().equals(accessType)) {
+					notifyAccessRequest(access, false);
+				}
 			}
 		}
 		return true;
 	}
+
+	private void notifyAccessRequest(ShareFileRepository.ShareFilesAccess access, boolean approved) {
+		try {
+			ShareFileRepository.ShareFile file = access.file;
+			CloudUsersRepository.CloudUser requester = access.user;
+			if (file == null || requester == null || requester.email == null) {
+				return;
+			}
+			CloudUsersRepository.CloudUser owner = usersRepository.findById(file.ownerid);
+			if (owner == null) {
+				return;
+			}
+			CloudUserFilesRepository.UserFile userFile = getUserFile(file);
+			emailSender.sendShareFileAccessEmail(requester.email, emailSender.userLang(requester.id), approved,
+					owner, file.name, file.type, userFile == null ? 0 : userFile.filesize, file.uuid);
+		} catch (Exception e) {
+			LOGGER.error("Failed to send share access email: " + e.getMessage(), e);
+		}
+	}
+
 
 	public UserdataController.UserFilesResults getSharedWithMe(int userid, String type) {
 		List<ShareFileRepository.ShareFilesAccess> list = shareFileRepository.findShareFilesAccessListByUserId(userid);
