@@ -639,7 +639,7 @@ public class UpdateSubscription {
 				kind = EXPIRED_STATE;
 			} else if (!purchaseToken.contains(".AO") || errorCode == 400) {
 				reason = String.format(" subscription is invalid - possibly fraud %s, %s (%s)", orderId, purchaseToken, e.getMessage());
-				if((currentTime - regTime.getTime()) > MAX_WAITING_TIME_TO_MAKE_INVALID) {
+				if (regTime != null && currentTime - regTime.getTime() > MAX_WAITING_TIME_TO_MAKE_INVALID) {
 					kind = "invalid";
 				}
 			} else if (errorCode == 410) {
