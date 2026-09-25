@@ -18,10 +18,12 @@ import requests
 from PIL import Image
 
 downloaded_files_cache: set = set()
+failed_files_cache: set = set()
 downloaded_files_cache_lock = threading.Lock()
 
 from .database_api import VALID_EXTENSIONS_LOWERCASE, is_valid_image_file_name, ch_client, ch_query
 from .database_api import populate_cache_from_db, scan_and_populate_db, insert_downloaded_image
+from .database_api import populate_failed_cache_from_db, insert_failed_image
 
 USER_AGENT = "OsmAnd-Bot/1.0 (+https://osmand.net; support@osmand.net) OsmAndPython/1.0"
 WIKI_MEDIA_URL = os.getenv('WIKI_MEDIA_URL', "https://data.osmand.net/wikimedia/images-1280/")
@@ -41,6 +43,7 @@ cache_folder = f"{CACHE_DIR}/images-{IMAGE_SIZE}/"
 
 OFFSET_BATCH = int(os.getenv('OFFSET_BATCH', '0'))
 DOWNLOAD_IF_EXISTS = os.getenv('DOWNLOAD_IF_EXISTS', 'false').lower() == 'true'
+FAILED_RETRY_DAYS = int(os.getenv('FAILED_RETRY_DAYS', '30'))
 PROCESS_PLACES = int(os.getenv('PROCESS_PLACES', '1000'))
 PLACES_PER_THREAD = int(os.getenv('PLACES_PER_THREAD', '10000'))
 ERROR_LIMIT_PERCENT = int(os.getenv('ERROR_LIMIT_PERCENT', '50'))
@@ -242,7 +245,7 @@ def download_image(file_name, override: bool = False, proxy_manager=None):
 
     file_path = _cached_path(file_name, True)
     if not override and os.path.exists(file_path):
-        return True
+        return 200
 
     status_code = 0
     reuse_same_proxy = False
@@ -283,11 +286,11 @@ def download_image(file_name, override: bool = False, proxy_manager=None):
                 print(f"{file_path} is downloaded. Time:{(time.time() - start_time):.2f}s [{attempt}]")
             # else:
             #     print("+") # debug
-            return True
+            return 200
         elif 500 <= status_code <= 599 or (status_code == 429 and 'failing image' in response.text):
             if _download_original(file_name, file_path, proxies):
                 print(f"{file_path} is downloaded from the original after HTTP-{status_code}. Time:{(time.time() - start_time):.2f}s")
-                return True
+                return 200
             break
         elif status_code == 429:
             reuse_same_proxy = True
@@ -303,7 +306,7 @@ def download_image(file_name, override: bool = False, proxy_manager=None):
         continue
 
     print(f"Failed to get {url}. Last status code: {status_code}")
-    return False
+    return status_code
 
 
 def download_images_per_page(page_no: int, override: bool = False, proxy_manager=None):
@@ -325,15 +328,18 @@ def download_images_per_page(page_no: int, override: bool = False, proxy_manager
             image_all_count += 1
             # Directly check the set (no os.path.exists here)
             with downloaded_files_cache_lock:
-                if not override and img_path in downloaded_files_cache:
+                if not override and (img_path in downloaded_files_cache or img_path in failed_files_cache):
                     continue  # Skip if found in the pre-scanned set
 
-            success = download_image(img_path, override, proxy_manager)
-            if not success:
+            status_code = download_image(img_path, override, proxy_manager)
+            if status_code != 200:
                 error_count += 1
                 place_img_error += 1
                 with monitoring_counter_lock:
                     monitoring_error_count += 1
+                with downloaded_files_cache_lock:
+                    failed_files_cache.add(img_path)
+                insert_failed_image(img_path, status_code)
             else:
                 with downloaded_files_cache_lock:
                     downloaded_files_cache.add(img_path)
@@ -390,7 +396,7 @@ def process_chunk(proxy_manager=None):
 
 def initialize_download_cache():
     """Populates the in-memory cache from DB or by scanning disk."""
-    global downloaded_files_cache
+    global downloaded_files_cache, failed_files_cache
     populate_db_flag = os.getenv('POPULATE_DOWNLOADED_DB', 'false').lower() == 'true'
 
     if populate_db_flag:
@@ -401,7 +407,8 @@ def initialize_download_cache():
     else:
         print("Reading downloaded files cache from database...")
         downloaded_files_cache = populate_cache_from_db()
-    print(f"Initialized cache with {len(downloaded_files_cache)} items.")
+    failed_files_cache = populate_failed_cache_from_db(FAILED_RETRY_DAYS)
+    print(f"Initialized cache with {len(downloaded_files_cache)} items, {len(failed_files_cache)} failed.")
 
 
 def file_name_image_format_lowercase(file_name):
@@ -450,7 +457,7 @@ def get_images_per_page(page_no: int, places_per_thread: int) -> list[tuple[int,
         for p in ch_query(query, client):
             place_id, place_paths = p[0], p[1]
             with downloaded_files_cache_lock:
-                cleaned_place_paths = [t for t in place_paths if t[0] not in downloaded_files_cache]
+                cleaned_place_paths = [t for t in place_paths if t[0] not in downloaded_files_cache and t[0] not in failed_files_cache]
             if cleaned_place_paths:
                 images.append((place_id, cleaned_place_paths))
         return images

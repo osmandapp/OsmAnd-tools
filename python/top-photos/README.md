@@ -42,6 +42,7 @@ Below is a listing of all global parameters. Each parameter is accompanied by it
 | MAX_TRIES              | int  | 10                | Number of attempts of image-downloader (useful with proxies)                 |
 | MAX_SLEEP              | int  | 60                | Maximum sleep between HTTP-429 errors (image-downloader)                     |
 | MAX_ORIGINAL_MB        | int  | 32                | Skip the original image above this size when the thumbnail fails (image-downloader) |
+| FAILED_RETRY_DAYS      | int  | 30                | Days before a failed download is retried (image-downloader)                  |
 
 
 ### Threading Model
