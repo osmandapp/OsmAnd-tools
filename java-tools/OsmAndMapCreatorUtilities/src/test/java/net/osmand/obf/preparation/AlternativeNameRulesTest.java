@@ -64,8 +64,10 @@ public class AlternativeNameRulesTest {
 		}
 
 		@Override
-		void addAlternativeToken(String prefix, Street obj, String word, List<String> alternativeWords) {
-			words.add(word);
+		AlternativeNameIndexGenerator.KeyOutcome addAlternativeToken(String prefix, Street obj, String word,
+				List<String> alternativeWords) {
+			return words.add(word) ? AlternativeNameIndexGenerator.KeyOutcome.BLOCK
+					: AlternativeNameIndexGenerator.KeyOutcome.DUP;
 		}
 	}
 }
