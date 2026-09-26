@@ -517,14 +517,23 @@ public class NameIndexCreator<T> {
 		return alternativeNames.getStats();
 	}
 
-	void addAlternativeToken(String prefix, T obj, String word, List<String> alternativeWords) {
+	// where the key went, at the time it is added: a later common-words build can still drop or merge the block
+	AlternativeNameIndexGenerator.KeyOutcome addAlternativeToken(String prefix, T obj, String word,
+			List<String> alternativeWords) {
 		NamedObjectsByPrefix<T> entry = namesIndex.get(prefix);
+		AlternativeNameIndexGenerator.KeyOutcome outcome;
 		if (entry == null) {
 			entry = new NamedObjectsByPrefix<T>();
 			entry.prefix = prefix;
 			namesIndex.put(prefix, entry);
+			outcome = AlternativeNameIndexGenerator.KeyOutcome.BLOCK;
+		} else if (entry.namedObjects.isEmpty() || entry.namedObjects.get(entry.namedObjects.size() - 1).object != obj) {
+			// addToken reuses only the last atom of the block
+			outcome = AlternativeNameIndexGenerator.KeyOutcome.ATOM;
+		} else {
+			outcome = AlternativeNameIndexGenerator.KeyOutcome.JOIN;
 		}
-		entry.addToken(obj, word, alternativeWords);
+		return entry.addToken(obj, word, alternativeWords) ? outcome : AlternativeNameIndexGenerator.KeyOutcome.DUP;
 	}
 
 	private static String substringByCodePoints(String value, int codePointCount) {

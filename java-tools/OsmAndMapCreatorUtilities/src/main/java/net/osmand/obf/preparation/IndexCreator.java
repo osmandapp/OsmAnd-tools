@@ -866,7 +866,7 @@ public class IndexCreator {
 			total.add(poi);
 		}
 		line.append(", total [").append(total).append("]");
-		line.append(", by rule [").append(total.byRule).append("]");
+		line.append(", by rule [").append(total.byRuleString()).append("]");
 		log.info(line.toString());
 	}
 

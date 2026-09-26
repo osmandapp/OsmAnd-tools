@@ -41,27 +41,70 @@ public class AlternativeNameIndexGenerator<T> {
 		String alternativeName(String name, String lang, String group);
 	}
 
-	/** Size of the alternative names of one name index: every key is one more prefix posting of an object. */
-	public static class Stats {
-		// names that got at least one alternative name
-		int names;
-		// alternative names produced by the rules
-		int alternatives;
-		// alternative keys added to the name index
-		int keys;
-		// alternative names by rule ("unglue", "street SS$1")
-		final Map<String, Integer> byRule = new TreeMap<>();
+	/** Where an alternative key went in the name index, from the most to the least expensive. */
+	public enum KeyOutcome {
+		// a new prefix block
+		BLOCK,
+		// a new atom (object) in an existing prefix block
+		ATOM,
+		// one more name of the atom the object already has in the block: only its suffixes are stored
+		JOIN,
+		// the object already has this key with the same words: nothing is stored
+		DUP
+	}
 
-		public void add(Stats other) {
-			names += other.names;
+	/** Alternative names and their keys by outcome, per rule or per name index. */
+	public static class KeyStats {
+		// alternative names produced
+		int alternatives;
+		final int[] outcomes = new int[KeyOutcome.values().length];
+
+		void add(KeyStats other) {
 			alternatives += other.alternatives;
-			keys += other.keys;
-			other.byRule.forEach((rule, count) -> byRule.merge(rule, count, Integer::sum));
+			for (int i = 0; i < outcomes.length; i++) {
+				outcomes[i] += other.outcomes[i];
+			}
+		}
+
+		// keys stored in the name index (every outcome but DUP)
+		int keys() {
+			return outcomes[KeyOutcome.BLOCK.ordinal()] + outcomes[KeyOutcome.ATOM.ordinal()]
+					+ outcomes[KeyOutcome.JOIN.ordinal()];
 		}
 
 		@Override
 		public String toString() {
-			return "names=" + names + " alternatives=" + alternatives + " keys=" + keys;
+			StringBuilder s = new StringBuilder("alternatives=").append(alternatives).append(" keys=").append(keys());
+			for (KeyOutcome o : KeyOutcome.values()) {
+				s.append(' ').append(o.name().toLowerCase()).append('=').append(outcomes[o.ordinal()]);
+			}
+			return s.toString();
+		}
+	}
+
+	/** Size of the alternative names of one name index: every key is one more prefix posting of an object. */
+	public static class Stats extends KeyStats {
+		// names that got at least one alternative name
+		int names;
+		// alternative names and keys by rule ("unglue", "street SS$1")
+		final Map<String, KeyStats> byRule = new TreeMap<>();
+
+		public void add(Stats other) {
+			names += other.names;
+			super.add(other);
+			other.byRule.forEach((rule, s) -> byRule.computeIfAbsent(rule, r -> new KeyStats()).add(s));
+		}
+
+		// "unglue: alternatives=.. keys=.. block=.. atom=.. join=.. dup=..; street $1str: ..."
+		public String byRuleString() {
+			StringBuilder s = new StringBuilder();
+			byRule.forEach((rule, stats) -> s.append(s.length() == 0 ? "" : "; ").append(rule).append(": ").append(stats));
+			return s.toString();
+		}
+
+		@Override
+		public String toString() {
+			return "names=" + names + " " + super.toString();
 		}
 	}
 
@@ -157,15 +200,17 @@ public class AlternativeNameIndexGenerator<T> {
 
 	private void addAlternativeName(List<String> nameWords, String alternative, T obj, int maxPrefixLength, String rule) {
 		List<String> alternativeWords = SearchAlgorithms.splitAndNormalize(alternative, false);
+		KeyStats ruleStats = stats.byRule.computeIfAbsent(rule, r -> new KeyStats());
 		stats.alternatives++;
-		stats.byRule.merge(rule, 1, Integer::sum);
+		ruleStats.alternatives++;
 		for (String word : new TreeSet<>(alternativeWords)) {
 			String prefix = NameIndexCreator.nameIndexPreparePrefix(word, maxPrefixLength);
 			if (nameWords.contains(word) || Algorithms.isEmpty(prefix)) {
 				continue;
 			}
-			nameIndex.addAlternativeToken(prefix, obj, word, alternativeWords);
-			stats.keys++;
+			int outcome = nameIndex.addAlternativeToken(prefix, obj, word, alternativeWords).ordinal();
+			stats.outcomes[outcome]++;
+			ruleStats.outcomes[outcome]++;
 		}
 	}
 
