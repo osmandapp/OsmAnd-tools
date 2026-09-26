@@ -54,7 +54,12 @@ import net.osmand.binary.BinaryMapPoiReaderAdapter;
 import net.osmand.binary.BinaryMapRouteReaderAdapter;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.binary.CommonWordsMultiIndex;
+import net.osmand.binary.SearchVariantRules;
+import net.osmand.binary.SearchLocales;
+import net.osmand.binary.Abbreviations;
+import net.osmand.obf.BinaryMerger;
 import net.osmand.obf.OBFDataCreator;
+import net.osmand.obf.preparation.AlternativeNameIndexGenerator;
 import net.osmand.obf.preparation.IndexAddressCreator;
 import net.osmand.obf.preparation.IndexCreator;
 import net.osmand.obf.preparation.IndexCreatorSettings;
@@ -109,7 +114,15 @@ public class SpatialSearchPipelineTest {
 	private static final boolean REGENERATE_OBF = true; // bypassed by LIVE_TESTING
 	private static final boolean TEST_EXTRA_RESULTS = true;
 	private static final List<Class<?>> OBF_GENERATE_CLASSES = List.of(IndexCreator.class, IndexPoiCreator.class,
-			IndexAddressCreator.class, NameIndexCreator.class, CommonWordsMultiIndex.class);
+			IndexAddressCreator.class, NameIndexCreator.class, CommonWordsMultiIndex.class,
+			AlternativeNameIndexGenerator.class, SearchVariantRules.class, SearchVariantRules.Variant.class,
+			SearchVariantRules.Entry.class, Abbreviations.class, SearchLocales.class, OBFDataCreator.class,
+			BinaryMerger.class);
+	// every rules file of OsmAnd-java resources: a new language file has to be added here to invalidate cached OBFs
+	private static final List<String> OBF_RULE_RESOURCES = List.of("rules.xml", "rules_en.xml", "rules_de.xml",
+			"rules_it.xml", "rules_fr.xml", "rules_es.xml", "rules_es_CO.xml", "rules_es_PE.xml", "rules_nl.xml",
+			"rules_pt.xml", "rules_ca.xml", "rules_ru.xml", "rules_uk.xml", "rules_bg.xml", "rules_sr.xml",
+			"rules_mk.xml");
 	private static final String HASH_VERSION = "2";
 	private static final String OBF_HASH_FILE_NAME = ".obf.hash";
 	private static final int MAX_KNOWN_HASHES = 4; // one per build that writes its own class files
@@ -406,7 +419,7 @@ public class SpatialSearchPipelineTest {
 	}
 
 	/**
-	 * The hash is taken over the compiled generator classes, and the IDE and Gradle write their own
+	 * The hash covers compiled generator classes and search rules. The IDE and Gradle write their own
 	 * class files: the same sources hash differently depending on who built them, and one hash per
 	 * file would throw the whole map cache away on every switch. The file keeps a hash per line, so
 	 * both builds are recognised, while a real change in the generators matches none of them.
@@ -1097,6 +1110,16 @@ public class SpatialSearchPipelineTest {
 			String hash = getClassHash(clazz);
 			if (!hash.startsWith("Error")) {
 				individualHashes.add(hash);
+			}
+		}
+		for (String resource : OBF_RULE_RESOURCES) {
+			try (InputStream input = SearchVariantRules.class.getResourceAsStream(resource)) {
+				if (input == null) {
+					throw new IllegalStateException("Missing search rules: " + resource);
+				}
+				individualHashes.add(resource + ":" + DigestUtils.sha256Hex(input));
+			} catch (IOException e) {
+				throw new IllegalStateException("Cannot hash search rules: " + resource, e);
 			}
 		}
 

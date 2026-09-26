@@ -330,6 +330,13 @@ public class BinaryMerger {
 		return fileName;
 	}
 
+	// region name written to the address and POI parts; the search takes the rules locale of the data from it
+	protected String getRegionName(File fileToExtract) {
+		String nm = fileToExtract.getName();
+		int i = nm.indexOf('_');
+		return i > 0 ? nm.substring(0, i) : nm;
+	}
+
 	protected boolean shouldMergeCitiesByNameDistance() {
 		return true;
 	}
@@ -715,11 +722,7 @@ public class BinaryMerger {
 				}
 			}
 		}
-		String nm = fileToExtract.getName();
-		int i = nm.indexOf('_');
-		if (i > 0) {
-			nm = nm.substring(0, i);
-		}
+		String nm = getRegionName(fileToExtract);
 		if (combineParts.contains(OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER)) {
 			combineAddressIndex(nm, writer, addressRegions, indexes);
 		}
