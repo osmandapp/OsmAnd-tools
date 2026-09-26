@@ -73,6 +73,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	// MEMORY address : choose what to use ?
 	private boolean loadInMemory = true;
+	// alternative names of the last written address name index
+	private AlternativeNameIndexGenerator.Stats alternativeNameStats;
 
 	// MEMORY address : address structure
 	// load it in memory
@@ -113,6 +115,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	public CityDataStorage getCityDataStorage() {
 		return cityDataStorage;
+	}
+
+	// null before the address index is written
+	public AlternativeNameIndexGenerator.Stats getAlternativeNameStats() {
+		return alternativeNameStats;
 	}
 
 
@@ -1360,6 +1367,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		progress.finishTask();
 
 		writer.writeAddressNameIndex(namesIndex);
+		alternativeNameStats = namesIndex.getAlternativeNameStats();
 		writer.endWriteAddressIndex();
 		writer.flush();
 		streetstat.close();

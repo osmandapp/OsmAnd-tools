@@ -483,6 +483,7 @@ public class IndexCreator {
 			writer.close();
 			mapRAFile.close();
 			log.info("Finish writing binary file"); //$NON-NLS-1$
+			print(mapFile, null, settings.indexPOI ? poiCreator != null ? poiCreator.getAlternativeNameStats() : null : null);
 		} catch (RuntimeException e) {
 			log.error("Log exception", e); //$NON-NLS-1$
 			throw e;
@@ -675,6 +676,8 @@ public class IndexCreator {
 				writer.close();
 				mapRAFile.close();
 				log.info("Finish writing binary file"); //$NON-NLS-1$
+				print(mapFile, settings.indexAddress ? indexAddressCreator.getAlternativeNameStats() : null,
+						settings.indexPOI ? indexPoiCreator.getAlternativeNameStats() : null);
 			}
 		} catch (RuntimeException e) {
 			log.error("Log exception", e); //$NON-NLS-1$
@@ -846,6 +849,24 @@ public class IndexCreator {
 
 	private void setGeneralProgress(IProgress progress, String genProgress) {
 		progress.setGeneralProgress(genProgress);
+	}
+
+	// one line per OBF to monitor how alternative names (rules*.xml, unglued words) grow the name indexes
+	private static void print(File mapFile, AlternativeNameIndexGenerator.Stats address,
+	                          AlternativeNameIndexGenerator.Stats poi) {
+		AlternativeNameIndexGenerator.Stats total = new AlternativeNameIndexGenerator.Stats();
+		StringBuilder line = new StringBuilder("ALTERNATIVE_NAMES_STATS: ").append(mapFile.getName())
+				.append(" size=").append(mapFile.length());
+		if (address != null) {
+			line.append(", address ").append(address);
+			total.add(address);
+		}
+		if (poi != null) {
+			line.append(", poi ").append(poi);
+			total.add(poi);
+		}
+		line.append(", total ").append(total).append(", by rule ").append(total.byRule);
+		System.out.println(line);
 	}
 
 	public static void main(String[] args)

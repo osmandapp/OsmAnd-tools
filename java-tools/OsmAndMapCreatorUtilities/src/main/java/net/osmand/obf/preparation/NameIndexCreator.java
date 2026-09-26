@@ -513,6 +513,10 @@ public class NameIndexCreator<T> {
 		alternativeNames.addAlternativeNames(name, lang, obj, maxPrefixLength);
 	}
 
+	public AlternativeNameIndexGenerator.Stats getAlternativeNameStats() {
+		return alternativeNames.getStats();
+	}
+
 	void addAlternativeToken(String prefix, T obj, String word, List<String> alternativeWords) {
 		NamedObjectsByPrefix<T> entry = namesIndex.get(prefix);
 		if (entry == null) {

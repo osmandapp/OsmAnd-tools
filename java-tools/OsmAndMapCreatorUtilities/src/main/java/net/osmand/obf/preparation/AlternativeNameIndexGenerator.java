@@ -2,6 +2,8 @@ package net.osmand.obf.preparation;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 import net.osmand.binary.CommonWordsMultiIndex;
@@ -39,9 +41,34 @@ public class AlternativeNameIndexGenerator<T> {
 		String alternativeName(String name, String lang, String group);
 	}
 
+	/** Size of the alternative names of one name index: every key is one more prefix posting of an object. */
+	public static class Stats {
+		// names that got at least one alternative name
+		int names;
+		// alternative names produced by the rules
+		int alternatives;
+		// alternative keys added to the name index
+		int keys;
+		// alternative names by rule ("unglue", "street SS$1")
+		final Map<String, Integer> byRule = new TreeMap<>();
+
+		public void add(Stats other) {
+			names += other.names;
+			alternatives += other.alternatives;
+			keys += other.keys;
+			other.byRule.forEach((rule, count) -> byRule.merge(rule, count, Integer::sum));
+		}
+
+		@Override
+		public String toString() {
+			return "names=" + names + " alternatives=" + alternatives + " keys=" + keys;
+		}
+	}
+
 	private final NameIndexCreator<T> nameIndex;
 	// every rule applied to a name, in this order
 	private final AlternativeNameRule[] rules = { new UnglueRule() };
+	private final Stats stats = new Stats();
 	// language group of the map (CommonWordsMultiIndex.DEFAULT_GROUPS), null when no group covers it
 	private String languageGroup;
 	private String mapName;
@@ -70,6 +97,10 @@ public class AlternativeNameIndexGenerator<T> {
 		return mapLocale;
 	}
 
+	public Stats getStats() {
+		return stats;
+	}
+
 	// name can carry the marker of an alternative name (NameIndexReader.altNameMarker): the marker is a word of the name,
 	// so the alternative words refer to it and stay with that variant
 	public void addAlternativeNames(String name, String lang, T obj, int maxPrefixLength) {
@@ -77,6 +108,7 @@ public class AlternativeNameIndexGenerator<T> {
 			return;
 		}
 		List<String> nameWords = null;
+		int alternatives = stats.alternatives;
 		for (AlternativeNameRule rule : rules) {
 			String alternative = rule.alternativeName(name, lang, languageGroup);
 			if (alternative == null) {
@@ -85,7 +117,7 @@ public class AlternativeNameIndexGenerator<T> {
 			if (nameWords == null) {
 				nameWords = SearchAlgorithms.splitAndNormalize(name, false);
 			}
-			addAlternativeName(nameWords, alternative, obj, maxPrefixLength);
+			addAlternativeName(nameWords, alternative, obj, maxPrefixLength, "unglue");
 		}
 		String owner = ownerType(obj);
 		if (owner != null) {
@@ -100,9 +132,12 @@ public class AlternativeNameIndexGenerator<T> {
 					if (nameWords == null) {
 						nameWords = SearchAlgorithms.splitAndNormalize(name, false);
 					}
-					addAlternativeName(nameWords, alternative, obj, maxPrefixLength);
+					addAlternativeName(nameWords, alternative, obj, maxPrefixLength, owner + " " + rule.target().trim());
 				}
 			}
+		}
+		if (stats.alternatives > alternatives) {
+			stats.names++;
 		}
 	}
 
@@ -120,14 +155,17 @@ public class AlternativeNameIndexGenerator<T> {
 		return obj instanceof PoiNameObject ? "poi" : null;
 	}
 
-	private void addAlternativeName(List<String> nameWords, String alternative, T obj, int maxPrefixLength) {
+	private void addAlternativeName(List<String> nameWords, String alternative, T obj, int maxPrefixLength, String rule) {
 		List<String> alternativeWords = SearchAlgorithms.splitAndNormalize(alternative, false);
+		stats.alternatives++;
+		stats.byRule.merge(rule, 1, Integer::sum);
 		for (String word : new TreeSet<>(alternativeWords)) {
 			String prefix = NameIndexCreator.nameIndexPreparePrefix(word, maxPrefixLength);
 			if (nameWords.contains(word) || Algorithms.isEmpty(prefix)) {
 				continue;
 			}
 			nameIndex.addAlternativeToken(prefix, obj, word, alternativeWords);
+			stats.keys++;
 		}
 	}
 
