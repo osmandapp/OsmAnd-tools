@@ -858,15 +858,16 @@ public class IndexCreator {
 		StringBuilder line = new StringBuilder("ALTERNATIVE_NAMES_STATS: ").append(mapFile.getName())
 				.append(" size=").append(mapFile.length());
 		if (address != null) {
-			line.append(", address ").append(address);
+			line.append(", address [").append(address).append("]");
 			total.add(address);
 		}
 		if (poi != null) {
-			line.append(", poi ").append(poi);
+			line.append(", poi [").append(poi).append("]");
 			total.add(poi);
 		}
-		line.append(", total ").append(total).append(", by rule ").append(total.byRule);
-		System.out.println(line);
+		line.append(", total [").append(total).append("]");
+		line.append(", by rule [").append(total.byRule).append("]");
+		log.info(line.toString());
 	}
 
 	public static void main(String[] args)
