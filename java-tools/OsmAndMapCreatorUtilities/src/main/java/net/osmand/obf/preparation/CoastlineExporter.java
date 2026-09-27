@@ -5,6 +5,8 @@ import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapIndexReader.MapIndex;
 import net.osmand.binary.BinaryMapIndexReader.MapRoot;
+import net.osmand.binary.ObfConstants;
+import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.util.MapUtils;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream;
 
@@ -14,7 +16,8 @@ import java.util.*;
 /**
  * natural=coastline of every zoom level stored in detailed maps, one coastline_<minzoom>-<maxzoom>.osm.bz2 per level
  * (the same shape as coastline.osm.bz2 of the basemap). Points with equal 31-bit coordinates become one node, so the
- * pieces of a coastline split between OBF blocks and maps join up again. Each way carries the map it comes from.
+ * pieces of a coastline split between OBF blocks and maps join up again. Each way carries the map it comes from, the OSM
+ * way it was made from (osm_id=way/<id>, when the OBF id keeps it) and its OBF id.
  *
  * Used to compare the basemap coastline (coastline.osm.bz2, oceantiles_12) with the detailed maps.
  *
@@ -59,6 +62,13 @@ public class CoastlineExporter {
 			}
 			sb.append("    <tag k='natural' v='coastline'/>\n");
 			sb.append("    <tag k='osmand_map' v='").append(map).append("'/>\n");
+			// the OSM way (or relation) this piece was made from, to link an error back to OSM
+			EntityType type = ObfConstants.getOsmEntityType(o);
+			long osmId = ObfConstants.getOsmObjectId(o);
+			if (type != null && osmId > 0) {
+				sb.append("    <tag k='osm_id' v='").append(type.name().toLowerCase()).append('/').append(osmId).append("'/>\n");
+			}
+			sb.append("    <tag k='obf_id' v='").append(o.getId()).append("'/>\n");
 			sb.append("  </way>\n");
 			ww.write(sb.toString());
 		}
