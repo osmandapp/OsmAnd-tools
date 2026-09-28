@@ -87,10 +87,13 @@ import net.osmand.util.MapsCollection;
  * <li>{@code load} - {@code all} (default) initializes every map of {@code maps.dir},
  * {@code case} initializes only the maps a case declares;</li>
  * <li>{@code basemap} - the basemap loaded in the {@code load=case} mode, default
- * {@code World_basemap_2.obf};</li>
+ * {@code World_basemap_2.obf}, or {@code World_basemap_mini_2.obf} when only the mini one is in
+ * {@code maps.dir};</li>
  * <li>{@code exclude} - comma separated name parts that {@code load=all} skips, default
  * {@code World_seamarks,basemap_mini} - an overlay and a second basemap would distort the
- * rendering; pass {@code -exclude=} to load literally everything;</li>
+ * rendering; without {@code World_basemap_2.obf} in {@code maps.dir} the mini basemap is the
+ * basemap and only {@code World_seamarks} is skipped; pass {@code -exclude=} to load literally
+ * everything;</li>
  * <li>{@code cases} - path to the json with the cases, default the bundled
  * {@code coastline-tests.json};</li>
  * <li>{@code issue} - run only the cases of one issue, e.g. {@code -issue=25618};</li>
@@ -217,6 +220,9 @@ public class CoastlineRenderingTester {
 
 	/** Without it the ocean is not rendered at all outside of the detailed maps. */
 	private static final String DEFAULT_BASEMAP = "World_basemap_2.obf";
+
+	/** The basemap of a maps folder that has no World_basemap, e.g. the prepare folder of the build server. */
+	private static final String MINI_BASEMAP = "World_basemap_mini_2.obf";
 
 	// ----------------------------------------------------------------- json model
 
@@ -794,7 +800,7 @@ public class CoastlineRenderingTester {
 			initAllMaps();
 		} else {
 			// the app always has the basemap, without it there is no ocean outside of a detailed map
-			String basemap = opt("basemap", DEFAULT_BASEMAP);
+			String basemap = opt("basemap", defaultBasemap());
 			if (!basemap.isEmpty() && !initMap(basemap)) {
 				System.err.println("No basemap - the sea will not be rendered outside of the detailed maps");
 			}
@@ -818,7 +824,8 @@ public class CoastlineRenderingTester {
 				collection.add(obf);
 			}
 		}
-		String[] excluded = opt("exclude", DEFAULT_EXCLUDED_MAPS).split(",");
+		String[] excluded = opt("exclude", defaultBasemap().equals(MINI_BASEMAP) ? "World_seamarks"
+				: DEFAULT_EXCLUDED_MAPS).split(",");
 		List<File> maps = new ArrayList<>();
 		List<String> skipped = new ArrayList<>();
 		for (File f : collection.getFilesToUse()) {
@@ -921,6 +928,14 @@ public class CoastlineRenderingTester {
 			renderer.initMapFile(f.getAbsolutePath(), true);
 			initializedMaps.add(f.getName());
 		}
+	}
+
+	/** World_basemap, or the mini basemap when the maps folder has only that one. */
+	private String defaultBasemap() {
+		if (!new File(mapsDir, DEFAULT_BASEMAP).isFile() && new File(mapsDir, MINI_BASEMAP).isFile()) {
+			return MINI_BASEMAP;
+		}
+		return DEFAULT_BASEMAP;
 	}
 
 	/** Initializes one map, downloading it into the maps folder when it is missing. */
