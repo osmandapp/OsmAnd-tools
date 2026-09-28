@@ -5,11 +5,15 @@ import com.google.gson.GsonBuilder;
 import net.osmand.server.DatasourceConfiguration;
 import net.osmand.server.api.services.GpxService;
 import net.osmand.server.osmgpx.GarbageClassifier;
+import net.osmand.server.osmgpx.TrackSimplifyEncoder;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import net.osmand.shared.gpx.GpxUtilities;
+import net.osmand.shared.gpx.primitives.TrkSegment;
+import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.util.Algorithms;
+import net.osmand.util.MapUtils;
 import okio.Buffer;
 import okio.Source;
 import org.apache.commons.logging.Log;
@@ -70,6 +74,8 @@ public class OsmGpxController {
 
 	private static final String GPX_METADATA_TABLE_NAME = "osm_gpx_data";
 	private static final String GPX_FILES_TABLE_NAME = "osm_gpx_files";
+	private static final String ROUTE_COLUMNS = "m.id, m.name, m.description, m.user, m.date, m.activity, m.lat, m.lon, " +
+			"m.speed, m.distance, m.points, m.tags";
 	private static final int SRID_WGS84 = 4326;
 	private static final String ERROR_ACTIVITY = "error";
 	private static final Set<String> INVALID_ACTIVITIES = new HashSet<>(GarbageClassifier.TYPES);
@@ -91,8 +97,14 @@ public class OsmGpxController {
 			List<Integer> maxSpeedRange,
 			List<Integer> maxDistBetweenPointsRange,
 			List<Integer> timeMinutesRange,
-			List<Integer> waypointsRange
+			List<Integer> waypointsRange,
+			Double lat,
+			Double lon,
+			Double radius
 	) {
+		boolean isNearPoint() {
+			return lat != null && lon != null && radius != null;
+		}
 	}
 
 	@PostMapping(path = {"/get-routes-list"}, consumes = "application/json", produces = "application/json")
@@ -176,7 +188,9 @@ public class OsmGpxController {
 		applyTagsFilter(req.tags(), tagMatchMode, conditions, params);
 
 		List<Feature> features;
-		if (isPointsOnlyRequest(req.activityArr())) {
+		if (req.isNearPoint()) {
+			features = queryRoutesNear(conditions, params, req.lat(), req.lon(), req.radius());
+		} else if (isPointsOnlyRequest(req.activityArr())) {
 			// error tracks have no geometry — return them as points only
 			features = queryRouteFeatures(conditions, params, false, MAX_ROUTES_SUMMARY, false);
 		} else {
@@ -393,9 +407,53 @@ public class OsmGpxController {
 		params.addAll(normalized);
 	}
 
+	// the tracks whose line passes within radius metres of the point, nearest first; error tracks by their start point
+	private List<Feature> queryRoutesNear(StringBuilder conditions, List<Object> params, double lat, double lon, double radius) {
+		String query = "SELECT " + ROUTE_COLUMNS + ", m.simplified_geometry FROM " + GPX_METADATA_TABLE_NAME + " m " +
+				"WHERE 1 = 1 " + conditions + " LIMIT " + MAX_ROUTES_SUMMARY;
+		record Near(Feature feature, double distance) {
+		}
+		List<Near> near = new ArrayList<>();
+		jdbcTemplate.query(query, ps -> {
+			for (int i = 0; i < params.size(); i++) {
+				ps.setObject(i + 1, params.get(i));
+			}
+		}, rs -> {
+			byte[] geometry = rs.getBytes("simplified_geometry");
+			boolean hasLine = geometry != null && geometry.length > 0;
+			double distance = hasLine
+					? distanceToTrack(geometry, lat, lon)
+					: MapUtils.getDistance(lat, lon, rs.getDouble("lat"), rs.getDouble("lon"));
+			if (distance > radius) {
+				return;
+			}
+			Feature feature = createBaseFeature(rs);
+			if (hasLine) {
+				feature.getProperties().put("geo_b64", Base64.getEncoder().encodeToString(geometry));
+			}
+			near.add(new Near(feature, distance));
+		});
+		near.sort(Comparator.comparingDouble(Near::distance));
+
+		return near.stream().map(Near::feature).toList();
+	}
+
+	private static double distanceToTrack(byte[] geometry, double lat, double lon) {
+		double best = Double.MAX_VALUE;
+		for (TrkSegment segment : TrackSimplifyEncoder.decodeGeometry(geometry).getSegments(false)) {
+			List<WptPt> points = segment.getPoints();
+			for (int i = 0; i < points.size(); i++) {
+				WptPt from = points.get(Math.max(0, i - 1));
+				WptPt to = points.get(i);
+				best = Math.min(best, MapUtils.getOrthogonalDistance(lat, lon,
+						from.getLatitude(), from.getLongitude(), to.getLatitude(), to.getLongitude()));
+			}
+		}
+		return best;
+	}
+
 	private List<Feature> queryRouteFeatures(StringBuilder conditions, List<Object> params, boolean withGeometry, int limit, boolean requireGeometry) {
-		String columns = "m.id, m.name, m.description, m.user, m.date, m.activity, m.lat, m.lon, " +
-				"m.speed, m.distance, m.points, m.tags";
+		String columns = ROUTE_COLUMNS;
 		if (withGeometry) {
 			columns += ", m.simplified_geometry";
 		}
