@@ -45,6 +45,18 @@
       "reason": "The place=island multipolygon joins two islets to Bely Island with untagged ways 270259332, 270259333, 270259335 across the water: OsmAnd fills the straits as land, openstreetmap-carto does not fill place=island.",
       "bbox": [69.99, 73.32, 70.56, 73.46],
       "minzoom": 10
+    },
+    {
+      "title": "Nonouti lagoon, -0.6, 174.35 (relation 4036870)",
+      "reason": "The whole atoll with its lagoon is mapped as one place=islet multipolygon (Tabukaokao, reef=coral): OsmAnd fills the lagoon as land, openstreetmap-carto does not fill place=islet.",
+      "bbox": [174.14, -0.82, 174.48, -0.52],
+      "minzoom": 10
+    },
+    {
+      "title": "Clipperton lagoon, 10.3, -109.22 (way 160415456)",
+      "reason": "The closed coastline of the atoll is also tagged place=island, so the island area covers the lagoon (relation 5883538, natural=water): OsmAnd fills it as land, openstreetmap-carto does not fill place=island.",
+      "bbox": [-109.24, 10.28, -109.19, 10.33],
+      "minzoom": 10
     }
   ],
   "cases": [
