@@ -81,28 +81,6 @@
       "maps": ["Canada_quebec_cote-nord_northamerica_2.obf"]
     },
     {
-      "issue": 18187,
-      "title": "World_seamarks contains objects deep inside continents (Attiki)",
-      "url": "https://github.com/osmandapp/OsmAnd/issues/18187",
-      "lat": 38.14246,
-      "lon": 23.95187,
-      "zooms": [14],
-      "radius": 1,
-      "check": "seamarksInland",
-      "maps": ["World_seamarks_2.obf"]
-    },
-    {
-      "issue": 18187,
-      "title": "World_seamarks contains objects deep inside continents (Evia)",
-      "url": "https://github.com/osmandapp/OsmAnd/issues/18187",
-      "lat": 38.38044,
-      "lon": 24.20120,
-      "zooms": [14],
-      "radius": 1,
-      "check": "seamarksInland",
-      "maps": ["World_seamarks_2.obf"]
-    },
-    {
       "issue": 3291,
       "title": "Ocean rendered as land: South Pacific",
       "lat": -21.943,
