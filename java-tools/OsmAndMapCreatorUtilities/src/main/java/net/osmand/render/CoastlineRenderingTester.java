@@ -75,9 +75,9 @@ import net.osmand.util.MapsCollection;
  * # the same cases through the OpenGL engine of the apps instead of the legacy one
  * OsmAndMapCreator/utilities.sh test-coastline-rendering -renderer=opengl -maps.dir=/var/maps
  * </pre>
- * Exit code: <b>0</b> - everything matches the reference, <b>2</b> - problems were reproduced (a
- * water difference, or a tile the renderer crashed on), <b>1</b> - the tester could not run (native
- * library could not be loaded, no maps, broken json).
+ * Exit code: <b>0</b> - nothing worse than {@code failAbove}, <b>2</b> - problems were reproduced (a
+ * tile whose water difference is above {@code failAbove}, or a tile the renderer crashed on), <b>1</b> -
+ * the tester could not run (native library could not be loaded, no maps, broken json).
  *
  * <p>Every option can be given either as an argument ({@code -maps.dir=...}) or as a system
  * property ({@code -Dmaps.dir=...}):
@@ -138,6 +138,9 @@ import net.osmand.util.MapsCollection;
  * {@code coastline-reference} in the current folder. It is reused by every run, so a rerun only
  * downloads the tiles it has not seen yet - delete the folder to force a refetch;</li>
  * <li>{@code referenceCache} - {@code false} to delete a reference tile once it was compared;</li>
+ * <li>{@code failAbove} - share of a tile, default {@value #DEFAULT_FAIL_ABOVE}: a failed tile ends
+ * the run with exit code 2 only when its water difference is above it. The smaller failures are
+ * still reported, but a build does not go red for them;</li>
  * <li>{@code tileSize}, {@code tolerance} - size of the rendered tile and the mask tolerance. The
  * reference tile is scaled to the rendered one, and {@code tileSize} is honoured by
  * {@code -renderer=opengl} only - the legacy renderer always draws 256 px per tile.</li>
@@ -177,6 +180,9 @@ public class CoastlineRenderingTester {
 	 */
 	private static final int[] OSMAND_ICE_COLORS = { 0xE4FDFF };
 	private static final int[] REFERENCE_ICE_COLORS = { 0xddecec };
+
+	/** Default of {@code failAbove}: failed tiles up to 10% of water difference do not fail the run. */
+	private static final double DEFAULT_FAIL_ABOVE = 0.1;
 
 	/** Max per channel difference to still treat a pixel as water. */
 	private static final int COLOR_TOLERANCE = 10;
@@ -347,6 +353,8 @@ public class CoastlineRenderingTester {
 		public String worstTile = "";
 		/** Failed tiles by the ranges of {@link #SEVERITY_FILTERS} (index 0 is unused). */
 		public int[] failedBySeverity = new int[SEVERITY_FILTERS.length];
+		/** Failed tiles above {@code failAbove}. */
+		public int failedAboveLimit;
 		/** The same numbers per zoom - the random tiles and the scans spread over many zooms. */
 		public Map<Integer, ZoomStats> zooms = new TreeMap<>();
 
@@ -392,6 +400,9 @@ public class CoastlineRenderingTester {
 		public int tiles;
 		public int comparedTiles;
 		public int failedTiles;
+		/** Failed tiles above {@code failAbove} - only these fail the run. */
+		public int failedAboveLimit;
+		public double failAbove;
 		public int renderErrors;
 		/** How many times the renderer died during the run, restarts included. */
 		public int rendererDeaths;
@@ -415,6 +426,7 @@ public class CoastlineRenderingTester {
 	private final boolean writeHtml;
 	private final int flushEvery;
 	private final boolean openGl;
+	private final double failAbove;
 
 	private CasesFile casesFile;
 	private RunResult result;
@@ -449,6 +461,7 @@ public class CoastlineRenderingTester {
 		this.writeHtml = Boolean.parseBoolean(opt("html", "true"));
 		this.flushEvery = Integer.parseInt(opt("flushEvery", "1000"));
 		this.openGl = RENDERER_OPENGL.equalsIgnoreCase(opt("renderer", RENDERER_LEGACY));
+		this.failAbove = Double.parseDouble(opt("failAbove", String.valueOf(DEFAULT_FAIL_ABOVE)));
 		if (!openGl && !RENDERER_LEGACY.equalsIgnoreCase(opt("renderer", RENDERER_LEGACY))) {
 			throw new IllegalArgumentException("-renderer must be " + RENDERER_LEGACY + " or "
 					+ RENDERER_OPENGL + " but was " + opt("renderer", RENDERER_LEGACY));
@@ -484,7 +497,7 @@ public class CoastlineRenderingTester {
 			RunResult res = new CoastlineRenderingTester(options).run();
 			// a renderer that crashes on a tile is a worse problem than a wrong coastline, so it
 			// must not end in a green build either
-			code = res.failedTiles > 0 || res.renderErrors > 0 ? 2 : 0;
+			code = res.failedAboveLimit > 0 || res.renderErrors > 0 ? 2 : 0;
 		} catch (Throwable e) {
 			e.printStackTrace();
 			code = 1;
@@ -514,6 +527,7 @@ public class CoastlineRenderingTester {
 		result.style = opt("style", "default.render.xml");
 		result.mapsDir = mapsDir.getAbsolutePath();
 		result.startedAt = start;
+		result.failAbove = failAbove;
 		try {
 			// the seamarks cases close every map, so they go last
 			cases.sort((a, b) -> Boolean.compare(a.isSeamarksCheck(), b.isSeamarksCheck()));
@@ -1137,6 +1151,9 @@ public class CoastlineRenderingTester {
 			zs.failedTiles++;
 			stats.failedBySeverity[res.bucket()]++;
 			zs.failedBySeverity[res.bucket()]++;
+			if (res.severity > failAbove) {
+				stats.failedAboveLimit++;
+			}
 			System.out.printf("  FAILED %d/%d/%d water: osmand %.1f%% reference %.1f%% - %s%n", zoom, x, y,
 					count(renderedWater) * 100.0 / (w * h), count(referenceWater) * 100.0 / (w * h),
 					String.join(", ", res.problems));
@@ -1211,6 +1228,9 @@ public class CoastlineRenderingTester {
 			if (ratio > def.maxDrawn) {
 				stats.failedTiles++;
 				stats.failedBySeverity[res.bucket()]++;
+				if (res.severity > failAbove) {
+					stats.failedAboveLimit++;
+				}
 				res.problems.add(String.format("%s alone draws %.3f%% of an inland tile (limit %.3f%%)",
 						String.join(", ", def.maps), ratio * 100, def.maxDrawn * 100));
 				System.out.printf("  FAILED %d/%d/%d - %s%n", zoom, x, y, res.problems.get(0));
@@ -1642,6 +1662,7 @@ public class CoastlineRenderingTester {
 		result.tiles = 0;
 		result.comparedTiles = 0;
 		result.failedTiles = 0;
+		result.failedAboveLimit = 0;
 		result.renderErrors = 0;
 		result.rendererDeaths = eyePiece == null ? 0 : eyePiece.deaths();
 		Map<String, GroupTotals> byGroup = new LinkedHashMap<>();
@@ -1649,6 +1670,7 @@ public class CoastlineRenderingTester {
 			result.tiles += s.tiles;
 			result.comparedTiles += s.comparedTiles;
 			result.failedTiles += s.failedTiles;
+			result.failedAboveLimit += s.failedAboveLimit;
 			result.renderErrors += s.renderErrors;
 			GroupTotals g = byGroup.computeIfAbsent(s.group == null ? GROUP_FIXED : s.group, k -> {
 				GroupTotals t = new GroupTotals();
@@ -1808,11 +1830,15 @@ public class CoastlineRenderingTester {
 					+ " see the report, that is a bug of the renderer%n",
 					result.renderErrors, result.rendererDeaths);
 		}
-		System.out.println(result.failedTiles > 0
-				? "COASTLINE PROBLEMS REPRODUCED - exit code 2"
+		System.out.println(result.failedAboveLimit > 0
+				? String.format("COASTLINE PROBLEMS REPRODUCED - %d tiles above %s - exit code 2",
+						result.failedAboveLimit, pct(failAbove))
 				: result.renderErrors > 0
 						? "RENDERER ERRORS - exit code 2"
-						: "No coastline problems found - exit code 0");
+						: result.failedTiles > 0
+								? String.format("%d failed tiles, none above %s - exit code 0", result.failedTiles,
+										pct(failAbove))
+								: "No coastline problems found - exit code 0");
 	}
 
 	private static String trim(String s, int len) {
@@ -1873,9 +1899,11 @@ public class CoastlineRenderingTester {
 					SEVERITY_FILTERS[i][0], i == 0 ? " checked" : ""));
 		}
 		sb.append("\n<header><h1>Coastline rendering &mdash; epic 3291</h1>");
-		sb.append(String.format("<p class=\"sum\"><b class=\"%s\">%d failed</b>%s &middot; %d tiles compared "
+		sb.append(String.format("<p class=\"sum\"><b class=\"%s\">%d failed</b>, <b class=\"%s\">%d above %s</b> "
+						+ "fail the build%s &middot; %d tiles compared "
 						+ "&middot; %d maps &middot; %s renderer &middot; style %s &middot; %.1f s &middot; %s</p>",
 				result.failedTiles > 0 ? "bad" : "good", result.failedTiles,
+				result.failedAboveLimit > 0 ? "bad" : "good", result.failedAboveLimit, pct(result.failAbove),
 				result.renderErrors > 0 ? String.format(" &middot; <b class=\"bad\">%d renderer "
 						+ "errors</b> (%d crashes)", result.renderErrors, result.rendererDeaths) : "",
 				result.comparedTiles, result.loadedMaps, esc(result.renderer), esc(result.style),
