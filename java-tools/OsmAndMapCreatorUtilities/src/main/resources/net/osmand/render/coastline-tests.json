@@ -14,7 +14,10 @@
     "-maxzoom=5 over the whole world, where the whole tile comes out as land while the reference is",
     "all water; the z7-z10 ones are Tuamotu atolls cut by the tile edge (Tematangi, Kauehi).",
     "brokenReferences are areas where the reference itself is wrong: every tile from 'minzoom' on",
-    "that touches 'bbox' is skipped by the cases, the random tiles and the scan alike."
+    "that touches 'bbox' is compared with tile.openstreetmap.org instead, by the cases, the random",
+    "tiles and the scan alike. dataIssues are areas where the OSM data is wrong: their tiles are skipped.",
+    "A failed tile is always compared with tile.openstreetmap.org once more, and counted as a stale",
+    "reference when that one agrees with the rendered tile."
   ],
   "brokenReferences": [
     {
@@ -22,6 +25,20 @@
       "reason": "The reference is drawn from water polygons older than the island (mapped 2026-06-12): straight land edges, 84% agreement with OSM against 99% of ours. Re-rendering does not help.",
       "bbox": [-72.482, 63.7073, -72.4714, 63.7119],
       "minzoom": 14
+    }
+  ],
+  "dataIssues": [
+    {
+      "title": "Islands near Postoyanny, 72.1, 146.1 (ways 1185693443-1185693448)",
+      "reason": "Real islands (checked on imagery) mapped as place=island without natural=coastline: OsmAnd fills place=island as land, openstreetmap-carto does not draw them at all.",
+      "bbox": [146.02, 72.03, 146.25, 72.15],
+      "minzoom": 10
+    },
+    {
+      "title": "Lagoon of St. Lawrence Island at 63.58, -171.09",
+      "reason": "The place=island area of the island covers its lagoon, which is sea by the coastline: OsmAnd fills it as land, openstreetmap-carto does not fill place=island.",
+      "bbox": [-171.1054, 63.5724, -171.0793, 63.5877],
+      "minzoom": 12
     }
   ],
   "cases": [

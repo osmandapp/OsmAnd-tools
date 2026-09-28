@@ -97,14 +97,16 @@ import net.osmand.util.MapsCollection;
  * everything;</li>
  * <li>{@code cases} - path to the json with the cases, default the bundled
  * {@code coastline-tests.json}. Its {@code brokenReferences} list areas where the reference tile
- * itself is wrong; their tiles are skipped by every case and mode;</li>
+ * itself is wrong; their tiles are compared with {@code secondReferenceUrl} (tile.openstreetmap.org)
+ * only. Its {@code dataIssues} list areas where the OSM data is wrong, e.g. real islands mapped with
+ * {@code place=island} but no coastline; their tiles are skipped;</li>
  * <li>{@code issue} - run only the cases of one issue, e.g. {@code -issue=25618};</li>
  * <li>{@code randomTilesK} - size of the random part of a run in thousands of tiles, default
  * {@value #DEFAULT_RANDOM_TILES_K}; {@code -randomTilesK=0} runs the json cases only. The tiles are
  * spread evenly over zooms {@value #RANDOM_MIN_ZOOM}..{@value #RANDOM_MAX_ZOOM},
  * {@value #SHARE_COASTAL}% of them with a coastline in them and the rest split between open ocean
- * and inland. {@code seed} defaults to the calendar month, so the same tiles are checked all month
- * long. {@code minzoom}/{@code maxzoom} do not change what is drawn, they only skip the zooms
+ * and inland. {@code seed} is fixed, so the same tiles are checked by every run and their reference
+ * tiles are cached. {@code minzoom}/{@code maxzoom} do not change what is drawn, they only skip the zooms
  * outside the range, so a slow run can be split into parts that add up to the whole one -
  * {@code -minzoom=1 -maxzoom=6} and {@code -minzoom=7} together are the full run. {@code -random}
  * runs that part alone;</li>
@@ -139,6 +141,11 @@ import net.osmand.util.MapsCollection;
  * {@code coastline-reference} in the current folder. It is reused by every run, so a rerun only
  * downloads the tiles it has not seen yet - delete the folder to force a refetch;</li>
  * <li>{@code referenceCache} - {@code false} to delete a reference tile once it was compared;</li>
+ * <li>{@code recheck} - {@code true} (default): a failed tile is compared once more with
+ * {@code secondReferenceUrl} of the cases file, tile.openstreetmap.org. Both draw
+ * openstreetmap-carto, but tile.osmand.net keeps older water polygons, so where the second reference
+ * agrees with the rendered tile the tile is counted as a <i>stale reference</i>, not as a failure.
+ * Only the failed tiles are fetched from there - a few hundred per run, within its usage policy;</li>
  * <li>{@code failAbove} - share of a tile, default {@value #DEFAULT_FAIL_ABOVE}: a failed tile ends
  * the run with exit code 2 only when its water difference is above it. The smaller failures are
  * still reported, but a build does not go red for them;</li>
@@ -242,17 +249,24 @@ public class CoastlineRenderingTester {
 	/** Content of coastline-tests.json. */
 	public static class CasesFile {
 		public String referenceUrl = "https://tile.osmand.net/hd/{z}/{x}/{y}.png";
+		/** the same style with up to date water polygons, see {@code recheck} */
+		public String secondReferenceUrl = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 		public String downloadUrl = "https://download.osmand.net/download?standard=yes&file={name}.zip";
 		public List<CaseDef> cases = new ArrayList<>();
-		/** areas where the reference itself is wrong - their tiles are skipped by every case and mode */
+		/** areas where the reference itself is wrong - their tiles are compared with the second reference only */
 		public List<BrokenReference> brokenReferences = new ArrayList<>();
+		/** areas where the OSM data is wrong and both sides draw it differently - their tiles are skipped */
+		public List<BrokenReference> dataIssues = new ArrayList<>();
 	}
 
-	/** An area whose reference tiles are known to be wrong, e.g. drawn from outdated water polygons. */
+	/**
+	 * An area of a known problem outside of the renderer: the reference is wrong (outdated water
+	 * polygons) or the OSM data is.
+	 */
 	public static class BrokenReference {
 		public String title;
 		public String reason;
-		/** leftLon, bottomLat, rightLon, topLat - every tile that touches it is skipped */
+		/** leftLon, bottomLat, rightLon, topLat - every tile that touches it */
 		public double[] bbox;
 		/** the smaller zooms still see the area as a few pixels and are compared as usual */
 		public int minzoom = 0;
@@ -329,6 +343,8 @@ public class CoastlineRenderingTester {
 		final Map<String, String> metrics = new LinkedHashMap<>();
 		final List<String> problems = new ArrayList<>();
 		double severity;
+		/** failed against the reference but agrees with the second one - see {@code recheck} */
+		boolean staleReference;
 
 		TileResult(CaseDef def, int zoom, int x, int y) {
 			this.def = def;
@@ -343,13 +359,19 @@ public class CoastlineRenderingTester {
 
 		/** Index into {@link #SEVERITY_FILTERS}: the report filters the tiles by it. */
 		int bucket() {
-			return severity > 0.5 ? 1 : (severity > 0.1 ? 2 : 3);
+			if (staleReference) {
+				return STALE_BUCKET;
+			}
+			return severity > 0.5 ? 1 : (severity > 0.1 ? 2 : (severity > 0.05 ? 3 : 4));
 		}
 	}
 
 	/** Filters of the report: css id suffix and label, the first one shows everything. */
 	private static final String[][] SEVERITY_FILTERS = { { "all", "all" }, { "s50", "&gt; 50%" },
-			{ "s10", "10&ndash;50%" }, { "s0", "&lt; 10%" } };
+			{ "s10", "10&ndash;50%" }, { "s5", "5&ndash;10%" }, { "s0", "&lt; 5%" },
+			{ "stale", "stale reference" } };
+
+	private static final int STALE_BUCKET = SEVERITY_FILTERS.length - 1;
 
 	/** Aggregated numbers of one case. */
 	public static class CaseStats {
@@ -374,6 +396,8 @@ public class CoastlineRenderingTester {
 		public int[] failedBySeverity = new int[SEVERITY_FILTERS.length];
 		/** Failed tiles above {@code failAbove}. */
 		public int failedAboveLimit;
+		/** Tiles that differ from the reference only because the reference is outdated - see {@code recheck}. */
+		public int staleReferences;
 		/** The same numbers per zoom - the random tiles and the scans spread over many zooms. */
 		public Map<Integer, ZoomStats> zooms = new TreeMap<>();
 
@@ -422,6 +446,7 @@ public class CoastlineRenderingTester {
 		/** Failed tiles above {@code failAbove} - only these fail the run. */
 		public int failedAboveLimit;
 		public double failAbove;
+		public int staleReferences;
 		public int renderErrors;
 		/** How many times the renderer died during the run, restarts included. */
 		public int rendererDeaths;
@@ -446,6 +471,8 @@ public class CoastlineRenderingTester {
 	private final int flushEvery;
 	private final boolean openGl;
 	private final double failAbove;
+	private final boolean recheck;
+	private final File secondReferenceCacheDir;
 
 	private CasesFile casesFile;
 	private RunResult result;
@@ -481,6 +508,9 @@ public class CoastlineRenderingTester {
 		this.flushEvery = Integer.parseInt(opt("flushEvery", "1000"));
 		this.openGl = RENDERER_OPENGL.equalsIgnoreCase(opt("renderer", RENDERER_LEGACY));
 		this.failAbove = Double.parseDouble(opt("failAbove", String.valueOf(DEFAULT_FAIL_ABOVE)));
+		this.recheck = Boolean.parseBoolean(opt("recheck", "true"));
+		this.secondReferenceCacheDir = new File(referenceCacheDir.getAbsoluteFile().getParentFile(),
+				referenceCacheDir.getName() + "-osm");
 		if (!openGl && !RENDERER_LEGACY.equalsIgnoreCase(opt("renderer", RENDERER_LEGACY))) {
 			throw new IllegalArgumentException("-renderer must be " + RENDERER_LEGACY + " or "
 					+ RENDERER_OPENGL + " but was " + opt("renderer", RENDERER_LEGACY));
@@ -1094,29 +1124,26 @@ public class CoastlineRenderingTester {
 		while (it.hasNext() || !ahead.isEmpty()) {
 			while (ahead.size() < PREFETCH && it.hasNext()) {
 				int[] t = it.next();
-				if (brokenReference(t[0], t[1], t[2]) == null) {
+				if (brokenReference(t[0], t[1], t[2]) == null && covering(casesFile.dataIssues, t[0], t[1], t[2]) == null) {
 					prefetchReference(t[0], t[1], t[2]);
 				}
 				ahead.add(t);
 			}
 			int[] t = ahead.poll();
-			BrokenReference broken = brokenReference(t[0], t[1], t[2]);
-			if (broken != null) {
-				stats.tiles++;
-				stats.skippedTiles++;
-				System.out.printf("  SKIPPED %d/%d/%d - broken reference: %s%n", t[0], t[1], t[2], broken.title);
-				continue;
-			}
 			compareTile(def, stats, dir, t[0], t[1], t[2]);
 			flush(stats, totalOfCase);
 		}
-		System.out.printf("  %d tiles, %d compared, %d skipped, %d failed%n", stats.tiles,
-				stats.comparedTiles, stats.skippedTiles, stats.failedTiles);
+		System.out.printf("  %d tiles, %d compared, %d skipped, %d failed, %d stale references%n", stats.tiles,
+				stats.comparedTiles, stats.skippedTiles, stats.failedTiles, stats.staleReferences);
 		return stats;
 	}
 
 	private BrokenReference brokenReference(int zoom, int x, int y) {
-		for (BrokenReference b : casesFile.brokenReferences) {
+		return covering(casesFile.brokenReferences, zoom, x, y);
+	}
+
+	private static BrokenReference covering(List<BrokenReference> areas, int zoom, int x, int y) {
+		for (BrokenReference b : areas) {
 			if (b.covers(zoom, x, y)) {
 				return b;
 			}
@@ -1124,12 +1151,63 @@ public class CoastlineRenderingTester {
 		return null;
 	}
 
+	/** Water masks of a rendered tile against one reference tile. */
+	private class WaterDiff {
+		final BufferedImage reference;
+		final int w, h;
+		final boolean[] renderedWater, referenceWater, extra, missing;
+		final double extraRatio, extraAllRatio, missingRatio;
+
+		WaterDiff(BufferedImage rendered, BufferedImage reference) {
+			this.reference = scaleDown(reference, rendered.getWidth(), rendered.getHeight());
+			w = rendered.getWidth();
+			h = rendered.getHeight();
+			renderedWater = waterMask(rendered, OSMAND_WATER_COLORS);
+			referenceWater = waterMask(this.reference, REFERENCE_WATER_COLORS);
+			boolean[] shaded = dilate(waterMask(rendered, SHADED_WATER_COLORS), w, h, SHADED_WATER_SPREAD_PX);
+			boolean[] ice = dilate(or(waterMask(rendered, OSMAND_ICE_COLORS),
+					waterMask(this.reference, REFERENCE_ICE_COLORS)), w, h, maskTolerance);
+			boolean[] extraAll = and(and(erode(renderedWater, w, h, maskTolerance),
+					not(dilate(referenceWater, w, h, maskTolerance))), not(ice));
+			extra = and(extraAll, not(shaded));
+			missing = and(and(erode(referenceWater, w, h, maskTolerance),
+					not(dilate(renderedWater, w, h, maskTolerance))), not(ice));
+			extraRatio = count(extra) * 1.0 / (w * h);
+			extraAllRatio = count(extraAll) * 1.0 / (w * h);
+			missingRatio = count(missing) * 1.0 / (w * h);
+		}
+
+		boolean ok(CaseDef def) {
+			return extraRatio <= def.maxExtraWater && missingRatio <= def.maxMissingWater;
+		}
+
+		double water(boolean[] mask) {
+			return count(mask) * 1.0 / (w * h);
+		}
+	}
+
 	private void compareTile(CaseDef def, CaseStats stats, File dir, int zoom, int x, int y) throws IOException {
 		stats.tiles++;
-		awaitReference(zoom, x, y);
-		BufferedImage reference = reference(zoom, x, y);
+		BrokenReference dataIssue = covering(casesFile.dataIssues, zoom, x, y);
+		if (dataIssue != null) {
+			stats.skippedTiles++;
+			System.out.printf("  SKIPPED %d/%d/%d - data issue: %s%n", zoom, x, y, dataIssue.title);
+			return;
+		}
+		BrokenReference broken = brokenReference(zoom, x, y);
+		BufferedImage reference;
+		if (broken != null) {
+			// the reference is known to be wrong here - the second one is the only one worth comparing with
+			reference = recheck ? secondReference(zoom, x, y) : null;
+		} else {
+			awaitReference(zoom, x, y);
+			reference = reference(zoom, x, y);
+		}
 		if (reference == null) {
 			stats.skippedTiles++;
+			if (broken != null) {
+				System.out.printf("  SKIPPED %d/%d/%d - broken reference: %s%n", zoom, x, y, broken.title);
+			}
 			return;
 		}
 		BufferedImage rendered;
@@ -1139,27 +1217,21 @@ public class CoastlineRenderingTester {
 			renderError(def, stats, zoom, x, y, e);
 			return;
 		}
-		reference = scaleDown(reference, rendered.getWidth(), rendered.getHeight());
-		int w = rendered.getWidth(), h = rendered.getHeight();
-
-		boolean[] renderedWater = waterMask(rendered, OSMAND_WATER_COLORS);
-		boolean[] referenceWater = waterMask(reference, REFERENCE_WATER_COLORS);
-		boolean[] shaded = dilate(waterMask(rendered, SHADED_WATER_COLORS), w, h, SHADED_WATER_SPREAD_PX);
-		boolean[] ice = dilate(or(waterMask(rendered, OSMAND_ICE_COLORS),
-				waterMask(reference, REFERENCE_ICE_COLORS)), w, h, maskTolerance);
-		boolean[] extraAll = and(and(erode(renderedWater, w, h, maskTolerance),
-				not(dilate(referenceWater, w, h, maskTolerance))), not(ice));
-		boolean[] extra = and(extraAll, not(shaded));
-		boolean[] missing = and(and(erode(referenceWater, w, h, maskTolerance),
-				not(dilate(renderedWater, w, h, maskTolerance))), not(ice));
-		double extraRatio = count(extra) * 1.0 / (w * h);
-		double extraAllRatio = count(extraAll) * 1.0 / (w * h);
-		double missingRatio = count(missing) * 1.0 / (w * h);
+		WaterDiff first = new WaterDiff(rendered, reference);
+		WaterDiff second = null;
+		if (broken == null && recheck && !first.ok(def)) {
+			BufferedImage img = secondReference(zoom, x, y);
+			second = img == null ? null : new WaterDiff(rendered, img);
+		}
+		boolean stale = second != null && second.ok(def);
+		// a stale reference is not the one to measure the renderer with
+		WaterDiff d = stale ? second : first;
+		double extraRatio = d.extraRatio, missingRatio = d.missingRatio;
 
 		stats.comparedTiles++;
 		stats.sumExtraWater += extraRatio;
 		stats.sumMissingWater += missingRatio;
-		stats.styledSaltPonds += extraAllRatio - extraRatio;
+		stats.styledSaltPonds += d.extraAllRatio - extraRatio;
 		if (Math.max(extraRatio, missingRatio) > Math.max(stats.worstExtraWater, stats.worstMissingWater)) {
 			stats.worstTile = zoom + "/" + x + "/" + y;
 		}
@@ -1175,6 +1247,7 @@ public class CoastlineRenderingTester {
 
 		TileResult res = new TileResult(def, zoom, x, y);
 		res.severity = Math.max(extraRatio, missingRatio);
+		res.staleReference = stale;
 		if (extraRatio > def.maxExtraWater) {
 			res.problems.add(String.format("%.2f%% of water over the land (limit %.2f%%)",
 					extraRatio * 100, def.maxExtraWater * 100));
@@ -1183,7 +1256,14 @@ public class CoastlineRenderingTester {
 			res.problems.add(String.format("%.2f%% of land over the water (limit %.2f%%)",
 					missingRatio * 100, def.maxMissingWater * 100));
 		}
-		if (!res.ok()) {
+		if (stale) {
+			stats.staleReferences++;
+			stats.failedBySeverity[res.bucket()]++;
+			zs.failedBySeverity[res.bucket()]++;
+			System.out.printf("  STALE REFERENCE %d/%d/%d water: osmand %.1f%% reference %.1f%% openstreetmap.org %.1f%%%n",
+					zoom, x, y, first.water(first.renderedWater) * 100, first.water(first.referenceWater) * 100,
+					second.water(second.referenceWater) * 100);
+		} else if (!res.ok()) {
 			stats.failedTiles++;
 			zs.failedTiles++;
 			stats.failedBySeverity[res.bucket()]++;
@@ -1191,27 +1271,40 @@ public class CoastlineRenderingTester {
 			if (res.severity > failAbove) {
 				stats.failedAboveLimit++;
 			}
-			System.out.printf("  FAILED %d/%d/%d water: osmand %.1f%% reference %.1f%% - %s%n", zoom, x, y,
-					count(renderedWater) * 100.0 / (w * h), count(referenceWater) * 100.0 / (w * h),
+			String secondWater = second != null
+					? String.format(" openstreetmap.org %.1f%%", second.water(second.referenceWater) * 100)
+					: (broken != null ? " (openstreetmap.org, broken reference)" : "");
+			System.out.printf("  FAILED %d/%d/%d water: osmand %.1f%% reference %.1f%%%s - %s%n", zoom, x, y,
+					d.water(d.renderedWater) * 100, d.water(d.referenceWater) * 100, secondWater,
 					String.join(", ", res.problems));
 		}
-		if (saveTile(res.ok())) {
+		if (saveTile(res.ok() && !stale)) {
 			dir.mkdirs();
 			ImageIO.write(rendered, "png", new File(dir, tileName(zoom, x, y, "rendered")));
-			ImageIO.write(reference, "png", new File(dir, tileName(zoom, x, y, "reference")));
-			ImageIO.write(diffImage(rendered, extra, missing), "png",
-					new File(dir, tileName(zoom, x, y, "diff")));
 			res.images.put("osmand", tileName(zoom, x, y, "rendered"));
-			res.images.put("reference", tileName(zoom, x, y, "reference"));
+			ImageIO.write(first.reference, "png", new File(dir, tileName(zoom, x, y, "reference")));
+			res.images.put(broken != null ? "openstreetmap.org" : "reference", tileName(zoom, x, y, "reference"));
+			if (second != null) {
+				ImageIO.write(second.reference, "png", new File(dir, tileName(zoom, x, y, "osm")));
+				res.images.put("openstreetmap.org", tileName(zoom, x, y, "osm"));
+			}
+			ImageIO.write(diffImage(rendered, d.extra, d.missing), "png", new File(dir, tileName(zoom, x, y, "diff")));
 			res.images.put("diff", tileName(zoom, x, y, "diff"));
 		}
-		res.metrics.put("water osmand", pct(count(renderedWater) * 1.0 / (w * h)));
-		res.metrics.put("water reference", pct(count(referenceWater) * 1.0 / (w * h)));
+		res.metrics.put("water osmand", pct(d.water(d.renderedWater)));
+		res.metrics.put(broken != null ? "water openstreetmap.org" : "water reference",
+				pct(first.water(first.referenceWater)));
+		if (second != null) {
+			res.metrics.put("water openstreetmap.org", pct(second.water(second.referenceWater)));
+		}
 		res.metrics.put("extra water", pct(extraRatio));
-		if (extraAllRatio - extraRatio > 0.0001) {
-			res.metrics.put("of it styled salt ponds", pct(extraAllRatio - extraRatio));
+		if (d.extraAllRatio - extraRatio > 0.0001) {
+			res.metrics.put("of it styled salt ponds", pct(d.extraAllRatio - extraRatio));
 		}
 		res.metrics.put("missing water", pct(missingRatio));
+		if (broken != null) {
+			res.metrics.put("broken reference", broken.title);
+		}
 		keepForReport(res);
 	}
 
@@ -1506,9 +1599,31 @@ public class CoastlineRenderingTester {
 		}
 	}
 
+	/**
+	 * The tile of {@code secondReferenceUrl}, fetched only for the tiles that failed or lie in a broken
+	 * reference area, and cached next to the reference cache.
+	 */
+	private BufferedImage secondReference(int zoom, int x, int y) {
+		File cached = new File(secondReferenceCacheDir, zoom + "/" + x + "_" + y + ".png");
+		try {
+			if (!cached.isFile() || cached.length() == 0) {
+				cached.getParentFile().mkdirs();
+				download(casesFile.secondReferenceUrl.replace("{z}", String.valueOf(zoom))
+						.replace("{x}", String.valueOf(x)).replace("{y}", String.valueOf(y)), cached);
+			}
+			return ImageIO.read(cached);
+		} catch (IOException e) {
+			System.err.println("Can't get the second reference tile " + zoom + "/" + x + "/" + y + ": "
+					+ e.getMessage());
+			cached.delete();
+			return null;
+		}
+	}
+
 	private static void download(String url, File target) throws IOException {
 		HttpURLConnection cn = (HttpURLConnection) new URL(url).openConnection();
-		cn.setRequestProperty("User-Agent", "OsmAnd-CoastlineRenderingTester");
+		// tile.openstreetmap.org requires an agent that says who is asking
+		cn.setRequestProperty("User-Agent", "OsmAnd-CoastlineRenderingTester (https://osmand.net)");
 		cn.setConnectTimeout(30000);
 		// a reference tile is a few KB - a minute is already a stuck connection, and one stuck
 		// download must not hold up the whole chunk
@@ -1700,6 +1815,7 @@ public class CoastlineRenderingTester {
 		result.comparedTiles = 0;
 		result.failedTiles = 0;
 		result.failedAboveLimit = 0;
+		result.staleReferences = 0;
 		result.renderErrors = 0;
 		result.rendererDeaths = eyePiece == null ? 0 : eyePiece.deaths();
 		Map<String, GroupTotals> byGroup = new LinkedHashMap<>();
@@ -1708,6 +1824,7 @@ public class CoastlineRenderingTester {
 			result.comparedTiles += s.comparedTiles;
 			result.failedTiles += s.failedTiles;
 			result.failedAboveLimit += s.failedAboveLimit;
+			result.staleReferences += s.staleReferences;
 			result.renderErrors += s.renderErrors;
 			GroupTotals g = byGroup.computeIfAbsent(s.group == null ? GROUP_FIXED : s.group, k -> {
 				GroupTotals t = new GroupTotals();
@@ -1797,7 +1914,7 @@ public class CoastlineRenderingTester {
 	}
 
 	private void keepForReport(TileResult res) {
-		if (!res.ok() || "all".equalsIgnoreCase(saveImages)) {
+		if (!res.ok() || res.staleReference || "all".equalsIgnoreCase(saveImages)) {
 			if (reported.size() < MAX_REPORTED_TILES) {
 				reported.add(res);
 			}
@@ -1862,6 +1979,10 @@ public class CoastlineRenderingTester {
 		System.out.printf("%d tiles compared, %d failed, %d maps loaded, %s renderer, %.1f s%n",
 				result.comparedTiles, result.failedTiles, result.loadedMaps, result.renderer,
 				result.durationMs / 1000.0);
+		if (result.staleReferences > 0) {
+			System.out.printf("%d tiles differ from the reference only - openstreetmap.org agrees with them%n",
+					result.staleReferences);
+		}
 		if (result.renderErrors > 0) {
 			System.out.printf("%d tiles could not be rendered at all, the renderer died %d times -"
 					+ " see the report, that is a bug of the renderer%n",
@@ -1941,8 +2062,10 @@ public class CoastlineRenderingTester {
 						+ "&middot; %d maps &middot; %s renderer &middot; style %s &middot; %.1f s &middot; %s</p>",
 				result.failedTiles > 0 ? "bad" : "good", result.failedTiles,
 				result.failedAboveLimit > 0 ? "bad" : "good", result.failedAboveLimit, pct(result.failAbove),
-				result.renderErrors > 0 ? String.format(" &middot; <b class=\"bad\">%d renderer "
-						+ "errors</b> (%d crashes)", result.renderErrors, result.rendererDeaths) : "",
+				(result.renderErrors > 0 ? String.format(" &middot; <b class=\"bad\">%d renderer "
+						+ "errors</b> (%d crashes)", result.renderErrors, result.rendererDeaths) : "")
+						+ (result.staleReferences > 0 ? String.format(" &middot; %d stale references (the tile "
+						+ "agrees with openstreetmap.org)", result.staleReferences) : ""),
 				result.comparedTiles, result.loadedMaps, esc(result.renderer), esc(result.style),
 				result.durationMs / 1000.0, new java.util.Date()));
 		if (result.groups.size() > 1) {
@@ -2086,9 +2209,9 @@ public class CoastlineRenderingTester {
 						+ "<a href=\"%s/tile/df/%d/%d/%d.png\" title=\"the same tile rendered by the server\">"
 						+ "server tile</a>"
 						+ "<a href=\"%s\" title=\"the reference tile\">reference tile</a>"
-						+ "<span class=\"badge\">%s</span></div>", r.ok() ? "good" : "bad",
+						+ "<span class=\"badge\">%s</span></div>", r.staleReference ? "stale" : r.ok() ? "good" : "bad",
 				r.zoom, r.x, r.y, MAP_SERVER, r.zoom, lat, lon, MAP_SERVER, r.zoom, r.x, r.y,
-				esc(referenceUrl(r.zoom, r.x, r.y)), r.ok() ? "ok" : "failed"));
+				esc(referenceUrl(r.zoom, r.x, r.y)), r.staleReference ? "stale reference" : r.ok() ? "ok" : "failed"));
 		if (!r.images.isEmpty()) {
 			sb.append("<div class=\"imgs\">");
 			for (Map.Entry<String, String> e : r.images.entrySet()) {
@@ -2157,14 +2280,27 @@ public class CoastlineRenderingTester {
 			+ "input.sev{position:absolute;opacity:0;pointer-events:none}\n"
 			+ ".filter{margin:8px 0 0;color:var(--mut)}.filter label{cursor:pointer;margin-left:6px;padding:2px 10px;"
 			+ "border:1px solid var(--line);border-radius:14px;white-space:nowrap}\n"
-			+ "#f-all:checked~header label[for=f-all],#f-s50:checked~header label[for=f-s50],"
-			+ "#f-s10:checked~header label[for=f-s10],#f-s0:checked~header label[for=f-s0]"
-			+ "{background:var(--fg);color:var(--bg);border-color:var(--fg)}\n"
-			// the tiles of the other ranges disappear, and so do the blocks left without a tile
-			+ "#f-s50:checked~main .tile:not(.s50),#f-s10:checked~main .tile:not(.s10),"
-			+ "#f-s0:checked~main .tile:not(.s0){display:none}\n"
-			+ "#f-s50:checked~main details.block:not(:has(.s50)),#f-s10:checked~main details.block:not(:has(.s10)),"
-			+ "#f-s0:checked~main details.block:not(:has(.s0)){display:none}\n";
+			+ ".tile.stale{border-color:var(--mut)}.tile.stale .badge{background:var(--line);color:var(--fg)}\n"
+			+ filterCss();
+
+	/** The css of the severity filter, one set of rules per range of {@link #SEVERITY_FILTERS}. */
+	private static String filterCss() {
+		StringBuilder checked = new StringBuilder(), tiles = new StringBuilder(), blocks = new StringBuilder();
+		for (int i = 0; i < SEVERITY_FILTERS.length; i++) {
+			String id = SEVERITY_FILTERS[i][0];
+			checked.append(i == 0 ? "" : ",").append("#f-").append(id).append(":checked~header label[for=f-")
+					.append(id).append("]");
+			if (i > 0) {
+				// the tiles of the other ranges disappear, and so do the blocks left without a tile
+				tiles.append(i == 1 ? "" : ",").append("#f-").append(id).append(":checked~main .tile:not(.")
+						.append(id).append(")");
+				blocks.append(i == 1 ? "" : ",").append("#f-").append(id)
+						.append(":checked~main details.block:not(:has(.").append(id).append("))");
+			}
+		}
+		return checked + "{background:var(--fg);color:var(--bg);border-color:var(--fg)}\n" + tiles
+				+ "{display:none}\n" + blocks + "{display:none}\n";
+	}
 
 	private static String esc(String s) {
 		return s == null ? "" : s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
