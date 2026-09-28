@@ -14,11 +14,14 @@ import java.io.Writer;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.ArrayDeque;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -133,9 +136,10 @@ import net.osmand.util.MapsCollection;
  * OsmAndMapCreator is used, a local repository checkout picks it up from {@code core-legacy}.
  * Ignored by {@code -renderer=opengl}, which needs no legacy library at all;</li>
  * <li>{@code fonts}, {@code style} - renderer setup, autodetected;</li>
- * <li>{@code threads} - parallel reference tile downloads, default 16. Rendering itself is single
- * threaded, this only controls how many reference tiles are fetched at once - raise it if the
- * progress line reports a high "waiting for references" share;</li>
+ * <li>{@code threads} - parallel reference tile downloads, default 16. The legacy renderer renders
+ * that many tiles at once too (at most one per processor): the native library keeps global state,
+ * so every thread gets its own copy of it, loaded by its own class loader, with its own maps.
+ * {@code -renderer=opengl} and the bundled library render one tile at a time;</li>
  * <li>{@code download} - {@code false} to never download a missing map;</li>
  * <li>{@code referenceDir} - where the downloaded reference tiles are kept, by default
  * {@code coastline-reference} in the current folder. It is reused by every run, so a rerun only
@@ -483,6 +487,13 @@ public class CoastlineRenderingTester {
 	private final Set<String> initializedMaps = new LinkedHashSet<>();
 	private final List<TileResult> reported = new ArrayList<>();
 	private ExecutorService downloadPool;
+	/** Legacy tiles rendered ahead of the comparison, null when rendering is single threaded. */
+	private ExecutorService renderPool;
+	private int renderThreads = 1;
+	/** Idle copies of the native library, each one used by a single thread at a time. */
+	private final java.util.concurrent.BlockingQueue<java.util.function.BiFunction<int[], Collection<String>, BufferedImage>> renderWorkers =
+			new java.util.concurrent.LinkedBlockingQueue<>();
+	private final Map<String, Future<PreparedTile>> pendingRenders = new HashMap<>();
 	/** Reference tiles already handed to the download pool, so that nobody downloads them twice. */
 	private final Map<String, Future<?>> pendingReferences = new ConcurrentHashMap<>();
 	private long referenceWaitNs;
@@ -570,6 +581,23 @@ public class CoastlineRenderingTester {
 		// that reconnects and does a TLS handshake per tile
 		System.setProperty("http.maxConnections", String.valueOf(Math.max(5, threads)));
 		downloadPool = Executors.newFixedThreadPool(threads);
+		if (!openGl && findNativeLibrary() != null) {
+			int n = Math.max(1, Math.min(threads, Runtime.getRuntime().availableProcessors()));
+			if (n > 1) {
+				renderThreads = n;
+				renderPool = Executors.newFixedThreadPool(renderThreads);
+				// each copy initializes its own maps, about a second - all of them at once
+				List<Future<java.util.function.BiFunction<int[], Collection<String>, BufferedImage>>> created = new ArrayList<>();
+				for (int i = 0; i < n; i++) {
+					int index = i;
+					created.add(renderPool.submit(() -> newRenderWorker(index)));
+				}
+				for (Future<java.util.function.BiFunction<int[], Collection<String>, BufferedImage>> f : created) {
+					renderWorkers.add(f.get());
+				}
+			}
+		}
+		System.out.println("Render threads : " + renderThreads);
 
 		result = new RunResult();
 		result.renderer = openGl ? RENDERER_OPENGL : RENDERER_LEGACY;
@@ -593,6 +621,9 @@ public class CoastlineRenderingTester {
 			}
 		} finally {
 			downloadPool.shutdownNow();
+			if (renderPool != null) {
+				renderPool.shutdownNow();
+			}
 			if (eyePiece != null) {
 				eyePiece.close();
 			}
@@ -1129,10 +1160,14 @@ public class CoastlineRenderingTester {
 				}
 				ahead.add(t);
 			}
+			submitRenders(ahead);
 			int[] t = ahead.poll();
 			compareTile(def, stats, dir, t[0], t[1], t[2]);
 			flush(stats, totalOfCase);
 		}
+		// a tile skipped for a missing reference; the next case may render it with other maps
+		pendingRenders.values().forEach(f -> f.cancel(false));
+		pendingRenders.clear();
 		System.out.printf("  %d tiles, %d compared, %d skipped, %d failed, %d stale references%n", stats.tiles,
 				stats.comparedTiles, stats.skippedTiles, stats.failedTiles, stats.staleReferences);
 		return stats;
@@ -1195,13 +1230,14 @@ public class CoastlineRenderingTester {
 			return;
 		}
 		BrokenReference broken = brokenReference(zoom, x, y);
+		PreparedTile prepared = preparedTile(zoom, x, y);
 		BufferedImage reference;
 		if (broken != null) {
 			// the reference is known to be wrong here - the second one is the only one worth comparing with
 			reference = recheck ? secondReference(zoom, x, y) : null;
 		} else {
 			awaitReference(zoom, x, y);
-			reference = reference(zoom, x, y);
+			reference = prepared != null ? prepared.reference : reference(zoom, x, y);
 		}
 		if (reference == null) {
 			stats.skippedTiles++;
@@ -1212,12 +1248,12 @@ public class CoastlineRenderingTester {
 		}
 		BufferedImage rendered;
 		try {
-			rendered = render(zoom, x, y);
+			rendered = prepared != null ? prepared.rendered : render(zoom, x, y);
 		} catch (EyePieceTileRenderer.TileRenderFailure e) {
 			renderError(def, stats, zoom, x, y, e);
 			return;
 		}
-		WaterDiff first = new WaterDiff(rendered, reference);
+		WaterDiff first = prepared != null && prepared.first != null ? prepared.first : new WaterDiff(rendered, reference);
 		WaterDiff second = null;
 		if (broken == null && recheck && !first.ok(def)) {
 			BufferedImage img = secondReference(zoom, x, y);
@@ -1474,6 +1510,137 @@ public class CoastlineRenderingTester {
 	 * few 31 bit units off the tile grid, which is enough to flip the ocean/land fill of a tile -
 	 * 6/4/62 and 6/58/19 come out as land through it and as water through this one.
 	 */
+	/** A tile rendered by the pool, with its reference and the comparison with it when there is one. */
+	private static class PreparedTile {
+		BufferedImage rendered;
+		BufferedImage reference;
+		WaterDiff first;
+	}
+
+	/**
+	 * Keeps the render pool busy with the next tiles of the queue - a few per thread, so that the
+	 * rendered images waiting for their comparison stay few. The pool renders a tile and also
+	 * compares it with the reference: the comparison takes as long as the rendering.
+	 */
+	private void submitRenders(Deque<int[]> ahead) {
+		if (renderPool == null) {
+			return;
+		}
+		int n = 0;
+		for (int[] t : ahead) {
+			if (n++ >= renderThreads * 4) {
+				break;
+			}
+			String key = t[0] + "/" + t[1] + "/" + t[2];
+			// the tiles compareTile skips without rendering
+			boolean skipped = covering(casesFile.dataIssues, t[0], t[1], t[2]) != null
+					|| (!recheck && brokenReference(t[0], t[1], t[2]) != null);
+			if (!skipped && !pendingRenders.containsKey(key)) {
+				List<String> maps = new ArrayList<>(initializedMaps);
+				boolean broken = brokenReference(t[0], t[1], t[2]) != null;
+				Future<?> download = pendingReferences.get(key);
+				pendingRenders.put(key, renderPool.submit(() -> {
+					PreparedTile p = new PreparedTile();
+					java.util.function.BiFunction<int[], Collection<String>, BufferedImage> worker = renderWorkers.take();
+					try {
+						p.rendered = worker.apply(t, maps);
+					} finally {
+						renderWorkers.add(worker);
+					}
+					if (!broken) {
+						if (download != null) {
+							try {
+								download.get();
+							} catch (ExecutionException e) {
+								// reference() retries it and reports the failure
+							}
+						}
+						p.reference = reference(t[0], t[1], t[2]);
+						p.first = p.reference == null ? null : new WaterDiff(p.rendered, p.reference);
+					}
+					return p;
+				}));
+			}
+		}
+	}
+
+	/**
+	 * A copy of the native library with a renderer of its own. The JVM binds a library file to one
+	 * class loader only, and the library keeps its maps, caches and output buffer in globals, so the
+	 * library file is copied and loaded through a class loader of its own - that loader has its own
+	 * {@code NativeLibrary} class and so its own set of natives.
+	 */
+	private java.util.function.BiFunction<int[], Collection<String>, BufferedImage> newRenderWorker(int index)
+			throws Exception {
+		File lib = findNativeLibrary();
+		File dir = Files.createTempDirectory("osmand-native-" + index).toFile();
+		File copy = new File(dir, lib.getName());
+		Files.copy(lib.toPath(), copy.toPath());
+		copy.deleteOnExit();
+		dir.deleteOnExit();
+		List<java.net.URL> urls = new ArrayList<>();
+		for (String entry : System.getProperty("java.class.path").split(File.pathSeparator)) {
+			urls.add(new File(entry).toURI().toURL());
+		}
+		ClassLoader loader = new java.net.URLClassLoader(urls.toArray(new java.net.URL[0]),
+				ClassLoader.getPlatformClassLoader());
+		Map<String, String> opts = new HashMap<>(options);
+		opts.put("native", copy.getAbsolutePath());
+		@SuppressWarnings("unchecked")
+		java.util.function.BiFunction<int[], Collection<String>, BufferedImage> worker =
+				(java.util.function.BiFunction<int[], Collection<String>, BufferedImage>) loader
+						.loadClass(CoastlineRenderingTester.class.getName())
+						.getMethod("renderWorker", Map.class, Collection.class)
+						.invoke(null, opts, new ArrayList<>(initializedMaps));
+		return worker;
+	}
+
+	/**
+	 * Called through the class loader of {@link #newRenderWorker}: a renderer on the library of
+	 * {@code -native} with the given maps. It renders a tile after initializing the maps the main
+	 * renderer has got since, and is not thread safe.
+	 */
+	public static java.util.function.BiFunction<int[], Collection<String>, BufferedImage> renderWorker(
+			Map<String, String> options, Collection<String> maps) throws Exception {
+		CoastlineRenderingTester t = new CoastlineRenderingTester(options);
+		t.initLegacyRenderer(t.opt("style", "default.render.xml"));
+		if (t.loadAllMaps) {
+			t.initAllMaps();
+		}
+		for (String map : maps) {
+			t.initMap(map);
+		}
+		return (tile, current) -> {
+			try {
+				for (String map : current) {
+					t.initMap(map);
+				}
+				return t.render(tile[0], tile[1], tile[2]);
+			} catch (IOException e) {
+				throw new java.io.UncheckedIOException(e);
+			}
+		};
+	}
+
+	/** The tile from the render pool when it was handed there, otherwise null. */
+	private PreparedTile preparedTile(int zoom, int x, int y) throws IOException {
+		Future<PreparedTile> f = pendingRenders.remove(zoom + "/" + x + "/" + y);
+		if (f == null) {
+			return null;
+		}
+		try {
+			return f.get();
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new IOException(e);
+		} catch (ExecutionException e) {
+			if (e.getCause() instanceof java.io.UncheckedIOException) {
+				throw ((java.io.UncheckedIOException) e.getCause()).getCause();
+			}
+			throw new IOException(e.getCause());
+		}
+	}
+
 	private BufferedImage render(int zoom, int x, int y) throws IOException {
 		if (openGl) {
 			// eyepiece renders from the tile centre with the window sized to one tile, so the tile
