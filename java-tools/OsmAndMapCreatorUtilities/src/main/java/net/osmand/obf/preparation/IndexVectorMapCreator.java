@@ -255,6 +255,11 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
             return;
         }
         tags = new LinkedHashMap<>(tags);
+        // natural=coastline is a way tag: on a relation it would take the coastline type away from the member ways
+        // (excludeFromMainIteration) and leave gaps in the coastline
+        if ("coastline".equals(tags.get(OSMTagKey.NATURAL.getValue()))) {
+            tags.remove(OSMTagKey.NATURAL.getValue());
+        }
         // some big islands are marked as multipolygon - don't process them (only keep
         // coastlines)
         boolean polygonIsland = MULTIPOLYGON.equals(tags.get(OSMTagKey.TYPE.getValue()))
