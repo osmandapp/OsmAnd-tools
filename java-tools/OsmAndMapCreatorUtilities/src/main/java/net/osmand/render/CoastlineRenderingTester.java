@@ -310,7 +310,16 @@ public class CoastlineRenderingTester {
 		boolean ok() {
 			return problems.isEmpty();
 		}
+
+		/** Index into {@link #SEVERITY_FILTERS}: the report filters the tiles by it. */
+		int bucket() {
+			return severity > 0.5 ? 1 : (severity > 0.1 ? 2 : 3);
+		}
 	}
+
+	/** Filters of the report: css id suffix and label, the first one shows everything. */
+	private static final String[][] SEVERITY_FILTERS = { { "all", "all" }, { "s50", "&gt; 50%" },
+			{ "s10", "10&ndash;50%" }, { "s0", "&lt; 10%" } };
 
 	/** Aggregated numbers of one case. */
 	public static class CaseStats {
@@ -331,6 +340,8 @@ public class CoastlineRenderingTester {
 		public double sumMissingWater;
 		public double styledSaltPonds;
 		public String worstTile = "";
+		/** Failed tiles by the ranges of {@link #SEVERITY_FILTERS} (index 0 is unused). */
+		public int[] failedBySeverity = new int[SEVERITY_FILTERS.length];
 		/** The same numbers per zoom - the random tiles and the scans spread over many zooms. */
 		public Map<Integer, ZoomStats> zooms = new TreeMap<>();
 
@@ -354,6 +365,7 @@ public class CoastlineRenderingTester {
 		public double worstExtraWater;
 		public double worstMissingWater;
 		public String worstTile = "";
+		public int[] failedBySeverity = new int[SEVERITY_FILTERS.length];
 	}
 
 	/** Failed / compared tiles of one group of cases. */
@@ -1118,6 +1130,8 @@ public class CoastlineRenderingTester {
 		if (!res.ok()) {
 			stats.failedTiles++;
 			zs.failedTiles++;
+			stats.failedBySeverity[res.bucket()]++;
+			zs.failedBySeverity[res.bucket()]++;
 			System.out.printf("  FAILED %d/%d/%d water: osmand %.1f%% reference %.1f%% - %s%n", zoom, x, y,
 					count(renderedWater) * 100.0 / (w * h), count(referenceWater) * 100.0 / (w * h),
 					String.join(", ", res.problems));
@@ -1191,6 +1205,7 @@ public class CoastlineRenderingTester {
 			res.metrics.put("drawn by the map", pct(ratio));
 			if (ratio > def.maxDrawn) {
 				stats.failedTiles++;
+				stats.failedBySeverity[res.bucket()]++;
 				res.problems.add(String.format("%s alone draws %.3f%% of an inland tile (limit %.3f%%)",
 						String.join(", ", def.maps), ratio * 100, def.maxDrawn * 100));
 				System.out.printf("  FAILED %d/%d/%d - %s%n", zoom, x, y, res.problems.get(0));
@@ -1841,7 +1856,18 @@ public class CoastlineRenderingTester {
 		// so the css goes into a file next to index.html
 		sb.append("<title>OsmAnd coastline tiles</title>\n");
 		sb.append("<link rel=\"stylesheet\" href=\"" + REPORT_CSS_FILE + "\">\n</head><body>\n");
-		sb.append("<header><h1>Coastline rendering &mdash; epic 3291</h1>");
+		// the severity filter: Jenkins allows no scripts, so it is radio buttons that the css reads with
+		// ":checked ~ main"; they have to be siblings in front of <header> and <main>
+		int[] total = new int[SEVERITY_FILTERS.length];
+		for (TileResult r : reported) {
+			total[0]++;
+			total[r.bucket()]++;
+		}
+		for (int i = 0; i < SEVERITY_FILTERS.length; i++) {
+			sb.append(String.format("<input type=\"radio\" name=\"sev\" class=\"sev\" id=\"f-%s\"%s>",
+					SEVERITY_FILTERS[i][0], i == 0 ? " checked" : ""));
+		}
+		sb.append("\n<header><h1>Coastline rendering &mdash; epic 3291</h1>");
 		sb.append(String.format("<p class=\"sum\"><b class=\"%s\">%d failed</b>%s &middot; %d tiles compared "
 						+ "&middot; %d maps &middot; %s renderer &middot; style %s &middot; %.1f s &middot; %s</p>",
 				result.failedTiles > 0 ? "bad" : "good", result.failedTiles,
@@ -1858,30 +1884,41 @@ public class CoastlineRenderingTester {
 			}
 			sb.append("<p class=\"sum groups\">").append(g).append("</p>");
 		}
+		sb.append("<p class=\"filter\">tiles by the worst of extra / missing water:");
+		for (int i = 0; i < SEVERITY_FILTERS.length; i++) {
+			sb.append(String.format(" <label for=\"f-%s\">%s <b>%d</b></label>", SEVERITY_FILTERS[i][0],
+					SEVERITY_FILTERS[i][1], total[i]));
+		}
+		sb.append("</p>");
+		StringBuilder severityHeads = new StringBuilder();
+		for (int i = 1; i < SEVERITY_FILTERS.length; i++) {
+			severityHeads.append("<th>").append(SEVERITY_FILTERS[i][1]).append("</th>");
+		}
 		sb.append("</header>\n<main>\n<table class=\"stats\"><tr><th>case</th><th>tiles</th><th>failed</th>"
-				+ "<th>worst extra water</th><th>worst missing water</th><th>worst tile</th></tr>");
+				+ severityHeads + "<th>worst extra water</th><th>worst missing water</th><th>worst tile</th></tr>");
 		String tableGroup = null;
 		for (CaseStats s : orderedCases(result)) {
 			String g = s.group == null ? GROUP_FIXED : s.group;
 			if (!g.equals(tableGroup)) {
 				tableGroup = g;
-				sb.append(String.format("<tr class=\"grp\"><td colspan=\"6\">%s</td></tr>", esc(g)));
+				sb.append(String.format("<tr class=\"grp\"><td colspan=\"%d\">%s</td></tr>",
+						5 + SEVERITY_FILTERS.length, esc(g)));
 			}
 			boolean seamarks = CHECK_SEAMARKS_INLAND.equals(s.check);
-			sb.append(String.format("<tr class=\"%s\"><td>%s#%d</a> %s</td><td>%d</td><td>%d</td>"
+			sb.append(String.format("<tr class=\"%s\"><td>%s#%d</a> %s</td><td>%d</td><td>%d</td>%s"
 							+ "<td>%s</td><td>%s</td><td>%s</td></tr>", s.failedTiles > 0 ? "bad" : "good",
 					s.url == null ? "<a>" : "<a href=\"" + esc(s.url) + "\">", s.issue, esc(s.title),
-					s.comparedTiles, s.failedTiles,
+					s.comparedTiles, s.failedTiles, severityCells(s.failedBySeverity),
 					seamarks ? pct(s.worstExtraWater) + " drawn" : pct(s.worstExtraWater),
 					seamarks ? "&mdash;" : pct(s.worstMissingWater), esc(s.worstTile)));
 			if (!GROUP_FIXED.equals(g) && s.zooms.size() > 1) {
 				// the random tiles and the scans: where the failures are is a question of the zoom
 				for (Map.Entry<Integer, ZoomStats> e : s.zooms.entrySet()) {
 					ZoomStats z = e.getValue();
-					sb.append(String.format("<tr class=\"zoom %s\"><td>z%d</td><td>%d</td><td>%d</td>"
+					sb.append(String.format("<tr class=\"zoom %s\"><td>z%d</td><td>%d</td><td>%d</td>%s"
 									+ "<td>%s</td><td>%s</td><td>%s</td></tr>", z.failedTiles > 0 ? "bad" : "good",
-							e.getKey(), z.comparedTiles, z.failedTiles, pct(z.worstExtraWater),
-							pct(z.worstMissingWater), esc(z.worstTile)));
+							e.getKey(), z.comparedTiles, z.failedTiles, severityCells(z.failedBySeverity),
+							pct(z.worstExtraWater), pct(z.worstMissingWater), esc(z.worstTile)));
 				}
 			}
 		}
@@ -1923,12 +1960,23 @@ public class CoastlineRenderingTester {
 				List<TileResult> tiles = e.getValue();
 				tiles.sort((a, b) -> a.ok() != b.ok() ? (a.ok() ? 1 : -1) : Double.compare(b.severity, a.severity));
 				int failed = 0;
+				int[] counts = new int[SEVERITY_FILTERS.length];
 				for (TileResult r : tiles) {
 					failed += r.ok() ? 0 : 1;
+					counts[r.bucket()]++;
 				}
-				sb.append(String.format("<details class=\"block\" open><summary>%s%s <span class=\"%s\">%d failed"
-								+ "</span></summary>\n", caseLink, e.getKey() < 0 ? "" : " &middot; z" + e.getKey(),
-						failed > 0 ? "bad" : "good", failed));
+				StringBuilder bucketCounts = new StringBuilder();
+				for (int i = 1; i < SEVERITY_FILTERS.length; i++) {
+					if (counts[i] > 0) {
+						bucketCounts.append(String.format(" <i class=\"%s\">%s&nbsp;%d</i>", SEVERITY_FILTERS[i][0],
+								SEVERITY_FILTERS[i][1], counts[i]));
+					}
+				}
+				// folded: the report is read one block at a time
+				sb.append(String.format("<details class=\"block\"><summary>%s%s <span class=\"%s\">%d failed"
+								+ "</span><span class=\"bc\">%s</span></summary>\n", caseLink,
+						e.getKey() < 0 ? "" : " &middot; z" + e.getKey(), failed > 0 ? "bad" : "good", failed,
+						bucketCounts));
 				for (TileResult r : tiles) {
 					appendTile(sb, r);
 				}
@@ -1949,10 +1997,21 @@ public class CoastlineRenderingTester {
 		}
 	}
 
+	/** The failed tiles of a table row by the ranges of {@link #SEVERITY_FILTERS}, zeros greyed out. */
+	private static String severityCells(int[] counts) {
+		StringBuilder res = new StringBuilder();
+		for (int i = 1; i < SEVERITY_FILTERS.length; i++) {
+			res.append(String.format("<td class=\"%s\">%d</td>", counts[i] == 0 ? "zero" : SEVERITY_FILTERS[i][0],
+					counts[i]));
+		}
+		return res.toString();
+	}
+
 	private void appendTile(StringBuilder sb, TileResult r) {
 		double lat = MapUtils.getLatitudeFromTile(r.zoom, r.y + 0.5);
 		double lon = MapUtils.getLongitudeFromTile(r.zoom, r.x + 0.5);
-		sb.append(String.format("<section class=\"tile %s\"><div class=\"hd\"><b>%d/%d/%d</b>"
+		sb.append(String.format("<section class=\"tile " + SEVERITY_FILTERS[r.bucket()][0]
+						+ " %s\"><div class=\"hd\"><b>%d/%d/%d</b>"
 						+ "<a href=\"%s/map/#%d/%.4f/%.4f\" title=\"open this place on the map\">map</a>"
 						+ "<a href=\"%s/tile/df/%d/%d/%d.png\" title=\"the same tile rendered by the server\">"
 						+ "server tile</a>"
@@ -2021,7 +2080,21 @@ public class CoastlineRenderingTester {
 			+ "table.stats tr.zoom.bad td{color:var(--bad)}\n"
 			+ "details.block>summary{cursor:pointer;font-size:15px;font-weight:600;margin:26px 0 10px;"
 			+ "padding-top:10px;border-top:1px solid var(--line)}\n"
-			+ "details.block>summary a{color:inherit}details.block>summary span{font-weight:400;font-size:13px}\n";
+			+ "details.block>summary a{color:inherit}details.block>summary span{font-weight:400;font-size:13px}\n"
+			+ ".bc i{font-style:normal;font-weight:400;font-size:12px;color:var(--mut);margin-left:10px}\n"
+			+ ".bc i.s50{color:var(--bad);font-weight:600}\n"
+			+ "table.stats td.zero{color:var(--mut);opacity:.5}table.stats td.s50{font-weight:600}\n"
+			+ "input.sev{position:absolute;opacity:0;pointer-events:none}\n"
+			+ ".filter{margin:8px 0 0;color:var(--mut)}.filter label{cursor:pointer;margin-left:6px;padding:2px 10px;"
+			+ "border:1px solid var(--line);border-radius:14px;white-space:nowrap}\n"
+			+ "#f-all:checked~header label[for=f-all],#f-s50:checked~header label[for=f-s50],"
+			+ "#f-s10:checked~header label[for=f-s10],#f-s0:checked~header label[for=f-s0]"
+			+ "{background:var(--fg);color:var(--bg);border-color:var(--fg)}\n"
+			// the tiles of the other ranges disappear, and so do the blocks left without a tile
+			+ "#f-s50:checked~main .tile:not(.s50),#f-s10:checked~main .tile:not(.s10),"
+			+ "#f-s0:checked~main .tile:not(.s0){display:none}\n"
+			+ "#f-s50:checked~main details.block:not(:has(.s50)),#f-s10:checked~main details.block:not(:has(.s10)),"
+			+ "#f-s0:checked~main details.block:not(:has(.s0)){display:none}\n";
 
 	private static String esc(String s) {
 		return s == null ? "" : s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
