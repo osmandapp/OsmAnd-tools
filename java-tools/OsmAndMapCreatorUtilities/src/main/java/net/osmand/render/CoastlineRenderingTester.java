@@ -250,8 +250,8 @@ public class CoastlineRenderingTester {
 		public int radius = 1;
 		public String[] maps = new String[0];
 		public String check = "water";
-		/** explicit {zoom, x, y} tiles - used by the random mode instead of bbox/radius */
-		public transient List<int[]> tiles;
+		/** explicit {zoom, x, y} tiles instead of bbox/radius - the random mode and a list of single tiles */
+		public List<int[]> tiles;
 		/** {@link #GROUP_FIXED}, {@link #GROUP_RANDOM} or {@link #GROUP_SCAN} */
 		public transient String group = GROUP_FIXED;
 		/** max share of a tile that may be rendered as water while the reference is land */
