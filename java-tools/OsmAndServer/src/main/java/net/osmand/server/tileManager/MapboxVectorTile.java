@@ -8,6 +8,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 
 public class MapboxVectorTile implements TileCacheProvider, Comparable<MapboxVectorTile> {
+	public static final int MIN_SHIFT = -3;
+	public static final int MAX_SHIFT = 3;
+	public static final int MAX_ZOOM = 22;
 	private byte[] runtimeTile;
 	private long lastAccess;
 	private String tileId;
@@ -15,13 +18,15 @@ public class MapboxVectorTile implements TileCacheProvider, Comparable<MapboxVec
 	public final int x;
 	public final int y;
 	public final int z;
+	public final int shift;
 	private static final long THREE_HOURS_IN_MILLIS = 3 * 60 * 60 * 1000L;
 
-	public MapboxVectorTile(TileServerConfig cfg, int x, int y, int z) {
+	public MapboxVectorTile(TileServerConfig cfg, int x, int y, int z, int shift) {
 		this.cfg = cfg;
 		this.x = x;
 		this.y = y;
 		this.z = z;
+		this.shift = shift;
 		setTileId();
 		touch();
 	}
@@ -44,8 +49,13 @@ public class MapboxVectorTile implements TileCacheProvider, Comparable<MapboxVec
 		}
 	}
 
+	// vector, vector-shift-1, vector-shift+1, etc.
+	public static String getCacheNamespace(int shift) {
+		return shift == 0 ? "vector" : "vector-shift" + (shift > 0 ? "+" : "") + shift;
+	}
+
 	public void setTileId() {
-		this.tileId = this.cfg.createTileId("vector", x, y, z, -1, -1);
+		this.tileId = this.cfg.createTileId(getCacheNamespace(shift), x, y, z, -1, -1);
 	}
 
 	public synchronized byte[] getCacheRuntimeTile() throws IOException {
@@ -65,7 +75,7 @@ public class MapboxVectorTile implements TileCacheProvider, Comparable<MapboxVec
 		return TileCacheProvider.super.getCacheFile(
 				cfg.mvtsLocation, ext, z, x, y,
 				-1, -1,
-				"vector", null, 22
+				getCacheNamespace(shift), null, MAX_ZOOM
 		);
 	}
 
