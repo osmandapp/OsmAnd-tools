@@ -15,6 +15,7 @@ import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.CommonWords;
 import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.OsmandOdb;
+import net.osmand.binary.SearchLocales;
 import net.osmand.data.*;
 import net.osmand.obf.preparation.*;
 import net.osmand.osm.MapRenderingTypesEncoder;
@@ -334,7 +335,10 @@ public class BinaryMerger {
 	protected String getRegionName(File fileToExtract) {
 		String nm = fileToExtract.getName();
 		int i = nm.indexOf('_');
-		return i > 0 ? nm.substring(0, i) : nm;
+		String region = i > 0 ? nm.substring(0, i) : nm;
+		// keep a subregion with its own locale: "Switzerland_ticino_europe_2.obf" -> "Switzerland_ticino"
+		String localePrefix = SearchLocales.mapPrefix(nm);
+		return localePrefix != null && localePrefix.length() > region.length() ? localePrefix : region;
 	}
 
 	protected boolean shouldMergeCitiesByNameDistance() {

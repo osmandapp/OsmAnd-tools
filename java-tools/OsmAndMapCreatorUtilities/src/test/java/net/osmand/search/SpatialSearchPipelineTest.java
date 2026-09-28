@@ -118,11 +118,8 @@ public class SpatialSearchPipelineTest {
 			AlternativeNameIndexGenerator.class, SearchVariantRules.class, SearchVariantRules.Variant.class,
 			SearchVariantRules.Entry.class, Abbreviations.class, SearchLocales.class, OBFDataCreator.class,
 			BinaryMerger.class);
-	// every rules file of OsmAnd-java resources: a new language file has to be added here to invalidate cached OBFs
-	private static final List<String> OBF_RULE_RESOURCES = List.of("rules.xml", "rules_en.xml", "rules_de.xml",
-			"rules_it.xml", "rules_fr.xml", "rules_es.xml", "rules_es_CO.xml", "rules_es_PE.xml", "rules_nl.xml",
-			"rules_pt.xml", "rules_ca.xml", "rules_ru.xml", "rules_uk.xml", "rules_bg.xml", "rules_sr.xml",
-			"rules_mk.xml");
+	// every rules file of OsmAnd-java resources, found by a scan so a new language file invalidates cached OBFs
+	private static final List<String> OBF_RULE_RESOURCES = listRuleResources();
 	private static final String HASH_VERSION = "2";
 	private static final String OBF_HASH_FILE_NAME = ".obf.hash";
 	private static final int MAX_KNOWN_HASHES = 4; // one per build that writes its own class files
@@ -1126,6 +1123,37 @@ public class SpatialSearchPipelineTest {
 		String allHashesCombined = String.join("\n", individualHashes);
 		allHashesCombined += HASH_VERSION;
 		return DigestUtils.sha256Hex(allHashesCombined);
+	}
+
+	// "rules.xml", "rules_de.xml", .. next to SearchVariantRules, from a resources folder or a jar, sorted for a stable hash
+	private static List<String> listRuleResources() {
+		java.net.URL base = SearchVariantRules.class.getResource("rules.xml");
+		if (base == null) {
+			throw new IllegalStateException("Missing search rules: rules.xml");
+		}
+		java.util.TreeSet<String> names = new java.util.TreeSet<>();
+		try {
+			if ("jar".equals(base.getProtocol())) {
+				java.net.JarURLConnection connection = (java.net.JarURLConnection) base.openConnection();
+				connection.setUseCaches(false);
+				String entry = connection.getEntryName();
+				String dir = entry.substring(0, entry.lastIndexOf('/') + 1);
+				try (java.util.jar.JarFile jar = connection.getJarFile()) {
+					jar.stream().map(java.util.jar.JarEntry::getName)
+							.filter(n -> n.startsWith(dir) && n.indexOf('/', dir.length()) < 0)
+							.map(n -> n.substring(dir.length())).forEach(names::add);
+				}
+			} else {
+				String[] files = new File(base.toURI()).getParentFile().list();
+				if (files != null) {
+					names.addAll(List.of(files));
+				}
+			}
+		} catch (IOException | java.net.URISyntaxException e) {
+			throw new IllegalStateException("Cannot list search rules near " + base, e);
+		}
+		names.removeIf(n -> !n.matches("rules(_[A-Za-z0-9_]+)?\\.xml"));
+		return new ArrayList<>(names);
 	}
 
 	private static String getClassHash(Class<?> clazz) {
