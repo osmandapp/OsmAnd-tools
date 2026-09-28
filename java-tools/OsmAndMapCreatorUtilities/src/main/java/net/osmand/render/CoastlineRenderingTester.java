@@ -151,7 +151,10 @@ public class CoastlineRenderingTester {
 	private static final int[] OSMAND_WATER_COLORS = { 0x5cc3e5 };
 
 	/** Water color of the reference tiles (tile.osmand.net renders openstreetmap-carto). */
-	private static final int[] REFERENCE_WATER_COLORS = { 0xaad3df };
+	private static final int[] REFERENCE_WATER_COLORS = { 0xaad3df,
+			// under the tinted, hatched overlay of openstreetmap-carto (Novaya Zemlya 8/169/43, Rügen
+			// 13/4401/2600 - a few units apart, within COLOR_TOLERANCE): the tinted water and its hatch lines
+			0xb1c9d4, 0xb5c1cb, 0xbabac3 };
 
 	/**
 	 * Dashes of the {@code wetland_saltern} shader. default.render.xml paints
@@ -171,7 +174,9 @@ public class CoastlineRenderingTester {
 	 * ice on either side are ignored on both.
 	 */
 	private static final int[] OSMAND_ICE_COLORS = { 0xE4FDFF };
-	private static final int[] REFERENCE_ICE_COLORS = { 0xddecec };
+	private static final int[] REFERENCE_ICE_COLORS = { 0xddecec,
+			// the same under the hatched overlay
+			0xdfe0e0, 0xe0d7d7, 0xe2cece };
 
 	/** Max per channel difference to still treat a pixel as water. */
 	private static final int COLOR_TOLERANCE = 10;
