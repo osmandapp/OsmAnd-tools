@@ -209,6 +209,16 @@ public class TopPhotosController {
 		});
 	}
 
+	@PostMapping(path = "/api/ban-image", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public ResponseEntity<Object> banImage(@RequestParam String imageTitle) {
+		String query = "INSERT INTO wiki.blocked_images_pending (imageTitle, blockReason) VALUES (?, 'banned')";
+		return json(() -> {
+			jdbcTemplate.update(query, imageTitle);
+			return Map.of("success", true);
+		});
+	}
+
 	// ---------- photos of one place (per-place page)
 
 	@GetMapping(path = "/api/run-places", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -228,13 +238,13 @@ public class TopPhotosController {
 	public ResponseEntity<Object> runImages(@RequestParam long runId, @RequestParam long placeId,
 			@RequestParam(required = false) String imageTitle, @RequestParam(defaultValue = "false") boolean isFinal) {
 		boolean byTitle = !Algorithms.isEmpty(imageTitle) && !"null".equals(imageTitle);
-		String titleCondition = byTitle ? " AND imageTitle = ?" : "";
 		if (isFinal) {
 			String query = """
-					SELECT *, score AS _score
-					FROM top_images_final
+					SELECT F.*, score AS _score
+					FROM top_images_final AS F
+					         LEFT ANTI JOIN wiki.blocked_images_pending AS B ON F.imageTitle = B.imageTitle
 					WHERE wikidata_id = ?%s
-					ORDER BY score DESC""".formatted(titleCondition);
+					ORDER BY score DESC""".formatted(byTitle ? " AND F.imageTitle = ?" : "");
 			return json(() -> rows(query, byTitle ? new Object[] { placeId, imageTitle } : new Object[] { placeId }));
 		}
 		String query = """
@@ -249,8 +259,9 @@ public class TopPhotosController {
 				                         similarity AS dup_sim
 				                    WHERE wikidata_id = ?
 				                    GROUP BY imageTitle) AS D ON S.imageTitle = D.imageTitle
+				         LEFT ANTI JOIN wiki.blocked_images_pending AS B ON S.imageTitle = B.imageTitle
 				WHERE S.run_id = ? AND S.proc_id = ?%s
-				ORDER BY S.score DESC, image_size DESC""".formatted(titleCondition);
+				ORDER BY S.score DESC, image_size DESC""".formatted(byTitle ? " AND S.imageTitle = ?" : "");
 		return json(() -> rows(query,
 				byTitle ? new Object[] { placeId, runId, placeId, imageTitle } : new Object[] { placeId, runId, placeId }));
 	}

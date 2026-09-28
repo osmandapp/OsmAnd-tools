@@ -81,6 +81,8 @@ public class MainUtilities {
 				GenerateRegionTags.main(subArgsArray);
 			} else if (utl.equals("generate-obf-files-in-batch")) {
 				IndexBatchCreator.main(subArgsArray);
+			} else if (utl.equals("export-coastlines")) {
+				CoastlineExporter.main(subArgsArray);
 			} else if (utl.equals("generate-ocean-tile-osm")) {
 				OceanTilesCreator.createJOSMFile(subArgsArray);
 			} else if (utl.equals("generate-java-style")) {
@@ -519,6 +521,7 @@ public class MainUtilities {
 		System.out.println("\t\t generate-osmlive-tests <path_to_directory_with_resources_project> <optional_path_to_unpack_files>: test osmand live functionality");
 		System.out.println("\t\t convert-gpx-to-obf <path_to_folder_with_gpx_files> or <path_to_gpx_file_with_file_name>: convert gpx file/files to obf file");
 		System.out.println("\t\t generate-region-tags <path to input osm file (osm, bz2, gz)> <path to output osm file>: process osm file and assign tag osmand_region_name to every entity.");
+		System.out.println("\t\t export-coastlines <dir of obf> <out dir>: writes coastline_<zoom level>.osm.bz2 with the natural=coastline of every zoom level stored in the detailed maps (World_* skipped)");
 		System.out.println("\t\t generate-ocean-tile-osm <optional path to osm file to write> <optional path to oceantiles_12.dat file>: generates ocean tiles osm file to check in JOSM ");
 		System.out.println("\t\t generate-obf-files-in-batch <path to batch.xml> <optional path to the file with regions list>: generates multiple obf files with different options");
 		System.out.println("\t\t generate-basemap <folder-with-osm-base-files> <optional mini>: generates basemap from prepared osm files");

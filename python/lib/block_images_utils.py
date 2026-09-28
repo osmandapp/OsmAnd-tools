@@ -20,6 +20,7 @@ IMAGE_STORAGE_PATH = os.path.join(IMAGE_BASE, f"{IMAGE_DIR}-{IMAGE_WIDTH_MAIN}")
 
 DB = "wiki"
 CLEANUP_TABLES = [
+    {"table": "top_images_score", "field": "imageTitle", "sync": True},  # source of top_images_final, keeps the ban across GenFinal
     {"table": "top_images_dups", "field": "imageTitle", "sync": True},
     {"table": "wiki_images_downloaded", "field": "name", "sync": True},  # exchange 10s - sync 1s
     {"table": "top_images_final", "field": "imageTitle", "sync": False},  # exchange 30s - sync 1s
@@ -27,9 +28,20 @@ CLEANUP_TABLES = [
 ]
 
 SELECT_BLOCKED = "SELECT imageTitle FROM blocked_images"
+PENDING_BLOCKED = "blocked_images_pending"  # banned in the admin, moved into blocked_images by the job before cleanup
+
+
+def process_pending_blocked_images() -> None:
+    pending = ch_query(f"SELECT imageTitle, blockReason FROM {PENDING_BLOCKED}")
+    for reason in set(reason for _, reason in pending):
+        block_images(set(title for title, r in pending if r == reason), reason)
+    if pending:
+        ch_query_params(f"DELETE FROM {PENDING_BLOCKED} WHERE imageTitle IN %(titles)s", {'titles': [title for title, _ in pending]})
+    print(f"Moved pending blocked images into blocked_images ({len(pending)})")
 
 
 def cleanup_tables() -> None:
+    process_pending_blocked_images()
     for t in CLEANUP_TABLES:
         sync = t["sync"]
         field = t["field"]
