@@ -9,9 +9,10 @@
     "https://download.osmand.net/list into -maps.dir when they are missing.",
     "check: 'water' compares the water masks, 'seamarksInland' renders the maps of 'maps' alone",
     "and requires the tile to stay empty.",
-    "The 'Ocean rendered as land' cases carry no 'maps': they are open ocean far from any detailed",
-    "map and are drawn from the basemap alone. They were found by -scan -minzoom=1 -maxzoom=5 over",
-    "the whole world, where the whole tile comes out as land while the reference is all water."
+    "The 'Ocean rendered as land' tiles carry no 'maps': they are open ocean far from any detailed",
+    "map and are drawn from the basemap alone. The z3-z5 ones were found by -scan -minzoom=1",
+    "-maxzoom=5 over the whole world, where the whole tile comes out as land while the reference is",
+    "all water; the z7-z10 ones are Tuamotu atolls cut by the tile edge (Tematangi, Kauehi)."
   ],
   "cases": [
     {
@@ -82,56 +83,25 @@
     },
     {
       "issue": 3291,
-      "title": "Ocean rendered as land: South Pacific",
-      "lat": -21.943,
-      "lon": -112.5,
-      "zooms": [3],
-      "radius": 0,
-      "maps": []
-    },
-    {
-      "issue": 3291,
-      "title": "Ocean rendered as land: Gulf of Alaska",
-      "lat": 52.483,
-      "lon": -140.625,
-      "zooms": [5],
-      "radius": 0,
-      "maps": []
-    },
-    {
-      "issue": 3291,
-      "title": "Ocean rendered as land: Pacific off Peru",
-      "lat": -16.636,
-      "lon": -84.375,
-      "zooms": [5],
-      "radius": 0,
-      "maps": []
-    },
-    {
-      "issue": 3291,
-      "title": "Ocean rendered as land: South Atlantic north",
-      "lat": -16.636,
-      "lon": 5.625,
-      "zooms": [5],
-      "radius": 0,
-      "maps": []
-    },
-    {
-      "issue": 3291,
-      "title": "Ocean rendered as land: South Atlantic south",
-      "lat": -27.059,
-      "lon": 5.625,
-      "zooms": [5],
-      "radius": 0,
-      "maps": []
-    },
-    {
-      "issue": 3291,
-      "title": "Ocean rendered as land: Amundsen Sea",
-      "lat": -72.396,
-      "lon": -140.625,
-      "zooms": [5],
-      "radius": 0,
+      "title": "Ocean rendered as land: basemap only",
+      "url": "https://github.com/osmandapp/OsmAnd-Issues/issues/3291",
+      "tiles": [
+        [3, 1, 4],
+        [5, 3, 10],
+        [5, 8, 17],
+        [5, 16, 17],
+        [5, 16, 18],
+        [5, 3, 25],
+        [7, 14, 71],
+        [7, 13, 71],
+        [8, 28, 143],
+        [8, 27, 143],
+        [10, 99, 557],
+        [10, 100, 557],
+        [7, 11, 69],
+        [8, 23, 139],
+        [9, 47, 278]
+      ],
       "maps": []
     }
   ]
