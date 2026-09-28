@@ -25,6 +25,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
@@ -330,6 +331,12 @@ public class CoastlineRenderingTester {
 		public double sumMissingWater;
 		public double styledSaltPonds;
 		public String worstTile = "";
+		/** The same numbers per zoom - the random tiles and the scans spread over many zooms. */
+		public Map<Integer, ZoomStats> zooms = new TreeMap<>();
+
+		ZoomStats zoom(int zoom) {
+			return zooms.computeIfAbsent(zoom, z -> new ZoomStats());
+		}
 
 		public double avgExtraWater() {
 			return comparedTiles == 0 ? 0 : sumExtraWater / comparedTiles;
@@ -338,6 +345,15 @@ public class CoastlineRenderingTester {
 		public double avgMissingWater() {
 			return comparedTiles == 0 ? 0 : sumMissingWater / comparedTiles;
 		}
+	}
+
+	/** Numbers of one zoom of a case. */
+	public static class ZoomStats {
+		public int comparedTiles;
+		public int failedTiles;
+		public double worstExtraWater;
+		public double worstMissingWater;
+		public String worstTile = "";
 	}
 
 	/** Failed / compared tiles of one group of cases. */
@@ -1081,6 +1097,13 @@ public class CoastlineRenderingTester {
 		}
 		stats.worstExtraWater = Math.max(stats.worstExtraWater, extraRatio);
 		stats.worstMissingWater = Math.max(stats.worstMissingWater, missingRatio);
+		ZoomStats zs = stats.zoom(zoom);
+		zs.comparedTiles++;
+		if (Math.max(extraRatio, missingRatio) > Math.max(zs.worstExtraWater, zs.worstMissingWater)) {
+			zs.worstTile = zoom + "/" + x + "/" + y;
+		}
+		zs.worstExtraWater = Math.max(zs.worstExtraWater, extraRatio);
+		zs.worstMissingWater = Math.max(zs.worstMissingWater, missingRatio);
 
 		TileResult res = new TileResult(def, zoom, x, y);
 		res.severity = Math.max(extraRatio, missingRatio);
@@ -1094,6 +1117,7 @@ public class CoastlineRenderingTester {
 		}
 		if (!res.ok()) {
 			stats.failedTiles++;
+			zs.failedTiles++;
 			System.out.printf("  FAILED %d/%d/%d water: osmand %.1f%% reference %.1f%% - %s%n", zoom, x, y,
 					count(renderedWater) * 100.0 / (w * h), count(referenceWater) * 100.0 / (w * h),
 					String.join(", ", res.problems));
@@ -1735,6 +1759,14 @@ public class CoastlineRenderingTester {
 				System.out.printf("%-58s worst tile %s, avg +H2O %s, avg -H2O %s%n", "",
 						s.worstTile, pct(s.avgExtraWater()), pct(s.avgMissingWater()));
 			}
+			if (!GROUP_FIXED.equals(g) && s.zooms.size() > 1) {
+				StringBuilder z = new StringBuilder();
+				for (Map.Entry<Integer, ZoomStats> e : s.zooms.entrySet()) {
+					z.append(String.format(" z%d %d/%d", e.getKey(), e.getValue().failedTiles,
+							e.getValue().comparedTiles));
+				}
+				System.out.printf("%-58s failed by zoom:%s%n", "", z);
+			}
 			if (s.renderErrors > 0) {
 				System.out.printf("%-58s %d tiles the renderer crashed on%n", "", s.renderErrors);
 			}
@@ -1842,57 +1874,66 @@ public class CoastlineRenderingTester {
 					s.comparedTiles, s.failedTiles,
 					seamarks ? pct(s.worstExtraWater) + " drawn" : pct(s.worstExtraWater),
 					seamarks ? "&mdash;" : pct(s.worstMissingWater), esc(s.worstTile)));
+			if (!GROUP_FIXED.equals(g) && s.zooms.size() > 1) {
+				// the random tiles and the scans: where the failures are is a question of the zoom
+				for (Map.Entry<Integer, ZoomStats> e : s.zooms.entrySet()) {
+					ZoomStats z = e.getValue();
+					sb.append(String.format("<tr class=\"zoom %s\"><td>z%d</td><td>%d</td><td>%d</td>"
+									+ "<td>%s</td><td>%s</td><td>%s</td></tr>", z.failedTiles > 0 ? "bad" : "good",
+							e.getKey(), z.comparedTiles, z.failedTiles, pct(z.worstExtraWater),
+							pct(z.worstMissingWater), esc(z.worstTile)));
+				}
+			}
 		}
 		sb.append("</table>\n");
 		if (reported.isEmpty()) {
 			sb.append("<p class=\"empty\">No failed tiles.</p>");
 		}
-		int lastIssue = -1;
-		String lastTitle = null;
-		String lastGroup = null;
+		// a block per fixed case and per zoom of the random tiles and the scans, each a <details> of its
+		// own so that it can be folded away (Jenkins serves the report without scripts); worst tiles first
+		Map<String, List<TileResult>> blocks = new LinkedHashMap<>();
+		for (CaseStats s : orderedCases(result)) {
+			blocks.put(s.issue + " " + s.title, new ArrayList<>());
+		}
 		for (TileResult r : reported) {
-			String g = r.def.group == null ? GROUP_FIXED : r.def.group;
+			blocks.computeIfAbsent(r.def.key(), k -> new ArrayList<>()).add(r);
+		}
+		String lastGroup = null;
+		for (List<TileResult> caseTiles : blocks.values()) {
+			if (caseTiles.isEmpty()) {
+				continue;
+			}
+			CaseDef def = caseTiles.get(0).def;
+			String g = def.group == null ? GROUP_FIXED : def.group;
 			if (!g.equals(lastGroup)) {
 				lastGroup = g;
-				lastIssue = -1;
-				lastTitle = null;
 				sb.append(String.format("<h1 class=\"grp\">%s</h1>\n", esc(g)));
 			}
-			if (r.def.issue != lastIssue || !r.def.title.equals(lastTitle)) {
-				lastIssue = r.def.issue;
-				lastTitle = r.def.title;
-				sb.append(String.format("<h2>%s#%d</a> %s</h2>\n",
-						r.def.url == null ? "<a>" : "<a href=\"" + esc(r.def.url) + "\">",
-						r.def.issue, esc(r.def.title)));
-			}
-			double lat = MapUtils.getLatitudeFromTile(r.zoom, r.y + 0.5);
-			double lon = MapUtils.getLongitudeFromTile(r.zoom, r.x + 0.5);
-			sb.append(String.format("<section class=\"tile %s\"><div class=\"hd\"><b>%d/%d/%d</b>"
-							+ "<a href=\"%s/map/#%d/%.4f/%.4f\" title=\"open this place on the map\">map</a>"
-							+ "<a href=\"%s/tile/df/%d/%d/%d.png\" title=\"the same tile rendered by the server\">"
-							+ "server tile</a>"
-							+ "<a href=\"%s\" title=\"the reference tile\">reference tile</a>"
-							+ "<span class=\"badge\">%s</span></div>", r.ok() ? "good" : "bad",
-					r.zoom, r.x, r.y, MAP_SERVER, r.zoom, lat, lon, MAP_SERVER, r.zoom, r.x, r.y,
-					esc(referenceUrl(r.zoom, r.x, r.y)), r.ok() ? "ok" : "failed"));
-			if (!r.images.isEmpty()) {
-				sb.append("<div class=\"imgs\">");
-				for (Map.Entry<String, String> e : r.images.entrySet()) {
-					sb.append(String.format("<figure><img loading=\"lazy\" src=\"%d/%s\" alt=\"%s\">"
-									+ "<figcaption>%s</figcaption></figure>", r.def.issue, e.getValue(),
-							esc(e.getKey()), esc(e.getKey())));
+			String caseLink = String.format("%s#%d</a> %s", def.url == null ? "<a>"
+					: "<a href=\"" + esc(def.url) + "\">", def.issue, esc(def.title));
+			Map<Integer, List<TileResult>> byZoom = new TreeMap<>(Collections.reverseOrder());
+			if (GROUP_FIXED.equals(g)) {
+				byZoom.put(-1, caseTiles);
+			} else {
+				for (TileResult r : caseTiles) {
+					byZoom.computeIfAbsent(r.zoom, z -> new ArrayList<>()).add(r);
 				}
-				sb.append("</div>");
 			}
-			sb.append("<dl>");
-			for (Map.Entry<String, String> e : r.metrics.entrySet()) {
-				sb.append(String.format("<dt>%s</dt><dd>%s</dd>", esc(e.getKey()), esc(e.getValue())));
+			for (Map.Entry<Integer, List<TileResult>> e : byZoom.entrySet()) {
+				List<TileResult> tiles = e.getValue();
+				tiles.sort((a, b) -> a.ok() != b.ok() ? (a.ok() ? 1 : -1) : Double.compare(b.severity, a.severity));
+				int failed = 0;
+				for (TileResult r : tiles) {
+					failed += r.ok() ? 0 : 1;
+				}
+				sb.append(String.format("<details class=\"block\" open><summary>%s%s <span class=\"%s\">%d failed"
+								+ "</span></summary>\n", caseLink, e.getKey() < 0 ? "" : " &middot; z" + e.getKey(),
+						failed > 0 ? "bad" : "good", failed));
+				for (TileResult r : tiles) {
+					appendTile(sb, r);
+				}
+				sb.append("</details>\n");
 			}
-			sb.append("</dl>");
-			for (String p : r.problems) {
-				sb.append("<p class=\"problem\">").append(esc(p)).append("</p>");
-			}
-			sb.append("</section>\n");
 		}
 		sb.append("</main>\n</body></html>\n");
 		File css = new File(outputDir, REPORT_CSS_FILE);
@@ -1906,6 +1947,37 @@ public class CoastlineRenderingTester {
 		if (!quiet) {
 			System.out.println("HTML report : " + report.getAbsolutePath());
 		}
+	}
+
+	private void appendTile(StringBuilder sb, TileResult r) {
+		double lat = MapUtils.getLatitudeFromTile(r.zoom, r.y + 0.5);
+		double lon = MapUtils.getLongitudeFromTile(r.zoom, r.x + 0.5);
+		sb.append(String.format("<section class=\"tile %s\"><div class=\"hd\"><b>%d/%d/%d</b>"
+						+ "<a href=\"%s/map/#%d/%.4f/%.4f\" title=\"open this place on the map\">map</a>"
+						+ "<a href=\"%s/tile/df/%d/%d/%d.png\" title=\"the same tile rendered by the server\">"
+						+ "server tile</a>"
+						+ "<a href=\"%s\" title=\"the reference tile\">reference tile</a>"
+						+ "<span class=\"badge\">%s</span></div>", r.ok() ? "good" : "bad",
+				r.zoom, r.x, r.y, MAP_SERVER, r.zoom, lat, lon, MAP_SERVER, r.zoom, r.x, r.y,
+				esc(referenceUrl(r.zoom, r.x, r.y)), r.ok() ? "ok" : "failed"));
+		if (!r.images.isEmpty()) {
+			sb.append("<div class=\"imgs\">");
+			for (Map.Entry<String, String> e : r.images.entrySet()) {
+				sb.append(String.format("<figure><img loading=\"lazy\" src=\"%d/%s\" alt=\"%s\">"
+								+ "<figcaption>%s</figcaption></figure>", r.def.issue, e.getValue(),
+						esc(e.getKey()), esc(e.getKey())));
+			}
+			sb.append("</div>");
+		}
+		sb.append("<dl>");
+		for (Map.Entry<String, String> e : r.metrics.entrySet()) {
+			sb.append(String.format("<dt>%s</dt><dd>%s</dd>", esc(e.getKey()), esc(e.getValue())));
+		}
+		sb.append("</dl>");
+		for (String p : r.problems) {
+			sb.append("<p class=\"problem\">").append(esc(p)).append("</p>");
+		}
+		sb.append("</section>\n");
 	}
 
 	private static final String REPORT_CSS_FILE = "styles.css";
@@ -1943,7 +2015,13 @@ public class CoastlineRenderingTester {
 			+ "figcaption{font-size:11px;color:var(--mut);text-align:center;padding-top:3px}\n"
 			+ "dl{display:grid;grid-template-columns:auto auto;gap:1px 10px;margin:8px 0 0;font-size:12px}\n"
 			+ "dt{color:var(--mut)}dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}\n"
-			+ ".problem{margin:8px 0 0;font-size:12px;color:var(--bad)}\n";
+			+ ".problem{margin:8px 0 0;font-size:12px;color:var(--bad)}\n"
+			+ "table.stats tr.zoom td{color:var(--mut);font-size:12px;padding-top:1px;padding-bottom:1px}\n"
+			+ "table.stats tr.zoom td:first-child{padding-left:22px}\n"
+			+ "table.stats tr.zoom.bad td{color:var(--bad)}\n"
+			+ "details.block>summary{cursor:pointer;font-size:15px;font-weight:600;margin:26px 0 10px;"
+			+ "padding-top:10px;border-top:1px solid var(--line)}\n"
+			+ "details.block>summary a{color:inherit}details.block>summary span{font-weight:400;font-size:13px}\n";
 
 	private static String esc(String s) {
 		return s == null ? "" : s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
