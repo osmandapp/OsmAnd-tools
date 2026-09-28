@@ -139,7 +139,7 @@ import net.osmand.util.MapsCollection;
  * <li>{@code threads} - parallel reference tile downloads, default 16. The legacy renderer renders
  * that many tiles at once too (at most one per processor): the native library keeps global state,
  * so every thread gets its own copy of it, loaded by its own class loader, with its own maps.
- * {@code -renderer=opengl} and the bundled library render one tile at a time;</li>
+ * {@code -renderer=opengl} renders one tile at a time;</li>
  * <li>{@code download} - {@code false} to never download a missing map;</li>
  * <li>{@code referenceDir} - where the downloaded reference tiles are kept, by default
  * {@code coastline-reference} in the current folder. It is reused by every run, so a rerun only
@@ -581,7 +581,7 @@ public class CoastlineRenderingTester {
 		// that reconnects and does a TLS handshake per tile
 		System.setProperty("http.maxConnections", String.valueOf(Math.max(5, threads)));
 		downloadPool = Executors.newFixedThreadPool(threads);
-		if (!openGl && findNativeLibrary() != null) {
+		if (!openGl) {
 			int n = Math.max(1, Math.min(threads, Runtime.getRuntime().availableProcessors()));
 			if (n > 1) {
 				renderThreads = n;
@@ -1573,19 +1573,22 @@ public class CoastlineRenderingTester {
 	private java.util.function.BiFunction<int[], Collection<String>, BufferedImage> newRenderWorker(int index)
 			throws Exception {
 		File lib = findNativeLibrary();
-		File dir = Files.createTempDirectory("osmand-native-" + index).toFile();
-		File copy = new File(dir, lib.getName());
-		Files.copy(lib.toPath(), copy.toPath());
-		copy.deleteOnExit();
-		dir.deleteOnExit();
+		Map<String, String> opts = new HashMap<>(options);
+		// the bundled library is unpacked into a new temporary file on every load anyway
+		if (lib != null) {
+			File dir = Files.createTempDirectory("osmand-native-" + index).toFile();
+			File copy = new File(dir, lib.getName());
+			Files.copy(lib.toPath(), copy.toPath());
+			copy.deleteOnExit();
+			dir.deleteOnExit();
+			opts.put("native", copy.getAbsolutePath());
+		}
 		List<java.net.URL> urls = new ArrayList<>();
 		for (String entry : System.getProperty("java.class.path").split(File.pathSeparator)) {
 			urls.add(new File(entry).toURI().toURL());
 		}
 		ClassLoader loader = new java.net.URLClassLoader(urls.toArray(new java.net.URL[0]),
 				ClassLoader.getPlatformClassLoader());
-		Map<String, String> opts = new HashMap<>(options);
-		opts.put("native", copy.getAbsolutePath());
 		@SuppressWarnings("unchecked")
 		java.util.function.BiFunction<int[], Collection<String>, BufferedImage> worker =
 				(java.util.function.BiFunction<int[], Collection<String>, BufferedImage>) loader
