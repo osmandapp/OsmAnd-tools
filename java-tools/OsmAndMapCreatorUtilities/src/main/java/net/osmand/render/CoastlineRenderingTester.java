@@ -96,7 +96,8 @@ import net.osmand.util.MapsCollection;
  * basemap and only {@code World_seamarks} is skipped; pass {@code -exclude=} to load literally
  * everything;</li>
  * <li>{@code cases} - path to the json with the cases, default the bundled
- * {@code coastline-tests.json};</li>
+ * {@code coastline-tests.json}. Its {@code brokenReferences} list areas where the reference tile
+ * itself is wrong; their tiles are skipped by every case and mode;</li>
  * <li>{@code issue} - run only the cases of one issue, e.g. {@code -issue=25618};</li>
  * <li>{@code randomTilesK} - size of the random part of a run in thousands of tiles, default
  * {@value #DEFAULT_RANDOM_TILES_K}; {@code -randomTilesK=0} runs the json cases only. The tiles are
@@ -243,6 +244,24 @@ public class CoastlineRenderingTester {
 		public String referenceUrl = "https://tile.osmand.net/hd/{z}/{x}/{y}.png";
 		public String downloadUrl = "https://download.osmand.net/download?standard=yes&file={name}.zip";
 		public List<CaseDef> cases = new ArrayList<>();
+		/** areas where the reference itself is wrong - their tiles are skipped by every case and mode */
+		public List<BrokenReference> brokenReferences = new ArrayList<>();
+	}
+
+	/** An area whose reference tiles are known to be wrong, e.g. drawn from outdated water polygons. */
+	public static class BrokenReference {
+		public String title;
+		public String reason;
+		/** leftLon, bottomLat, rightLon, topLat - every tile that touches it is skipped */
+		public double[] bbox;
+		/** the smaller zooms still see the area as a few pixels and are compared as usual */
+		public int minzoom = 0;
+
+		boolean covers(int zoom, int x, int y) {
+			return zoom >= minzoom && bbox != null
+					&& x <= MapUtils.getTileNumberX(zoom, bbox[2]) && x + 1 > MapUtils.getTileNumberX(zoom, bbox[0])
+					&& y <= MapUtils.getTileNumberY(zoom, bbox[1]) && y + 1 > MapUtils.getTileNumberY(zoom, bbox[3]);
+		}
 	}
 
 	/** One reproducible location, or a zoom range scan. */
@@ -1075,16 +1094,34 @@ public class CoastlineRenderingTester {
 		while (it.hasNext() || !ahead.isEmpty()) {
 			while (ahead.size() < PREFETCH && it.hasNext()) {
 				int[] t = it.next();
-				prefetchReference(t[0], t[1], t[2]);
+				if (brokenReference(t[0], t[1], t[2]) == null) {
+					prefetchReference(t[0], t[1], t[2]);
+				}
 				ahead.add(t);
 			}
 			int[] t = ahead.poll();
+			BrokenReference broken = brokenReference(t[0], t[1], t[2]);
+			if (broken != null) {
+				stats.tiles++;
+				stats.skippedTiles++;
+				System.out.printf("  SKIPPED %d/%d/%d - broken reference: %s%n", t[0], t[1], t[2], broken.title);
+				continue;
+			}
 			compareTile(def, stats, dir, t[0], t[1], t[2]);
 			flush(stats, totalOfCase);
 		}
 		System.out.printf("  %d tiles, %d compared, %d skipped, %d failed%n", stats.tiles,
 				stats.comparedTiles, stats.skippedTiles, stats.failedTiles);
 		return stats;
+	}
+
+	private BrokenReference brokenReference(int zoom, int x, int y) {
+		for (BrokenReference b : casesFile.brokenReferences) {
+			if (b.covers(zoom, x, y)) {
+				return b;
+			}
+		}
+		return null;
 	}
 
 	private void compareTile(CaseDef def, CaseStats stats, File dir, int zoom, int x, int y) throws IOException {

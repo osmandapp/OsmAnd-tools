@@ -146,6 +146,10 @@ to pin it.
   to `Integer.MAX_VALUE`, without which the edge tiles render as blank land.
 - Glaciers (`#E4FDFF` here, `#ddecec` in the reference) and `landuse=salt_pond` are excluded from
   the water mask on purpose - they are water coloured but not water.
+- **The reference can be wrong too.** tile.osmand.net draws the sea from water polygons that lag
+  OSM, and re-rendering the tile (`render_list --force`) gives the same picture. Such an area goes
+  into `brokenReferences` of `coastline-tests.json` (bbox + minzoom): its tiles are skipped in every
+  mode and logged as `SKIPPED ... broken reference`. Check against the OSM coastline before adding one.
 - `World_seamarks` and `basemap_mini` are excluded from `load=all`; an overlay and a second basemap
   distort the rendering.
 - Jenkins serves the report under a CSP that drops inline `<style>`, so the css lives in a separate

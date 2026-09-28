@@ -12,7 +12,17 @@
     "The 'Ocean rendered as land' tiles carry no 'maps': they are open ocean far from any detailed",
     "map and are drawn from the basemap alone. The z3-z5 ones were found by -scan -minzoom=1",
     "-maxzoom=5 over the whole world, where the whole tile comes out as land while the reference is",
-    "all water; the z7-z10 ones are Tuamotu atolls cut by the tile edge (Tematangi, Kauehi)."
+    "all water; the z7-z10 ones are Tuamotu atolls cut by the tile edge (Tematangi, Kauehi).",
+    "brokenReferences are areas where the reference itself is wrong: every tile from 'minzoom' on",
+    "that touches 'bbox' is skipped by the cases, the random tiles and the scan alike."
+  ],
+  "brokenReferences": [
+    {
+      "title": "Island at 63.709, -72.477 (way 1528910723)",
+      "reason": "The reference is drawn from water polygons older than the island (mapped 2026-06-12): straight land edges, 84% agreement with OSM against 99% of ours. Re-rendering does not help.",
+      "bbox": [-72.482, 63.7073, -72.4714, 63.7119],
+      "minzoom": 14
+    }
   ],
   "cases": [
     {
