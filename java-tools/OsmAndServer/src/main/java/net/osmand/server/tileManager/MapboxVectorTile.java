@@ -11,6 +11,8 @@ public class MapboxVectorTile implements TileCacheProvider, Comparable<MapboxVec
 	public static final int MIN_SHIFT = -3;
 	public static final int MAX_SHIFT = 3;
 	public static final int MAX_ZOOM = 22;
+	private static final int MAX_MVT_TILES_ZOOM = 15;
+	private static final int MVT_TILE_INCREASE_DETAILS_BEFORE_DETAILED_ZOOM = 9;
 	private byte[] runtimeTile;
 	private long lastAccess;
 	private String tileId;
@@ -26,7 +28,7 @@ public class MapboxVectorTile implements TileCacheProvider, Comparable<MapboxVec
 		this.x = x;
 		this.y = y;
 		this.z = z;
-		this.shift = shift;
+		this.shift = normalizeShift(z, shift);
 		setTileId();
 		touch();
 	}
@@ -47,6 +49,14 @@ public class MapboxVectorTile implements TileCacheProvider, Comparable<MapboxVec
 				}
 			}
 		}
+	}
+
+	public static int normalizeShift(int mapZoom, int shift) {
+		// Keep the data zoom calculation in sync with getMapboxVectorTileData in core-legacy.
+		int baseDataZoom = mapZoom < MVT_TILE_INCREASE_DETAILS_BEFORE_DETAILED_ZOOM - 1 ? mapZoom + 1 : mapZoom;
+		int dataZoom = Math.max(1, Math.min(MAX_MVT_TILES_ZOOM, baseDataZoom + shift));
+		// Reuse the unshifted cache when clamping makes the shift ineffective.
+		return dataZoom == Math.min(MAX_MVT_TILES_ZOOM, baseDataZoom) ? 0 : dataZoom - baseDataZoom;
 	}
 
 	// vector, vector-shift-1, vector-shift+1, etc.

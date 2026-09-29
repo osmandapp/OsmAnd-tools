@@ -65,8 +65,9 @@ public class MapboxVectorTileController {
 			return errorConfig("Tile service is not initialized: " + osmAndMapsService.validateNativeLib());
 		}
 
-		String tileId = config.createTileId(MapboxVectorTile.getCacheNamespace(shift), x, y, z, -1, -1);
-        MapboxVectorTile tile = tileMemoryCache.getTile(tileId, k -> new MapboxVectorTile(config, x, y, z, shift));
+		int effectiveShift = MapboxVectorTile.normalizeShift(z, shift);
+		String tileId = config.createTileId(MapboxVectorTile.getCacheNamespace(effectiveShift), x, y, z, -1, -1);
+        MapboxVectorTile tile = tileMemoryCache.getTile(tileId, k -> new MapboxVectorTile(config, x, y, z, effectiveShift));
         // for testing
         //MapboxVectorTile tile = new MapboxVectorTile(config, x, y, z, shift);
         tileMemoryCache.conditionalCleanupCache();
