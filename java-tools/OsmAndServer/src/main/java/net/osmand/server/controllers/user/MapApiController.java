@@ -713,7 +713,7 @@ public class MapApiController {
 		if (pu == null) {
 			return ResponseEntity.badRequest().body("User not found");
 		}
-		return userdataService.sendCode(action, lang, pu);
+		return userdataService.sendCode(EmailSenderService.CloudAccountAction.fromCodeRequest(action, false), lang, pu);
 	}
 
 	@PostMapping(path = {"/auth/send-code-to-new-email"})
@@ -745,7 +745,13 @@ public class MapApiController {
 			usersRepository.saveAndFlush(pu);
 
 			// send code to new email
-			return userdataService.sendCode(action, lang, pu);
+			EmailSenderService.CloudAccountAction emailAction = EmailSenderService.CloudAccountAction.fromCodeRequest(action, true);
+			ResponseEntity<String> sent = userdataService.sendCode(emailAction, lang, pu);
+			if (emailAction == EmailSenderService.CloudAccountAction.EMAIL_CHANGE && sent.getStatusCode().is2xxSuccessful()) {
+				emailSender.sendOsmAndCloudAccountEmail(currentAcc.email, null, lang,
+						EmailSenderService.CloudAccountAction.EMAIL_CHANGED, EmailSenderService.maskEmail(email));
+			}
+			return sent;
 		}
 		return ResponseEntity.badRequest().body("Please enter valid email");
 	}

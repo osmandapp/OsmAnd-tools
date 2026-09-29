@@ -148,6 +148,8 @@ public class FastSpringController {
 
 			userSubService.verifyAndRefreshProOrderId(user);
 
+			emailSender.sendAfterCommit(() -> sendPurchaseReceipt(email, event, purchases, subscriptions));
+
 			if (sendOsmAndAndSpecialGiftEmail) {
 				LOGGER.info("FastSpring: Sending special gift email to " + EmailSenderService.shorten(email) + " for orderId: " + data.order + ", purchaseToken: " + data.reference);
 				emailSender.sendOsmAndSpecialGiftEmail(email);
@@ -508,6 +510,19 @@ public class FastSpringController {
 		}
 	}
 
+	private void sendPurchaseReceipt(String email, FastSpringWebhookRequest.Event event,
+	                                 List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> purchases,
+	                                 List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions) {
+		FastSpringWebhookRequest.Data data = event.data;
+		try {
+			Date orderDate = event.created != null ? new Date(event.created) : new Date();
+			emailSender.sendPurchaseReceiptEmail(email, data.language, data.order, orderDate, data.totalDisplay,
+					purchases, subscriptions);
+		} catch (Exception e) {
+			LOGGER.error("FastSpring: failed to send receipt for orderId " + data.order + ": " + e.getMessage(), e);
+		}
+	}
+
 	public static class FastSpringWebhookRequest {
 
 		public List<Event> events;
@@ -523,6 +538,8 @@ public class FastSpringController {
 			public String order; // orderId
 			public String subscription; // subscriptionId, present on subscription.* events
 			public String reference; // purchaseToken
+			public String totalDisplay;
+			public String language; // two-letter ISO code of the order's language
 			public Customer customer;
 			public Tags tags;
 			public List<Item> items;

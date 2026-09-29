@@ -89,6 +89,9 @@ public class UserSubscriptionService {
 	@Autowired
 	private PromoService promoService;
 
+	@Autowired
+	protected EmailSenderService emailSender;
+
 	Gson gson = new Gson();
 
 	private AndroidPublisher androidPublisher;
@@ -499,6 +502,27 @@ public class UserSubscriptionService {
 		previousUser.orderid = null;
 		usersRepository.saveAndFlush(previousUser);
 		LOG.info("Cleared orderId for previous user " + previousUser.id);
+
+		notifyPurchaseLinked(newUserId, iapList, subscriptionList);
+	}
+
+	// Send only once the relink is committed, so a rollback cannot leave the user with an email about purchases
+	// that stayed on the previous account. A mail failure must not fail the relink itself.
+	private void notifyPurchaseLinked(int newUserId,
+	                                  List<SupporterDeviceInAppPurchase> purchases,
+	                                  List<SupporterDeviceSubscription> subscriptions) {
+		CloudUsersRepository.CloudUser newUser = usersRepository.findById(newUserId);
+		if (newUser == null || newUser.email == null) {
+			return;
+		}
+		emailSender.sendAfterCommit(() -> {
+			try {
+				emailSender.sendPurchaseLinkedEmail(newUser.email, emailSender.userLang(newUserId),
+						purchases, subscriptions);
+			} catch (Exception e) {
+				LOG.error("Failed to send purchase linked email: " + e.getMessage(), e);
+			}
+		});
 	}
 
 	@NotNull
