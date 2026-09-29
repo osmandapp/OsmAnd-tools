@@ -196,6 +196,18 @@ public class CoastlineRenderingTester {
 	private static final int[] OSMAND_ICE_COLORS = { 0xE4FDFF };
 	private static final int[] REFERENCE_ICE_COLORS = { 0xddecec };
 
+	/**
+	 * Land cover both styles draw where the sea meets the land - sand, beach, tidal rock, mud, tidal
+	 * flats - is ignored on both sides like the ice: the styles paint it differently over the sea,
+	 * and the coastline is still checked all around it. The colors are measured on rendered tiles
+	 * (the native renderer rounds the style colors): sand and shoals, beach, tidal rock, mud, the
+	 * wetland_tidalflat shader, and the light water and hatch of reefs of default.render.xml; sand,
+	 * beach and bare ground of openstreetmap-carto.
+	 */
+	private static final int[] OSMAND_LANDCOVER_COLORS = { 0xffe3bd, 0xfff3bd, 0xbde3ef, 0xcecac5, 0xbdc2c5,
+			0xa5c2ce, 0x9c927b, 0x5ad2e6, 0x6b82c5 };
+	private static final int[] REFERENCE_LANDCOVER_COLORS = { 0xf5e9c6, 0xfff1ba, 0xeee5dc };
+
 	/** Default of {@code failAbove}: failed tiles up to 10% of water difference do not fail the run. */
 	private static final double DEFAULT_FAIL_ABOVE = 0.1;
 
@@ -209,12 +221,13 @@ public class CoastlineRenderingTester {
 	private static final int DEFAULT_RANDOM_TILES_K = 10;
 
 	/**
-	 * Areas openstreetmap-carto draws under the sea or not at all: over the sea the reference shows
-	 * water, while OsmAnd fills them (islands mapped with their lagoon, reserves tagged desert, tidal
-	 * sand, mud and rock). Hiding them can't make water out of land - the land is still under them.
+	 * Areas openstreetmap-carto does not fill over the sea, while OsmAnd does: islands mapped with
+	 * their lagoon, reserves tagged desert, parks and archaeological sites with their bay, offshore oil
+	 * fields tagged industrial. Hiding them can't make water out of land - the land is still under
+	 * them. Land cover both styles draw is checked instead, see OSMAND_LANDCOVER_COLORS.
 	 */
-	static final String DEFAULT_HIDE = "place=island,place=islet,natural=desert,natural=sand,natural=beach,"
-			+ "natural=mud,natural=bare_rock,natural=shoal,natural=reef,natural=wetland";
+	static final String DEFAULT_HIDE = "place=island,place=islet,natural=desert,leisure=park,historic=archaeological_site,"
+			+ "landuse=industrial";
 
 	/** How the random tiles are split: coastal, open ocean, inland. */
 	private static final int SHARE_COASTAL = 80, SHARE_OCEAN = 10;
@@ -1308,8 +1321,9 @@ public class CoastlineRenderingTester {
 			renderedWater = waterMask(rendered, OSMAND_WATER_COLORS);
 			referenceWater = waterMask(this.reference, REFERENCE_WATER_COLORS);
 			boolean[] shaded = dilate(waterMask(rendered, SHADED_WATER_COLORS), w, h, SHADED_WATER_SPREAD_PX);
-			boolean[] ice = dilate(or(waterMask(rendered, OSMAND_ICE_COLORS),
-					waterMask(this.reference, REFERENCE_ICE_COLORS)), w, h, maskTolerance);
+			boolean[] ice = dilate(or(or(waterMask(rendered, OSMAND_ICE_COLORS),
+					waterMask(this.reference, REFERENCE_ICE_COLORS)), or(waterMask(rendered, OSMAND_LANDCOVER_COLORS),
+					waterMask(this.reference, REFERENCE_LANDCOVER_COLORS))), w, h, maskTolerance);
 			boolean[] extraAll = and(and(erode(renderedWater, w, h, maskTolerance),
 					not(dilate(referenceWater, w, h, maskTolerance))), not(ice));
 			extra = and(extraAll, not(shaded));
