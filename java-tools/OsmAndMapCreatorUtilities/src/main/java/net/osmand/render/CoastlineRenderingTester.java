@@ -208,8 +208,8 @@ public class CoastlineRenderingTester {
 			0xa5c2ce, 0x9c927b, 0x5ad2e6, 0x6b82c5 };
 	private static final int[] REFERENCE_LANDCOVER_COLORS = { 0xf5e9c6, 0xfff1ba, 0xeee5dc };
 
-	/** Default of {@code failAbove}: failed tiles up to 10% of water difference do not fail the run. */
-	private static final double DEFAULT_FAIL_ABOVE = 0.1;
+	/** Default of {@code failAbove}: failed tiles up to 5% of water difference do not fail the run. */
+	private static final double DEFAULT_FAIL_ABOVE = 0.05;
 
 	/** Max per channel difference to still treat a pixel as water. */
 	private static final int COLOR_TOLERANCE = 10;
