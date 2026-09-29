@@ -182,6 +182,7 @@ public class AdminService {
 		public String nickname;
 		public Date tokenTime;
 		public Date regTime;
+		public Date webLinkTime;
 		public Integer filesCount;
 	}
 

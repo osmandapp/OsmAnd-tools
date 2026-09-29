@@ -174,6 +174,7 @@ public class OrderManagementService {
 		AdminService.CloudUserInfo info = new AdminService.CloudUserInfo();
 		info.nickname = user.nickname;
 		info.tokenTime = user.tokenTime;
+		info.webLinkTime = user.webLinkToken != null ? user.webLinkTime : null;
 		info.regTime = user.regTime;
 		UserdataController.UserFilesResults res = userdataService.generateFiles(user.id, null, false, false, Collections.emptySet());
 		info.filesCount = res.totalFiles;

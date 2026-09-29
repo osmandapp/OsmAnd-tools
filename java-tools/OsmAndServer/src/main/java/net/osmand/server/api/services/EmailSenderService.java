@@ -50,6 +50,16 @@ public class EmailSenderService {
 	    LOGGER.info("sendOsmAndCloudWebEmail to: " + shorten(email) + " (" + ok + ") [" + lang + "]");
 	}
     
+    public void sendOsmAndCloudWebLinkEmail(String email, String cancelUrl) {
+	    boolean ok = new EmailSenderTemplate()
+			    .load("cloud/web-link")
+			    .set("CANCEL_URL", cancelUrl)
+			    .to(email)
+			    .send()
+			    .isSuccess();
+	    LOGGER.info("sendOsmAndCloudWebLinkEmail to: " + shorten(email) + " (" + ok + ")");
+	}
+
     public void sendOsmAndCloudRegistrationEmail(String email, String token, String lang, boolean newUser) {
 		String subject = newUser ? "@SUBJECT_NEW@" : "@SUBJECT_OLD@";
 	    boolean ok = new EmailSenderTemplate()
