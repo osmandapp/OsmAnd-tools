@@ -33,8 +33,11 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.YearMonth;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -88,6 +91,8 @@ public class OsmGpxController {
 	public record RoutesListRequest(
 			List<String> activityArr,
 			Integer year,
+			String dateFrom,
+			String dateTo,
 			String minLat,
 			String maxLat,
 			String minLon,
@@ -142,11 +147,9 @@ public class OsmGpxController {
 			appendSkipInvalidActivities(conditions, params);
 		}
 
-		if (req.year() != null) {
-			error = filterByYear(String.valueOf(req.year()), params, conditions);
-			if (error != null) {
-				return error;
-			}
+		error = filterByDate(req.year(), req.dateFrom(), req.dateTo(), params, conditions);
+		if (error != null) {
+			return error;
 		}
 
 		if (req.activityArr() != null && !req.activityArr().isEmpty()) {
@@ -226,6 +229,8 @@ public class OsmGpxController {
 	                                        @RequestParam String minLon,
 	                                        @RequestParam String maxLon,
 	                                        @RequestParam(required = false) Integer year,
+	                                        @RequestParam(required = false) String dateFrom,
+	                                        @RequestParam(required = false) String dateTo,
 	                                        @RequestParam(required = false) List<String> activityArr) {
 		if (!config.osmgpxInitialized()) {
 			return ResponseEntity.ok("OsmGpx datasource is not initialized");
@@ -241,11 +246,9 @@ public class OsmGpxController {
 
 		appendSkipInvalidActivities(conditions, params);
 
-		if (year != null) {
-			error = filterByYear(String.valueOf(year), params, conditions);
-			if (error != null) {
-				return error;
-			}
+		error = filterByDate(year, dateFrom, dateTo, params, conditions);
+		if (error != null) {
+			return error;
 		}
 
 		if (activityArr != null && !activityArr.isEmpty()) {
@@ -314,6 +317,8 @@ public class OsmGpxController {
 	                                      @RequestParam String minLon,
 	                                      @RequestParam String maxLon,
 	                                      @RequestParam(required = false) Integer year,
+	                                      @RequestParam(required = false) String dateFrom,
+	                                      @RequestParam(required = false) String dateTo,
 	                                      @RequestParam(required = false) List<String> activityArr) {
 		if (!config.osmgpxInitialized()) {
 			return ResponseEntity.ok("OsmGpx datasource is not initialized");
@@ -329,11 +334,9 @@ public class OsmGpxController {
 
 		appendSkipInvalidActivities(conditions, params);
 
-		if (year != null) {
-			error = filterByYear(String.valueOf(year), params, conditions);
-			if (error != null) {
-				return error;
-			}
+		error = filterByDate(year, dateFrom, dateTo, params, conditions);
+		if (error != null) {
+			return error;
 		}
 
 		if (activityArr != null && !activityArr.isEmpty()) {
@@ -364,7 +367,9 @@ public class OsmGpxController {
 	                                            @RequestParam String maxLat,
 	                                            @RequestParam String minLon,
 	                                            @RequestParam String maxLon,
-	                                            @RequestParam(required = false) Integer year) {
+	                                            @RequestParam(required = false) Integer year,
+	                                            @RequestParam(required = false) String dateFrom,
+	                                            @RequestParam(required = false) String dateTo) {
 		if (!config.osmgpxInitialized()) {
 			return ResponseEntity.ok("OsmGpx datasource is not initialized");
 		}
@@ -380,11 +385,9 @@ public class OsmGpxController {
 		conditions.append(" AND m.activity IS NOT NULL AND m.activity <> '' AND m.activity NOT IN ")
 				.append(placeholders(INVALID_ACTIVITIES, params));
 
-		if (year != null) {
-			error = filterByYear(String.valueOf(year), params, conditions);
-			if (error != null) {
-				return error;
-			}
+		error = filterByDate(year, dateFrom, dateTo, params, conditions);
+		if (error != null) {
+			return error;
 		}
 
 		String query =
@@ -675,15 +678,24 @@ public class OsmGpxController {
 		return null;
 	}
 
-	private ResponseEntity<String> filterByYear(String year, List<Object> params, StringBuilder conditions) {
-		if (!Algorithms.isEmpty(year)) {
-			try {
-				Integer parsedYear = Integer.parseInt(year);
-				conditions.append(" AND extract(year from m.date) = ?");
-				params.add(parsedYear);
-			} catch (NumberFormatException e) {
-				return ResponseEntity.badRequest().body("Invalid year format.");
+	// dateFrom, dateTo: YYYY-MM of the OSM upload date, both months included
+	private ResponseEntity<String> filterByDate(Integer year, String dateFrom, String dateTo, List<Object> params,
+	                                            StringBuilder conditions) {
+		if (year != null) {
+			conditions.append(" AND extract(year from m.date) = ?");
+			params.add(year);
+		}
+		try {
+			if (!Algorithms.isEmpty(dateFrom)) {
+				conditions.append(" AND m.date >= ?");
+				params.add(Date.valueOf(YearMonth.parse(dateFrom).atDay(1)));
 			}
+			if (!Algorithms.isEmpty(dateTo)) {
+				conditions.append(" AND m.date < ?");
+				params.add(Date.valueOf(YearMonth.parse(dateTo).plusMonths(1).atDay(1)));
+			}
+		} catch (DateTimeParseException e) {
+			return ResponseEntity.badRequest().body("Invalid month format, expected YYYY-MM.");
 		}
 		return null;
 	}
