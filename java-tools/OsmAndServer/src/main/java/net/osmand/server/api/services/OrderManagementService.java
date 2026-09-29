@@ -237,7 +237,7 @@ public class OrderManagementService {
 		return Collections.emptyList();
 	}
 
-	public boolean orderWithSkuExists(String sku, String orderId) {
+	public boolean orderWithSkuExists(String orderId, String sku) {
 		List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subs =
 				subscriptionsRepository.findByOrderId(orderId);
 		if (subs != null) {
