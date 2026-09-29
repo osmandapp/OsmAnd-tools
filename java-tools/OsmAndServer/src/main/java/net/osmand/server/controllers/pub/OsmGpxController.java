@@ -142,10 +142,7 @@ public class OsmGpxController {
 			return error;
 		}
 
-		boolean invalidActivities = isInvalidActivityRequest(req.activityArr());
-		if (!invalidActivities) {
-			appendSkipInvalidActivities(conditions, params);
-		}
+		appendSkipInvalidActivities(req.activityArr(), conditions, params);
 
 		error = filterByDate(req.year(), req.dateFrom(), req.dateTo(), params, conditions);
 		if (error != null) {
@@ -244,7 +241,7 @@ public class OsmGpxController {
 			return error;
 		}
 
-		appendSkipInvalidActivities(conditions, params);
+		appendSkipInvalidActivities(activityArr, conditions, params);
 
 		error = filterByDate(year, dateFrom, dateTo, params, conditions);
 		if (error != null) {
@@ -332,7 +329,7 @@ public class OsmGpxController {
 			return error;
 		}
 
-		appendSkipInvalidActivities(conditions, params);
+		appendSkipInvalidActivities(activityArr, conditions, params);
 
 		error = filterByDate(year, dateFrom, dateTo, params, conditions);
 		if (error != null) {
@@ -382,8 +379,7 @@ public class OsmGpxController {
 			return error;
 		}
 
-		conditions.append(" AND m.activity IS NOT NULL AND m.activity <> '' AND m.activity NOT IN ")
-				.append(placeholders(INVALID_ACTIVITIES, params));
+		conditions.append(" AND m.activity IS NOT NULL AND m.activity <> ''");
 
 		error = filterByDate(year, dateFrom, dateTo, params, conditions);
 		if (error != null) {
@@ -644,10 +640,6 @@ public class OsmGpxController {
 		}
 	}
 
-	private boolean isInvalidActivityRequest(List<String> activityArr) {
-		return activityArr != null && !activityArr.isEmpty() && INVALID_ACTIVITIES.containsAll(activityArr);
-	}
-
 	private boolean isPointsOnlyRequest(List<String> activityArr) {
 		return activityArr != null && !activityArr.isEmpty()
 				&& activityArr.stream().allMatch(ERROR_ACTIVITY::equals);
@@ -658,7 +650,11 @@ public class OsmGpxController {
 		return "(" + String.join(",", Collections.nCopies(values.size(), "?")) + ")";
 	}
 
-	private void appendSkipInvalidActivities(StringBuilder conditions, List<Object> params) {
+	// without an activity filter the garbage and error tracks are left out; a filter that lists them gets them
+	private void appendSkipInvalidActivities(List<String> activityArr, StringBuilder conditions, List<Object> params) {
+		if (activityArr != null && !activityArr.isEmpty()) {
+			return;
+		}
 		conditions.append(" AND (m.activity IS NULL OR m.activity NOT IN ").append(placeholders(INVALID_ACTIVITIES, params)).append(")");
 	}
 
