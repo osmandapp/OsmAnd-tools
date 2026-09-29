@@ -136,6 +136,9 @@ import net.osmand.util.MapsCollection;
  * OsmAndMapCreator is used, a local repository checkout picks it up from {@code core-legacy}.
  * Ignored by {@code -renderer=opengl}, which needs no legacy library at all;</li>
  * <li>{@code fonts}, {@code style} - renderer setup, autodetected;</li>
+ * <li>{@code hide} - comma separated {@code tag=value} objects that are not drawn, default
+ * {@value #DEFAULT_HIDE}: the style is patched on the fly (a copy in {@code <out>/style}) because
+ * the reference draws the sea over them. {@code -hide=} renders the style as it is;</li>
  * <li>{@code threads} - parallel reference tile downloads, default 16. The legacy renderer renders
  * that many tiles at once too (at most one per processor): the native library keeps global state,
  * so every thread gets its own copy of it, loaded by its own class loader, with its own maps.
@@ -204,6 +207,14 @@ public class CoastlineRenderingTester {
 
 	/** Default size of the random part of a run, in thousands of tiles - see {@code randomTilesK}. */
 	private static final int DEFAULT_RANDOM_TILES_K = 10;
+
+	/**
+	 * Areas openstreetmap-carto draws under the sea or not at all: over the sea the reference shows
+	 * water, while OsmAnd fills them (islands mapped with their lagoon, reserves tagged desert, tidal
+	 * sand, mud and rock). Hiding them can't make water out of land - the land is still under them.
+	 */
+	static final String DEFAULT_HIDE = "place=island,place=islet,natural=desert,natural=sand,natural=beach,"
+			+ "natural=mud,natural=bare_rock,natural=shoal,natural=reef,natural=wetland";
 
 	/** How the random tiles are split: coastal, open ocean, inland. */
 	private static final int SHARE_COASTAL = 80, SHARE_OCEAN = 10;
@@ -601,7 +612,8 @@ public class CoastlineRenderingTester {
 
 		result = new RunResult();
 		result.renderer = openGl ? RENDERER_OPENGL : RENDERER_LEGACY;
-		result.style = opt("style", "default.render.xml");
+		result.style = opt("style", "default.render.xml")
+				+ (hiddenTags().isEmpty() ? "" : " without " + opt("hide", DEFAULT_HIDE));
 		result.mapsDir = mapsDir.getAbsolutePath();
 		result.startedAt = start;
 		result.failAbove = failAbove;
@@ -867,8 +879,94 @@ public class CoastlineRenderingTester {
 
 	// ----------------------------------------------------------------- renderer setup
 
+	/** The {@code -hide} objects as {tag, value} pairs. */
+	private List<String[]> hiddenTags() {
+		List<String[]> res = new ArrayList<>();
+		for (String s : opt("hide", DEFAULT_HIDE).split(",")) {
+			int eq = s.indexOf('=');
+			if (eq > 0) {
+				res.add(new String[] { s.substring(0, eq).trim(), s.substring(eq + 1).trim() });
+			}
+		}
+		return res;
+	}
+
+	private static String readStyle(File file, String name) throws IOException {
+		if (file != null && file.isFile()) {
+			return new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+		}
+		try (InputStream is = RenderingRulesStorage.class.getResourceAsStream(name)) {
+			if (is == null) {
+				throw new IOException("Can't find rendering style " + name);
+			}
+			return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+		}
+	}
+
+	/**
+	 * The style with {@code order="-1"} for every {@code -hide} object in front of its order section,
+	 * so they are not drawn at all. Null when the style has no order section of its own.
+	 */
+	static String hideInStyle(String xml, List<String[]> hidden) {
+		for (int i = xml.indexOf("<order>"); i >= 0; i = xml.indexOf("<order>", i + 1)) {
+			int comment = xml.lastIndexOf("<!--", i);
+			if (comment >= 0 && xml.lastIndexOf("-->", i) < comment) {
+				continue;
+			}
+			StringBuilder cases = new StringBuilder("<order>");
+			for (String[] t : hidden) {
+				cases.append("\n\t\t<case tag=\"").append(t[0]).append("\" value=\"").append(t[1])
+						.append("\" order=\"-1\"/>");
+			}
+			return xml.substring(0, i) + cases + xml.substring(i + "<order>".length());
+		}
+		return null;
+	}
+
+	/**
+	 * Writes the style with the {@code -hide} objects taken out into {@code dir}, next to copies of
+	 * the other styles of its folder (its addons and the styles it depends on). Returns false when
+	 * nothing is hidden or the style can't be patched, the original is used then.
+	 */
+	private boolean writeStyleWithoutHidden(File sourceDir, String fileName, File dir) throws IOException {
+		List<String[]> hidden = hiddenTags();
+		if (hidden.isEmpty()) {
+			return false;
+		}
+		String patched = hideInStyle(readStyle(sourceDir == null ? null : new File(sourceDir, fileName), fileName),
+				hidden);
+		if (patched == null) {
+			System.err.println("Style " + fileName + " has no <order> section, -hide is ignored");
+			return false;
+		}
+		dir.mkdirs();
+		File[] siblings = sourceDir == null ? null : sourceDir.listFiles();
+		if (siblings != null) {
+			for (File f : siblings) {
+				if (f.isFile() && f.getName().endsWith(".render.xml") && !f.getName().equals(fileName)) {
+					writeAtomically(Files.readAllBytes(f.toPath()), new File(dir, f.getName()));
+				}
+			}
+		}
+		writeAtomically(patched.getBytes(StandardCharsets.UTF_8), new File(dir, fileName));
+		return true;
+	}
+
+	/** The render workers write the same files at the same time. */
+	private static void writeAtomically(byte[] content, File file) throws IOException {
+		File tmp = File.createTempFile(file.getName(), ".tmp", file.getParentFile());
+		Files.write(tmp.toPath(), content);
+		Files.move(tmp.toPath(), file.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+				java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+	}
+
 	/** The v1 engine: {@code libosmand}, the same renderer the tile server runs today. */
 	private void initLegacyRenderer(String style) throws Exception {
+		File styleFile = new File(style);
+		File dir = new File(outputDir, "style");
+		if (writeStyleWithoutHidden(styleFile.isFile() ? styleFile.getParentFile() : null, styleFile.getName(), dir)) {
+			style = new File(dir, styleFile.getName()).getAbsolutePath();
+		}
 		// null lets NativeJavaRendering load the library bundled into OsmAndMapCreator
 		File nativeLib = findNativeLibrary();
 		File fonts = findFonts();
@@ -896,6 +994,10 @@ public class CoastlineRenderingTester {
 		File stylesPath = findStyles();
 		String styleName = style.endsWith(".render.xml")
 				? style.substring(0, style.length() - ".render.xml".length()) : style;
+		File patchedStyles = new File(outputDir, "opengl-styles");
+		if (writeStyleWithoutHidden(stylesPath, styleName + ".render.xml", patchedStyles)) {
+			stylesPath = patchedStyles;
+		}
 		System.out.println("eyepiece       : " + binary.getAbsolutePath());
 		System.out.println("Styles path    : " + (stylesPath == null
 				? "built into OsmAndCore" : stylesPath.getAbsolutePath()));
@@ -918,6 +1020,7 @@ public class CoastlineRenderingTester {
 		System.out.println("Reference cache: " + referenceCacheDir.getAbsolutePath()
 				+ " (" + countCachedReferences() + " tiles kept from the previous runs)");
 		System.out.println("Style          : " + style);
+		System.out.println("Hidden         : " + (hiddenTags().isEmpty() ? "nothing" : opt("hide", DEFAULT_HIDE)));
 		if (openGl) {
 			initOpenGlRenderer(style);
 		} else {

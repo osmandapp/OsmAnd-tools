@@ -16,6 +16,8 @@
     "brokenReferences are areas where the reference itself is wrong: every tile from 'minzoom' on",
     "that touches 'bbox' is compared with tile.openstreetmap.org instead, by the cases, the random",
     "tiles and the scan alike. dataIssues are areas where the OSM data is wrong: their tiles are skipped.",
+    "Areas the reference draws the sea over (place=island, natural=desert, sand, mud...) are not drawn, see -hide.",
+    "Areas the reference draws the sea over (place=island, natural=desert, sand, mud...) are hidden by -hide.",
     "A failed tile is always compared with tile.openstreetmap.org once more, and counted as a stale",
     "reference when that one agrees with the rendered tile."
   ],
@@ -27,38 +29,7 @@
       "minzoom": 14
     }
   ],
-  "dataIssues": [
-    {
-      "title": "Islands near Postoyanny, 72.1, 146.1 (ways 1185693443-1185693448)",
-      "reason": "Real islands (checked on imagery) mapped as place=island without natural=coastline: OsmAnd fills place=island as land, openstreetmap-carto does not draw them at all.",
-      "bbox": [146.02, 72.03, 146.25, 72.15],
-      "minzoom": 10
-    },
-    {
-      "title": "Lagoon of St. Lawrence Island at 63.58, -171.09",
-      "reason": "The place=island area of the island covers its lagoon, which is sea by the coastline: OsmAnd fills it as land, openstreetmap-carto does not fill place=island.",
-      "bbox": [-171.1054, 63.5724, -171.0793, 63.5877],
-      "minzoom": 12
-    },
-    {
-      "title": "Straits of Bely Island at 73.38, 70.2 (relation 1867826)",
-      "reason": "The place=island multipolygon joins two islets to Bely Island with untagged ways 270259332, 270259333, 270259335 across the water: OsmAnd fills the straits as land, openstreetmap-carto does not fill place=island.",
-      "bbox": [69.99, 73.32, 70.56, 73.46],
-      "minzoom": 10
-    },
-    {
-      "title": "Nonouti lagoon, -0.6, 174.35 (relation 4036870)",
-      "reason": "The whole atoll with its lagoon is mapped as one place=islet multipolygon (Tabukaokao, reef=coral): OsmAnd fills the lagoon as land, openstreetmap-carto does not fill place=islet.",
-      "bbox": [174.14, -0.82, 174.48, -0.52],
-      "minzoom": 10
-    },
-    {
-      "title": "Clipperton lagoon, 10.3, -109.22 (way 160415456)",
-      "reason": "The closed coastline of the atoll is also tagged place=island, so the island area covers the lagoon (relation 5883538, natural=water): OsmAnd fills it as land, openstreetmap-carto does not fill place=island.",
-      "bbox": [-109.24, 10.28, -109.19, 10.33],
-      "minzoom": 10
-    }
-  ],
+  "dataIssues": [],
   "cases": [
     {
       "issue": 24376,
