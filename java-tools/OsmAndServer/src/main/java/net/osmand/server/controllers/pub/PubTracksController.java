@@ -168,10 +168,14 @@ public class PubTracksController {
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 
-	/** every reviewed track as one csv row, gzip; gpx=true adds the original GPX file (gzip, base64); since keeps tracks with a review from that moment on */
+	/** admins only: every reviewed track as one csv row, gzip; gpx=true adds the original GPX file (gzip, base64); since keeps tracks with a review from that moment on */
 	@GetMapping(path = "/reviews.csv.gz")
 	public void export(@RequestParam(defaultValue = "false") boolean gpx, @RequestParam(required = false) String since,
-			HttpServletResponse response) throws IOException {
+			Authentication auth, HttpServletResponse response) throws IOException {
+		if (!isAdmin(auth)) {
+			response.sendError(HttpStatus.FORBIDDEN.value(), "Admins only");
+			return;
+		}
 		if (!config.osmgpxInitialized()) {
 			response.sendError(HttpStatus.SERVICE_UNAVAILABLE.value(), "OsmGpx datasource is not initialized");
 			return;
