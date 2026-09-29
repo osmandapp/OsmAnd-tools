@@ -126,6 +126,17 @@
     },
     {
       "issue": 3291,
+      "title": "Funafuti islet mapped as natural=coastline multipolygon drawn twice (Funafala)",
+      "url": "https://github.com/osmandapp/OsmAnd-Issues/issues/3291",
+      "tiles": [
+        [16, 65379, 34364],
+        [15, 32695, 17159],
+        [14, 16342, 8580]
+      ],
+      "maps": ["Oceania_australia-oceania_2.obf"]
+    },
+    {
+      "issue": 3291,
       "title": "Ocean rendered as land: basemap only",
       "url": "https://github.com/osmandapp/OsmAnd-Issues/issues/3291",
       "tiles": [
