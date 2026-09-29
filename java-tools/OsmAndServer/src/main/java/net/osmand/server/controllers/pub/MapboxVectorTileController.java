@@ -53,7 +53,7 @@ public class MapboxVectorTileController {
 			@RequestParam(required = false, defaultValue = "0") int shift)
 			throws IOException {
 		if (shift < MapboxVectorTile.MIN_SHIFT || shift > MapboxVectorTile.MAX_SHIFT) {
-			return errorConfig("shift must be between -3 and 3");
+			return errorConfig("shift must be between " + MapboxVectorTile.MIN_SHIFT + " and " + MapboxVectorTile.MAX_SHIFT);
 		}
 		if (z < 0 || z > MapboxVectorTile.MAX_ZOOM || x < 0 || y < 0 || x >= (1 << z) || y >= (1 << z)) {
 			return errorConfig("Invalid tile coordinates");
