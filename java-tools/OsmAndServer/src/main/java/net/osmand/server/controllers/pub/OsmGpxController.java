@@ -2,6 +2,7 @@ package net.osmand.server.controllers.pub;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import net.osmand.data.QuadRect;
 import net.osmand.server.DatasourceConfiguration;
 import net.osmand.server.api.services.GpxService;
 import net.osmand.server.osmgpx.GarbageClassifier;
@@ -69,6 +70,7 @@ public class OsmGpxController {
 	private static final int MAX_RUNTIME_CACHE_SIZE = 5000;
 	private static final int MAX_ROUTES_SUMMARY = 100000;
 	private static final int MAX_ROUTES_FULL_MODE_THRESHOLD = 5000;
+	private static final int MAX_NEAR_RADIUS_M = 1000;
 	private static final int MAX_TAGS_PER_BBOX = 1000;
 	private final AtomicInteger cacheTouch = new AtomicInteger(0);
 
@@ -118,7 +120,19 @@ public class OsmGpxController {
 		StringBuilder conditions = new StringBuilder();
 		List<Object> params = new ArrayList<>();
 
-		ResponseEntity<String> error = addCoords(params, conditions, req.minLat(), req.maxLat(), req.minLon(), req.maxLon());
+		int nearRadius = 0;
+		ResponseEntity<String> error;
+		if (req.isNearPoint()) {
+			if (req.radius() <= 0) {
+				return ResponseEntity.badRequest().body("Invalid radius.");
+			}
+			nearRadius = (int) Math.min(req.radius(), MAX_NEAR_RADIUS_M);
+			QuadRect box = MapUtils.calculateLatLonBbox(req.lat(), req.lon(), nearRadius);
+			error = addCoords(params, conditions, String.valueOf(box.bottom), String.valueOf(box.top),
+					String.valueOf(box.left), String.valueOf(box.right));
+		} else {
+			error = addCoords(params, conditions, req.minLat(), req.maxLat(), req.minLon(), req.maxLon());
+		}
 		if (error != null) {
 			return error;
 		}
@@ -189,7 +203,7 @@ public class OsmGpxController {
 
 		List<Feature> features;
 		if (req.isNearPoint()) {
-			features = queryRoutesNear(conditions, params, req.lat(), req.lon(), req.radius());
+			features = queryRoutesNear(conditions, params, req.lat(), req.lon(), nearRadius);
 		} else if (isPointsOnlyRequest(req.activityArr())) {
 			// error tracks have no geometry — return them as points only
 			features = queryRouteFeatures(conditions, params, false, MAX_ROUTES_SUMMARY, false);
@@ -410,7 +424,7 @@ public class OsmGpxController {
 	// the tracks whose line passes within radius metres of the point, nearest first; error tracks by their start point
 	private List<Feature> queryRoutesNear(StringBuilder conditions, List<Object> params, double lat, double lon, double radius) {
 		String query = "SELECT " + ROUTE_COLUMNS + ", m.simplified_geometry FROM " + GPX_METADATA_TABLE_NAME + " m " +
-				"WHERE 1 = 1 " + conditions + " LIMIT " + MAX_ROUTES_SUMMARY;
+				"WHERE 1 = 1 " + conditions;
 		record Near(Feature feature, double distance) {
 		}
 		List<Near> near = new ArrayList<>();
