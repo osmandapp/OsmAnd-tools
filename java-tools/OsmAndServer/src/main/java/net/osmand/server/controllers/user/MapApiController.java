@@ -218,6 +218,11 @@ public class MapApiController {
 		return res;
 	}
 
+	@PostMapping(path = { "/auth/cancel-link" }, consumes = "application/json", produces = "application/json")
+	public ResponseEntity<String> cancelWebLoginLink(@RequestBody UserPasswordPost credentials) {
+		return userdataService.cancelWebLoginLink(credentials.username, credentials.token);
+	}
+
 	@PostMapping(path = { "/auth/logout" }, consumes = "application/json", produces = "application/json")
 	public ResponseEntity<String> logoutMapUser(HttpServletRequest request) throws ServletException {
 		request.logout();
