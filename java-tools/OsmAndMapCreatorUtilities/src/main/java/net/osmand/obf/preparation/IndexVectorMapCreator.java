@@ -427,7 +427,14 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
             if (!multiPolygonsWays.containsKey(w.getId())) {
                 multiPolygonsWays.put(w.getId(), new TIntArrayList());
             }
-            multiPolygonsWays.get(w.getId()).addAll(typeUse);
+            for (int i = 0; i < typeUse.size(); i++) {
+                MapRulType rt = renderingTypes.getTypeByInternalId(typeUse.get(i));
+                // the coastline is built from the ways, a multipolygon tagged natural=coastline must not take it away
+                if (rt != null && "natural".equals(rt.getTag()) && "coastline".equals(rt.getValue())) {
+                    continue;
+                }
+                multiPolygonsWays.get(w.getId()).add(typeUse.get(i));
+            }
         }
     }
 
