@@ -7,7 +7,9 @@ description: Run or debug the coastline rendering test (CoastlineRenderingTester
 
 Renders tiles with the legacy native renderer (v1) or with OsmAndCore (v2, `-renderer=opengl`) and
 compares the water mask against the reference `https://tile.osmand.net/hd/{z}/{x}/{y}.png`. Exit
-code 0 = clean, 2 = problems reproduced, 1 = could not run. Writes `index.html` + `summary.json`
+code 0 = no failed tile above `-failAbove` (default 0.1, i.e. 10% of the tile), 2 = a tile above it
+or a renderer crash, 1 = could not run. Smaller failures are still in the report, they just do not
+turn the build red. Writes `index.html` + `summary.json`
 into the output folder, images for failed tiles only.
 
 - Utility: `java-tools/OsmAndMapCreatorUtilities/src/main/java/net/osmand/render/CoastlineRenderingTester.java`
@@ -144,6 +146,10 @@ to pin it.
   to `Integer.MAX_VALUE`, without which the edge tiles render as blank land.
 - Glaciers (`#E4FDFF` here, `#ddecec` in the reference) and `landuse=salt_pond` are excluded from
   the water mask on purpose - they are water coloured but not water.
+- **The reference can be wrong too.** tile.osmand.net draws the sea from water polygons that lag
+  OSM, and re-rendering the tile (`render_list --force`) gives the same picture. Such an area goes
+  into `brokenReferences` of `coastline-tests.json` (bbox + minzoom): its tiles are skipped in every
+  mode and logged as `SKIPPED ... broken reference`. Check against the OSM coastline before adding one.
 - `World_seamarks` and `basemap_mini` are excluded from `load=all`; an overlay and a second basemap
   distort the rendering.
 - Jenkins serves the report under a CSP that drops inline `<style>`, so the css lives in a separate
