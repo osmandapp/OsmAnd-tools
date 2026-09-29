@@ -142,7 +142,7 @@ import net.osmand.util.MapsCollection;
  * <li>{@code threads} - parallel reference tile downloads, default 16. The legacy renderer renders
  * that many tiles at once too (at most one per processor): the native library keeps global state,
  * so every thread gets its own copy of it, loaded by its own class loader, with its own maps.
- * {@code -renderer=opengl} renders one tile at a time;</li>
+ * {@code -renderer=opengl} runs an eyepiece process per thread;</li>
  * <li>{@code download} - {@code false} to never download a missing map;</li>
  * <li>{@code referenceDir} - where the downloaded reference tiles are kept, by default
  * {@code coastline-reference} in the current folder. It is reused by every run, so a rerun only
@@ -495,13 +495,16 @@ public class CoastlineRenderingTester {
 	private long lastFlush;
 	private NativeJavaRendering renderer;
 	private EyePieceTileRenderer eyePiece;
+	private java.util.function.Function<File, EyePieceTileRenderer> newEyePiece;
+	/** The eyepiece processes of the render pool, one per thread. */
+	private final List<EyePieceTileRenderer> eyePieceWorkers = new java.util.concurrent.CopyOnWriteArrayList<>();
 	private final Set<String> initializedMaps = new LinkedHashSet<>();
 	private final List<TileResult> reported = new ArrayList<>();
 	private ExecutorService downloadPool;
-	/** Legacy tiles rendered ahead of the comparison, null when rendering is single threaded. */
+	/** Tiles rendered ahead of the comparison, null when rendering is single threaded. */
 	private ExecutorService renderPool;
 	private int renderThreads = 1;
-	/** Idle copies of the native library, each one used by a single thread at a time. */
+	/** Idle renderers (copies of the native library or eyepiece processes), each one used by a single thread at a time. */
 	private final java.util.concurrent.BlockingQueue<java.util.function.BiFunction<int[], Collection<String>, BufferedImage>> renderWorkers =
 			new java.util.concurrent.LinkedBlockingQueue<>();
 	private final Map<String, Future<PreparedTile>> pendingRenders = new HashMap<>();
@@ -592,20 +595,18 @@ public class CoastlineRenderingTester {
 		// that reconnects and does a TLS handshake per tile
 		System.setProperty("http.maxConnections", String.valueOf(Math.max(5, threads)));
 		downloadPool = Executors.newFixedThreadPool(threads);
-		if (!openGl) {
-			int n = Math.max(1, Math.min(threads, Runtime.getRuntime().availableProcessors()));
-			if (n > 1) {
-				renderThreads = n;
-				renderPool = Executors.newFixedThreadPool(renderThreads);
-				// each copy initializes its own maps, about a second - all of them at once
-				List<Future<java.util.function.BiFunction<int[], Collection<String>, BufferedImage>>> created = new ArrayList<>();
-				for (int i = 0; i < n; i++) {
-					int index = i;
-					created.add(renderPool.submit(() -> newRenderWorker(index)));
-				}
-				for (Future<java.util.function.BiFunction<int[], Collection<String>, BufferedImage>> f : created) {
-					renderWorkers.add(f.get());
-				}
+		int n = Math.max(1, Math.min(threads, Runtime.getRuntime().availableProcessors()));
+		if (n > 1) {
+			renderThreads = n;
+			renderPool = Executors.newFixedThreadPool(renderThreads);
+			// each copy initializes its own maps, about a second - all of them at once
+			List<Future<java.util.function.BiFunction<int[], Collection<String>, BufferedImage>>> created = new ArrayList<>();
+			for (int i = 0; i < n; i++) {
+				int index = i;
+				created.add(renderPool.submit(() -> newRenderWorker(index)));
+			}
+			for (Future<java.util.function.BiFunction<int[], Collection<String>, BufferedImage>> f : created) {
+				renderWorkers.add(f.get());
 			}
 		}
 		System.out.println("Render threads : " + renderThreads);
@@ -639,6 +640,7 @@ public class CoastlineRenderingTester {
 			if (eyePiece != null) {
 				eyePiece.close();
 			}
+			eyePieceWorkers.forEach(EyePieceTileRenderer::close);
 		}
 		result.loadedMaps = initializedMaps.size();
 		recomputeTotals();
@@ -1005,6 +1007,9 @@ public class CoastlineRenderingTester {
 		System.out.println("Map symbols    : " + (symbols
 				? "drawn" : "off, they are 94% of the time of a tile (-symbols=true draws them)"));
 		eyePiece = new EyePieceTileRenderer(binary, stylesPath, styleName, tileSize, symbols, outputDir,
+				Boolean.parseBoolean(opt("eyepieceLog", "false")));
+		File styles = stylesPath;
+		newEyePiece = dir -> new EyePieceTileRenderer(binary, styles, styleName, tileSize, symbols, dir,
 				Boolean.parseBoolean(opt("eyepieceLog", "false")));
 		if (Boolean.parseBoolean(opt("eyepieceCheck", "true"))) {
 			eyePiece.checkBatchTileMode();
@@ -1675,6 +1680,23 @@ public class CoastlineRenderingTester {
 	 */
 	private java.util.function.BiFunction<int[], Collection<String>, BufferedImage> newRenderWorker(int index)
 			throws Exception {
+		if (openGl) {
+			// a process of its own, with its own maps and tiles folders
+			EyePieceTileRenderer e = newEyePiece.apply(new File(outputDir, "opengl-worker-" + index));
+			eyePieceWorkers.add(e);
+			return (tile, current) -> {
+				List<File> maps = new ArrayList<>();
+				for (String name : current) {
+					maps.add(new File(mapsDir, name));
+				}
+				try {
+					e.setMaps(maps);
+					return e.render(tile[0], tile[1], tile[2]);
+				} catch (IOException ex) {
+					throw new java.io.UncheckedIOException(ex);
+				}
+			};
+		}
 		File lib = findNativeLibrary();
 		Map<String, String> opts = new HashMap<>(options);
 		// the bundled library is unpacked into a new temporary file on every load anyway
@@ -2091,6 +2113,9 @@ public class CoastlineRenderingTester {
 		result.staleReferences = 0;
 		result.renderErrors = 0;
 		result.rendererDeaths = eyePiece == null ? 0 : eyePiece.deaths();
+		for (EyePieceTileRenderer e : eyePieceWorkers) {
+			result.rendererDeaths += e.deaths();
+		}
 		Map<String, GroupTotals> byGroup = new LinkedHashMap<>();
 		for (CaseStats s : result.cases) {
 			result.tiles += s.tiles;

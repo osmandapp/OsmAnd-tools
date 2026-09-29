@@ -205,7 +205,7 @@ public class BasemapProcessor {
         quadTrees = new SimplisticQuadTree[mapZooms.getLevels().size()];
         for (int i = 0; i < mapZooms.getLevels().size(); i++) {
             MapZoomPair p = mapZooms.getLevels().get(i);
-            quadTrees[i] = constructTilesQuadTree(Math.min(p.getMaxZoom(), 11));
+            quadTrees[i] = constructTilesQuadTree(Math.min(p.getMaxZoom(), 11), p.getMaxZoom() > 11);
         }
         coastlines = new BasemapCoastlines(logMapDataWarn);
     }
@@ -332,6 +332,15 @@ public class BasemapProcessor {
     }
 
     public SimplisticQuadTree constructTilesQuadTree(int maxZoom) {
+        return constructTilesQuadTree(maxZoom, false);
+    }
+
+    /**
+     * @param splitSeaUnderLand split a cell of maxZoom once more where it counts as land (half or less of
+     *            its ocean tiles are sea) but has sea tiles: 2 sea and 2 coast tiles around an atoll drew the
+     *            open sea as land at z12+ (Nukulaelae, 13/8190/4309)
+     */
+    public SimplisticQuadTree constructTilesQuadTree(int maxZoom, boolean splitSeaUnderLand) {
         SimplisticQuadTree rootTree = new SimplisticQuadTree(0, 0, 0);
 
 
@@ -343,13 +352,13 @@ public class BasemapProcessor {
                 toVisit.add(rootTree.getOrCreateSubTree(x, y, baseZoom));
             }
         }
-        initializeQuadTree(rootTree, baseZoom, maxZoom, toVisit);
+        initializeQuadTree(rootTree, baseZoom, maxZoom, splitSeaUnderLand, toVisit);
         return rootTree;
 
     }
 
     protected void initializeQuadTree(SimplisticQuadTree rootTree, int baseZoom, int maxZoom,
-			LinkedList<SimplisticQuadTree> toVisit) {
+			boolean splitSeaUnderLand, LinkedList<SimplisticQuadTree> toVisit) {
 		while (!toVisit.isEmpty()) {
 			SimplisticQuadTree subtree = toVisit.poll();
 			int x = subtree.x;
@@ -357,7 +366,9 @@ public class BasemapProcessor {
 			int zoom = subtree.zoom;
 			SimplisticQuadTree st = rootTree.getOrCreateSubTree(x, y, zoom);
 			st.seaCharacteristic = getSeaTile(x, y, zoom);
-			if (zoom < maxZoom && !isWaterTile(x, y, zoom) && !isLandTile(x, y, zoom)) {
+			boolean seaUnderLand = splitSeaUnderLand && zoom == maxZoom && zoom < TILE_ZOOMLEVEL
+					&& st.seaCharacteristic > 0 && st.seaCharacteristic <= 0.5;
+			if ((zoom < maxZoom || seaUnderLand) && !isWaterTile(x, y, zoom) && !isLandTile(x, y, zoom)) {
 				SimplisticQuadTree[] vis = st.getAllChildren();
 				Collections.addAll(toVisit, vis);
 			}

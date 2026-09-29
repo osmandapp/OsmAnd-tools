@@ -119,6 +119,25 @@
         [9, 47, 278]
       ],
       "maps": []
+    },
+    {
+      "issue": 3291,
+      "title": "Places fixed in September 2026: atoll sea cell, Minerva reefs, Manzanillo lagoon, wind farm, Arctic z11, Nonouti, Bely Island",
+      "url": "https://github.com/osmandapp/OsmAnd-Issues/issues/3291",
+      "tiles": [
+        [13, 8190, 4309],
+        [15, 84, 18629],
+        [13, 1722, 3654],
+        [13, 4215, 2668],
+        [11, 656, 227],
+        [11, 550, 263],
+        [12, 4031, 2054],
+        [10, 711, 198]
+      ],
+      "maps": ["Oceania_australia-oceania_2.obf", "Mexico_colima_northamerica_2.obf",
+        "Netherlands_noord-holland_europe_2.obf", "Netherlands_friesland_europe_2.obf",
+        "Greenland_northamerica_2.obf", "Canada_nunavut-north-east_northamerica_2.obf",
+        "Canada_nunavut-north-west_northamerica_2.obf", "Russia_yamal_asia_2.obf"]
     }
   ]
 }
