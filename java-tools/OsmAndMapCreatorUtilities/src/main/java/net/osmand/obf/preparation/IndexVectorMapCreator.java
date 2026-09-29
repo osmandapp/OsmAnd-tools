@@ -297,6 +297,11 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
         }
 
 
+        // the coastline is built from the ways tagged natural=coastline, a multipolygon would draw it twice
+        // and take the coastline type away from its ways
+        if ("coastline".equals(tags.get(OSMTagKey.NATURAL.getValue()))) {
+            tags.remove(OSMTagKey.NATURAL.getValue());
+        }
         MultipolygonBuilder original = new MultipolygonBuilder();
         original.setId(e.getId());
         boolean climbing = MultipolygonBuilder.isClimbingMultipolygon(e);
@@ -427,14 +432,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
             if (!multiPolygonsWays.containsKey(w.getId())) {
                 multiPolygonsWays.put(w.getId(), new TIntArrayList());
             }
-            for (int i = 0; i < typeUse.size(); i++) {
-                MapRulType rt = renderingTypes.getTypeByInternalId(typeUse.get(i));
-                // the coastline is built from the ways, a multipolygon tagged natural=coastline must not take it away
-                if (rt != null && "natural".equals(rt.getTag()) && "coastline".equals(rt.getValue())) {
-                    continue;
-                }
-                multiPolygonsWays.get(w.getId()).add(typeUse.get(i));
-            }
+            multiPolygonsWays.get(w.getId()).addAll(typeUse);
         }
     }
 
