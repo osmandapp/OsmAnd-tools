@@ -2,6 +2,8 @@ package net.osmand.server.controllers.pub;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import net.osmand.data.QuadRect;
 import net.osmand.server.DatasourceConfiguration;
 import net.osmand.server.api.services.GpxService;
@@ -74,6 +76,7 @@ public class OsmGpxController {
 	private static final int MAX_ROUTES_SUMMARY = 100000;
 	private static final int MAX_ROUTES_FULL_MODE_THRESHOLD = 5000;
 	private static final int MAX_NEAR_RADIUS_M = 1000;
+	private static final int MAX_NEAR_ROUTES = 500;
 	private static final int MAX_TAGS_PER_BBOX = 1000;
 	private final AtomicInteger cacheTouch = new AtomicInteger(0);
 
@@ -203,6 +206,13 @@ public class OsmGpxController {
 
 		List<Feature> features;
 		if (req.isNearPoint()) {
+			if (countRoutes(conditions, params) > MAX_NEAR_ROUTES) {
+				JsonObject tooMany = new JsonObject();
+				tooMany.add("features", new JsonArray());
+				tooMany.addProperty("tooMany", true);
+				tooMany.addProperty("maxRoutes", MAX_NEAR_ROUTES);
+				return ResponseEntity.ok(gson.toJson(tooMany));
+			}
 			features = queryRoutesNear(conditions, params, req.lat(), req.lon(), nearRadius);
 		} else if (isPointsOnlyRequest(req.activityArr())) {
 			// error tracks have no geometry — return them as points only
@@ -418,6 +428,12 @@ public class OsmGpxController {
 		conditions.append(String.join(",", Collections.nCopies(normalized.size(), "?")));
 		conditions.append("]::text[]");
 		params.addAll(normalized);
+	}
+
+	private long countRoutes(StringBuilder conditions, List<Object> params) {
+		Long count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + GPX_METADATA_TABLE_NAME + " m WHERE 1 = 1 " + conditions,
+				Long.class, params.toArray());
+		return count == null ? 0 : count;
 	}
 
 	// the tracks whose line passes within radius metres of the point, nearest first; error tracks by their start point
