@@ -70,6 +70,14 @@ public interface CloudUsersRepository extends JpaRepository<CloudUser, Long> {
         @Column(name = "tokentime")
         @Temporal(TemporalType.TIMESTAMP)
         public Date tokenTime;
+
+        // one-off web login link created by support (see UserdataService.createWebLoginLink)
+        @Column(name = "weblinktoken")
+        public String webLinkToken;
+
+        @Column(name = "weblinktime")
+        @Temporal(TemporalType.TIMESTAMP)
+        public Date webLinkTime;
         
     }
 

@@ -14,7 +14,12 @@
     "-maxzoom=5 over the whole world, where the whole tile comes out as land while the reference is",
     "all water; the z7-z10 ones are Tuamotu atolls cut by the tile edge (Tematangi, Kauehi).",
     "brokenReferences are areas where the reference itself is wrong: every tile from 'minzoom' on",
-    "that touches 'bbox' is skipped by the cases, the random tiles and the scan alike."
+    "that touches 'bbox' is compared with tile.openstreetmap.org instead, by the cases, the random",
+    "tiles and the scan alike. dataIssues are areas where the OSM data is wrong: their tiles are skipped.",
+    "Areas the reference draws the sea over (place=island, natural=desert, sand, mud...) are not drawn, see -hide.",
+    "Areas the reference draws the sea over (place=island, natural=desert, sand, mud...) are hidden by -hide.",
+    "A failed tile is always compared with tile.openstreetmap.org once more, and counted as a stale",
+    "reference when that one agrees with the rendered tile."
   ],
   "brokenReferences": [
     {
@@ -24,6 +29,7 @@
       "minzoom": 14
     }
   ],
+  "dataIssues": [],
   "cases": [
     {
       "issue": 24376,
@@ -93,6 +99,44 @@
     },
     {
       "issue": 3291,
+      "title": "Hangzhou Bay tidal flats flooded by whole tiles near Ningbo",
+      "url": "https://github.com/osmandapp/OsmAnd-Issues/issues/3291",
+      "lat": 30.34635,
+      "lon": 121.16935,
+      "minzoom": 11,
+      "maxzoom": 14,
+      "radius": 1,
+      "maps": ["China_zhejiang_asia_2.obf"]
+    },
+    {
+      "issue": 3291,
+      "title": "Greenland islets mapped as natural=coastline multipolygons drawn twice (Sallinngualua, Niaqornaarsuk)",
+      "url": "https://github.com/osmandapp/OsmAnd-Issues/issues/3291",
+      "tiles": [
+        [10, 354, 206],
+        [10, 353, 206],
+        [11, 708, 412],
+        [11, 718, 513],
+        [11, 718, 512],
+        [14, 5797, 3445],
+        [14, 5911, 4503],
+        [11, 738, 563]
+      ],
+      "maps": ["Greenland_northamerica_2.obf"]
+    },
+    {
+      "issue": 3291,
+      "title": "Funafuti islet mapped as natural=coastline multipolygon drawn twice (Funafala)",
+      "url": "https://github.com/osmandapp/OsmAnd-Issues/issues/3291",
+      "tiles": [
+        [16, 65379, 34364],
+        [15, 32695, 17159],
+        [14, 16342, 8580]
+      ],
+      "maps": ["Oceania_australia-oceania_2.obf"]
+    },
+    {
+      "issue": 3291,
       "title": "Ocean rendered as land: basemap only",
       "url": "https://github.com/osmandapp/OsmAnd-Issues/issues/3291",
       "tiles": [
@@ -113,6 +157,25 @@
         [9, 47, 278]
       ],
       "maps": []
+    },
+    {
+      "issue": 3291,
+      "title": "Places fixed in September 2026: atoll sea cell, Minerva reefs, Manzanillo lagoon, wind farm, Arctic z11, Nonouti, Bely Island",
+      "url": "https://github.com/osmandapp/OsmAnd-Issues/issues/3291",
+      "tiles": [
+        [13, 8190, 4309],
+        [15, 84, 18629],
+        [13, 1722, 3654],
+        [13, 4215, 2668],
+        [11, 656, 227],
+        [11, 550, 263],
+        [12, 4031, 2054],
+        [10, 711, 198]
+      ],
+      "maps": ["Oceania_australia-oceania_2.obf", "Mexico_colima_northamerica_2.obf",
+        "Netherlands_noord-holland_europe_2.obf", "Netherlands_friesland_europe_2.obf",
+        "Greenland_northamerica_2.obf", "Canada_nunavut-north-east_northamerica_2.obf",
+        "Canada_nunavut-north-west_northamerica_2.obf", "Russia_yamal_asia_2.obf"]
     }
   ]
 }

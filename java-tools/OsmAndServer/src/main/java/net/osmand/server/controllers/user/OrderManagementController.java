@@ -10,6 +10,9 @@ import net.osmand.server.api.services.AdminService.Purchase;
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.services.AppleOrderLookupService;
 import net.osmand.server.api.services.OrderManagementService;
+import net.osmand.server.api.services.UserdataService;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -22,6 +25,9 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Collections;
+import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.UUID;
 
@@ -32,6 +38,8 @@ import static net.osmand.purchases.PurchaseHelper.PLATFORM_FASTSPRING;
 @RequestMapping("/admin/order-mgmt")
 public class OrderManagementController {
 
+	private static final Log LOG = LogFactory.getLog(OrderManagementController.class);
+
 	@Autowired
 	OrderManagementService orderManagementService;
 
@@ -40,6 +48,9 @@ public class OrderManagementController {
 
 	@Autowired
 	private CloudUsersRepository usersRepository;
+
+	@Autowired
+	private UserdataService userdataService;
 
 	@Autowired
 	private DeviceSubscriptionsRepository subscriptionsRepository;
@@ -193,6 +204,23 @@ public class OrderManagementController {
 		});
 
 		return ResponseEntity.ok().build();
+	}
+
+	@PostMapping("/cloud/web-link")
+	@PreAuthorize("hasAnyAuthority(T(net.osmand.server.WebSecurityConfiguration).ROLE_ADMIN, T(net.osmand.server.WebSecurityConfiguration).ROLE_SUPPORT)")
+	@ResponseBody
+	public ResponseEntity<?> createWebLoginLink(Authentication auth, @RequestParam String email) {
+		CloudUsersRepository.CloudUser pu = usersRepository.findByEmailIgnoreCase(email.trim());
+		if (pu == null) {
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("OsmAnd Cloud account not found");
+		}
+		Date validFrom = userdataService.createWebLoginLink(pu);
+		LOG.info("web-link: created by " + auth.getName() + " for " + pu.email);
+		Map<String, Object> res = new LinkedHashMap<>();
+		res.put("url", userdataService.getWebLinkUrl(pu));
+		res.put("validFrom", validFrom);
+		res.put("validTo", new Date(pu.webLinkTime.getTime() + UserdataService.WEB_LINK_VALID_TO));
+		return ResponseEntity.ok(res);
 	}
 
 	@PostMapping("/orders/valid")
