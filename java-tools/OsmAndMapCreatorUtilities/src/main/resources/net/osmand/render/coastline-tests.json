@@ -110,6 +110,22 @@
     },
     {
       "issue": 3291,
+      "title": "Greenland islets mapped as natural=coastline multipolygons drawn twice (Sallinngualua, Niaqornaarsuk)",
+      "url": "https://github.com/osmandapp/OsmAnd-Issues/issues/3291",
+      "tiles": [
+        [10, 354, 206],
+        [10, 353, 206],
+        [11, 708, 412],
+        [11, 718, 513],
+        [11, 718, 512],
+        [14, 5797, 3445],
+        [14, 5911, 4503],
+        [11, 738, 563]
+      ],
+      "maps": ["Greenland_northamerica_2.obf"]
+    },
+    {
+      "issue": 3291,
       "title": "Ocean rendered as land: basemap only",
       "url": "https://github.com/osmandapp/OsmAnd-Issues/issues/3291",
       "tiles": [
