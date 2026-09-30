@@ -55,7 +55,7 @@ public interface SearchTestDatasetRepository extends JpaRepository<Dataset, Long
 		}
 
 		public enum Source {
-			CSV, Overpass
+			CSV, Overpass, UnitTest
 		}
 
 		@Id

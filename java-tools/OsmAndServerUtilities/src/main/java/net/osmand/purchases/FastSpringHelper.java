@@ -1,5 +1,6 @@
 package net.osmand.purchases;
 
+import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
 import com.google.gson.Gson;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -13,6 +14,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 
 
 public class FastSpringHelper {
@@ -30,9 +32,34 @@ public class FastSpringHelper {
 			"net.osmand.fastspring.subscription.pro.annual.test",
 			"net.osmand.fastspring.subscription.maps.annual");
 
+	// web checkout products: pricing page card id, FastSpring product path and its sku
+	public record FastSpringProduct(String id, String path, String sku) {
+		public boolean isTest() {
+			return sku.endsWith(".test");
+		}
+	}
+
+	public static final List<FastSpringProduct> products = List.of(
+			new FastSpringProduct("osmand-pro", "osmand-pro-monthly", "net.osmand.fastspring.subscription.pro.monthly"),
+			new FastSpringProduct("osmand-pro", "osmand-pro-annual", "net.osmand.fastspring.subscription.pro.annual"),
+			new FastSpringProduct("osmand-pro", "test-osmand-pro-annual", "net.osmand.fastspring.subscription.pro.annual.test"),
+			new FastSpringProduct("osmand-maps-plus", "osmand-maps-annual", "net.osmand.fastspring.subscription.maps.annual"),
+			new FastSpringProduct("osmand-maps-plus", "osmand-maps", "net.osmand.fastspring.inapp.maps.plus"),
+			new FastSpringProduct("osmand-maps-plus", "test-osmand-maps", "net.osmand.fastspring.inapp.maps.plus.test"),
+			new FastSpringProduct("osmand-15-years", "osmand-15-years", "net.osmand.fastspring.inapp.osmand_pro_xv"),
+			new FastSpringProduct("osmand-15-years", "test-osmand-15-years", "net.osmand.fastspring.inapp.osmand_pro_xv.test"));
+
 	// Minimum delay (15 minutes) before validating a FastSpring purchase/subscription
 	// to allow FastSpring systems to process the order
 	public static final long MINIMUM_VALIDATION_DELAY_MILLIS = 15 * 60 * 1000;
+
+	// subscription states (https://developer.fastspring.com/reference/retrieve-a-subscription)
+	public static final String SUBSCRIPTION_STATE_CANCELED = "canceled";
+	public static final String SUBSCRIPTION_STATE_DEACTIVATED = "deactivated";
+
+	// values for the "kind" column, same convention as UpdateSubscription.deleteSubscription (expired/invalid/gone)
+	public static final String KIND_REFUND = "refund";
+	public static final String KIND_CHARGEBACK = "chargeback";
 
 	private static final String API_BASE = "https://api.fastspring.com";
 	private static final int CONNECT_TIMEOUT_MILLIS = 30 * 1000;
@@ -47,8 +74,11 @@ public class FastSpringHelper {
 	 * @return true if it's too early to validate (less than 15 minutes old), false if validation can proceed
 	 */
 	public static boolean isTooEarlyToValidate(long recordTimestampMillis) {
-		long timeSincePurchase = System.currentTimeMillis() - recordTimestampMillis;
-		return timeSincePurchase < MINIMUM_VALIDATION_DELAY_MILLIS;
+		return isTooEarlyToValidate(recordTimestampMillis, System.currentTimeMillis());
+	}
+
+	public static boolean isTooEarlyToValidate(long recordTimestampMillis, long now) {
+		return now - recordTimestampMillis < MINIMUM_VALIDATION_DELAY_MILLIS;
 	}
 
 	public static void main(String[] args) throws IOException {
@@ -66,16 +96,16 @@ public class FastSpringHelper {
 				LOG.warn("Failed to get subscription with orderId: " + orderId);
 				return;
 			}
-			LOG.info(String.format("Subscription[id=%s, sku=%s, active=%s, autoRenew=%s, begin=%s, nextChargeDate=%s]",
-					sub.id, sub.sku, sub.active, sub.autoRenew, sub.begin, sub.nextChargeDate));
+			LOG.info(String.format("Subscription[id=%s, sku=%s, active=%s, state=%s, autoRenew=%s, begin=%s, next=%s, nextChargeDate=%s, deactivationDate=%s]",
+					sub.id, sub.sku, sub.active, sub.state, sub.autoRenew, sub.begin, sub.next, sub.nextChargeDate, sub.deactivationDate));
 		} else if (type.equals("-inapp")) {
 			FastSpringPurchase inApp = getInAppPurchaseByOrderIdAndSku(orderId, sku);
 			if (inApp == null) {
 				LOG.warn("Failed to get in-app purchase with orderId: " + orderId);
 				return;
 			}
-			LOG.info(String.format("InAppPurchase[sku=%s, purchaseTime=%s, completed=%s, valid=%s]",
-					inApp.sku, inApp.purchaseTime, inApp.completed, inApp.isValid()));
+			LOG.info(String.format("InAppPurchase[sku=%s, purchaseTime=%s, completed=%s, refunded=%s, valid=%s]",
+					inApp.sku, inApp.purchaseTime, inApp.completed, inApp.refunded, inApp.isValid()));
 		} else {
 			LOG.warn("Unknown type: " + type);
 		}
@@ -96,16 +126,13 @@ public class FastSpringHelper {
 
 	public static FastSpringPurchase getInAppPurchaseByOrderIdAndSku(String orderId, String sku) throws IOException {
 		FastSpringOrder order = getOrder(orderId);
-		if (order == null) {
-			return null;
-		}
+		return order == null ? null : inAppPurchase(order, sku);
+	}
+
+	public static FastSpringPurchase inAppPurchase(FastSpringOrder order, String sku) {
 		for (FastSpringOrder.Item item : order.items) {
 			if (sku.equals(item.sku)) {
-				Long purchaseTime = order.changed;
-				Boolean completed = order.completed;
-				String currency = order.currency;
-				Double price = item.subtotal;
-				return new FastSpringPurchase(item.sku, purchaseTime, completed, currency, price);
+				return new FastSpringPurchase(item.sku, order.changed, order.completed, order.currency, item.subtotal, order.isRefunded());
 			}
 		}
 		return null;
@@ -143,6 +170,32 @@ public class FastSpringHelper {
 		return true;
 	}
 
+	// https://developer.fastspring.com/reference/createordersession
+	public static String createSession(String email, String productPath) throws IOException {
+		HttpURLConnection connection = openConnection("/sessions");
+		connection.setRequestMethod("POST");
+		connection.setDoOutput(true);
+		connection.setRequestProperty("Content-Type", "application/json");
+		Map<String, Object> body = Map.of(
+				"contact", Map.of("email", email),
+				"items", List.of(Map.of("product", productPath, "quantity", 1)),
+				"tags", Map.of("userEmail", email));
+		try (OutputStream os = connection.getOutputStream()) {
+			os.write(GSON.toJson(body).getBytes(StandardCharsets.UTF_8));
+		}
+		int code = connection.getResponseCode();
+		if (code != 200 && code != 201) {
+			LOG.warn("Failed to create FastSpring session for " + productPath + ": "
+					+ code + " " + connection.getResponseMessage());
+			return null;
+		}
+		try (InputStream is = connection.getInputStream();
+		     InputStreamReader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
+			FastSpringSession session = GSON.fromJson(reader, FastSpringSession.class);
+			return session == null ? null : session.id;
+		}
+	}
+
 	private static FastSpringOrder getOrder(String orderId) throws IOException {
 		HttpURLConnection connection = openConnection("/orders/" + orderId);
 		try (InputStream is = connection.getInputStream();
@@ -162,7 +215,7 @@ public class FastSpringHelper {
 		}
 	}
 
-	private static FastSpringSubscription getSubscription(String subscriptionId) throws IOException {
+	public static FastSpringSubscription getSubscription(String subscriptionId) throws IOException {
 		HttpURLConnection connection = openConnection("/subscriptions/" + subscriptionId);
 		try (InputStream is = connection.getInputStream();
 		     InputStreamReader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
@@ -207,12 +260,24 @@ public class FastSpringHelper {
 		return connection;
 	}
 
+	public static class FastSpringSession {
+		public String id;
+	}
+
 	public static class FastSpringOrder {
 		public String id;
 		public Long changed; //purchaseTime
 		public Boolean completed;
 		public String currency;
 		public List<Item> items;
+		public List<Return> returns; // refunds; the order itself stays completed=true
+
+		public boolean isRefunded() {
+			return returns != null && !returns.isEmpty();
+		}
+
+		public static class Return {
+		}
 
 		public static class Item {
 			public String sku;
@@ -223,14 +288,42 @@ public class FastSpringHelper {
 
 	public static class FastSpringSubscription {
 		public String id;
+		public String initialOrderId; // order that created the subscription, our key together with sku
 		public Boolean active;
 		public String state; // active, overdue, canceled, deactivated, trial (https://developer.fastspring.com/reference/retrieve-a-subscription)
 		public String sku;
 		public Long begin; //purchaseTime
-		public Long nextChargeDate; //expiretime
-		public Boolean autoRenew;
+		public Long next; // next billing date, not cleared by cancel/deactivation
+		public Long nextChargeDate; // only while a next charge is scheduled, absent after cancel
+		public Long deactivationDate;
+		public Boolean autoRenew; // stays true after cancel, state is authoritative
 		public Double price;
 		public String currency;
+
+		public boolean isCanceledOrDeactivated() {
+			return SUBSCRIPTION_STATE_CANCELED.equals(state) || SUBSCRIPTION_STATE_DEACTIVATED.equals(state);
+		}
+
+		public boolean isAutoRenewing() {
+			return Boolean.TRUE.equals(autoRenew) && !isCanceledOrDeactivated();
+		}
+
+		public Long getExpiryTime() {
+			if (isCanceledOrDeactivated()) {
+				return deactivationDate;
+			}
+			return next != null ? next : nextChargeDate;
+		}
+
+		public SubscriptionPurchase toSubscriptionPurchase() {
+			return new SubscriptionPurchase()
+					.setOrderId(id)
+					.setStartTimeMillis(begin)
+					.setExpiryTimeMillis(getExpiryTime())
+					.setAutoRenewing(isAutoRenewing())
+					.setPriceAmountMicros(Math.round(price * 1000000))
+					.setPriceCurrencyCode(currency);
+		}
 	}
 
 	public static class FastSpringPurchase {
@@ -239,17 +332,19 @@ public class FastSpringHelper {
 		public Boolean completed;
 		public String currency;
 		public Double price;
+		public boolean refunded;
 
-		FastSpringPurchase(String sku, Long purchaseTime, Boolean completed, String currency, Double price) {
+		FastSpringPurchase(String sku, Long purchaseTime, Boolean completed, String currency, Double price, boolean refunded) {
 			this.sku = sku;
 			this.purchaseTime = purchaseTime;
 			this.completed = completed;
 			this.currency = currency;
 			this.price = price;
+			this.refunded = refunded;
 		}
 
 		public boolean isValid() {
-			return this.completed;
+			return Boolean.TRUE.equals(completed) && !refunded;
 		}
 	}
 }

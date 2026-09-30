@@ -64,16 +64,19 @@ public interface ReportService {
 					CAST(COALESCE(json_extract(row, '$.id'), 0) AS INTEGER) AS obj_id, error
 				FROM gen_result AS g WHERE case_id = ? ORDER BY g.id
 			)""";
+	// older runs stored an empty search result as an error: it is Not Found
+	String RUN_ERROR_SQL = "%1$s.error IS NOT NULL AND %1$s.error NOT IN " +
+			"('Search result is empty', 'First search result is missing', 'Result point location is null')";
 	String REPORT_SQL = GEN_SQL + """
 			 SELECT CASE
-			    WHEN r.error IS NOT NULL THEN 'Error'
+			    WHEN %s THEN 'Error'
 				WHEN g.gen_count <= 0 OR g.query IS NULL OR trim(g.query) = '' THEN 'Not Processed'
 				WHEN COALESCE(found, res_distance <= 50) THEN 'Found'
 			    WHEN SUBSTR(COALESCE(json_extract(r.row, '$.actual_place'), ''), 1, INSTR(json_extract(r.row, '$.actual_place'), ' -') - 1) IN ('2','3','4','5') THEN 'Partial'
 				ELSE 'Not Found'
 			END AS "group", UPPER(COALESCE(json_extract(r.row, '$.web_type'), 'absence')) AS type,
 			    g.ds_id || '.' || g.tc_id AS row_id, g.id as gen_id, g.lat_lon, g.query, g.obj_id as id, g.in_row, res_count, res_place, CAST((r.res_distance/10) AS INTEGER)*10 as res_dist,
-			    r.lat || ', ' || r.lon as search_lat_lon, r.bbox as search_bbox, res_lat_lon, r.row AS out_row, r.stat_bytes, r.stat_time, r.duration AS time FROM gen AS g, run_result AS r WHERE g.id = r.gen_id AND run_id = ? """;
+			    r.lat || ', ' || r.lon as search_lat_lon, r.bbox as search_bbox, res_lat_lon, r.row AS out_row, r.stat_bytes, r.stat_time, r.duration AS time FROM gen AS g, run_result AS r WHERE g.id = r.gen_id AND run_id = ? """.formatted(RUN_ERROR_SQL.formatted("r"));
 	String FULL_REPORT_SQL = REPORT_SQL + """
 			 UNION SELECT 'Generated' AS "group", CASE
 			    WHEN error IS NOT NULL THEN 'Error'
@@ -81,9 +84,24 @@ public interface ReportService {
 				WHEN query IS NULL OR trim(query) = '' THEN 'Empty' ELSE 'Processed' END AS type,
 			ds_id || '.' || tc_id AS row_id, id as gen_id, lat_lon, query, obj_id as id,
 			in_row, NULL, NULL, NULL, NULL, NULL, NULL, NULL as out_row, NULL, NULL, NULL FROM gen ORDER BY "group", gen_id""";
-	String[] IN_PROPS = new String[]{"group", "type", "row_id", "id", "lat_lon", "search_lat_lon", "query", "src_map_found", "actual_name"};
-	String[] OUT_PROPS = new String[]{"res_name", "res_dist", "actual_dist", "res_lat_lon", "actual_lat_lon", "res_place", "actual_place", "res_id", "actual_id", 
-			"oid", "res_count", "search_bbox", "stat_bytes", "stat_time", "time"};
+	
+	enum InProp {
+		group, type, row_id, id, lat_lon, search_lat_lon, query, src_map_found
+	}
+
+	enum OutProp {
+		res_name(true), actual_name(true), res_dist, actual_dist, res_lat_lon, actual_lat_lon, res_place, actual_place, res_id, actual_id, oid, res_count, actual_count, search_bbox, stat_bytes, stat_time, time;
+
+		final boolean polymorphic;
+
+		OutProp() {
+			this(false);
+		}
+
+		OutProp(boolean polymorphic) {
+			this.polymorphic = polymorphic;
+		}
+	}
 
 	JdbcTemplate getJdbcTemplate();
 
@@ -132,32 +150,28 @@ public interface ReportService {
 
 	default List<Map<String, Object>> extendTo(List<Map<String, Object>> results, String[] allCols) {
 		// Exclude fields already exposed as top-level columns to avoid duplication
-		final java.util.Set<String> exclude = new java.util.HashSet<>(java.util.Arrays.asList(IN_PROPS));
+		final Set<String> exclude = Arrays.stream(InProp.values()).map(Enum::name).collect(Collectors.toSet());
 		exclude.add("web_type");
-		exclude.addAll(java.util.Arrays.asList(allCols));
-		List<String> outProps = Arrays.asList(OUT_PROPS);
+		exclude.addAll(Arrays.asList(allCols));
+		Map<String, OutProp> outProps = Arrays.stream(OutProp.values())
+				.collect(Collectors.toMap(Enum::name, p -> p));
 
 		return results.stream().map(srcRow -> {
 			String inRowJson = (String) srcRow.get("in_row");
 			String outRowJson = (String) srcRow.get("out_row");
-			srcRow.remove("in_row");
-			srcRow.remove("out_row");
 
 			Map<String, Object> row = new LinkedHashMap<>();
 			row.put("gen_id", srcRow.get("gen_id"));
 			if (inRowJson == null) return row;
-			for (String p : IN_PROPS)
-				if (srcRow.containsKey(p))
-					row.put(p, srcRow.get(p));
+			for (InProp p : InProp.values())
+				if (srcRow.containsKey(p.name()))
+					row.put(p.name(), srcRow.get(p.name()));
 
 			try {
 				Map<String, Object> out = new LinkedHashMap<>();
 				if (outRowJson != null) {
-					for (String p : OUT_PROPS) {
-						row.put(p, srcRow.get(p));
-					}
-					if (srcRow.containsKey("id")) {
-						row.put("oid", srcRow.get("id"));
+					for (OutProp p : OutProp.values()) {
+						row.put(p.name(), srcRow.get(p.name()));
 					}
 					JsonNode outRow = getObjectMapper().readTree(outRowJson);
 					// For consistency with CSV, serialize values as text, skipping excluded keys
@@ -165,8 +179,10 @@ public interface ReportService {
 						if (exclude.contains(fn) || fn.startsWith("stat_") || fn.endsWith("_stats") || fn.startsWith("spatial_"))
 							return; // remove from the inner 'row' map
 						JsonNode v = outRow.get(fn);
-						if (outProps.contains(fn)) {
-							row.put(fn, v.asText());
+						OutProp prop = outProps.get(fn);
+						if (prop != null) {
+							// Names may be either the legacy scalar or a [selected, candidates] tuple.
+							row.put(fn, prop.polymorphic ? v : v.asText());
 						} else {
 							out.put(fn, v.asText());
 						}
@@ -175,7 +191,7 @@ public interface ReportService {
 					row.put("res_tags", getObjectMapper().writeValueAsString(out));
 				}
 			} catch (IOException e) {
-				// ignore invalid JSON in 'row'
+				getLogger().warn("Ignoring invalid result JSON for gen_id {}", srcRow.get("gen_id"), e);
 			}
 			return row;
 		}).collect(Collectors.toList());
@@ -229,7 +245,7 @@ public interface ReportService {
 				"SELECT run.status, run.spatial, run.threads_count, run.maps_count, COALESCE(finish - start, max(run_result.timestamp) - start) AS time_duration," +
 						" count(*) AS total," +
 						" count(*) FILTER (WHERE gen_count > 0 and trim(query) <> '') AS processed," +
-						" count(*) FILTER (WHERE run_result.error IS NOT NULL) AS failed," +
+						" count(*) FILTER (WHERE " + RUN_ERROR_SQL.formatted("run_result") + ") AS failed," +
 						" count(*) FILTER (WHERE COALESCE(run_result.found, res_distance <= 50)) AS found_count," +
 						" count(*) FILTER (WHERE Not found AND SUBSTR(COALESCE(" + runResultActualPlaceSql + ", ''), 1, INSTR(" + runResultActualPlaceSql + ", ' -') - 1) IN ('2','3','4','5')) as partial_count," +
 						" sum(stat_bytes) FILTER (WHERE stat_bytes IS NOT NULL) AS total_bytes," +

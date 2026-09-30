@@ -3,6 +3,8 @@ project(bird)
 set(extra_dependencies "")
 set(extra_libraries "")
 
+find_package(OpenGL)
+
 find_package(FreeGLUT)
 if (FreeGLUT_FOUND)
 	set(extra_dependencies ${extra_dependencies}
@@ -28,12 +30,12 @@ else()
 	endif()
 endif()
 
-set(target_specific_sources "")
 set(target_specific_private_definitions "")
 if (CMAKE_TARGET_OS STREQUAL "macosx")
-	set(target_specific_sources ${target_specific_sources}
-		"x11.cpp"
-	)
+	if (FreeGLUT_FOUND)
+		set(CMAKE_MACOSX_RPATH ON)
+		set(CMAKE_INSTALL_RPATH "@executable_path" "/usr/local/lib")
+	endif()
 	set(target_specific_private_definitions ${target_specific_private_definitions}
 		-DGL_SILENCE_DEPRECATION
 	)
@@ -41,7 +43,6 @@ endif()
 
 set(sources
 	"main.cpp"
-	${target_specific_sources}
 )
 
 if (CMAKE_SHARED_LIBS_ALLOWED_ON_TARGET)

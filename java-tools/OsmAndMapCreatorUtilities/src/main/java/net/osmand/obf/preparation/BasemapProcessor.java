@@ -96,6 +96,7 @@ public class BasemapProcessor {
     private final MapZooms mapZooms;
     private final Log logMapDataWarn;
     private SimplisticQuadTree[] quadTrees;
+    private BasemapCoastlines coastlines;
     private static int MOST_DETAILED_APPROXIMATION = 9;
 
     protected static class SimplisticQuadTree {
@@ -132,6 +133,14 @@ public class BasemapProcessor {
                 dataObjects.put(p, new ArrayList<SimplisticBinaryData>());
             }
             dataObjects.get(p).add(w);
+        }
+
+        public void removeQuadData(MapZoomPair p, SimplisticBinaryData w) {
+            List<SimplisticBinaryData> l = dataObjects.get(p);
+            l.remove(w);
+            if (l.isEmpty()) {
+                dataObjects.remove(p);
+            }
         }
 
         public boolean dataIsDefined(MapZoomPair p) {
@@ -196,8 +205,9 @@ public class BasemapProcessor {
         quadTrees = new SimplisticQuadTree[mapZooms.getLevels().size()];
         for (int i = 0; i < mapZooms.getLevels().size(); i++) {
             MapZoomPair p = mapZooms.getLevels().get(i);
-            quadTrees[i] = constructTilesQuadTree(Math.min(p.getMaxZoom(), 11));
+            quadTrees[i] = constructTilesQuadTree(Math.min(p.getMaxZoom(), 11), p.getMaxZoom() > 11);
         }
+        coastlines = new BasemapCoastlines(logMapDataWarn);
     }
 
     protected void constructBitSetInfo(String datFile) {
@@ -322,6 +332,15 @@ public class BasemapProcessor {
     }
 
     public SimplisticQuadTree constructTilesQuadTree(int maxZoom) {
+        return constructTilesQuadTree(maxZoom, false);
+    }
+
+    /**
+     * @param splitSeaUnderLand split a cell of maxZoom once more where it counts as land (half or less of
+     *            its ocean tiles are sea) but has sea tiles: 2 sea and 2 coast tiles around an atoll drew the
+     *            open sea as land at z12+ (Nukulaelae, 13/8190/4309)
+     */
+    public SimplisticQuadTree constructTilesQuadTree(int maxZoom, boolean splitSeaUnderLand) {
         SimplisticQuadTree rootTree = new SimplisticQuadTree(0, 0, 0);
 
 
@@ -333,13 +352,13 @@ public class BasemapProcessor {
                 toVisit.add(rootTree.getOrCreateSubTree(x, y, baseZoom));
             }
         }
-        initializeQuadTree(rootTree, baseZoom, maxZoom, toVisit);
+        initializeQuadTree(rootTree, baseZoom, maxZoom, splitSeaUnderLand, toVisit);
         return rootTree;
 
     }
 
     protected void initializeQuadTree(SimplisticQuadTree rootTree, int baseZoom, int maxZoom,
-			LinkedList<SimplisticQuadTree> toVisit) {
+			boolean splitSeaUnderLand, LinkedList<SimplisticQuadTree> toVisit) {
 		while (!toVisit.isEmpty()) {
 			SimplisticQuadTree subtree = toVisit.poll();
 			int x = subtree.x;
@@ -347,7 +366,9 @@ public class BasemapProcessor {
 			int zoom = subtree.zoom;
 			SimplisticQuadTree st = rootTree.getOrCreateSubTree(x, y, zoom);
 			st.seaCharacteristic = getSeaTile(x, y, zoom);
-			if (zoom < maxZoom && !isWaterTile(x, y, zoom) && !isLandTile(x, y, zoom)) {
+			boolean seaUnderLand = splitSeaUnderLand && zoom == maxZoom && zoom < TILE_ZOOMLEVEL
+					&& st.seaCharacteristic > 0 && st.seaCharacteristic <= 0.5;
+			if ((zoom < maxZoom || seaUnderLand) && !isWaterTile(x, y, zoom) && !isLandTile(x, y, zoom)) {
 				SimplisticQuadTree[] vis = st.getAllChildren();
 				Collections.addAll(toVisit, vis);
 			}
@@ -356,10 +377,15 @@ public class BasemapProcessor {
 
 
     public void writeBasemapFile(BinaryMapIndexWriter writer, String regionName) throws IOException {
+        // before the encoding rules are written: the glued coastlines register their types (processEntity ignores mini)
+        coastlines.glue(w -> processEntity(false, w));
         writer.startWriteMapIndex(regionName);
         // write map encoding rules
         writer.writeMapEncodingRules(renderingTypes.getEncodingRuleTypes());
 
+        for (int l = 0; l < mapZooms.getLevels().size(); l++) {
+            coastlines.fixTopology(l, mapZooms.getLevel(l));
+        }
         int i = 0;
         for (MapZoomPair p : mapZooms.getLevels()) {
             // write map levels and map index
@@ -458,6 +484,9 @@ public class BasemapProcessor {
 				((Way) e).getNodeIds().reverse();
 			}
 		}
+		if (coastlines != null && e instanceof Way && "coastline".equals(e.getTag("natural")) && coastlines.collect((Way) e)) {
+			return;
+		}
 		long refId = e.getId();
 		
 		boolean coastline = "coastline".equals(e.getTag("natural"));
@@ -514,7 +543,7 @@ public class BasemapProcessor {
 					}
 					splitContinuousWay(((Way) e).getNodes(), typeUse.toArray(),
 							!addtypeUse.isEmpty() ? addtypeUse.toArray() : null,
-							zoomPair, zoomToEncode, quadTrees[level], refId);
+							zoomPair, zoomToEncode, level, refId);
 				} else {
 					polygon = isPolygon(e);
 					List<Node> ns = ((Way) e).getNodes();
@@ -603,7 +632,8 @@ public class BasemapProcessor {
 	}
 
 	public void splitContinuousWay(List<Node> ns, int[] types, int[] addTypes, MapZoomPair zoomPair, int zoomToEncode,
-                                   SimplisticQuadTree quadTree, long refId) {
+                                   int level, long refId) {
+        SimplisticQuadTree quadTree = quadTrees[level];
         int z = getViewZoom(zoomPair.getMinZoom(), zoomToEncode);
         int i = 1;
         Node prevNode = ns.get(0);
@@ -663,13 +693,24 @@ public class BasemapProcessor {
                     break wayConstruct;
                 }
             }
-            List<Node> res = new ArrayList<Node>();
-            OsmMapUtils.simplifyDouglasPeucker(w, zoomToEncode - 1 + 8 + zoomWaySmoothness, 3, res, true);
-            addRawData(res, null, types, addTypes, zoomPair, quadTree, z, tilex, tiley, null, refId);
+            BasemapCoastlines.Piece piece = coastlines.addPiece(level, w, zoomToEncode - 1 + 8 + zoomWaySmoothness);
+            SimplisticBinaryData data = addRawData(piece.simplify(), null, types, addTypes, zoomPair, quadTree, z, tilex, tiley, null, refId);
+            SimplisticQuadTree quad = quadTree.getOrCreateSubTree(tilex, tiley, z);
+            piece.setOutput(new BasemapCoastlines.PieceOutput() {
+                @Override
+                public void setCoordinates(byte[] coordinates) {
+                    data.coordinates = coordinates;
+                }
+
+                @Override
+                public void remove() {
+                    quad.removeQuadData(zoomPair, data);
+                }
+            });
         }
     }
 
-    private void addRawData(List<Node> res, List<List<Node>> inner, int[] types, int[] addTypes, MapZoomPair zoomPair, SimplisticQuadTree quadTree, int z, int tilex,
+    private SimplisticBinaryData addRawData(List<Node> res, List<List<Node>> inner, int[] types, int[] addTypes, MapZoomPair zoomPair, SimplisticQuadTree quadTree, int z, int tilex,
                             int tiley, Map<MapRulType, String> names, long id) {
         SimplisticQuadTree quad = quadTree.getOrCreateSubTree(tilex, tiley, z);
         if (quad == null) {
@@ -727,6 +768,7 @@ public class BasemapProcessor {
 	    }
 	    data.innerCoordinates = bcoordinates.toByteArray();
 	    quad.addQuadData(zoomPair, data);
+	    return data;
     }
 
     private int getViewZoom(int minZoom, int maxZoom) {

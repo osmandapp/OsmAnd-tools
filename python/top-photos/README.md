@@ -41,6 +41,8 @@ Below is a listing of all global parameters. Each parameter is accompanied by it
 | ASTRO_IMAGES_ONLY      | bool | false             | Download images for lat==lon==0 objects only (image-downloader)              |
 | MAX_TRIES              | int  | 10                | Number of attempts of image-downloader (useful with proxies)                 |
 | MAX_SLEEP              | int  | 60                | Maximum sleep between HTTP-429 errors (image-downloader)                     |
+| MAX_ORIGINAL_MB        | int  | 32                | Skip the original image above this size when the thumbnail fails (image-downloader) |
+| FAILED_RETRY_DAYS      | int  | 90                | Days before a failed download is retried (image-downloader)                  |
 
 
 ### Threading Model
@@ -51,7 +53,7 @@ to destroy job hanging illusion.
 
 # 1. How to use TopPlaces job
 
-- Frontend URL: https://maptile.osmand.net:4000/
+- Frontend URL: https://test.osmand.net/admin/top-photos
 - Jenkins job URL: https://data.osmand.net:8080/view/Wiki/job/Wiki_TopPlacePhotos/
 - Set required environment variables (e.g., `MODEL`, `MAX_PLACES_PER_QUAD`, `PARALLEL`, `PHOTOS_PER_PLACE`, `MIN_ELO`, `SAVE_SCORE_ENV`) are described above.
 - Either `QUAD` or `SELECTED_PLACE_IDS` must be provided.

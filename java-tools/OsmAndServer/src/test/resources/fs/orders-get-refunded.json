@@ -1,0 +1,300 @@
+{
+  "order": "ORDER_ID_INAPP_TEST000",
+  "id": "ORDER_ID_INAPP_TEST000",
+  "reference": "OSMANDBV000000-0000-00001",
+  "buyerReference": null,
+  "ipAddress": "0.0.0.0",
+  "completed": true,
+  "orderLevelCouponApplied": false,
+  "changed": 1788192806114,
+  "changedValue": 1788192806114,
+  "changedInSeconds": 1788192806,
+  "changedDisplay": "31/08/2026",
+  "changedDisplayISO8601": "2026-08-31",
+  "changedDisplayEmailEnhancements": "Aug 31, 2026",
+  "changedDisplayEmailEnhancementsWithTime": "Aug 31, 2026 04:13:26 PM",
+  "language": "fr",
+  "live": true,
+  "currency": "EUR",
+  "payoutCurrency": "USD",
+  "quote": null,
+  "invoiceUrl": "https://osmand.onfastspring.com/popup-osmand/account/order/OSMANDBV000000-0000-00001/invoice/INVOICE_TEST",
+  "siteId": "SITE_ID_TEST",
+  "account": "ACCOUNT_ID_TEST0000001",
+  "total": 69.99,
+  "totalDisplay": "69,99 €",
+  "totalInPayoutCurrency": 78.23,
+  "totalInPayoutCurrencyDisplay": "78,23 $US",
+  "tax": 11.66,
+  "taxDisplay": "11,66 €",
+  "taxInPayoutCurrency": 13.03,
+  "taxInPayoutCurrencyDisplay": "13,03 $US",
+  "subtotal": 58.33,
+  "subtotalDisplay": "58,33 €",
+  "subtotalInPayoutCurrency": 65.2,
+  "subtotalInPayoutCurrencyDisplay": "65,20 $US",
+  "discount": 0,
+  "discountDisplay": "0,00 €",
+  "discountInPayoutCurrency": 0,
+  "discountInPayoutCurrencyDisplay": "0,00 $US",
+  "discountWithTax": 0,
+  "discountWithTaxDisplay": "0,00 €",
+  "discountWithTaxInPayoutCurrency": 0,
+  "discountWithTaxInPayoutCurrencyDisplay": "0,00 $US",
+  "billDescriptor": "FS *osmand",
+  "oneClickPay": false,
+  "payment": {
+    "type": "applepay",
+    "creditcard": "mastercard"
+  },
+  "customer": {
+    "first": "Test",
+    "last": "User",
+    "email": "user@example.com",
+    "company": null,
+    "phone": null,
+    "subscribed": false
+  },
+  "address": {
+    "addressLine1": "1 Test Street",
+    "city": "Testville",
+    "postalCode": "00000",
+    "country": "FR",
+    "display": "1 Test Street, Testville, 00000, FR"
+  },
+  "recipients": [
+    {
+      "recipient": {
+        "first": "Test",
+        "last": "User",
+        "email": "user@example.com",
+        "company": null,
+        "phone": null,
+        "subscribed": false,
+        "account": "ACCOUNT_ID_TEST0000001",
+        "address": {
+          "addressLine1": "1 Test Street",
+          "city": "Testville",
+          "postalCode": "00000",
+          "country": "FR",
+          "display": "1 Test Street, Testville, 00000, FR"
+        }
+      }
+    }
+  ],
+  "tags": {
+    "userEmail": "user@example.com"
+  },
+  "notes": [],
+  "items": [
+    {
+      "product": "osmand-maps",
+      "quantity": 1,
+      "display": "OsmAnd Maps+",
+      "sku": "net.osmand.fastspring.inapp.maps.plus",
+      "imageUrl": "https://example.com/ic_action_osmand_maps_plus.png",
+      "shortDisplay": "OsmAnd Maps+",
+      "subtotal": 58.33,
+      "subtotalDisplay": "58,33 €",
+      "subtotalInPayoutCurrency": 65.2,
+      "subtotalInPayoutCurrencyDisplay": "65,20 $US",
+      "discount": 0,
+      "discountDisplay": "0,00 €",
+      "discountInPayoutCurrency": 0,
+      "discountInPayoutCurrencyDisplay": "0,00 $US",
+      "isAddon": true,
+      "fulfillments": {
+        "instructions": "<p>Vous avez acheté OsmAnd Maps+ via un achat intégré avec votre compte OsmAnd Cloud.</p>"
+      },
+      "driver": {
+        "type": "cross-sell",
+        "path": "osmand-popup-osmand"
+      },
+      "withholdings": {
+        "taxWithholdings": false
+      },
+      "proratedItemChangeAmount": 0,
+      "proratedItemChangeAmountDisplay": "0,00 €",
+      "proratedItemChangeAmountInPayoutCurrency": 0,
+      "proratedItemChangeAmountInPayoutCurrencyDisplay": "0,00 $US",
+      "proratedItemProratedCharge": 0,
+      "proratedItemProratedChargeDisplay": "0,00 €",
+      "proratedItemProratedChargeInPayoutCurrency": 0,
+      "proratedItemProratedChargeInPayoutCurrencyDisplay": "0,00 $US",
+      "proratedItemCreditAmount": 0,
+      "proratedItemCreditAmountDisplay": "0,00 €",
+      "proratedItemCreditAmountInPayoutCurrency": 0,
+      "proratedItemCreditAmountInPayoutCurrencyDisplay": "0,00 $US",
+      "proratedItemTaxAmount": 0,
+      "proratedItemTaxAmountDisplay": "0,00 €",
+      "proratedItemTaxAmountInPayoutCurrency": 0,
+      "proratedItemTaxAmountInPayoutCurrencyDisplay": "0,00 $US",
+      "proratedItemTotal": 0,
+      "proratedItemTotalDisplay": "0,00 €",
+      "proratedItemTotalInPayoutCurrency": 0,
+      "proratedItemTotalInPayoutCurrencyDisplay": "0,00 $US"
+    }
+  ],
+  "returns": [
+    {
+      "return": "RETURN_ID_TEST00000001",
+      "amount": 69.99,
+      "amountDisplay": "69,99 €",
+      "amountInPayoutCurrency": 78.23,
+      "amountInPayoutCurrencyDisplay": "78,23 $US"
+    }
+  ],
+  "action": "order.get",
+  "result": "success",
+  "orders": [
+    {
+      "order": "ORDER_ID_INAPP_TEST000",
+      "id": "ORDER_ID_INAPP_TEST000",
+      "reference": "OSMANDBV000000-0000-00001",
+      "buyerReference": null,
+      "ipAddress": "0.0.0.0",
+      "completed": true,
+      "orderLevelCouponApplied": false,
+      "changed": 1788192806114,
+      "changedValue": 1788192806114,
+      "changedInSeconds": 1788192806,
+      "changedDisplay": "31/08/2026",
+      "changedDisplayISO8601": "2026-08-31",
+      "changedDisplayEmailEnhancements": "Aug 31, 2026",
+      "changedDisplayEmailEnhancementsWithTime": "Aug 31, 2026 04:13:26 PM",
+      "language": "fr",
+      "live": true,
+      "currency": "EUR",
+      "payoutCurrency": "USD",
+      "quote": null,
+      "invoiceUrl": "https://osmand.onfastspring.com/popup-osmand/account/order/OSMANDBV000000-0000-00001/invoice/INVOICE_TEST",
+      "siteId": "SITE_ID_TEST",
+      "account": "ACCOUNT_ID_TEST0000001",
+      "total": 69.99,
+      "totalDisplay": "69,99 €",
+      "totalInPayoutCurrency": 78.23,
+      "totalInPayoutCurrencyDisplay": "78,23 $US",
+      "tax": 11.66,
+      "taxDisplay": "11,66 €",
+      "taxInPayoutCurrency": 13.03,
+      "taxInPayoutCurrencyDisplay": "13,03 $US",
+      "subtotal": 58.33,
+      "subtotalDisplay": "58,33 €",
+      "subtotalInPayoutCurrency": 65.2,
+      "subtotalInPayoutCurrencyDisplay": "65,20 $US",
+      "discount": 0,
+      "discountDisplay": "0,00 €",
+      "discountInPayoutCurrency": 0,
+      "discountInPayoutCurrencyDisplay": "0,00 $US",
+      "discountWithTax": 0,
+      "discountWithTaxDisplay": "0,00 €",
+      "discountWithTaxInPayoutCurrency": 0,
+      "discountWithTaxInPayoutCurrencyDisplay": "0,00 $US",
+      "billDescriptor": "FS *osmand",
+      "oneClickPay": false,
+      "payment": {
+        "type": "applepay",
+        "creditcard": "mastercard"
+      },
+      "customer": {
+        "first": "Test",
+        "last": "User",
+        "email": "user@example.com",
+        "company": null,
+        "phone": null,
+        "subscribed": false
+      },
+      "address": {
+        "addressLine1": "1 Test Street",
+        "city": "Testville",
+        "postalCode": "00000",
+        "country": "FR",
+        "display": "1 Test Street, Testville, 00000, FR"
+      },
+      "recipients": [
+        {
+          "recipient": {
+            "first": "Test",
+            "last": "User",
+            "email": "user@example.com",
+            "company": null,
+            "phone": null,
+            "subscribed": false,
+            "account": "ACCOUNT_ID_TEST0000001",
+            "address": {
+              "addressLine1": "1 Test Street",
+              "city": "Testville",
+              "postalCode": "00000",
+              "country": "FR",
+              "display": "1 Test Street, Testville, 00000, FR"
+            }
+          }
+        }
+      ],
+      "tags": {
+        "userEmail": "user@example.com"
+      },
+      "notes": [],
+      "items": [
+        {
+          "product": "osmand-maps",
+          "quantity": 1,
+          "display": "OsmAnd Maps+",
+          "sku": "net.osmand.fastspring.inapp.maps.plus",
+          "imageUrl": "https://example.com/ic_action_osmand_maps_plus.png",
+          "shortDisplay": "OsmAnd Maps+",
+          "subtotal": 58.33,
+          "subtotalDisplay": "58,33 €",
+          "subtotalInPayoutCurrency": 65.2,
+          "subtotalInPayoutCurrencyDisplay": "65,20 $US",
+          "discount": 0,
+          "discountDisplay": "0,00 €",
+          "discountInPayoutCurrency": 0,
+          "discountInPayoutCurrencyDisplay": "0,00 $US",
+          "isAddon": true,
+          "fulfillments": {
+            "instructions": "<p>Vous avez acheté OsmAnd Maps+ via un achat intégré avec votre compte OsmAnd Cloud.</p>"
+          },
+          "driver": {
+            "type": "cross-sell",
+            "path": "osmand-popup-osmand"
+          },
+          "withholdings": {
+            "taxWithholdings": false
+          },
+          "proratedItemChangeAmount": 0,
+          "proratedItemChangeAmountDisplay": "0,00 €",
+          "proratedItemChangeAmountInPayoutCurrency": 0,
+          "proratedItemChangeAmountInPayoutCurrencyDisplay": "0,00 $US",
+          "proratedItemProratedCharge": 0,
+          "proratedItemProratedChargeDisplay": "0,00 €",
+          "proratedItemProratedChargeInPayoutCurrency": 0,
+          "proratedItemProratedChargeInPayoutCurrencyDisplay": "0,00 $US",
+          "proratedItemCreditAmount": 0,
+          "proratedItemCreditAmountDisplay": "0,00 €",
+          "proratedItemCreditAmountInPayoutCurrency": 0,
+          "proratedItemCreditAmountInPayoutCurrencyDisplay": "0,00 $US",
+          "proratedItemTaxAmount": 0,
+          "proratedItemTaxAmountDisplay": "0,00 €",
+          "proratedItemTaxAmountInPayoutCurrency": 0,
+          "proratedItemTaxAmountInPayoutCurrencyDisplay": "0,00 $US",
+          "proratedItemTotal": 0,
+          "proratedItemTotalDisplay": "0,00 €",
+          "proratedItemTotalInPayoutCurrency": 0,
+          "proratedItemTotalInPayoutCurrencyDisplay": "0,00 $US"
+        }
+      ],
+      "returns": [
+        {
+          "return": "RETURN_ID_TEST00000001",
+          "amount": 69.99,
+          "amountDisplay": "69,99 €",
+          "amountInPayoutCurrency": 78.23,
+          "amountInPayoutCurrencyDisplay": "78,23 $US"
+        }
+      ],
+      "action": "order.get",
+      "result": "success"
+    }
+  ]
+}

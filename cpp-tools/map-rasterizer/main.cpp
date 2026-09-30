@@ -87,6 +87,9 @@ void printUsage(const std::string& warning /*= std::string()*/)
     tcout << xT("\t-outputRasterWidth=size_in_pixels") << std::endl;
     tcout << xT("\t-outputRasterHeight=size_in_pixels") << std::endl;
     tcout << xT("\t-outputImageFilename=path/with/filename and/or -outputJSONFilename=path/with/filename (without extension)") << std::endl;
+    tcout << xT("\t[-tiles=path/to/list/of/z/x/y/tiles or -tiles=- to read them from stdin,") << std::endl;
+    tcout << xT("\t -tilesOutputDir=path/to/write/z/x/y.png, -tileSize=256 - batch tile mode,") << std::endl;
+    tcout << xT("\t one image per tile, answering with a 'TILE z/x/y file' line for each of them]") << std::endl;
     tcout << xT("\t[-outputImageFormat=png|jpeg]") << std::endl;
     tcout << xT("\t[-latLon=46.95:7.45 or -target31=x:y]") << std::endl;
     tcout << xT("\t[-targetOnRelief]") << std::endl;
@@ -101,6 +104,7 @@ void printUsage(const std::string& warning /*= std::string()*/)
     tcout << xT("\t[-fov=16.5]") << std::endl;
     tcout << xT("\t[-referenceTileSize=256]") << std::endl;
     tcout << xT("\t[-displayDensityFactor=1.0]") << std::endl;
+    tcout << xT("\t[-noSymbols - no labels and icons, 94% faster per tile]") << std::endl;
     tcout << xT("\t[-locale=en]") << std::endl;
     tcout << xT("\t[-verbose]") << std::endl;
 #if defined(OSMAND_TARGET_OS_linux)

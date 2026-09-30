@@ -50,6 +50,11 @@ public class IndexRegionBboxFilter {
 
 	public boolean shouldFilterMapEntity(Entity entity) {
 		Map<String, String> tags = entity.getTags();
+		// coastlines of other countries come in as members of sea multipolygons (Baffin Bay) and break the
+		// coastline of the map that really owns them
+		if (entity instanceof Way way && "coastline".equals(tags.get("natural"))) {
+			return !isAnyNodeInsideRegionBbox(way);
+		}
 		if (!tags.isEmpty()) {
 			for (Map.Entry<String, String> filter : LOFAR_TELESCOPE_SYMPTOMS.entrySet()) {
 				if (filter.getValue().equals(tags.get(filter.getKey()))) {
@@ -87,6 +92,18 @@ public class IndexRegionBboxFilter {
 		}
 		for (QuadRect quad : inflatedRegionQuads) {
 			if (quad.contains(lon, lat, lon, lat)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private boolean isAnyNodeInsideRegionBbox(Way way) {
+		if (inflatedRegionQuads == null || way.getNodes().isEmpty()) {
+			return true;
+		}
+		for (Node n : way.getNodes()) {
+			if (n != null && isInsideRegionBbox(n.getLatitude(), n.getLongitude())) {
 				return true;
 			}
 		}

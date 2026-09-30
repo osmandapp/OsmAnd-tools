@@ -1,0 +1,100 @@
+{
+  "events": [
+    {
+      "id": "EVENT_ID_TEST00000000000000000",
+      "processed": false,
+      "created": 1788969830326,
+      "type": "return.created",
+      "live": true,
+      "data": {
+        "return": "RETURN_ID_TEST00000000",
+        "quote": null,
+        "reference": "OSMANDBV000000-0000-00000X",
+        "completed": true,
+        "changed": 1788969830027,
+        "changedValue": 1788969830027,
+        "changedInSeconds": 1788969830,
+        "changedDisplay": "09.09.26",
+        "changedDisplayISO8601": "2026-09-09",
+        "live": true,
+        "account": "ACCOUNT_ID_TEST0000000",
+        "currency": "EUR",
+        "payoutCurrency": "USD",
+        "totalReturn": 19.99,
+        "totalReturnDisplay": "19,99 €",
+        "totalReturnInPayoutCurrency": 22.42,
+        "totalReturnInPayoutCurrencyDisplay": "22,42 $",
+        "tax": 3.19,
+        "taxDisplay": "3,19 €",
+        "taxInPayoutCurrency": 3.58,
+        "taxInPayoutCurrencyDisplay": "3,58 $",
+        "subtotal": 16.8,
+        "subtotalDisplay": "16,80 €",
+        "subtotalInPayoutCurrency": 18.84,
+        "subtotalInPayoutCurrencyDisplay": "18,84 $",
+        "totalRefundInPayoutCurrency": 22.42,
+        "payment": {
+          "type": "paypal"
+        },
+        "reason": "Product Not As Expected",
+        "note": "",
+        "type": "RETURN",
+        "refundPerformerType": "sellerApp",
+        "refundSourceComponent": "refund",
+        "original": {
+          "id": "ORDER_ID_TEST000000000",
+          "order": "ORDER_ID_TEST000000000",
+          "reference": "OSMANDBV000000-0000-00000",
+          "account": "ACCOUNT_ID_TEST0000000",
+          "currency": "EUR",
+          "payoutCurrency": "USD",
+          "total": 19.99,
+          "totalDisplay": "19,99 €",
+          "totalInPayoutCurrency": 22.42,
+          "totalInPayoutCurrencyDisplay": "22,42 $",
+          "tax": 3.19,
+          "taxDisplay": "3,19 €",
+          "taxInPayoutCurrency": 3.58,
+          "taxInPayoutCurrencyDisplay": "3,58 $",
+          "subtotal": 16.8,
+          "subtotalDisplay": "16,80 €",
+          "subtotalInPayoutCurrency": 18.84,
+          "subtotalInPayoutCurrencyDisplay": "18,84 $",
+          "notes": [],
+          "tags": {
+            "userEmail": "user@example.com"
+          },
+          "subscriptions": [
+            "SUBSCRIPTION_ID_TEST00"
+          ]
+        },
+        "customer": {
+          "first": "Test",
+          "last": "User",
+          "email": "user@example.com",
+          "company": null,
+          "phone": null,
+          "subscribed": false
+        },
+        "items": [
+          {
+            "product": "osmand-pro-annual",
+            "quantity": 1,
+            "display": "OsmAnd Pro Jährlich",
+            "sku": "net.osmand.fastspring.subscription.pro.annual",
+            "refundType": "Full Refund",
+            "subtotal": 16.8,
+            "subtotalDisplay": "16,80 €",
+            "subtotalInPayoutCurrency": 18.84,
+            "subtotalInPayoutCurrencyDisplay": "18,84 $",
+            "subscription": "SUBSCRIPTION_ID_TEST00",
+            "withholdings": {
+              "taxWithholdings": false
+            }
+          }
+        ],
+        "refundPerformer": "admin@example.com"
+      }
+    }
+  ]
+}

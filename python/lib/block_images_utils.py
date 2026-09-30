@@ -20,6 +20,7 @@ IMAGE_STORAGE_PATH = os.path.join(IMAGE_BASE, f"{IMAGE_DIR}-{IMAGE_WIDTH_MAIN}")
 
 DB = "wiki"
 CLEANUP_TABLES = [
+    {"table": "top_images_score", "field": "imageTitle", "sync": True},  # source of top_images_final, keeps the ban across GenFinal
     {"table": "top_images_dups", "field": "imageTitle", "sync": True},
     {"table": "wiki_images_downloaded", "field": "name", "sync": True},  # exchange 10s - sync 1s
     {"table": "top_images_final", "field": "imageTitle", "sync": False},  # exchange 30s - sync 1s
@@ -27,9 +28,20 @@ CLEANUP_TABLES = [
 ]
 
 SELECT_BLOCKED = "SELECT imageTitle FROM blocked_images"
+PENDING_BLOCKED = "blocked_images_pending"  # banned in the admin, moved into blocked_images by the job before cleanup
+
+
+def process_pending_blocked_images() -> None:
+    pending = ch_query(f"SELECT imageTitle, blockReason FROM {PENDING_BLOCKED}")
+    for reason in set(reason for _, reason in pending):
+        block_images(set(title for title, r in pending if r == reason), reason)
+    if pending:
+        ch_query_params(f"DELETE FROM {PENDING_BLOCKED} WHERE imageTitle IN %(titles)s", {'titles': [title for title, _ in pending]})
+    print(f"Moved pending blocked images into blocked_images ({len(pending)})")
 
 
 def cleanup_tables() -> None:
+    process_pending_blocked_images()
     for t in CLEANUP_TABLES:
         sync = t["sync"]
         field = t["field"]
@@ -90,6 +102,24 @@ def list_blocked(reason: str | bool | None = True) -> None:
         print(f"{blocked_at} {title} ({reason})")
 
     print(f"Total listed: {total}")
+
+
+def _get_images_by_keyword(keyword: str) -> list[str]:
+    query = "SELECT DISTINCT imageTitle FROM wikiimages WHERE imageTitle LIKE %(keyword)s ORDER BY imageTitle"
+    return [row[0] for row in ch_query_params(query, {"keyword": f"%{keyword}%"})]
+
+
+def list_by_keyword(keyword: str) -> None:
+    titles = _get_images_by_keyword(keyword)
+    for title in titles:
+        print(title)
+    print(f"Total listed: {len(titles)}")
+
+
+def ban_by_keyword(keyword: str) -> None:
+    titles = _get_images_by_keyword(keyword)
+    if titles:
+        block_images(set(titles), BLOCK_BANNED)
 
 
 def block_images(files: set[str], reason: str) -> None:

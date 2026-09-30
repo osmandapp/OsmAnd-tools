@@ -48,6 +48,7 @@ import net.osmand.search.core.TopIndexFilter;
 import net.osmand.search.core.spatial.SpatialPoiSearch;
 import net.osmand.search.core.spatial.SpatialSearchContext;
 import net.osmand.search.core.spatial.SpatialSearchResult;
+import net.osmand.search.core.spatial.test.SpatialResultFormatter;
 import net.osmand.search.core.spatial.SpatialTextSearch;
 import net.osmand.search.core.spatial.SpatialTextSearch.SpatialSearchResults;
 import net.osmand.search.core.spatial.SpatialTextSearch.SpatialTextSearchSettings;
@@ -63,6 +64,8 @@ public class SpatialSearchService {
 	private static final Log LOGGER = LogFactory.getLog(SpatialSearchService.class);
 
 	public static final int SPATIAL_PREFIX_CACHE_LIMIT = 4_000;
+	// rows sent to the client: "restaurant" in Cologne had 180K results and 378 MB
+	private static final int MAX_SPATIAL_FEATURES = 1000;
 	private static final int SPATIAL_SEARCH_THREADS = 4;
 	private static final int SPATIAL_AUTOCOMPLETE_THREADS = 3;
 	private static final int SPATIAL_SEARCH_QUEUE = 8;
@@ -117,7 +120,8 @@ public class SpatialSearchService {
 		public Map<String, Object> info = new LinkedHashMap<>();
 	}
 
-	public record SpatialResults(SpatialSearchResults results, SpatialSearchContext.SpatialSearchStats stats, int obfCount) {
+	public record SpatialResults(SpatialSearchResults results, SpatialSearchContext.SpatialSearchStats stats, int obfCount,
+	                             SpatialResultFormatter formatter) {
 	}
 
 	@PostConstruct
@@ -267,6 +271,9 @@ public class SpatialSearchService {
 				SpatialPoiSearch poiTypeSearch = getSpatialPoiTypeSearch();
 				Map<MapObject, Feature> amenityFeatureCache = new IdentityHashMap<>();
 				for (SpatialSearchResult r : res.mainResults) {
+					if (response.features.size() >= MAX_SPATIAL_FEATURES) {
+						break; // results are sorted: nobody scrolls past them, "restaurant" sent 300+ MB
+					}
 					Feature f = null;
 					List<MapObject> objs = r.getObjects();
 					if (r.isPoiCategory()) {

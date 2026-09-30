@@ -173,7 +173,8 @@ public class OceanTilesCreator {
                 OceanTileInfo oc = map.get(key);
                 int vl = 0;
                 if(oc == null || oc.type == OceanTileInfo.UNDEFINED) {
-                    vl = previousSea ? SEA : LAND;
+                    // south of -84.35 is Antarctica: the antimeridian cut edges flip the row parity there
+                    vl = previousSea && y < antarcticaStart ? SEA : LAND;
                 } else {
                     vl = 3;
                     boolean odd = oc.linesIntersectMedian % 2 == 0;

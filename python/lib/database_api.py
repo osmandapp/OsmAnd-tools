@@ -186,6 +186,26 @@ def scan_and_populate_db(cache_root_folder: str) -> Set[str]:
     return found_names
 
 
+def populate_failed_cache_from_db(retry_days: int) -> Set[str]:
+    query = f"SELECT name FROM wiki_images_failed GROUP BY name HAVING max(timestamp) > now() - INTERVAL {retry_days} DAY"
+    failed_names = set()
+    try:
+        with ch_client() as client:
+            failed_names = {row[0] for row in ch_query(query, client)}
+        print(f"Populated failed cache from DB with {len(failed_names)} entries.")
+    except Exception as e:
+        print(f"Error populating failed cache from DB: {e}")
+    return failed_names
+
+
+def insert_failed_image(name: str, status: int):
+    try:
+        ch_insert('wiki_images_failed', [[name, status, datetime.datetime.now()]],
+                  column_names=['name', 'status', 'timestamp'])
+    except Exception as e:
+        print(f"Error inserting failed record for {name}: {e}")
+
+
 def insert_downloaded_image(name: str, folder: str, timestamp: datetime.datetime, filesize: int,
                             mediaId: int, namspace: int):
     """Inserts a record for a newly downloaded image."""

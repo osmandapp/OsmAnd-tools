@@ -1,0 +1,97 @@
+{
+  "events": [
+    {
+      "id": "EVENT_ID_TEST00000000000000001",
+      "processed": false,
+      "created": 1788525745728,
+      "type": "return.created",
+      "live": true,
+      "data": {
+        "return": "RETURN_ID_TEST00000001",
+        "quote": null,
+        "reference": "OSMANDBV000000-0000-00001X",
+        "completed": true,
+        "changed": 1788525745471,
+        "changedValue": 1788525745471,
+        "changedInSeconds": 1788525745,
+        "changedDisplay": "04/09/2026",
+        "changedDisplayISO8601": "2026-09-04",
+        "live": true,
+        "account": "ACCOUNT_ID_TEST0000001",
+        "currency": "EUR",
+        "payoutCurrency": "USD",
+        "totalReturn": 69.99,
+        "totalReturnDisplay": "69,99 €",
+        "totalReturnInPayoutCurrency": 78.44,
+        "totalReturnInPayoutCurrencyDisplay": "78,44 $US",
+        "tax": 11.66,
+        "taxDisplay": "11,66 €",
+        "taxInPayoutCurrency": 13.07,
+        "taxInPayoutCurrencyDisplay": "13,07 $US",
+        "subtotal": 58.33,
+        "subtotalDisplay": "58,33 €",
+        "subtotalInPayoutCurrency": 65.37,
+        "subtotalInPayoutCurrencyDisplay": "65,37 $US",
+        "totalRefundInPayoutCurrency": 78.44,
+        "payment": {
+          "type": "applepay",
+          "creditcard": "mastercard"
+        },
+        "reason": "Product Not As Expected",
+        "note": "",
+        "type": "RETURN",
+        "refundPerformerType": "sellerApp",
+        "refundSourceComponent": "refund",
+        "original": {
+          "id": "ORDER_ID_INAPP_TEST000",
+          "order": "ORDER_ID_INAPP_TEST000",
+          "reference": "OSMANDBV000000-0000-00001",
+          "account": "ACCOUNT_ID_TEST0000001",
+          "currency": "EUR",
+          "payoutCurrency": "USD",
+          "total": 69.99,
+          "totalDisplay": "69,99 €",
+          "totalInPayoutCurrency": 78.44,
+          "totalInPayoutCurrencyDisplay": "78,44 $US",
+          "tax": 11.66,
+          "taxDisplay": "11,66 €",
+          "taxInPayoutCurrency": 13.07,
+          "taxInPayoutCurrencyDisplay": "13,07 $US",
+          "subtotal": 58.33,
+          "subtotalDisplay": "58,33 €",
+          "subtotalInPayoutCurrency": 65.37,
+          "subtotalInPayoutCurrencyDisplay": "65,37 $US",
+          "notes": [],
+          "tags": {
+            "userEmail": "user@example.com"
+          }
+        },
+        "customer": {
+          "first": "Test",
+          "last": "User",
+          "email": "user@example.com",
+          "company": null,
+          "phone": null,
+          "subscribed": false
+        },
+        "items": [
+          {
+            "product": "osmand-maps",
+            "quantity": 1,
+            "display": "OsmAnd Maps+",
+            "sku": "net.osmand.fastspring.inapp.maps.plus",
+            "refundType": "Full Refund",
+            "subtotal": 58.33,
+            "subtotalDisplay": "58,33 €",
+            "subtotalInPayoutCurrency": 65.37,
+            "subtotalInPayoutCurrencyDisplay": "65,37 $US",
+            "withholdings": {
+              "taxWithholdings": false
+            }
+          }
+        ],
+        "refundPerformer": "admin@example.com"
+      }
+    }
+  ]
+}

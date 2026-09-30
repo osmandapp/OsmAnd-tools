@@ -297,6 +297,11 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
         }
 
 
+        // the coastline is built from the ways tagged natural=coastline, a multipolygon would draw it twice
+        // and take the coastline type away from its ways
+        if ("coastline".equals(tags.get(OSMTagKey.NATURAL.getValue()))) {
+            tags.remove(OSMTagKey.NATURAL.getValue());
+        }
         MultipolygonBuilder original = new MultipolygonBuilder();
         original.setId(e.getId());
         boolean climbing = MultipolygonBuilder.isClimbingMultipolygon(e);
