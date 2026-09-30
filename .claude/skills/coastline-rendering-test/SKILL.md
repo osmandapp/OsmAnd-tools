@@ -7,7 +7,7 @@ description: Run or debug the coastline rendering test (CoastlineRenderingTester
 
 Renders tiles with the legacy native renderer (v1) or with OsmAndCore (v2, `-renderer=opengl`) and
 compares the water mask against the reference `https://tile.osmand.net/hd/{z}/{x}/{y}.png`. Exit
-code 0 = no failed tile above `-failAbove` (default 0.1, i.e. 10% of the tile), 2 = a tile above it
+code 0 = no failed tile above `-failAbove` (default 0.05, i.e. 5% of the tile), 2 = a tile above it
 or a renderer crash, 1 = could not run. Smaller failures are still in the report, they just do not
 turn the build red. Writes `index.html` + `summary.json`
 into the output folder, images for failed tiles only.

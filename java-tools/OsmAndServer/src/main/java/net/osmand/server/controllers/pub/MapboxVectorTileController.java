@@ -49,8 +49,14 @@ public class MapboxVectorTileController {
 
 	@RequestMapping(path = "/{z}/{x}/{y}.mvt", produces = MediaType.APPLICATION_PROTOBUF_VALUE)
 	public ResponseEntity<?> getTile(@PathVariable int z, @PathVariable int x, @PathVariable int y,
-			@RequestParam(required = false, defaultValue = "true") boolean cache)
+			@RequestParam(defaultValue = "true") boolean cache, @RequestParam(defaultValue = "0") int shift)
 			throws IOException {
+		if (shift < MapboxVectorTile.MIN_SHIFT || shift > MapboxVectorTile.MAX_SHIFT) {
+			return errorConfig("shift must be between " + MapboxVectorTile.MIN_SHIFT + " and " + MapboxVectorTile.MAX_SHIFT);
+		}
+		if (z < 0 || z > MapboxVectorTile.MAX_ZOOM || x < 0 || y < 0 || x >= (1 << z) || y >= (1 << z)) {
+			return errorConfig("Invalid tile coordinates");
+		}
 		if (!osmAndMapsService.validateAndInitConfig()) {
 			return errorConfig("Tile service is not initialized");
 		}
@@ -58,10 +64,11 @@ public class MapboxVectorTileController {
 			return errorConfig("Tile service is not initialized: " + osmAndMapsService.validateNativeLib());
 		}
 
-		String tileId = config.createTileId("vector", x, y, z, -1, -1);
-        MapboxVectorTile tile = tileMemoryCache.getTile(tileId, k -> new MapboxVectorTile(config, x, y, z));
+		int effectiveShift = MapboxVectorTile.normalizeShift(z, shift);
+		String tileId = config.createTileId(MapboxVectorTile.getCacheNamespace(effectiveShift), x, y, z, -1, -1);
+        MapboxVectorTile tile = tileMemoryCache.getTile(tileId, k -> new MapboxVectorTile(config, x, y, z, effectiveShift));
         // for testing
-        //MapboxVectorTile tile = new MapboxVectorTile(config, x, y, z);
+        //MapboxVectorTile tile = new MapboxVectorTile(config, x, y, z, shift);
         tileMemoryCache.conditionalCleanupCache();
 		byte[] data = cache ? tile.getCacheRuntimeTile() : null;
 		if (cache) {
@@ -103,42 +110,32 @@ public class MapboxVectorTileController {
 			for (File file : files) {
 				if (file.isDirectory()) {
 					cleanUpDirectory(file);
-				} else if (file.isFile() && isValidMapboxVectorTileFile(file)) {
-					int zoom = parseZoomFromFileName(file.getName());
+				} else if (file.isFile() && file.getName().endsWith(".mvt")) {
+					int zoom = parseZoomFromCachePath(file);
 					if (zoom == -1) {
 						continue;
 					}
 					if ((zoom <= 7 && now - file.lastModified() >= CLEANUP_CACHE_BEFORE_ZOOM_7) ||
 							(zoom > 7 && now - file.lastModified() >= CLEANUP_CACHE_AFTER_ZOOM_7)) {
 						try {
-							Path filePath = file.toPath();
-							Files.delete(filePath);
+							Files.delete(file.toPath());
 						} catch (IOException e) {
 							LOGGER.warn("Failed to delete file: " + file.getAbsolutePath(), e);
 						}
-
 					}
 				}
 			}
 		}
 	}
 
-	private int parseZoomFromFileName(String fileName) {
-		String[] parts = fileName.split(File.separator);
-		if (parts.length < 2) {
+	private int parseZoomFromCachePath(File file) {
+		try {
+			Path relative = Path.of(config.mvtsLocation).relativize(file.toPath());
+			int zoom = Integer.parseInt(relative.getName(1).toString());
+			return zoom >= 0 && zoom <= MapboxVectorTile.MAX_ZOOM ? zoom : -1;
+		} catch (IllegalArgumentException e) {
 			return -1;
 		}
-		for (int i = 0; i < parts.length; i++) {
-			if (parts[i].equals("mvts") && i + 2 < parts.length) {
-				return Integer.parseInt(parts[i + 2]);
-			}
-		}
-		return -1;
-	}
-
-	private boolean isValidMapboxVectorTileFile(File file) {
-		String name = file.getName();
-		return name.endsWith(".mvt") && name.contains("mvts");
 	}
 
 	private byte[] getTileFromService(MapboxVectorTile tile) throws IOException {
@@ -147,7 +144,7 @@ public class MapboxVectorTileController {
 		if (DEBUG) {
 			LOGGER.info("Start rendering tile [" + tile.getTileId() + "] on thread: " + Thread.currentThread().getId());
 		}
-        Future<byte[]> future = executor.submit(() -> osmAndMapsService.renderMapboxVectorTile(tile.z, tile.x, tile.y));
+        Future<byte[]> future = executor.submit(() -> osmAndMapsService.renderMapboxVectorTile(tile.z, tile.x, tile.y, tile.shift));
         byte[] data;
 		try {
             data = future.get(30, TimeUnit.SECONDS);

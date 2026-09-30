@@ -142,7 +142,7 @@ import net.osmand.util.MapsCollection;
  * <li>{@code threads} - parallel reference tile downloads, default 16. The legacy renderer renders
  * that many tiles at once too (at most one per processor): the native library keeps global state,
  * so every thread gets its own copy of it, loaded by its own class loader, with its own maps.
- * {@code -renderer=opengl} renders one tile at a time;</li>
+ * {@code -renderer=opengl} runs an eyepiece process per thread;</li>
  * <li>{@code download} - {@code false} to never download a missing map;</li>
  * <li>{@code referenceDir} - where the downloaded reference tiles are kept, by default
  * {@code coastline-reference} in the current folder. It is reused by every run, so a rerun only
@@ -196,8 +196,20 @@ public class CoastlineRenderingTester {
 	private static final int[] OSMAND_ICE_COLORS = { 0xE4FDFF };
 	private static final int[] REFERENCE_ICE_COLORS = { 0xddecec };
 
-	/** Default of {@code failAbove}: failed tiles up to 10% of water difference do not fail the run. */
-	private static final double DEFAULT_FAIL_ABOVE = 0.1;
+	/**
+	 * Land cover both styles draw where the sea meets the land - sand, beach, tidal rock, mud, tidal
+	 * flats - is ignored on both sides like the ice: the styles paint it differently over the sea,
+	 * and the coastline is still checked all around it. The colors are measured on rendered tiles
+	 * (the native renderer rounds the style colors): sand and shoals, beach, tidal rock, mud, the
+	 * wetland_tidalflat shader, and the light water and hatch of reefs of default.render.xml; sand,
+	 * beach and bare ground of openstreetmap-carto.
+	 */
+	private static final int[] OSMAND_LANDCOVER_COLORS = { 0xffe3bd, 0xfff3bd, 0xbde3ef, 0xcecac5, 0xbdc2c5,
+			0xa5c2ce, 0x9c927b, 0x5ad2e6, 0x6b82c5 };
+	private static final int[] REFERENCE_LANDCOVER_COLORS = { 0xf5e9c6, 0xfff1ba, 0xeee5dc };
+
+	/** Default of {@code failAbove}: failed tiles up to 5% of water difference do not fail the run. */
+	private static final double DEFAULT_FAIL_ABOVE = 0.05;
 
 	/** Max per channel difference to still treat a pixel as water. */
 	private static final int COLOR_TOLERANCE = 10;
@@ -209,12 +221,14 @@ public class CoastlineRenderingTester {
 	private static final int DEFAULT_RANDOM_TILES_K = 10;
 
 	/**
-	 * Areas openstreetmap-carto draws under the sea or not at all: over the sea the reference shows
-	 * water, while OsmAnd fills them (islands mapped with their lagoon, reserves tagged desert, tidal
-	 * sand, mud and rock). Hiding them can't make water out of land - the land is still under them.
+	 * Areas openstreetmap-carto does not fill over the sea, while OsmAnd does: islands mapped with
+	 * their lagoon, reserves tagged desert, parks and archaeological sites with their bay, offshore oil
+	 * fields tagged industrial, land reclamation sites tagged construction with their canals (Jeddah).
+	 * Hiding them can't make water out of land - the land is still under them. Land cover both styles
+	 * draw is checked instead, see OSMAND_LANDCOVER_COLORS.
 	 */
-	static final String DEFAULT_HIDE = "place=island,place=islet,natural=desert,natural=sand,natural=beach,"
-			+ "natural=mud,natural=bare_rock,natural=shoal,natural=reef,natural=wetland";
+	static final String DEFAULT_HIDE = "place=island,place=islet,natural=desert,leisure=park,historic=archaeological_site,"
+			+ "landuse=industrial,landuse=construction";
 
 	/** How the random tiles are split: coastal, open ocean, inland. */
 	private static final int SHARE_COASTAL = 80, SHARE_OCEAN = 10;
@@ -495,13 +509,16 @@ public class CoastlineRenderingTester {
 	private long lastFlush;
 	private NativeJavaRendering renderer;
 	private EyePieceTileRenderer eyePiece;
+	private java.util.function.Function<File, EyePieceTileRenderer> newEyePiece;
+	/** The eyepiece processes of the render pool, one per thread. */
+	private final List<EyePieceTileRenderer> eyePieceWorkers = new java.util.concurrent.CopyOnWriteArrayList<>();
 	private final Set<String> initializedMaps = new LinkedHashSet<>();
 	private final List<TileResult> reported = new ArrayList<>();
 	private ExecutorService downloadPool;
-	/** Legacy tiles rendered ahead of the comparison, null when rendering is single threaded. */
+	/** Tiles rendered ahead of the comparison, null when rendering is single threaded. */
 	private ExecutorService renderPool;
 	private int renderThreads = 1;
-	/** Idle copies of the native library, each one used by a single thread at a time. */
+	/** Idle renderers (copies of the native library or eyepiece processes), each one used by a single thread at a time. */
 	private final java.util.concurrent.BlockingQueue<java.util.function.BiFunction<int[], Collection<String>, BufferedImage>> renderWorkers =
 			new java.util.concurrent.LinkedBlockingQueue<>();
 	private final Map<String, Future<PreparedTile>> pendingRenders = new HashMap<>();
@@ -592,20 +609,18 @@ public class CoastlineRenderingTester {
 		// that reconnects and does a TLS handshake per tile
 		System.setProperty("http.maxConnections", String.valueOf(Math.max(5, threads)));
 		downloadPool = Executors.newFixedThreadPool(threads);
-		if (!openGl) {
-			int n = Math.max(1, Math.min(threads, Runtime.getRuntime().availableProcessors()));
-			if (n > 1) {
-				renderThreads = n;
-				renderPool = Executors.newFixedThreadPool(renderThreads);
-				// each copy initializes its own maps, about a second - all of them at once
-				List<Future<java.util.function.BiFunction<int[], Collection<String>, BufferedImage>>> created = new ArrayList<>();
-				for (int i = 0; i < n; i++) {
-					int index = i;
-					created.add(renderPool.submit(() -> newRenderWorker(index)));
-				}
-				for (Future<java.util.function.BiFunction<int[], Collection<String>, BufferedImage>> f : created) {
-					renderWorkers.add(f.get());
-				}
+		int n = Math.max(1, Math.min(threads, Runtime.getRuntime().availableProcessors()));
+		if (n > 1) {
+			renderThreads = n;
+			renderPool = Executors.newFixedThreadPool(renderThreads);
+			// each copy initializes its own maps, about a second - all of them at once
+			List<Future<java.util.function.BiFunction<int[], Collection<String>, BufferedImage>>> created = new ArrayList<>();
+			for (int i = 0; i < n; i++) {
+				int index = i;
+				created.add(renderPool.submit(() -> newRenderWorker(index)));
+			}
+			for (Future<java.util.function.BiFunction<int[], Collection<String>, BufferedImage>> f : created) {
+				renderWorkers.add(f.get());
 			}
 		}
 		System.out.println("Render threads : " + renderThreads);
@@ -639,6 +654,7 @@ public class CoastlineRenderingTester {
 			if (eyePiece != null) {
 				eyePiece.close();
 			}
+			eyePieceWorkers.forEach(EyePieceTileRenderer::close);
 		}
 		result.loadedMaps = initializedMaps.size();
 		recomputeTotals();
@@ -1006,6 +1022,9 @@ public class CoastlineRenderingTester {
 				? "drawn" : "off, they are 94% of the time of a tile (-symbols=true draws them)"));
 		eyePiece = new EyePieceTileRenderer(binary, stylesPath, styleName, tileSize, symbols, outputDir,
 				Boolean.parseBoolean(opt("eyepieceLog", "false")));
+		File styles = stylesPath;
+		newEyePiece = dir -> new EyePieceTileRenderer(binary, styles, styleName, tileSize, symbols, dir,
+				Boolean.parseBoolean(opt("eyepieceLog", "false")));
 		if (Boolean.parseBoolean(opt("eyepieceCheck", "true"))) {
 			eyePiece.checkBatchTileMode();
 		}
@@ -1303,8 +1322,9 @@ public class CoastlineRenderingTester {
 			renderedWater = waterMask(rendered, OSMAND_WATER_COLORS);
 			referenceWater = waterMask(this.reference, REFERENCE_WATER_COLORS);
 			boolean[] shaded = dilate(waterMask(rendered, SHADED_WATER_COLORS), w, h, SHADED_WATER_SPREAD_PX);
-			boolean[] ice = dilate(or(waterMask(rendered, OSMAND_ICE_COLORS),
-					waterMask(this.reference, REFERENCE_ICE_COLORS)), w, h, maskTolerance);
+			boolean[] ice = dilate(or(or(waterMask(rendered, OSMAND_ICE_COLORS),
+					waterMask(this.reference, REFERENCE_ICE_COLORS)), or(waterMask(rendered, OSMAND_LANDCOVER_COLORS),
+					waterMask(this.reference, REFERENCE_LANDCOVER_COLORS))), w, h, maskTolerance);
 			boolean[] extraAll = and(and(erode(renderedWater, w, h, maskTolerance),
 					not(dilate(referenceWater, w, h, maskTolerance))), not(ice));
 			extra = and(extraAll, not(shaded));
@@ -1675,6 +1695,23 @@ public class CoastlineRenderingTester {
 	 */
 	private java.util.function.BiFunction<int[], Collection<String>, BufferedImage> newRenderWorker(int index)
 			throws Exception {
+		if (openGl) {
+			// a process of its own, with its own maps and tiles folders
+			EyePieceTileRenderer e = newEyePiece.apply(new File(outputDir, "opengl-worker-" + index));
+			eyePieceWorkers.add(e);
+			return (tile, current) -> {
+				List<File> maps = new ArrayList<>();
+				for (String name : current) {
+					maps.add(new File(mapsDir, name));
+				}
+				try {
+					e.setMaps(maps);
+					return e.render(tile[0], tile[1], tile[2]);
+				} catch (IOException ex) {
+					throw new java.io.UncheckedIOException(ex);
+				}
+			};
+		}
 		File lib = findNativeLibrary();
 		Map<String, String> opts = new HashMap<>(options);
 		// the bundled library is unpacked into a new temporary file on every load anyway
@@ -2091,6 +2128,9 @@ public class CoastlineRenderingTester {
 		result.staleReferences = 0;
 		result.renderErrors = 0;
 		result.rendererDeaths = eyePiece == null ? 0 : eyePiece.deaths();
+		for (EyePieceTileRenderer e : eyePieceWorkers) {
+			result.rendererDeaths += e.deaths();
+		}
 		Map<String, GroupTotals> byGroup = new LinkedHashMap<>();
 		for (CaseStats s : result.cases) {
 			result.tiles += s.tiles;
