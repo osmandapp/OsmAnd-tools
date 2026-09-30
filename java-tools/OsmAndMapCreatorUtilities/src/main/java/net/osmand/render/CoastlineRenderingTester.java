@@ -223,11 +223,12 @@ public class CoastlineRenderingTester {
 	/**
 	 * Areas openstreetmap-carto does not fill over the sea, while OsmAnd does: islands mapped with
 	 * their lagoon, reserves tagged desert, parks and archaeological sites with their bay, offshore oil
-	 * fields tagged industrial. Hiding them can't make water out of land - the land is still under
-	 * them. Land cover both styles draw is checked instead, see OSMAND_LANDCOVER_COLORS.
+	 * fields tagged industrial, land reclamation sites tagged construction with their canals (Jeddah).
+	 * Hiding them can't make water out of land - the land is still under them. Land cover both styles
+	 * draw is checked instead, see OSMAND_LANDCOVER_COLORS.
 	 */
 	static final String DEFAULT_HIDE = "place=island,place=islet,natural=desert,leisure=park,historic=archaeological_site,"
-			+ "landuse=industrial";
+			+ "landuse=industrial,landuse=construction";
 
 	/** How the random tiles are split: coastal, open ocean, inland. */
 	private static final int SHARE_COASTAL = 80, SHARE_OCEAN = 10;
