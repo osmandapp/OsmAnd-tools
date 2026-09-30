@@ -195,7 +195,7 @@ public class MapAddressLayer implements MapPanelLayer {
 
 		GeocodingUtilities su = new GeocodingUtilities();
 		List<GeocodingResult> res = su.reverseGeocodingSearch(ctx, lat, lon, false);
-		List<GeocodingResult> complete = su.sortGeocodingResults(list, res);
+		List<GeocodingResult> complete = su.findAddresses(list, res);
 //		complete.addAll(res);
 //		Collections.sort(complete, GeocodingUtilities.DISTANCE_COMPARATOR);
 		long lid = -1;
