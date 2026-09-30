@@ -93,7 +93,6 @@ public class OsmGpxController {
 
 	public record RoutesListRequest(
 			List<String> activityArr,
-			Integer year,
 			String dateFrom,
 			String dateTo,
 			String minLat,
@@ -147,7 +146,7 @@ public class OsmGpxController {
 
 		appendSkipInvalidActivities(req.activityArr(), conditions, params);
 
-		error = filterByDate(req.year(), req.dateFrom(), req.dateTo(), params, conditions);
+		error = filterByDate(req.dateFrom(), req.dateTo(), params, conditions);
 		if (error != null) {
 			return error;
 		}
@@ -237,7 +236,6 @@ public class OsmGpxController {
 	                                        @RequestParam String maxLat,
 	                                        @RequestParam String minLon,
 	                                        @RequestParam String maxLon,
-	                                        @RequestParam(required = false) Integer year,
 	                                        @RequestParam(required = false) String dateFrom,
 	                                        @RequestParam(required = false) String dateTo,
 	                                        @RequestParam(required = false) List<String> activityArr) {
@@ -255,7 +253,7 @@ public class OsmGpxController {
 
 		appendSkipInvalidActivities(activityArr, conditions, params);
 
-		error = filterByDate(year, dateFrom, dateTo, params, conditions);
+		error = filterByDate(dateFrom, dateTo, params, conditions);
 		if (error != null) {
 			return error;
 		}
@@ -325,7 +323,6 @@ public class OsmGpxController {
 	                                      @RequestParam String maxLat,
 	                                      @RequestParam String minLon,
 	                                      @RequestParam String maxLon,
-	                                      @RequestParam(required = false) Integer year,
 	                                      @RequestParam(required = false) String dateFrom,
 	                                      @RequestParam(required = false) String dateTo,
 	                                      @RequestParam(required = false) List<String> activityArr) {
@@ -343,7 +340,7 @@ public class OsmGpxController {
 
 		appendSkipInvalidActivities(activityArr, conditions, params);
 
-		error = filterByDate(year, dateFrom, dateTo, params, conditions);
+		error = filterByDate(dateFrom, dateTo, params, conditions);
 		if (error != null) {
 			return error;
 		}
@@ -376,7 +373,6 @@ public class OsmGpxController {
 	                                            @RequestParam String maxLat,
 	                                            @RequestParam String minLon,
 	                                            @RequestParam String maxLon,
-	                                            @RequestParam(required = false) Integer year,
 	                                            @RequestParam(required = false) String dateFrom,
 	                                            @RequestParam(required = false) String dateTo) {
 		if (!config.osmgpxInitialized()) {
@@ -393,7 +389,7 @@ public class OsmGpxController {
 
 		conditions.append(" AND m.activity IS NOT NULL AND m.activity <> ''");
 
-		error = filterByDate(year, dateFrom, dateTo, params, conditions);
+		error = filterByDate(dateFrom, dateTo, params, conditions);
 		if (error != null) {
 			return error;
 		}
@@ -700,12 +696,7 @@ public class OsmGpxController {
 	}
 
 	// dateFrom, dateTo: YYYY-MM of the OSM upload date, both months included
-	private ResponseEntity<String> filterByDate(Integer year, String dateFrom, String dateTo, List<Object> params,
-	                                            StringBuilder conditions) {
-		if (year != null) {
-			conditions.append(" AND extract(year from m.date) = ?");
-			params.add(year);
-		}
+	private ResponseEntity<String> filterByDate(String dateFrom, String dateTo, List<Object> params, StringBuilder conditions) {
 		try {
 			if (!Algorithms.isEmpty(dateFrom)) {
 				conditions.append(" AND m.date >= ?");
