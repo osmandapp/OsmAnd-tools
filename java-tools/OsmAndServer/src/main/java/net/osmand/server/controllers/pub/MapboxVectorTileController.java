@@ -49,8 +49,7 @@ public class MapboxVectorTileController {
 
 	@RequestMapping(path = "/{z}/{x}/{y}.mvt", produces = MediaType.APPLICATION_PROTOBUF_VALUE)
 	public ResponseEntity<?> getTile(@PathVariable int z, @PathVariable int x, @PathVariable int y,
-			@RequestParam(required = false, defaultValue = "true") boolean cache,
-			@RequestParam(required = false, defaultValue = "0") int shift)
+			@RequestParam(defaultValue = "true") boolean cache, @RequestParam(defaultValue = "0") int shift)
 			throws IOException {
 		if (shift < MapboxVectorTile.MIN_SHIFT || shift > MapboxVectorTile.MAX_SHIFT) {
 			return errorConfig("shift must be between " + MapboxVectorTile.MIN_SHIFT + " and " + MapboxVectorTile.MAX_SHIFT);
