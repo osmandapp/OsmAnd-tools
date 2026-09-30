@@ -1024,7 +1024,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				List<GeocodingResult> res = geocodingUtilities.reverseGeocodingSearch(geocodingCtx,
 						latLon.getLatitude(), latLon.getLongitude(), false);
 				if (settings.poiGeocodingPrecise) {
-					res = geocodingUtilities.sortGeocodingResults(Collections.singletonList(geoReader), res);
+					res = geocodingUtilities.findAddresses(Collections.singletonList(geoReader), res);
 				}
 				geocodingCnt++;
 				if (res.size() > 0 && res.get(0).getDistance() < GEOCODING_DISTANCE) {
