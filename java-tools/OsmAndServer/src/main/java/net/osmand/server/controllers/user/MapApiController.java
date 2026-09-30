@@ -26,6 +26,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
 import net.osmand.map.OsmandRegions;
+import net.osmand.purchases.FastSpringHelper;
 import net.osmand.server.api.services.*;
 import net.osmand.server.api.services.search.UserDataSearchService;
 import net.osmand.shared.gpx.GpxFile;
@@ -37,6 +38,7 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.*;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -706,6 +708,29 @@ public class MapApiController {
 		info.put("regtime", pu.regTime != null ? String.valueOf(pu.regTime.getTime()) : "");
 
 		return ResponseEntity.ok(gson.toJson(Collections.singletonMap(INFO_KEY, info)));
+	}
+
+	@PostMapping(path = {"/fastspring-session"})
+	public ResponseEntity<String> createFastSpringSession(@RequestParam String id, @RequestParam String type,
+	                                                      @RequestParam(defaultValue = "false") boolean test) throws IOException {
+		CloudUserDevice dev = osmAndMapsService.checkUser();
+		if (dev == null) {
+			return userdataService.tokenNotValidResponse();
+		}
+		FastSpringHelper.FastSpringProduct product = userSubService.findFastSpringProduct(id, type, test);
+		if (product == null) {
+			return ResponseEntity.badRequest().body("Unknown product " + id + " " + type);
+		}
+		CloudUsersRepository.CloudUser pu = usersRepository.findById(dev.userid);
+		if (userSubService.hasActivePurchase(pu, product.sku())) {
+			return ResponseEntity.status(HttpStatus.CONFLICT).body("Already purchased " + id + " " + type);
+		}
+		String sessionId = FastSpringHelper.createSession(pu.email, product.path());
+		if (sessionId == null) {
+			return ResponseEntity.internalServerError().body("Failed to create checkout session");
+		}
+
+		return ResponseEntity.ok(gson.toJson(Collections.singletonMap("id", sessionId)));
 	}
 
 	@PostMapping(path = {"/auth/send-code"})

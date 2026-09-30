@@ -61,6 +61,7 @@ public class UserSubscriptionService {
 	private static final String PURCHASE_STORE_KEY = "store";
 	private static final String BILLING_DATE_KEY = "billingDate";
 	private static final String PURCHASE_TYPE_KEY = "type";
+	private static final String PURCHASE_TYPE_ONE_TIME = "one-time";
 	private static final String START_TIME_KEY = "start_time";
 	private static final String EXPIRE_TIME_KEY = "expire_time";
 	private static final String VALID_KEY = "valid";
@@ -705,7 +706,7 @@ public class UserSubscriptionService {
 					subInfo.put(PURCHASE_TYPE_KEY, getSubscriptionType(s));
 				} else {
 					subInfo.put(PURCHASE_NAME_KEY, subBaseData.name());
-					subInfo.put(PURCHASE_TYPE_KEY, subBaseData.duration() >= 12 ? "annual" : "monthly");
+					subInfo.put(PURCHASE_TYPE_KEY, getPurchaseType(s.sku));
 				}
 				subInfo.put(PURCHASE_STORE_KEY, parsePlatform(PurchaseHelper.getPlatformBySku(s.sku)));
 				subInfo.put(BILLING_DATE_KEY, getSubscriptionBillingDate(s));
@@ -713,6 +714,41 @@ public class UserSubscriptionService {
 			});
 		}
 		return subsInfo;
+	}
+
+	public String getPurchaseType(String sku) {
+		PurchasesDataLoader.Subscription subscription = purchasesDataLoader.getSubscriptions().get(sku);
+		if (subscription != null) {
+			return subscription.duration() >= 12 ? "annual" : "monthly";
+		}
+
+		return purchasesDataLoader.getInApps().containsKey(sku) ? PURCHASE_TYPE_ONE_TIME : null;
+	}
+
+	public FastSpringHelper.FastSpringProduct findFastSpringProduct(String id, String type, boolean test) {
+		for (FastSpringHelper.FastSpringProduct p : FastSpringHelper.products) {
+			if (p.id().equals(id) && p.isTest() == test && type.equals(getPurchaseType(p.sku()))) {
+				return p;
+			}
+		}
+
+		return null;
+	}
+
+	public boolean hasActivePurchase(CloudUsersRepository.CloudUser pu, String sku) {
+		String type = getPurchaseType(sku);
+		if (type == null) {
+			return false;
+		}
+		Map<String, PurchasesDataLoader.Subscription> subMap = purchasesDataLoader.getSubscriptions();
+		Map<String, PurchasesDataLoader.InApp> inappMap = purchasesDataLoader.getInApps();
+		String name = subMap.containsKey(sku) ? subMap.get(sku).name() : inappMap.get(sku).name();
+		List<Map<String, String>> purchases = new ArrayList<>(getAllSubscriptionsInfo(pu, subMap));
+		purchases.addAll(getAllInAppsInfo(pu, inappMap));
+
+		return purchases.stream().anyMatch(p -> "true".equals(p.get(VALID_KEY))
+				&& name.equals(p.get(PURCHASE_NAME_KEY))
+				&& type.equals(p.getOrDefault(PURCHASE_TYPE_KEY, PURCHASE_TYPE_ONE_TIME)));
 	}
 
 	private List<Map<String, String>> getAllInAppsInfo(CloudUsersRepository.CloudUser pu, Map<String, PurchasesDataLoader.InApp> inappMap) {

@@ -66,6 +66,20 @@ public class FastSpringController {
 	private static final String SKU_OSMAND_PRO_XV = "osmand_pro_xv";
 
 
+	@GetMapping("/products")
+	@ResponseBody
+	public ResponseEntity<String> products(@RequestParam(defaultValue = "false") boolean test) {
+		List<Map<String, String>> products = new ArrayList<>();
+		for (FastSpringHelper.FastSpringProduct p : FastSpringHelper.products) {
+			String type = userSubService.getPurchaseType(p.sku());
+			if (p.isTest() == test && type != null) {
+				products.add(Map.of("id", p.id(), "type", type, "path", p.path()));
+			}
+		}
+
+		return ResponseEntity.ok(gson.toJson(products));
+	}
+
 	// https://developer.fastspring.com/reference/webhooks-overview
 	@Transactional
 	@PostMapping("/order-completed")

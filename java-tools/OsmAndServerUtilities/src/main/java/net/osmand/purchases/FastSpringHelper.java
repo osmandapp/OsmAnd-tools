@@ -14,6 +14,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 
 
 public class FastSpringHelper {
@@ -30,6 +31,23 @@ public class FastSpringHelper {
 			"net.osmand.fastspring.subscription.pro.annual",
 			"net.osmand.fastspring.subscription.pro.annual.test",
 			"net.osmand.fastspring.subscription.maps.annual");
+
+	// web checkout products: pricing page card id, FastSpring product path and its sku
+	public record FastSpringProduct(String id, String path, String sku) {
+		public boolean isTest() {
+			return sku.endsWith(".test");
+		}
+	}
+
+	public static final List<FastSpringProduct> products = List.of(
+			new FastSpringProduct("osmand-pro", "osmand-pro-monthly", "net.osmand.fastspring.subscription.pro.monthly"),
+			new FastSpringProduct("osmand-pro", "osmand-pro-annual", "net.osmand.fastspring.subscription.pro.annual"),
+			new FastSpringProduct("osmand-pro", "test-osmand-pro-annual", "net.osmand.fastspring.subscription.pro.annual.test"),
+			new FastSpringProduct("osmand-maps-plus", "osmand-maps-annual", "net.osmand.fastspring.subscription.maps.annual"),
+			new FastSpringProduct("osmand-maps-plus", "osmand-maps", "net.osmand.fastspring.inapp.maps.plus"),
+			new FastSpringProduct("osmand-maps-plus", "test-osmand-maps", "net.osmand.fastspring.inapp.maps.plus.test"),
+			new FastSpringProduct("osmand-15-years", "osmand-15-years", "net.osmand.fastspring.inapp.osmand_pro_xv"),
+			new FastSpringProduct("osmand-15-years", "test-osmand-15-years", "net.osmand.fastspring.inapp.osmand_pro_xv.test"));
 
 	// Minimum delay (15 minutes) before validating a FastSpring purchase/subscription
 	// to allow FastSpring systems to process the order
@@ -152,6 +170,32 @@ public class FastSpringHelper {
 		return true;
 	}
 
+	// https://developer.fastspring.com/reference/createordersession
+	public static String createSession(String email, String productPath) throws IOException {
+		HttpURLConnection connection = openConnection("/sessions");
+		connection.setRequestMethod("POST");
+		connection.setDoOutput(true);
+		connection.setRequestProperty("Content-Type", "application/json");
+		Map<String, Object> body = Map.of(
+				"contact", Map.of("email", email),
+				"items", List.of(Map.of("product", productPath, "quantity", 1)),
+				"tags", Map.of("userEmail", email));
+		try (OutputStream os = connection.getOutputStream()) {
+			os.write(GSON.toJson(body).getBytes(StandardCharsets.UTF_8));
+		}
+		int code = connection.getResponseCode();
+		if (code != 200 && code != 201) {
+			LOG.warn("Failed to create FastSpring session for " + productPath + ": "
+					+ code + " " + connection.getResponseMessage());
+			return null;
+		}
+		try (InputStream is = connection.getInputStream();
+		     InputStreamReader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
+			FastSpringSession session = GSON.fromJson(reader, FastSpringSession.class);
+			return session == null ? null : session.id;
+		}
+	}
+
 	private static FastSpringOrder getOrder(String orderId) throws IOException {
 		HttpURLConnection connection = openConnection("/orders/" + orderId);
 		try (InputStream is = connection.getInputStream();
@@ -214,6 +258,10 @@ public class FastSpringHelper {
 		connection.setRequestProperty("Accept", "application/json");
 
 		return connection;
+	}
+
+	public static class FastSpringSession {
+		public String id;
 	}
 
 	public static class FastSpringOrder {
