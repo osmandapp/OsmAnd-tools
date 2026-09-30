@@ -206,14 +206,16 @@ public class OsmGpxController {
 
 		List<Feature> features;
 		if (req.isNearPoint()) {
-			if (countRoutes(conditions, params) > MAX_NEAR_ROUTES) {
+			features = countRoutes(conditions, params) > MAX_ROUTES_FULL_MODE_THRESHOLD
+					? null
+					: queryRoutesNear(conditions, params, req.lat(), req.lon(), nearRadius);
+			if (features == null) {
 				JsonObject tooMany = new JsonObject();
 				tooMany.add("features", new JsonArray());
 				tooMany.addProperty("tooMany", true);
 				tooMany.addProperty("maxRoutes", MAX_NEAR_ROUTES);
 				return ResponseEntity.ok(gson.toJson(tooMany));
 			}
-			features = queryRoutesNear(conditions, params, req.lat(), req.lon(), nearRadius);
 		} else if (isPointsOnlyRequest(req.activityArr())) {
 			// error tracks have no geometry — return them as points only
 			features = queryRouteFeatures(conditions, params, false, MAX_ROUTES_SUMMARY, false);
@@ -436,7 +438,8 @@ public class OsmGpxController {
 		return count == null ? 0 : count;
 	}
 
-	// the tracks whose line passes within radius metres of the point, nearest first; error tracks by their start point
+	// the tracks whose line passes within radius metres of the point, nearest first; error tracks by their start point;
+	// null when more than MAX_NEAR_ROUTES of them pass there, the rows after that are not decoded
 	private List<Feature> queryRoutesNear(StringBuilder conditions, List<Object> params, double lat, double lon, double radius) {
 		String query = "SELECT " + ROUTE_COLUMNS + ", m.simplified_geometry FROM " + GPX_METADATA_TABLE_NAME + " m " +
 				"WHERE 1 = 1 " + conditions;
@@ -448,6 +451,9 @@ public class OsmGpxController {
 				ps.setObject(i + 1, params.get(i));
 			}
 		}, rs -> {
+			if (near.size() > MAX_NEAR_ROUTES) {
+				return;
+			}
 			byte[] geometry = rs.getBytes("simplified_geometry");
 			boolean hasLine = geometry != null && geometry.length > 0;
 			double distance = hasLine
@@ -462,6 +468,9 @@ public class OsmGpxController {
 			}
 			near.add(new Near(feature, distance));
 		});
+		if (near.size() > MAX_NEAR_ROUTES) {
+			return null;
+		}
 		near.sort(Comparator.comparingDouble(Near::distance));
 
 		return near.stream().map(Near::feature).toList();
