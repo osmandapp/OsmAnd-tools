@@ -433,9 +433,8 @@ public class OsmGpxController {
 	}
 
 	private long countRoutes(StringBuilder conditions, List<Object> params) {
-		Long count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + GPX_METADATA_TABLE_NAME + " m WHERE 1 = 1 " + conditions,
+		return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + GPX_METADATA_TABLE_NAME + " m WHERE 1 = 1 " + conditions,
 				Long.class, params.toArray());
-		return count == null ? 0 : count;
 	}
 
 	// the tracks whose line passes within radius metres of the point, nearest first; error tracks by their start point;
