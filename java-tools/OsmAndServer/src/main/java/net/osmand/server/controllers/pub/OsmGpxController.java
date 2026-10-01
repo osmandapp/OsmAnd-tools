@@ -209,7 +209,7 @@ public class OsmGpxController {
 
 		List<Feature> features;
 		if (req.isNearPoint()) {
-			features = countRoutes(conditions, params) > MAX_ROUTES_FULL_MODE_THRESHOLD
+			features = countRoutes(conditions, params, MAX_ROUTES_FULL_MODE_THRESHOLD + 1) > MAX_ROUTES_FULL_MODE_THRESHOLD
 					? null
 					: queryRoutesNear(conditions, params, req.lat(), req.lon(), nearRadius);
 			if (features == null) {
@@ -432,9 +432,12 @@ public class OsmGpxController {
 		params.addAll(normalized);
 	}
 
-	private long countRoutes(StringBuilder conditions, List<Object> params) {
-		return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + GPX_METADATA_TABLE_NAME + " m WHERE 1 = 1 " + conditions,
-				Long.class, params.toArray());
+	// at most limit rows are counted, enough to compare the count with limit - 1
+	private long countRoutes(StringBuilder conditions, List<Object> params, int limit) {
+		List<Object> limited = new ArrayList<>(params);
+		limited.add(limit);
+		return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM (SELECT 1 FROM " + GPX_METADATA_TABLE_NAME + " m WHERE 1 = 1 "
+				+ conditions + " LIMIT ?) t", Long.class, limited.toArray());
 	}
 
 	// the tracks whose line passes within radius metres of the point, nearest first; error tracks by their start point;
