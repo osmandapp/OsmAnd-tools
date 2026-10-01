@@ -350,7 +350,8 @@ public class DownloadOsmGPX {
 					+ " GENERATED ALWAYS AS (ST_MakeEnvelope(minlon, minlat, maxlon, maxlat, " + SRID_WGS84 + ")) STORED");
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_bbox_geom ON " + GPX_METADATA_TABLE_NAME
 					+ " USING GIST (bbox)");
-			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_year ON " + GPX_METADATA_TABLE_NAME + " ((extract(year from date)))");
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_date ON " + GPX_METADATA_TABLE_NAME + " (date)");
+			statement.executeUpdate("DROP INDEX IF EXISTS idx_osm_gpx_year");
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_ranges_optimized ON " + GPX_METADATA_TABLE_NAME
 					+ " (minlat, maxlat, minlon, maxlon, activity) INCLUDE (distance, speed)"
 					+ " WHERE (distance > 0::double precision OR speed > 0::double precision)"
