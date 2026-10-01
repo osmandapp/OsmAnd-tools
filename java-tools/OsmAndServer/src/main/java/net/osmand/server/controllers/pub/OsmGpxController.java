@@ -7,6 +7,7 @@ import com.google.gson.JsonObject;
 import net.osmand.data.QuadRect;
 import net.osmand.server.DatasourceConfiguration;
 import net.osmand.server.api.services.GpxService;
+import net.osmand.server.osmgpx.ActivityClassifier;
 import net.osmand.server.osmgpx.GarbageClassifier;
 import net.osmand.server.osmgpx.TrackSimplifyEncoder;
 import net.osmand.server.utils.WebGpxParser;
@@ -137,6 +138,9 @@ public class OsmGpxController {
 			QuadRect box = MapUtils.calculateLatLonBbox(req.lat(), req.lon(), nearRadius);
 			error = addCoords(params, conditions, String.valueOf(box.bottom), String.valueOf(box.top),
 					String.valueOf(box.left), String.valueOf(box.right));
+			// the same tracks heat_build.py puts into the tiles
+			conditions.append(" AND m.date IS NOT NULL AND (length(m.simplified_geometry) > 0 OR m.activity = ?)");
+			params.add(ERROR_ACTIVITY);
 		} else {
 			error = addCoords(params, conditions, req.minLat(), req.maxLat(), req.minLon(), req.maxLon());
 		}
@@ -474,7 +478,13 @@ public class OsmGpxController {
 
 	private static double distanceToTrack(byte[] geometry, double lat, double lon) {
 		double best = Double.MAX_VALUE;
-		for (TrkSegment segment : TrackSimplifyEncoder.decodeGeometry(geometry).getSegments(false)) {
+		GpxFile line;
+		try {
+			line = TrackSimplifyEncoder.decodeGeometry(geometry);
+		} catch (IllegalArgumentException e) {
+			return best;
+		}
+		for (TrkSegment segment : line.getSegments(false)) {
 			List<WptPt> points = segment.getPoints();
 			for (int i = 0; i < points.size(); i++) {
 				WptPt from = points.get(Math.max(0, i - 1));
@@ -684,14 +694,22 @@ public class OsmGpxController {
 			return ResponseEntity.badRequest().body("Activity parameter is required.");
 		}
 		Set<String> activities = new LinkedHashSet<>();
+		boolean withUnlabelled = false;
 		for (String activity : activityArr) {
 			if (GarbageClassifier.GARBAGE.equals(activity)) {
 				activities.addAll(GarbageClassifier.TYPES);
+			} else if (ActivityClassifier.NOSPEED.equals(activity)) {
+				// the No timing bin of heat_build.py
+				withUnlabelled = true;
+				activities.add(activity);
+				activities.add(GarbageClassifier.GARBAGE);
+				activities.add(GarbageClassifier.TELEPORT);
 			} else {
 				activities.add(activity);
 			}
 		}
-		conditions.append(" AND m.activity IN ").append(placeholders(activities, params));
+		String in = placeholders(activities, params);
+		conditions.append(withUnlabelled ? " AND (m.activity IS NULL OR m.activity IN " + in + ")" : " AND m.activity IN " + in);
 		return null;
 	}
 
