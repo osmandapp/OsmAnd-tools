@@ -13,6 +13,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -171,13 +172,21 @@ public class FastSpringHelper {
 	}
 
 	// https://developer.fastspring.com/reference/createordersession
-	public static String createSession(String email, String productPath) throws IOException {
+	public static String createSession(String email, String productPath, String country, String language) throws IOException {
 		HttpURLConnection connection = openConnection("/sessions");
 		connection.setRequestMethod("POST");
 		connection.setDoOutput(true);
 		connection.setRequestProperty("Content-Type", "application/json");
+		Map<String, Object> contact = new HashMap<>();
+		contact.put("email", email);
+		if (country != null && !country.isBlank()) {
+			contact.put("country", country);
+		}
+		if (language != null && !language.isBlank()) {
+			contact.put("language", language);
+		}
 		Map<String, Object> body = Map.of(
-				"contact", Map.of("email", email),
+				"contact", contact,
 				"items", List.of(Map.of("product", productPath, "quantity", 1)),
 				"tags", Map.of("userEmail", email));
 		try (OutputStream os = connection.getOutputStream()) {
