@@ -713,7 +713,8 @@ public class MapApiController {
 	@PostMapping(path = {"/fastspring-session"})
 	public ResponseEntity<String> createFastSpringSession(@RequestParam String id, @RequestParam String type,
 	                                                      @RequestParam(defaultValue = "false") boolean test,
-	                                                      @RequestParam(required = false) String country) throws IOException {
+	                                                      @RequestParam(required = false) String country,
+	                                                      @RequestParam(required = false) String language) throws IOException {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
@@ -726,7 +727,7 @@ public class MapApiController {
 		if (userSubService.hasActivePurchase(pu, product.sku())) {
 			return ResponseEntity.status(HttpStatus.CONFLICT).body("Already purchased " + id + " " + type);
 		}
-		String sessionId = FastSpringHelper.createSession(pu.email, product.path(), country);
+		String sessionId = FastSpringHelper.createSession(pu.email, product.path(), country, language);
 		if (sessionId == null) {
 			return ResponseEntity.internalServerError().body("Failed to create checkout session");
 		}
