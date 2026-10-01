@@ -35,10 +35,8 @@ public class IndexCreationContext {
     public OsmandRegions allRegions;
     public boolean basemap;
 
-    private boolean decryptAbbreviations = false;
-	// rules locale of the English region names are expanded for ("en_US"); needDecryptAbbreviations allows only English
-	private String decryptAbbreviationsLocale = DECRYPT_ABBREVIATIONS_LANGUAGE;
-	private static final String DECRYPT_ABBREVIATIONS_LANGUAGE = "en";
+	// rules locale of the map ("en_US", "it_IT"), "" when no locale covers it: see SearchLocales
+	private String mapLocale = "";
     private boolean translitJapaneseNames = false;
 	private boolean translitChineseNames = false;
 	private final IndexCreator indexCreator;
@@ -55,10 +53,7 @@ public class IndexCreationContext {
 		if (regionName != null) {
 			this.translitJapaneseNames = regionName.toLowerCase().startsWith(JAPAN);
 			this.translitChineseNames = regionName.toLowerCase().startsWith(CHINA);
-			this.decryptAbbreviations = needDecryptAbbreviations(getRegionLang(allRegions, regionName));
-			if (decryptAbbreviations) {
-				decryptAbbreviationsLocale = englishLocale(regionName);
-			}
+			this.mapLocale = SearchLocales.forMap(regionName);
             WorldRegion region = this.allRegions.getRegionDataByDownloadName(regionName);
             if (region != null) {
 				bboxFilter.initRegionQuads(region);
@@ -121,30 +116,6 @@ public class IndexCreationContext {
 		return regionsFinalFile;
 	}
 
-    private static String getRegionLang(OsmandRegions osmandRegions, String regionName) {
-		if (osmandRegions == null) {
-			return null;
-		}
-        WorldRegion wr = osmandRegions.getRegionDataByDownloadName(regionName);
-        if (wr != null) {
-            return wr.getParams().getRegionLang();
-        } else {
-            return null;
-        }
-    }
-
-    private static boolean needDecryptAbbreviations(String regionLang) {
-        if (regionLang != null) {
-            String[] langArr = regionLang.split(",");
-            for (String lang : langArr) {
-                if (lang.equals("en")) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
 	public void translitJapaneseNames(Entity e) {
 		if (needTranslitName(e, e.getTags(), translitJapaneseNames, JAPAN)) {
 			String ltn = e.getTag("name:ja-latn");
@@ -186,30 +157,24 @@ public class IndexCreationContext {
 		return false;
 	}
 
+	/**
+	 * Rewrites the words of a street name by the normalizations of the rules of its locale (rules.xml,
+	 * normalize="true"). The locale is the one of the map; a file that covers several countries (addRegionTag) takes
+	 * the one of the first map region at the location whose locale is known.
+	 */
 	public String decryptAbbreviations(String name, LatLon loc, boolean addRegionTag) {
-		String locale = null;
-		if (decryptAbbreviations) {
-			locale = decryptAbbreviationsLocale;
-		} else if (addRegionTag && loc != null) {
+		String locale = mapLocale;
+		if (locale.isEmpty() && addRegionTag && loc != null) {
 			Set<String> dwNames = calcDownloadNames(null, false, allRegions,
 					new QuadRect(loc.getLongitude(), loc.getLatitude(), loc.getLongitude(), loc.getLatitude()));
 			for (String dwName : dwNames) {
-				if (needDecryptAbbreviations(getRegionLang(allRegions, dwName))) {
-					locale = englishLocale(dwName);
+				locale = SearchLocales.forMap(dwName);
+				if (!locale.isEmpty()) {
 					break;
 				}
 			}
 		}
-		if (locale != null) {
-			name = Abbreviations.replaceAll(name, locale);
-		}
-		return name;
-	}
-
-	// locale of an English region ("en_US"); plain English when the region is not in SearchLocales or not English there
-	private static String englishLocale(String regionName) {
-		String locale = SearchLocales.forMap(regionName);
-		return SearchLocales.language(locale).equals(DECRYPT_ABBREVIATIONS_LANGUAGE) ? locale : DECRYPT_ABBREVIATIONS_LANGUAGE;
+		return locale.isEmpty() ? name : Abbreviations.replaceAll(name, locale, "street");
 	}
 
 	public Set<String> calcRegionTag(Entity entity, boolean add) {

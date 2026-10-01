@@ -115,8 +115,8 @@ public class SpatialSearchPipelineTest {
 	private static final boolean TEST_EXTRA_RESULTS = true;
 	private static final List<Class<?>> OBF_GENERATE_CLASSES = List.of(IndexCreator.class, IndexPoiCreator.class,
 			IndexAddressCreator.class, NameIndexCreator.class, CommonWordsMultiIndex.class,
-			AlternativeNameIndexGenerator.class, SearchVariantRules.class, SearchVariantRules.Variant.class,
-			SearchVariantRules.Entry.class, Abbreviations.class, SearchLocales.class, OBFDataCreator.class,
+			AlternativeNameIndexGenerator.class, SearchVariantRules.class, SearchVariantRules.Rule.class,
+			Abbreviations.class, SearchLocales.class, OBFDataCreator.class,
 			BinaryMerger.class);
 	// every rules file of OsmAnd-java resources, found by a scan so a new language file invalidates cached OBFs
 	private static final List<String> OBF_RULE_RESOURCES = listRuleResources();

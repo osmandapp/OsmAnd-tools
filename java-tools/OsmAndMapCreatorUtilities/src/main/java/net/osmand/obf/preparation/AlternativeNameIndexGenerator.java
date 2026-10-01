@@ -9,7 +9,7 @@ import java.util.TreeSet;
 import net.osmand.binary.CommonWordsMultiIndex;
 import net.osmand.binary.SearchLocales;
 import net.osmand.binary.SearchVariantRules;
-import net.osmand.binary.SearchVariantRules.Variant;
+import net.osmand.binary.SearchVariantRules.Rule;
 import net.osmand.data.City;
 import net.osmand.data.Street;
 import net.osmand.obf.preparation.NameIndexCreator.PoiNameObject;
@@ -166,7 +166,7 @@ public class AlternativeNameIndexGenerator<T> {
 		if (owner != null) {
 			// name and alt_name are in the language of the map, name:de in German in the country of the map
 			String locale = SearchLocales.forName(lang, mapLocale);
-			for (Variant rule : SearchVariantRules.forLocale(locale).index()) {
+			for (Rule rule : SearchVariantRules.forLocale(locale).index()) {
 				if (!rule.appliesTo(owner)) {
 					continue;
 				}
@@ -175,7 +175,7 @@ public class AlternativeNameIndexGenerator<T> {
 					if (nameWords == null) {
 						nameWords = SearchAlgorithms.splitAndNormalize(name, false);
 					}
-					addAlternativeName(nameWords, alternative, obj, maxPrefixLength, owner + " " + rule.target().trim());
+					addAlternativeName(nameWords, alternative, obj, maxPrefixLength, owner + " " + rule.to().trim());
 				}
 			}
 		}
