@@ -84,7 +84,7 @@ public class OsmGpxController {
 	private static final String GPX_METADATA_TABLE_NAME = "osm_gpx_data";
 	private static final String GPX_FILES_TABLE_NAME = "osm_gpx_files";
 	private static final String ROUTE_COLUMNS = "m.id, m.name, m.description, m.user, m.date, m.activity, m.lat, m.lon, " +
-			"m.speed, m.distance, m.points, m.tags";
+			"m.speed, m.distance, m.points, m.max_speed, m.max_dist_between_points, m.time_minutes, m.waypoints, m.tags";
 	private static final int SRID_WGS84 = 4326;
 	private static final String ERROR_ACTIVITY = "error";
 	private static final Set<String> INVALID_ACTIVITIES = new HashSet<>(GarbageClassifier.TYPES);
@@ -556,6 +556,22 @@ public class OsmGpxController {
 		int points = rs.getInt("points");
 		if (points != 0) {
 			feature.getProperties().put("points", points);
+		}
+		int maxSpeed = (int) rs.getFloat("max_speed");
+		if (maxSpeed != 0) {
+			feature.getProperties().put("maxSpeed", maxSpeed);
+		}
+		int maxDistBetweenPoints = (int) rs.getFloat("max_dist_between_points");
+		if (maxDistBetweenPoints != 0) {
+			feature.getProperties().put("maxDistBetweenPoints", maxDistBetweenPoints);
+		}
+		int timeMinutes = rs.getInt("time_minutes");
+		if (timeMinutes != 0) {
+			feature.getProperties().put("timeMinutes", timeMinutes);
+		}
+		int waypoints = rs.getInt("waypoints");
+		if (waypoints != 0) {
+			feature.getProperties().put("waypoints", waypoints);
 		}
 		java.sql.Array tagsArray = rs.getArray("tags");
 		if (tagsArray != null) {
