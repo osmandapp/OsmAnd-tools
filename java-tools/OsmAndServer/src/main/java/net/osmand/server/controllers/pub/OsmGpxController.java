@@ -486,8 +486,11 @@ public class OsmGpxController {
 		}
 		for (TrkSegment segment : line.getSegments(false)) {
 			List<WptPt> points = segment.getPoints();
-			for (int i = 0; i < points.size(); i++) {
-				WptPt from = points.get(Math.max(0, i - 1));
+			if (points.size() == 1) {
+				best = Math.min(best, MapUtils.getDistance(lat, lon, points.get(0).getLatitude(), points.get(0).getLongitude()));
+			}
+			for (int i = 1; i < points.size(); i++) {
+				WptPt from = points.get(i - 1);
 				WptPt to = points.get(i);
 				best = Math.min(best, MapUtils.getOrthogonalDistance(lat, lon,
 						from.getLatitude(), from.getLongitude(), to.getLatitude(), to.getLongitude()));
