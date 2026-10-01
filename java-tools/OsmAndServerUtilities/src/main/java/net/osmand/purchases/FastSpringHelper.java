@@ -172,7 +172,7 @@ public class FastSpringHelper {
 	}
 
 	// https://developer.fastspring.com/reference/createordersession
-	public static String createSession(String email, String productPath, String country) throws IOException {
+	public static String createSession(String email, String productPath, String country, String language) throws IOException {
 		HttpURLConnection connection = openConnection("/sessions");
 		connection.setRequestMethod("POST");
 		connection.setDoOutput(true);
@@ -181,6 +181,9 @@ public class FastSpringHelper {
 		contact.put("email", email);
 		if (country != null && !country.isBlank()) {
 			contact.put("country", country);
+		}
+		if (language != null && !language.isBlank()) {
+			contact.put("language", language);
 		}
 		Map<String, Object> body = Map.of(
 				"contact", contact,
