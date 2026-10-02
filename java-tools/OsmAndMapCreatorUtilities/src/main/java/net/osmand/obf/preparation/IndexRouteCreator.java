@@ -1,5 +1,6 @@
 package net.osmand.obf.preparation;
 
+import com.google.protobuf.UnknownFieldSet;
 import gnu.trove.TIntCollection;
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.iterator.TIntObjectIterator;
@@ -648,6 +649,13 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 										RelationMember via = viaL.iterator().next();
 										if (via.getEntityId().getType() == EntityType.WAY) {
 											rd.viaWay = via.getEntityId().getId();
+										}
+									}
+									if (viaL.size() > 1) {
+										rd.viaWays = new long[viaL.size()];
+										int i = 0;
+										for (RelationMember via : viaL) {
+											rd.viaWays[i++] = via.getEntityId().getId();
 										}
 									}
 									rdList.add(rd);
@@ -1484,6 +1492,11 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
                         if(rd.viaWay != 0) {
                             restrictionVia.add(rd.viaWay);
                         }
+                        if (rd.viaWays != null) {
+                            for (long viaWay : rd.viaWays) {
+                                restrictionVia.add(viaWay);
+                            }
+                        }
                     }
                 }
                 ids.add(id);
@@ -1523,6 +1536,15 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
                         if (rd.viaWay != 0) {
                             int viaId = wc.registerWayMapId(rd.viaWay);
                             restriction.setVia(viaId);
+                        }
+                        if (rd.viaWays != null) {
+                            // a chain of via ways (#12537): the other vias are the repeated field "via"
+                            UnknownFieldSet.Field.Builder otherVias = UnknownFieldSet.Field.newBuilder();
+                            for (int i = 1; i < rd.viaWays.length; i++) {
+                                otherVias.addVarint(wc.registerWayMapId(rd.viaWays[i]));
+                            }
+                            restriction.setUnknownFields(UnknownFieldSet.newBuilder()
+                                    .addField(RestrictionData.VIA_FIELD_NUMBER, otherVias.build()).build());
                         }
                         dataBlock.addRestrictions(restriction.build());
                     }
