@@ -31,6 +31,8 @@ public class VectorMetatile implements TileCacheProvider, Comparable<VectorMetat
 	private final String interactiveKey;
 	private final String renderingProps;
 	private final String cacheKey;
+	// rendering file of the loaded depth test style, see DepthTestMaps
+	private static String loadedFile;
 
 	public VectorMetatile(TileServerConfig cfg, String tileId, VectorStyle style, int z, int x, int y,
 	                      int metaSizeLog, int tileSizeLog, String interactiveKey, String renderingProps, String cacheKey) {
@@ -187,8 +189,17 @@ public class VectorMetatile implements TileCacheProvider, Comparable<VectorMetat
 			if (nativelib == null) {
 				return null;
 			}
-			if (!this.style.name.equalsIgnoreCase(nativelib.getRenderingRuleStorage().getName())) {
-				nativelib.loadRuleStorage(this.style.name + ".render.xml", props);
+			if (this.style.depth != null) {
+				String err = DepthTestMaps.INSTANCE.activate(nativelib, this.cfg, this.style.depth, this.cfg.obfLocation);
+				if (err != null) {
+					return ResponseEntity.status(503).body(err);
+				}
+				props += ",depthContours=true";
+			}
+			if (this.style.file != null ? !this.style.file.equals(loadedFile)
+					: loadedFile != null || !this.style.name.equalsIgnoreCase(nativelib.getRenderingRuleStorage().getName())) {
+				nativelib.loadRuleStorage(this.style.file != null ? this.style.file : this.style.name + ".render.xml", props);
+				loadedFile = this.style.file;
 			} else {
 				nativelib.setRenderingProps(props);
 			}

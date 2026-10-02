@@ -28,6 +28,10 @@ public class TileMemoryCache<T extends TileCacheProvider> {
 		return cacheMap.get(key);
 	}
 
+	public void removeByPrefix(String prefix) {
+		cacheMap.keySet().removeIf(k -> k.startsWith(prefix));
+	}
+
 	public Object getLock(String tileId) {
 		return lockMap.computeIfAbsent(tileId, k -> new Object());
 	}
