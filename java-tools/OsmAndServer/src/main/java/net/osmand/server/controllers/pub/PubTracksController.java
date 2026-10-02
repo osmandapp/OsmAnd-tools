@@ -209,7 +209,7 @@ public class PubTracksController {
 			where.append(" AND m.manual_review->'users' IS NOT NULL");
 		}
 		if (!isBlank(q)) {
-			if (q.trim().matches("\\d+")) {
+			if (q.trim().matches("\\d{1,18}")) {
 				where.append(" AND m.id = ?");
 				args.add(Long.parseLong(q.trim()));
 			} else {

@@ -209,14 +209,14 @@ public class OsmGpxController {
 
 		List<Feature> features;
 		if (req.isNearPoint()) {
-			features = countRoutes(conditions, params, MAX_ROUTES_FULL_MODE_THRESHOLD + 1) > MAX_ROUTES_FULL_MODE_THRESHOLD
-					? null
-					: queryRoutesNear(conditions, params, req.lat(), req.lon(), nearRadius);
+			// too many around the point to decode them all, or too many of them within the radius; the hint quotes the limit that fired
+			boolean tooManyAround = countRoutes(conditions, params, MAX_ROUTES_FULL_MODE_THRESHOLD + 1) > MAX_ROUTES_FULL_MODE_THRESHOLD;
+			features = tooManyAround ? null : queryRoutesNear(conditions, params, req.lat(), req.lon(), nearRadius);
 			if (features == null) {
 				JsonObject tooMany = new JsonObject();
 				tooMany.add("features", new JsonArray());
 				tooMany.addProperty("tooMany", true);
-				tooMany.addProperty("maxRoutes", MAX_NEAR_ROUTES);
+				tooMany.addProperty("maxRoutes", tooManyAround ? MAX_ROUTES_FULL_MODE_THRESHOLD : MAX_NEAR_ROUTES);
 				return ResponseEntity.ok(gson.toJson(tooMany));
 			}
 		} else if (isPointsOnlyRequest(req.activityArr())) {
