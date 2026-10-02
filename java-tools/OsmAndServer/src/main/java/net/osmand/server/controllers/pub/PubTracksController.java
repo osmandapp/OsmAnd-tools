@@ -10,6 +10,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -69,6 +70,10 @@ public class PubTracksController {
 	private static final Pattern NUMBER = Pattern.compile("[-+]?\\d+(\\.\\d+)?([eE][-+]?\\d+)?"); // negative coordinates are not formulas
 	// any review of the track (admin or a user) was saved at or after the $s instant; review times are ISO-8601 strings, so they compare as text
 	private static final String REVIEWED_SINCE = "jsonb_path_exists(m.manual_review, '$.**.time ? (@ >= $s)', jsonb_build_object('s', ?::text))";
+	private static final String REVIEWED_BEFORE = "jsonb_path_exists(m.manual_review, '$.**.time ? (@ < $s)', jsonb_build_object('s', ?::text))";
+	private static final String REVIEWED_AS = "jsonb_path_exists(m.manual_review, '$.**.verdict ? (@ == $v)', jsonb_build_object('v', ?::text))";
+	private static final String LAST_REVIEW = "(SELECT max(x #>> '{}') FROM jsonb_path_query(m.manual_review, '$.**.time') x)";
+	private static final int LIST_LIMIT = 500;
 	private static final String[] EXPORT_COLUMNS = {"id", "user", "date", "name", "description", "tags", "lat", "lon", "activity",
 			"activity_source", "file_activity", "speed_matches_activity", "speed", "max_speed", "distance", "points", "time_minutes",
 			"reviews", "track_stats", "geometry_b64"};
@@ -168,10 +173,83 @@ public class PubTracksController {
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 
-	/** admins only: every reviewed track as one csv row, gzip; gpx=true adds the original GPX file (gzip, base64); since keeps tracks with a review from that moment on */
+	@GetMapping(path = "/reviews-list", produces = MediaType.APPLICATION_JSON_VALUE)
+	public ResponseEntity<String> list(@RequestParam(required = false) String since, @RequestParam(required = false) String until,
+			@RequestParam(required = false) String verdict, @RequestParam(required = false) String who,
+			@RequestParam(required = false) String q, @RequestParam(defaultValue = "50") int limit,
+			@RequestParam(defaultValue = "0") int offset, Authentication auth) {
+		if (!isAdmin(auth)) {
+			return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Admins only");
+		}
+		if (!config.osmgpxInitialized()) {
+			return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body("OsmGpx datasource is not initialized");
+		}
+		if (!isBlank(verdict) && !VERDICTS.contains(verdict)) {
+			return ResponseEntity.badRequest().body("verdict must be one of " + VERDICTS);
+		}
+		StringBuilder where = new StringBuilder(" WHERE m.manual_review IS NOT NULL");
+		List<Object> args = new ArrayList<>();
+		Instant from = parseSince(since);
+		if (from != null) {
+			where.append(" AND ").append(REVIEWED_SINCE);
+			args.add(from.toString());
+		}
+		Instant to = parseSince(until);
+		if (to != null) {
+			where.append(" AND ").append(REVIEWED_BEFORE);
+			args.add(to.toString());
+		}
+		if (!isBlank(verdict)) {
+			where.append(" AND ").append(REVIEWED_AS);
+			args.add(verdict);
+		}
+		if ("admin".equals(who)) {
+			where.append(" AND m.manual_review->'admin' IS NOT NULL");
+		} else if ("users".equals(who)) {
+			where.append(" AND m.manual_review->'users' IS NOT NULL");
+		}
+		if (!isBlank(q)) {
+			if (q.trim().matches("\\d+")) {
+				where.append(" AND m.id = ?");
+				args.add(Long.parseLong(q.trim()));
+			} else {
+				where.append(" AND m.\"user\" ILIKE ?");
+				args.add("%" + q.trim() + "%");
+			}
+		}
+		JsonObject res = new JsonObject();
+		res.addProperty("total", jdbcTemplate.queryForObject("SELECT count(*) FROM " + TABLE + " m" + where, Long.class, args.toArray()));
+		args.add(Math.max(1, Math.min(limit, LIST_LIMIT)));
+		args.add(Math.max(0, offset));
+		JsonArray rows = new JsonArray();
+		jdbcTemplate.query("SELECT m.id, m.\"user\", m.date, m.name, m.activity, m.file_activity, m.speed, m.distance, m.points, m.time_minutes,"
+						+ " m.manual_review::text AS manual_review FROM " + TABLE + " m" + where + " ORDER BY " + LAST_REVIEW + " DESC LIMIT ? OFFSET ?",
+				(RowCallbackHandler) rs -> {
+					JsonObject row = new JsonObject();
+					row.addProperty("id", rs.getLong("id"));
+					row.addProperty("user", rs.getString("user"));
+					row.addProperty("date", rs.getString("date"));
+					row.addProperty("name", rs.getString("name"));
+					row.addProperty("activity", rs.getString("activity"));
+					row.addProperty("fileActivity", rs.getString("file_activity"));
+					row.addProperty("speed", rs.getString("speed"));
+					row.addProperty("distance", rs.getString("distance"));
+					row.addProperty("points", rs.getString("points"));
+					row.addProperty("timeMinutes", rs.getString("time_minutes"));
+					row.add("reviews", publicView(rs.getString("manual_review"), null));
+					rows.add(row);
+				}, args.toArray());
+		res.add("rows", rows);
+		return ResponseEntity.ok(gson.toJson(res));
+	}
+
+	/**
+	 * admins only: every reviewed track as one csv row, gzip; gpx=true adds the original GPX file (gzip, base64);
+	 * since/until keep the tracks with a review from that moment on / before it
+	 */
 	@GetMapping(path = "/reviews.csv.gz")
 	public void export(@RequestParam(defaultValue = "false") boolean gpx, @RequestParam(required = false) String since,
-			Authentication auth, HttpServletResponse response) throws IOException {
+			@RequestParam(required = false) String until, Authentication auth, HttpServletResponse response) throws IOException {
 		if (!isAdmin(auth)) {
 			response.sendError(HttpStatus.FORBIDDEN.value(), "Admins only");
 			return;
@@ -181,6 +259,7 @@ public class PubTracksController {
 			return;
 		}
 		Instant from = parseSince(since);
+		Instant to = parseSince(until);
 		response.setContentType("application/gzip");
 		response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"osmgpx-reviews.csv.gz\"");
 		String select = "SELECT m.id, m.\"user\", m.date, m.name, m.description, m.tags, m.lat, m.lon, m.activity, m.activity_source, "
@@ -188,14 +267,20 @@ public class PubTracksController {
 				+ "m.manual_review::text AS manual_review, m.track_stats::text AS track_stats, m.simplified_geometry"
 				+ (gpx ? ", f.data AS gpx FROM " + TABLE + " m LEFT JOIN osm_gpx_files f ON f.id = m.id" : " FROM " + TABLE + " m")
 				+ " WHERE m.manual_review IS NOT NULL AND m.id > ?" + (from == null ? "" : " AND " + REVIEWED_SINCE)
-				+ " ORDER BY m.id LIMIT " + EXPORT_BATCH;
+				+ (to == null ? "" : " AND " + REVIEWED_BEFORE) + " ORDER BY m.id LIMIT " + EXPORT_BATCH;
 		int batches = 0;
 		try (Writer w = new OutputStreamWriter(new GZIPOutputStream(response.getOutputStream(), 1 << 16), StandardCharsets.UTF_8)) {
 			w.write(String.join(",", EXPORT_COLUMNS) + (gpx ? ",gpx_gz_b64" : "") + "\n");
 			long lastId = -1;
 			while (true) {
 				long[] last = {-1};
-				Object[] args = from == null ? new Object[] {lastId} : new Object[] {lastId, from.toString()};
+				List<Object> args = new ArrayList<>(List.of(lastId));
+				if (from != null) {
+					args.add(from.toString());
+				}
+				if (to != null) {
+					args.add(to.toString());
+				}
 				jdbcTemplate.query(select, (RowCallbackHandler) rs -> {
 					try {
 						writeRow(w, rs, gpx);
@@ -203,7 +288,7 @@ public class PubTracksController {
 						throw new UncheckedIOException(e);
 					}
 					last[0] = rs.getLong("id");
-				}, args);
+				}, args.toArray());
 				if (last[0] < 0) {
 					break;
 				}
