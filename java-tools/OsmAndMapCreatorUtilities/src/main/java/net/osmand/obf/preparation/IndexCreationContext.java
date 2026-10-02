@@ -54,7 +54,7 @@ public class IndexCreationContext {
 			this.decryptAbbreviations = needDecryptAbbreviations(getRegionLang(allRegions, regionName));
             WorldRegion region = this.allRegions.getRegionDataByDownloadName(regionName);
             if (region != null) {
-				bboxFilter.initRegionQuads(region);
+				bboxFilter.initRegionQuads(region, allRegions);
             }
 		}
 	}

@@ -3,15 +3,18 @@ package net.osmand.obf.preparation;
 import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
+import net.osmand.map.OsmandRegions;
 import net.osmand.map.WorldRegion;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Way;
+import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -29,10 +32,14 @@ public class IndexRegionBboxFilter {
 	);
 
 	private List<QuadRect> inflatedRegionQuads = null;
+	private WorldRegion region = null;
+	private OsmandRegions allRegions = null;
 
 	private static final Log log = LogFactory.getLog(IndexRegionBboxFilter.class);
 
-	public void initRegionQuads(WorldRegion region) {
+	public void initRegionQuads(WorldRegion region, OsmandRegions allRegions) {
+		this.region = region;
+		this.allRegions = allRegions;
 		inflatedRegionQuads = region.getAllPolygonsBounds();
 		double inflate = INFLATE_REGION_BBOX_KM * 1000 / MapUtils.METERS_IN_DEGREE;
 		for (QuadRect rect : inflatedRegionQuads) {
@@ -51,9 +58,10 @@ public class IndexRegionBboxFilter {
 	public boolean shouldFilterMapEntity(Entity entity) {
 		Map<String, String> tags = entity.getTags();
 		// coastlines of other countries come in as members of sea multipolygons (Baffin Bay) and break the
-		// coastline of the map that really owns them
+		// coastline of the map that really owns them; a coastline no other map owns stays (the Aleutians
+		// west of 180 are outside every region, they reach Alaska only through the Bering Sea relation)
 		if (entity instanceof Way way && "coastline".equals(tags.get("natural"))) {
-			return !isAnyNodeInsideRegionBbox(way);
+			return !isAnyNodeInsideRegionBbox(way) && isOwnedByAnotherMap(way);
 		}
 		if (!tags.isEmpty()) {
 			for (Map.Entry<String, String> filter : LOFAR_TELESCOPE_SYMPTOMS.entrySet()) {
@@ -104,6 +112,28 @@ public class IndexRegionBboxFilter {
 		}
 		for (Node n : way.getNodes()) {
 			if (n != null && isInsideRegionBbox(n.getLatitude(), n.getLongitude())) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private boolean isOwnedByAnotherMap(Way way) {
+		if (allRegions == null) {
+			return true;
+		}
+		List<Node> nodes = way.getNodes();
+		for (Node n : new Node[] {nodes.get(0), nodes.get(nodes.size() / 2), nodes.get(nodes.size() - 1)}) {
+			if (n == null) {
+				continue;
+			}
+			try {
+				for (WorldRegion r : allRegions.getWorldRegionsAt(n.getLatLon())) {
+					if (r.isRegionMapDownload() && !Algorithms.objectEquals(r.getRegionDownloadName(), region.getRegionDownloadName())) {
+						return true;
+					}
+				}
+			} catch (IOException e) {
 				return true;
 			}
 		}
