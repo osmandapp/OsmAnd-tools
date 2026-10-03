@@ -29,20 +29,7 @@
       "minzoom": 14
     }
   ],
-  "dataIssues": [
-    {
-      "title": "Chukotka coastline broken at 180 (68.98N)",
-      "reason": "OSM has no coastline between node 223075973 (68.97702, -180), the end of way 20804200, and node 257658341 (68.98619, 179.97614), the start of way 23778484; the 2-node ways 239992347 and 240021524 on the meridian connect to nothing. Legacy fills the open sea north of the gap as land (14/16379/3793, 13/8191/1896).",
-      "bbox": [179.85, 68.95, 180.0, 69.07],
-      "minzoom": 12
-    },
-    {
-      "title": "Schiessgebiet Nordsee (way 173486729, landuse=military, military=range)",
-      "reason": "Both references hatch the military range over the open sea, so there is no water to compare (16/33958/20885, 15/16976/10465).",
-      "bbox": [6.4999, 54.2499, 7.0001, 54.6667],
-      "minzoom": 10
-    }
-  ],
+  "dataIssues": [],
   "cases": [
     {
       "issue": 24376,

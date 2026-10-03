@@ -174,7 +174,10 @@ public class CoastlineRenderingTester {
 			// 13/4401/2600 - a few units apart, within COLOR_TOLERANCE). Its hatch lines #b5c1cb and #babac3
 			// are left out: both are within the tolerance of runways (#bbbbcc), and the mask tolerance
 			// bridges the thin lines anyway
-			0xb1c9d4 };
+			0xb1c9d4,
+			// water under the redder overlay of military=range / danger areas (Schiessgebiet Nordsee
+			// 16/33958/20885); its hatch lines #c6a5ad and #cf969b are bridged by the mask tolerance
+			0xbcb8c1 };
 
 	/**
 	 * Dashes of the {@code wetland_saltern} shader. default.render.xml paints
