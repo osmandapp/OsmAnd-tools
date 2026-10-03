@@ -225,12 +225,16 @@ public class CoastlineRenderingTester {
 	 * their lagoon, reserves tagged desert, parks and archaeological sites with their bay, offshore oil
 	 * fields tagged industrial, land reclamation sites tagged construction with their canals (Jeddah),
 	 * offshore solar plants (Yellow River delta), aerodromes on sea ice (McMurdo), landfills with their
-	 * ponds (Mykolaiv), mangroves mapped as wood into the sea (Para).
+	 * ponds (Mykolaiv), mangroves mapped as wood into the sea (Para), ruins mapped with their bay (Grant
+	 * Point, Alaska), wave test sites tagged power=generator (EMEC, Orkney), salt ponds: plain
+	 *  below z13, where SHADED_WATER_COLORS cannot tell them from the sea (Salinas Grandes,
+	 * Aral, Atacama).
 	 * Hiding them can't make water out of land - the land is still under them. Land cover both styles
 	 * draw is checked instead, see OSMAND_LANDCOVER_COLORS.
 	 */
 	static final String DEFAULT_HIDE = "place=island,place=islet,natural=desert,leisure=park,historic=archaeological_site,"
-			+ "landuse=industrial,landuse=construction,power=plant,aeroway=aerodrome,landuse=landfill,natural=wood";
+			+ "landuse=industrial,landuse=construction,power=plant,aeroway=aerodrome,landuse=landfill,natural=wood,"
+			+ "historic=ruins,power=generator,landuse=salt_pond";
 
 	/** How the random tiles are split: coastal, open ocean, inland. */
 	private static final int SHARE_COASTAL = 80, SHARE_OCEAN = 10;
