@@ -174,7 +174,10 @@ public class CoastlineRenderingTester {
 			// 13/4401/2600 - a few units apart, within COLOR_TOLERANCE). Its hatch lines #b5c1cb and #babac3
 			// are left out: both are within the tolerance of runways (#bbbbcc), and the mask tolerance
 			// bridges the thin lines anyway
-			0xb1c9d4 };
+			0xb1c9d4,
+			// water under the redder overlay of military=range / danger areas (Schiessgebiet Nordsee
+			// 16/33958/20885); its hatch lines #c6a5ad and #cf969b are bridged by the mask tolerance
+			0xbcb8c1 };
 
 	/**
 	 * Dashes of the {@code wetland_saltern} shader. default.render.xml paints
@@ -223,12 +226,18 @@ public class CoastlineRenderingTester {
 	/**
 	 * Areas openstreetmap-carto does not fill over the sea, while OsmAnd does: islands mapped with
 	 * their lagoon, reserves tagged desert, parks and archaeological sites with their bay, offshore oil
-	 * fields tagged industrial, land reclamation sites tagged construction with their canals (Jeddah).
+	 * fields tagged industrial, land reclamation sites tagged construction with their canals (Jeddah),
+	 * offshore solar plants (Yellow River delta), aerodromes on sea ice (McMurdo), landfills with their
+	 * ponds (Mykolaiv), mangroves mapped as wood into the sea (Para), ruins mapped with their bay (Grant
+	 * Point, Alaska), wave test sites tagged power=generator (EMEC, Orkney), salt ponds: plain
+	 *  below z13, where SHADED_WATER_COLORS cannot tell them from the sea (Salinas Grandes,
+	 * Aral, Atacama).
 	 * Hiding them can't make water out of land - the land is still under them. Land cover both styles
 	 * draw is checked instead, see OSMAND_LANDCOVER_COLORS.
 	 */
 	static final String DEFAULT_HIDE = "place=island,place=islet,natural=desert,leisure=park,historic=archaeological_site,"
-			+ "landuse=industrial,landuse=construction";
+			+ "landuse=industrial,landuse=construction,power=plant,aeroway=aerodrome,landuse=landfill,natural=wood,"
+			+ "historic=ruins,power=generator,landuse=salt_pond";
 
 	/** How the random tiles are split: coastal, open ocean, inland. */
 	private static final int SHARE_COASTAL = 80, SHARE_OCEAN = 10;
