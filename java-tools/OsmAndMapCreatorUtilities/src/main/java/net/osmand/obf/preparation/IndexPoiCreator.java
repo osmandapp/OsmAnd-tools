@@ -66,6 +66,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private static final Log log = LogFactory.getLog(IndexPoiCreator.class);
 
 	private Connection poiConnection;
+	// alternative names of the last written POI name index
+	private AlternativeNameIndexGenerator.Stats alternativeNameStats;
 	private File poiIndexFile;
 	private PreparedStatement poiPreparedStatement;
 	private PreparedStatement tagGroupsPreparedStatement;
@@ -755,6 +757,11 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 	}
 
+	// null before the POI index is written
+	public AlternativeNameIndexGenerator.Stats getAlternativeNameStats() {
+		return alternativeNameStats;
+	}
+
 	public void writeBinaryPoiIndex(File poiGeocoding, BinaryMapIndexWriter writer, String regionName,
 			IProgress progress) throws SQLException, IOException {
 		if (poiPreparedStatement != null) {
@@ -794,6 +801,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		// 2.5 write names table
 		Map<PoiTileBox, List<BinaryFileReference>> fpToWriteSeeks = writer.writePoiNameIndex(globalCategories,
 				namesIndex, startFpPoiIndex);
+		alternativeNameStats = namesIndex.getAlternativeNameStats();
 
 		// 3. write boxes
 		log.info("Poi box processing finished");

@@ -2081,7 +2081,7 @@ public interface InspectorService extends OBFService {
         CommonWords defaultInstance = CommonWords.getInstance();
         for (String candidateName : candidateNames) {
             List<String> tokens = SearchAlgorithms.splitAndNormalize(candidateName, true);
-            SearchAlgorithms.removeCommonWords(defaultInstance, tokens);
+            SearchAlgorithms.removeCommonWords(defaultInstance, tokens, "");
             if (tokens.size() == 1 && tokens.contains(tokenName)) {
                 return true;
             }

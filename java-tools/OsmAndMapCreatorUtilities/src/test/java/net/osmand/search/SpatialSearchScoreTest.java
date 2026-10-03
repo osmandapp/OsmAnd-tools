@@ -11,7 +11,12 @@ import net.osmand.search.core.spatial.SpatialTextSearch;
 public class SpatialSearchScoreTest extends SpatialSearchPipelineTest {
 	
     public SpatialSearchScoreTest(String name, File file) {
-        super(name, new File(new File(file.getParentFile(), "score"), file.getName()));
+        super(name, scoreFileOrDefault(file));
+    }
+
+    private static File scoreFileOrDefault(File file) {
+        File scoreFile = new File(new File(file.getParentFile(), "score"), file.getName());
+        return scoreFile.isFile() ? scoreFile : file;
     }
 
     @Override
