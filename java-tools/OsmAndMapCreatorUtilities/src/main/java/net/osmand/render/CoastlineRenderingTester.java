@@ -184,9 +184,13 @@ public class CoastlineRenderingTester {
 	 * {@code landuse=salt_pond} with {@code $waterColor} plus this shader on purpose, while
 	 * openstreetmap-carto paints the same ponds as a wetland. That is a style difference and not a
 	 * broken coastline, so the areas covered by the shader are excluded from the extra water mask
-	 * (they are still counted and reported separately).
+	 * (they are still counted and reported separately). The legacy engine draws the dashes lighter.
+	 * The style starts the shader at z13; the patched style starts it at z11 with the ponds, see
+	 * SALTERN_SHADER_FROM.
 	 */
-	private static final int[] SHADED_WATER_COLORS = { 0x2992ef };
+	private static final int[] SHADED_WATER_COLORS = { 0x2992ef, 0xd6e7ff, 0xb5dfff };
+
+	private static final String SALTERN_SHADER_FROM = "<apply_if minzoom=\"13\" shader=\"wetland_saltern\"";
 
 	private static final int SHADED_WATER_SPREAD_PX = 16;
 
@@ -229,15 +233,13 @@ public class CoastlineRenderingTester {
 	 * fields tagged industrial, land reclamation sites tagged construction with their canals (Jeddah),
 	 * offshore solar plants (Yellow River delta), aerodromes on sea ice (McMurdo), landfills with their
 	 * ponds (Mykolaiv), mangroves mapped as wood into the sea (Para), ruins mapped with their bay (Grant
-	 * Point, Alaska), wave test sites tagged power=generator (EMEC, Orkney), salt ponds: plain
-	 *  below z13, where SHADED_WATER_COLORS cannot tell them from the sea (Salinas Grandes,
-	 * Aral, Atacama).
+	 * Point, Alaska), wave test sites tagged power=generator (EMEC, Orkney).
 	 * Hiding them can't make water out of land - the land is still under them. Land cover both styles
 	 * draw is checked instead, see OSMAND_LANDCOVER_COLORS.
 	 */
 	static final String DEFAULT_HIDE = "place=island,place=islet,natural=desert,leisure=park,historic=archaeological_site,"
 			+ "landuse=industrial,landuse=construction,power=plant,aeroway=aerodrome,landuse=landfill,natural=wood,"
-			+ "historic=ruins,power=generator,landuse=salt_pond";
+			+ "historic=ruins,power=generator";
 
 	/** How the random tiles are split: coastal, open ocean, inland. */
 	private static final int SHARE_COASTAL = 80, SHARE_OCEAN = 10;
@@ -943,7 +945,8 @@ public class CoastlineRenderingTester {
 				cases.append("\n\t\t<case tag=\"").append(t[0]).append("\" value=\"").append(t[1])
 						.append("\" order=\"-1\"/>");
 			}
-			return xml.substring(0, i) + cases + xml.substring(i + "<order>".length());
+			return (xml.substring(0, i) + cases + xml.substring(i + "<order>".length()))
+					.replace(SALTERN_SHADER_FROM, SALTERN_SHADER_FROM.replace("13", "11"));
 		}
 		return null;
 	}
