@@ -78,6 +78,10 @@ public interface CloudUsersRepository extends JpaRepository<CloudUser, Long> {
         @Column(name = "weblinktime")
         @Temporal(TemporalType.TIMESTAMP)
         public Date webLinkTime;
+
+        // user turned off access for OAuth clients (AI assistants); null = allowed
+        @Column(name = "oauthdisabled")
+        public Boolean oauthDisabled;
         
     }
 
