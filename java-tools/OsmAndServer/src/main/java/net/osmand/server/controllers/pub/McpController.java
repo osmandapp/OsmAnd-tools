@@ -23,6 +23,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -76,6 +77,9 @@ public class McpController {
 	private static final long MAX_READ_SIZE = 1024 * 1024;
 	private static final int MAX_WRITE_SIZE = 5 * 1024 * 1024;
 	private static final int MAX_NAME_LENGTH = 512;
+	// guide for assistants, kept in web-server-config to edit without a server release
+	private static final String GUIDE_FILE = "api/mcp_guide.md";
+	private static final String GUIDE_URI = "osmand://guide";
 
 	@Autowired
 	private OAuthService oauthService;
@@ -95,6 +99,9 @@ public class McpController {
 	@Autowired
 	private UserSubscriptionService userSubService;
 
+	@Value("${osmand.web.location}")
+	private String websiteLocation;
+
 	private final Gson gson = new GsonBuilder().disableHtmlEscaping().create();
 
 	private enum Access { NONE, READ, WRITE }
@@ -108,6 +115,9 @@ public class McpController {
 			"description", "File name with folder as returned by list_files");
 
 	private static final List<Tool> TOOLS = List.of(
+			new Tool("get_guide", Access.NONE,
+					"How OsmAnd Cloud files are organized and formatted (favorites, tracks...). Read before writing files.",
+					schema(Map.of(), List.of())),
 			new Tool("get_account", Access.NONE,
 					"OsmAnd account of the connected user: email and OsmAnd Pro status.",
 					schema(Map.of(), List.of())),
@@ -177,6 +187,8 @@ public class McpController {
 		case "ping" -> result(id, Map.of());
 		case "tools/list" -> result(id, Map.of("tools", listTools(grant)));
 		case "tools/call" -> callTool(id, grant, params);
+		case "resources/list" -> result(id, Map.of("resources", listResources()));
+		case "resources/read" -> readResource(id, params);
 		default -> error(id, -32601, "Method not found: " + method);
 		};
 		return ResponseEntity.ok(gson.toJson(res));
@@ -186,11 +198,11 @@ public class McpController {
 		Object asked = params.get("protocolVersion");
 		String version = PROTOCOL_VERSIONS.contains(asked) ? (String) asked : PROTOCOL_VERSIONS.get(0);
 		return Map.of("protocolVersion", version,
-				"capabilities", Map.of("tools", Map.of("listChanged", false)),
+				"capabilities", Map.of("tools", Map.of("listChanged", false), "resources", Map.of("listChanged", false)),
 				"serverInfo", Map.of("name", "osmand", "version", "0.2"),
 				"instructions", "Tools work with the user's OsmAnd Cloud files (favorites, tracks, markers, settings...). "
 						+ "They do not control the app on the phone; changes reach the apps on their next Cloud sync. "
-						+ "Ask the user before write_file or delete_file.");
+						+ "Call get_guide before writing files. Ask the user before write_file or delete_file.");
 	}
 
 	private List<Map<String, Object>> listTools(OAuthGrant grant) {
@@ -220,6 +232,7 @@ public class McpController {
 		LOG.info("MCP tool call " + name + " user " + grant.userid + " client " + grant.clientid);
 		try {
 			Object data = switch (name) {
+			case "get_guide" -> guide();
 			case "get_account" -> getAccount(grant.userid);
 			case "list_files" -> listFiles(grant, str(args, "group"), str(args, "folder"));
 			case "read_file" -> readFile(grant, str(args, "type"), str(args, "name"), args.get("version"));
@@ -236,6 +249,39 @@ public class McpController {
 			LOG.error("MCP tool " + name + " failed for user " + grant.userid, e);
 			return toolResult(id, "Tool failed: " + e.getMessage(), true);
 		}
+	}
+
+	// ---------- guide ----------
+
+	private String readGuide() {
+		File f = new File(websiteLocation, GUIDE_FILE);
+		try {
+			return f.isFile() ? Files.readString(f.toPath()) : null;
+		} catch (Exception e) {
+			LOG.error("Can't read " + f, e);
+			return null;
+		}
+	}
+
+	private String guide() throws ToolException {
+		String text = readGuide();
+		if (text == null) {
+			throw new ToolException("Guide is not available");
+		}
+		return text;
+	}
+
+	private List<Map<String, Object>> listResources() {
+		return readGuide() == null ? List.of()
+				: List.of(Map.of("uri", GUIDE_URI, "name", "OsmAnd Cloud guide", "mimeType", "text/markdown"));
+	}
+
+	private Map<String, Object> readResource(JsonElement id, Map<?, ?> params) {
+		String text = GUIDE_URI.equals(params.get("uri")) ? readGuide() : null;
+		if (text == null) {
+			return error(id, -32002, "Resource not found");
+		}
+		return result(id, Map.of("contents", List.of(Map.of("uri", GUIDE_URI, "mimeType", "text/markdown", "text", text))));
 	}
 
 	// ---------- tools ----------
@@ -485,6 +531,9 @@ public class McpController {
 	}
 
 	private boolean isAvailable(OAuthGrant grant, Tool t) {
+		if (t.name.equals("get_guide")) {
+			return true;
+		}
 		if (t.access == Access.NONE) {
 			return hasScope(grant, OAuthService.SCOPE_ACCOUNT_READ);
 		}
