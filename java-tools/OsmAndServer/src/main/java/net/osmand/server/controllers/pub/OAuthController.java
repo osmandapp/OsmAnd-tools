@@ -92,7 +92,7 @@ public class OAuthController {
 		m.put("code_challenge_methods_supported", List.of("S256"));
 		m.put("token_endpoint_auth_methods_supported", List.of(OAuthService.AUTH_METHOD_NONE,
 				OAuthService.AUTH_METHOD_POST, OAuthService.AUTH_METHOD_BASIC));
-		m.put("scopes_supported", List.copyOf(OAuthService.SCOPES.keySet()));
+		m.put("scopes_supported", List.copyOf(OAuthService.SCOPES));
 		m.put("authorization_response_iss_parameter_supported", true);
 		return json(HttpStatus.OK, m);
 	}
@@ -104,7 +104,7 @@ public class OAuthController {
 		Map<String, Object> m = new LinkedHashMap<>();
 		m.put("resource", base + McpController.MCP_PATH);
 		m.put("authorization_servers", List.of(base));
-		m.put("scopes_supported", List.copyOf(OAuthService.SCOPES.keySet()));
+		m.put("scopes_supported", List.copyOf(OAuthService.SCOPES));
 		m.put("bearer_methods_supported", List.of("header"));
 		m.put("resource_name", "OsmAnd");
 		return json(HttpStatus.OK, m);
@@ -211,25 +211,67 @@ public class OAuthController {
 		request.getSession(true).setAttribute(PENDING_ATTR + nonce, new PendingAuthorization(dev.userid,
 				client.clientid, redirectUri, state, codeChallenge, resource));
 		Set<String> checked = oauthService.defaultScopes(scope);
-		StringBuilder scopes = new StringBuilder();
-		for (Map.Entry<String, String> e : OAuthService.SCOPES.entrySet()) {
-			String v = HtmlUtils.htmlEscape(e.getKey());
-			scopes.append("<label class=\"scope\"><input type=\"checkbox\" name=\"scope\" value=\"").append(v)
-					.append("\"").append(checked.contains(e.getKey()) ? " checked" : "").append("> ")
-					.append(HtmlUtils.htmlEscape(e.getValue())).append("</label>");
-		}
 		String n = HtmlUtils.htmlEscape(nonce);
-		return page(HttpStatus.OK, "Connect " + client.clientname + "?",
-				"<p><b>" + clientName + "</b> wants to access your OsmAnd account <b>"
-						+ HtmlUtils.htmlEscape(pu.email) + "</b>.</p>"
+		String initial = HtmlUtils.htmlEscape(client.clientname.isEmpty() ? "?"
+				: client.clientname.substring(0, 1).toUpperCase());
+		return page(HttpStatus.OK, client.clientname + " wants to connect to OsmAnd",
+				"<div class=\"app\">" + initial + "</div><div class=\"arrows\">&#8644;</div>"
+						+ "<div class=\"logo\">" + LOGO_SVG + "</div>",
+				"<p class=\"lead\"><b>" + clientName + "</b> will be able to use your OsmAnd Cloud data "
+						+ "as you allow below.</p>"
+						+ "<div class=\"acct\"><span class=\"avatar\">" + HtmlUtils.htmlEscape(
+								pu.email.substring(0, 1).toUpperCase()) + "</span><div><small>Signed in as</small><b>"
+						+ HtmlUtils.htmlEscape(pu.email) + "</b></div></div>"
 						+ "<form method=\"post\" action=\"/oauth/authorize\">"
-						+ "<p>Allow it to:</p>" + scopes
-						+ "<p class=\"muted\">After you allow it, you will be returned to <b>" + host + "</b>. "
-						+ "Only continue if you started this connection there. "
-						+ "You can disconnect it at any time in your OsmAnd account.</p>"
+						+ permissionTable(checked)
+						+ "<p class=\"hint\">Edits are saved as new versions, older versions stay in OsmAnd Cloud. "
+						+ "You can change access or disconnect at any time in your OsmAnd account, Connected apps.</p>"
 						+ "<input type=\"hidden\" name=\"nonce\" value=\"" + n + "\">"
-						+ "<button name=\"decision\" value=\"allow\" class=\"primary\">Allow</button> "
-						+ "<button name=\"decision\" value=\"deny\">Deny</button></form>");
+						+ "<div class=\"actions\"><button name=\"decision\" value=\"allow\" class=\"primary\">Allow</button>"
+						+ "<button name=\"decision\" value=\"deny\">Cancel</button></div>"
+						+ "<p class=\"fine\">After you allow it, you return to <b>" + host + "</b>. "
+						+ "Continue only if you started this connection there.</p></form>"
+						+ PERMISSION_SCRIPT);
+	}
+
+	private static final String LOGO_SVG = "<svg viewBox=\"0 0 192 192\" width=\"40\" height=\"40\" aria-label=\"OsmAnd\">"
+			+ "<path fill-rule=\"evenodd\" fill=\"#FF8800\" d=\"M168 96C168 125.833 149.856 151.429 124 162.353C110.634 168 "
+			+ "106 171 102 179C101.611 179.779 101.278 180.52 100.969 181.208C99.6915 184.055 98.8184 186 96 186C93.1816 186 "
+			+ "92.3085 184.055 91.0311 181.208C90.7221 180.52 90.3895 179.779 90 179C86 171 81 168 68 162.353C42.1445 151.429 "
+			+ "24 125.833 24 96C24 56.2355 56.2355 24 96 24C135.765 24 168 56.2355 168 96ZM136 96.0001C136 118.091 118.091 "
+			+ "136 96.0001 136C73.9087 136 56 118.091 56 96.0001C56 73.9087 73.9087 56 96.0001 56C118.091 56 136 73.9087 136 "
+			+ "96.0001Z\"/></svg>";
+
+	// edit includes view: ticking Edit ticks View, unticking View unticks Edit; Allow needs at least one
+	private static final String PERMISSION_SCRIPT = "<script>(function(){"
+			+ "var f=document.querySelector('form'),a=f.querySelector('button.primary');"
+			+ "function q(k){return f.querySelector('input[value=\"'+k+'\"]');}"
+			+ "function upd(){a.disabled=!f.querySelector('input[name=scope]:checked');}"
+			+ "f.querySelectorAll('input[name=scope]').forEach(function(e){e.addEventListener('change',function(){"
+			+ "var g=e.value.split(':')[0];"
+			+ "if(e.checked&&e.value.endsWith(':write')){q(g+':read').checked=true;}"
+			+ "if(!e.checked&&e.value.endsWith(':read')&&q(g+':write')){q(g+':write').checked=false;}upd();});});"
+			+ "upd();})();</script>";
+
+	private static String permissionTable(Set<String> checked) {
+		StringBuilder sb = new StringBuilder("<table class=\"perm\"><thead><tr><th></th><th>View</th><th>Edit</th>"
+				+ "</tr></thead><tbody>");
+		for (OAuthService.ScopeGroup g : OAuthService.SCOPE_GROUPS) {
+			sb.append("<tr><td><b>").append(HtmlUtils.htmlEscape(g.title())).append("</b><small>")
+					.append(HtmlUtils.htmlEscape(g.description())).append("</small></td>");
+			sb.append("<td>").append(toggle(g, g.key() + OAuthService.READ, "view", checked)).append("</td><td>");
+			if (g.write()) {
+				sb.append(toggle(g, g.key() + OAuthService.WRITE, "edit", checked));
+			}
+			sb.append("</td></tr>");
+		}
+		return sb.append("</tbody></table>").toString();
+	}
+
+	private static String toggle(OAuthService.ScopeGroup g, String scope, String action, Set<String> checked) {
+		return "<label class=\"sw\"><input type=\"checkbox\" name=\"scope\" value=\"" + HtmlUtils.htmlEscape(scope)
+				+ "\" aria-label=\"" + HtmlUtils.htmlEscape(g.title() + ": " + action) + "\""
+				+ (checked.contains(scope) ? " checked" : "") + "><i></i></label>";
 	}
 
 	@PostMapping(path = "/oauth/authorize")
@@ -319,6 +361,7 @@ public class OAuthController {
 		Map<String, Object> m = new LinkedHashMap<>();
 		m.put("enabled", oauthService.isEnabled(usersRepository.findById(dev.userid)));
 		m.put("connections", oauthService.getConnections(dev.userid));
+		m.put("groups", OAuthService.SCOPE_GROUPS);
 		return json(HttpStatus.OK, m);
 	}
 
@@ -340,6 +383,19 @@ public class OAuthController {
 		}
 		if (!oauthService.revokeConnection(dev.userid, id)) {
 			return ResponseEntity.badRequest().body(gson.toJson(Map.of("error", "unknown connection")));
+		}
+		return connections();
+	}
+
+	@PostMapping(path = "/mapapi/oauth/scope", produces = MediaType.APPLICATION_JSON_VALUE)
+	public ResponseEntity<String> setConnectionScope(@RequestParam int id,
+	                                                 @RequestParam(name = "scope", required = false) List<String> scope) {
+		CloudUserDevice dev = currentUser();
+		if (dev == null) {
+			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+		}
+		if (!oauthService.setConnectionScope(dev.userid, id, scope)) {
+			return ResponseEntity.badRequest().body(gson.toJson(Map.of("error", "unknown connection or empty scope")));
 		}
 		return connections();
 	}
@@ -415,18 +471,50 @@ public class OAuthController {
 		return json(e.status, m);
 	}
 
+	private static final String PAGE_CSS = ":root{--bg:#f2f3f5;--card:#fff;--text:#1f2023;--muted:#6b6e76;"
+			+ "--line:#e6e7ea;--accent:#237bff;--off:#c9ccd1;--soft:#eef4ff}"
+			+ "@media (prefers-color-scheme: dark){:root{--bg:#141517;--card:#1f2023;--text:#eceef1;--muted:#9a9ea6;"
+			+ "--line:#33353a;--off:#4a4d54;--soft:#1d2a40}}"
+			+ "*{box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;"
+			+ "background:var(--bg);color:var(--text);margin:0;padding:16px;font-size:15px;line-height:1.45}"
+			+ ".card{max-width:520px;margin:32px auto;background:var(--card);border-radius:16px;padding:28px;"
+			+ "box-shadow:0 2px 12px rgba(0,0,0,.08)}h1{font-size:22px;line-height:1.3;margin:0 0 8px;text-align:center}"
+			+ "a{color:var(--accent)}.muted,.hint,.fine{color:var(--muted)}.hint{font-size:13px;margin:16px 0}"
+			+ ".fine{font-size:12px;text-align:center;margin:16px 0 0}.lead{text-align:center;margin:0 0 20px}"
+			+ ".pair{display:flex;align-items:center;justify-content:center;gap:14px;margin:0 0 18px}"
+			+ ".app,.logo{width:56px;height:56px;border-radius:16px;display:flex;"
+			+ "align-items:center;justify-content:center;background:var(--soft)}.app{font-size:26px;font-weight:600;"
+			+ "color:var(--accent)}.arrows{color:var(--muted);font-size:22px}"
+			+ ".acct{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:12px;"
+			+ "padding:10px 14px;margin:0 0 18px}.acct small{display:block;color:var(--muted);font-size:12px}"
+			+ ".avatar{width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;display:flex;"
+			+ "align-items:center;justify-content:center;font-weight:600;flex:none}"
+			+ ".perm{width:100%;border-collapse:collapse}.perm th{font-size:12px;font-weight:600;color:var(--muted);"
+			+ "text-transform:uppercase;letter-spacing:.04em;padding:0 0 6px;width:64px;text-align:center}"
+			+ ".perm td{padding:10px 0;border-top:1px solid var(--line);text-align:center;vertical-align:middle}"
+			+ ".perm td:first-child{text-align:left}.perm small{display:block;color:var(--muted);font-size:13px}"
+			+ ".sw{position:relative;display:inline-block;width:40px;height:24px;cursor:pointer}"
+			+ ".sw input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:1}"
+			+ ".sw i{position:absolute;inset:0;background:var(--off);border-radius:12px;transition:background .15s}"
+			+ ".sw i:before{content:'';position:absolute;width:18px;height:18px;left:3px;top:3px;background:#fff;"
+			+ "border-radius:50%;transition:transform .15s;box-shadow:0 1px 2px rgba(0,0,0,.3)}"
+			+ ".sw input:checked+i{background:var(--accent)}.sw input:checked+i:before{transform:translateX(16px)}"
+			+ ".sw input:focus-visible+i{outline:2px solid var(--accent);outline-offset:2px}"
+			+ ".actions{display:flex;flex-direction:row-reverse;gap:12px}.actions button{flex:1}"
+			+ "button{font:inherit;font-weight:600;padding:12px 20px;border-radius:10px;border:1px solid var(--line);"
+			+ "background:var(--card);color:var(--text);cursor:pointer}button.primary{background:var(--accent);"
+			+ "border-color:var(--accent);color:#fff}button:disabled{opacity:.5;cursor:default}";
+
 	private static ResponseEntity<String> page(HttpStatus status, String title, String bodyHtml) {
+		return page(status, title, "<div class=\"logo\">" + LOGO_SVG + "</div>", bodyHtml);
+	}
+
+	private static ResponseEntity<String> page(HttpStatus status, String title, String iconsHtml, String bodyHtml) {
 		String html = "<!doctype html><html><head><meta charset=\"utf-8\">"
 				+ "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
-				+ "<title>" + HtmlUtils.htmlEscape(title) + " - OsmAnd</title><style>"
-				+ "body{font-family:system-ui,sans-serif;background:#f4f4f6;color:#222;margin:0;padding:16px}"
-				+ ".card{max-width:480px;margin:40px auto;background:#fff;border-radius:12px;padding:24px;"
-				+ "box-shadow:0 1px 4px rgba(0,0,0,.1)}h1{font-size:20px;margin-top:0}.muted{color:#666;font-size:14px}"
-				+ "button{font-size:16px;padding:10px 20px;border-radius:8px;border:1px solid #ccc;background:#fff;"
-				+ "cursor:pointer;margin-right:8px}label.scope{display:block;margin:6px 0}button.primary{background:#237bff;border-color:#237bff;color:#fff}"
-				+ "@media (prefers-color-scheme: dark){body{background:#17181a;color:#eee}.card{background:#222326}"
-				+ ".muted{color:#aaa}button{background:#333;color:#eee;border-color:#555}a{color:#6ea8ff}}"
-				+ "</style></head><body><div class=\"card\"><h1>" + HtmlUtils.htmlEscape(title) + "</h1>"
+				+ "<title>" + HtmlUtils.htmlEscape(title) + " - OsmAnd</title><style>" + PAGE_CSS
+				+ "</style></head><body><div class=\"card\"><div class=\"pair\">" + iconsHtml
+				+ "</div><h1>" + HtmlUtils.htmlEscape(title) + "</h1>"
 				+ bodyHtml + "</div></body></html>";
 		return ResponseEntity.status(status).contentType(MediaType.TEXT_HTML).cacheControl(CacheControl.noStore())
 				.header("X-Frame-Options", "DENY").body(html);

@@ -68,24 +68,27 @@ public class OAuthService {
 
 	// OsmAnd Cloud file types grouped as in the app backup screen; scope = group + ":read" / ":write"
 	public enum CloudGroup {
-		FAVORITES("favorites", "Favorites", "FAVOURITES"),
-		TRACKS("tracks", "Tracks", "GPX", "GPX_DIR"),
-		MARKERS("markers", "Map markers and itineraries", "ACTIVE_MARKERS", "HISTORY_MARKERS", "ITINERARY_GROUPS"),
-		OSM("osm", "OSM edits and notes", "OSM_EDITS", "OSM_NOTES"),
-		HISTORY("history", "Search and navigation history", "SEARCH_HISTORY", "NAVIGATION_HISTORY"),
-		SETTINGS("settings", "Profiles and settings", "GLOBAL", "PROFILE", "PLUGIN", "QUICK_ACTIONS", "POI_UI_FILTERS",
-				"AVOID_ROADS", "ONLINE_ROUTING_ENGINES", "MAP_SOURCES", "DATA", "RESOURCES", "DOWNLOADS",
-				"SUGGESTED_DOWNLOADS"),
+		FAVORITES("favorites", "Favorites", "Saved places and their groups", "FAVOURITES"),
+		TRACKS("tracks", "Tracks", "GPX tracks and track folders", "GPX", "GPX_DIR"),
+		MARKERS("markers", "Map markers", "Markers and itineraries", "ACTIVE_MARKERS", "HISTORY_MARKERS",
+				"ITINERARY_GROUPS"),
+		OSM("osm", "OSM edits", "Your OpenStreetMap edits and notes", "OSM_EDITS", "OSM_NOTES"),
+		HISTORY("history", "History", "Search and navigation history", "SEARCH_HISTORY", "NAVIGATION_HISTORY"),
+		SETTINGS("settings", "Settings", "Profiles, plugins, quick actions, map sources", "GLOBAL", "PROFILE", "PLUGIN",
+				"QUICK_ACTIONS", "POI_UI_FILTERS", "AVOID_ROADS", "ONLINE_ROUTING_ENGINES", "MAP_SOURCES", "DATA",
+				"RESOURCES", "DOWNLOADS", "SUGGESTED_DOWNLOADS"),
 		// FILE and any type unknown here: rendering styles, routing files, audio/video notes, maps
-		FILES("files", "Other files (map styles, routing, media notes, maps)", "FILE");
+		FILES("files", "Other files", "Map styles, routing files, media notes, maps", "FILE");
 
 		public final String key;
 		public final String title;
+		public final String description;
 		public final Set<String> types;
 
-		CloudGroup(String key, String title, String... types) {
+		CloudGroup(String key, String title, String description, String... types) {
 			this.key = key;
 			this.title = title;
+			this.description = description;
 			this.types = Set.of(types);
 		}
 
@@ -99,13 +102,22 @@ public class OAuthService {
 		}
 	}
 
-	// scope -> text on the consent page
-	public static final Map<String, String> SCOPES = new LinkedHashMap<>();
+	// rows of the permission table (consent page, account settings): scope prefix, title, description, has write
+	public record ScopeGroup(String key, String title, String description, boolean write) {
+	}
+
+	public static final List<ScopeGroup> SCOPE_GROUPS = new ArrayList<>();
+	public static final Set<String> SCOPES = new LinkedHashSet<>();
 	static {
-		SCOPES.put(SCOPE_ACCOUNT_READ, "See your account email and OsmAnd Pro status");
+		SCOPE_GROUPS.add(new ScopeGroup("account", "Account", "Email and OsmAnd Pro status", false));
 		for (CloudGroup g : CloudGroup.values()) {
-			SCOPES.put(g.key + READ, g.title + ": read");
-			SCOPES.put(g.key + WRITE, g.title + ": change and delete (old versions stay in Cloud)");
+			SCOPE_GROUPS.add(new ScopeGroup(g.key, g.title, g.description, true));
+		}
+		for (ScopeGroup g : SCOPE_GROUPS) {
+			SCOPES.add(g.key + READ);
+			if (g.write) {
+				SCOPES.add(g.key + WRITE);
+			}
 		}
 	}
 
@@ -238,13 +250,13 @@ public class OAuthService {
 		Set<String> res = new LinkedHashSet<>();
 		if (requested != null) {
 			for (String s : requested.trim().split("\\s+")) {
-				if (SCOPES.containsKey(s)) {
+				if (SCOPES.contains(s)) {
 					res.add(s);
 				}
 			}
 		}
 		if (res.isEmpty()) {
-			for (String s : SCOPES.keySet()) {
+			for (String s : SCOPES) {
 				if (s.endsWith(READ)) {
 					res.add(s);
 				}
@@ -253,11 +265,12 @@ public class OAuthService {
 		return res;
 	}
 
-	// scopes the user checked on the consent page, in canonical order
+	// scopes the user checked, in canonical order; edit includes view
 	public String grantedScope(java.util.Collection<String> checked) {
 		Set<String> res = new LinkedHashSet<>();
-		for (String s : SCOPES.keySet()) {
-			if (checked != null && checked.contains(s)) {
+		for (String s : SCOPES) {
+			if (checked != null && (checked.contains(s)
+					|| (s.endsWith(READ) && checked.contains(s.substring(0, s.length() - READ.length()) + WRITE)))) {
 				res.add(s);
 			}
 		}
@@ -402,6 +415,19 @@ public class OAuthService {
 			return false;
 		}
 		grantsRepository.delete(g);
+		return true;
+	}
+
+	// user changed the permissions of a connection in account settings; applies to the next request
+	public boolean setConnectionScope(int userId, int grantId, java.util.Collection<String> checked) {
+		OAuthGrant g = grantsRepository.findById(grantId).orElse(null);
+		String scope = grantedScope(checked);
+		if (g == null || g.userid != userId || scope.isEmpty()) {
+			return false;
+		}
+		g.scope = scope;
+		grantsRepository.save(g);
+		LOG.info("OAuth scope changed by user " + userId + " for client " + g.clientid + ": " + scope);
 		return true;
 	}
 
