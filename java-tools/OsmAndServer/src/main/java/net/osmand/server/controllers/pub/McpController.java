@@ -171,20 +171,25 @@ public class McpController {
 					"params", Map.of("type", "object")), "required", List.of("lat", "lon")));
 
 	private static final Map<String, Object> WAYPOINTS_ARG = Map.of("type", "array", "description",
-			"Track waypoints (places to see), up to " + McpSearch.MAX_WAYPOINTS + ". Pass osm (from search or "
-					+ "search_popular_places, e.g. way/27830282) with lat/lon: the server stores the POI as OsmAnd does, "
-					+ "so the app shows its details, and takes its name and icon. icon: OsmAnd icon name from a search "
-					+ "result (default " + McpSearch.DEFAULT_ICON + ").",
+			"Track waypoints, up to " + McpSearch.MAX_WAYPOINTS + ": pass a search / search_popular_places result as "
+					+ "it is (plus group). With osm the server stores the POI as OsmAnd does (origin, OSM tags: opening "
+					+ "hours, website, wiki...), so the app shows its details; name and icon come from the POI unless given. "
+					+ "icon: an OsmAnd icon name from a result (default " + McpSearch.DEFAULT_ICON + ").",
 			"items", Map.of("type", "object", "properties", Map.ofEntries(
 					Map.entry("lat", Map.of("type", "number")), Map.entry("lon", Map.of("type", "number")),
 					Map.entry("osm", Map.of("type", "string", "description", "node/123, way/123 or relation/123")),
-					Map.entry("wikidata", Map.of("type", "string", "description", "Q123")),
-					Map.entry("name", Map.of("type", "string")), Map.entry("description", Map.of("type", "string")),
+					Map.entry("name", Map.of("type", "string")),
+					Map.entry("description", Map.of("type", "string", "description", "Short text, e.g. from search_popular_places")),
 					Map.entry("icon", Map.of("type", "string")),
+					Map.entry("wikidata", Map.of("type", "string", "description", "Q123")),
+					Map.entry("wikipedia", Map.of("type", "string", "description", "Article URL")),
+					Map.entry("photo", Map.of("type", "string", "description", "Wikimedia Commons URL")),
+					Map.entry("openingHours", Map.of("type", "string")), Map.entry("website", Map.of("type", "string")),
+					Map.entry("phone", Map.of("type", "string")),
+					Map.entry("group", Map.of("type", "string", "description", "Waypoint group, e.g. Sights, Food")),
 					Map.entry("color", Map.of("type", "string", "description", "#RRGGBB")),
 					Map.entry("background", Map.of("type", "string", "description", "circle, octagon or square")),
-					Map.entry("group", Map.of("type", "string", "description", "Waypoint group, e.g. Sights")),
-					Map.entry("link", Map.of("type", "string", "description", "URL, e.g. the Wikipedia article"))),
+					Map.entry("link", Map.of("type", "string", "description", "Another URL"))),
 					"required", List.of("lat", "lon")));
 
 	// tools without Cloud data: any connection may use them
@@ -390,7 +395,10 @@ public class McpController {
 						+ "They do not control the app on the phone; changes reach the apps on their next Cloud sync. "
 						+ "Call get_guide before writing files. Ask the user before write_file or delete_file. "
 						+ "For GPX tracks use analyze_track and read_track_points instead of read_file. "
-						+ "search, search_popular_places and build_route work with the OsmAnd map, not with Cloud files.");
+						+ "search, search_popular_places and build_route work with the OsmAnd map, not with Cloud files. "
+						+ "To plan a route with places (get_guide, Routes and Search): find them with search_popular_places "
+						+ "and search, check the way with build_route in the user's profile, then save it with create_track "
+						+ "and the chosen results as waypoints.");
 	}
 
 	private List<Map<String, Object>> listTools(OAuthGrant grant) {
