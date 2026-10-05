@@ -261,7 +261,8 @@ public class McpController {
 			new Tool("search", Access.NONE,
 					"Search places as the OsmAnd search box: POIs by name or type (\"cafe\", \"Golden Gate\", \"fuel\"), "
 							+ "addresses, streets, cities. Results near lat/lon come first, with distance, address, opening "
-							+ "hours, phone, website, OsmAnd icon and osm id (for create_track waypoints). Up to "
+							+ "hours, phone, website, OsmAnd icon, osm id (for create_track waypoints) and osmandLink (the place on the "
+							+ "OsmAnd map with its details, give it to the user). Up to "
 							+ McpSearch.MAX_RESULTS + " results.",
 					schema(Map.of("text", Map.of("type", "string"),
 							"lat", Map.of("type", "number", "description", "Search near this point"),
@@ -277,7 +278,7 @@ public class McpController {
 					schema(Map.of("locale", Map.of("type", "string", "description", "Language, default en")), List.of())),
 			new Tool("search_popular_places", Access.NONE,
 					"Popular places around a point, as the OsmAnd map Explore layer: Wikipedia / Wikidata places ranked "
-							+ "by popularity, with a short description, Wikipedia link, photo, OsmAnd icon and osm id. Good for "
+							+ "by popularity, with a short description, Wikipedia link, photo, OsmAnd icon, osm id and osmandLink. Good for "
 							+ "sightseeing and planning walks; small places (parks, gardens) may rank low, use search for them.",
 					schema(Map.of("lat", Map.of("type", "number"), "lon", Map.of("type", "number"),
 							"radius_km", Map.of("type", "number", "description", "Default 3, max " + (int) McpSearch.MAX_RADIUS_KM),

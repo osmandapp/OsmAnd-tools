@@ -119,7 +119,9 @@ public class McpSearch {
 			m.put("lon", McpTracks.round(ll[1], 6));
 			m.put("distanceKm", McpTracks.round(d, 2));
 			put(m, "icon", icon(p));
-			put(m, "osm", osmRef(str(p, "web_poi_osmUrl")));
+			String osm = osmRef(str(p, "web_poi_osmUrl"));
+			put(m, "osm", osm);
+			put(m, "osmandLink", osmandUrl(str(p, "web_poi_subType"), ll, osm));
 			put(m, "address", str(p, "web_city"));
 			put(m, "openingHours", str(p, "amenity_opening_hours"));
 			put(m, "phone", first(p, "phone", "osm_tag_phone"));
@@ -192,6 +194,7 @@ public class McpSearch {
 			String osmType = str(p, "osmtype"), osmId = str(p, "osmid");
 			if (osmType != null && osmType.matches("[123]") && osmId != null && osmId.matches("\\d+")) {
 				m.put("osm", OSM_TYPES[Integer.parseInt(osmType)] + "/" + osmId);
+				put(m, "osmandLink", osmandUrl(str(p, "poisubtype"), ll, (String) m.get("osm")));
 			}
 			String elo = str(p, "elo");
 			m.put("popularity", elo != null ? (int) Double.parseDouble(elo) : 0);
@@ -368,6 +371,17 @@ public class McpSearch {
 		if (v instanceof String t && !t.isBlank() && t.length() < 1000) {
 			ext.putIfAbsent(key, t.trim());
 		}
+	}
+
+	// the web map's link to a POI (PoiManager.getPoiParams: /map/poi/?type&pin&osmId), opens it with its details
+	private String osmandUrl(String type, double[] ll, String osm) {
+		if (osm == null || ll == null) {
+			return null;
+		}
+		String t = type != null ? type.split(";")[0] : "";
+		String pin = String.format(java.util.Locale.US, "%.6f,%.6f", ll[0], ll[1]);
+		return localApi + "/map/poi/?type=" + enc(t) + "&pin=" + pin + "&osmId=" + osm.substring(osm.indexOf('/') + 1)
+				+ "#17/" + String.format(java.util.Locale.US, "%.5f/%.5f", ll[0], ll[1]);
 	}
 
 	private static String osmRef(String url) {
