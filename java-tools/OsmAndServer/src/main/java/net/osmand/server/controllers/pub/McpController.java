@@ -129,8 +129,8 @@ public class McpController {
 
 	private volatile McpRoutes routes;
 
-	@Value("${osmand.routing.site:}")
-	private String routingSite;
+	@Value("${osmand.mcp.server-api:}")
+	private String serverApi;
 
 	@Value("${osmand.web.location}")
 	private String websiteLocation;
@@ -546,7 +546,7 @@ public class McpController {
 		McpRoutes r = routes;
 		if (r == null) {
 			r = new McpRoutes(routingService, osmAndMapsService, webGpxParser, routingController.routingParams().getBody(),
-					routingSite);
+					serverApi);
 			routes = r;
 		}
 		return r;

@@ -44,8 +44,8 @@ public class McpRoutes {
 	// profile -> parameter -> description, from /routing/routing-modes without the (devel) parameters
 	private final Map<String, Map<String, Object>> profiles;
 	private final Gson gson = new GsonBuilder().serializeSpecialFloatingPointValues().create();
-	// the web map's routing server (maptile on osmand.net); empty = route with this server's own maps
-	private final String routingSite;
+	// map data server (osmand.mcp.server-api, maptile on osmand.net); empty = route with this server's own maps
+	private final String serverApi;
 	private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
 	public static class RouteException extends Exception {
@@ -63,9 +63,9 @@ public class McpRoutes {
 	}
 
 	public McpRoutes(RoutingService routingService, OsmAndMapsService mapsService, WebGpxParser webGpxParser,
-	          String routingModesJson, String routingSite) {
+	          String routingModesJson, String serverApi) {
 		this.routingService = routingService;
-		this.routingSite = routingSite == null ? "" : routingSite.trim().replaceAll("/+$", "");
+		this.serverApi = serverApi == null ? "" : serverApi.trim().replaceAll("/+$", "");
 		this.mapsService = mapsService;
 		this.webGpxParser = webGpxParser;
 		this.profiles = new LinkedHashMap<>();
@@ -211,13 +211,13 @@ public class McpRoutes {
 
 	private List<WebGpxParser.Point> routeLeg(LatLon a, LatLon b, String mode, boolean hhOnly) throws RouteException {
 		try {
-			if (routingSite.isEmpty()) {
+			if (serverApi.isEmpty()) {
 				return routingService.updateRouteBetweenPoints(a, b, mode, false, hhOnly, null).points;
 			}
 			// the same call the web map makes to its routing server
 			String form = "start=" + enc(gson.toJson(a)) + "&end=" + enc(gson.toJson(b)) + "&routeMode=" + enc(mode)
 					+ "&hasRouting=false";
-			HttpRequest req = HttpRequest.newBuilder(URI.create(routingSite + "/routing/update-route-between-points"))
+			HttpRequest req = HttpRequest.newBuilder(URI.create(serverApi + "/routing/update-route-between-points"))
 					.timeout(Duration.ofMinutes(2)).header("Content-Type", "application/x-www-form-urlencoded")
 					.POST(HttpRequest.BodyPublishers.ofString(form)).build();
 			HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());

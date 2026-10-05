@@ -22,6 +22,8 @@ logging:
 osmand:
   oauth.enabled: ${OAUTH_ENABLED:false}
   oauth.default-user-enabled: ${OAUTH_DEFAULT_USER_ENABLED:false}
+  # map data server of the MCP tools (routing, search, weather...), as the web map's maptile; empty = this server
+  mcp.server-api: ${MCP_SERVER_API:https://maptile.osmand.net}
   night-builds-json.location: https://dl2.osmand.net/night-builds-json/
   # ! should contain folders or symlinks indexes, night-builds, gen !
   files.location: ${user.dir}/../../../
@@ -51,7 +53,6 @@ server:
 
 osmand.routing:
   hh-only-limit: ${HH_ONLY_LIMIT:100} # Maximum Start-End direct distance before HH routing is enforced (km)
-  site: ${ROUTING_SITE:https://maptile.osmand.net} # routing server the MCP route tools call, as the web map does; empty = this server
 
 tile-server:
   obf.location: ${OBF_LOCATION:}
