@@ -60,7 +60,9 @@ import net.osmand.server.api.services.OAuthService.CloudGroup;
 import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.api.services.RoutingService;
 import net.osmand.server.api.services.ShareFileService;
+import net.osmand.server.api.services.WikiService;
 import net.osmand.server.api.services.mcp.McpRoutes;
+import net.osmand.server.api.services.mcp.McpSearch;
 import net.osmand.server.api.services.mcp.McpTracks;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.server.api.services.StorageService.InternalZipFile;
@@ -98,6 +100,9 @@ public class McpController {
 	private OAuthService oauthService;
 
 	@Autowired
+	private WikiService wikiService;
+
+	@Autowired
 	private CloudUsersRepository usersRepository;
 
 	@Autowired
@@ -128,6 +133,8 @@ public class McpController {
 	private WebGpxParser webGpxParser;
 
 	private volatile McpRoutes routes;
+
+	private volatile McpSearch search;
 
 	@Value("${osmand.mcp.server-api:}")
 	private String serverApi;
@@ -162,7 +169,8 @@ public class McpController {
 					"params", Map.of("type", "object")), "required", List.of("lat", "lon")));
 
 	// tools without Cloud data: any connection may use them
-	private static final Set<String> OPEN_TOOLS = Set.of("get_guide", "get_routing_profiles", "build_route");
+	private static final Set<String> OPEN_TOOLS = Set.of("get_guide", "get_routing_profiles", "build_route", "search",
+			"get_poi_categories", "search_popular_places");
 
 	private static final List<Tool> TOOLS = List.of(
 			new Tool("get_guide", Access.NONE,
@@ -226,6 +234,31 @@ public class McpController {
 							"params", Map.of("type", "object", "description", "Default profile parameters, e.g. "
 									+ "{\"avoid_motorway\": true, \"width\": 2.5}")),
 							List.of("points"))),
+			new Tool("search", Access.NONE,
+					"Search places as the OsmAnd search box: POIs by name or type (\"cafe\", \"Golden Gate\", \"fuel\"), "
+							+ "addresses, streets, cities. Results near lat/lon come first, with distance, address, opening "
+							+ "hours, phone, website, OSM link. Up to " + McpSearch.MAX_RESULTS + " results.",
+					schema(Map.of("text", Map.of("type", "string"),
+							"lat", Map.of("type", "number", "description", "Search near this point"),
+							"lon", Map.of("type", "number"),
+							"locale", Map.of("type", "string", "description", "Language of names, e.g. en, de, uk; default en"),
+							"limit", Map.of("type", "integer", "description", "Default 20, max " + McpSearch.MAX_RESULTS)),
+							List.of("text", "lat", "lon"))),
+			new Tool("get_poi_categories", Access.NONE,
+					"OsmAnd POI categories with their types (e.g. sustenance: cafe, restaurant...), names that search "
+							+ "understands, and the topics of search_popular_places.",
+					schema(Map.of("locale", Map.of("type", "string", "description", "Language, default en")), List.of())),
+			new Tool("search_popular_places", Access.NONE,
+					"Popular places around a point, as the OsmAnd map Explore layer: Wikipedia / Wikidata places ranked "
+							+ "by popularity, with a short description, Wikipedia link and photo. Good for sightseeing and "
+							+ "planning walks.",
+					schema(Map.of("lat", Map.of("type", "number"), "lon", Map.of("type", "number"),
+							"radius_km", Map.of("type", "number", "description", "Default 3, max " + (int) McpSearch.MAX_RADIUS_KM),
+							"topics", Map.of("type", "array", "items", Map.of("type", "string"), "description",
+									"Topic ids, default all: " + McpSearch.TOPICS),
+							"locale", Map.of("type", "string", "description", "Language, default en"),
+							"limit", Map.of("type", "integer", "description", "Default 20, max " + McpSearch.MAX_RESULTS)),
+							List.of("lat", "lon"))),
 			new Tool("create_track", Access.WRITE,
 					"Build a route through points (as build_route) and save it as a GPX track in OsmAnd Cloud "
 							+ "(a new file or a new version). The track keeps the route points with their profiles, so "
@@ -332,7 +365,8 @@ public class McpController {
 				"instructions", "Tools work with the user's OsmAnd Cloud files (favorites, tracks, markers, settings...). "
 						+ "They do not control the app on the phone; changes reach the apps on their next Cloud sync. "
 						+ "Call get_guide before writing files. Ask the user before write_file or delete_file. "
-						+ "For GPX tracks use analyze_track and read_track_points instead of read_file.");
+						+ "For GPX tracks use analyze_track and read_track_points instead of read_file. "
+						+ "search, search_popular_places and build_route work with the OsmAnd map, not with Cloud files.");
 	}
 
 	private List<Map<String, Object>> listTools(OAuthGrant grant) {
@@ -372,6 +406,7 @@ public class McpController {
 			case "get_routing_profiles" -> routes().describe();
 			case "build_route" -> routes().summary(buildRoute(args), true);
 			case "create_track" -> createTrack(grant, args);
+			case "search", "get_poi_categories", "search_popular_places" -> searchTool(name, args);
 			case "list_versions" -> listVersions(grant, str(args, "type"), str(args, "name"));
 			case "list_favorites" -> listFavorites(grant, str(args, "group"));
 			case "write_file" -> writeFile(grant, str(args, "type"), str(args, "name"), str(args, "content"));
@@ -540,6 +575,39 @@ public class McpController {
 		res.put("expiresInMinutes", DOWNLOAD_LINK_TTL_MIN);
 		res.put("oneTime", true);
 		return res;
+	}
+
+	private McpSearch search() {
+		McpSearch s = search;
+		if (s == null) {
+			s = new McpSearch(serverApi, OAuthController.baseUrl(), wikiService);
+			search = s;
+		}
+		return s;
+	}
+
+	private Object searchTool(String name, Map<?, ?> args) throws ToolException {
+		String locale = str(args, "locale");
+		int limit = args.get("limit") instanceof Number n ? Math.min(Math.max(n.intValue(), 1), McpSearch.MAX_RESULTS) : 20;
+		try {
+			if (name.equals("get_poi_categories")) {
+				return search().categories(locale);
+			}
+			if (!(args.get("lat") instanceof Number lat) || !(args.get("lon") instanceof Number lon)) {
+				throw new ToolException("lat and lon are required");
+			}
+			if (name.equals("search")) {
+				return search().search(str(args, "text"), lat.doubleValue(), lon.doubleValue(), locale, limit);
+			}
+			Set<String> topics = new java.util.LinkedHashSet<>();
+			if (args.get("topics") instanceof List<?> l) {
+				l.forEach(t -> topics.add(t instanceof Number n ? String.valueOf(n.intValue()) : String.valueOf(t)));
+			}
+			double r = args.get("radius_km") instanceof Number n ? n.doubleValue() : 3;
+			return search().popular(lat.doubleValue(), lon.doubleValue(), r, topics, locale, limit);
+		} catch (McpSearch.SearchException e) {
+			throw new ToolException(e.getMessage());
+		}
 	}
 
 	private McpRoutes routes() {
