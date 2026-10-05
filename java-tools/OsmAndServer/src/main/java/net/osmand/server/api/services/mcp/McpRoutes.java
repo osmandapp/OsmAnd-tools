@@ -1,5 +1,13 @@
 package net.osmand.server.api.services.mcp;
 
+import java.io.IOException;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -9,6 +17,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.reflect.TypeToken;
 
 import net.osmand.data.LatLon;
 import net.osmand.server.api.services.OsmAndMapsService;
@@ -35,6 +44,9 @@ public class McpRoutes {
 	// profile -> parameter -> description, from /routing/routing-modes without the (devel) parameters
 	private final Map<String, Map<String, Object>> profiles;
 	private final Gson gson = new GsonBuilder().serializeSpecialFloatingPointValues().create();
+	// map data server (osmand.mcp.server-api, maptile on osmand.net); empty = route with this server's own maps
+	private final String serverApi;
+	private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
 	public static class RouteException extends Exception {
 		private static final long serialVersionUID = 1L;
@@ -51,8 +63,9 @@ public class McpRoutes {
 	}
 
 	public McpRoutes(RoutingService routingService, OsmAndMapsService mapsService, WebGpxParser webGpxParser,
-	          String routingModesJson) {
+	          String routingModesJson, String serverApi) {
 		this.routingService = routingService;
+		this.serverApi = serverApi == null ? "" : serverApi.trim().replaceAll("/+$", "");
 		this.mapsService = mapsService;
 		this.webGpxParser = webGpxParser;
 		this.profiles = new LinkedHashMap<>();
@@ -179,10 +192,8 @@ public class McpRoutes {
 					p.geometry = straight(prev, p);
 				} else {
 					LatLon a = new LatLon(prev.lat, prev.lng), b = new LatLon(p.lat, p.lng);
-					RoutingService.RouteResult r = routingService.updateRouteBetweenPoints(a, b, prev.profile, false,
-							MapUtils.getDistance(a, b) > hhOnlyLimitM, null);
-					p.geometry = r.points;
-					routed = r.points.size() > 2 || !r.routeTypes.isEmpty();
+					p.geometry = routeLeg(a, b, prev.profile, MapUtils.getDistance(a, b) > hhOnlyLimitM);
+					routed = p.geometry.size() > 2;
 				}
 				for (int k = 1; k < p.geometry.size(); k++) {
 					WebGpxParser.Point g0 = p.geometry.get(k - 1), g1 = p.geometry.get(k);
@@ -196,6 +207,35 @@ public class McpRoutes {
 		WebGpxParser.Point last = res.get(res.size() - 1);
 		last.profile = res.get(res.size() - 2).profile;
 		return new Built(res, legs);
+	}
+
+	private List<WebGpxParser.Point> routeLeg(LatLon a, LatLon b, String mode, boolean hhOnly) throws RouteException {
+		try {
+			if (serverApi.isEmpty()) {
+				return routingService.updateRouteBetweenPoints(a, b, mode, false, hhOnly, null).points;
+			}
+			// the same call the web map makes to its routing server
+			String form = "start=" + enc(gson.toJson(a)) + "&end=" + enc(gson.toJson(b)) + "&routeMode=" + enc(mode)
+					+ "&hasRouting=false";
+			HttpRequest req = HttpRequest.newBuilder(URI.create(serverApi + "/routing/update-route-between-points"))
+					.timeout(Duration.ofMinutes(2)).header("Content-Type", "application/x-www-form-urlencoded")
+					.POST(HttpRequest.BodyPublishers.ofString(form)).build();
+			HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
+			if (resp.statusCode() != 200) {
+				throw new RouteException("Routing server error " + resp.statusCode());
+			}
+			JsonObject o = new JsonParser().parse(resp.body()).getAsJsonObject();
+			return gson.fromJson(o.get("points"), new TypeToken<List<WebGpxParser.Point>>() {}.getType());
+		} catch (IOException e) {
+			throw new RouteException("Routing server is not available: " + e.getMessage());
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new RouteException("Routing interrupted");
+		}
+	}
+
+	private static String enc(String s) {
+		return URLEncoder.encode(s, StandardCharsets.UTF_8);
 	}
 
 	public Map<String, Object> summary(Built b, boolean withGeometry) {
