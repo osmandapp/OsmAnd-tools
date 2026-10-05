@@ -209,6 +209,7 @@ public class EmailSenderTemplate {
 		include("defaults", lang, false); // settings (email-headers, vars, etc)
 
 		if (checkUseBase(template, lang)) {
+			set(USE_BASE, "true"); // before the includes, so header/base keep their [if mso] blocks
 			include("base", lang, false); // optional
 			include("base-locale", lang, false); // optional
 			include("header", lang, false); // optional
@@ -310,6 +311,10 @@ public class EmailSenderTemplate {
 		return toList.isEmpty();
 	}
 
+	Map<String, String> headers() {
+		return headers;
+	}
+
 	private String fill(String in) {
 		String filled = in;
 		if (filled != null) {
@@ -352,7 +357,9 @@ public class EmailSenderTemplate {
 		}
 	}
 
-	private final String HTML_COMMENT_MATCH = "(?s).*<!--.*?-->*.";
+	private static final Pattern HTML_COMMENT_MATCH = Pattern.compile("(?s).*<!--.*?-->*.");
+	private static final Pattern COMMAND_COMMENT = Pattern.compile("<!--.*?([A-Za-z-]+)[:\\s]+(.*?)\\s*-->");
+	private static final Pattern KEY_VALUE = Pattern.compile("^(.*?)\\s*=\\s*(.*?)$");
 	private static final Pattern HTML_COMMENT_REPLACE = Pattern.compile("(?s)<!--.*?-->"); // (?s) Pattern.DOTALL (multiline)
 	private final String HTML_NEWLINE_TO_BR = "HTML_NEWLINE_TO_BR"; // user-defined var from templates
 	private final String TRANSACTIONAL = "TRANSACTIONAL";
@@ -367,15 +374,15 @@ public class EmailSenderTemplate {
 		if (isProtectedMsoSpan(line.trim())) {
 			return;
 		}
-		if (!line.matches(HTML_COMMENT_MATCH)) {
+		if (!HTML_COMMENT_MATCH.matcher(line).matches()) {
 			return;
 		}
-		Matcher matcher = Pattern.compile("<!--.*?([A-Za-z-]+)[:\\s]+(.*?)\\s*-->").matcher(line);
+		Matcher matcher = COMMAND_COMMENT.matcher(line);
 		if (matcher.find()) {
 			String command = matcher.group(1);
 			String argument = matcher.group(2);
 			if ("Set".equalsIgnoreCase(command)) {
-				Matcher keyval = Pattern.compile("^(.*?)\\s*=\\s*(.*?)$").matcher(argument);
+				Matcher keyval = KEY_VALUE.matcher(argument);
 				if (keyval.find()) {
 					set(keyval.group(1), keyval.group(2));
 				}

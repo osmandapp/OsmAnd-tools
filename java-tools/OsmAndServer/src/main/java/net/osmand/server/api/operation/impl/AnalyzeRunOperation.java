@@ -18,7 +18,7 @@ import net.osmand.server.api.operation.AdminOperation;
 import net.osmand.server.api.operation.OperationContext;
 import net.osmand.server.api.operation.OperationRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository;
-import net.osmand.server.utils.FileSizeFormatter;
+import net.osmand.util.Algorithms;
 
 @Component
 @AdminOperation(name = "analyze-run")
@@ -79,10 +79,10 @@ public class AnalyzeRunOperation extends AbstractParallelOperation<AnalyzeRunOpe
 					}
 				}
 			});
-			r.put("filesize", FileSizeFormatter.format(filesize.get()));
-			r.put("zipfilesize", FileSizeFormatter.format(zipfilesize.get()));
-			r.put("allVersionsFilesize", FileSizeFormatter.format(allFilesize.get()));
-			r.put("allVersionsZipfilesize", FileSizeFormatter.format(allZipfilesize.get()));
+			r.put("filesize", Algorithms.formatFileSize(filesize.get()));
+			r.put("zipfilesize", Algorithms.formatFileSize(zipfilesize.get()));
+			r.put("allVersionsFilesize", Algorithms.formatFileSize(allFilesize.get()));
+			r.put("allVersionsZipfilesize", Algorithms.formatFileSize(allZipfilesize.get()));
 		}
 		return r;
 	}

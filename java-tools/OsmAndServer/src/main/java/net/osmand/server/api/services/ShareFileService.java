@@ -4,7 +4,6 @@ import com.google.gson.Gson;
 import net.osmand.server.api.repo.*;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.controllers.user.ShareFileController;
-import net.osmand.server.utils.FileSizeFormatter;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;

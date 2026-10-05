@@ -3,6 +3,7 @@ package net.osmand.server.controllers.pub;
 import static net.osmand.server.api.repo.DeviceInAppPurchasesRepository.*;
 import static net.osmand.server.api.repo.DeviceSubscriptionsRepository.*;
 import static net.osmand.server.api.repo.SupportersRepository.*;
+import static net.osmand.server.api.services.EmailSenderService.CloudAccountAction;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 import java.io.IOException;
@@ -224,7 +225,8 @@ public class UserdataController {
 			// see comment on constant
 			pu.token = (new Random().nextInt(8999) + 1000) + "";
 			// TODO iOS: add lang in OARegisterUserCommand.m before sendRequestWithUrl params[@"lang"] = ...
-			emailSender.sendOsmAndCloudRegistrationEmail(pu.email, pu.token, lang, newUser);
+			emailSender.sendOsmAndCloudAccountEmail(pu.email, pu.token, lang,
+					newUser ? CloudAccountAction.SETUP : CloudAccountAction.LOGIN);
 		}
 		CloudUser saved = usersRepository.saveAndFlush(pu);
 	    if (orderid != null) {
@@ -480,8 +482,7 @@ public class UserdataController {
 		if (pu == null) {
 			return ResponseEntity.badRequest().body("User not found");
 		}
-		return userdataService.sendCode(EmailSenderService.CloudAccountAction.fromCodeRequest(data.action, false),
-				data.lang, pu);
+		return userdataService.sendCode(CloudAccountAction.fromCodeRequest(data.action, false), data.lang, pu);
 	}
 
 	public static class UserFilesResults {

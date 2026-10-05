@@ -14,7 +14,6 @@ import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.repo.CloudUsersRepository;
 import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
-import net.osmand.server.utils.FileSizeFormatter;
 import net.osmand.util.Algorithms;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -22,11 +21,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.util.HtmlUtils;
 
 @Service
 public class EmailSenderService {
 
 	private static final String SHARE_LINK_PREFIX = "https://osmand.net/map/share/join/";
+	private static final Pattern TEMPLATE_TOKEN_START = Pattern.compile("@(?=[A-Z0-9_]+@)");
 
 	@Autowired
 	protected PurchasesDataLoader purchasesDataLoader;
@@ -47,8 +48,6 @@ public class EmailSenderService {
 		}
 	}
 
-	// language of the user's most recently used device (the app sends it on device-register, the web on login);
-	// null when no device reported one, then the template falls back to English
 	public String userLang(int userid) {
 		String lang = null;
 		Date latest = null;
@@ -68,8 +67,6 @@ public class EmailSenderService {
 		EmailSenderService sender = new EmailSenderService();
 		String email = "dmarc-reports@osmand.net";
 		sender.sendOsmAndCloudPromoEmail(email, "promo");
-		sender.sendOsmAndCloudWebEmail(email, "token", "delete", "en");
-		sender.sendOsmAndCloudRegistrationEmail(email, "token", "en", true);
 		for (CloudAccountAction action : CloudAccountAction.values()) {
 			sender.sendOsmAndCloudAccountEmail(email, "token", "en", action, "new@osmand.net");
 		}
@@ -89,29 +86,6 @@ public class EmailSenderService {
 	    LOGGER.info("sendOsmAndCloudPromoEmail to: " + shorten(email) + " (" + ok + ")");
 	}
     
-    public void sendOsmAndCloudWebEmail(String email, String token, String action, String lang) {
-		String templateAction = action;
-		if ("setup".equals(action)) {
-			templateAction = "@ACTION_SETUP@";
-		} else if("change".equals(action)) {
-			templateAction = "@ACTION_CHANGE@";
-		} else if("delete".equals(action)) {
-			templateAction = "@ACTION_DELETE@";
-		}
-	    boolean ok = new EmailSenderTemplate()
-			    .load("cloud/web", lang)
-			    .set("ACTION", templateAction)
-			    .set("TOKEN", token)
-			    .to(email)
-			    .send()
-			    .isSuccess();
-	    LOGGER.info("sendOsmAndCloudWebEmail to: " + shorten(email) + " (" + ok + ") [" + lang + "]");
-	}
-    
-    public void sendOsmAndCloudRegistrationEmail(String email, String token, String lang, boolean newUser) {
-		sendOsmAndCloudAccountEmail(email, token, lang, newUser ? CloudAccountAction.SETUP : CloudAccountAction.LOGIN);
-	}
-
 	public enum CloudAccountAction {
 		SETUP("cloud/account/setup"),
 		LOGIN("cloud/account/login"),
@@ -161,7 +135,7 @@ public class EmailSenderService {
 				? name.substring(dotIdx + 1).toUpperCase(Locale.ROOT) : "FILE";
 		String meta = fileType == null ? ext : fileType;
 		if (fileSize > 0) {
-			meta = meta + " · " + FileSizeFormatter.format(fileSize);
+			meta = meta + " · " + Algorithms.formatFileSize(fileSize);
 		}
 		String url = fileUuid == null ? "https://osmand.net/map" : SHARE_LINK_PREFIX + fileUuid;
 		String template = approved ? "cloud/share/approved" : "cloud/share/declined";
@@ -180,14 +154,12 @@ public class EmailSenderService {
 	}
 
 	static String htmlText(String s) {
-		return s == null ? "" : org.springframework.web.util.HtmlUtils.htmlEscape(s).replace("@", "&#64;");
+		return s == null ? "" : HtmlUtils.htmlEscape(s).replace("@", "&#64;");
 	}
 
 	static String plainText(String s) {
 		return s == null ? "" : TEMPLATE_TOKEN_START.matcher(s.replaceAll("[\\r\\n]+", " ")).replaceAll("＠");
 	}
-
-	private static final Pattern TEMPLATE_TOKEN_START = Pattern.compile("@(?=[A-Z0-9_]+@)");
 
 	public void sendPurchaseReceiptEmail(String email, String lang, String orderId, Date orderDate, String orderTotal,
 			List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> purchases,
@@ -283,6 +255,9 @@ public class EmailSenderService {
 
 	public void sendOsmAndCloudAccountEmail(String email, String token, String lang, CloudAccountAction action,
 			String newEmail) {
+		if (token == null && action != CloudAccountAction.EMAIL_CHANGED) {
+			throw new IllegalArgumentException("Token is required for " + action.name() + " email:" + shorten(email));
+		}
 		EmailSenderTemplate sender = new EmailSenderTemplate()
 				.load(action.template, lang)
 				.set("TOKEN", token == null ? "" : token);

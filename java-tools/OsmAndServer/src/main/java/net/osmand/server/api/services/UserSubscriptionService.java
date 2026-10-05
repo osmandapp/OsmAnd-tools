@@ -90,7 +90,7 @@ public class UserSubscriptionService {
 	private PromoService promoService;
 
 	@Autowired
-	protected EmailSenderService emailSender;
+	private EmailSenderService emailSender;
 
 	Gson gson = new Gson();
 
@@ -493,8 +493,6 @@ public class UserSubscriptionService {
 		notifyPurchaseLinked(newUserId, iapList, subscriptionList);
 	}
 
-	// Send only once the relink is committed, so a rollback cannot leave the user with an email about purchases
-	// that stayed on the previous account. A mail failure must not fail the relink itself.
 	private void notifyPurchaseLinked(int newUserId,
 	                                  List<SupporterDeviceInAppPurchase> purchases,
 	                                  List<SupporterDeviceSubscription> subscriptions) {
