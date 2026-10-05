@@ -1,8 +1,6 @@
 package net.osmand.obf.preparation;
 
-import net.osmand.binary.Abbreviations;
 import net.osmand.binary.BinaryMapDataObject;
-import net.osmand.binary.SearchLocales;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
 import net.osmand.map.OsmandRegions;
@@ -35,8 +33,6 @@ public class IndexCreationContext {
     public OsmandRegions allRegions;
     public boolean basemap;
 
-	// rules locale of the map ("en_US", "it_IT"), "" when no locale covers it: see SearchLocales
-	private String mapLocale = "";
     private boolean translitJapaneseNames = false;
 	private boolean translitChineseNames = false;
 	private final IndexCreator indexCreator;
@@ -53,7 +49,6 @@ public class IndexCreationContext {
 		if (regionName != null) {
 			this.translitJapaneseNames = regionName.toLowerCase().startsWith(JAPAN);
 			this.translitChineseNames = regionName.toLowerCase().startsWith(CHINA);
-			this.mapLocale = SearchLocales.forMap(regionName);
             WorldRegion region = this.allRegions.getRegionDataByDownloadName(regionName);
             if (region != null) {
 				bboxFilter.initRegionQuads(region);
@@ -155,26 +150,6 @@ public class IndexCreationContext {
 			return etags.get(MapRenderingTypesEncoder.OSMAND_REGION_NAME_TAG).contains(region);
 		}
 		return false;
-	}
-
-	/**
-	 * Rewrites the words of a street name by the normalizations of the rules of its locale (rules.xml,
-	 * normalize="true"). The locale is the one of the map; a file that covers several countries (addRegionTag) takes
-	 * the one of the first map region at the location whose locale is known.
-	 */
-	public String decryptAbbreviations(String name, LatLon loc, boolean addRegionTag) {
-		String locale = mapLocale;
-		if (locale.isEmpty() && addRegionTag && loc != null) {
-			Set<String> dwNames = calcDownloadNames(null, false, allRegions,
-					new QuadRect(loc.getLongitude(), loc.getLatitude(), loc.getLongitude(), loc.getLatitude()));
-			for (String dwName : dwNames) {
-				locale = SearchLocales.forMap(dwName);
-				if (!locale.isEmpty()) {
-					break;
-				}
-			}
-		}
-		return locale.isEmpty() ? name : Abbreviations.replaceAll(name, locale, "street");
 	}
 
 	public Set<String> calcRegionTag(Entity entity, boolean add) {
