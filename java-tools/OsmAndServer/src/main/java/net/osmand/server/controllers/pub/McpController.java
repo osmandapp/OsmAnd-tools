@@ -61,6 +61,7 @@ import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.api.services.RoutingService;
 import net.osmand.server.api.services.ShareFileService;
 import net.osmand.server.api.services.WikiService;
+import net.osmand.server.api.services.search.AmenityTagsService;
 import net.osmand.server.api.services.mcp.McpRoutes;
 import net.osmand.server.api.services.mcp.McpSearch;
 import net.osmand.shared.gpx.primitives.WptPt;
@@ -103,6 +104,9 @@ public class McpController {
 
 	@Autowired
 	private WikiService wikiService;
+
+	@Autowired
+	private AmenityTagsService amenityTagsService;
 
 	@Autowired
 	private CloudUsersRepository usersRepository;
@@ -172,8 +176,8 @@ public class McpController {
 
 	private static final Map<String, Object> WAYPOINTS_ARG = Map.of("type", "array", "description",
 			"Track waypoints, up to " + McpSearch.MAX_WAYPOINTS + ": pass a search / search_popular_places result as "
-					+ "it is (plus group). With osm the server stores the POI as OsmAnd does (origin, OSM tags: opening "
-					+ "hours, website, wiki...), so the app shows its details; name and icon come from the POI unless given. "
+					+ "it is (plus group). With osm the server stores the POI as OsmAnd does (origin and all its tags: "
+					+ "opening hours, website, wiki...), so the app shows its details; name and icon come from the POI unless given. "
 					+ "icon: an OsmAnd icon name from a result (default " + McpSearch.DEFAULT_ICON + ").",
 			"items", Map.of("type", "object", "properties", Map.ofEntries(
 					Map.entry("lat", Map.of("type", "number")), Map.entry("lon", Map.of("type", "number")),
@@ -181,11 +185,9 @@ public class McpController {
 					Map.entry("name", Map.of("type", "string")),
 					Map.entry("description", Map.of("type", "string", "description", "Short text, e.g. from search_popular_places")),
 					Map.entry("icon", Map.of("type", "string")),
-					Map.entry("wikidata", Map.of("type", "string", "description", "Q123")),
-					Map.entry("wikipedia", Map.of("type", "string", "description", "Article URL")),
-					Map.entry("photo", Map.of("type", "string", "description", "Wikimedia Commons URL")),
-					Map.entry("openingHours", Map.of("type", "string")), Map.entry("website", Map.of("type", "string")),
-					Map.entry("phone", Map.of("type", "string")),
+					Map.entry("tags", Map.of("type", "object", "description", "OSM tags of a place without osm, e.g. "
+							+ "the tags of a search_popular_places result (wikidata, wikipedia...); stored as OsmAnd stores "
+							+ "POI tags")),
 					Map.entry("group", Map.of("type", "string", "description", "Waypoint group, e.g. Sights, Food")),
 					Map.entry("color", Map.of("type", "string", "description", "#RRGGBB")),
 					Map.entry("background", Map.of("type", "string", "description", "circle, octagon or square")),
@@ -194,7 +196,7 @@ public class McpController {
 
 	// tools without Cloud data: any connection may use them
 	private static final Set<String> OPEN_TOOLS = Set.of("get_guide", "get_routing_profiles", "build_route", "search",
-			"get_poi_categories", "search_popular_places");
+			"search_by_category", "get_poi_categories", "search_popular_places");
 
 	private static final List<Tool> TOOLS = List.of(
 			new Tool("get_guide", Access.NONE,
@@ -272,10 +274,38 @@ public class McpController {
 							"radius_km", Map.of("type", "number", "description", "Only results within this distance, "
 									+ "sorted by distance (e.g. 2 for \"near\"); max " + (int) McpSearch.MAX_RADIUS_KM)),
 							List.of("text", "lat", "lon"))),
+			new Tool("search_by_category", Access.NONE,
+					"Places around a point by OsmAnd POI filters, as the POI filters of the app: any of categories, "
+							+ "each of filters (e.g. fuel stations with diesel), open now. Sorted by distance, with the POI "
+							+ "tags OsmAnd shows (opening hours, phone, website...), OsmAnd icon, osm id and osmandLink.",
+					schema(Map.ofEntries(Map.entry("categories", Map.of("type", "array", "items", Map.of("type", "string"),
+									"description", "Any of: categories (sustenance, shop), types (park, fuel, cafe), top "
+											+ "filters (cafe_and_restaurant, sightseeing), brands (top_index_brand_mcdonalds); "
+											+ "see get_poi_categories")),
+							Map.entry("filters", Map.of("type", "array", "items", Map.of("type", "string"),
+									"description", "Each of these additional values, e.g. [\"fuel_diesel\"], "
+											+ "[\"cuisine_pizza\"]")),
+							Map.entry("open_now", Map.of("type", "boolean", "description", "Only places open now by their "
+									+ "opening hours (needs time_zone); results get openNow and openingHoursNow")),
+							Map.entry("time_zone", Map.of("type", "string", "description", "Time zone of the place, e.g. "
+									+ "Europe/Kyiv")),
+							Map.entry("lat", Map.of("type", "number")), Map.entry("lon", Map.of("type", "number")),
+							Map.entry("radius_km", Map.of("type", "number", "description", "Default 1, max "
+									+ (int) McpSearch.MAX_RADIUS_KM)),
+							Map.entry("with_unnamed", Map.of("type", "boolean", "description", "Also places without a name, "
+									+ "default false")),
+							Map.entry("locale", Map.of("type", "string", "description", "Language, default en")),
+							Map.entry("limit", Map.of("type", "integer", "description", "Default 20, max "
+									+ McpSearch.MAX_RESULTS))),
+							List.of("categories", "lat", "lon"))),
 			new Tool("get_poi_categories", Access.NONE,
-					"OsmAnd POI categories with their types (e.g. sustenance: cafe, restaurant...), names that search "
-							+ "understands, and the topics of search_popular_places.",
-					schema(Map.of("locale", Map.of("type", "string", "description", "Language, default en")), List.of())),
+					"OsmAnd POI filters: top filters (as in the app), categories with their types (e.g. sustenance: "
+							+ "cafe, restaurant...), names that search and search_by_category understand, and the topics "
+							+ "of search_popular_places. With filter: the additional filters of that category or type, "
+							+ "as the app's POI filter screen (fuel -> fuel_type: fuel_diesel...), for search_by_category filters.",
+					schema(Map.of("locale", Map.of("type", "string", "description", "Language, default en"),
+							"filter", Map.of("type", "string", "description", "A category, top filter or type, e.g. fuel")),
+							List.of())),
 			new Tool("search_popular_places", Access.NONE,
 					"Popular places around a point, as the OsmAnd map Explore layer: Wikipedia / Wikidata places ranked "
 							+ "by popularity, with a short description, Wikipedia link, photo, OsmAnd icon, osm id and osmandLink. Good for "
@@ -396,9 +426,9 @@ public class McpController {
 						+ "They do not control the app on the phone; changes reach the apps on their next Cloud sync. "
 						+ "Call get_guide before writing files. Ask the user before write_file or delete_file. "
 						+ "For GPX tracks use analyze_track and read_track_points instead of read_file. "
-						+ "search, search_popular_places and build_route work with the OsmAnd map, not with Cloud files. "
-						+ "To plan a route with places (get_guide, Routes and Search): find them with search_popular_places "
-						+ "and search, check the way with build_route in the user's profile, then save it with create_track "
+						+ "search, search_by_category, search_popular_places and build_route work with the OsmAnd map, not with Cloud files. "
+						+ "To plan a route with places (get_guide, Routes and Search): find them with search_popular_places, "
+						+ "search_by_category and search, check the way with build_route in the user's profile, then save it with create_track "
 						+ "and the chosen results as waypoints.");
 	}
 
@@ -439,7 +469,7 @@ public class McpController {
 			case "get_routing_profiles" -> routes().describe();
 			case "build_route" -> routes().summary(buildRoute(args), true);
 			case "create_track" -> createTrack(grant, args);
-			case "search", "get_poi_categories", "search_popular_places" -> searchTool(name, args);
+			case "search", "search_by_category", "get_poi_categories", "search_popular_places" -> searchTool(name, args);
 			case "list_versions" -> listVersions(grant, str(args, "type"), str(args, "name"));
 			case "list_favorites" -> listFavorites(grant, str(args, "group"));
 			case "write_file" -> writeFile(grant, str(args, "type"), str(args, "name"), str(args, "content"));
@@ -613,7 +643,7 @@ public class McpController {
 	private McpSearch search() {
 		McpSearch s = search;
 		if (s == null) {
-			s = new McpSearch(serverApi, OAuthController.baseUrl(), wikiService);
+			s = new McpSearch(serverApi, OAuthController.baseUrl(), wikiService, amenityTagsService);
 			search = s;
 		}
 		return s;
@@ -624,7 +654,7 @@ public class McpController {
 		int limit = args.get("limit") instanceof Number n ? Math.min(Math.max(n.intValue(), 1), McpSearch.MAX_RESULTS) : 20;
 		try {
 			if (name.equals("get_poi_categories")) {
-				return search().categories(locale);
+				return search().categories(locale, str(args, "filter"));
 			}
 			if (!(args.get("lat") instanceof Number lat) || !(args.get("lon") instanceof Number lon)) {
 				throw new ToolException("lat and lon are required");
@@ -633,6 +663,20 @@ public class McpController {
 				Double radius = args.get("radius_km") instanceof Number n
 						? Math.min(Math.max(n.doubleValue(), 0.05), McpSearch.MAX_RADIUS_KM) : null;
 				return search().search(str(args, "text"), lat.doubleValue(), lon.doubleValue(), locale, limit, radius);
+			}
+			if (name.equals("search_by_category")) {
+				List<String> cats = new ArrayList<>();
+				if (args.get("categories") instanceof List<?> l) {
+					l.forEach(c -> cats.add(String.valueOf(c)));
+				}
+				List<String> filters = new ArrayList<>();
+				if (args.get("filters") instanceof List<?> l) {
+					l.forEach(c -> filters.add(String.valueOf(c)));
+				}
+				double r = args.get("radius_km") instanceof Number n ? n.doubleValue() : 1;
+				return search().searchCategories(cats, filters, Boolean.TRUE.equals(args.get("open_now")),
+						str(args, "time_zone"), lat.doubleValue(), lon.doubleValue(), r, locale, limit,
+						Boolean.TRUE.equals(args.get("with_unnamed")));
 			}
 			Set<String> topics = new java.util.LinkedHashSet<>();
 			if (args.get("topics") instanceof List<?> l) {
