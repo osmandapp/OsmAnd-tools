@@ -2,14 +2,22 @@ package net.osmand.server.controllers.pub;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import net.osmand.data.QuadRect;
 import net.osmand.server.DatasourceConfiguration;
 import net.osmand.server.api.services.GpxService;
+import net.osmand.server.osmgpx.ActivityClassifier;
 import net.osmand.server.osmgpx.GarbageClassifier;
+import net.osmand.server.osmgpx.TrackSimplifyEncoder;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import net.osmand.shared.gpx.GpxUtilities;
+import net.osmand.shared.gpx.primitives.TrkSegment;
+import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.util.Algorithms;
+import net.osmand.util.MapUtils;
 import okio.Buffer;
 import okio.Source;
 import org.apache.commons.logging.Log;
@@ -28,8 +36,11 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.YearMonth;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -65,11 +76,15 @@ public class OsmGpxController {
 	private static final int MAX_RUNTIME_CACHE_SIZE = 5000;
 	private static final int MAX_ROUTES_SUMMARY = 100000;
 	private static final int MAX_ROUTES_FULL_MODE_THRESHOLD = 5000;
+	private static final int MAX_NEAR_RADIUS_M = 1000;
+	private static final int MAX_NEAR_ROUTES = 500;
 	private static final int MAX_TAGS_PER_BBOX = 1000;
 	private final AtomicInteger cacheTouch = new AtomicInteger(0);
 
 	private static final String GPX_METADATA_TABLE_NAME = "osm_gpx_data";
 	private static final String GPX_FILES_TABLE_NAME = "osm_gpx_files";
+	private static final String ROUTE_COLUMNS = "m.id, m.name, m.description, m.user, m.date, m.activity, m.lat, m.lon, " +
+			"m.speed, m.distance, m.points, m.max_speed, m.max_dist_between_points, m.time_minutes, m.waypoints, m.tags";
 	private static final int SRID_WGS84 = 4326;
 	private static final String ERROR_ACTIVITY = "error";
 	private static final Set<String> INVALID_ACTIVITIES = new HashSet<>(GarbageClassifier.TYPES);
@@ -79,7 +94,8 @@ public class OsmGpxController {
 
 	public record RoutesListRequest(
 			List<String> activityArr,
-			Integer year,
+			String dateFrom,
+			String dateTo,
 			String minLat,
 			String maxLat,
 			String minLon,
@@ -91,8 +107,14 @@ public class OsmGpxController {
 			List<Integer> maxSpeedRange,
 			List<Integer> maxDistBetweenPointsRange,
 			List<Integer> timeMinutesRange,
-			List<Integer> waypointsRange
+			List<Integer> waypointsRange,
+			Double lat,
+			Double lon,
+			Double radius
 	) {
+		boolean isNearPoint() {
+			return lat != null && lon != null && radius != null;
+		}
 	}
 
 	@PostMapping(path = {"/get-routes-list"}, consumes = "application/json", produces = "application/json")
@@ -106,21 +128,31 @@ public class OsmGpxController {
 		StringBuilder conditions = new StringBuilder();
 		List<Object> params = new ArrayList<>();
 
-		ResponseEntity<String> error = addCoords(params, conditions, req.minLat(), req.maxLat(), req.minLon(), req.maxLon());
+		int nearRadius = 0;
+		ResponseEntity<String> error;
+		if (req.isNearPoint()) {
+			if (req.radius() <= 0) {
+				return ResponseEntity.badRequest().body("Invalid radius.");
+			}
+			nearRadius = (int) Math.min(req.radius(), MAX_NEAR_RADIUS_M);
+			QuadRect box = MapUtils.calculateLatLonBbox(req.lat(), req.lon(), nearRadius);
+			error = addCoords(params, conditions, String.valueOf(box.bottom), String.valueOf(box.top),
+					String.valueOf(box.left), String.valueOf(box.right));
+			// the same tracks heat_build.py puts into the tiles
+			conditions.append(" AND m.date IS NOT NULL AND (length(m.simplified_geometry) > 0 OR m.activity = ?)");
+			params.add(ERROR_ACTIVITY);
+		} else {
+			error = addCoords(params, conditions, req.minLat(), req.maxLat(), req.minLon(), req.maxLon());
+		}
 		if (error != null) {
 			return error;
 		}
 
-		boolean invalidActivities = isInvalidActivityRequest(req.activityArr());
-		if (!invalidActivities) {
-			appendSkipInvalidActivities(conditions, params);
-		}
+		appendSkipInvalidActivities(req.activityArr(), conditions, params);
 
-		if (req.year() != null) {
-			error = filterByYear(String.valueOf(req.year()), params, conditions);
-			if (error != null) {
-				return error;
-			}
+		error = filterByDate(req.dateFrom(), req.dateTo(), params, conditions);
+		if (error != null) {
+			return error;
 		}
 
 		if (req.activityArr() != null && !req.activityArr().isEmpty()) {
@@ -176,7 +208,18 @@ public class OsmGpxController {
 		applyTagsFilter(req.tags(), tagMatchMode, conditions, params);
 
 		List<Feature> features;
-		if (isPointsOnlyRequest(req.activityArr())) {
+		if (req.isNearPoint()) {
+			// too many around the point to decode them all, or too many of them within the radius; the hint quotes the limit that fired
+			boolean tooManyAround = countRoutes(conditions, params, MAX_ROUTES_FULL_MODE_THRESHOLD + 1) > MAX_ROUTES_FULL_MODE_THRESHOLD;
+			features = tooManyAround ? null : queryRoutesNear(conditions, params, req.lat(), req.lon(), nearRadius);
+			if (features == null) {
+				JsonObject tooMany = new JsonObject();
+				tooMany.add("features", new JsonArray());
+				tooMany.addProperty("tooMany", true);
+				tooMany.addProperty("maxRoutes", tooManyAround ? MAX_ROUTES_FULL_MODE_THRESHOLD : MAX_NEAR_ROUTES);
+				return ResponseEntity.ok(gson.toJson(tooMany));
+			}
+		} else if (isPointsOnlyRequest(req.activityArr())) {
 			// error tracks have no geometry — return them as points only
 			features = queryRouteFeatures(conditions, params, false, MAX_ROUTES_SUMMARY, false);
 		} else {
@@ -197,7 +240,8 @@ public class OsmGpxController {
 	                                        @RequestParam String maxLat,
 	                                        @RequestParam String minLon,
 	                                        @RequestParam String maxLon,
-	                                        @RequestParam(required = false) Integer year,
+	                                        @RequestParam(required = false) String dateFrom,
+	                                        @RequestParam(required = false) String dateTo,
 	                                        @RequestParam(required = false) List<String> activityArr) {
 		if (!config.osmgpxInitialized()) {
 			return ResponseEntity.ok("OsmGpx datasource is not initialized");
@@ -211,13 +255,11 @@ public class OsmGpxController {
 			return error;
 		}
 
-		appendSkipInvalidActivities(conditions, params);
+		appendSkipInvalidActivities(activityArr, conditions, params);
 
-		if (year != null) {
-			error = filterByYear(String.valueOf(year), params, conditions);
-			if (error != null) {
-				return error;
-			}
+		error = filterByDate(dateFrom, dateTo, params, conditions);
+		if (error != null) {
+			return error;
 		}
 
 		if (activityArr != null && !activityArr.isEmpty()) {
@@ -285,7 +327,8 @@ public class OsmGpxController {
 	                                      @RequestParam String maxLat,
 	                                      @RequestParam String minLon,
 	                                      @RequestParam String maxLon,
-	                                      @RequestParam(required = false) Integer year,
+	                                      @RequestParam(required = false) String dateFrom,
+	                                      @RequestParam(required = false) String dateTo,
 	                                      @RequestParam(required = false) List<String> activityArr) {
 		if (!config.osmgpxInitialized()) {
 			return ResponseEntity.ok("OsmGpx datasource is not initialized");
@@ -299,13 +342,11 @@ public class OsmGpxController {
 			return error;
 		}
 
-		appendSkipInvalidActivities(conditions, params);
+		appendSkipInvalidActivities(activityArr, conditions, params);
 
-		if (year != null) {
-			error = filterByYear(String.valueOf(year), params, conditions);
-			if (error != null) {
-				return error;
-			}
+		error = filterByDate(dateFrom, dateTo, params, conditions);
+		if (error != null) {
+			return error;
 		}
 
 		if (activityArr != null && !activityArr.isEmpty()) {
@@ -336,7 +377,8 @@ public class OsmGpxController {
 	                                            @RequestParam String maxLat,
 	                                            @RequestParam String minLon,
 	                                            @RequestParam String maxLon,
-	                                            @RequestParam(required = false) Integer year) {
+	                                            @RequestParam(required = false) String dateFrom,
+	                                            @RequestParam(required = false) String dateTo) {
 		if (!config.osmgpxInitialized()) {
 			return ResponseEntity.ok("OsmGpx datasource is not initialized");
 		}
@@ -349,14 +391,11 @@ public class OsmGpxController {
 			return error;
 		}
 
-		conditions.append(" AND m.activity IS NOT NULL AND m.activity <> '' AND m.activity NOT IN ")
-				.append(placeholders(INVALID_ACTIVITIES, params));
+		conditions.append(" AND m.activity IS NOT NULL AND m.activity <> ''");
 
-		if (year != null) {
-			error = filterByYear(String.valueOf(year), params, conditions);
-			if (error != null) {
-				return error;
-			}
+		error = filterByDate(dateFrom, dateTo, params, conditions);
+		if (error != null) {
+			return error;
 		}
 
 		String query =
@@ -393,9 +432,77 @@ public class OsmGpxController {
 		params.addAll(normalized);
 	}
 
+	// at most limit rows are counted, enough to compare the count with limit - 1
+	private long countRoutes(StringBuilder conditions, List<Object> params, int limit) {
+		List<Object> limited = new ArrayList<>(params);
+		limited.add(limit);
+		return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM (SELECT 1 FROM " + GPX_METADATA_TABLE_NAME + " m WHERE 1 = 1 "
+				+ conditions + " LIMIT ?) t", Long.class, limited.toArray());
+	}
+
+	// the tracks whose line passes within radius metres of the point, nearest first; error tracks by their start point;
+	// null when more than MAX_NEAR_ROUTES of them pass there, the rows after that are not decoded
+	private List<Feature> queryRoutesNear(StringBuilder conditions, List<Object> params, double lat, double lon, double radius) {
+		String query = "SELECT " + ROUTE_COLUMNS + ", m.simplified_geometry FROM " + GPX_METADATA_TABLE_NAME + " m " +
+				"WHERE 1 = 1 " + conditions;
+		record Near(Feature feature, double distance) {
+		}
+		List<Near> near = new ArrayList<>();
+		jdbcTemplate.query(query, ps -> {
+			for (int i = 0; i < params.size(); i++) {
+				ps.setObject(i + 1, params.get(i));
+			}
+		}, rs -> {
+			if (near.size() > MAX_NEAR_ROUTES) {
+				return;
+			}
+			byte[] geometry = rs.getBytes("simplified_geometry");
+			boolean hasLine = geometry != null && geometry.length > 0;
+			double distance = hasLine
+					? distanceToTrack(geometry, lat, lon)
+					: MapUtils.getDistance(lat, lon, rs.getDouble("lat"), rs.getDouble("lon"));
+			if (distance > radius) {
+				return;
+			}
+			Feature feature = createBaseFeature(rs);
+			if (hasLine) {
+				feature.getProperties().put("geo_b64", Base64.getEncoder().encodeToString(geometry));
+			}
+			near.add(new Near(feature, distance));
+		});
+		if (near.size() > MAX_NEAR_ROUTES) {
+			return null;
+		}
+		near.sort(Comparator.comparingDouble(Near::distance));
+
+		return near.stream().map(Near::feature).toList();
+	}
+
+	private static double distanceToTrack(byte[] geometry, double lat, double lon) {
+		double best = Double.MAX_VALUE;
+		GpxFile line;
+		try {
+			line = TrackSimplifyEncoder.decodeGeometry(geometry);
+		} catch (IllegalArgumentException e) {
+			return best;
+		}
+		for (TrkSegment segment : line.getSegments(false)) {
+			List<WptPt> points = segment.getPoints();
+			if (points.size() == 1) {
+				best = Math.min(best, MapUtils.getDistance(lat, lon, points.get(0).getLatitude(), points.get(0).getLongitude()));
+			}
+			for (int i = 1; i < points.size(); i++) {
+				WptPt from = points.get(i - 1);
+				WptPt to = points.get(i);
+				best = Math.min(best, MapUtils.getOrthogonalDistance(lat, lon,
+						from.getLatitude(), from.getLongitude(), to.getLatitude(), to.getLongitude()));
+			}
+		}
+		return best;
+	}
+
 	private List<Feature> queryRouteFeatures(StringBuilder conditions, List<Object> params, boolean withGeometry, int limit, boolean requireGeometry) {
-		String columns = "m.id, m.name, m.description, m.user, m.date, m.activity, m.lat, m.lon, " +
-				"m.speed, m.distance, m.points, m.tags";
+		String columns = ROUTE_COLUMNS;
 		if (withGeometry) {
 			columns += ", m.simplified_geometry";
 		}
@@ -449,6 +556,22 @@ public class OsmGpxController {
 		int points = rs.getInt("points");
 		if (points != 0) {
 			feature.getProperties().put("points", points);
+		}
+		int maxSpeed = (int) rs.getFloat("max_speed");
+		if (maxSpeed != 0) {
+			feature.getProperties().put("maxSpeed", maxSpeed);
+		}
+		int maxDistBetweenPoints = (int) rs.getFloat("max_dist_between_points");
+		if (maxDistBetweenPoints != 0) {
+			feature.getProperties().put("maxDistBetweenPoints", maxDistBetweenPoints);
+		}
+		int timeMinutes = rs.getInt("time_minutes");
+		if (timeMinutes != 0) {
+			feature.getProperties().put("timeMinutes", timeMinutes);
+		}
+		int waypoints = rs.getInt("waypoints");
+		if (waypoints != 0) {
+			feature.getProperties().put("waypoints", waypoints);
 		}
 		java.sql.Array tagsArray = rs.getArray("tags");
 		if (tagsArray != null) {
@@ -569,10 +692,6 @@ public class OsmGpxController {
 		}
 	}
 
-	private boolean isInvalidActivityRequest(List<String> activityArr) {
-		return activityArr != null && !activityArr.isEmpty() && INVALID_ACTIVITIES.containsAll(activityArr);
-	}
-
 	private boolean isPointsOnlyRequest(List<String> activityArr) {
 		return activityArr != null && !activityArr.isEmpty()
 				&& activityArr.stream().allMatch(ERROR_ACTIVITY::equals);
@@ -583,7 +702,11 @@ public class OsmGpxController {
 		return "(" + String.join(",", Collections.nCopies(values.size(), "?")) + ")";
 	}
 
-	private void appendSkipInvalidActivities(StringBuilder conditions, List<Object> params) {
+	// without an activity filter the garbage and error tracks are left out; a filter that lists them gets them
+	private void appendSkipInvalidActivities(List<String> activityArr, StringBuilder conditions, List<Object> params) {
+		if (activityArr != null && !activityArr.isEmpty()) {
+			return;
+		}
 		conditions.append(" AND (m.activity IS NULL OR m.activity NOT IN ").append(placeholders(INVALID_ACTIVITIES, params)).append(")");
 	}
 
@@ -592,26 +715,38 @@ public class OsmGpxController {
 			return ResponseEntity.badRequest().body("Activity parameter is required.");
 		}
 		Set<String> activities = new LinkedHashSet<>();
+		boolean withUnlabelled = false;
 		for (String activity : activityArr) {
 			if (GarbageClassifier.GARBAGE.equals(activity)) {
 				activities.addAll(GarbageClassifier.TYPES);
+			} else if (ActivityClassifier.NOSPEED.equals(activity)) {
+				// the No timing bin of heat_build.py
+				withUnlabelled = true;
+				activities.add(activity);
+				activities.add(GarbageClassifier.GARBAGE);
+				activities.add(GarbageClassifier.TELEPORT);
 			} else {
 				activities.add(activity);
 			}
 		}
-		conditions.append(" AND m.activity IN ").append(placeholders(activities, params));
+		String in = placeholders(activities, params);
+		conditions.append(withUnlabelled ? " AND (m.activity IS NULL OR m.activity IN " + in + ")" : " AND m.activity IN " + in);
 		return null;
 	}
 
-	private ResponseEntity<String> filterByYear(String year, List<Object> params, StringBuilder conditions) {
-		if (!Algorithms.isEmpty(year)) {
-			try {
-				Integer parsedYear = Integer.parseInt(year);
-				conditions.append(" AND extract(year from m.date) = ?");
-				params.add(parsedYear);
-			} catch (NumberFormatException e) {
-				return ResponseEntity.badRequest().body("Invalid year format.");
+	// dateFrom, dateTo: YYYY-MM of the OSM upload date, both months included
+	private ResponseEntity<String> filterByDate(String dateFrom, String dateTo, List<Object> params, StringBuilder conditions) {
+		try {
+			if (!Algorithms.isEmpty(dateFrom)) {
+				conditions.append(" AND m.date >= ?");
+				params.add(Date.valueOf(YearMonth.parse(dateFrom).atDay(1)));
 			}
+			if (!Algorithms.isEmpty(dateTo)) {
+				conditions.append(" AND m.date < ?");
+				params.add(Date.valueOf(YearMonth.parse(dateTo).plusMonths(1).atDay(1)));
+			}
+		} catch (DateTimeParseException e) {
+			return ResponseEntity.badRequest().body("Invalid month format, expected YYYY-MM.");
 		}
 		return null;
 	}
