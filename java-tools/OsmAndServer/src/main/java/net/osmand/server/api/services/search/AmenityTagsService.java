@@ -6,6 +6,7 @@ import net.osmand.data.AmenityTagEntry;
 import net.osmand.data.AmenityTagEntriesBuilder;
 import net.osmand.osm.PoiCategory;
 import net.osmand.osm.PoiType;
+import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.util.Algorithms;
 import org.springframework.stereotype.Service;
 
@@ -28,7 +29,8 @@ public class AmenityTagsService {
 		AdditionalInfoBundle infoBundle = new AdditionalInfoBundle(poiTypesService.getMapPoiTypes(lang), tags);
 		List<String> preferredLangs = lang != null ? List.of(lang) : List.of();
 		boolean allowNoteTag = false; // The "note" tag is enabled only for OSM editing.
-		List<AmenityTagEntry> tagEntries = infoBundle.getVisibleTags(allowNoteTag, preferredLangs);
+		List<AmenityTagEntry> tagEntries = infoBundle.getVisibleTags(allowNoteTag, preferredLangs,
+				getExtensionFallbackKeys(tags));
 
 		List<AmenityTagEntry> infoTagEntries = new ArrayList<>();
 		List<AmenityTagEntry> descriptionTagEntries = new ArrayList<>();
@@ -44,6 +46,20 @@ public class AmenityTagsService {
 		List<AmenityTagEntry> sortedTagEntries = sortTagEntries(infoBundle, infoTagEntries);
 		sortedTagEntries.addAll(descriptionTagEntries);
 		return toVisibleTags(sortedTagEntries);
+	}
+
+	// keys of a GPX point from another namespace (e.g. "test:country"): shown as generic rows when the POI logic
+	// does not know them, as the app does (AmenityExtensionsHelper.getStoredExtensionFallbackKeys)
+	private static Set<String> getExtensionFallbackKeys(Map<String, String> tags) {
+		Set<String> keys = new HashSet<>();
+		for (String key : tags.keySet()) {
+			if (key.indexOf(':') > 0 && !key.startsWith(GpxUtilities.AMENITY_PREFIX)
+					&& !key.startsWith(GpxUtilities.OSM_PREFIX) && !key.startsWith(GpxUtilities.OSMAND_EXTENSIONS_PREFIX)
+					&& !key.startsWith(GpxUtilities.GPXTPX_PREFIX)) {
+				keys.add(key);
+			}
+		}
+		return keys;
 	}
 
 	private List<AmenityTagEntry> sortTagEntries(AdditionalInfoBundle infoBundle, List<AmenityTagEntry> tagEntries) {
