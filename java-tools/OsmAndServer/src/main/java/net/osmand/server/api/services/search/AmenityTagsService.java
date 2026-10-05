@@ -48,14 +48,26 @@ public class AmenityTagsService {
 		return toVisibleTags(sortedTagEntries);
 	}
 
-	// keys of a GPX point from another namespace (e.g. "test:country"): shown as generic rows when the POI logic
-	// does not know them, as the app does (AmenityExtensionsHelper.getStoredExtensionFallbackKeys)
+	// OsmAnd's own point fields: not shown
+	private static final Set<String> SERVICE_KEYS = Set.of(GpxUtilities.ICON_NAME_EXTENSION,
+			GpxUtilities.BACKGROUND_TYPE_EXTENSION, GpxUtilities.COLOR_NAME_EXTENSION, GpxUtilities.LINE_WIDTH_EXTENSION,
+			GpxUtilities.PROFILE_TYPE_EXTENSION, GpxUtilities.ADDRESS_EXTENSION, GpxUtilities.HIDDEN_EXTENSION,
+			GpxUtilities.PINNED_EXTENSION, GpxUtilities.POINT_TYPE_EXTENSION, GpxUtilities.OSM_URL_EXTENSION,
+			GpxUtilities.TRKPT_INDEX_EXTENSION, GpxUtilities.POINT_ELEVATION, GpxUtilities.POINT_SPEED,
+			GpxUtilities.POINT_BEARING, GpxUtilities.POINT_HEADING, GpxUtilities.MIN_ELEVATION,
+			GpxUtilities.MAX_ELEVATION, GpxUtilities.AVG_ELEVATION, GpxUtilities.DIFF_ELEVATION_UP,
+			GpxUtilities.DIFF_ELEVATION_DOWN, "visited_date");
+
+	// a GPX point shows all its data: keys the POI logic does not know (e.g. hr, test:country) become generic rows;
+	// only OsmAnd's service fields and namespaces are skipped
 	private static Set<String> getExtensionFallbackKeys(Map<String, String> tags) {
 		Set<String> keys = new HashSet<>();
 		for (String key : tags.keySet()) {
-			if (key.indexOf(':') > 0 && !key.startsWith(GpxUtilities.AMENITY_PREFIX)
-					&& !key.startsWith(GpxUtilities.OSM_PREFIX) && !key.startsWith(GpxUtilities.OSMAND_EXTENSIONS_PREFIX)
-					&& !key.startsWith(GpxUtilities.GPXTPX_PREFIX)) {
+			if (!key.startsWith(GpxUtilities.AMENITY_PREFIX) && !key.startsWith(GpxUtilities.OSM_PREFIX)
+					&& !key.startsWith("collapsable_") && !key.startsWith("web_")
+					&& !key.startsWith(GpxUtilities.OSMAND_EXTENSIONS_PREFIX)
+					&& !key.startsWith(GpxUtilities.GPXTPX_PREFIX) && !key.startsWith("gpxx:")
+					&& !SERVICE_KEYS.contains(key)) {
 				keys.add(key);
 			}
 		}
