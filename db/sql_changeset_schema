@@ -41,7 +41,7 @@ CREATE TABLE promo_campaigns(name text, starttime timestamp, endtime timestamp, 
 ALTER TABLE user_accounts ADD CONSTRAINT email_uniq UNIQUE (email);
 ALTER TABLE user_accounts ADD COLUMN weblinktoken text, ADD COLUMN weblinktime timestamp;
 -- OAuth for MCP clients (OAuthService)
-ALTER TABLE user_accounts ADD COLUMN oauthdisabled boolean;
+ALTER TABLE user_accounts ADD COLUMN oauthenabled boolean;
 CREATE TABLE oauth_clients(clientid text primary key, clientname text, redirecturis text, secrethash text, createtime timestamp);
 CREATE TABLE user_oauth_grants(id serial primary key, userid integer not null REFERENCES user_accounts(id) ON DELETE CASCADE,
     clientid text not null, scope text, resource text, redirecturi text, codehash text, codechallenge text, codeexpire timestamp,

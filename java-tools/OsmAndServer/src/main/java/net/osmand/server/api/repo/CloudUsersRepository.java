@@ -79,9 +79,9 @@ public interface CloudUsersRepository extends JpaRepository<CloudUser, Long> {
         @Temporal(TemporalType.TIMESTAMP)
         public Date webLinkTime;
 
-        // user turned off access for OAuth clients (AI assistants); null = allowed
-        @Column(name = "oauthdisabled")
-        public Boolean oauthDisabled;
+        // access for OAuth clients (AI assistants): true/false = user's choice, null = never chosen (osmand.oauth.default-user-enabled)
+        @Column(name = "oauthenabled")
+        public Boolean oauthEnabled;
         
     }
 

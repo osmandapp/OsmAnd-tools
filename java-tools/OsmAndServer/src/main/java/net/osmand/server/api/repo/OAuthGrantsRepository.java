@@ -15,7 +15,10 @@ import jakarta.persistence.Temporal;
 import jakarta.persistence.TemporalType;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import net.osmand.server.api.repo.OAuthGrantsRepository.OAuthGrant;
 
@@ -31,6 +34,12 @@ public interface OAuthGrantsRepository extends JpaRepository<OAuthGrant, Integer
 	OAuthGrant findByRefreshhash(String refreshhash);
 
 	List<OAuthGrant> findByUserid(int userid);
+
+	// only this column: saving the whole entity could bring back a scope change or a revoked grant
+	@Transactional
+	@Modifying
+	@Query(value = "UPDATE user_oauth_grants SET lastusetime = :time WHERE id = :id", nativeQuery = true)
+	void updateLastUseTime(int id, Date time);
 
 	@Entity
 	@Table(name = "user_oauth_grants")

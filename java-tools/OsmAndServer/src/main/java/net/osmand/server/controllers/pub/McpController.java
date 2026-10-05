@@ -53,6 +53,7 @@ import net.osmand.server.api.repo.OAuthGrantsRepository.OAuthGrant;
 import net.osmand.server.api.services.FavoriteService;
 import net.osmand.server.api.services.OAuthService;
 import net.osmand.server.api.services.OAuthService.CloudGroup;
+import net.osmand.server.api.services.ShareFileService;
 import net.osmand.server.api.services.StorageService.InternalZipFile;
 import net.osmand.server.api.services.UserSubscriptionService;
 import net.osmand.server.api.services.UserdataService;
@@ -98,6 +99,9 @@ public class McpController {
 
 	@Autowired
 	private UserSubscriptionService userSubService;
+
+	@Autowired
+	private ShareFileService shareFileService;
 
 	@Value("${osmand.web.location}")
 	private String websiteLocation;
@@ -385,7 +389,7 @@ public class McpController {
 				Set.of(FavoriteService.FILE_TYPE_FAVOURITES)).uniqueFiles) {
 			UserFile uf = f.filesize < 0 ? null
 					: userdataService.getLastFileVersion(grant.userid, f.name, FavoriteService.FILE_TYPE_FAVOURITES);
-			GpxFile gpx = uf == null || uf.filesize < 0 ? null : readGpx(uf);
+			GpxFile gpx = uf == null || uf.filesize < 0 ? null : shareFileService.getFile(uf);
 			if (gpx == null) {
 				continue;
 			}
@@ -424,9 +428,7 @@ public class McpController {
 		}
 		validateContent(type, name, bytes);
 		CloudUserDevice dev = webDevice(grant.userid);
-		File tmp = File.createTempFile("mcp-upload", ".tmp");
-		Files.write(tmp.toPath(), bytes);
-		InternalZipFile zip = InternalZipFile.buildFromFileAndDelete(tmp);
+		InternalZipFile zip = InternalZipFile.buildFromBytes(bytes);
 		userdataService.validateUserForUpload(dev, type, zip.getSize());
 		userdataService.uploadFile(zip, dev, name, type, System.currentTimeMillis());
 		LOG.info("MCP write " + type + " " + name + " user " + grant.userid + " client " + grant.clientid);
@@ -521,13 +523,6 @@ public class McpController {
 
 	private InputStream openStream(UserFile uf) {
 		return uf.data != null ? new ByteArrayInputStream(uf.data) : userdataService.getInputStream(uf);
-	}
-
-	private GpxFile readGpx(UserFile uf) throws Exception {
-		try (Source source = new Buffer().readFrom(new GZIPInputStream(openStream(uf)))) {
-			GpxFile gpx = GpxUtilities.INSTANCE.loadGpxFile(source);
-			return gpx.getError() == null ? gpx : null;
-		}
 	}
 
 	private boolean isAvailable(OAuthGrant grant, Tool t) {

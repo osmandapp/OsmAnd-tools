@@ -16,12 +16,13 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import net.osmand.server.api.repo.CloudUsersRepository;
@@ -55,7 +56,9 @@ public class OAuthService {
 	private static final int MAX_REDIRECT_URIS = 5;
 	private static final int MAX_URI_LENGTH = 512;
 	private static final int MAX_CLIENT_NAME = 100;
-	private static final int MAX_REGISTRATIONS_PER_HOUR = 20;
+	// all IPs together: hosted assistants (Claude.ai, ChatGPT) register every user's client from a few shared IPs
+	private static final int MAX_REGISTRATIONS_PER_HOUR = 1000;
+	private static final long UNUSED_CLIENT_TTL_MS = 24 * 60 * 60 * 1000L;
 	private static final Set<String> FORBIDDEN_SCHEMES = Set.of("javascript", "data", "file", "vbscript", "about", "blob");
 
 	public static final String AUTH_METHOD_NONE = "none";
@@ -133,8 +136,11 @@ public class OAuthService {
 	@Autowired
 	private UserSubscriptionService userSubService;
 
+	@Value("${osmand.oauth.default-user-enabled:false}")
+	private boolean defaultUserEnabled;
+
 	private final SecureRandom random = new SecureRandom();
-	private final Map<String, Deque<Long>> registrationsByIp = new ConcurrentHashMap<>();
+	private final Deque<Long> registrations = new ArrayDeque<>();
 
 	public static class OAuthException extends Exception {
 		private static final long serialVersionUID = 1L;
@@ -166,9 +172,9 @@ public class OAuthService {
 
 	// ---------- clients ----------
 
-	public RegisteredClient registerClient(String ip, String name, List<String> redirectUris, String authMethod)
+	public RegisteredClient registerClient(String name, List<String> redirectUris, String authMethod)
 			throws OAuthException {
-		if (!allowRegistration(ip)) {
+		if (!allowRegistration()) {
 			throw new OAuthException("invalid_client_metadata", "Too many registrations, try later",
 					HttpStatus.TOO_MANY_REQUESTS);
 		}
@@ -245,13 +251,15 @@ public class OAuthService {
 
 	// ---------- authorization code ----------
 
-	// scopes pre-checked on the consent page: the supported requested ones, or all read scopes if none requested
+	// scopes pre-checked on the consent page: view of the requested groups, or of all groups if none requested.
+	// Edit is never pre-checked: clients request every scope_supported, the user ticks Edit.
 	public Set<String> defaultScopes(String requested) {
 		Set<String> res = new LinkedHashSet<>();
 		if (requested != null) {
 			for (String s : requested.trim().split("\\s+")) {
-				if (SCOPES.contains(s)) {
-					res.add(s);
+				String read = s.endsWith(WRITE) ? s.substring(0, s.length() - WRITE.length()) + READ : s;
+				if (SCOPES.contains(read)) {
+					res.add(read);
 				}
 			}
 		}
@@ -360,20 +368,21 @@ public class OAuthService {
 			return null;
 		}
 		CloudUser pu = usersRepository.findById(g.userid);
-		if (pu == null || Boolean.TRUE.equals(pu.oauthDisabled)) {
+		if (!isEnabled(pu)) {
 			return null;
 		}
 		if (g.lastusetime == null || now - g.lastusetime.getTime() > LAST_USE_UPDATE_MS) {
 			g.lastusetime = new Date(now);
-			grantsRepository.save(g);
+			grantsRepository.updateLastUseTime(g.id, g.lastusetime);
 		}
 		return g;
 	}
 
 	// ---------- user settings ----------
 
+	// user's choice in account settings; null = never chosen, then the server default
 	public boolean isEnabled(CloudUser pu) {
-		return pu != null && !Boolean.TRUE.equals(pu.oauthDisabled);
+		return pu != null && (pu.oauthEnabled != null ? pu.oauthEnabled : defaultUserEnabled);
 	}
 
 	public void setEnabled(int userId, boolean enabled) {
@@ -381,7 +390,7 @@ public class OAuthService {
 		if (pu == null) {
 			return;
 		}
-		pu.oauthDisabled = enabled ? null : Boolean.TRUE;
+		pu.oauthEnabled = enabled;
 		usersRepository.saveAndFlush(pu);
 		if (!enabled) {
 			grantsRepository.deleteAll(grantsRepository.findByUserid(userId));
@@ -442,7 +451,7 @@ public class OAuthService {
 	private void checkUserAllowsOAuth(int userId) throws OAuthException {
 		CloudUser pu = usersRepository.findById(userId);
 		if (!isEnabled(pu)) {
-			throw new OAuthException("invalid_grant", "Access for OAuth clients is disabled in the OsmAnd account");
+			throw new OAuthException("invalid_grant", "Access for OAuth clients is not turned on in the OsmAnd account");
 		}
 		if (!isPro(pu)) {
 			throw new OAuthException("invalid_grant", "OsmAnd Pro is required");
@@ -478,22 +487,27 @@ public class OAuthService {
 		grantsRepository.deleteAll(stale);
 	}
 
-	private boolean allowRegistration(String ip) {
+	private boolean allowRegistration() {
 		long now = System.currentTimeMillis();
-		Deque<Long> times = registrationsByIp.computeIfAbsent(ip == null ? "" : ip, k -> new ArrayDeque<>());
-		synchronized (times) {
-			while (!times.isEmpty() && now - times.peekFirst() > 3600 * 1000L) {
-				times.pollFirst();
+		synchronized (registrations) {
+			while (!registrations.isEmpty() && now - registrations.peekFirst() > 3600 * 1000L) {
+				registrations.pollFirst();
 			}
-			if (times.size() >= MAX_REGISTRATIONS_PER_HOUR) {
+			if (registrations.size() >= MAX_REGISTRATIONS_PER_HOUR) {
 				return false;
 			}
-			times.addLast(now);
-		}
-		if (registrationsByIp.size() > 10000) {
-			registrationsByIp.clear();
+			registrations.addLast(now);
 		}
 		return true;
+	}
+
+	// registration is anonymous, so drop clients that never got a connection
+	@Scheduled(fixedRate = 60 * 60 * 1000L)
+	public void deleteUnusedClients() {
+		int n = clientsRepository.deleteUnusedBefore(new Date(System.currentTimeMillis() - UNUSED_CLIENT_TTL_MS));
+		if (n > 0) {
+			LOG.info("OAuth unused clients deleted: " + n);
+		}
 	}
 
 	// https for web clients, http only for loopback (RFC 8252 7.3), private-use schemes for native apps (7.1)

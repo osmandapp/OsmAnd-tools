@@ -12,7 +12,10 @@ import jakarta.persistence.Temporal;
 import jakarta.persistence.TemporalType;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import net.osmand.server.api.repo.OAuthClientsRepository.OAuthClient;
 
@@ -21,6 +24,13 @@ import net.osmand.server.api.repo.OAuthClientsRepository.OAuthClient;
 public interface OAuthClientsRepository extends JpaRepository<OAuthClient, String> {
 
 	OAuthClient findByClientid(String clientid);
+
+	// clients registered before the time that have no connection (abandoned or never authorized)
+	@Transactional
+	@Modifying
+	@Query(value = "DELETE FROM oauth_clients c WHERE c.createtime < :before AND NOT EXISTS "
+			+ "(SELECT 1 FROM user_oauth_grants g WHERE g.clientid = c.clientid)", nativeQuery = true)
+	int deleteUnusedBefore(Date before);
 
 	@Entity
 	@Table(name = "oauth_clients")

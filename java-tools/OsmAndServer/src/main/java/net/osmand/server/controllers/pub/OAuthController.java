@@ -136,7 +136,7 @@ public class OAuthController {
 			return oauthError(new OAuthException("invalid_client_metadata", "JSON body expected"));
 		}
 		try {
-			RegisteredClient rc = oauthService.registerClient(request.getRemoteAddr(), r.client_name,
+			RegisteredClient rc = oauthService.registerClient(r.client_name,
 					r.redirect_uris, r.token_endpoint_auth_method);
 			Map<String, Object> m = new LinkedHashMap<>();
 			m.put("client_id", rc.client.clientid);
@@ -197,15 +197,15 @@ public class OAuthController {
 		CloudUser pu = usersRepository.findById(dev.userid);
 		String host = OAuthService.redirectHost(redirectUri);
 		Link back = new Link("Return to " + host, redirectUrl(redirectUri, Map.of("error", "access_denied"), state));
-		if (!oauthService.isEnabled(pu)) {
-			return message(HttpStatus.OK, "Access is turned off", "Access for AI assistants is turned off in your "
-					+ "OsmAnd account settings, so " + client.clientname + " cannot be connected.",
-					List.of(new Link("Open account settings", LOGIN_PAGE), back));
-		}
 		if (!oauthService.isPro(pu)) {
 			return message(HttpStatus.OK, "OsmAnd Pro required",
 					"Connecting AI assistants such as " + client.clientname + " is part of OsmAnd Pro.",
 					List.of(new Link("See OsmAnd Pro", "/pricing"), back));
+		}
+		if (!oauthService.isEnabled(pu)) {
+			return message(HttpStatus.OK, "Turn on AI assistants", "To connect " + client.clientname
+					+ ", first turn on AI assistants in your OsmAnd account settings, then connect again.",
+					List.of(new Link("Open account settings", LOGIN_PAGE), back));
 		}
 		String nonce = UUID.randomUUID().toString();
 		request.getSession(true).setAttribute(PENDING_ATTR + nonce, new PendingAuthorization(dev.userid,
@@ -315,8 +315,11 @@ public class OAuthController {
 	}
 
 	@PostMapping(path = "/mapapi/oauth/enabled", produces = MediaType.APPLICATION_JSON_VALUE)
-	public ResponseEntity<String> setEnabled(@RequestParam boolean enabled) {
+	public ResponseEntity<String> setEnabled(@RequestParam boolean enabled, HttpServletRequest request) {
 		CloudUserDevice dev = currentUser();
+		if (!isSameOrigin(request)) {
+			return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+		}
 		if (dev == null) {
 			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
 		}
@@ -325,8 +328,11 @@ public class OAuthController {
 	}
 
 	@PostMapping(path = "/mapapi/oauth/revoke", produces = MediaType.APPLICATION_JSON_VALUE)
-	public ResponseEntity<String> revokeConnection(@RequestParam int id) {
+	public ResponseEntity<String> revokeConnection(@RequestParam int id, HttpServletRequest request) {
 		CloudUserDevice dev = currentUser();
+		if (!isSameOrigin(request)) {
+			return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+		}
 		if (dev == null) {
 			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
 		}
@@ -338,8 +344,12 @@ public class OAuthController {
 
 	@PostMapping(path = "/mapapi/oauth/scope", produces = MediaType.APPLICATION_JSON_VALUE)
 	public ResponseEntity<String> setConnectionScope(@RequestParam int id,
-	                                                 @RequestParam(name = "scope", required = false) List<String> scope) {
+	                                                 @RequestParam(name = "scope", required = false) List<String> scope,
+	                                                 HttpServletRequest request) {
 		CloudUserDevice dev = currentUser();
+		if (!isSameOrigin(request)) {
+			return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+		}
 		if (dev == null) {
 			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
 		}
@@ -357,6 +367,18 @@ public class OAuthController {
 			return u.getUserDevice();
 		}
 		return null;
+	}
+
+	// CSRF guard for the account settings POSTs: the session cookie is SameSite=None and the app's CSRF matcher
+	// skips POST, so a foreign page could submit a form. Browsers always send Origin (or Referer) on such a form.
+	private static boolean isSameOrigin(HttpServletRequest request) {
+		String base = baseUrl();
+		String origin = request.getHeader(HttpHeaders.ORIGIN);
+		if (origin != null) {
+			return origin.equals(base);
+		}
+		String referer = request.getHeader(HttpHeaders.REFERER);
+		return referer == null || referer.equals(base) || referer.startsWith(base + "/");
 	}
 
 	private boolean isOurResource(String resource) {

@@ -393,6 +393,18 @@ public class StorageService {
 			return zipfile;
 		}
 
+		// gzipped in memory, no temp files; for small contents only
+		public static InternalZipFile buildFromBytes(byte[] content) throws IOException {
+			InternalZipFile zipfile = new InternalZipFile();
+			zipfile.contentSize = content.length;
+			ByteArrayOutputStream bous = new ByteArrayOutputStream();
+			try (GZIPOutputStream gz = new GZIPOutputStream(bous)) {
+				gz.write(content);
+			}
+			zipfile.data = bous.toByteArray();
+			return zipfile;
+		}
+
     	public static InternalZipFile buildFromServerFile(ServerCommonFile file, String name) throws IOException {
     		InternalZipFile zipfile = new InternalZipFile();
 			zipfile.contentSize = file.di.getContentSize();
