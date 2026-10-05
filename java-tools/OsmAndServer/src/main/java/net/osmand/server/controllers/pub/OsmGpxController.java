@@ -2,7 +2,6 @@ package net.osmand.server.controllers.pub;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import net.osmand.data.QuadRect;
 import net.osmand.server.DatasourceConfiguration;
@@ -76,8 +75,9 @@ public class OsmGpxController {
 	private static final int MAX_RUNTIME_CACHE_SIZE = 5000;
 	private static final int MAX_ROUTES_SUMMARY = 100000;
 	private static final int MAX_ROUTES_FULL_MODE_THRESHOLD = 5000;
-	private static final int MAX_NEAR_RADIUS_M = 1000;
+	private static final int MAX_NEAR_RADIUS_M = 500_000;
 	private static final int MAX_NEAR_ROUTES = 500;
+	private static final int MAX_NEAR_CANDIDATES = 5000;
 	private static final int MAX_TAGS_PER_BBOX = 1000;
 	private final AtomicInteger cacheTouch = new AtomicInteger(0);
 
@@ -209,16 +209,14 @@ public class OsmGpxController {
 
 		List<Feature> features;
 		if (req.isNearPoint()) {
-			// too many around the point to decode them all, or too many of them within the radius; the hint quotes the limit that fired
-			boolean tooManyAround = countRoutes(conditions, params, MAX_ROUTES_FULL_MODE_THRESHOLD + 1) > MAX_ROUTES_FULL_MODE_THRESHOLD;
-			features = tooManyAround ? null : queryRoutesNear(conditions, params, req.lat(), req.lon(), nearRadius);
-			if (features == null) {
-				JsonObject tooMany = new JsonObject();
-				tooMany.add("features", new JsonArray());
-				tooMany.addProperty("tooMany", true);
-				tooMany.addProperty("maxRoutes", tooManyAround ? MAX_ROUTES_FULL_MODE_THRESHOLD : MAX_NEAR_ROUTES);
-				return ResponseEntity.ok(gson.toJson(tooMany));
+			NearRoutes near = queryRoutesNear(conditions, params, req.lat(), req.lon(), nearRadius);
+			FeatureCollection nearest = new FeatureCollection();
+			nearest.setFeatures(near.features());
+			JsonObject res = gson.toJsonTree(nearest).getAsJsonObject();
+			if (near.limited()) {
+				res.addProperty("limited", true);
 			}
+			return ResponseEntity.ok(gson.toJson(res));
 		} else if (isPointsOnlyRequest(req.activityArr())) {
 			// error tracks have no geometry — return them as points only
 			features = queryRouteFeatures(conditions, params, false, MAX_ROUTES_SUMMARY, false);
@@ -432,30 +430,29 @@ public class OsmGpxController {
 		params.addAll(normalized);
 	}
 
-	// at most limit rows are counted, enough to compare the count with limit - 1
-	private long countRoutes(StringBuilder conditions, List<Object> params, int limit) {
-		List<Object> limited = new ArrayList<>(params);
-		limited.add(limit);
-		return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM (SELECT 1 FROM " + GPX_METADATA_TABLE_NAME + " m WHERE 1 = 1 "
-				+ conditions + " LIMIT ?) t", Long.class, limited.toArray());
+	private record NearRoutes(List<Feature> features, boolean limited) {
 	}
 
-	// the tracks whose line passes within radius metres of the point, nearest first; error tracks by their start point;
-	// null when more than MAX_NEAR_ROUTES of them pass there, the rows after that are not decoded
-	private List<Feature> queryRoutesNear(StringBuilder conditions, List<Object> params, double lat, double lon, double radius) {
+	// candidates come nearest rectangle first, so any radius reads at most MAX_NEAR_CANDIDATES rows
+	private NearRoutes queryRoutesNear(StringBuilder conditions, List<Object> params, double lat, double lon, double radius) {
 		String query = "SELECT " + ROUTE_COLUMNS + ", m.simplified_geometry FROM " + GPX_METADATA_TABLE_NAME + " m " +
-				"WHERE 1 = 1 " + conditions;
+				"WHERE 1 = 1 " + conditions + " ORDER BY m.bbox <-> ST_SetSRID(ST_MakePoint(?, ?), " + SRID_WGS84 + ") LIMIT ?";
+		List<Object> args = new ArrayList<>(params);
+		args.add(lon);
+		args.add(lat);
+		args.add(MAX_NEAR_CANDIDATES);
 		record Near(Feature feature, double distance) {
 		}
-		List<Near> near = new ArrayList<>();
+		// the farthest of the kept tracks on top, so only the MAX_NEAR_ROUTES nearest are held and encoded
+		PriorityQueue<Near> nearest = new PriorityQueue<>(Comparator.comparingDouble(Near::distance).reversed());
+		int[] candidates = {0};
+		int[] matched = {0};
 		jdbcTemplate.query(query, ps -> {
-			for (int i = 0; i < params.size(); i++) {
-				ps.setObject(i + 1, params.get(i));
+			for (int i = 0; i < args.size(); i++) {
+				ps.setObject(i + 1, args.get(i));
 			}
 		}, rs -> {
-			if (near.size() > MAX_NEAR_ROUTES) {
-				return;
-			}
+			candidates[0]++;
 			byte[] geometry = rs.getBytes("simplified_geometry");
 			boolean hasLine = geometry != null && geometry.length > 0;
 			double distance = hasLine
@@ -464,18 +461,24 @@ public class OsmGpxController {
 			if (distance > radius) {
 				return;
 			}
+			matched[0]++;
+			if (nearest.size() == MAX_NEAR_ROUTES) {
+				if (distance >= nearest.peek().distance()) {
+					return;
+				}
+				nearest.poll();
+			}
 			Feature feature = createBaseFeature(rs);
 			if (hasLine) {
 				feature.getProperties().put("geo_b64", Base64.getEncoder().encodeToString(geometry));
 			}
-			near.add(new Near(feature, distance));
+			nearest.add(new Near(feature, distance));
 		});
-		if (near.size() > MAX_NEAR_ROUTES) {
-			return null;
-		}
+		List<Near> near = new ArrayList<>(nearest);
 		near.sort(Comparator.comparingDouble(Near::distance));
+		boolean limited = candidates[0] >= MAX_NEAR_CANDIDATES || matched[0] > MAX_NEAR_ROUTES;
 
-		return near.stream().map(Near::feature).toList();
+		return new NearRoutes(near.stream().map(Near::feature).toList(), limited);
 	}
 
 	private static double distanceToTrack(byte[] geometry, double lat, double lon) {
