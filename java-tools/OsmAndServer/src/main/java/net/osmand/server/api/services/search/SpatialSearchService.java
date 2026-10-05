@@ -299,6 +299,19 @@ public class SpatialSearchService {
 			response.info = getSearchStats(res.stats, sTime, response.features.size());
 			response.info.put("words-matched", res.combinations == null || res.combinations.isEmpty() ? 0
 					: res.combinations.get(0).getTokenCount());
+			if (res.suggestions != null && !res.suggestions.isEmpty()) {
+				// words that continue the word still being typed, the most frequent first
+				List<Map<String, Object>> suggestions = new ArrayList<>();
+				for (SpatialTextSearch.SpatialSuggestion sg : res.suggestions) {
+					Map<String, Object> m = new LinkedHashMap<>();
+					m.put("word", sg.word());
+					m.put("count", sg.count());
+					suggestions.add(m);
+				}
+				response.info.put("suggestions", suggestions);
+			}
+			Runtime rt = Runtime.getRuntime();
+			response.info.put("heapMb", (rt.totalMemory() - rt.freeMemory()) >> 20);
 		} catch (TimeoutException e) {
 			LOGGER.warn(String.format("Spatial search timeout %d ms for '%s'", timeoutMs, ctx.text()));
 			response.info.put("timeout", true);
