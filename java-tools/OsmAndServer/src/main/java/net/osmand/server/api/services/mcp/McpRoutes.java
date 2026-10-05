@@ -1,4 +1,4 @@
-package net.osmand.server.controllers.pub;
+package net.osmand.server.api.services.mcp;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -22,11 +22,11 @@ import net.osmand.util.MapUtils;
  * Routes for MCP clients with the server router, the same way the web Plan route builds them:
  * every point carries the profile of the leg that starts at it (a router profile with parameters, line or gap).
  */
-class McpRoutes {
+public class McpRoutes {
 
 	static final String LINE = WebGpxParser.LINE_PROFILE_TYPE;
 	static final String GAP = "gap";
-	static final int MAX_POINTS = 50;
+	public static final int MAX_POINTS = 50;
 	private static final int MAX_GEOMETRY = 300;
 
 	private final RoutingService routingService;
@@ -36,7 +36,7 @@ class McpRoutes {
 	private final Map<String, Map<String, Object>> profiles;
 	private final Gson gson = new GsonBuilder().serializeSpecialFloatingPointValues().create();
 
-	static class RouteException extends Exception {
+	public static class RouteException extends Exception {
 		private static final long serialVersionUID = 1L;
 
 		RouteException(String message) {
@@ -44,13 +44,13 @@ class McpRoutes {
 		}
 	}
 
-	record Leg(String profile, double distanceM, boolean routed) {
+	public record Leg(String profile, double distanceM, boolean routed) {
 	}
 
-	record Built(List<WebGpxParser.Point> points, List<Leg> legs) {
+	public record Built(List<WebGpxParser.Point> points, List<Leg> legs) {
 	}
 
-	McpRoutes(RoutingService routingService, OsmAndMapsService mapsService, WebGpxParser webGpxParser,
+	public McpRoutes(RoutingService routingService, OsmAndMapsService mapsService, WebGpxParser webGpxParser,
 	          String routingModesJson) {
 		this.routingService = routingService;
 		this.mapsService = mapsService;
@@ -84,7 +84,7 @@ class McpRoutes {
 		}
 	}
 
-	Map<String, Object> describe() {
+	public Map<String, Object> describe() {
 		Map<String, Object> res = new LinkedHashMap<>();
 		res.put("profiles", profiles);
 		res.put("special", Map.of(LINE, "straight line to the next point", GAP,
@@ -139,7 +139,7 @@ class McpRoutes {
 	}
 
 	// points: [{lat, lon, profile?, params?}], the profile of a point is used for the leg that starts at it
-	Built build(List<?> points, String defProfile, Map<?, ?> defParams) throws Exception {
+	public Built build(List<?> points, String defProfile, Map<?, ?> defParams) throws Exception {
 		if (points == null || points.size() < 2) {
 			throw new RouteException("At least 2 points are required");
 		}
@@ -198,7 +198,7 @@ class McpRoutes {
 		return new Built(res, legs);
 	}
 
-	Map<String, Object> summary(Built b, boolean withGeometry) {
+	public Map<String, Object> summary(Built b, boolean withGeometry) {
 		Map<String, Object> res = new LinkedHashMap<>();
 		double total = 0;
 		List<Map<String, Object>> legs = new ArrayList<>();
@@ -245,7 +245,7 @@ class McpRoutes {
 	}
 
 	// GPX as the web Plan route saves it: route points with the leg profiles + track geometry
-	String toGpx(Built b, String trackName, String description) {
+	public String toGpx(Built b, String trackName, String description) {
 		Map<String, Object> track = new LinkedHashMap<>();
 		track.put("points", b.points);
 		Map<String, Object> data = new LinkedHashMap<>();

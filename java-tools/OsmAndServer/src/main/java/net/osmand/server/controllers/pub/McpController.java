@@ -60,6 +60,8 @@ import net.osmand.server.api.services.OAuthService.CloudGroup;
 import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.api.services.RoutingService;
 import net.osmand.server.api.services.ShareFileService;
+import net.osmand.server.api.services.mcp.McpRoutes;
+import net.osmand.server.api.services.mcp.McpTracks;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.server.api.services.StorageService.InternalZipFile;
 import net.osmand.server.api.services.UserSubscriptionService;

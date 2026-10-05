@@ -1,4 +1,4 @@
-package net.osmand.server.controllers.pub;
+package net.osmand.server.api.services.mcp;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -18,10 +18,10 @@ import net.osmand.util.MapUtils;
  * Track summaries for MCP clients: a long recording does not fit into a model's context,
  * so the server computes what the assistant asks about (speed, stops, profile) and returns points in slices.
  */
-class McpTracks {
+public class McpTracks {
 
-	static final int MAX_PROFILE = 500;
-	static final int MAX_POINTS = 500;
+	public static final int MAX_PROFILE = 500;
+	public static final int MAX_POINTS = 500;
 	private static final int MAX_STOPS = 100;
 	// speed over at least this time, single GPS jumps would give absurd maxima
 	private static final long SPEED_WINDOW_MS = 10_000;
@@ -32,7 +32,7 @@ class McpTracks {
 	private final double[] dist; // cumulative distance, m
 	private final boolean timed;
 
-	McpTracks(GpxFile gpx) {
+	public McpTracks(GpxFile gpx) {
 		pts = new ArrayList<>();
 		List<Integer> segmentStarts = new ArrayList<>();
 		for (Track t : gpx.getTracks()) {
@@ -62,11 +62,7 @@ class McpTracks {
 		timed = pts.size() > 1 && pts.get(0).getTime() > 0 && pts.get(pts.size() - 1).getTime() > pts.get(0).getTime();
 	}
 
-	int size() {
-		return pts.size();
-	}
-
-	Map<String, Object> analyze(GpxFile gpx, int profileSize, double stopMinutes) {
+	public Map<String, Object> analyze(GpxFile gpx, int profileSize, double stopMinutes) {
 		GpxTrackAnalysis a = gpx.getAnalysis(0, null, null, null, false);
 		Map<String, Object> res = new LinkedHashMap<>();
 		Map<String, Object> s = new LinkedHashMap<>();
@@ -200,7 +196,7 @@ class McpTracks {
 	}
 
 	// points between indexes or times, every step-th one; step is chosen to fit MAX_POINTS if not given
-	Map<String, Object> slice(Integer fromIndex, Integer toIndex, Long fromTime, Long toTime, Integer step) {
+	public Map<String, Object> slice(Integer fromIndex, Integer toIndex, Long fromTime, Long toTime, Integer step) {
 		int n = pts.size();
 		int from = fromIndex != null ? Math.max(0, fromIndex) : 0;
 		int to = toIndex != null ? Math.min(n - 1, toIndex) : n - 1;
