@@ -378,6 +378,15 @@ public class OAuthService {
 		return g;
 	}
 
+	// grant that still works (not revoked, refresh not expired, access on), e.g. for a download link made by it
+	public OAuthGrant activeGrant(int grantId) {
+		OAuthGrant g = grantsRepository.findById(grantId).orElse(null);
+		if (g == null || g.refreshexpire == null || g.refreshexpire.getTime() < System.currentTimeMillis()) {
+			return null;
+		}
+		return isEnabled(usersRepository.findById(g.userid)) ? g : null;
+	}
+
 	// ---------- user settings ----------
 
 	// user's choice in account settings; null = never chosen, then the server default

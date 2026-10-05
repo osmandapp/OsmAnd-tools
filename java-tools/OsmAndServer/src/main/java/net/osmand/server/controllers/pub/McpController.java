@@ -19,6 +19,7 @@ import java.util.Set;
 import java.util.zip.GZIPInputStream;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -32,8 +33,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
@@ -53,7 +57,12 @@ import net.osmand.server.api.repo.OAuthGrantsRepository.OAuthGrant;
 import net.osmand.server.api.services.FavoriteService;
 import net.osmand.server.api.services.OAuthService;
 import net.osmand.server.api.services.OAuthService.CloudGroup;
+import net.osmand.server.api.services.OsmAndMapsService;
+import net.osmand.server.api.services.RoutingService;
 import net.osmand.server.api.services.ShareFileService;
+import net.osmand.server.api.services.mcp.McpRoutes;
+import net.osmand.server.api.services.mcp.McpTracks;
+import net.osmand.server.utils.WebGpxParser;
 import net.osmand.server.api.services.StorageService.InternalZipFile;
 import net.osmand.server.api.services.UserSubscriptionService;
 import net.osmand.server.api.services.UserdataService;
@@ -78,6 +87,9 @@ public class McpController {
 	private static final long MAX_READ_SIZE = 1024 * 1024;
 	private static final int MAX_WRITE_SIZE = 5 * 1024 * 1024;
 	private static final int MAX_NAME_LENGTH = 512;
+	// tracks are parsed on the server for analyze_track / read_track_points
+	private static final long MAX_TRACK_SIZE = 64 * 1024 * 1024;
+	private static final long DOWNLOAD_LINK_TTL_MIN = 10;
 	// guide for assistants, kept in web-server-config to edit without a server release
 	private static final String GUIDE_FILE = "api/mcp_guide.md";
 	private static final String GUIDE_URI = "osmand://guide";
@@ -103,10 +115,31 @@ public class McpController {
 	@Autowired
 	private ShareFileService shareFileService;
 
+	@Autowired
+	private RoutingController routingController;
+
+	@Autowired
+	private RoutingService routingService;
+
+	@Autowired
+	private OsmAndMapsService osmAndMapsService;
+
+	@Autowired
+	private WebGpxParser webGpxParser;
+
+	private volatile McpRoutes routes;
+
 	@Value("${osmand.web.location}")
 	private String websiteLocation;
 
 	private final Gson gson = new GsonBuilder().disableHtmlEscaping().create();
+
+	// one-time download links: sha256(token) -> file version, bound to the grant that made it; lost on restart
+	private record DownloadLink(int grantId, long fileId, String fileName) {
+	}
+
+	private final Cache<String, DownloadLink> downloadLinks = CacheBuilder.newBuilder()
+			.expireAfterWrite(DOWNLOAD_LINK_TTL_MIN, java.util.concurrent.TimeUnit.MINUTES).maximumSize(10000).build();
 
 	private enum Access { NONE, READ, WRITE }
 
@@ -117,6 +150,16 @@ public class McpController {
 			"description", "Cloud file type as returned by list_files, e.g. GPX, FAVOURITES, PROFILE");
 	private static final Map<String, Object> NAME_ARG = Map.of("type", "string",
 			"description", "File name with folder as returned by list_files");
+
+	private static final Map<String, Object> POINTS_ARG = Map.of("type", "array", "description",
+			"2-" + McpRoutes.MAX_POINTS + " points in order; profile/params of a point apply to the leg from it to the next",
+			"items", Map.of("type", "object", "properties", Map.of("lat", Map.of("type", "number"),
+					"lon", Map.of("type", "number"),
+					"profile", Map.of("type", "string", "description", "Leg profile: car, bicycle, ..., line or gap"),
+					"params", Map.of("type", "object")), "required", List.of("lat", "lon")));
+
+	// tools without Cloud data: any connection may use them
+	private static final Set<String> OPEN_TOOLS = Set.of("get_guide", "get_routing_profiles", "build_route");
 
 	private static final List<Tool> TOOLS = List.of(
 			new Tool("get_guide", Access.NONE,
@@ -137,6 +180,61 @@ public class McpController {
 					schema(Map.of("type", TYPE_ARG, "name", NAME_ARG,
 							"version", Map.of("type", "integer", "description", "Version time in ms from list_versions")),
 							List.of("type", "name"))),
+			new Tool("analyze_track", Access.READ,
+					"Summary of a GPX track computed on the server, for tracks of any size: distance, duration, moving "
+							+ "time, average and max speed (where and when), elevation, stops (where, when, how long) and "
+							+ "a profile of equal-distance parts with time, average speed and elevation.",
+					schema(Map.of("type", TYPE_ARG, "name", NAME_ARG,
+							"version", Map.of("type", "integer", "description", "Version time in ms from list_versions"),
+							"profile_parts", Map.of("type", "integer", "description",
+									"Number of profile parts, default 50, max " + McpTracks.MAX_PROFILE),
+							"stop_minutes", Map.of("type", "number", "description", "Shortest stop to report, default 3")),
+							List.of("type", "name"))),
+			new Tool("read_track_points", Access.READ,
+					"Track points of a GPX file in slices: index, time, lat, lon, elevation, distance from start, "
+							+ "recorded speed. Select by index or time range and take every step-th point; at most "
+							+ McpTracks.MAX_POINTS + " points per call, continue from nextFromIndex.",
+					schema(Map.of("type", TYPE_ARG, "name", NAME_ARG,
+							"version", Map.of("type", "integer", "description", "Version time in ms from list_versions"),
+							"from_index", Map.of("type", "integer"), "to_index", Map.of("type", "integer"),
+							"from_time", Map.of("type", "string", "description", "ISO time, e.g. 2025-12-28T13:40:00Z"),
+							"to_time", Map.of("type", "string", "description", "ISO time"),
+							"step", Map.of("type", "integer", "description", "Every step-th point; default fits the range "
+									+ "into " + McpTracks.MAX_POINTS + " points")),
+							List.of("type", "name"))),
+			new Tool("get_download_link", Access.READ,
+					"One-time HTTPS link to download a whole Cloud file (any size), valid " + DOWNLOAD_LINK_TTL_MIN
+							+ " minutes, for assistants that can run code (e.g. curl and a script). Do not show the "
+							+ "link to other people. Prefer analyze_track / read_track_points when no code can be run.",
+					schema(Map.of("type", TYPE_ARG, "name", NAME_ARG,
+							"version", Map.of("type", "integer", "description", "Version time in ms from list_versions")),
+							List.of("type", "name"))),
+			new Tool("get_routing_profiles", Access.NONE,
+					"Navigation profiles of the OsmAnd router (car, bicycle, pedestrian, truck...) with their "
+							+ "parameters (avoid motorways, short way, driving style...) and the special profiles line and gap.",
+					schema(Map.of(), List.of())),
+			new Tool("build_route", Access.NONE,
+					"Route through points with the OsmAnd router. Each point may set the profile of the leg that starts "
+							+ "at it, e.g. car then line then bicycle,avoid_unpaved; the others use the default profile. "
+							+ "Returns distance per leg and a simplified geometry. Does not save anything.",
+					schema(Map.of("points", POINTS_ARG,
+							"profile", Map.of("type", "string", "description", "Default profile, e.g. car or "
+									+ "\"bicycle,avoid_unpaved\" (see get_routing_profiles)"),
+							"params", Map.of("type", "object", "description", "Default profile parameters, e.g. "
+									+ "{\"avoid_motorway\": true, \"width\": 2.5}")),
+							List.of("points"))),
+			new Tool("create_track", Access.WRITE,
+					"Build a route through points (as build_route) and save it as a GPX track in OsmAnd Cloud "
+							+ "(a new file or a new version). The track keeps the route points with their profiles, so "
+							+ "it can be edited in OsmAnd Plan route.",
+					schema(Map.of("name", Map.of("type", "string", "description", "Track file name with folder, "
+									+ "ending with .gpx, e.g. Trips/Alps day 1.gpx"),
+							"points", POINTS_ARG,
+							"profile", Map.of("type", "string", "description", "Default profile"),
+							"params", Map.of("type", "object", "description", "Default profile parameters"),
+							"title", Map.of("type", "string", "description", "Track name shown in OsmAnd"),
+							"description", Map.of("type", "string")),
+							List.of("name", "points"))),
 			new Tool("list_versions", Access.READ,
 					"All stored versions of one Cloud file, newest first; deleted=true marks a deletion.",
 					schema(Map.of("type", TYPE_ARG, "name", NAME_ARG), List.of("type", "name"))),
@@ -153,6 +251,30 @@ public class McpController {
 			new Tool("delete_file", Access.WRITE,
 					"Delete a Cloud file. Earlier versions stay in Cloud and can be restored with read_file + write_file.",
 					schema(Map.of("type", TYPE_ARG, "name", NAME_ARG), List.of("type", "name"))));
+
+	// GET /mcp?download=<token> from get_download_link: the token is the only credential, so it is one-time,
+	// short-lived, bound to one file version and dies with the connection (revoke, access off)
+	@RequestMapping(path = MCP_PATH, method = RequestMethod.GET, params = "download")
+	public void download(@RequestParam("download") String token, HttpServletResponse response) throws Exception {
+		DownloadLink link = token == null ? null : downloadLinks.asMap().remove(OAuthService.hash(token));
+		OAuthGrant grant = link == null ? null : oauthService.activeGrant(link.grantId);
+		UserFile uf = grant == null ? null : filesRepository.findById(link.fileId).orElse(null);
+		if (uf == null || uf.userid != grant.userid || uf.filesize < 0
+				|| !can(grant, CloudGroup.ofType(uf.type), Access.READ)) {
+			response.sendError(HttpStatus.NOT_FOUND.value(), "Link is invalid, used or expired");
+			return;
+		}
+		LOG.info("MCP download " + uf.type + " " + uf.name + " user " + grant.userid + " client " + grant.clientid);
+		String fileName = link.fileName.replaceAll("[^\\w.\\- ]", "_");
+		response.setContentType(fileName.toLowerCase().endsWith(".gpx") ? "application/gpx+xml"
+				: MediaType.APPLICATION_OCTET_STREAM_VALUE);
+		response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"");
+		response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
+		response.setHeader("Referrer-Policy", "no-referrer");
+		try (InputStream in = new GZIPInputStream(openStream(uf))) {
+			in.transferTo(response.getOutputStream());
+		}
+	}
 
 	@RequestMapping(path = MCP_PATH, method = { RequestMethod.GET, RequestMethod.DELETE })
 	public ResponseEntity<String> notSupported() {
@@ -206,7 +328,8 @@ public class McpController {
 				"serverInfo", Map.of("name", "osmand", "version", "0.2"),
 				"instructions", "Tools work with the user's OsmAnd Cloud files (favorites, tracks, markers, settings...). "
 						+ "They do not control the app on the phone; changes reach the apps on their next Cloud sync. "
-						+ "Call get_guide before writing files. Ask the user before write_file or delete_file.");
+						+ "Call get_guide before writing files. Ask the user before write_file or delete_file. "
+						+ "For GPX tracks use analyze_track and read_track_points instead of read_file.");
 	}
 
 	private List<Map<String, Object>> listTools(OAuthGrant grant) {
@@ -240,6 +363,12 @@ public class McpController {
 			case "get_account" -> getAccount(grant.userid);
 			case "list_files" -> listFiles(grant, str(args, "group"), str(args, "folder"));
 			case "read_file" -> readFile(grant, str(args, "type"), str(args, "name"), args.get("version"));
+			case "analyze_track" -> analyzeTrack(grant, args);
+			case "read_track_points" -> readTrackPoints(grant, args);
+			case "get_download_link" -> downloadLink(grant, str(args, "type"), str(args, "name"), args.get("version"));
+			case "get_routing_profiles" -> routes().describe();
+			case "build_route" -> routes().summary(buildRoute(args), true);
+			case "create_track" -> createTrack(grant, args);
 			case "list_versions" -> listVersions(grant, str(args, "type"), str(args, "name"));
 			case "list_favorites" -> listFavorites(grant, str(args, "group"));
 			case "write_file" -> writeFile(grant, str(args, "type"), str(args, "name"), str(args, "content"));
@@ -327,7 +456,8 @@ public class McpController {
 		return res;
 	}
 
-	private String readFile(OAuthGrant grant, String type, String name, Object version) throws Exception {
+	// latest or the given version of a file the grant may read
+	private UserFile readableFile(OAuthGrant grant, String type, String name, Object version) throws ToolException {
 		checkFileAccess(grant, type, name, Access.READ);
 		UserFile uf = version instanceof Number n ? findVersion(grant.userid, type, name, n.longValue())
 				: userdataService.getLastFileVersion(grant.userid, name, type);
@@ -337,8 +467,14 @@ public class McpController {
 		if (uf.filesize < 0) {
 			throw new ToolException("This version is a deletion; use list_versions for earlier versions");
 		}
+		return uf;
+	}
+
+	private String readFile(OAuthGrant grant, String type, String name, Object version) throws Exception {
+		UserFile uf = readableFile(grant, type, name, version);
 		if (uf.filesize > MAX_READ_SIZE) {
-			throw new ToolException("File is too large to read (" + uf.filesize + " bytes)");
+			throw new ToolException("File is too large to read (" + uf.filesize + " bytes). For a GPX track use "
+					+ "analyze_track or read_track_points; get_download_link gives the whole file to code.");
 		}
 		byte[] bytes;
 		try (InputStream in = new GZIPInputStream(openStream(uf))) {
@@ -349,6 +485,117 @@ public class McpController {
 					.onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString();
 		} catch (CharacterCodingException e) {
 			throw new ToolException("Binary file (" + bytes.length + " bytes), only text files can be read");
+		}
+	}
+
+	private McpTracks loadTrack(OAuthGrant grant, Map<?, ?> args, GpxFile[] gpxOut) throws Exception {
+		String type = str(args, "type"), name = str(args, "name");
+		UserFile uf = readableFile(grant, type, name, args.get("version"));
+		if (name == null || !name.toLowerCase().endsWith(".gpx")) {
+			throw new ToolException("Not a GPX file");
+		}
+		if (uf.filesize > MAX_TRACK_SIZE) {
+			throw new ToolException("Track is too large to analyze (" + uf.filesize + " bytes), use get_download_link");
+		}
+		GpxFile gpx = shareFileService.getFile(uf);
+		if (gpx == null) {
+			throw new ToolException("Could not read the GPX file");
+		}
+		if (gpxOut != null) {
+			gpxOut[0] = gpx;
+		}
+		return new McpTracks(gpx);
+	}
+
+	private Map<String, Object> analyzeTrack(OAuthGrant grant, Map<?, ?> args) throws Exception {
+		GpxFile[] gpx = new GpxFile[1];
+		McpTracks t = loadTrack(grant, args, gpx);
+		int parts = Math.max(1, Math.min(McpTracks.MAX_PROFILE, num(args, "profile_parts", 50).intValue()));
+		double stopMin = Math.max(0.5, num(args, "stop_minutes", 3).doubleValue());
+		return t.analyze(gpx[0], parts, stopMin);
+	}
+
+	private Map<String, Object> readTrackPoints(OAuthGrant grant, Map<?, ?> args) throws Exception {
+		McpTracks t = loadTrack(grant, args, null);
+		Number from = num(args, "from_index", null), to = num(args, "to_index", null), step = num(args, "step", null);
+		return t.slice(from == null ? null : from.intValue(), to == null ? null : to.intValue(),
+				time(args, "from_time"), time(args, "to_time"), step == null ? null : step.intValue());
+	}
+
+	private Map<String, Object> downloadLink(OAuthGrant grant, String type, String name, Object version)
+			throws ToolException {
+		UserFile uf = readableFile(grant, type, name, version);
+		String token = "odl_" + java.util.UUID.randomUUID().toString().replace("-", "")
+				+ java.util.UUID.randomUUID().toString().replace("-", "");
+		String fileName = name.substring(name.lastIndexOf('/') + 1);
+		downloadLinks.put(OAuthService.hash(token), new DownloadLink(grant.id, uf.id, fileName));
+		LOG.info("MCP download link " + type + " " + name + " user " + grant.userid + " client " + grant.clientid);
+		Map<String, Object> res = new LinkedHashMap<>();
+		res.put("url", OAuthController.baseUrl() + MCP_PATH + "?download=" + token);
+		res.put("fileName", fileName);
+		res.put("size", uf.filesize);
+		res.put("expiresInMinutes", DOWNLOAD_LINK_TTL_MIN);
+		res.put("oneTime", true);
+		return res;
+	}
+
+	private McpRoutes routes() {
+		McpRoutes r = routes;
+		if (r == null) {
+			r = new McpRoutes(routingService, osmAndMapsService, webGpxParser, routingController.routingParams().getBody());
+			routes = r;
+		}
+		return r;
+	}
+
+	private McpRoutes.Built buildRoute(Map<?, ?> args) throws Exception {
+		try {
+			return routes().build(args.get("points") instanceof List<?> l ? l : null, str(args, "profile"),
+					args.get("params") instanceof Map<?, ?> m ? m : null);
+		} catch (McpRoutes.RouteException e) {
+			throw new ToolException(e.getMessage());
+		}
+	}
+
+	private Map<String, Object> createTrack(OAuthGrant grant, Map<?, ?> args) throws Exception {
+		String name = str(args, "name");
+		if (name == null || !name.toLowerCase().endsWith(".gpx")) {
+			throw new ToolException("name must end with .gpx");
+		}
+		checkFileAccess(grant, "GPX", name, Access.WRITE);
+		McpRoutes.Built b = buildRoute(args);
+		String title = str(args, "title");
+		if (title == null) {
+			title = name.substring(name.lastIndexOf('/') + 1, name.length() - 4);
+		}
+		String gpx = routes().toGpx(b, title, str(args, "description"));
+		Map<String, Object> res = routes().summary(b, false);
+		res.put("saved", writeFile(grant, "GPX", name, gpx));
+		res.put("name", name);
+		return res;
+	}
+
+	private static Number num(Map<?, ?> args, String key, Number def) throws ToolException {
+		Object v = args.get(key);
+		if (v == null) {
+			return def;
+		}
+		if (v instanceof Number n) {
+			return n;
+		}
+		try {
+			return Double.parseDouble(v.toString());
+		} catch (NumberFormatException e) {
+			throw new ToolException(key + " must be a number");
+		}
+	}
+
+	private static Long time(Map<?, ?> args, String key) throws ToolException {
+		String v = str(args, key);
+		try {
+			return v == null ? null : java.time.Instant.parse(v).toEpochMilli();
+		} catch (java.time.format.DateTimeParseException e) {
+			throw new ToolException(key + " must be an ISO time like 2025-12-28T13:40:00Z");
 		}
 	}
 
@@ -526,8 +773,11 @@ public class McpController {
 	}
 
 	private boolean isAvailable(OAuthGrant grant, Tool t) {
-		if (t.name.equals("get_guide")) {
+		if (OPEN_TOOLS.contains(t.name)) {
 			return true;
+		}
+		if (t.name.equals("create_track")) {
+			return can(grant, CloudGroup.TRACKS, Access.WRITE);
 		}
 		if (t.access == Access.NONE) {
 			return hasScope(grant, OAuthService.SCOPE_ACCOUNT_READ);
