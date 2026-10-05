@@ -63,6 +63,7 @@ import net.osmand.server.api.services.ShareFileService;
 import net.osmand.server.api.services.WikiService;
 import net.osmand.server.api.services.mcp.McpRoutes;
 import net.osmand.server.api.services.mcp.McpSearch;
+import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.server.api.services.mcp.McpTracks;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.server.api.services.StorageService.InternalZipFile;
@@ -169,6 +170,28 @@ public class McpController {
 					"profile", Map.of("type", "string", "description", "Leg profile: car, bicycle, ..., line or gap"),
 					"params", Map.of("type", "object")), "required", List.of("lat", "lon")));
 
+	private static final Map<String, Object> WAYPOINTS_ARG = Map.of("type", "array", "description",
+			"Track waypoints, up to " + McpSearch.MAX_WAYPOINTS + ": pass a search / search_popular_places result as "
+					+ "it is (plus group). With osm the server stores the POI as OsmAnd does (origin, OSM tags: opening "
+					+ "hours, website, wiki...), so the app shows its details; name and icon come from the POI unless given. "
+					+ "icon: an OsmAnd icon name from a result (default " + McpSearch.DEFAULT_ICON + ").",
+			"items", Map.of("type", "object", "properties", Map.ofEntries(
+					Map.entry("lat", Map.of("type", "number")), Map.entry("lon", Map.of("type", "number")),
+					Map.entry("osm", Map.of("type", "string", "description", "node/123, way/123 or relation/123")),
+					Map.entry("name", Map.of("type", "string")),
+					Map.entry("description", Map.of("type", "string", "description", "Short text, e.g. from search_popular_places")),
+					Map.entry("icon", Map.of("type", "string")),
+					Map.entry("wikidata", Map.of("type", "string", "description", "Q123")),
+					Map.entry("wikipedia", Map.of("type", "string", "description", "Article URL")),
+					Map.entry("photo", Map.of("type", "string", "description", "Wikimedia Commons URL")),
+					Map.entry("openingHours", Map.of("type", "string")), Map.entry("website", Map.of("type", "string")),
+					Map.entry("phone", Map.of("type", "string")),
+					Map.entry("group", Map.of("type", "string", "description", "Waypoint group, e.g. Sights, Food")),
+					Map.entry("color", Map.of("type", "string", "description", "#RRGGBB")),
+					Map.entry("background", Map.of("type", "string", "description", "circle, octagon or square")),
+					Map.entry("link", Map.of("type", "string", "description", "Another URL"))),
+					"required", List.of("lat", "lon")));
+
 	// tools without Cloud data: any connection may use them
 	private static final Set<String> OPEN_TOOLS = Set.of("get_guide", "get_routing_profiles", "build_route", "search",
 			"get_poi_categories", "search_popular_places");
@@ -238,12 +261,15 @@ public class McpController {
 			new Tool("search", Access.NONE,
 					"Search places as the OsmAnd search box: POIs by name or type (\"cafe\", \"Golden Gate\", \"fuel\"), "
 							+ "addresses, streets, cities. Results near lat/lon come first, with distance, address, opening "
-							+ "hours, phone, website, OSM link. Up to " + McpSearch.MAX_RESULTS + " results.",
+							+ "hours, phone, website, OsmAnd icon and osm id (for create_track waypoints). Up to "
+							+ McpSearch.MAX_RESULTS + " results.",
 					schema(Map.of("text", Map.of("type", "string"),
 							"lat", Map.of("type", "number", "description", "Search near this point"),
 							"lon", Map.of("type", "number"),
 							"locale", Map.of("type", "string", "description", "Language of names, e.g. en, de, uk; default en"),
-							"limit", Map.of("type", "integer", "description", "Default 20, max " + McpSearch.MAX_RESULTS)),
+							"limit", Map.of("type", "integer", "description", "Default 20, max " + McpSearch.MAX_RESULTS),
+							"radius_km", Map.of("type", "number", "description", "Only results within this distance, "
+									+ "sorted by distance (e.g. 2 for \"near\"); max " + (int) McpSearch.MAX_RADIUS_KM)),
 							List.of("text", "lat", "lon"))),
 			new Tool("get_poi_categories", Access.NONE,
 					"OsmAnd POI categories with their types (e.g. sustenance: cafe, restaurant...), names that search "
@@ -251,8 +277,8 @@ public class McpController {
 					schema(Map.of("locale", Map.of("type", "string", "description", "Language, default en")), List.of())),
 			new Tool("search_popular_places", Access.NONE,
 					"Popular places around a point, as the OsmAnd map Explore layer: Wikipedia / Wikidata places ranked "
-							+ "by popularity, with a short description, Wikipedia link and photo. Good for sightseeing and "
-							+ "planning walks.",
+							+ "by popularity, with a short description, Wikipedia link, photo, OsmAnd icon and osm id. Good for "
+							+ "sightseeing and planning walks; small places (parks, gardens) may rank low, use search for them.",
 					schema(Map.of("lat", Map.of("type", "number"), "lon", Map.of("type", "number"),
 							"radius_km", Map.of("type", "number", "description", "Default 3, max " + (int) McpSearch.MAX_RADIUS_KM),
 							"topics", Map.of("type", "array", "items", Map.of("type", "string"), "description",
@@ -270,7 +296,9 @@ public class McpController {
 							"profile", Map.of("type", "string", "description", "Default profile"),
 							"params", Map.of("type", "object", "description", "Default profile parameters"),
 							"title", Map.of("type", "string", "description", "Track name shown in OsmAnd"),
-							"description", Map.of("type", "string")),
+							"description", Map.of("type", "string"),
+							"waypoints", WAYPOINTS_ARG,
+							"locale", Map.of("type", "string", "description", "Language of waypoint names from osm, default en")),
 							List.of("name", "points"))),
 			new Tool("list_versions", Access.READ,
 					"All stored versions of one Cloud file, newest first; deleted=true marks a deletion.",
@@ -367,7 +395,10 @@ public class McpController {
 						+ "They do not control the app on the phone; changes reach the apps on their next Cloud sync. "
 						+ "Call get_guide before writing files. Ask the user before write_file or delete_file. "
 						+ "For GPX tracks use analyze_track and read_track_points instead of read_file. "
-						+ "search, search_popular_places and build_route work with the OsmAnd map, not with Cloud files.");
+						+ "search, search_popular_places and build_route work with the OsmAnd map, not with Cloud files. "
+						+ "To plan a route with places (get_guide, Routes and Search): find them with search_popular_places "
+						+ "and search, check the way with build_route in the user's profile, then save it with create_track "
+						+ "and the chosen results as waypoints.");
 	}
 
 	private List<Map<String, Object>> listTools(OAuthGrant grant) {
@@ -598,7 +629,9 @@ public class McpController {
 				throw new ToolException("lat and lon are required");
 			}
 			if (name.equals("search")) {
-				return search().search(str(args, "text"), lat.doubleValue(), lon.doubleValue(), locale, limit);
+				Double radius = args.get("radius_km") instanceof Number n
+						? Math.min(Math.max(n.doubleValue(), 0.05), McpSearch.MAX_RADIUS_KM) : null;
+				return search().search(str(args, "text"), lat.doubleValue(), lon.doubleValue(), locale, limit, radius);
 			}
 			Set<String> topics = new java.util.LinkedHashSet<>();
 			if (args.get("topics") instanceof List<?> l) {
@@ -641,7 +674,23 @@ public class McpController {
 		if (title == null) {
 			title = name.substring(name.lastIndexOf('/') + 1, name.length() - 4);
 		}
-		String gpx = routes().toGpx(b, title, str(args, "description"));
+		List<WptPt> wpts = new ArrayList<>();
+		if (args.get("waypoints") instanceof List<?> l) {
+			if (l.size() > McpSearch.MAX_WAYPOINTS) {
+				throw new ToolException("At most " + McpSearch.MAX_WAYPOINTS + " waypoints");
+			}
+			for (int i = 0; i < l.size(); i++) {
+				if (!(l.get(i) instanceof Map<?, ?> w)) {
+					throw new ToolException("waypoint " + i + " must be an object");
+				}
+				try {
+					wpts.add(search().waypoint(w, str(args, "locale")));
+				} catch (McpSearch.SearchException e) {
+					throw new ToolException("waypoint " + i + ": " + e.getMessage());
+				}
+			}
+		}
+		String gpx = routes().toGpx(b, title, str(args, "description"), wpts);
 		Map<String, Object> res = routes().summary(b, false);
 		res.put("saved", writeFile(grant, "GPX", name, gpx));
 		res.put("name", name);

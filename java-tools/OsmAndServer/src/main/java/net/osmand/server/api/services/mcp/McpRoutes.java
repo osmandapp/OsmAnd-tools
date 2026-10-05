@@ -25,6 +25,7 @@ import net.osmand.server.api.services.RoutingService;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
+import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.util.MapUtils;
 
 /**
@@ -285,7 +286,7 @@ public class McpRoutes {
 	}
 
 	// GPX as the web Plan route saves it: route points with the leg profiles + track geometry
-	public String toGpx(Built b, String trackName, String description) {
+	public String toGpx(Built b, String trackName, String description, List<WptPt> waypoints) {
 		Map<String, Object> track = new LinkedHashMap<>();
 		track.put("points", b.points);
 		Map<String, Object> data = new LinkedHashMap<>();
@@ -297,6 +298,18 @@ public class McpRoutes {
 		data.put("routeTypes", List.of());
 		WebGpxParser.TrackData td = gson.fromJson(gson.toJson(data), WebGpxParser.TrackData.class);
 		GpxFile gpx = webGpxParser.createGpxFileFromTrackData(td);
+		for (WptPt w : waypoints) {
+			gpx.addPoint(w);
+		}
+		// a group takes the look of its first point
+		for (GpxUtilities.PointsGroup g : gpx.getPointsGroups().values()) {
+			if (!g.getPoints().isEmpty()) {
+				WptPt first = g.getPoints().get(0);
+				g.setIconName(first.getIconName());
+				g.setBackgroundType(first.getBackgroundType());
+				g.setColor(first.getColor(0));
+			}
+		}
 		// not GpxUtilities.asString: it returns okio Buffer.toString() ("[text=...]"), not the XML
 		okio.Buffer buf = new okio.Buffer();
 		Exception e = GpxUtilities.INSTANCE.writeGpx(null, buf, gpx, null);

@@ -14,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
@@ -21,12 +22,22 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import net.osmand.server.api.services.WikiService;
+import net.osmand.shared.gpx.GpxUtilities;
+import net.osmand.shared.gpx.primitives.Link;
+import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.util.MapUtils;
 
 // search tools of the MCP server: the web map's search (on the map data server) and its Explore layer (wiki places)
 public class McpSearch {
 
 	public static final int MAX_RESULTS = 100;
+	public static final int MAX_WAYPOINTS = 100;
+	public static final String DEFAULT_ICON = "special_star";
+	// the web map's POI icons, mx_<name>.svg; a missing one comes back as the web app page (text/html)
+	private static final String ICONS_PATH = "/map/images/poi-icons-svg/mx_";
+	private final Map<String, Boolean> icons = new ConcurrentHashMap<>();
+	private volatile Boolean iconsAvailable;
+	private static final String[] OSM_TYPES = { null, "node", "way", "relation" };
 	public static final double MAX_RADIUS_KM = 50;
 	private static final int MAX_DESCRIPTION = 300;
 	// web map resources/wiki_data_filters.json
@@ -68,7 +79,8 @@ public class McpSearch {
 	}
 
 	// text search near a point: places, addresses and POIs, as the web map search box
-	public Map<String, Object> search(String text, double lat, double lon, String locale, int limit) throws SearchException {
+	public Map<String, Object> search(String text, double lat, double lon, String locale, int limit, Double radiusKm)
+			throws SearchException {
 		if (text == null || text.isBlank()) {
 			throw new SearchException("text is required");
 		}
@@ -89,11 +101,12 @@ public class McpSearch {
 				categories.add(c);
 				continue;
 			}
-			if (places.size() >= limit) {
-				continue;
-			}
 			double[] ll = coords(f);
 			if (ll == null) {
+				continue;
+			}
+			double d = MapUtils.getDistance(lat, lon, ll[0], ll[1]) / 1000;
+			if (radiusKm != null && d > radiusKm) {
 				continue;
 			}
 			Map<String, Object> m = new LinkedHashMap<>();
@@ -102,20 +115,26 @@ public class McpSearch {
 			m.put("kind", type);
 			put(m, "category", str(p, "web_poi_type"));
 			put(m, "type", str(p, "web_poi_subType"));
-			m.put("lat", ll[0]);
-			m.put("lon", ll[1]);
-			m.put("distanceKm", McpTracks.round(MapUtils.getDistance(lat, lon, ll[0], ll[1]) / 1000, 2));
+			m.put("lat", McpTracks.round(ll[0], 6));
+			m.put("lon", McpTracks.round(ll[1], 6));
+			m.put("distanceKm", McpTracks.round(d, 2));
+			put(m, "icon", icon(p));
+			put(m, "osm", osmRef(str(p, "web_poi_osmUrl")));
 			put(m, "address", str(p, "web_city"));
 			put(m, "openingHours", str(p, "amenity_opening_hours"));
 			put(m, "phone", first(p, "phone", "osm_tag_phone"));
 			put(m, "website", first(p, "website", "osm_tag_website"));
 			put(m, "cuisine", str(p, "osm_tag_cuisine"));
 			put(m, "wikidata", str(p, "osm_tag_wikidata"));
-			put(m, "osmUrl", str(p, "web_poi_osmUrl"));
+			String wp = str(p, "osm_tag_wikipedia");
+			put(m, "wikipedia", wp != null && wp.startsWith("http") ? wp.replace(' ', '_') : null);
 			places.add(m);
 		}
+		if (radiusKm != null) {
+			places.sort(Comparator.comparingDouble(m -> (Double) m.get("distanceKm")));
+		}
 		Map<String, Object> out = new LinkedHashMap<>();
-		out.put("results", places);
+		out.put("results", places.size() > limit ? places.subList(0, limit) : places);
 		if (!categories.isEmpty()) {
 			out.put("matchingCategories", categories);
 		}
@@ -166,9 +185,14 @@ public class McpSearch {
 			put(m, "type", str(p, "poisubtype"));
 			put(m, "topic", TOPICS.get(str(p, "topic")));
 			put(m, "categories", str(p, "categories"));
-			m.put("lat", ll[0]);
-			m.put("lon", ll[1]);
+			m.put("lat", McpTracks.round(ll[0], 6));
+			m.put("lon", McpTracks.round(ll[1], 6));
 			m.put("distanceKm", McpTracks.round(d, 2));
+			put(m, "icon", icon(p));
+			String osmType = str(p, "osmtype"), osmId = str(p, "osmid");
+			if (osmType != null && osmType.matches("[123]") && osmId != null && osmId.matches("\\d+")) {
+				m.put("osm", OSM_TYPES[Integer.parseInt(osmType)] + "/" + osmId);
+			}
 			String elo = str(p, "elo");
 			m.put("popularity", elo != null ? (int) Double.parseDouble(elo) : 0);
 			String desc = str(p, "wikiDesc");
@@ -190,6 +214,170 @@ public class McpSearch {
 		out.put("places", places.size() > limit ? places.subList(0, limit) : places);
 		return out;
 	}
+
+	// a track waypoint as OsmAnd saves a POI: amenity_origin, amenity_* / osm_tag_* tags (the app shows the POI
+	// details from them and finds the POI on its maps), the POI icon; w: {lat, lon, osm, wikidata, name,
+	// description, icon, color, background, group, link}
+	public WptPt waypoint(Map<?, ?> w, String locale) throws SearchException {
+		WptPt pt = new WptPt();
+		Double lat = w.get("lat") instanceof Number n ? n.doubleValue() : null;
+		Double lon = w.get("lon") instanceof Number n ? n.doubleValue() : null;
+		String osm = w.get("osm") instanceof String o ? o.trim() : null;
+		String name = w.get("name") instanceof String x && !x.isBlank() ? x : null;
+		String icon = w.get("icon") instanceof String x && !x.isBlank() ? x.replaceFirst("^mx_", "") : null;
+		if (osm != null) {
+			if (!osm.matches("(node|way|relation)/\\d+")) {
+				throw new SearchException("osm must look like node/123, way/123 or relation/123: " + osm);
+			}
+			if (lat == null || lon == null) {
+				throw new SearchException("lat and lon are required with osm (the POI is searched near them)");
+			}
+			JsonObject f = get("/search/get-poi-by-osmid?lat=" + lat + "&lon=" + lon + "&osmid="
+					+ osm.substring(osm.indexOf('/') + 1) + "&type=" + osm.substring(0, osm.indexOf('/')));
+			JsonObject p = f.has("properties") && f.get("properties").isJsonObject() ? f.getAsJsonObject("properties")
+					: null;
+			if (p == null || str(p, "amenity_type") == null) {
+				throw new SearchException("POI " + osm + " is not found near " + lat + ", " + lon);
+			}
+			for (String k : p.keySet()) {
+				if (k.startsWith(GpxUtilities.AMENITY_PREFIX) || k.startsWith(GpxUtilities.OSM_PREFIX)
+						|| k.startsWith("collapsable_")) {
+					String v = str(p, k);
+					if (v != null) {
+						pt.getExtensionsToWrite().put(k, v);
+					}
+				}
+			}
+			String en = first(p, "web_poi_name:en", "amenity_name");
+			pt.setAmenityOriginName("Amenity:" + (en != null ? en : "") + ": " + str(p, "amenity_type") + ":"
+					+ str(p, "amenity_subtype"));
+			double[] ll = coords(f);
+			if (ll != null) {
+				lat = ll[0];
+				lon = ll[1];
+			}
+			if (name == null) {
+				name = first(p, "web_poi_name:" + lang(locale), "web_poi_name", "amenity_name");
+			}
+			if (icon == null) {
+				icon = icon(p);
+			}
+		}
+		if (lat == null || lon == null || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
+			throw new SearchException("waypoint needs lat and lon");
+		}
+		// fields of a search / search_popular_places result, as OsmAnd stores POI tags (amenity_*, osm_tag_*);
+		// the POI's own tags win
+		Map<String, String> ext = pt.getExtensionsToWrite();
+		if (w.get("wikidata") instanceof String q && q.matches("Q\\d+")) {
+			ext.putIfAbsent(GpxUtilities.OSM_PREFIX + "wikidata", q);
+		}
+		String wikipedia = w.get("wikipedia") instanceof String x && x.matches("https?://\\S+") ? x : null;
+		if (wikipedia != null) {
+			ext.putIfAbsent(GpxUtilities.OSM_PREFIX + "wikipedia", wikipedia);
+		}
+		if (w.get("photo") instanceof String ph && ph.contains("File:")) {
+			ext.putIfAbsent(GpxUtilities.OSM_PREFIX + "wikimedia_commons",
+					java.net.URLDecoder.decode(ph.substring(ph.indexOf("File:")), StandardCharsets.UTF_8));
+		}
+		putText(ext, GpxUtilities.AMENITY_PREFIX + "opening_hours", w.get("openingHours"));
+		putText(ext, GpxUtilities.OSM_PREFIX + "website", w.get("website"));
+		putText(ext, GpxUtilities.OSM_PREFIX + "phone", w.get("phone"));
+		List<Link> links = new ArrayList<>();
+		if (w.get("link") instanceof String l && l.matches("https?://\\S+")) {
+			links.add(new Link(l));
+		}
+		if (wikipedia != null && links.stream().noneMatch(x -> wikipedia.equals(x.getHref()))) {
+			links.add(new Link(wikipedia, "Wikipedia"));
+		}
+		if (osm != null) {
+			links.add(new Link("https://www.openstreetmap.org/" + osm, "OpenStreetMap"));
+		}
+		if (icon != null && !iconExists(icon)) {
+			throw new SearchException("Unknown icon " + icon + ": use the icon of a search result or e.g. " + DEFAULT_ICON);
+		}
+		pt.setLat(lat);
+		pt.setLon(lon);
+		pt.setName(name);
+		if (w.get("description") instanceof String d && !d.isBlank()) {
+			pt.setDesc(d);
+		}
+		pt.setIconName(icon != null ? icon : DEFAULT_ICON);
+		String bg = w.get("background") instanceof String b ? b : "circle";
+		if (!Set.of("circle", "octagon", "square").contains(bg)) {
+			throw new SearchException("background is circle, octagon or square");
+		}
+		pt.setBackgroundType(bg);
+		if (w.get("color") instanceof String c) {
+			if (!c.matches("#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})")) {
+				throw new SearchException("color is #RRGGBB");
+			}
+			pt.setColor(c);
+		}
+		if (w.get("group") instanceof String g && !g.isBlank()) {
+			pt.setCategory(g);
+		}
+		if (!links.isEmpty()) {
+			pt.setLinks(links);
+		}
+		return pt;
+	}
+
+	// the icon the web map shows for a POI (PoiManager.getIconNameForPoiType)
+	String icon(JsonObject p) {
+		String tag = str(p, "web_typeOsmTag"), value = str(p, "web_typeOsmValue"), key = str(p, "web_iconKeyName");
+		for (String c : new String[] { tag != null && value != null ? tag + "_" + value : null, key,
+				key != null ? "topo_" + key : null, str(p, "web_poi_iconName") }) {
+			if (c != null && iconExists(c)) {
+				return c;
+			}
+		}
+		return null;
+	}
+
+	// OsmAnd icon names valid in osmand:icon, checked against the web map's icon files (cached)
+	public boolean iconExists(String name) {
+		if (name == null || !name.matches("[a-z0-9_]+")) {
+			return false;
+		}
+		if (iconsAvailable == null) {
+			if (!fetchIcon(DEFAULT_ICON)) {
+				return true; // no icon files to check against (local server, network): trust the name
+			}
+			iconsAvailable = true;
+		}
+		return icons.computeIfAbsent(name, this::fetchIcon);
+	}
+
+	private boolean fetchIcon(String name) {
+		try {
+			HttpRequest req = HttpRequest.newBuilder(URI.create(serverApi + ICONS_PATH + name + ".svg"))
+					.timeout(Duration.ofSeconds(10)).method("HEAD", HttpRequest.BodyPublishers.noBody()).build();
+			HttpResponse<Void> resp = http.send(req, HttpResponse.BodyHandlers.discarding());
+			return resp.statusCode() == 200
+					&& resp.headers().firstValue("Content-Type").orElse("").startsWith("image/svg");
+		} catch (IOException e) {
+			return false;
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			return false;
+		}
+	}
+
+	private static void putText(Map<String, String> ext, String key, Object v) {
+		if (v instanceof String t && !t.isBlank() && t.length() < 1000) {
+			ext.putIfAbsent(key, t.trim());
+		}
+	}
+
+	private static String osmRef(String url) {
+		if (url == null) {
+			return null;
+		}
+		java.util.regex.Matcher m = java.util.regex.Pattern.compile("/(node|way|relation)/(\\d+)").matcher(url);
+		return m.find() ? m.group(1) + "/" + m.group(2) : null;
+	}
+
 
 	private String label(JsonObject p, String lang) {
 		String labels = str(p, "labelsJson");
