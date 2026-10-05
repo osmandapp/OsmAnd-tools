@@ -51,6 +51,7 @@ server:
 
 osmand.routing:
   hh-only-limit: ${HH_ONLY_LIMIT:100} # Maximum Start-End direct distance before HH routing is enforced (km)
+  site: ${ROUTING_SITE:https://maptile.osmand.net} # routing server the MCP route tools call, as the web map does; empty = this server
 
 tile-server:
   obf.location: ${OBF_LOCATION:}
