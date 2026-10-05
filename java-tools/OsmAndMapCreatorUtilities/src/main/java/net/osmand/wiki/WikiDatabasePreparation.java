@@ -1366,26 +1366,44 @@ public class WikiDatabasePreparation {
 		Connection commonsWikiConn = DBDialect.SQLITE.getDatabaseConnection(wikidataDB.getAbsolutePath(), log);
 		Statement st = commonsWikiConn.createStatement();
 		ResultSet rs = st
-				.executeQuery("SELECT C.id,M.lang,M.title FROM wiki_coords C LEFT JOIN wiki_mapping M ON M.id=C.id");
+				.executeQuery("SELECT C.id,M.lang,M.title,C.osmid FROM wiki_coords C LEFT JOIN wiki_mapping M ON M.id=C.id");
 		Map<Long, OsmLatLonId> res = new TreeMap<>();
+		// items without an OSM link: update-wikidata processes only new items, so older ones get the link here
+		// (OSM objects that got a wikidata tag later or were missing in the OSM extract); wikipedia links first
+		Map<Long, OsmLatLonId> missingByWiki = new HashMap<>();
+		Map<Long, OsmLatLonId> missingByWikidata = new HashMap<>();
 		int scan = 0;
 		long time = System.currentTimeMillis();
 		while (rs.next()) {
 			long wid = rs.getLong(1);
 			String articleLang = rs.getString(2);
 			String articleTitle = rs.getString(3);
+			boolean noOsm = rs.getLong(4) == 0;
 			if (++scan % 500000 == 0) {
 				System.out.println("Scanning wiki to merge with OSM... " + scan + " "
 						+ (System.currentTimeMillis() - time) + " ms");
 				time = System.currentTimeMillis();
 			}
 			if (articleLang != null) {
-				setWikidataId(res, c.getCoordinates("wikipedia:" + articleLang, articleTitle), wid);
-				setWikidataId(res, c.getCoordinates("wikipedia", articleLang + ":" + articleTitle), wid);
-				setWikidataId(res, c.getCoordinates("wikipedia", articleTitle), wid);
+				OsmLatLonId o = c.getCoordinates("wikipedia:" + articleLang, articleTitle);
+				setWikidataId(res, o, wid);
+				OsmLatLonId o2 = c.getCoordinates("wikipedia", articleLang + ":" + articleTitle);
+				setWikidataId(res, o2, wid);
+				OsmLatLonId o3 = c.getCoordinates("wikipedia", articleTitle);
+				setWikidataId(res, o3, wid);
+				OsmLatLonId first = o != null ? o : (o2 != null ? o2 : o3);
+				if (noOsm && first != null) {
+					missingByWiki.putIfAbsent(wid, first);
+				}
 			}
-			setWikidataId(res, c.getCoordinates("wikidata", "Q" + wid), wid);
+			OsmLatLonId ow = c.getCoordinates("wikidata", "Q" + wid);
+			setWikidataId(res, ow, wid);
+			if (noOsm && ow != null) {
+				missingByWikidata.putIfAbsent(wid, ow);
+			}
 		}
+		missingByWikidata.forEach(missingByWiki::putIfAbsent);
+		updateMissingOsmLinks(commonsWikiConn, missingByWiki);
 		try {
 			commonsWikiConn.createStatement().executeQuery("DROP TABLE osm_wikidata");
 		} catch (SQLException e) {
@@ -1456,6 +1474,34 @@ public class WikiDatabasePreparation {
 		mappingConn.close();
 		srcSt.close();
 		srcConn.close();
+	}
+
+	// the same OSM fields as WikiDataHandler.processJsonPage writes for a new item
+	private static void updateMissingOsmLinks(Connection conn, Map<Long, OsmLatLonId> links) throws SQLException {
+		boolean autoCommit = conn.getAutoCommit();
+		conn.setAutoCommit(false);
+		PreparedStatement ps = conn.prepareStatement(
+				"UPDATE wiki_coords SET lat = ?, lon = ?, osmtype = ?, osmid = ?, poitype = ?, poisubtype = ? WHERE id = ?");
+		int batch = 0;
+		for (Map.Entry<Long, OsmLatLonId> e : links.entrySet()) {
+			OsmLatLonId o = e.getValue();
+			ps.setDouble(1, o.lat);
+			ps.setDouble(2, o.lon);
+			ps.setInt(3, o.type + 1);
+			ps.setLong(4, o.id);
+			ps.setString(5, o.amenity == null ? null : o.amenity.getType().getKeyName());
+			ps.setString(6, o.amenity == null ? null : o.amenity.getSubType());
+			ps.setLong(7, e.getKey());
+			ps.addBatch();
+			if (++batch % 1000 == 0) {
+				ps.executeBatch();
+			}
+		}
+		ps.executeBatch();
+		ps.close();
+		conn.commit();
+		conn.setAutoCommit(autoCommit);
+		System.out.println("OSM links added to " + links.size() + " wiki items");
 	}
 
 	private static void setWikidataId(Map<Long, OsmLatLonId> mp, OsmLatLonId c, long wid) {
