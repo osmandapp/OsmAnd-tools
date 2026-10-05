@@ -20,9 +20,7 @@ logging:
 
 
 osmand:
-  # OAuth server + remote MCP endpoint (/oauth/*, /.well-known/oauth-*, /mcp) for AI assistants
   oauth.enabled: ${OAUTH_ENABLED:false}
-  # access for AI assistants of users who never chose it in account settings (user_accounts.oauthenabled is null)
   oauth.default-user-enabled: ${OAUTH_DEFAULT_USER_ENABLED:false}
   night-builds-json.location: https://dl2.osmand.net/night-builds-json/
   # ! should contain folders or symlinks indexes, night-builds, gen !
