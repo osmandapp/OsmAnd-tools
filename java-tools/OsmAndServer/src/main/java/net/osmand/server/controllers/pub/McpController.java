@@ -84,6 +84,7 @@ public class McpController {
 	public static final String MCP_PATH = "/mcp";
 	private static final List<String> PROTOCOL_VERSIONS = List.of("2025-06-18", "2025-03-26", "2024-11-05");
 	private static final int MAX_ITEMS = 500;
+	private static final int MAX_FILES = 10000;
 	private static final long MAX_READ_SIZE = 1024 * 1024;
 	private static final int MAX_WRITE_SIZE = 5 * 1024 * 1024;
 	private static final int MAX_NAME_LENGTH = 512;
@@ -441,8 +442,8 @@ public class McpController {
 					|| (folder != null && !f.name.startsWith(folder))) {
 				continue;
 			}
-			if (res.size() >= MAX_ITEMS) {
-				res.add(Map.of("truncated", "only the first " + MAX_ITEMS + " files are listed, filter by group or folder"));
+			if (res.size() >= MAX_FILES) {
+				res.add(Map.of("truncated", "only the first " + MAX_FILES + " files are listed, filter by group or folder"));
 				break;
 			}
 			Map<String, Object> m = new LinkedHashMap<>();
