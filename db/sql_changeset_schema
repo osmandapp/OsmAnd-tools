@@ -39,6 +39,17 @@ CREATE TABLE user_account_devices(id serial primary key, userid integer, devicei
 CREATE TABLE user_files(id bigserial primary key, type text, name text, userid integer, deviceid integer, updatetime timestamp, clienttime timestamp, filesize bigint, zipfilesize bigint, storage text, storagename text, shortlinktiles text[], gendetails jsonb, data bytea);
 CREATE TABLE promo_campaigns(name text, starttime timestamp, endtime timestamp, subactivemonths integer, numberlimit integer, used integer, lastusers text);
 ALTER TABLE user_accounts ADD CONSTRAINT email_uniq UNIQUE (email);
+ALTER TABLE user_accounts ADD COLUMN weblinktoken text, ADD COLUMN weblinktime timestamp;
+-- OAuth for MCP clients (OAuthService)
+ALTER TABLE user_accounts ADD COLUMN oauthenabled boolean;
+CREATE TABLE oauth_clients(clientid text primary key, clientname text, redirecturis text, secrethash text, createtime timestamp);
+CREATE TABLE user_oauth_grants(id serial primary key, userid integer not null REFERENCES user_accounts(id) ON DELETE CASCADE,
+    clientid text not null, scope text, resource text, redirecturi text, codehash text, codechallenge text, codeexpire timestamp,
+    accesshash text, accessexpire timestamp, refreshhash text, refreshexpire timestamp, createtime timestamp, lastusetime timestamp);
+CREATE INDEX user_oauth_grants_userid_idx on user_oauth_grants(userid);
+CREATE UNIQUE INDEX user_oauth_grants_codehash_idx on user_oauth_grants(codehash);
+CREATE UNIQUE INDEX user_oauth_grants_accesshash_idx on user_oauth_grants(accesshash);
+CREATE UNIQUE INDEX user_oauth_grants_refreshhash_idx on user_oauth_grants(refreshhash);
 ---
 --- alter table user_files add column storage text;
 --- alter table user_files alter column filesize type bigint;

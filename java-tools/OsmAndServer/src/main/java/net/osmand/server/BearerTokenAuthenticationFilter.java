@@ -14,6 +14,8 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import net.osmand.server.api.services.OAuthService;
+
 public class BearerTokenAuthenticationFilter extends OncePerRequestFilter {
 
     private UserDetailsService userDetailsService;
@@ -31,7 +33,9 @@ public class BearerTokenAuthenticationFilter extends OncePerRequestFilter {
         String username = null;
         String jwt = null;
 
-        if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
+        // OAuth access tokens are checked only by the MCP endpoint, they must not log in as a Cloud device
+        if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")
+                && !authorizationHeader.startsWith("Bearer " + OAuthService.ACCESS_TOKEN_PREFIX)) {
             jwt = authorizationHeader.substring(7);
             // For now, we'll just use the token as the username.
             // In a real application, you would decode the JWT and get the username from it.

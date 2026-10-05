@@ -673,10 +673,10 @@ public class OsmAndMapsService {
 		return image;
 	}
 
-	public byte[] renderMapboxVectorTile(int zoom, int x, int y) throws IOException {
+	public byte[] renderMapboxVectorTile(int zoom, int x, int y, int shift) throws IOException {
 		byte[] tile = null;
 		if (nativelib != null) {
-			tile = nativelib.getMapboxVectorTileFile(zoom, x, y);
+			tile = nativelib.getMapboxVectorTileFile(zoom, x, y, shift);
 		}
 		return tile;
 	}
@@ -696,7 +696,7 @@ public class OsmAndMapsService {
 			RoutingContext ctx = prepareRouterContext(new RouteParameters("geocoding"), router, usedMapList, false);
 			GeocodingUtilities su = new GeocodingUtilities();
 			List<GeocodingResult> res = su.reverseGeocodingSearch(ctx, lat, lon, false);
-			complete = su.sortGeocodingResults(usedMapList, res);
+			complete = su.findAddresses(usedMapList, res);
 		} finally {
 			unlockReaders(usedMapList);
 		}
