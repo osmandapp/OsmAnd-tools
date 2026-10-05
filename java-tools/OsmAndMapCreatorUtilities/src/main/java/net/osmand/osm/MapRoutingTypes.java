@@ -335,7 +335,7 @@ public class MapRoutingTypes {
 		return listTypes.get(id - 1);
 	}
 
-	private MapRouteType registerRule(String tag, String val) {
+	public MapRouteType registerRule(String tag, String val) {
 		String id = constructRuleKey(tag, val);
 		if(!types.containsKey(id)) {
 			MapRouteType rt = new MapRouteType();
