@@ -19,14 +19,7 @@ import com.google.gson.stream.JsonWriter;
 
 import net.osmand.shared.gpx.primitives.GpxExtensions;
 
-/**
- * Gson for GPX objects sent to and from the web map.
- * <p>
- * OsmAnd-shared keeps the extensions of a point in flat arrays (extensionsArray, deferredArray) behind the
- * extensions / deferredExtensions properties; Gson serializes fields, so without this the web gets the arrays and
- * reads no tags. The JSON keeps the shape it had before: "extensions" and "deferredExtensions" as objects.
- * The arrays are still read, as a JSON written before this fix carries them.
- */
+// Gson for GPX objects of the web map: extensions as objects, not the flat arrays of OsmAnd-shared
 public class GpxJson {
 
 	private static final String EXTENSIONS = "extensions";

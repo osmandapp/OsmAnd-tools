@@ -2,12 +2,13 @@ package net.osmand.server.utils;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.List;
 import java.util.Objects;
+
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.google.gson.Gson;
 
-import kotlin.Pair;
+import net.osmand.server.api.services.GpxService;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
 import okio.Buffer;
@@ -25,26 +26,15 @@ public class WebGpxTestData {
 		}
 	}
 
-	// as GpxService.buildTrackDataFromGpxFile, without the analysis
 	public static WebGpxParser.TrackData trackData() throws IOException {
-		GpxFile gpxFile = load();
-		WebGpxParser parser = new WebGpxParser();
-		WebGpxParser.TrackData data = new WebGpxParser.TrackData();
-		data.metaData = new WebGpxParser.WebMetaData(gpxFile.getMetadata());
-		data.wpts = parser.getWpts(gpxFile);
-		Pair<List<WebGpxParser.WebTrack>, List<GpxUtilities.RouteType>> tracks = parser.getTracks(gpxFile);
-		data.tracks = tracks.getFirst();
-		data.routeTypes = tracks.getSecond();
-		data.ext = gpxFile.getExtensions();
-		if (!gpxFile.getTracks().isEmpty()) {
-			data.trackAppearance = new WebGpxParser.WebTrackAppearance(data.ext);
-		}
-		if (!gpxFile.getRoutes().isEmpty()) {
-			parser.addRoutePoints(gpxFile, data);
-		}
-		data.pointsGroups = parser.getPointsGroups(gpxFile);
+		return gpxService().buildTrackDataFromGpxFile(load(), null);
+	}
 
-		return data;
+	public static GpxService gpxService() {
+		GpxService gpxService = new GpxService();
+		ReflectionTestUtils.setField(gpxService, "webGpxParser", new WebGpxParser());
+
+		return gpxService;
 	}
 
 	public static String trackDataJson(Gson gson) throws IOException {

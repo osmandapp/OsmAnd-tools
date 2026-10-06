@@ -1,5 +1,6 @@
 package net.osmand.server.controllers.pub;
 
+import static net.osmand.server.utils.WebGpxTestData.gpxService;
 import static net.osmand.server.utils.WebGpxTestData.sentBackJson;
 import static org.junit.Assert.*;
 
@@ -10,13 +11,11 @@ import java.util.zip.GZIPOutputStream;
 
 import org.junit.Test;
 import org.springframework.mock.web.MockHttpSession;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-import net.osmand.server.api.services.GpxService;
 import net.osmand.server.utils.GpxJson;
 import net.osmand.server.utils.WebGpxParser;
 
@@ -65,12 +64,9 @@ public class GpxControllerTest {
 	}
 
 	private static GpxController controller() {
-		WebGpxParser parser = new WebGpxParser();
-		GpxService gpxService = new GpxService();
-		ReflectionTestUtils.setField(gpxService, "webGpxParser", parser);
 		GpxController controller = new GpxController();
-		controller.webGpxParser = parser;
-		controller.gpxService = gpxService;
+		controller.gpxService = gpxService();
+		controller.webGpxParser = new WebGpxParser();
 		controller.session = new UserSessionResources();
 
 		return controller;
