@@ -588,6 +588,8 @@ public class WebGpxParser {
                 GpxUtilities.PointsGroup group;
                 if (dataGroup.ext != null) {
                     group = dataGroup.ext;
+                    group.setIconName(dataGroup.iconName);
+                    group.setBackgroundType(dataGroup.backgroundType);
                     List<Wpt> wptsData = dataGroup.points;
                     for (Wpt wpt : wptsData) {
                         group.getPoints().add(convertToWptPt(wpt));
@@ -641,7 +643,7 @@ public class WebGpxParser {
                                 routePoint.getExtensionsToWrite().put(PROFILE_TYPE_EXTENSION, String.valueOf(point.profile));
                             }
                             allPoints += geo.isEmpty() ? 0 : geo.size();
-                            boolean isLast = i == t.points.size() - 1;
+                            boolean isLast = i == t.points.size() - 1 || t.points.get(i + 1).geometry.isEmpty();
                             //for last rtept trkpt_idx = last index of trkpt points
                             int ind = isLast ? allPoints - 1 : allPoints;
                             routePoint.getExtensionsToWrite().put(TRKPT_INDEX_EXTENSION, String.valueOf(allPoints == 0 ? 0 : ind));
@@ -678,8 +680,12 @@ public class WebGpxParser {
             }
             trackExt.put(GPX_EXT_SHOW_ARROWS, String.valueOf(trackAppearance.showArrows));
             trackExt.put(GPX_EXT_SHOW_START_FINISH, String.valueOf(trackAppearance.showStartFinish));
-            trackExt.put(GPX_EXT_COLOR, trackAppearance.color);
-            trackExt.put(GPX_EXT_WIDTH, trackAppearance.width);
+            if (trackAppearance.color != null) {
+                trackExt.put(GPX_EXT_COLOR, trackAppearance.color);
+            }
+            if (trackAppearance.width != null) {
+                trackExt.put(GPX_EXT_WIDTH, trackAppearance.width);
+            }
         }
         return trackExt;
     }

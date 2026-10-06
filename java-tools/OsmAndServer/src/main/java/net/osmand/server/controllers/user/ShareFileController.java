@@ -1,7 +1,6 @@
 package net.osmand.server.controllers.user;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository;
 import net.osmand.server.api.repo.CloudUsersRepository;
@@ -12,6 +11,7 @@ import net.osmand.server.api.services.UserdataService;
 import net.osmand.server.api.services.ShareFileService;
 import net.osmand.server.api.services.search.UserDataSearchService;
 import net.osmand.server.controllers.pub.UserdataController;
+import net.osmand.server.utils.GpxJson;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
@@ -56,7 +56,7 @@ public class ShareFileController {
 	protected GpxService gpxService;
 
 	Gson gson = new Gson();
-	Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
+	Gson gsonWithNans = GpxJson.createWithNans();
 
 	protected static final Log LOGGER = LogFactory.getLog(ShareFileController.class);
 

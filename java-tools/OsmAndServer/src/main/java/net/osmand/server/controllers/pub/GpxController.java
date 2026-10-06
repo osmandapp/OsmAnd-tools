@@ -55,7 +55,7 @@ public class GpxController {
     
 	protected static final Log LOGGER = LogFactory.getLog(GpxController.class);
 
-	Gson gson = new Gson();
+	Gson gson = GpxJson.create();
 	
 	// point extensions as an object, as the web map reads them
 	Gson gsonWithNans = GpxJson.createWithNans();
@@ -255,7 +255,7 @@ public class GpxController {
 															   @RequestParam Boolean simplified,
 	                                                           HttpSession httpSession) throws IOException {
 		String jsonData = decompressGzip(data);
-		WebGpxParser.TrackData trackData = new Gson().fromJson(jsonData, WebGpxParser.TrackData.class);
+		WebGpxParser.TrackData trackData = gson.fromJson(jsonData, WebGpxParser.TrackData.class);
 
 		GpxFile gpxFile = webGpxParser.createGpxFileFromTrackData(trackData);
 		if (simplified != null && simplified) {

@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.reflect.TypeToken;
@@ -22,6 +21,7 @@ import com.google.gson.reflect.TypeToken;
 import net.osmand.data.LatLon;
 import net.osmand.server.api.services.OsmAndMapsService;
 import net.osmand.server.api.services.RoutingService;
+import net.osmand.server.utils.GpxJson;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
@@ -44,7 +44,7 @@ public class McpRoutes {
 	private final WebGpxParser webGpxParser;
 	// profile -> parameter -> description, from /routing/routing-modes without the (devel) parameters
 	private final Map<String, Map<String, Object>> profiles;
-	private final Gson gson = new GsonBuilder().serializeSpecialFloatingPointValues().create();
+	private final Gson gson = GpxJson.createWithNans();
 	// map data server (osmand.mcp.server-api, maptile on osmand.net); empty = route with this server's own maps
 	private final String serverApi;
 	private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();

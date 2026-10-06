@@ -56,7 +56,7 @@ public class AmenityTagsService {
 			GpxUtilities.TRKPT_INDEX_EXTENSION, GpxUtilities.POINT_ELEVATION, GpxUtilities.POINT_SPEED,
 			GpxUtilities.POINT_BEARING, GpxUtilities.POINT_HEADING, GpxUtilities.MIN_ELEVATION,
 			GpxUtilities.MAX_ELEVATION, GpxUtilities.AVG_ELEVATION, GpxUtilities.DIFF_ELEVATION_UP,
-			GpxUtilities.DIFF_ELEVATION_DOWN, "visited_date");
+			GpxUtilities.DIFF_ELEVATION_DOWN, "visited_date", "creation_date", "pickup_date", "calendar_event");
 
 	// a GPX point shows all its data: keys the POI logic does not know (e.g. hr, test:country) become generic rows;
 	// only OsmAnd's service fields and namespaces are skipped

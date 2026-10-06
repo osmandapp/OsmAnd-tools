@@ -32,7 +32,6 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 
 import net.osmand.binary.GeocodingUtilities.GeocodingResult;
 import net.osmand.data.LatLon;
@@ -50,6 +49,7 @@ import net.osmand.server.api.services.RoutingService;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import net.osmand.server.controllers.pub.GeojsonClasses.FeatureCollection;
 import net.osmand.server.controllers.pub.GeojsonClasses.Geometry;
+import net.osmand.server.utils.GpxJson;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -73,7 +73,7 @@ public class RoutingController {
 
 	Gson gson = new Gson();
 
-	Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
+	Gson gsonWithNans = GpxJson.createWithNans();
 
 	private static final CacheControl ROUTING_MODES_HTTP_CACHE =
 			CacheControl.maxAge(7, TimeUnit.DAYS).cachePublic();

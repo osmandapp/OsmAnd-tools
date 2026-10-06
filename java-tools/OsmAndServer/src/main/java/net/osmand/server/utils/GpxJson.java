@@ -1,47 +1,40 @@
 package net.osmand.server.utils;
 
 import java.io.IOException;
-import java.lang.reflect.Type;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
 import com.google.gson.TypeAdapter;
 import com.google.gson.TypeAdapterFactory;
-import com.google.gson.internal.bind.JsonTreeReader;
-import com.google.gson.internal.bind.JsonTreeWriter;
 import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonToken;
 import com.google.gson.stream.JsonWriter;
 
 import net.osmand.shared.gpx.primitives.GpxExtensions;
 
-/**
- * Gson for GPX objects sent to and from the web map.
- * <p>
- * OsmAnd-shared keeps the extensions of a point in flat arrays (extensionsArray, deferredArray) behind the
- * extensions / deferredExtensions properties; Gson serializes fields, so without this the web gets the arrays and
- * reads no tags. The JSON keeps the shape it had before: "extensions" and "deferredExtensions" as objects.
- */
+// Gson for GPX objects of the web map: extensions as objects, not the flat arrays of OsmAnd-shared
 public class GpxJson {
 
 	private static final String EXTENSIONS = "extensions";
-	private static final String DEFERRED = "deferredExtensions";
-	private static final Type MAP_TYPE = new TypeToken<LinkedHashMap<String, String>>() {}.getType();
-
-	public static GsonBuilder builder() {
-		return new GsonBuilder().registerTypeAdapterFactory(new ExtensionsFactory());
-	}
+	private static final String DEFERRED_EXTENSIONS = "deferredExtensions";
+	private static final String EXTENSIONS_ARRAY = "extensionsArray";
+	private static final String DEFERRED_ARRAY = "deferredArray";
+	private static final TypeToken<Map<String, String>> MAP_TYPE = new TypeToken<Map<String, String>>() {};
 
 	public static Gson create() {
-		return builder().create();
+		return new GsonBuilder().registerTypeAdapterFactory(new ExtensionsFactory()).create();
 	}
 
 	public static Gson createWithNans() {
-		return builder().serializeSpecialFloatingPointValues().create();
+		return new GsonBuilder().registerTypeAdapterFactory(new ExtensionsFactory())
+				.serializeSpecialFloatingPointValues().create();
 	}
 
 	private static class ExtensionsFactory implements TypeAdapterFactory {
@@ -51,63 +44,142 @@ public class GpxJson {
 			if (!GpxExtensions.class.isAssignableFrom(type.getRawType())) {
 				return null;
 			}
-			TypeAdapter<T> delegate = gson.getDelegateAdapter(this, type);
-			TypeAdapter<JsonElement> elements = gson.getAdapter(JsonElement.class);
-			return new TypeAdapter<T>() {
-				@Override
-				public void write(JsonWriter out, T value) throws IOException {
-					if (value == null) {
-						out.nullValue();
-						return;
-					}
-					// a lenient tree writer: points carry NaN (ele, speed...), the outer writer decides about them
-					JsonTreeWriter treeWriter = new JsonTreeWriter();
-					treeWriter.setLenient(true);
-					delegate.write(treeWriter, value);
-					JsonElement tree = treeWriter.get();
-					if (tree.isJsonObject()) {
-						JsonObject o = tree.getAsJsonObject();
-						o.remove("extensionsArray");
-						o.remove("deferredArray");
-						GpxExtensions g = (GpxExtensions) value;
-						put(o, EXTENSIONS, g.getExtensions());
-						put(o, DEFERRED, g.getDeferredExtensions());
-					}
-					elements.write(out, tree);
-				}
+			return new ExtensionsAdapter<>(gson, type.getRawType());
+		}
+	}
 
-				private void put(JsonObject o, String key, Map<String, String> map) {
-					if (map != null) {
-						o.add(key, gson.toJsonTree(new LinkedHashMap<>(map), MAP_TYPE));
-					}
-				}
+	// the fields as Gson's reflective adapter binds them, with the arrays written as objects
+	private static class ExtensionsAdapter<T> extends TypeAdapter<T> {
 
-				@Override
-				public T read(JsonReader in) throws IOException {
-					JsonElement tree = elements.read(in);
-					if (tree == null || tree.isJsonNull()) {
-						return null;
+		private final Gson gson;
+		private final Class<? super T> rawType;
+		private final Map<String, BoundField> fields = new LinkedHashMap<>();
+		private final TypeAdapter<Map<String, String>> mapAdapter;
+
+		ExtensionsAdapter(Gson gson, Class<? super T> rawType) {
+			this.gson = gson;
+			this.rawType = rawType;
+			this.mapAdapter = gson.getAdapter(MAP_TYPE);
+			for (Class<?> c = rawType; c != Object.class; c = c.getSuperclass()) {
+				for (Field field : c.getDeclaredFields()) {
+					int modifiers = field.getModifiers();
+					if (Modifier.isStatic(modifiers) || Modifier.isTransient(modifiers) || field.isSynthetic()) {
+						continue;
 					}
-					JsonElement ext = null, deferred = null;
-					if (tree.isJsonObject()) {
-						ext = tree.getAsJsonObject().remove(EXTENSIONS);
-						deferred = tree.getAsJsonObject().remove(DEFERRED);
-					}
-					JsonTreeReader treeReader = new JsonTreeReader(tree);
-					treeReader.setLenient(true);
-					T value = delegate.read(treeReader);
-					if (value != null) {
-						GpxExtensions g = (GpxExtensions) value;
-						if (ext != null && ext.isJsonObject()) {
-							g.setExtensions(gson.fromJson(ext, MAP_TYPE));
-						}
-						if (deferred != null && deferred.isJsonObject()) {
-							g.setDeferredExtensions(gson.fromJson(deferred, MAP_TYPE));
-						}
-					}
-					return value;
+					field.setAccessible(true);
+					fields.putIfAbsent(field.getName(), new BoundField(field, gson.getAdapter(TypeToken.get(field.getGenericType()))));
 				}
-			};
+			}
+		}
+
+		@Override
+		public void write(JsonWriter out, T value) throws IOException {
+			if (value == null) {
+				out.nullValue();
+				return;
+			}
+			out.beginObject();
+			for (Map.Entry<String, BoundField> e : fields.entrySet()) {
+				String name = e.getKey();
+				if (name.equals(EXTENSIONS_ARRAY) || name.equals(DEFERRED_ARRAY)) {
+					continue;
+				}
+				Object fieldValue = e.getValue().get(value);
+				if (fieldValue != value) {
+					out.name(name);
+					e.getValue().adapter(gson, fieldValue).write(out, fieldValue);
+				}
+			}
+			GpxExtensions g = (GpxExtensions) value;
+			writeMap(out, EXTENSIONS, g.getExtensions());
+			writeMap(out, DEFERRED_EXTENSIONS, g.getDeferredExtensions());
+			out.endObject();
+		}
+
+		private void writeMap(JsonWriter out, String name, Map<String, String> map) throws IOException {
+			if (map != null) {
+				out.name(name);
+				mapAdapter.write(out, map);
+			}
+		}
+
+		@Override
+		public T read(JsonReader in) throws IOException {
+			if (in.peek() == JsonToken.NULL) {
+				in.nextNull();
+				return null;
+			}
+			T value = newInstance();
+			GpxExtensions g = (GpxExtensions) value;
+			in.beginObject();
+			while (in.hasNext()) {
+				String name = in.nextName();
+				BoundField field = fields.get(name);
+				if (name.equals(EXTENSIONS)) {
+					g.setExtensions(mapAdapter.read(in));
+				} else if (name.equals(DEFERRED_EXTENSIONS)) {
+					g.setDeferredExtensions(mapAdapter.read(in));
+				} else if (field != null) {
+					field.read(in, value);
+				} else {
+					in.skipValue();
+				}
+			}
+			in.endObject();
+			return value;
+		}
+
+		@SuppressWarnings("unchecked")
+		private T newInstance() {
+			try {
+				Constructor<? super T> constructor = rawType.getDeclaredConstructor();
+				constructor.setAccessible(true);
+				return (T) constructor.newInstance();
+			} catch (ReflectiveOperationException e) {
+				throw new JsonParseException("Can't create " + rawType.getName(), e);
+			}
+		}
+	}
+
+	private static class BoundField {
+
+		private final Field field;
+		private final TypeAdapter<Object> adapter;
+
+		@SuppressWarnings("unchecked")
+		BoundField(Field field, TypeAdapter<?> adapter) {
+			this.field = field;
+			this.adapter = (TypeAdapter<Object>) adapter;
+		}
+
+		Object get(Object owner) {
+			try {
+				return field.get(owner);
+			} catch (IllegalAccessException e) {
+				throw new JsonParseException("Can't read " + field.getName(), e);
+			}
+		}
+
+		// as Gson does: a field of a plain class type is written with the adapter of its runtime class
+		@SuppressWarnings("unchecked")
+		TypeAdapter<Object> adapter(Gson gson, Object fieldValue) {
+			if (fieldValue != null && !field.getType().isPrimitive() && field.getGenericType() instanceof Class
+					&& fieldValue.getClass() != field.getType()) {
+				return (TypeAdapter<Object>) gson.getAdapter(fieldValue.getClass());
+			}
+			return adapter;
+		}
+
+		void read(JsonReader in, Object owner) throws IOException {
+			Object fieldValue = adapter.read(in);
+			if (fieldValue == null && field.getType().isPrimitive()) {
+				return;
+			}
+			try {
+				field.set(owner, fieldValue);
+			} catch (IllegalAccessException e) {
+				throw new JsonParseException("Can't write " + field.getName(), e);
+			}
 		}
 	}
 }
