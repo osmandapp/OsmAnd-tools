@@ -208,15 +208,16 @@ public class EmailSenderTemplate {
 		String lang = safeLang(langNullable);
 		include("defaults", lang, false); // settings (email-headers, vars, etc)
 
-		if (checkUseBase(template, lang)) {
+		List<String> templateLines = readTemplate(template, lang, true);
+		if (isUseBase(templateLines)) {
 			set(USE_BASE, "true"); // before the includes, so header/base keep their [if mso] blocks
 			include("base", lang, false); // optional
 			include("base-locale", lang, false); // optional
 			include("header", lang, false); // optional
-			include(template, lang, true); // template required
+			parse(templateLines);
 			include("footer", lang, false); // optional
 		} else {
-			include(template, lang, true);
+			parse(templateLines);
 		}
 
 		if (!"true".equals(vars.get(TRANSACTIONAL))) {
@@ -225,18 +226,15 @@ public class EmailSenderTemplate {
 		return this;
 	}
 
-	private boolean checkUseBase(String template, String lang) {
-		File file = findTemplateFile(template, lang);
-		if (file == null) {
-			return false;
-		}
-		try (Scanner reader = new Scanner(file)) {
-			while (reader.hasNextLine()) {
-				if (USE_BASE_FLAG.matcher(reader.nextLine()).matches()) {
+	private boolean isUseBase(List<String> lines) {
+		for (String line : lines) {
+			Matcher command = commandOf(line);
+			if (command != null && "Set".equalsIgnoreCase(command.group(1))) {
+				Matcher keyval = KEY_VALUE.matcher(command.group(2));
+				if (keyval.find() && USE_BASE.equals(keyval.group(1)) && "true".equals(keyval.group(2))) {
 					return true;
 				}
 			}
-		} catch (FileNotFoundException ignored) {
 		}
 		return false;
 	}
@@ -369,21 +367,14 @@ public class EmailSenderTemplate {
 	private final String HTML_NEWLINE_TO_BR = "HTML_NEWLINE_TO_BR"; // user-defined var from templates
 	private final String TRANSACTIONAL = "TRANSACTIONAL";
 	private final String USE_BASE = "USE_BASE";
-	private static final Pattern USE_BASE_FLAG = Pattern.compile("\\s*<!--\\s*Set\\s+USE_BASE\\s*=\\s*true\\s*-->\\s*");
 
 	private void parseCommandArgumentsFromComment(String line) {
 		// <!--  Name  OsmAnd and co    -->
 		// <!--From: @NOREPLY_MAIL_FROM@-->
 		// <!--Set: HTML_NEWLINE_TO_BR=true-->
 		// <!-- Set DEFAULT_MAIL_FROM = noreply@domain -->
-		if (isProtectedMsoSpan(line.trim())) {
-			return;
-		}
-		if (!HTML_COMMENT_MATCH.matcher(line).matches()) {
-			return;
-		}
-		Matcher matcher = COMMAND_COMMENT.matcher(line);
-		if (matcher.find()) {
+		Matcher matcher = commandOf(line);
+		if (matcher != null) {
 			String command = matcher.group(1);
 			String argument = matcher.group(2);
 			if ("Set".equalsIgnoreCase(command)) {
@@ -410,6 +401,14 @@ public class EmailSenderTemplate {
 		}
 	}
 
+	private Matcher commandOf(String line) {
+		if (isProtectedMsoSpan(line.trim()) || !HTML_COMMENT_MATCH.matcher(line).matches()) {
+			return null;
+		}
+		Matcher matcher = COMMAND_COMMENT.matcher(line);
+		return matcher.find() ? matcher : null;
+	}
+
 	private File findTemplateFile(String template, String lang) {
 		List<String> search = Arrays.asList(
 				defaultTemplatesDirectory + "/" + template + "/" + lang + ".html", // dir/template/name/lang.html
@@ -433,6 +432,13 @@ public class EmailSenderTemplate {
 	}
 
 	private void include(String template, String lang, boolean required) {
+		List<String> templateLines = readTemplate(template, lang, required);
+		if (templateLines != null) {
+			parse(templateLines);
+		}
+	}
+
+	private List<String> readTemplate(String template, String lang, boolean required) {
 		File foundFile = findTemplateFile(template, lang);
 
 		if (foundFile == null) {
@@ -440,7 +446,7 @@ public class EmailSenderTemplate {
 				throw new IllegalStateException(template + ": template not found in " + defaultTemplatesDirectory +
 						" - fetch web-server-config and set EMAIL_TEMPLATES=/path/to/templates/email (environment)");
 			}
-			return; // silent
+			return null; // silent
 		}
 
 		List<String> templateLines = new ArrayList<>();
@@ -454,8 +460,7 @@ public class EmailSenderTemplate {
 			templateLines.add(reader.nextLine());
 		}
 		reader.close();
-
-		parse(templateLines);
+		return templateLines;
 	}
 
 	private void parse(List<String> lines) {

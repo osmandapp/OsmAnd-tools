@@ -65,7 +65,7 @@ public class MsoConditionalCommentTest {
 
 	@Test
 	public void headerKeepsMsoBlock_whenTemplateLoadedWithUseBase() throws IOException {
-		EmailSenderTemplate t = loadFromTemplatesDir("<!--Set USE_BASE=true-->\n");
+		EmailSenderTemplate t = loadFromTemplatesDir("<!--Set: USE_BASE=true-->\n");
 		String body = t.toString();
 
 		assertTrue("[if mso] opener from header.html must survive", body.contains("<!--[if mso]>"));
