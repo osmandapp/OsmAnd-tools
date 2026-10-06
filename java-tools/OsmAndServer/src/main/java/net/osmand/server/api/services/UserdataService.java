@@ -507,6 +507,11 @@ public class UserdataService {
         filesRepository.save(fl);
     }
 
+    public String generateEmailToken() {
+        // Maximum 7 digits: lengths >= SPECIAL_PERMANENT_TOKEN (8) are treated as permanent tokens.
+        return Integer.toString(new SecureRandom().nextInt(900000) + 100000); // Generate 6 digits (100000-999999).
+    }
+
     public ResponseEntity<String> webUserActivate(String email, String token, String password, String lang) {
         if (password.length() < 8) {
             throw new OsmAndPublicApiException(ERROR_CODE_PASSWORD_IS_TO_SIMPLE, "enter password with at least 8 symbols");
@@ -541,7 +546,7 @@ public class UserdataService {
 		if (pu != null) {
             pu.tokendevice = TOKEN_DEVICE_WEB;
             if (pu.token == null || pu.token.length() < UserdataController.SPECIAL_PERMANENT_TOKEN) {
-                pu.token = (new Random().nextInt(8999) + 1000) + "";
+                pu.token = generateEmailToken();
             }
             pu.tokenTime = new Date();
             usersRepository.saveAndFlush(pu);
@@ -1494,7 +1499,7 @@ public class UserdataService {
         if (pu == null) {
             return ResponseEntity.badRequest().body("Email is not registered");
         }
-        String token = (new Random().nextInt(8999) + 1000) + "";
+        String token = generateEmailToken();
         emailSender.sendOsmAndCloudWebEmail(pu.email, token, action, lang);
         pu.token = token;
         pu.tokenTime = new Date();

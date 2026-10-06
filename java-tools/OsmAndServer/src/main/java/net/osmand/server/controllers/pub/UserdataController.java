@@ -221,7 +221,7 @@ public class UserdataController {
 		pu.tokenTime = new Date();
 		if (pu.token == null || pu.token.length() < SPECIAL_PERMANENT_TOKEN) {
 			// see comment on constant
-			pu.token = (new Random().nextInt(8999) + 1000) + "";
+			pu.token = userdataService.generateEmailToken();
 			// TODO iOS: add lang in OARegisterUserCommand.m before sendRequestWithUrl params[@"lang"] = ...
 			emailSender.sendOsmAndCloudRegistrationEmail(pu.email, pu.token, lang, true);
 		}
