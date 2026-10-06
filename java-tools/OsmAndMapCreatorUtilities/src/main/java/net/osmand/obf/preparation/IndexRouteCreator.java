@@ -178,12 +178,27 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 
 	// direction of the camera by the order of "from" and "to" in this way, read by RouteDataObject.isDirectionApplicable
 	private void addSpeedCameraDirections(List<Node> nodes) {
+		Node first = nodes.get(0);
+		Node last = nodes.get(nodes.size() - 1);
 		for (int fromIndex = 0; fromIndex < nodes.size(); fromIndex++) {
 			Node from = nodes.get(fromIndex);
 			Node to = from == null ? null : speedCameraTargets.get(from.getId());
-			int toIndex = to == null ? -1 : nodes.indexOf(to);
-			if (toIndex >= 0 && toIndex != fromIndex) {
-				String direction = toIndex > fromIndex ? "forward" : "backward";
+			if (to == null) {
+				continue;
+			}
+			int toIndex = nodes.indexOf(to);
+			String direction = null;
+			if (toIndex >= 0) {
+				if (toIndex != fromIndex) {
+					direction = toIndex > fromIndex ? "forward" : "backward";
+				}
+			} else if (first != null && last != null) {
+				// "to" is on another way: the road goes towards the end of this way nearest to "to"
+				// (also when "from" is that end: the road is split at "from")
+				boolean lastIsNearer = MapUtils.getDistance(last.getLatLon(), to.getLatLon()) < MapUtils.getDistance(first.getLatLon(), to.getLatLon());
+				direction = lastIsNearer ? "forward" : "backward";
+			}
+			if (direction != null) {
 				pointTypes.get(from.getId()).add(routeTypes.registerRule("direction", direction).getInternalId());
 			}
 		}
