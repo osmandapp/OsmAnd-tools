@@ -33,7 +33,7 @@ public interface MapUserRepository extends JpaRepository<MapUser, MapUserPrimary
 	@Query("DELETE FROM MapUser u WHERE lower(u.email) = lower(:email)")
 	void deleteAllByEmailIgnoreCase(@Param("email") String email);
 
-	@Entity
+	@Entity(name = "MapUser")
 	@Table(name = "email_free_users")
 	@IdClass(MapUserPrimaryKey.class)
 	class MapUser implements Serializable {
