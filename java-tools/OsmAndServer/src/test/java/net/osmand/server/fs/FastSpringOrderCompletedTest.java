@@ -25,6 +25,7 @@ import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
 import net.osmand.server.api.repo.DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
+import net.osmand.server.api.services.EmailSenderService;
 import net.osmand.server.api.services.UserSubscriptionService;
 import net.osmand.server.controllers.pub.FastSpringController;
 import net.osmand.server.controllers.pub.FastSpringController.FastSpringWebhookRequest;
@@ -45,6 +46,8 @@ public class FastSpringOrderCompletedTest {
 	UserSubscriptionService userSubService;
 	@Mock
 	PurchasesDataLoader purchasesDataLoader;
+	@Mock
+	EmailSenderService emailSender;
 	@InjectMocks
 	FastSpringController controller;
 

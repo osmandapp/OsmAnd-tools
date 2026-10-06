@@ -72,7 +72,7 @@ Special variables:
 
 Template variables:
 
-	Variables may reference other variables up to 4 levels deep (e.g. FIRST=1 SECOND=@FIRST@ THIRD=@SECOND@)
+	Variables may reference other variables at any depth (e.g. FIRST=1 SECOND=@FIRST@ THIRD=@SECOND@)
 
 Public methods:
 
@@ -318,12 +318,17 @@ public class EmailSenderTemplate {
 	private String fill(String in) {
 		String filled = in;
 		if (filled != null) {
-			final int PASSES = 4; // deep enough for base-template vars (@FOOTER_CONTACT@ -> _T2 -> @SUPPORT_EMAIL@)
-			for (int i = 0; i < PASSES; i++) {
+			String previous;
+			int passes = 0;
+			do {
+				if (passes++ > vars.size()) {
+					throw new IllegalStateException("Template variables reference each other in a cycle");
+				}
+				previous = filled;
 				for (String key : vars.keySet()) {
 					filled = filled.replace("@" + key + "@", vars.get(key));
 				}
-			}
+			} while (!filled.equals(previous));
 			if (filled.matches("(?s)^.*@[A-Z_]+@.*$")) {
 				throw new IllegalStateException(filled + ": error - please fill all tokens @A-Z@");
 			}

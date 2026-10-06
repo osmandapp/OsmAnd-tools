@@ -88,6 +88,7 @@ public class FastSpringController {
 			List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> purchases = new ArrayList<>();
 			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = new ArrayList<>();
 			String orderId = data.order;
+			Date orderDate = event.created != null ? new Date(event.created) : new Date();
 			int userId = user.id;
 			boolean sendOsmAndAndSpecialGiftEmail = false;
 			for (FastSpringWebhookRequest.Item item : data.items) {
@@ -110,7 +111,7 @@ public class FastSpringController {
 					iap.orderId = orderId;
 					iap.sku = sku;
 					iap.purchaseToken = data.reference;
-					iap.purchaseTime = event.created != null ? new Date(event.created) : new Date();
+					iap.purchaseTime = orderDate;
 					iap.timestamp = new Date();
 					iap.userId = userId;
 					iap.valid = true;
@@ -148,7 +149,7 @@ public class FastSpringController {
 
 			userSubService.verifyAndRefreshProOrderId(user);
 
-			emailSender.sendAfterCommit(() -> sendPurchaseReceipt(email, event, purchases, subscriptions));
+			emailSender.sendAfterCommit(() -> sendPurchaseReceipt(email, data, orderDate, purchases, subscriptions));
 
 			if (sendOsmAndAndSpecialGiftEmail) {
 				LOGGER.info("FastSpring: Sending special gift email to " + EmailSenderService.shorten(email) + " for orderId: " + data.order + ", purchaseToken: " + data.reference);
@@ -433,12 +434,10 @@ public class FastSpringController {
 		}
 	}
 
-	private void sendPurchaseReceipt(String email, FastSpringWebhookRequest.Event event,
+	private void sendPurchaseReceipt(String email, FastSpringWebhookRequest.Data data, Date orderDate,
 	                                 List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> purchases,
 	                                 List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions) {
-		FastSpringWebhookRequest.Data data = event.data;
 		try {
-			Date orderDate = event.created != null ? new Date(event.created) : new Date();
 			emailSender.sendPurchaseReceiptEmail(email, data.language, data.order, orderDate, data.totalDisplay,
 					purchases, subscriptions);
 		} catch (Exception e) {
