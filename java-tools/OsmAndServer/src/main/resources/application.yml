@@ -36,6 +36,7 @@ osmand:
   wiki.location: ${osmand.files.location}/wikidata/wikidata_commons_osm.sqlitedb
   heightmap.location: ${HEIGHTMAP_LOCATION:}
   crash-reports.location: ${CRASH_REPORTS_LOCATION:}
+  analytics.location: ${ANALYTICS_LOCATION:}
 
 server:
   port: 8080
