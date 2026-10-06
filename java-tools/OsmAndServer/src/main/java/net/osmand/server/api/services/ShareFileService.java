@@ -155,6 +155,10 @@ public class ShareFileService {
 		return false;
 	}
 
+	public void deleteAllShareFiles(int userid) {
+		shareFileRepository.deleteAll(shareFileRepository.findByOwnerid(userid));
+	}
+
 	public ResponseEntity<String> checkAccessAndReturnError(ShareFileRepository.ShareFile file) {
 		if (file.publicAccess) {
 			return null;

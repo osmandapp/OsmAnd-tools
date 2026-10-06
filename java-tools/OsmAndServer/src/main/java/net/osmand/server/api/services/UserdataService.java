@@ -1447,6 +1447,7 @@ public class UserdataService {
 						LOG.info("Deleted (/delete-account) users with email " + pu.email + " and id " + pu.id);
 						removeUserIdFromPurchases(pu.id);
 						disconnectGarmin(pu.id);
+						shareFileService.deleteAllShareFiles(pu.id);
                         int numOfUserDevicesDelete = devicesRepository.deleteByUserid(dev.userid);
                         if (numOfUserDevicesDelete != -1) {
 							LOG.info("Deleted (/delete-account) user devices for user " + pu.email + " and id " + pu.id);
