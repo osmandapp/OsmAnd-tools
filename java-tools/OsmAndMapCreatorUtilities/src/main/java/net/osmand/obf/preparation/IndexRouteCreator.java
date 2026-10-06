@@ -71,8 +71,8 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	private TLongObjectHashMap<WayNodeId> basemapRemovedNodes = new TLongObjectHashMap<WayNodeId>();
 	private TLongObjectHashMap<RouteMissingPoints> basemapNodesToReinsert = new TLongObjectHashMap<RouteMissingPoints> ();
 	
-	// "from" node of speed camera relations -> the nearest "to" (or "device") of each of them
-	private TLongObjectHashMap<List<LatLon>> speedCameraTargets = new TLongObjectHashMap<List<LatLon>>();
+	// "from" node of speed camera relations -> their "to" nodes
+	private TLongObjectHashMap<TLongArrayList> speedCameraTargets = new TLongObjectHashMap<TLongArrayList>();
 
 	// local purpose to speed up processing cache allocation
 	TIntArrayList outTypes = new TIntArrayList();
@@ -166,71 +166,45 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	// enforcement is checked from "from" towards "to" ("device" acts as "to" if there is none, see Relation:enforcement)
+	// enforcement is checked from "from" towards "to"
 	private void addSpeedCameraTarget(Relation relation, Node from) {
-		Node target = getNearestNode(relation.getMemberEntities("to"), from);
-		if (target == null) {
-			target = getNearestNode(relation.getMemberEntities("device"), from);
-		}
-		if (target != null) {
-			List<LatLon> targets = speedCameraTargets.get(from.getId());
-			if (targets == null) {
-				targets = new ArrayList<>();
-				speedCameraTargets.put(from.getId(), targets);
-			}
-			targets.add(target.getLatLon());
-		}
-	}
-
-	private Node getNearestNode(Collection<Entity> entities, Node node) {
-		Node nearest = null;
-		double minDistance = Double.MAX_VALUE;
-		for (Entity entity : entities) {
-			if (entity instanceof Node) {
-				double distance = MapUtils.getDistance(node.getLatLon(), entity.getLatLon());
-				if (distance < minDistance) {
-					minDistance = distance;
-					nearest = (Node) entity;
+		for (Entity to : relation.getMemberEntities("to")) {
+			if (to instanceof Node) {
+				TLongArrayList targets = speedCameraTargets.get(from.getId());
+				if (targets == null) {
+					targets = new TLongArrayList();
+					speedCameraTargets.put(from.getId(), targets);
 				}
+				targets.add(to.getId());
 			}
 		}
-		return nearest;
 	}
 
-	// direction of the camera relative to this way's node order, read by RouteDataObject.isDirectionApplicable;
+	// direction of the camera by the order of "from" and "to" in this way, read by RouteDataObject.isDirectionApplicable;
 	// relations of both directions sharing the node keep it undirected
 	private void addSpeedCameraDirections(List<Node> nodes) {
-		for (int i = 0; i < nodes.size(); i++) {
-			Node node = nodes.get(i);
-			List<LatLon> targets = node == null ? null : speedCameraTargets.get(node.getId());
-			Node prev = nodes.get(Math.max(i - 1, 0));
-			Node next = nodes.get(Math.min(i + 1, nodes.size() - 1));
-			if (targets == null || prev == null || next == null) {
+		for (int fromIndex = 0; fromIndex < nodes.size(); fromIndex++) {
+			Node from = nodes.get(fromIndex);
+			TLongArrayList targets = from == null ? null : speedCameraTargets.get(from.getId());
+			if (targets == null) {
 				continue;
 			}
 			int forward = 0, backward = 0;
-			for (LatLon target : targets) {
-				double dot = getDotProduct31(prev.getLatLon(), next.getLatLon(), node.getLatLon(), target);
-				if (dot > 0) {
-					forward++;
-				} else if (dot < 0) {
-					backward++;
+			for (int toIndex = 0; toIndex < nodes.size(); toIndex++) {
+				Node to = nodes.get(toIndex);
+				if (to != null && targets.contains(to.getId())) {
+					if (toIndex > fromIndex) {
+						forward++;
+					} else if (toIndex < fromIndex) {
+						backward++;
+					}
 				}
 			}
 			String direction = backward == 0 && forward > 0 ? "forward" : forward == 0 && backward > 0 ? "backward" : null;
 			if (direction != null) {
-				pointTypes.get(node.getId()).add(routeTypes.registerRule("direction", direction).getInternalId());
+				pointTypes.get(from.getId()).add(routeTypes.registerRule("direction", direction).getInternalId());
 			}
 		}
-	}
-
-	// dot product of vectors a1->a2 and b1->b2 in 31 tile coordinates (Mercator keeps angles)
-	private static double getDotProduct31(LatLon a1, LatLon a2, LatLon b1, LatLon b2) {
-		double ax = MapUtils.get31TileNumberX(a2.getLongitude()) - MapUtils.get31TileNumberX(a1.getLongitude());
-		double ay = MapUtils.get31TileNumberY(a2.getLatitude()) - MapUtils.get31TileNumberY(a1.getLatitude());
-		double bx = MapUtils.get31TileNumberX(b2.getLongitude()) - MapUtils.get31TileNumberX(b1.getLongitude());
-		double by = MapUtils.get31TileNumberY(b2.getLatitude()) - MapUtils.get31TileNumberY(b1.getLatitude());
-		return ax * bx + ay * by;
 	}
 
 	public void indexLowEmissionZones(Entity e, OsmDbAccessorContext ctx) throws SQLException {
