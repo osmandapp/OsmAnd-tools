@@ -420,9 +420,11 @@ public class RoutingController {
 			decisions.add(leg.decision);
 			List<LatLonEle> legLine = new ArrayList<>();
 			if (leg.network != null) {
+				appendLatLons(legLine, leg.startJoin);
 				appendLatLons(legLine, leg.startConnector);
 				routingService.getElevationsBySegments(legLine, features, leg.network);
 				appendLatLons(legLine, leg.endConnector);
+				appendLatLons(legLine, leg.endJoin);
 			} else if (leg.openWater != null) {
 				appendLatLons(legLine, leg.openWater);
 			} else {
