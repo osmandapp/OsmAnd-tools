@@ -1,0 +1,50 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<gpx version="1.1" creator="OsmAnd" xmlns="http://www.topografix.com/GPX/1/1" xmlns:osmand="https://osmand.net/docs/technical/osmand-file-formats/osmand-gpx" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">
+  <metadata>
+    <name>points-with-extensions</name>
+    <time>2026-10-01T09:00:00Z</time>
+    <extensions>
+      <osmand:custom_meta>m1</osmand:custom_meta>
+    </extensions>
+  </metadata>
+  <wpt lat="50.45" lon="30.52">
+    <name>Cafe</name>
+    <desc>d</desc>
+    <type>Food</type>
+    <extensions>
+      <osmand:icon>cafe</osmand:icon>
+      <osmand:color>#ff0000</osmand:color>
+      <osmand:amenity_opening_hours>Mo-Fr 08:00-20:00</osmand:amenity_opening_hours>
+      <osmand:osm_tag_phone>+380441234567</osmand:osm_tag_phone>
+      <my_note>hello</my_note>
+    </extensions>
+  </wpt>
+  <trk>
+    <name>points-with-extensions</name>
+    <extensions>
+      <osmand:custom_trk>x</osmand:custom_trk>
+    </extensions>
+    <trkseg>
+      <trkpt lat="50.45" lon="30.52">
+        <ele>100</ele>
+        <time>2026-10-01T10:00:00Z</time>
+        <extensions>
+          <gpxtpx:TrackPointExtension>
+            <gpxtpx:hr>120</gpxtpx:hr>
+          </gpxtpx:TrackPointExtension>
+          <osmand:custom_pt>p0</osmand:custom_pt>
+        </extensions>
+      </trkpt>
+      <trkpt lat="50.46" lon="30.53">
+        <ele>101</ele>
+        <time>2026-10-01T10:01:00Z</time>
+        <extensions>
+          <gpxtpx:TrackPointExtension>
+            <gpxtpx:hr>121</gpxtpx:hr>
+          </gpxtpx:TrackPointExtension>
+          <osmand:custom_pt>p1</osmand:custom_pt>
+        </extensions>
+      </trkpt>
+    </trkseg>
+  </trk>
+</gpx>
