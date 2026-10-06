@@ -71,8 +71,8 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	private TLongObjectHashMap<WayNodeId> basemapRemovedNodes = new TLongObjectHashMap<WayNodeId>();
 	private TLongObjectHashMap<RouteMissingPoints> basemapNodesToReinsert = new TLongObjectHashMap<RouteMissingPoints> ();
 	
-	// "from" node of speed camera relations -> their "to" nodes
-	private TLongObjectHashMap<TLongArrayList> speedCameraTargets = new TLongObjectHashMap<TLongArrayList>();
+	// "from" node of a speed camera relation -> its "to" (or "device") node
+	private TLongObjectHashMap<Node> speedCameraTargets = new TLongObjectHashMap<Node>();
 
 	// local purpose to speed up processing cache allocation
 	TIntArrayList outTypes = new TIntArrayList();
@@ -166,42 +166,24 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 	}
 
-	// enforcement is checked from "from" towards "to"
+	// enforcement is checked from "from" towards "to" ("device" acts as "to" if there is none, see Relation:enforcement)
 	private void addSpeedCameraTarget(Relation relation, Node from) {
-		for (Entity to : relation.getMemberEntities("to")) {
-			if (to instanceof Node) {
-				TLongArrayList targets = speedCameraTargets.get(from.getId());
-				if (targets == null) {
-					targets = new TLongArrayList();
-					speedCameraTargets.put(from.getId(), targets);
-				}
-				targets.add(to.getId());
+		List<Entity> to = relation.getMemberEntities("to");
+		for (Entity target : to.isEmpty() ? relation.getMemberEntities("device") : to) {
+			if (target instanceof Node) {
+				speedCameraTargets.put(from.getId(), (Node) target);
 			}
 		}
 	}
 
-	// direction of the camera by the order of "from" and "to" in this way, read by RouteDataObject.isDirectionApplicable;
-	// relations of both directions sharing the node keep it undirected
+	// direction of the camera by the order of "from" and "to" in this way, read by RouteDataObject.isDirectionApplicable
 	private void addSpeedCameraDirections(List<Node> nodes) {
 		for (int fromIndex = 0; fromIndex < nodes.size(); fromIndex++) {
 			Node from = nodes.get(fromIndex);
-			TLongArrayList targets = from == null ? null : speedCameraTargets.get(from.getId());
-			if (targets == null) {
-				continue;
-			}
-			int forward = 0, backward = 0;
-			for (int toIndex = 0; toIndex < nodes.size(); toIndex++) {
-				Node to = nodes.get(toIndex);
-				if (to != null && targets.contains(to.getId())) {
-					if (toIndex > fromIndex) {
-						forward++;
-					} else if (toIndex < fromIndex) {
-						backward++;
-					}
-				}
-			}
-			String direction = backward == 0 && forward > 0 ? "forward" : forward == 0 && backward > 0 ? "backward" : null;
-			if (direction != null) {
+			Node to = from == null ? null : speedCameraTargets.get(from.getId());
+			int toIndex = to == null ? -1 : nodes.indexOf(to);
+			if (toIndex >= 0 && toIndex != fromIndex) {
+				String direction = toIndex > fromIndex ? "forward" : "backward";
 				pointTypes.get(from.getId()).add(routeTypes.registerRule("direction", direction).getInternalId());
 			}
 		}
