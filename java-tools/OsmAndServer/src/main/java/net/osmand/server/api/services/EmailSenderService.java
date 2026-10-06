@@ -5,6 +5,7 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.TimeZone;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -26,7 +27,6 @@ import org.springframework.web.util.HtmlUtils;
 @Service
 public class EmailSenderService {
 
-	private static final String SHARE_LINK_PREFIX = "https://osmand.net/map/share/join/";
 	private static final Pattern TEMPLATE_TOKEN_START = Pattern.compile("@(?=[A-Z0-9_]+@)");
 
 	@Autowired
@@ -137,7 +137,6 @@ public class EmailSenderService {
 		if (fileSize > 0) {
 			meta = meta + " · " + Algorithms.formatFileSize(fileSize);
 		}
-		String url = fileUuid == null ? "https://osmand.net/map" : SHARE_LINK_PREFIX + fileUuid;
 		String template = approved ? "cloud/share/approved" : "cloud/share/declined";
 		boolean ok = new EmailSenderTemplate()
 				.load(template, lang)
@@ -146,7 +145,7 @@ public class EmailSenderService {
 				.set("FILE_NAME_PLAIN", plainText(name))
 				.set("FILE_EXT", htmlText(ext))
 				.set("FILE_META", htmlText(meta))
-				.set("FILE_URL", htmlText(url))
+				.set("FILE_UUID", fileUuid == null ? "" : fileUuid.toString())
 				.to(email)
 				.send()
 				.isSuccess();
@@ -220,21 +219,7 @@ public class EmailSenderService {
 		LOGGER.info("sendPurchaseReceiptEmail order " + orderId + " to: " + shorten(email) + " (" + ok + ") [" + lang + "]");
 	}
 
-	public void sendPurchaseLinkedEmail(String email, String lang,
-			List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> purchases,
-			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions) {
-		String productName;
-		if (subscriptions != null && !subscriptions.isEmpty()) {
-			DeviceSubscriptionsRepository.SupporterDeviceSubscription sub = subscriptions.get(0);
-			PurchasesDataLoader.Subscription skuData = purchasesDataLoader.getSubscriptions().get(sub.sku);
-			productName = skuData != null ? skuData.name() : sub.sku;
-		} else if (purchases != null && !purchases.isEmpty()) {
-			DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase iap = purchases.get(0);
-			PurchasesDataLoader.InApp skuData = purchasesDataLoader.getInApps().get(iap.sku);
-			productName = skuData != null ? skuData.name() : iap.sku;
-		} else {
-			return;
-		}
+	public void sendPurchaseLinkedEmail(String email, String lang, String productName) {
 		boolean ok = new EmailSenderTemplate()
 				.load("cloud/purchase/linked", lang)
 				.set("EMAIL", htmlText(email))
@@ -246,11 +231,10 @@ public class EmailSenderService {
 	}
 
 	private static String formatReceiptDate(Date date, String lang) {
-		Locale locale = lang == null || lang.isEmpty() ? Locale.ENGLISH : Locale.forLanguageTag(lang.replace('_', '-'));
-		if (locale.getLanguage().isEmpty()) {
-			locale = Locale.ENGLISH;
-		}
-		return DateFormat.getDateInstance(DateFormat.MEDIUM, locale).format(date);
+		Locale locale = Locale.forLanguageTag(EmailSenderTemplate.safeLang(lang).replace('_', '-'));
+		DateFormat format = DateFormat.getDateInstance(DateFormat.MEDIUM, locale);
+		format.setTimeZone(TimeZone.getTimeZone("UTC"));
+		return format.format(date);
 	}
 
 	public void sendOsmAndCloudAccountEmail(String email, String token, String lang, CloudAccountAction action,

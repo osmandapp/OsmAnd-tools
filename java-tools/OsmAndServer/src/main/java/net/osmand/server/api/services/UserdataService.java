@@ -131,9 +131,10 @@ public class UserdataService {
     public static final String MODEL_DEVICE_WEB = "Web";
     public static final String TOKEN_DEVICE_WEB = "web";
     public static final int ERROR_CODE_PRO_USERS = 100;
-    public static final long CODE_EXPIRATION_TIME_MS = TimeUnit.MILLISECONDS.convert(10, TimeUnit.MINUTES);
+    public static final int CODE_EXPIRATION_TIME_MINUTES = 10;
+    public static final long CODE_EXPIRATION_TIME_MS = TimeUnit.MINUTES.toMillis(CODE_EXPIRATION_TIME_MINUTES);
     public static final int CODE_MAX_ATTEMPTS = 4;
-    private static final String CODE_TTL_TEXT = "(" + TimeUnit.MILLISECONDS.toMinutes(CODE_EXPIRATION_TIME_MS) + " min)";
+    private static final String CODE_TTL_TEXT = "(" + CODE_EXPIRATION_TIME_MINUTES + " min)";
     private static final long MB = 1024 * 1024;
     public static final int BUFFER_SIZE = 1024 * 512;
     public static final long MAXIMUM_ACCOUNT_SIZE = 3000 * MB; // 3 (5 GB - std, 50 GB - ext, 1000 GB - pro)

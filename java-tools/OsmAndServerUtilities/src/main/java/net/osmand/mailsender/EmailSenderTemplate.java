@@ -200,7 +200,7 @@ public class EmailSenderTemplate {
 	// "../../some/file", falls back to English instead of loading an arbitrary .html file into the email.
 	private static final Pattern LANG_PATTERN = Pattern.compile("[a-zA-Z]{2,3}([-_][a-zA-Z0-9]{2,4})?");
 
-	static String safeLang(@Nullable String lang) {
+	public static String safeLang(@Nullable String lang) {
 		return lang != null && LANG_PATTERN.matcher(lang).matches() ? lang : "en";
 	}
 

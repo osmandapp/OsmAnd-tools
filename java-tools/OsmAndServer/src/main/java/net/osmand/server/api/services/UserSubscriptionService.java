@@ -490,20 +490,33 @@ public class UserSubscriptionService {
 		usersRepository.saveAndFlush(previousUser);
 		LOG.info("Cleared orderId for previous user " + previousUser.id);
 
-		notifyPurchaseLinked(newUserId, iapList, subscriptionList);
+		if (!iapList.isEmpty() || !subscriptionList.isEmpty()) {
+			notifyPurchaseLinked(newUserId);
+		}
 	}
 
-	private void notifyPurchaseLinked(int newUserId,
-	                                  List<SupporterDeviceInAppPurchase> purchases,
-	                                  List<SupporterDeviceSubscription> subscriptions) {
+	private void notifyPurchaseLinked(int newUserId) {
 		CloudUsersRepository.CloudUser newUser = usersRepository.findById(newUserId);
 		if (newUser == null || newUser.email == null) {
 			return;
 		}
+		String productName;
+		List<SupporterDeviceSubscription> subscriptions = subscriptionsRepo.findByUserIdAndValidTrue(newUserId);
+		List<SupporterDeviceInAppPurchase> purchases = inAppPurchasesRepo.findByUserIdAndValidTrue(newUserId);
+		if (!subscriptions.isEmpty()) {
+			SupporterDeviceSubscription sub = subscriptions.get(0);
+			PurchasesDataLoader.Subscription skuData = purchasesDataLoader.getSubscriptions().get(sub.sku);
+			productName = skuData != null ? skuData.name() : sub.sku;
+		} else if (!purchases.isEmpty()) {
+			SupporterDeviceInAppPurchase iap = purchases.get(0);
+			PurchasesDataLoader.InApp skuData = purchasesDataLoader.getInApps().get(iap.sku);
+			productName = skuData != null ? skuData.name() : iap.sku;
+		} else {
+			return;
+		}
 		emailSender.sendAfterCommit(() -> {
 			try {
-				emailSender.sendPurchaseLinkedEmail(newUser.email, emailSender.userLang(newUserId),
-						purchases, subscriptions);
+				emailSender.sendPurchaseLinkedEmail(newUser.email, emailSender.userLang(newUserId), productName);
 			} catch (Exception e) {
 				LOG.error("Failed to send purchase linked email: " + e.getMessage(), e);
 			}
