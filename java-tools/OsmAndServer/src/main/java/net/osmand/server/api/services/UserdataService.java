@@ -178,7 +178,17 @@ public class UserdataService {
     private final Cache<String, RequestData> requestTracker = CacheBuilder.newBuilder()
             .expireAfterWrite(24, TimeUnit.HOURS)
             .build();
-    
+
+    private static final int EMAIL_TOKEN_MIN_DELAY_MINUTES = 10;
+    private static final int EMAIL_TOKEN_MAX_DELAY_MINUTES = 60;
+    private static final int EMAIL_TOKEN_AVG_HOURLY_USERS = 100; // 5x reserve
+    private final Cache<String, SecureEmailToken> emailTokenRequests = CacheBuilder.newBuilder()
+            .expireAfterWrite(EMAIL_TOKEN_MAX_DELAY_MINUTES, TimeUnit.MINUTES)
+            .build();
+
+    private record SecureEmailToken(String token, long nextAllowedAt) {
+    }
+
     private static class RequestData {
         public int checkCount;
         public long lastCheckTime;
@@ -507,7 +517,22 @@ public class UserdataService {
         filesRepository.save(fl);
     }
 
-    public String generateEmailToken() {
+    public synchronized void updateSecureEmailToken(CloudUser user) {
+        String email = user.email.trim().toLowerCase(Locale.ROOT);
+        long now = System.currentTimeMillis();
+        SecureEmailToken token = emailTokenRequests.getIfPresent(email);
+        if (token == null || token.nextAllowedAt() <= now) {
+            // More emails issued tokens in the last hour increase the per-email pause from 10 to 60 minutes.
+            long delayMinutes = Math.min(EMAIL_TOKEN_MAX_DELAY_MINUTES, Math.max(EMAIL_TOKEN_MIN_DELAY_MINUTES,
+                    EMAIL_TOKEN_MIN_DELAY_MINUTES * emailTokenRequests.size() / EMAIL_TOKEN_AVG_HOURLY_USERS));
+            token = new SecureEmailToken(generateEmailToken(), now + TimeUnit.MINUTES.toMillis(delayMinutes));
+            emailTokenRequests.put(email, token);
+            user.tokenTime = new Date(now);
+        }
+        user.token = token.token();
+    }
+
+    private String generateEmailToken() {
         // Maximum 7 digits: lengths >= SPECIAL_PERMANENT_TOKEN (8) are treated as permanent tokens.
         return Integer.toString(new SecureRandom().nextInt(900000) + 100000); // Generate 6 digits (100000-999999).
     }
@@ -546,9 +571,10 @@ public class UserdataService {
 		if (pu != null) {
             pu.tokendevice = TOKEN_DEVICE_WEB;
             if (pu.token == null || pu.token.length() < UserdataController.SPECIAL_PERMANENT_TOKEN) {
-                pu.token = generateEmailToken();
+                updateSecureEmailToken(pu);
+            } else {
+                pu.tokenTime = new Date(); // SPECIAL_PERMANENT_TOKEN
             }
-            pu.tokenTime = new Date();
             usersRepository.saveAndFlush(pu);
             emailSender.sendOsmAndCloudWebEmail(pu.email, pu.token, "@ACTION_SETUP@", lang);
 		} else {
@@ -1499,10 +1525,9 @@ public class UserdataService {
         if (pu == null) {
             return ResponseEntity.badRequest().body("Email is not registered");
         }
-        String token = generateEmailToken();
+        updateSecureEmailToken(pu);
+        String token = pu.token;
         emailSender.sendOsmAndCloudWebEmail(pu.email, token, action, lang);
-        pu.token = token;
-        pu.tokenTime = new Date();
         usersRepository.saveAndFlush(pu);
 
 	    userSubService.verifyAndRefreshProOrderId(pu);

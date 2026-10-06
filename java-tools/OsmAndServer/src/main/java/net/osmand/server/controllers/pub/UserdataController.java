@@ -218,12 +218,13 @@ public class UserdataController {
 			pu.orderid = orderid;
 		}
 		pu.tokendevice = deviceId;
-		pu.tokenTime = new Date();
 		if (pu.token == null || pu.token.length() < SPECIAL_PERMANENT_TOKEN) {
 			// see comment on constant
-			pu.token = userdataService.generateEmailToken();
+			userdataService.updateSecureEmailToken(pu);
 			// TODO iOS: add lang in OARegisterUserCommand.m before sendRequestWithUrl params[@"lang"] = ...
 			emailSender.sendOsmAndCloudRegistrationEmail(pu.email, pu.token, lang, true);
+		} else {
+			pu.tokenTime = new Date(); // SPECIAL_PERMANENT_TOKEN
 		}
 		CloudUser saved = usersRepository.saveAndFlush(pu);
 	    if (orderid != null) {
