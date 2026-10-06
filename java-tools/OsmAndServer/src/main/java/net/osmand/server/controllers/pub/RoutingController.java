@@ -351,6 +351,7 @@ public class RoutingController {
 					}
 					res = null;
 					resListElevation = boatLine(boatLegs, list, features, props);
+					putDepthProfile(resListElevation, props);
 				} else {
 					res = osmAndMapsService.routing(disableOldRouting, routeMode, props, list.get(0),
 							list.get(list.size() - 1), list.subList(1, list.size() - 1),
@@ -409,6 +410,31 @@ public class RoutingController {
 	 * joining them to the points, and a straight line for a leg with no route. Empty when no leg has a route. Sets
 	 * the overall distance and time of the whole route and the decision of every leg.
 	 */
+	/** [distance m, depth m or null, lat, lon] along the boat route, for the depth chart. */
+	private void putDepthProfile(List<LatLonEle> line, Map<String, Object> props) {
+		if (line.size() < 2) {
+			return;
+		}
+		try {
+			List<LatLon> points = new ArrayList<>();
+			for (LatLonEle p : line) {
+				points.add(new LatLon(p.getLatitude(), p.getLongitude()));
+			}
+			List<Object> profile = new ArrayList<>();
+			boolean known = false;
+			for (net.osmand.router.sea.SeaDepthProfile.Sample s : osmAndMapsService.depthProfile(points)) {
+				known |= !Double.isNaN(s.depth);
+				profile.add(Arrays.asList(Math.round(s.distance), Double.isNaN(s.depth) ? null
+						: Math.round(s.depth * 10) / 10.0, s.lat, s.lon));
+			}
+			if (known) {
+				props.put("depthProfile", profile);
+			}
+		} catch (IOException | RuntimeException e) {
+			LOGGER.error("depth profile: " + e.getMessage(), e);
+		}
+	}
+
 	private List<LatLonEle> boatLine(List<BoatRoute> legs, List<LatLon> points, List<Feature> features,
 			Map<String, Object> props) {
 		List<LatLonEle> line = new ArrayList<>();
@@ -447,6 +473,10 @@ public class RoutingController {
 				: new TreeMap<>();
 		overall.put("distance", distance);
 		overall.put("time", time);
+		// open water all the way has no network routing time; the web shows the route only when it is set
+		if (!(overall.get("routingTime") instanceof Number) || ((Number) overall.get("routingTime")).doubleValue() <= 0) {
+			overall.put("routingTime", time);
+		}
 		props.put("overall", overall);
 		return line;
 	}

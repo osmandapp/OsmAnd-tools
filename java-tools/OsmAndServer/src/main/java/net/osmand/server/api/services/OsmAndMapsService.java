@@ -1121,6 +1121,31 @@ public class OsmAndMapsService {
 	 * {@link #routing}, with {@link net.osmand.router.sea.BoatRoutePlanner} deciding where to join open water. One leg
 	 * per pair of neighbouring points.
 	 */
+	private List<BinaryMapIndexReader> depthReaders;
+
+	/**
+	 * Depth along a boat route from the depth OBFs in {@code <obf location>/depth}, regional files before the European
+	 * and world ones (see {@link net.osmand.router.sea.SeaDepthProfile}). The readers are opened once and shared, so
+	 * profiles are computed one at a time.
+	 */
+	public synchronized List<net.osmand.router.sea.SeaDepthProfile.Sample> depthProfile(List<LatLon> line)
+			throws IOException {
+		if (depthReaders == null) {
+			depthReaders = new ArrayList<>();
+			File[] files = tileConfig.obfLocation == null ? null : new File(tileConfig.obfLocation, "depth").listFiles();
+			if (files != null) {
+				Arrays.sort(files, Comparator.comparingLong(File::length));
+				for (File f : files) {
+					if (f.getName().endsWith(".depth.obf")) {
+						depthReaders.add(new BinaryMapIndexReader(new RandomAccessFile(f, "r"), f));
+					}
+				}
+			}
+			LOGGER.info("Depth files: " + depthReaders.size());
+		}
+		return new net.osmand.router.sea.SeaDepthProfile(depthReaders).profile(line);
+	}
+
 	public List<net.osmand.router.sea.BoatRoutePlanner.BoatRoute> boatRouting(String routeMode, Map<String, Object> props,
 			List<LatLon> routePoints, net.osmand.router.sea.BoatRoutePlanner.ShoreProvider shores,
 			RouteCalculationProgress progress) throws IOException, InterruptedException {
