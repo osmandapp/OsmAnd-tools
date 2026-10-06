@@ -98,6 +98,9 @@ public class UserdataService {
 	@Autowired
 	GarminUserConnectionRepository garminUserConnectionRepository;
 
+	@Autowired
+	MapUserRepository mapUserRepository;
+
     @Autowired
     protected StorageService storageService;
 
@@ -1448,6 +1451,7 @@ public class UserdataService {
 						removeUserIdFromPurchases(pu.id);
 						disconnectGarmin(pu.id);
 						shareFileService.deleteAllShareFiles(pu.id);
+						mapUserRepository.deleteAllByEmailIgnoreCase(pu.email);
                         int numOfUserDevicesDelete = devicesRepository.deleteByUserid(dev.userid);
                         if (numOfUserDevicesDelete != -1) {
 							LOG.info("Deleted (/delete-account) user devices for user " + pu.email + " and id " + pu.id);
