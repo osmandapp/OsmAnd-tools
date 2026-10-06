@@ -25,9 +25,8 @@ public class GpxJsonTest {
 		JsonObject ext = wptExt(trackDataJson(GpxJson.createWithNans()));
 		assertFalse(ext.has("extensionsArray"));
 		JsonObject extensions = ext.getAsJsonObject("extensions");
-		assertEquals("Mo-Fr 08:00-20:00", extensions.get("amenity_opening_hours").getAsString());
-		assertEquals("+380441234567", extensions.get("osm_tag_phone").getAsString());
-		assertEquals("hello", extensions.get("my_note").getAsString());
+		assertEquals("Mo-Fr 07:00-21:00; Sa 09:00-21:00; Su 09:00-19:30", extensions.get("amenity_opening_hours").getAsString());
+		assertEquals("Starbucks", extensions.get("osm_tag_brand").getAsString());
 	}
 
 	@Test
@@ -49,7 +48,7 @@ public class GpxJsonTest {
 	@Test
 	public void readsExtensionsArray() throws IOException {
 		WebGpxParser.TrackData data = GpxJson.create().fromJson(trackDataJson(PLAIN), WebGpxParser.TrackData.class);
-		assertEquals("Mo-Fr 08:00-20:00", data.wpts.get(0).ext.getExtensions().get("amenity_opening_hours"));
+		assertEquals("Mo-Fr 07:00-21:00; Sa 09:00-21:00; Su 09:00-19:30", data.wpts.get(0).ext.getExtensions().get("amenity_opening_hours"));
 	}
 
 	// JSON.stringify of the web map writes NaN as null
@@ -58,7 +57,7 @@ public class GpxJsonTest {
 		String json = trackDataJson(GpxJson.createWithNans()).replace("NaN", "null");
 		WebGpxParser.TrackData data = GpxJson.create().fromJson(json, WebGpxParser.TrackData.class);
 		assertTrue(Double.isNaN(data.wpts.get(0).ext.getHdop()));
-		assertEquals("hello", data.wpts.get(0).ext.getExtensions().get("my_note"));
+		assertEquals("Starbucks", data.wpts.get(0).ext.getExtensions().get("osm_tag_brand"));
 	}
 
 	private static JsonObject wptExt(String json) {

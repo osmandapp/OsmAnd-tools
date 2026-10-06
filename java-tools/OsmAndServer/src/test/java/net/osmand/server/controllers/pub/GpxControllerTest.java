@@ -23,8 +23,8 @@ import net.osmand.server.utils.WebGpxParser;
 // /gpx/save-track-data and /gpx/get-analysis with the track data the web map sends back
 public class GpxControllerTest {
 
-	private static final String[] SAVED_TAGS = { "amenity_opening_hours", "osm_tag_phone", "my_note", "hr>120",
-			"custom_pt", "custom_trk", "custom_meta" };
+	private static final String[] SAVED_TAGS = { "amenity_opening_hours", "osm_tag_brand", "United States", "hr>94",
+			"displaycolor", "activity>hiking" };
 
 	// /gpx/save-track-data: the GPX keeps the extensions of the waypoints, track points, track and metadata
 	@Test
@@ -47,8 +47,8 @@ public class GpxControllerTest {
 				.getAsJsonObject();
 		JsonObject trackPoint = routePoint.getAsJsonArray("geometry").get(0).getAsJsonObject();
 		JsonObject wpt = data.getAsJsonArray("wpts").get(0).getAsJsonObject();
-		assertEquals("p0", trackPoint.getAsJsonObject("ext").getAsJsonObject("extensions").get("custom_pt").getAsString());
-		assertEquals("hello", wpt.getAsJsonObject("ext").getAsJsonObject("extensions").get("my_note").getAsString());
+		assertEquals("94", trackPoint.getAsJsonObject("ext").getAsJsonObject("extensions").get("gpxtpx:hr").getAsString());
+		assertEquals("Starbucks", wpt.getAsJsonObject("ext").getAsJsonObject("extensions").get("osm_tag_brand").getAsString());
 	}
 
 	private static void assertSavedTags(String gpx) {

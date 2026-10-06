@@ -30,44 +30,43 @@ public class WebGpxParserTest {
 		List<WebGpxParser.Wpt> wpts = trackData().wpts;
 		assertEquals(3, wpts.size());
 
-		WebGpxParser.Wpt cafe = wpts.get(0);
-		assertEquals("Cafe", cafe.name);
-		assertEquals("d", cafe.desc);
-		assertEquals("Food", cafe.category);
-		assertEquals(50.45, cafe.lat, 0);
-		assertEquals(30.52, cafe.lon, 0);
-		assertEquals("#ff0000", cafe.color);
-		assertEquals("cafe", cafe.icon);
-		assertEquals("circle", cafe.background);
-		assertEquals("Khreshchatyk 1", cafe.address);
-		assertEquals(Map.of("amenity_opening_hours", "Mo-Fr 08:00-20:00", "osm_tag_phone", "+380441234567",
-				"my_note", "hello"), cafe.ext.getExtensions());
+		WebGpxParser.Wpt starbucks = wpts.get(0);
+		assertEquals("Starbucks", starbucks.name);
+		assertEquals("Cafe", starbucks.category);
+		assertEquals(52.5194036, starbucks.lat, 0);
+		assertEquals(13.3887345, starbucks.lon, 0);
+		assertEquals("#a71de1", starbucks.color);
+		assertEquals("amenity_cafe", starbucks.icon);
+		assertEquals("circle", starbucks.background);
+		assertEquals("Friedrichstraße (Spandau), Berlin", starbucks.address);
+		assertEquals(Map.of("amenity_opening_hours", "Mo-Fr 07:00-21:00; Sa 09:00-21:00; Su 09:00-19:30",
+				"osm_tag_brand", "Starbucks"), starbucks.ext.getExtensions());
 
-		WebGpxParser.Wpt viewpoint = wpts.get(1);
-		assertEquals("true", viewpoint.hidden);
-		assertEquals(Map.of("test:country", "UA"), viewpoint.ext.getExtensions());
+		WebGpxParser.Wpt test = wpts.get(1);
+		assertEquals("true", test.hidden);
+		assertEquals(Map.of("test:country", "United States"), test.ext.getExtensions());
 
-		WebGpxParser.Wpt spring = wpts.get(2);
-		assertEquals("water", spring.desc);
-		assertNull(spring.category);
-		assertNull(spring.ext.getExtensions());
+		WebGpxParser.Wpt velo = wpts.get(2);
+		assertEquals("6/13/2016 9:32:27 PM", velo.desc);
+		assertNull(velo.category);
+		assertNull(velo.ext.getExtensions());
 	}
 
 	@Test
 	public void pointsGroups() throws IOException {
 		Map<String, WebGpxParser.WebPointsGroup> groups = trackData().pointsGroups;
-		assertEquals(List.of("Food", "Nature", ""), List.copyOf(groups.keySet()));
+		assertEquals(List.of("Cafe", "SOTM", ""), List.copyOf(groups.keySet()));
 
-		WebGpxParser.WebPointsGroup food = groups.get("Food");
-		assertEquals("#ff0000", food.color);
-		assertEquals("cafe", food.iconName);
-		assertEquals("circle", food.backgroundType);
-		assertFalse(food.hidden);
+		WebGpxParser.WebPointsGroup cafe = groups.get("Cafe");
+		assertEquals("#a71de1", cafe.color);
+		assertEquals("special_star", cafe.iconName);
+		assertEquals("circle", cafe.backgroundType);
+		assertFalse(cafe.hidden);
 
-		WebGpxParser.WebPointsGroup nature = groups.get("Nature");
-		assertEquals("special_star", nature.iconName);
-		assertEquals("octagon", nature.backgroundType);
-		assertTrue(nature.hidden);
+		WebGpxParser.WebPointsGroup sotm = groups.get("SOTM");
+		assertEquals("place_town", sotm.iconName);
+		assertEquals("circle", sotm.backgroundType);
+		assertTrue(sotm.hidden);
 	}
 
 	// two routes over two segments: a route point per rtept, the trkpts of a leg in its geometry
@@ -80,15 +79,15 @@ public class WebGpxParserTest {
 
 		assertEquals("pedestrian", points.get(0).profile);
 		assertTrue(points.get(0).geometry.isEmpty());
-		assertEquals(List.of("p0", "p1", "p2"), customPt(points.get(1).geometry));
+		assertEquals(List.of("94", "95", "96"), hr(points.get(1).geometry));
 		// the last point of a segment that is not the last one ends it with a gap
 		assertEquals(GpxUtilities.GAP_PROFILE_TYPE, points.get(1).profile);
 
 		assertEquals("bicycle", points.get(2).profile);
 		assertTrue(points.get(2).geometry.isEmpty());
 		assertEquals("bicycle", points.get(3).profile);
-		assertEquals(List.of("p3", "p4", "p5"), customPt(points.get(3).geometry));
-		assertEquals(Map.of("custom_trk", "x"), track(data.tracks.get(0)).getExtensions());
+		assertEquals(List.of("95", "91", "91"), hr(points.get(3).geometry));
+		assertEquals(Map.of("displaycolor", "Red"), track(data.tracks.get(0)).getExtensions());
 	}
 
 	@Test
@@ -202,7 +201,7 @@ public class WebGpxParserTest {
 		return (Track) ReflectionTestUtils.getField(track, "ext");
 	}
 
-	private static List<String> customPt(List<WebGpxParser.Point> geometry) {
-		return geometry.stream().map(p -> p.ext.getExtensions().get("custom_pt")).toList();
+	private static List<String> hr(List<WebGpxParser.Point> geometry) {
+		return geometry.stream().map(p -> p.ext.getExtensions().get("gpxtpx:hr")).toList();
 	}
 }
