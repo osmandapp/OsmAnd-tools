@@ -680,8 +680,12 @@ public class WebGpxParser {
             }
             trackExt.put(GPX_EXT_SHOW_ARROWS, String.valueOf(trackAppearance.showArrows));
             trackExt.put(GPX_EXT_SHOW_START_FINISH, String.valueOf(trackAppearance.showStartFinish));
-            trackExt.put(GPX_EXT_COLOR, trackAppearance.color);
-            trackExt.put(GPX_EXT_WIDTH, trackAppearance.width);
+            if (trackAppearance.color != null) {
+                trackExt.put(GPX_EXT_COLOR, trackAppearance.color);
+            }
+            if (trackAppearance.width != null) {
+                trackExt.put(GPX_EXT_WIDTH, trackAppearance.width);
+            }
         }
         return trackExt;
     }

@@ -3,6 +3,7 @@ package net.osmand.server.utils;
 import static net.osmand.server.utils.WebGpxTestData.load;
 import static net.osmand.server.utils.WebGpxTestData.sentBackJson;
 import static net.osmand.server.utils.WebGpxTestData.trackData;
+import static net.osmand.server.utils.WebGpxTestData.trackDataJson;
 import static org.junit.Assert.*;
 
 import java.io.IOException;
@@ -156,6 +157,17 @@ public class WebGpxParserTest {
 		assertEquals(before.get(1).getPoints().get(1).getExtensions(), after.get(1).getPoints().get(1).getExtensions());
 		// the end of a segment followed by another one gets the gap profile, which a rtept does not write (as the app)
 		assertNull(after.get(0).getPoints().get(1).getProfileType());
+	}
+
+	// the appearance of a track without color and width, as GpxService sends it
+	@Test
+	public void savedWithAppearanceWithoutColor() throws IOException {
+		WebGpxParser.TrackData data = GpxJson.create().fromJson(trackDataJson(GpxJson.createWithNans()),
+				WebGpxParser.TrackData.class);
+		assertNull(data.trackAppearance.color);
+		GpxFile gpxFile = new WebGpxParser().createGpxFileFromTrackData(data);
+		assertNull(GpxUtilities.INSTANCE.writeGpx(null, new Buffer(), gpxFile, null));
+		assertFalse(gpxFile.getExtensions().containsKey(WebGpxParser.GPX_EXT_COLOR));
 	}
 
 	// as /gpx/save-track-data gets the track from the web map, then loaded as the apps load the saved file
