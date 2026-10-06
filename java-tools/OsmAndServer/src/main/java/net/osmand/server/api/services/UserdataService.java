@@ -91,6 +91,16 @@ public class UserdataService {
 	@Autowired
 	ShareFileService shareFileService;
 
+	@Lazy
+	@Autowired
+	GarminConnectService garminConnectService;
+
+	@Autowired
+	GarminUserConnectionRepository garminUserConnectionRepository;
+
+	@Autowired
+	MapUserRepository mapUserRepository;
+
     @Autowired
     protected StorageService storageService;
 
@@ -112,6 +122,9 @@ public class UserdataService {
 
 	@Autowired
 	protected DeviceInAppPurchasesRepository inAppPurchasesRepo;
+
+	@Autowired
+	protected SupportersRepository supportersRepository;
 
 	@Autowired
 	JdbcTemplate jdbcTemplate;
@@ -1438,7 +1451,11 @@ public class UserdataService {
                     int numOfUsersDelete = usersRepository.deleteByEmailIgnoreCase(pu.email);
                     if (numOfUsersDelete != -1) {
 						LOG.info("Deleted (/delete-account) users with email " + pu.email + " and id " + pu.id);
+						removeEmailFromSupporters(pu.id);
 						removeUserIdFromPurchases(pu.id);
+						disconnectGarmin(pu.id);
+						shareFileService.deleteAllShareFiles(pu.id);
+						mapUserRepository.deleteAllByEmailIgnoreCase(pu.email);
                         int numOfUserDevicesDelete = devicesRepository.deleteByUserid(dev.userid);
                         if (numOfUserDevicesDelete != -1) {
 							LOG.info("Deleted (/delete-account) user devices for user " + pu.email + " and id " + pu.id);
@@ -1456,6 +1473,27 @@ public class UserdataService {
         return ResponseEntity.badRequest().body("Email doesn't match login username");
     }
 
+	private void removeEmailFromSupporters(int userId) {
+		Set<Long> supporterIds = new HashSet<>();
+		for (DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription : subscriptionsRepo.findAllByUserId(userId)) {
+			if (subscription.supporterId != null) {
+				supporterIds.add(subscription.supporterId);
+			}
+		}
+		for (DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase inAppPurchase : inAppPurchasesRepo.findByUserId(userId)) {
+			if (inAppPurchase.supporterId != null) {
+				supporterIds.add(inAppPurchase.supporterId);
+			}
+		}
+		for (SupportersRepository.Supporter supporter : supportersRepository.findAllById(supporterIds)) {
+			supporter.userEmail = null;
+			supportersRepository.save(supporter);
+		}
+		if (!supporterIds.isEmpty()) {
+			LOG.info("Removed email from supporters " + supporterIds + " for user with id " + userId);
+		}
+	}
+
 	private void removeUserIdFromPurchases(int userId) {
 		List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepo.findAllByUserId(userId);
 		if (subscriptions != null && !subscriptions.isEmpty()) {
@@ -1472,6 +1510,18 @@ public class UserdataService {
 				inAppPurchasesRepo.save(inAppPurchase);
 			}
 			LOG.info("Removed userid from in-app purchases for user with id " + userId);
+		}
+	}
+
+	private void disconnectGarmin(int userId) {
+		try {
+			garminConnectService.partnerDisconnect(userId);
+		} catch (Exception e) {
+			if (e instanceof InterruptedException) {
+				Thread.currentThread().interrupt();
+			}
+			LOG.warn("Garmin disconnect (/delete-account) failed for user with id " + userId, e);
+			garminUserConnectionRepository.deleteByUserid(userId);
 		}
 	}
 
