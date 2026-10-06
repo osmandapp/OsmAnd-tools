@@ -588,6 +588,8 @@ public class WebGpxParser {
                 GpxUtilities.PointsGroup group;
                 if (dataGroup.ext != null) {
                     group = dataGroup.ext;
+                    group.setIconName(dataGroup.iconName);
+                    group.setBackgroundType(dataGroup.backgroundType);
                     List<Wpt> wptsData = dataGroup.points;
                     for (Wpt wpt : wptsData) {
                         group.getPoints().add(convertToWptPt(wpt));

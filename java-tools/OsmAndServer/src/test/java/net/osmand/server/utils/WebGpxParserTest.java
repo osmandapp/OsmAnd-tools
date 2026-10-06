@@ -108,12 +108,14 @@ public class WebGpxParserTest {
 	}
 
 	@Test
-	public void savedGroupsKeepNameColorHidden() throws IOException {
+	public void savedGroupsAsLoaded() throws IOException {
 		Map<String, GpxUtilities.PointsGroup> before = load().getPointsGroups();
 		Map<String, GpxUtilities.PointsGroup> after = save().getPointsGroups();
 		assertEquals(before.keySet(), after.keySet());
 		for (String name : before.keySet()) {
 			assertEquals(name, before.get(name).getColor(), after.get(name).getColor());
+			assertEquals(name, before.get(name).getIconName(), after.get(name).getIconName());
+			assertEquals(name, before.get(name).getBackgroundType(), after.get(name).getBackgroundType());
 			assertEquals(name, before.get(name).getHidden(), after.get(name).getHidden());
 		}
 	}
