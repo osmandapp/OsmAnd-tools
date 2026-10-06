@@ -100,6 +100,7 @@ public class FastSpringSubscriptionsGetTest {
 		SupporterDeviceSubscription s = revalidate("subscriptions-get-deactivated.json", 1788969830287L); // 2026-09-09
 		assertFalse("deactivated subscription must be invalid", s.valid);
 		assertFalse(s.autorenewing);
+		assertEquals("expired", s.kind);
 		verify(repo).save(s);
 	}
 }

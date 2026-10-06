@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -128,11 +129,42 @@ public class HHRoutingPrepareContext {
 	public RoutingConfiguration getRoutingConfig() {
 		Builder builder = RoutingConfiguration.parseDefault();
 		RoutingMemoryLimits memoryLimit = new RoutingMemoryLimits(ROUTING_MEMORY_LIMIT, ROUTING_MEMORY_LIMIT);
-		RoutingConfiguration config = builder.build(ROUTING_PROFILE, memoryLimit, PROFILE_SETTINGS);
+		GeneralRouter router = builder.getRouter(ROUTING_PROFILE);
+		RoutingConfiguration config = builder.build(ROUTING_PROFILE, memoryLimit,
+				withDefaultParameters(router, PROFILE_SETTINGS));
 		config.planRoadDirection = 1;
 		config.heuristicCoefficient = 0; // dijkstra
 		config.ambiguousConditionalTags = ambiguousConditionalTags; // resolveAmbiguousConditionalTags
 		return config;
+	}
+
+	// Clients route with the default parameters (e.g. bicycle driving_style_balance) and HHRoutePlanner
+	// matches them to the baked profile, so shortcuts must be costed with them too.
+	// An explicit parameter replaces the defaults of its group (driving_style_prefer_unpaved drops balance).
+	static Map<String, String> withDefaultParameters(GeneralRouter router, Map<String, String> settings) {
+		Set<String> explicitGroups = new HashSet<>();
+		for (String key : settings.keySet()) {
+			GeneralRouter.RoutingParameter p = router.getParameters().get(key);
+			if (p != null && p.getGroup() != null) {
+				explicitGroups.add(p.getGroup());
+			}
+		}
+		Map<String, String> params = new TreeMap<>();
+		for (Map.Entry<String, GeneralRouter.RoutingParameter> e : router.getParameters().entrySet()) {
+			GeneralRouter.RoutingParameter p = e.getValue();
+			if (p.getGroup() != null && explicitGroups.contains(p.getGroup())) {
+				continue;
+			}
+			if (p.getType() == GeneralRouter.RoutingParameterType.BOOLEAN) {
+				if (p.getDefaultBoolean()) {
+					params.put(e.getKey(), "true");
+				}
+			} else if (p.getDefaultNumeric() > 0) {
+				params.put(e.getKey(), p.getDefaultString());
+			}
+		}
+		params.putAll(settings);
+		return params;
 	}
 
 

@@ -1,0 +1,131 @@
+<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<!-- synthetic structure, real tags and values: OsmAnd#19027 (Starbucks), OsmAnd#25226 (Test), web tests/selenium/gpx (VELO-0, track points) -->
+<gpx version="1.1" creator="OsmAnd" xmlns="http://www.topografix.com/GPX/1/1" xmlns:osmand="https://osmand.net/docs/technical/osmand-file-formats/osmand-gpx" xmlns:gpxx="http://www.garmin.com/xmlschemas/GpxExtensions/v3" xmlns:test="https://test.net">
+  <metadata>
+    <name>points-with-extensions</name>
+    <time>2023-05-01T15:14:15Z</time>
+    <extensions>
+      <osmand:activity>hiking</osmand:activity>
+    </extensions>
+  </metadata>
+  <wpt lat="52.5194036" lon="13.3887345">
+    <name>Starbucks</name>
+    <type>Cafe</type>
+    <extensions>
+      <osmand:icon>amenity_cafe</osmand:icon>
+      <osmand:color>#a71de1</osmand:color>
+      <osmand:background>circle</osmand:background>
+      <osmand:address>Friedrichstraße (Spandau), Berlin</osmand:address>
+      <osmand:amenity_opening_hours>Mo-Fr 07:00-21:00; Sa 09:00-21:00; Su 09:00-19:30</osmand:amenity_opening_hours>
+      <osmand:osm_tag_brand>Starbucks</osmand:osm_tag_brand>
+    </extensions>
+  </wpt>
+  <wpt lat="37.546087" lon="-77.4532843">
+    <name>Test</name>
+    <type>SOTM</type>
+    <extensions>
+      <osmand:icon>place_town</osmand:icon>
+      <osmand:color>#ff4e4eff</osmand:color>
+      <osmand:background>circle</osmand:background>
+      <osmand:hidden>true</osmand:hidden>
+      <test:country>United States</test:country>
+    </extensions>
+  </wpt>
+  <wpt lat="50.776637" lon="29.570159">
+    <name>VELO-0</name>
+    <desc>6/13/2016 9:32:27 PM</desc>
+  </wpt>
+  <trk>
+    <name>points-with-extensions</name>
+    <extensions>
+      <gpxx:TrackExtension>
+        <gpxx:DisplayColor>Red</gpxx:DisplayColor>
+      </gpxx:TrackExtension>
+    </extensions>
+    <trkseg>
+      <trkpt lat="50.0182977" lon="19.8901514">
+        <ele>224.6</ele>
+        <time>2023-05-01T15:14:15Z</time>
+        <extensions>
+          <osmand:hr>94</osmand:hr>
+        </extensions>
+      </trkpt>
+      <trkpt lat="50.0182957" lon="19.8901428">
+        <ele>224.6</ele>
+        <time>2023-05-01T15:14:16Z</time>
+        <extensions>
+          <osmand:hr>95</osmand:hr>
+          <osmand:speed>0.7</osmand:speed>
+        </extensions>
+      </trkpt>
+      <trkpt lat="50.018288" lon="19.8901518">
+        <ele>224.6</ele>
+        <time>2023-05-01T15:14:19Z</time>
+        <extensions>
+          <osmand:hr>96</osmand:hr>
+          <osmand:speed>0.4</osmand:speed>
+        </extensions>
+      </trkpt>
+    </trkseg>
+    <trkseg>
+      <trkpt lat="50.0182589" lon="19.8901386">
+        <ele>224.6</ele>
+        <time>2023-05-01T15:14:23Z</time>
+        <extensions>
+          <osmand:hr>95</osmand:hr>
+          <osmand:speed>0.8</osmand:speed>
+        </extensions>
+      </trkpt>
+      <trkpt lat="50.0182232" lon="19.8901328">
+        <ele>224.8</ele>
+        <time>2023-05-01T15:14:34Z</time>
+        <extensions>
+          <osmand:hr>91</osmand:hr>
+          <osmand:speed>0.4</osmand:speed>
+        </extensions>
+      </trkpt>
+      <trkpt lat="50.0182269" lon="19.8901242">
+        <ele>224.6</ele>
+        <time>2023-05-01T15:14:43Z</time>
+        <extensions>
+          <osmand:hr>91</osmand:hr>
+          <osmand:speed>0.1</osmand:speed>
+        </extensions>
+      </trkpt>
+    </trkseg>
+  </trk>
+  <rte>
+    <rtept lat="50.0182977" lon="19.8901514">
+      <extensions>
+        <osmand:profile>pedestrian</osmand:profile>
+        <osmand:trkpt_idx>0</osmand:trkpt_idx>
+      </extensions>
+    </rtept>
+    <rtept lat="50.018288" lon="19.8901518">
+      <extensions>
+        <osmand:profile>pedestrian</osmand:profile>
+        <osmand:trkpt_idx>2</osmand:trkpt_idx>
+      </extensions>
+    </rtept>
+  </rte>
+  <rte>
+    <rtept lat="50.0182589" lon="19.8901386">
+      <extensions>
+        <osmand:profile>bicycle</osmand:profile>
+        <osmand:trkpt_idx>0</osmand:trkpt_idx>
+      </extensions>
+    </rtept>
+    <rtept lat="50.0182269" lon="19.8901242">
+      <extensions>
+        <osmand:profile>bicycle</osmand:profile>
+        <osmand:trkpt_idx>2</osmand:trkpt_idx>
+      </extensions>
+    </rtept>
+  </rte>
+  <extensions>
+    <osmand:points_groups>
+      <group name="Cafe" color="#a71de1" icon="special_star" background="circle" />
+      <group name="SOTM" color="#ff4e4eff" icon="place_town" background="circle" hidden="true" />
+    </osmand:points_groups>
+  </extensions>
+</gpx>

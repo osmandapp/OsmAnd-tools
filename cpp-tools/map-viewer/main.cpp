@@ -1360,7 +1360,7 @@ void activateProvider(int layerIdx, int idx)
 //        settings.insert("OSMMapperAssistantFixme", "true");
         mapPresentationEnvironment->setSettings(settings);
 
-        auto tileProvider = new OsmAnd::MapRasterLayerProvider_Software(mapPrimitivesProvider, false, false, true);
+        auto tileProvider = new OsmAnd::MapRasterLayerProvider_Software(mapPrimitivesProvider, true, false, true);
         renderer->setMapLayerProvider(layerIdx, std::shared_ptr<OsmAnd::IMapLayerProvider>(tileProvider));
     }
     else if (idx == 3)

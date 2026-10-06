@@ -106,7 +106,7 @@ public class DownloadIndexDocument {
 		addDeletedMap("Canada_british-columbia_sunshine-coast_northamerica_2.obf.zip", DownloadType.MAP, "09.09.2026");
 		addDeletedMap("Canada_british-columbia_thompson-nicola_northamerica_2.obf.zip", DownloadType.MAP, "09.09.2026");
 		addDeletedMap("Gb_channel-islands_europe_2.obf.zip", DownloadType.MAP, "09.09.2026");
-		addDeletedMap("Hungary_europe_2.obf.zip", DownloadType.MAP, "09.09.2026");
+//		addDeletedMap("Hungary_europe_2.obf.zip", DownloadType.MAP, "09.09.2026");
 
 		addDeletedMap("Argentina_southamerica_2.road.obf.zip", DownloadType.ROAD_MAP, "09.09.2026");
 		addDeletedMap("Austria_europe_2.road.obf.zip", DownloadType.ROAD_MAP, "09.09.2026");
@@ -158,7 +158,7 @@ public class DownloadIndexDocument {
 		addDeletedMap("Germany_bayern_europe_2.road.obf.zip", DownloadType.ROAD_MAP, "09.09.2026");
 		addDeletedMap("Germany_hessen_europe_2.road.obf.zip", DownloadType.ROAD_MAP, "09.09.2026");
 		addDeletedMap("Germany_niedersachsen_europe_2.road.obf.zip", DownloadType.ROAD_MAP, "09.09.2026");
-		addDeletedMap("Hungary_europe_2.road.obf.zip", DownloadType.ROAD_MAP, "09.09.2026");
+//		addDeletedMap("Hungary_europe_2.road.obf.zip", DownloadType.ROAD_MAP, "09.09.2026");
 		addDeletedMap("Iran_asia_2.road.obf.zip", DownloadType.ROAD_MAP, "09.09.2026");
 		addDeletedMap("Japan_chubu_asia_2.road.obf.zip", DownloadType.ROAD_MAP, "09.09.2026");
 		addDeletedMap("Japan_kanto_asia_2.road.obf.zip", DownloadType.ROAD_MAP, "09.09.2026");

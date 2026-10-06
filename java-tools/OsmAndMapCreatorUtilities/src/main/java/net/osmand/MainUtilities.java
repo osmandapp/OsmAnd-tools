@@ -81,6 +81,8 @@ public class MainUtilities {
 				GenerateRegionTags.main(subArgsArray);
 			} else if (utl.equals("generate-obf-files-in-batch")) {
 				IndexBatchCreator.main(subArgsArray);
+			} else if (utl.equals("export-coastlines")) {
+				CoastlineExporter.main(subArgsArray);
 			} else if (utl.equals("generate-ocean-tile-osm")) {
 				OceanTilesCreator.createJOSMFile(subArgsArray);
 			} else if (utl.equals("generate-java-style")) {
@@ -176,6 +178,8 @@ public class MainUtilities {
 				settings.indexMap = true;
 				parseIndexCreatorArgs(subArgs, settings);
 				generateObf(subArgs, settings);
+			} else if (utl.equals("generate-single-map")) {
+				generateSingleMap(subArgs);
 			} else if (utl.equals("split-obf")) {
 				ObfRegionSplitter.main(subArgsArray);
 			} else if (utl.equals("merge-bulk-osmlive-day")) {
@@ -348,6 +352,9 @@ public class MainUtilities {
 			} else if (s.startsWith("--poi-top-index-list=")) {
 				settings.poiTopIndexUrl = s.substring(s.indexOf('=') + 1);
 				it.remove();
+			} else if (s.startsWith("--map-zooms=")) {
+				settings.mapZooms = s.substring(s.indexOf('=') + 1);
+				it.remove();
 			} else if (s.startsWith("--rendering-types=")) {
 				settings.renderingTypesFile = s.substring(s.indexOf('=') + 1);
 				it.remove();
@@ -378,9 +385,38 @@ public class MainUtilities {
 	}
 
 
+	// generate-single-map <output obf> <osm files...> [--name=REGION] [index creator options]: one map section from
+	// many osm files, the way CombineSRTMIntoFile builds contour lines
+	private static void generateSingleMap(List<String> subArgs) throws Exception {
+		IndexCreatorSettings settings = new IndexCreatorSettings();
+		settings.indexMap = true;
+		parseIndexCreatorArgs(subArgs, settings);
+		String regionName = null;
+		List<File> files = new ArrayList<>();
+		for (String s : subArgs) {
+			if (s.startsWith("--name=")) {
+				regionName = s.substring("--name=".length());
+			} else {
+				files.add(new File(s));
+			}
+		}
+		File target = files.remove(0).getAbsoluteFile();
+		IndexCreator ic = new IndexCreator(target.getParentFile(), settings);
+		ic.setDialects(DBDialect.SQLITE, DBDialect.SQLITE);
+		ic.setRegionName(regionName != null ? regionName : target.getName().substring(0, target.getName().indexOf('.')));
+		ic.setMapFileName(target.getName());
+		File nodesDB = new File(target.getParentFile(), target.getName() + "." + IndexCreator.TEMP_NODES_DB);
+		ic.setNodesDBFile(nodesDB);
+		MapZooms zooms = settings.mapZooms == null ? MapZooms.getDefault() : MapZooms.parseZooms(settings.mapZooms);
+		ic.generateIndexes(files.toArray(new File[0]), new ConsoleProgressImplementation(1), null, zooms,
+				new MapRenderingTypesEncoder(settings.renderingTypesFile, target.getName()), log, true);
+		nodesDB.delete();
+	}
+
 	public static void generateObf(List<String> subArgs, IndexCreatorSettings settings)
 			throws IOException, SQLException, InterruptedException, XmlPullParserException {
-		generateObf(subArgs, MapZooms.getDefault(), settings);
+		generateObf(subArgs, settings.mapZooms == null ? MapZooms.getDefault() : MapZooms.parseZooms(settings.mapZooms),
+				settings);
 	}
 
 	public static void generateObf(List<String> subArgs, MapZooms zooms, IndexCreatorSettings settings) throws IOException, SQLException,
@@ -466,7 +502,10 @@ public class MainUtilities {
 		System.out.println("This utility provides access to all other console utilities of OsmAnd,");
 		System.out.println("each utility has own argument list and own synopsys. Here is the list:");
 		System.out.println("\t\t generate-obf <path to osm file> <--srtm=opt-folder-with-srtm-data>: simple way to generate obf file in place. "
-				+ "\t\t\t	Another supported options generate-map, generate-address, generate-poi, generate-roads (generate obf partially)");
+				+ "\t\t\t	Another supported options generate-map, generate-address, generate-poi, generate-roads (generate obf partially)"
+				+ "; --map-zooms=13- or --map-zooms=9-10;11-12 sets the map section zoom levels");
+		System.out.println("\t\t generate-single-map <output obf> <osm files> <--name=region> <--map-zooms=...>: "
+				+ "one map section from many osm files (up to 2048), e.g. tiles of one region");
 		System.out.println("\t\t inspector <params>: powerful tool to inspect obf files and convert them to osm");
 		System.out.println("\t\t check-ocean-tile <lat> <lon> <zoom=11>: checks ocean or land tile is in bz2 list");
 		System.out.println("\t\t generate-ocean-tile <coastline osm file> <optional output file>: creates ocean tiles 12 zoom");
@@ -482,6 +521,7 @@ public class MainUtilities {
 		System.out.println("\t\t generate-osmlive-tests <path_to_directory_with_resources_project> <optional_path_to_unpack_files>: test osmand live functionality");
 		System.out.println("\t\t convert-gpx-to-obf <path_to_folder_with_gpx_files> or <path_to_gpx_file_with_file_name>: convert gpx file/files to obf file");
 		System.out.println("\t\t generate-region-tags <path to input osm file (osm, bz2, gz)> <path to output osm file>: process osm file and assign tag osmand_region_name to every entity.");
+		System.out.println("\t\t export-coastlines <dir of obf> <out dir>: writes coastline_<zoom level>.osm.bz2 with the natural=coastline of every zoom level stored in the detailed maps (World_* skipped)");
 		System.out.println("\t\t generate-ocean-tile-osm <optional path to osm file to write> <optional path to oceantiles_12.dat file>: generates ocean tiles osm file to check in JOSM ");
 		System.out.println("\t\t generate-obf-files-in-batch <path to batch.xml> <optional path to the file with regions list>: generates multiple obf files with different options");
 		System.out.println("\t\t generate-basemap <folder-with-osm-base-files> <optional mini>: generates basemap from prepared osm files");

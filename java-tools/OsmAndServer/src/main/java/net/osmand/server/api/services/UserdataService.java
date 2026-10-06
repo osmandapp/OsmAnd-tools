@@ -13,6 +13,9 @@ import java.io.OutputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -88,6 +91,16 @@ public class UserdataService {
 	@Autowired
 	ShareFileService shareFileService;
 
+	@Lazy
+	@Autowired
+	GarminConnectService garminConnectService;
+
+	@Autowired
+	GarminUserConnectionRepository garminUserConnectionRepository;
+
+	@Autowired
+	MapUserRepository mapUserRepository;
+
     @Autowired
     protected StorageService storageService;
 
@@ -109,6 +122,9 @@ public class UserdataService {
 
 	@Autowired
 	protected DeviceInAppPurchasesRepository inAppPurchasesRepo;
+
+	@Autowired
+	protected SupportersRepository supportersRepository;
 
 	@Autowired
 	JdbcTemplate jdbcTemplate;
@@ -557,6 +573,9 @@ public class UserdataService {
         }
         if (pu.token == null || !pu.token.equals(token) || pu.tokenTime == null || System.currentTimeMillis()
                 - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS)) {
+            if (isWebLinkValid(pu, token)) {
+                return ok();
+            }
             wearOutToken(pu);
             return ResponseEntity.badRequest().body("error_token");
         }
@@ -610,14 +629,18 @@ public class UserdataService {
         boolean tokenIsActive = pu.token != null && pu.tokenTime != null &&
                 (System.currentTimeMillis() - pu.tokenTime.getTime()) <
                         TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
-        if ( ! (tokenIsActive && pu.token.equals(token))) {
+        boolean webLink = TOKEN_DEVICE_WEB.equals(deviceId) && isWebLinkValid(pu, token);
+        if (webLink) {
+            pu.webLinkToken = null;
+            pu.webLinkTime = null;
+        } else if ( ! (tokenIsActive && pu.token.equals(token))) {
             wearOutToken(pu); // cut down on tries (even for web password)
             if ( ! (tokenIsActive && validateWithWebPassword(pu.id, token))) {
                 LOG.error("device-register: invalid token (" + email + ") [" + token + "]");
                 throw new OsmAndPublicApiException(ERROR_CODE_TOKEN_IS_NOT_VALID_OR_EXPIRED, "token is not valid or expired (24h)");
             }
         }
-        if (pu.token.length() < UserdataController.SPECIAL_PERMANENT_TOKEN) {
+        if (pu.token != null && pu.token.length() < UserdataController.SPECIAL_PERMANENT_TOKEN) {
         	pu.token = null;
         }
         pu.tokenTime = null;
@@ -1428,7 +1451,11 @@ public class UserdataService {
                     int numOfUsersDelete = usersRepository.deleteByEmailIgnoreCase(pu.email);
                     if (numOfUsersDelete != -1) {
 						LOG.info("Deleted (/delete-account) users with email " + pu.email + " and id " + pu.id);
+						removeEmailFromSupporters(pu.id);
 						removeUserIdFromPurchases(pu.id);
+						disconnectGarmin(pu.id);
+						shareFileService.deleteAllShareFiles(pu.id);
+						mapUserRepository.deleteAllByEmailIgnoreCase(pu.email);
                         int numOfUserDevicesDelete = devicesRepository.deleteByUserid(dev.userid);
                         if (numOfUserDevicesDelete != -1) {
 							LOG.info("Deleted (/delete-account) user devices for user " + pu.email + " and id " + pu.id);
@@ -1446,6 +1473,27 @@ public class UserdataService {
         return ResponseEntity.badRequest().body("Email doesn't match login username");
     }
 
+	private void removeEmailFromSupporters(int userId) {
+		Set<Long> supporterIds = new HashSet<>();
+		for (DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription : subscriptionsRepo.findAllByUserId(userId)) {
+			if (subscription.supporterId != null) {
+				supporterIds.add(subscription.supporterId);
+			}
+		}
+		for (DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase inAppPurchase : inAppPurchasesRepo.findByUserId(userId)) {
+			if (inAppPurchase.supporterId != null) {
+				supporterIds.add(inAppPurchase.supporterId);
+			}
+		}
+		for (SupportersRepository.Supporter supporter : supportersRepository.findAllById(supporterIds)) {
+			supporter.userEmail = null;
+			supportersRepository.save(supporter);
+		}
+		if (!supporterIds.isEmpty()) {
+			LOG.info("Removed email from supporters " + supporterIds + " for user with id " + userId);
+		}
+	}
+
 	private void removeUserIdFromPurchases(int userId) {
 		List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepo.findAllByUserId(userId);
 		if (subscriptions != null && !subscriptions.isEmpty()) {
@@ -1462,6 +1510,18 @@ public class UserdataService {
 				inAppPurchasesRepo.save(inAppPurchase);
 			}
 			LOG.info("Removed userid from in-app purchases for user with id " + userId);
+		}
+	}
+
+	private void disconnectGarmin(int userId) {
+		try {
+			garminConnectService.partnerDisconnect(userId);
+		} catch (Exception e) {
+			if (e instanceof InterruptedException) {
+				Thread.currentThread().interrupt();
+			}
+			LOG.warn("Garmin disconnect (/delete-account) failed for user with id " + userId, e);
+			garminUserConnectionRepository.deleteByUserid(userId);
 		}
 	}
 
@@ -1524,6 +1584,63 @@ public class UserdataService {
         } else {
             return ResponseEntity.badRequest().body("Token is not valid or expired (24h)");
         }
+    }
+
+    // Support creates the link, the owner gets an email that lets them cancel it.
+    // The link works only after a delay, so whoever created it can't use it before the owner can react.
+    public static final long WEB_LINK_VALID_FROM = TimeUnit.HOURS.toMillis(6);
+    public static final long WEB_LINK_VALID_TO = TimeUnit.HOURS.toMillis(72);
+    public static final String WEB_LINK_URL = "https://osmand.net/map/account/";
+
+    public Date createWebLoginLink(CloudUsersRepository.CloudUser pu) {
+        byte[] bytes = new byte[24];
+        new SecureRandom().nextBytes(bytes);
+        pu.webLinkToken = HexFormat.of().formatHex(bytes);
+        pu.webLinkTime = new Date();
+        usersRepository.saveAndFlush(pu);
+        emailSender.sendOsmAndCloudWebLinkEmail(pu.email, getWebLinkCancelUrl(pu));
+        LOG.info("web-link: created for " + EmailSenderService.shorten(pu.email));
+        return new Date(pu.webLinkTime.getTime() + WEB_LINK_VALID_FROM);
+    }
+
+    public String getWebLinkUrl(CloudUsersRepository.CloudUser pu) {
+        return WEB_LINK_URL + "?email=" + URLEncoder.encode(pu.email, StandardCharsets.UTF_8) + "&link=" + pu.webLinkToken;
+    }
+
+    private String getWebLinkCancelUrl(CloudUsersRepository.CloudUser pu) {
+        return WEB_LINK_URL + "?email=" + URLEncoder.encode(pu.email, StandardCharsets.UTF_8) + "&cancel-link="
+                + getWebLinkCancelCode(pu);
+    }
+
+    // the cancel code can't be turned back into the link token
+    private String getWebLinkCancelCode(CloudUsersRepository.CloudUser pu) {
+        try {
+            byte[] hash = MessageDigest.getInstance("SHA-256").digest(pu.webLinkToken.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash, 0, 16);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    public boolean isWebLinkValid(CloudUsersRepository.CloudUser pu, String token) {
+        if (pu.webLinkToken == null || pu.webLinkTime == null || token == null
+                || !MessageDigest.isEqual(pu.webLinkToken.getBytes(StandardCharsets.UTF_8), token.getBytes(StandardCharsets.UTF_8))) {
+            return false;
+        }
+        long age = System.currentTimeMillis() - pu.webLinkTime.getTime();
+        return age >= WEB_LINK_VALID_FROM && age <= WEB_LINK_VALID_TO;
+    }
+
+    public ResponseEntity<String> cancelWebLoginLink(String email, String cancelCode) {
+        CloudUsersRepository.CloudUser pu = email == null ? null : usersRepository.findByEmailIgnoreCase(email.trim());
+        if (pu == null || pu.webLinkToken == null || cancelCode == null || !getWebLinkCancelCode(pu).equals(cancelCode)) {
+            return ResponseEntity.badRequest().body("Link is not valid or already cancelled");
+        }
+        pu.webLinkToken = null;
+        pu.webLinkTime = null;
+        usersRepository.saveAndFlush(pu);
+        LOG.info("web-link: cancelled by owner " + EmailSenderService.shorten(pu.email));
+        return ok();
     }
 
     public void wearOutToken(CloudUsersRepository.CloudUser pu) {
