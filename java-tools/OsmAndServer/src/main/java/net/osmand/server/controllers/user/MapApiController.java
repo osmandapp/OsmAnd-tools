@@ -750,12 +750,9 @@ public class MapApiController {
 			usersRepository.saveAndFlush(pu);
 
 			// send code to new email
-			ResponseEntity<String> sent = userdataService.sendCode(emailAction, lang, pu);
-			if (sent.getStatusCode().is2xxSuccessful()) {
-				emailSender.sendOsmAndCloudAccountEmail(currentAcc.email, null, lang,
-						CloudAccountAction.EMAIL_CHANGED, EmailSenderService.maskEmail(email));
-			}
-			return sent;
+			String oldEmail = currentAcc.email;
+			return userdataService.sendCode(emailAction, lang, pu, () -> emailSender.sendOsmAndCloudAccountEmail(
+					oldEmail, null, lang, CloudAccountAction.EMAIL_CHANGED, EmailSenderService.maskEmail(email)));
 		}
 		return ResponseEntity.badRequest().body("Please enter valid email");
 	}

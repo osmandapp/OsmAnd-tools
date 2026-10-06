@@ -118,8 +118,8 @@ public class EmailSenderService {
 		}
 	}
 
-	public void sendOsmAndCloudAccountEmail(String email, String token, String lang, CloudAccountAction action) {
-		sendOsmAndCloudAccountEmail(email, token, lang, action, null);
+	public boolean sendOsmAndCloudAccountEmail(String email, String token, String lang, CloudAccountAction action) {
+		return sendOsmAndCloudAccountEmail(email, token, lang, action, null);
 	}
 
 	public void sendShareFileAccessEmail(String email, String lang, boolean approved,
@@ -237,20 +237,22 @@ public class EmailSenderService {
 		return format.format(date);
 	}
 
-	public void sendOsmAndCloudAccountEmail(String email, String token, String lang, CloudAccountAction action,
+	public boolean sendOsmAndCloudAccountEmail(String email, String token, String lang, CloudAccountAction action,
 			String newEmail) {
 		if (token == null && action != CloudAccountAction.EMAIL_CHANGED) {
 			throw new IllegalArgumentException("Token is required for " + action.name() + " email:" + shorten(email));
 		}
 		EmailSenderTemplate sender = new EmailSenderTemplate()
 				.load(action.template, lang)
-				.set("TOKEN", token == null ? "" : token);
+				.set("TOKEN", token == null ? "" : token)
+				.set("CODE_TTL_MINUTES", String.valueOf(UserdataService.CODE_EXPIRATION_TIME_MINUTES));
 		if (newEmail != null) {
 			sender.set("NEW_EMAIL", htmlText(newEmail));
 		}
 		boolean ok = sender.to(email).send().isSuccess();
 		LOGGER.info("sendOsmAndCloudAccountEmail " + action.name() + " to: " + shorten(email)
 				+ " (" + ok + ") [" + lang + "]");
+		return ok;
 	}
     
     public boolean sendPromocodesEmails(String mailTo, String templateId, String promocodes) {

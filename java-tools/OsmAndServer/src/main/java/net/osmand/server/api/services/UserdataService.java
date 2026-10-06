@@ -1482,6 +1482,12 @@ public class UserdataService {
     @Transactional
     public ResponseEntity<String> sendCode(EmailSenderService.CloudAccountAction action, String lang,
             CloudUsersRepository.CloudUser pu) {
+        return sendCode(action, lang, pu, null);
+    }
+
+    @Transactional
+    public ResponseEntity<String> sendCode(EmailSenderService.CloudAccountAction action, String lang,
+            CloudUsersRepository.CloudUser pu, Runnable onSent) {
         if (action == null) {
             return ResponseEntity.badRequest().body("Unknown action");
         }
@@ -1493,8 +1499,13 @@ public class UserdataService {
         pu.tokenTime = new Date();
         usersRepository.saveAndFlush(pu);
         String email = pu.email;
-        emailSender.sendAfterCommit(() -> emailSender.sendOsmAndCloudAccountEmail(email, token, lang, action,
-                action == EmailSenderService.CloudAccountAction.EMAIL_CHANGE ? email : null));
+        emailSender.sendAfterCommit(() -> {
+            boolean sent = emailSender.sendOsmAndCloudAccountEmail(email, token, lang, action,
+                    action == EmailSenderService.CloudAccountAction.EMAIL_CHANGE ? email : null);
+            if (sent && onSent != null) {
+                onSent.run();
+            }
+        });
 
 	    userSubService.verifyAndRefreshProOrderId(pu);
 
