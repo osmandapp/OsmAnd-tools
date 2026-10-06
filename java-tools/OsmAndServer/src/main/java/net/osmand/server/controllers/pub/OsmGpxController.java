@@ -141,6 +141,8 @@ public class OsmGpxController {
 			// the same tracks heat_build.py puts into the tiles
 			conditions.append(" AND m.date IS NOT NULL AND (length(m.simplified_geometry) > 0 OR m.activity = ?)");
 			params.add(ERROR_ACTIVITY);
+			// NaN bounds fail the bbox filter only when minlon is NaN, other such rows pass it
+			conditions.append(" AND 'NaN'::float8 NOT IN (m.minlat, m.minlon, m.maxlat, m.maxlon)");
 		} else {
 			error = addCoords(params, conditions, req.minLat(), req.maxLat(), req.minLon(), req.maxLon());
 		}
@@ -435,8 +437,9 @@ public class OsmGpxController {
 
 	// candidates come nearest rectangle first, so any radius reads at most MAX_NEAR_CANDIDATES rows
 	private NearRoutes queryRoutesNear(StringBuilder conditions, List<Object> params, double lat, double lon, double radius) {
+		// <#> sorts by the index boxes only, <-> rechecks every row on its polygon and fails on NaN bounds
 		String query = "SELECT " + ROUTE_COLUMNS + ", m.simplified_geometry FROM " + GPX_METADATA_TABLE_NAME + " m " +
-				"WHERE 1 = 1 " + conditions + " ORDER BY m.bbox <-> ST_SetSRID(ST_MakePoint(?, ?), " + SRID_WGS84 + ") LIMIT ?";
+				"WHERE 1 = 1 " + conditions + " ORDER BY m.bbox <#> ST_SetSRID(ST_MakePoint(?, ?), " + SRID_WGS84 + ") LIMIT ?";
 		List<Object> args = new ArrayList<>(params);
 		args.add(lon);
 		args.add(lat);

@@ -946,8 +946,7 @@ public class DownloadOsmGPX {
 				}
 				for (WptPt p : seg.getPoints()) {
 					WptPt last = points.isEmpty() ? null : points.get(points.size() - 1);
-					if (!(Math.abs(p.getLat()) <= 90 && Math.abs(p.getLon()) <= 180)
-							|| (Math.abs(p.getLat()) < 0.01 && Math.abs(p.getLon()) < 0.01)) {
+					if (!isValidPoint(p)) {
 						clean.invalidPoints++;
 					} else if (last != null && p.getLat() == last.getLat() && p.getLon() == last.getLon()) {
 						clean.frozenPoints++;
@@ -962,6 +961,12 @@ public class DownloadOsmGPX {
 		}
 		splitPieces(removeSpikes(points, clean), clean);
 		return clean;
+	}
+
+	// NaN fails the range check too
+	static boolean isValidPoint(WptPt p) {
+		return Math.abs(p.getLat()) <= 90 && Math.abs(p.getLon()) <= 180
+				&& !(Math.abs(p.getLat()) < 0.01 && Math.abs(p.getLon()) < 0.01);
 	}
 
 	private static List<WptPt> removeSpikes(List<WptPt> points, CleanTrack clean) {
@@ -1648,7 +1653,26 @@ public class DownloadOsmGPX {
 	private GpxFile calculateMinMaxLatLon(OsmGpxFile r) {
 		GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(new Buffer().write(r.gpx.getBytes()));
 		if (gpxFile.getError() == null) {
-			KQuadRect rect = gpxFile.getBounds(r.lat, r.lon);
+			// the bounds of the valid points only: one NaN point would make them all NaN
+			KQuadRect rect = null;
+			List<WptPt> points = new ArrayList<>(gpxFile.getAllPoints());
+			gpxFile.getRoutes().forEach(route -> points.addAll(route.getPoints()));
+			for (WptPt p : points) {
+				if (!isValidPoint(p)) {
+					continue;
+				}
+				if (rect == null) {
+					rect = new KQuadRect(p.getLon(), p.getLat(), p.getLon(), p.getLat());
+				} else {
+					rect.setLeft(Math.min(rect.getLeft(), p.getLon()));
+					rect.setRight(Math.max(rect.getRight(), p.getLon()));
+					rect.setTop(Math.max(rect.getTop(), p.getLat()));
+					rect.setBottom(Math.min(rect.getBottom(), p.getLat()));
+				}
+			}
+			if (rect == null) {
+				rect = new KQuadRect(r.lon, r.lat, r.lon, r.lat);
+			}
 			r.minlon = rect.getLeft();
 			r.minlat = rect.getBottom();
 			r.maxlon = rect.getRight();
