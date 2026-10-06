@@ -438,12 +438,17 @@ public class UserSubscriptionService {
 		}
 		List<SupporterDeviceSubscription> subscriptionList = subscriptionsRepo.findByOrderId(pu.orderid);
 		if (subscriptionList != null && !subscriptionList.isEmpty()) {
-			subscriptionList.forEach(s -> {
+			boolean linked = false;
+			for (SupporterDeviceSubscription s : subscriptionList) {
 				if (s.userId == null) {
 					s.userId = pu.id;
 					subscriptionsRepo.saveAndFlush(s);
+					linked = true;
 				}
-			});
+			}
+			if (linked) {
+				notifyPurchaseLinked(pu.id);
+			}
 			return true;
 		}
 		return false;
@@ -456,12 +461,17 @@ public class UserSubscriptionService {
 		List<SupporterDeviceInAppPurchase> inAppPurchases = inAppPurchasesRepo.findByOrderId(pu.orderid);
 		Map<String, PurchasesDataLoader.InApp> inappMap = purchasesDataLoader.getInApps();
 		if (inAppPurchases != null && !inAppPurchases.isEmpty()) {
-			inAppPurchases.forEach(s -> {
+			boolean linked = false;
+			for (SupporterDeviceInAppPurchase s : inAppPurchases) {
 				if (s.userId == null && isProInappValid(s, inappMap) == null) {
 					s.userId = pu.id;
 					inAppPurchasesRepo.saveAndFlush(s);
+					linked = true;
 				}
-			});
+			}
+			if (linked) {
+				notifyPurchaseLinked(pu.id);
+			}
 			return true;
 		}
 		return false;

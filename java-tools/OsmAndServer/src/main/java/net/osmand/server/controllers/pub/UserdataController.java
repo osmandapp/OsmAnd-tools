@@ -200,7 +200,7 @@ public class UserdataController {
 		// allow to register only with small case
 		email = email.toLowerCase().trim();
 		CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
-		boolean newUser = pu == null;
+		boolean newUser = pu == null || devicesRepository.findByUserid(pu.id).isEmpty();
 		if (!email.contains("@")) {
 			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
 		}
