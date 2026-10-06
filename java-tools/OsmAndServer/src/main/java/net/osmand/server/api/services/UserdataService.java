@@ -124,6 +124,9 @@ public class UserdataService {
 	protected DeviceInAppPurchasesRepository inAppPurchasesRepo;
 
 	@Autowired
+	protected SupportersRepository supportersRepository;
+
+	@Autowired
 	JdbcTemplate jdbcTemplate;
 
 	@Autowired
@@ -1448,6 +1451,7 @@ public class UserdataService {
                     int numOfUsersDelete = usersRepository.deleteByEmailIgnoreCase(pu.email);
                     if (numOfUsersDelete != -1) {
 						LOG.info("Deleted (/delete-account) users with email " + pu.email + " and id " + pu.id);
+						removeEmailFromSupporters(pu.id);
 						removeUserIdFromPurchases(pu.id);
 						disconnectGarmin(pu.id);
 						shareFileService.deleteAllShareFiles(pu.id);
@@ -1468,6 +1472,27 @@ public class UserdataService {
         }
         return ResponseEntity.badRequest().body("Email doesn't match login username");
     }
+
+	private void removeEmailFromSupporters(int userId) {
+		Set<Long> supporterIds = new HashSet<>();
+		for (DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription : subscriptionsRepo.findAllByUserId(userId)) {
+			if (subscription.supporterId != null) {
+				supporterIds.add(subscription.supporterId);
+			}
+		}
+		for (DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase inAppPurchase : inAppPurchasesRepo.findByUserId(userId)) {
+			if (inAppPurchase.supporterId != null) {
+				supporterIds.add(inAppPurchase.supporterId);
+			}
+		}
+		for (SupportersRepository.Supporter supporter : supportersRepository.findAllById(supporterIds)) {
+			supporter.userEmail = null;
+			supportersRepository.save(supporter);
+		}
+		if (!supporterIds.isEmpty()) {
+			LOG.info("Removed email from supporters " + supporterIds + " for user with id " + userId);
+		}
+	}
 
 	private void removeUserIdFromPurchases(int userId) {
 		List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepo.findAllByUserId(userId);
