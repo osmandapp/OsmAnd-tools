@@ -1653,14 +1653,25 @@ public class DownloadOsmGPX {
 	private GpxFile calculateMinMaxLatLon(OsmGpxFile r) {
 		GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(new Buffer().write(r.gpx.getBytes()));
 		if (gpxFile.getError() == null) {
-			// the bounds of the points cleanTrack keeps: one NaN point would make them all NaN
-			KQuadRect rect = new KQuadRect(r.lon, r.lat, r.lon, r.lat);
+			// the bounds of the valid points only: one NaN point would make them all NaN
+			KQuadRect rect = null;
 			List<WptPt> points = new ArrayList<>(gpxFile.getAllPoints());
 			gpxFile.getRoutes().forEach(route -> points.addAll(route.getPoints()));
 			for (WptPt p : points) {
-				if (isValidPoint(p)) {
-					GpxUtilities.INSTANCE.updateQR(rect, p, r.lat, r.lon);
+				if (!isValidPoint(p)) {
+					continue;
 				}
+				if (rect == null) {
+					rect = new KQuadRect(p.getLon(), p.getLat(), p.getLon(), p.getLat());
+				} else {
+					rect.setLeft(Math.min(rect.getLeft(), p.getLon()));
+					rect.setRight(Math.max(rect.getRight(), p.getLon()));
+					rect.setTop(Math.max(rect.getTop(), p.getLat()));
+					rect.setBottom(Math.min(rect.getBottom(), p.getLat()));
+				}
+			}
+			if (rect == null) {
+				rect = new KQuadRect(r.lon, r.lat, r.lon, r.lat);
 			}
 			r.minlon = rect.getLeft();
 			r.minlat = rect.getBottom();

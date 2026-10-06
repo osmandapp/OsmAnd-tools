@@ -141,7 +141,7 @@ public class OsmGpxController {
 			// the same tracks heat_build.py puts into the tiles
 			conditions.append(" AND m.date IS NOT NULL AND (length(m.simplified_geometry) > 0 OR m.activity = ?)");
 			params.add(ERROR_ACTIVITY);
-			// a NaN point of a track makes its bounds NaN, and such rows still pass the bbox filter
+			// NaN bounds fail the bbox filter only when minlon is NaN, other such rows pass it
 			conditions.append(" AND 'NaN'::float8 NOT IN (m.minlat, m.minlon, m.maxlat, m.maxlon)");
 		} else {
 			error = addCoords(params, conditions, req.minLat(), req.maxLat(), req.minLon(), req.maxLon());
