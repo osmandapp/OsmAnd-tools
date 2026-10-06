@@ -1,6 +1,6 @@
 package net.osmand.server.controllers.pub;
 
-import static net.osmand.server.utils.WebGpxTestData.trackDataJson;
+import static net.osmand.server.utils.WebGpxTestData.sentBackJson;
 import static org.junit.Assert.*;
 
 import java.io.ByteArrayOutputStream;
@@ -29,22 +29,23 @@ public class GpxControllerTest {
 	// /gpx/save-track-data: the GPX keeps the extensions of the waypoints, track points, track and metadata
 	@Test
 	public void saveTrackDataKeepsExtensions() throws IOException {
-		assertSavedTags(saveTrackData(trackDataJson(GpxJson.createWithNans())));
+		assertSavedTags(saveTrackData(sentBackJson(GpxJson.createWithNans())));
 	}
 
 	// /gpx/save-track-data: a track the web map got before GpxJson carries the extensions as flat arrays
 	@Test
 	public void saveTrackDataReadsExtensionsArray() throws IOException {
-		assertSavedTags(saveTrackData(trackDataJson(new GsonBuilder().serializeSpecialFloatingPointValues().create())));
+		assertSavedTags(saveTrackData(sentBackJson(new GsonBuilder().serializeSpecialFloatingPointValues().create())));
 	}
 
 	// /gpx/get-analysis: the track comes back with the extensions of its points
 	@Test
 	public void getAnalysisKeepsExtensions() throws IOException {
-		String json = controller().getAnalysis(gzip(trackDataJson(GpxJson.createWithNans()))).getBody();
+		String json = controller().getAnalysis(gzip(sentBackJson(GpxJson.createWithNans()))).getBody();
 		JsonObject data = new JsonParser().parse(json).getAsJsonObject().getAsJsonObject("data");
-		JsonObject trackPoint = data.getAsJsonArray("tracks").get(0).getAsJsonObject().getAsJsonArray("points").get(0)
+		JsonObject routePoint = data.getAsJsonArray("tracks").get(0).getAsJsonObject().getAsJsonArray("points").get(1)
 				.getAsJsonObject();
+		JsonObject trackPoint = routePoint.getAsJsonArray("geometry").get(0).getAsJsonObject();
 		JsonObject wpt = data.getAsJsonArray("wpts").get(0).getAsJsonObject();
 		assertEquals("p0", trackPoint.getAsJsonObject("ext").getAsJsonObject("extensions").get("custom_pt").getAsString());
 		assertEquals("hello", wpt.getAsJsonObject("ext").getAsJsonObject("extensions").get("my_note").getAsString());

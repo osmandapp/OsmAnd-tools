@@ -17,14 +17,17 @@ public class WebGpxTestData {
 
 	private static final String GPX = "points-with-extensions.gpx";
 
-	// as GpxService.buildTrackDataFromGpxFile, without the analysis
-	public static String trackDataJson(Gson gson) throws IOException {
-		GpxFile gpxFile;
+	public static GpxFile load() throws IOException {
 		try (InputStream in = WebGpxTestData.class.getResourceAsStream("/gpx/" + GPX);
 		     Buffer source = new Buffer()) {
 			source.readFrom(Objects.requireNonNull(in, GPX));
-			gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
+			return GpxUtilities.INSTANCE.loadGpxFile(source);
 		}
+	}
+
+	// as GpxService.buildTrackDataFromGpxFile, without the analysis
+	public static WebGpxParser.TrackData trackData() throws IOException {
+		GpxFile gpxFile = load();
 		WebGpxParser parser = new WebGpxParser();
 		WebGpxParser.TrackData data = new WebGpxParser.TrackData();
 		data.metaData = new WebGpxParser.WebMetaData(gpxFile.getMetadata());
@@ -33,7 +36,26 @@ public class WebGpxTestData {
 		data.tracks = tracks.getFirst();
 		data.routeTypes = tracks.getSecond();
 		data.ext = gpxFile.getExtensions();
+		if (!gpxFile.getTracks().isEmpty()) {
+			data.trackAppearance = new WebGpxParser.WebTrackAppearance(data.ext);
+		}
+		if (!gpxFile.getRoutes().isEmpty()) {
+			parser.addRoutePoints(gpxFile, data);
+		}
 		data.pointsGroups = parser.getPointsGroups(gpxFile);
+
+		return data;
+	}
+
+	public static String trackDataJson(Gson gson) throws IOException {
+		return gson.toJson(trackData());
+	}
+
+	// as prepareTrackData of the web map sends the track back to save it: without the appearance and the analysis
+	public static String sentBackJson(Gson gson) throws IOException {
+		WebGpxParser.TrackData data = trackData();
+		data.trackAppearance = null;
+		data.analysis = null;
 
 		return gson.toJson(data);
 	}

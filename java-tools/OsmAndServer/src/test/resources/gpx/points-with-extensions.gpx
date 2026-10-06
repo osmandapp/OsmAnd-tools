@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
-<gpx version="1.1" creator="OsmAnd" xmlns="http://www.topografix.com/GPX/1/1" xmlns:osmand="https://osmand.net/docs/technical/osmand-file-formats/osmand-gpx" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">
+<gpx version="1.1" creator="OsmAnd" xmlns="http://www.topografix.com/GPX/1/1" xmlns:osmand="https://osmand.net/docs/technical/osmand-file-formats/osmand-gpx" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1" xmlns:test="https://example.com/test">
   <metadata>
     <name>points-with-extensions</name>
     <time>2026-10-01T09:00:00Z</time>
@@ -14,10 +14,27 @@
     <extensions>
       <osmand:icon>cafe</osmand:icon>
       <osmand:color>#ff0000</osmand:color>
+      <osmand:background>circle</osmand:background>
+      <osmand:address>Khreshchatyk 1</osmand:address>
       <osmand:amenity_opening_hours>Mo-Fr 08:00-20:00</osmand:amenity_opening_hours>
       <osmand:osm_tag_phone>+380441234567</osmand:osm_tag_phone>
       <my_note>hello</my_note>
     </extensions>
+  </wpt>
+  <wpt lat="50.47" lon="30.54">
+    <name>Viewpoint</name>
+    <type>Nature</type>
+    <extensions>
+      <osmand:icon>special_star</osmand:icon>
+      <osmand:color>#00ff00</osmand:color>
+      <osmand:background>octagon</osmand:background>
+      <osmand:hidden>true</osmand:hidden>
+      <test:country>UA</test:country>
+    </extensions>
+  </wpt>
+  <wpt lat="50.49" lon="30.56">
+    <name>Spring</name>
+    <desc>water</desc>
   </wpt>
   <trk>
     <name>points-with-extensions</name>
@@ -45,6 +62,82 @@
           <osmand:custom_pt>p1</osmand:custom_pt>
         </extensions>
       </trkpt>
+      <trkpt lat="50.47" lon="30.54">
+        <ele>102</ele>
+        <time>2026-10-01T10:02:00Z</time>
+        <extensions>
+          <gpxtpx:TrackPointExtension>
+            <gpxtpx:hr>122</gpxtpx:hr>
+          </gpxtpx:TrackPointExtension>
+          <osmand:custom_pt>p2</osmand:custom_pt>
+        </extensions>
+      </trkpt>
+    </trkseg>
+    <trkseg>
+      <trkpt lat="50.48" lon="30.55">
+        <ele>103</ele>
+        <time>2026-10-01T11:00:00Z</time>
+        <extensions>
+          <gpxtpx:TrackPointExtension>
+            <gpxtpx:hr>130</gpxtpx:hr>
+          </gpxtpx:TrackPointExtension>
+          <osmand:custom_pt>p3</osmand:custom_pt>
+        </extensions>
+      </trkpt>
+      <trkpt lat="50.49" lon="30.56">
+        <ele>104</ele>
+        <time>2026-10-01T11:01:00Z</time>
+        <extensions>
+          <gpxtpx:TrackPointExtension>
+            <gpxtpx:hr>131</gpxtpx:hr>
+          </gpxtpx:TrackPointExtension>
+          <osmand:custom_pt>p4</osmand:custom_pt>
+        </extensions>
+      </trkpt>
+      <trkpt lat="50.50" lon="30.57">
+        <ele>105</ele>
+        <time>2026-10-01T11:02:00Z</time>
+        <extensions>
+          <gpxtpx:TrackPointExtension>
+            <gpxtpx:hr>132</gpxtpx:hr>
+          </gpxtpx:TrackPointExtension>
+          <osmand:custom_pt>p5</osmand:custom_pt>
+        </extensions>
+      </trkpt>
     </trkseg>
   </trk>
+  <rte>
+    <rtept lat="50.45" lon="30.52">
+      <extensions>
+        <osmand:profile>pedestrian</osmand:profile>
+        <osmand:trkpt_idx>0</osmand:trkpt_idx>
+      </extensions>
+    </rtept>
+    <rtept lat="50.47" lon="30.54">
+      <extensions>
+        <osmand:profile>pedestrian</osmand:profile>
+        <osmand:trkpt_idx>2</osmand:trkpt_idx>
+      </extensions>
+    </rtept>
+  </rte>
+  <rte>
+    <rtept lat="50.48" lon="30.55">
+      <extensions>
+        <osmand:profile>bicycle</osmand:profile>
+        <osmand:trkpt_idx>0</osmand:trkpt_idx>
+      </extensions>
+    </rtept>
+    <rtept lat="50.50" lon="30.57">
+      <extensions>
+        <osmand:profile>bicycle</osmand:profile>
+        <osmand:trkpt_idx>2</osmand:trkpt_idx>
+      </extensions>
+    </rtept>
+  </rte>
+  <extensions>
+    <osmand:points_groups>
+      <group name="Food" color="#ff0000" icon="cafe" background="circle" />
+      <group name="Nature" color="#00ff00" icon="special_star" background="octagon" hidden="true" />
+    </osmand:points_groups>
+  </extensions>
 </gpx>
