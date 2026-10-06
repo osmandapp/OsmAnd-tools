@@ -189,14 +189,17 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			int toIndex = nodes.indexOf(to);
 			String direction = null;
 			if (toIndex >= 0) {
+				//  "to" is the same way. 
+				//  |first----from----to---last|
 				if (toIndex != fromIndex) {
 					direction = toIndex > fromIndex ? "forward" : "backward";
 				}
 			} else if (first != null && last != null) {
-				// "to" is on another way: the road goes towards the end of this way nearest to "to"
-				// (also when "from" is that end: the road is split at "from")
-				boolean lastIsNearer = MapUtils.getDistance(last.getLatLon(), to.getLatLon()) < MapUtils.getDistance(first.getLatLon(), to.getLatLon());
-				direction = lastIsNearer ? "forward" : "backward";
+				//  "to" is on another way. we assume it connects with our current way (or it is close enough).
+				//  check which endpoint (first/last) of current way is closest for "to". we assume "to" follows in this direction.
+				//  |first1----from----last1|  -->   |first2----to----last2|
+				boolean lastNodeIsCloser = MapUtils.getDistance(last.getLatLon(), to.getLatLon()) < MapUtils.getDistance(first.getLatLon(), to.getLatLon());
+				direction = lastNodeIsCloser ? "forward" : "backward";
 			}
 			if (direction != null) {
 				pointTypes.get(from.getId()).add(routeTypes.registerRule("direction", direction).getInternalId());
