@@ -1118,11 +1118,11 @@ public class OsmAndMapsService {
 
 	/**
 	 * A boat route that mixes the water network with open water (OsmAnd-Issues #3170): the same routing context as
-	 * {@link #routing}, with {@link net.osmand.router.BoatRoutePlanner} deciding where to join open water. One leg
+	 * {@link #routing}, with {@link net.osmand.router.sea.BoatRoutePlanner} deciding where to join open water. One leg
 	 * per pair of neighbouring points.
 	 */
-	public List<net.osmand.router.BoatRoutePlanner.BoatRoute> boatRouting(String routeMode, Map<String, Object> props,
-			List<LatLon> routePoints, net.osmand.router.BoatRoutePlanner.ShoreProvider shores,
+	public List<net.osmand.router.sea.BoatRoutePlanner.BoatRoute> boatRouting(String routeMode, Map<String, Object> props,
+			List<LatLon> routePoints, net.osmand.router.sea.BoatRoutePlanner.ShoreProvider shores,
 			RouteCalculationProgress progress) throws IOException, InterruptedException {
 		LatLon start = routePoints.get(0), end = routePoints.get(routePoints.size() - 1);
 		QuadRect points = points(routePoints.subList(1, routePoints.size() - 1), start, end);
@@ -1145,10 +1145,10 @@ public class OsmAndMapsService {
 			}
 			ctx.routingTime = 0;
 			ctx.calculationProgress = progress;
-			List<net.osmand.router.BoatRoutePlanner.BoatRoute> legs = new net.osmand.router.BoatRoutePlanner(shores)
+			List<net.osmand.router.sea.BoatRoutePlanner.BoatRoute> legs = new net.osmand.router.sea.BoatRoutePlanner(shores)
 					.route(router, ctx, routePoints);
 			List<RouteSegmentResult> network = new ArrayList<>();
-			for (net.osmand.router.BoatRoutePlanner.BoatRoute leg : legs) {
+			for (net.osmand.router.sea.BoatRoutePlanner.BoatRoute leg : legs) {
 				if (leg.network != null) {
 					network.addAll(leg.network);
 				}
