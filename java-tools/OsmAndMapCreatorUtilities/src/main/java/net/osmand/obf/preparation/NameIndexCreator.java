@@ -70,6 +70,14 @@ public class NameIndexCreator<T> {
 	final Set<String> notKeyWords = new HashSet<>();
 	// map whose language group chooses the keys of names, null for the rare word rule
 	private String mapName;
+	// the keys of the names of the last object, for its alternative names (AlternativeNameIndexGenerator): the generator
+	// adds the alternative names of a name right after the names of the object
+	private T keysObject;
+	private final Map<String, NameKeys> keysOfNames = new HashMap<>();
+
+	/** Words of one name of an object and the words that became keys. */
+	public record NameKeys(List<String> words, Set<String> keys, boolean notable) {
+	}
 
 	final AlternativeNameIndexGenerator<T> alternativeNames = new AlternativeNameIndexGenerator<>(this);
 
@@ -79,7 +87,7 @@ public class NameIndexCreator<T> {
 
 	// download name of the map ("Ukraine_kyiv-city_europe"), used when COMMON_WORDS_BY_LANGUAGE and a group covers it
 	public void setMapName(String mapName) {
-		// language group of the map (CommonWordsMultiIndex.DEFAULT_GROUPS), null when no group covers it
+		// statistics group of the map (<locales> of rules.xml), null when no group covers it
 		String languageGroup = mapName == null ? null : CommonWordsMultiIndex.getInstance().getGroupId(mapName);
 		boolean covered = COMMON_WORDS_BY_LANGUAGE && languageGroup != null;
 		this.mapName = covered ? mapName : null;
@@ -421,7 +429,23 @@ public class NameIndexCreator<T> {
 		}
 	}
 	
+	/** Collects the words of keys_report.tsv (IndexCreatorSettings.keysReport). */
+	public void enableKeysReport() {
+		alternativeNames.enableKeysReport();
+	}
+
+	/** @return map whose statistics group chooses the keys of names, null when the rare word rule applies */
+	String getKeysMapName() {
+		return mapName;
+	}
+
+	/** @return the words and keys of a name of the object last given to {@link #addToNameIndex}, null if unknown */
+	NameKeys getNameKeys(T obj, String name) {
+		return obj == keysObject ? keysOfNames.get(name) : null;
+	}
+
 	public void addToNameIndex(String name, T obj, int maxPrefixLength, boolean indexNumbers) {
+		String originalName = name;
 		if (obj instanceof Street s) {
 //			if(name.startsWith("<") && name.trim().endsWith(">") && 
 //				!name.startsWith("<<")) {
@@ -437,8 +461,18 @@ public class NameIndexCreator<T> {
 		// wikidata id ("national" finds Tongass National Forest), a city; towns and villages do not
 		boolean notable = obj instanceof PoiNameObject p && (p.eloRating() >= 0 || p.wikidata())
 				|| obj instanceof City c && c.getType() == CityType.CITY;
-		Set<String> keys = mapName == null ? null
-				: new HashSet<>(CommonWordsMultiIndex.getInstance().getWordsToIndex(mapName, uniqueNames, notable));
+		// one decision for every word (rules-spec.md, 4.2): numbers and markers, notable, <class0>, classes 2 and 1
+		CommonWordsMultiIndex.KeyOutcome[] outcomes = mapName == null ? null
+				: CommonWordsMultiIndex.getInstance().selectKeys(mapName, uniqueNames, notable);
+		Set<String> keys = null;
+		if (outcomes != null) {
+			keys = new HashSet<>();
+			for (int i = 0; i < outcomes.length; i++) {
+				if (outcomes[i].key) {
+					keys.add(uniqueNames.get(i));
+				}
+			}
+		}
 		String legacyKey = null;
 		if (keys != null) {
 			// TODO remove when app versions with the legacy search (SearchCoreFactory) no longer download maps: it looks a
@@ -459,11 +493,18 @@ public class NameIndexCreator<T> {
 				break;
 			}
 		}
-		for (String token : uniqueNames) {
+		if (obj != keysObject) {
+			keysObject = obj;
+			keysOfNames.clear();
+		}
+		Set<String> nameKeys = new HashSet<>();
+		for (int i = 0; i < uniqueNames.size(); i++) {
+			String token = uniqueNames.get(i);
 			if (Algorithms.isEmpty(token)) {
 				continue;
 			}
 			if (NameIndexReader.isIndexMarker(token)) {
+				alternativeNames.decide(token, KeyDecision.NUMBER, originalName);
 				tokenFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
 				commonNonIndexedFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
 				continue;
@@ -475,9 +516,12 @@ public class NameIndexCreator<T> {
 			// a pure number is kept with the other words of the name ("6178/2.Sokak"), a number with letters is not:
 			// "33-я" of "вулиця 33-я Лінія" is the only word telling apart its Лінія streets
 			if (!indexNumbers && SearchAlgorithms.isNumber2Letters(token) && parsePureIntegerSuffix(token) != null) {
+				alternativeNames.decide(token, KeyDecision.NUMBER, originalName);
 				continue;
 			}
 			if (keys != null && !keys.contains(token)) {
+				alternativeNames.decide(token, outcomes[i] == CommonWordsMultiIndex.KeyOutcome.DROPPED_CLASS1
+						? KeyDecision.DROPPED_CLASS1 : KeyDecision.DROPPED_CLASS2, originalName);
 				// not a key of this name: kept as a reference in the common words table
 				notKeyWords.add(token);
 				tokenFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
@@ -487,7 +531,11 @@ public class NameIndexCreator<T> {
 			if (token.equals(legacyKey)) {
 				// the other words of the name still refer to it, as they did before it became a key
 				notKeyWords.add(token);
+				alternativeNames.decide(token, KeyDecision.LEGACY, originalName);
+			} else {
+				alternativeNames.decide(token, outcomes == null ? KeyDecision.KEPT : KeyDecision.of(outcomes[i]), originalName);
 			}
+			nameKeys.add(token);
 			NamedObjectsByPrefix<T> entry = namesIndex.get(prefix);
 			if (entry == null) {
 				entry = new NamedObjectsByPrefix<T>();
@@ -505,6 +553,7 @@ public class NameIndexCreator<T> {
 			}
 			
 		}		
+		keysOfNames.put(originalName, new NameKeys(allNames, nameKeys, notable));
 	}
 
 	

@@ -1,6 +1,7 @@
 package net.osmand.obf.preparation;
 
 import net.osmand.binary.BinaryMapDataObject;
+import net.osmand.binary.SearchLocales;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
 import net.osmand.map.OsmandRegions;
@@ -27,8 +28,9 @@ import java.util.*;
 
 public class IndexCreationContext {
     private static final Log log = LogFactory.getLog(IndexCreationContext.class);
-    private static final String JAPAN = "japan";
-	private static final String CHINA = "china";
+	// transliteration of names of <locales> of rules.xml (SearchLocales.translitForMap)
+	private static final String JAPANESE = "ja";
+	private static final String CHINESE = "zh";
 
     public OsmandRegions allRegions;
     public boolean basemap;
@@ -47,8 +49,9 @@ public class IndexCreationContext {
         }
         this.allRegions = prepareRegions();
 		if (regionName != null) {
-			this.translitJapaneseNames = regionName.toLowerCase().startsWith(JAPAN);
-			this.translitChineseNames = regionName.toLowerCase().startsWith(CHINA);
+			String translit = SearchLocales.translitForMap(regionName);
+			this.translitJapaneseNames = JAPANESE.equals(translit);
+			this.translitChineseNames = CHINESE.equals(translit);
             WorldRegion region = this.allRegions.getRegionDataByDownloadName(regionName);
             if (region != null) {
 				bboxFilter.initRegionQuads(region);
@@ -112,7 +115,7 @@ public class IndexCreationContext {
 	}
 
 	public void translitJapaneseNames(Entity e) {
-		if (needTranslitName(e, e.getTags(), translitJapaneseNames, JAPAN)) {
+		if (needTranslitName(e, e.getTags(), translitJapaneseNames, JAPANESE)) {
 			String ltn = e.getTag("name:ja-latn");
 			if (!Algorithms.isEmpty(ltn)) {
 				e.putTag(OSMTagKey.NAME_EN.getValue(), ltn);
@@ -124,7 +127,7 @@ public class IndexCreationContext {
 	}
 
 	public void translitChineseNames(Entity e) {
-		if (needTranslitName(e, e.getTags(), translitChineseNames, CHINA)) {
+		if (needTranslitName(e, e.getTags(), translitChineseNames, CHINESE)) {
 			try {
 				String pinyinNameTag = "name:zh_pinyin";
 				if (e.getNameTags().containsKey(pinyinNameTag)) {
@@ -139,7 +142,7 @@ public class IndexCreationContext {
 		}
 	}
 
-	private boolean needTranslitName(Entity e, Map<String, String> etags, boolean translitByRegionName, String region) {
+	private boolean needTranslitName(Entity e, Map<String, String> etags, boolean translitByRegionName, String translit) {
 		if (!Algorithms.isEmpty(etags.get(OSMTagKey.NAME_EN.getValue()))
 				|| Algorithms.isEmpty(etags.get(OSMTagKey.NAME.getValue()))) {
 			return false;
@@ -147,7 +150,12 @@ public class IndexCreationContext {
 		if (translitByRegionName) {
 			return true;
 		} else if (!Algorithms.isEmpty(etags.get(MapRenderingTypesEncoder.OSMAND_REGION_NAME_TAG))) {
-			return etags.get(MapRenderingTypesEncoder.OSMAND_REGION_NAME_TAG).contains(region);
+			String regions = etags.get(MapRenderingTypesEncoder.OSMAND_REGION_NAME_TAG);
+			for (Map.Entry<String, String> prefix : SearchLocales.translitsByPrefix().entrySet()) {
+				if (prefix.getValue().equals(translit) && regions.contains(prefix.getKey())) {
+					return true;
+				}
+			}
 		}
 		return false;
 	}

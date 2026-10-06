@@ -774,6 +774,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 		NameIndexCreator<PoiNameObject> namesIndex = new NameIndexCreator<>(CommonWords.getPoiInstance());
 		namesIndex.setMapName(settings.nameIndexMapName != null ? settings.nameIndexMapName : regionName);
+		if (settings.keysReport) {
+			namesIndex.enableKeysReport();
+		}
 
 		int zoomToStart = ZOOM_TO_SAVE_START;
 		IntBbox bbox = new IntBbox();

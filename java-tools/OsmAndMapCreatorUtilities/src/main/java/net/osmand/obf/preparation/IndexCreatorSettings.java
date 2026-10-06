@@ -80,6 +80,9 @@ public class IndexCreatorSettings {
 	// download name of the map whose language group chooses the keys of names, null for the region name
 	public String nameIndexMapName;
 
+	// writes <obf>.keys_report.tsv: the decision on every word with a class (KeyDecision), to measure search rules
+	public boolean keysReport = false;
+
 	public boolean keepOnlyRouteRelationObjects;
 
 	public boolean indexMultipolygon = true;

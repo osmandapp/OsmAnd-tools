@@ -27,6 +27,7 @@ import rtree.RTreeException;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Iterator;
@@ -483,7 +484,8 @@ public class IndexCreator {
 			writer.close();
 			mapRAFile.close();
 			log.info("Finish writing binary file"); //$NON-NLS-1$
-			print(mapFile, null, settings.indexPOI ? poiCreator != null ? poiCreator.getAlternativeNameStats() : null : null);
+			print(mapFile, null, settings.indexPOI ? poiCreator != null ? poiCreator.getAlternativeNameStats() : null : null,
+					settings.keysReport);
 		} catch (RuntimeException e) {
 			log.error("Log exception", e); //$NON-NLS-1$
 			throw e;
@@ -677,7 +679,7 @@ public class IndexCreator {
 				mapRAFile.close();
 				log.info("Finish writing binary file"); //$NON-NLS-1$
 				print(mapFile, settings.indexAddress ? indexAddressCreator.getAlternativeNameStats() : null,
-						settings.indexPOI ? indexPoiCreator.getAlternativeNameStats() : null);
+						settings.indexPOI ? indexPoiCreator.getAlternativeNameStats() : null, settings.keysReport);
 			}
 		} catch (RuntimeException e) {
 			log.error("Log exception", e); //$NON-NLS-1$
@@ -851,9 +853,10 @@ public class IndexCreator {
 		progress.setGeneralProgress(genProgress);
 	}
 
-	// one line per OBF to monitor how alternative names (rules*.xml, unglued words) grow the name indexes
+	// one line per OBF to monitor the keys of names (KeyDecision) and how alternative names (rules*.xml, unglued words)
+	// grow the name indexes; keysReport writes the decisions on the words with a class next to the OBF
 	private static void print(File mapFile, AlternativeNameIndexGenerator.Stats address,
-	                          AlternativeNameIndexGenerator.Stats poi) {
+	                          AlternativeNameIndexGenerator.Stats poi, boolean keysReport) {
 		AlternativeNameIndexGenerator.Stats total = new AlternativeNameIndexGenerator.Stats();
 		StringBuilder line = new StringBuilder("ALTERNATIVE_NAMES_STATS: ").append(mapFile.getName())
 				.append(" size=").append(mapFile.length());
@@ -868,6 +871,20 @@ public class IndexCreator {
 		line.append(", total [").append(total).append("]");
 		line.append(", by rule [").append(total.byRuleString()).append("]");
 		log.info(line.toString());
+		if (keysReport) {
+			File report = new File(mapFile.getParentFile(), mapFile.getName() + ".keys_report.tsv");
+			try (Writer out = new OutputStreamWriter(new FileOutputStream(report), StandardCharsets.UTF_8)) {
+				out.write(String.join("\t", "index", "word", "class", "source", "decision", "count", "example") + "\n");
+				if (address != null) {
+					address.writeKeysReport("address", out);
+				}
+				if (poi != null) {
+					poi.writeKeysReport("poi", out);
+				}
+			} catch (IOException e) {
+				log.error("Cannot write " + report, e);
+			}
+		}
 	}
 
 	public static void main(String[] args)

@@ -1,5 +1,6 @@
 package net.osmand.obf.preparation;
 
+import net.osmand.binary.CommonWords;
 import net.osmand.data.Street;
 import org.junit.Test;
 
@@ -56,11 +57,34 @@ public class AlternativeNameRulesTest {
 		assertTrue(names.words.contains("bahnhofstr"));
 	}
 
+	@Test
+	public void wordOfAnAlternativeNameIsAKeyByItsOwnClass() {
+		// "strada" and "statale" are service words of the Italian group: the name is found by "tonale" only
+		Capture names = new Capture(CommonWords.getAddrInstance());
+		names.setMapName("Italy_lombardia_europe");
+		Street street = new Street(null);
+		names.addToNameIndex("Strada Statale 42 del Tonale", street, 4, false);
+		names.addAlternativeNamesToNameIndex("Strada Statale 42 del Tonale", null, street, 4);
+		AlternativeNameIndexGenerator.Stats stats = names.getAlternativeNameStats();
+		assertTrue(stats.decisions(KeyDecision.DROPPED_CLASS1) >= 2);
+		// "SS42" and "SS" are keys although the words they replace are not
+		assertTrue(names.words.contains("ss42"));
+		assertTrue(names.words.contains("ss"));
+		assertEquals(2, stats.decisions(KeyDecision.ALT));
+		// "del" of the alternative names keeps the decision of the name
+		assertTrue(stats.decisions(KeyDecision.ALT_SHADOWED) >= 1);
+		assertFalse(names.words.contains("del"));
+	}
+
 	private static class Capture extends NameIndexCreator<Street> {
 		final Set<String> words = new HashSet<>();
 
 		Capture() {
 			super(null);
+		}
+
+		Capture(CommonWords commonWords) {
+			super(commonWords);
 		}
 
 		@Override

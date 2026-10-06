@@ -2,6 +2,7 @@ package net.osmand.obf.preparation;
 
 import static org.junit.Assert.assertEquals;
 
+import net.osmand.binary.SearchVariantRules;
 import org.junit.Test;
 
 public class UnglueNameTest {
@@ -100,6 +101,7 @@ public class UnglueNameTest {
 	}
 
 	private static void check(String name, String expected) {
-		assertEquals(name, expected, new AlternativeNameIndexGenerator.UnglueRule().alternativeName(name, null, null));
+		// <unglue> of rules.xml applies to the names of every locale
+		assertEquals(name, expected, SearchVariantRules.forLocale("").unglue(name));
 	}
 }
