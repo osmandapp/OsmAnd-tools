@@ -643,7 +643,7 @@ public class WebGpxParser {
                                 routePoint.getExtensionsToWrite().put(PROFILE_TYPE_EXTENSION, String.valueOf(point.profile));
                             }
                             allPoints += geo.isEmpty() ? 0 : geo.size();
-                            boolean isLast = i == t.points.size() - 1;
+                            boolean isLast = i == t.points.size() - 1 || t.points.get(i + 1).geometry.isEmpty();
                             //for last rtept trkpt_idx = last index of trkpt points
                             int ind = isLast ? allPoints - 1 : allPoints;
                             routePoint.getExtensionsToWrite().put(TRKPT_INDEX_EXTENSION, String.valueOf(allPoints == 0 ? 0 : ind));

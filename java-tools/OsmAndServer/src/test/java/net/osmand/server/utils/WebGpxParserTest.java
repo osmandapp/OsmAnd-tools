@@ -149,10 +149,13 @@ public class WebGpxParserTest {
 			for (int i = 0; i < b.size(); i++) {
 				assertEquals(b.get(i).getLat(), a.get(i).getLat(), 0);
 				assertEquals(b.get(i).getLon(), a.get(i).getLon(), 0);
+				assertEquals(r + ":" + i, b.get(i).getTrkPtIndex(), a.get(i).getTrkPtIndex());
 			}
 			assertEquals(b.get(0).getExtensions(), a.get(0).getExtensions());
 		}
 		assertEquals(before.get(1).getPoints().get(1).getExtensions(), after.get(1).getPoints().get(1).getExtensions());
+		// the end of a segment followed by another one gets the gap profile, which a rtept does not write (as the app)
+		assertNull(after.get(0).getPoints().get(1).getProfileType());
 	}
 
 	// as /gpx/save-track-data gets the track from the web map, then loaded as the apps load the saved file
