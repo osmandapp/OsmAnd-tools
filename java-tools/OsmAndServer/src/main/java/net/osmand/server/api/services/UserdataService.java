@@ -91,6 +91,13 @@ public class UserdataService {
 	@Autowired
 	ShareFileService shareFileService;
 
+	@Lazy
+	@Autowired
+	GarminConnectService garminConnectService;
+
+	@Autowired
+	GarminUserConnectionRepository garminUserConnectionRepository;
+
     @Autowired
     protected StorageService storageService;
 
@@ -1439,6 +1446,7 @@ public class UserdataService {
                     if (numOfUsersDelete != -1) {
 						LOG.info("Deleted (/delete-account) users with email " + pu.email + " and id " + pu.id);
 						removeUserIdFromPurchases(pu.id);
+						disconnectGarmin(pu.id);
                         int numOfUserDevicesDelete = devicesRepository.deleteByUserid(dev.userid);
                         if (numOfUserDevicesDelete != -1) {
 							LOG.info("Deleted (/delete-account) user devices for user " + pu.email + " and id " + pu.id);
@@ -1472,6 +1480,18 @@ public class UserdataService {
 				inAppPurchasesRepo.save(inAppPurchase);
 			}
 			LOG.info("Removed userid from in-app purchases for user with id " + userId);
+		}
+	}
+
+	private void disconnectGarmin(int userId) {
+		try {
+			garminConnectService.partnerDisconnect(userId);
+		} catch (Exception e) {
+			if (e instanceof InterruptedException) {
+				Thread.currentThread().interrupt();
+			}
+			LOG.warn("Garmin disconnect (/delete-account) failed for user with id " + userId, e);
+			garminUserConnectionRepository.deleteById(userId);
 		}
 	}
 
