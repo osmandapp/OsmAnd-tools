@@ -9,6 +9,7 @@ import net.osmand.server.api.services.GpxService;
 import net.osmand.server.osmgpx.ActivityClassifier;
 import net.osmand.server.osmgpx.GarbageClassifier;
 import net.osmand.server.osmgpx.TrackSimplifyEncoder;
+import net.osmand.server.utils.GpxJson;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
@@ -66,7 +67,7 @@ public class OsmGpxController {
 	Gson gson = new GsonBuilder().create();
 
 	protected static final Log LOGGER = LogFactory.getLog(OsmGpxController.class);
-	Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
+	Gson gsonWithNans = GpxJson.createWithNans();
 
 	Map<String, RouteFile> routesCache = new ConcurrentHashMap<>();
 
