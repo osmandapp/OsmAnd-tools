@@ -2,7 +2,6 @@ package net.osmand.server.api.services;
 
 import com.google.gson.*;
 import jakarta.annotation.Nullable;
-import jakarta.transaction.Transactional;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFile;
@@ -367,7 +366,6 @@ public class GarminConnectService {
 		}
 	}
 
-	@Transactional(Transactional.TxType.NOT_SUPPORTED)
 	public PartnerDisconnectResult partnerDisconnect(int userid) throws IOException, InterruptedException {
 		GarminUserConnectionRepository.GarminUserConnection row = garminUserConnectionRepository.findByUserid(userid);
 		if (row == null) {
@@ -388,7 +386,7 @@ public class GarminConnectService {
 		if (code / 100 != 2 && code != 404) {
 			LOG.warn("Garmin DELETE user/registration failed: HTTP " + code + " " + res.body());
 		}
-		garminUserConnectionRepository.delete(row);
+		garminUserConnectionRepository.deleteByUserid(userid);
 		return PartnerDisconnectResult.OK;
 	}
 

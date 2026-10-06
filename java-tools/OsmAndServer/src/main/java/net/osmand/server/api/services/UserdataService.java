@@ -1521,7 +1521,7 @@ public class UserdataService {
 				Thread.currentThread().interrupt();
 			}
 			LOG.warn("Garmin disconnect (/delete-account) failed for user with id " + userId, e);
-			garminUserConnectionRepository.deleteById(userId);
+			garminUserConnectionRepository.deleteByUserid(userId);
 		}
 	}
 
