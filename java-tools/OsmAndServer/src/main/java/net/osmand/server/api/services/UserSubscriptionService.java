@@ -503,7 +503,8 @@ public class UserSubscriptionService {
 		String productName;
 		List<SupporterDeviceSubscription> subscriptions = subscriptionsRepo.findByUserIdAndValidTrue(newUserId);
 		List<SupporterDeviceInAppPurchase> purchases = inAppPurchasesRepo.findByUserIdAndValidTrue(newUserId);
-		if (!subscriptions.isEmpty()) {
+		boolean subscription = !subscriptions.isEmpty();
+		if (subscription) {
 			SupporterDeviceSubscription sub = subscriptions.get(0);
 			PurchasesDataLoader.Subscription skuData = purchasesDataLoader.getSubscriptions().get(sub.sku);
 			productName = skuData != null ? skuData.name() : sub.sku;
@@ -516,7 +517,8 @@ public class UserSubscriptionService {
 		}
 		emailSender.sendAfterCommit(() -> {
 			try {
-				emailSender.sendPurchaseLinkedEmail(newUser.email, emailSender.userLang(newUserId), productName);
+				emailSender.sendPurchaseLinkedEmail(newUser.email, emailSender.userLang(newUserId), productName,
+						subscription);
 			} catch (Exception e) {
 				LOG.error("Failed to send purchase linked email: " + e.getMessage(), e);
 			}

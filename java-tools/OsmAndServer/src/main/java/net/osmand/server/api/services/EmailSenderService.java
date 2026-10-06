@@ -199,7 +199,6 @@ public class EmailSenderService {
 		} else {
 			return;
 		}
-		String productShort = productName.startsWith("OsmAnd ") ? productName.substring("OsmAnd ".length()) : productName;
 		EmailSenderTemplate sender = new EmailSenderTemplate()
 				.load("cloud/purchase/receipt", lang)
 				.set("EMAIL", htmlText(email))
@@ -207,7 +206,7 @@ public class EmailSenderService {
 				.set("ORDER_DATE", htmlText(formatReceiptDate(orderDate, lang)))
 				.set("ORDER_TOTAL", orderTotal == null ? "&mdash;" : htmlText(orderTotal))
 				.set("PRODUCT_NAME", htmlText(productName))
-				.set("PRODUCT_SHORT", htmlText(productShort))
+				.set("PRODUCT_SHORT", htmlText(productShort(productName)))
 				.set("PLAN_NAME", planName)
 				.set("RECEIPT_PLAN_COUNT", planCount);
 		if (renewalDate != null) {
@@ -219,15 +218,24 @@ public class EmailSenderService {
 		LOGGER.info("sendPurchaseReceiptEmail order " + orderId + " to: " + shorten(email) + " (" + ok + ") [" + lang + "]");
 	}
 
-	public void sendPurchaseLinkedEmail(String email, String lang, String productName) {
+	public void sendPurchaseLinkedEmail(String email, String lang, String productName, boolean subscription) {
+		String kind = subscription ? "_SUBSCRIPTION@" : "_PURCHASE@";
 		boolean ok = new EmailSenderTemplate()
 				.load("cloud/purchase/linked", lang)
+				.set("LINKED_PREHEADER", "@LINKED_PREHEADER" + kind)
+				.set("LINKED_INTRO", "@LINKED_INTRO" + kind)
+				.set("LINKED_FEATURES", "@LINKED_FEATURES" + kind)
+				.set("PRODUCT_SHORT", htmlText(productShort(productName)))
 				.set("EMAIL", htmlText(email))
 				.set("PRODUCT_NAME", htmlText(productName))
 				.to(email)
 				.send()
 				.isSuccess();
 		LOGGER.info("sendPurchaseLinkedEmail to: " + shorten(email) + " (" + ok + ") [" + lang + "]");
+	}
+
+	private static String productShort(String productName) {
+		return productName.startsWith("OsmAnd ") ? productName.substring("OsmAnd ".length()) : productName;
 	}
 
 	private static String formatReceiptDate(Date date, String lang) {
