@@ -225,8 +225,10 @@ public class UserdataController {
 			// see comment on constant
 			pu.token = (new Random().nextInt(8999) + 1000) + "";
 			// TODO iOS: add lang in OARegisterUserCommand.m before sendRequestWithUrl params[@"lang"] = ...
-			emailSender.sendOsmAndCloudAccountEmail(pu.email, pu.token, lang,
-					newUser ? CloudAccountAction.SETUP : CloudAccountAction.LOGIN);
+			String regEmail = pu.email;
+			String regToken = pu.token;
+			CloudAccountAction action = newUser ? CloudAccountAction.SETUP : CloudAccountAction.LOGIN;
+			emailSender.sendAfterCommit(() -> emailSender.sendOsmAndCloudAccountEmail(regEmail, regToken, lang, action));
 		}
 		CloudUser saved = usersRepository.saveAndFlush(pu);
 	    if (orderid != null) {

@@ -1489,11 +1489,12 @@ public class UserdataService {
             return ResponseEntity.badRequest().body("Email is not registered");
         }
         String token = (new Random().nextInt(8999) + 1000) + "";
-        emailSender.sendOsmAndCloudAccountEmail(pu.email, token, lang, action,
-                action == EmailSenderService.CloudAccountAction.EMAIL_CHANGE ? pu.email : null);
         pu.token = token;
         pu.tokenTime = new Date();
         usersRepository.saveAndFlush(pu);
+        String email = pu.email;
+        emailSender.sendAfterCommit(() -> emailSender.sendOsmAndCloudAccountEmail(email, token, lang, action,
+                action == EmailSenderService.CloudAccountAction.EMAIL_CHANGE ? email : null));
 
 	    userSubService.verifyAndRefreshProOrderId(pu);
 

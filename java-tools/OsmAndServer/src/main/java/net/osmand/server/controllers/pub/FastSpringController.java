@@ -152,7 +152,7 @@ public class FastSpringController {
 
 			if (sendOsmAndAndSpecialGiftEmail) {
 				LOGGER.info("FastSpring: Sending special gift email to " + EmailSenderService.shorten(email) + " for orderId: " + data.order + ", purchaseToken: " + data.reference);
-				emailSender.sendOsmAndSpecialGiftEmail(email);
+				emailSender.sendAfterCommit(() -> emailSender.sendOsmAndSpecialGiftEmail(email));
 			}
 		} else {
 			LOGGER.error("FastSpring: User not found for email " + EmailSenderService.shorten(email) + " orderId: " + data.order + ", purchaseToken: " + data.reference);
