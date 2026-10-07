@@ -1,8 +1,12 @@
 package net.osmand.server.api.services;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
@@ -14,6 +18,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import com.google.common.cache.Cache;
 
+import net.osmand.server.api.repo.CloudUserDevicesRepository;
+import net.osmand.server.api.repo.CloudUsersRepository;
 import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
 
 @RunWith(Parameterized.class)
@@ -55,7 +61,7 @@ public class UserdataServiceEmailTokenTest {
     public int expectedDigits;
 
     @Test
-    public void delayAndDigitsDependOnUserCountAndResendPreservesToken() {
+    public void tokensScaleWithLoadAndAreReplacedAfterSuccessfulLogin() {
         UserdataService service = new UserdataService();
         Cache<?, ?> cache = (Cache<?, ?>) ReflectionTestUtils.getField(service, "emailTokenRequests");
         for (int i = 0; i < cachedUsers; i++) {
@@ -78,6 +84,25 @@ public class UserdataServiceEmailTokenTest {
         assertSame(tokenTime, user.tokenTime);
         assertSame(cachedToken, cache.getIfPresent(user.email));
         assertEquals(cachedUsers + 1, cache.size());
+
+        service.usersRepository = mock(CloudUsersRepository.class);
+        service.devicesRepository = mock(CloudUserDevicesRepository.class);
+        service.userSubService = mock(UserSubscriptionService.class);
+        when(service.usersRepository.findByEmailIgnoreCase(user.email)).thenReturn(user);
+
+        assertEquals(400, service.validateToken(user.email, "").getStatusCode().value());
+        assertSame(cachedToken, cache.getIfPresent(user.email));
+
+        service.registerNewDevice(user.email, token, null, "access-token", "en", null, null);
+        assertNull(user.token);
+        assertNull(user.tokenTime);
+        assertNull(cache.getIfPresent(user.email));
+        assertEquals(cachedUsers, cache.size());
+
+        service.updateSecureEmailToken(user);
+        assertNotNull(user.tokenTime);
+        assertNotNull(cache.getIfPresent(user.email));
+        assertEquals(expectedDigits, user.token.length());
     }
 
     private static CloudUser user(String email) {
