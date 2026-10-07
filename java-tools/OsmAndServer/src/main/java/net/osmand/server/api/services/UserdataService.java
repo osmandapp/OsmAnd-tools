@@ -179,10 +179,15 @@ public class UserdataService {
             .expireAfterWrite(24, TimeUnit.HOURS)
             .build();
 
+    private static final int EMAIL_TOKEN_MIN_DIGITS = 6;
+    private static final int EMAIL_TOKEN_MAX_DIGITS = 12;
+
     private static final int EMAIL_TOKEN_EXPIRATION_HOURS = 24;
     private static final int EMAIL_TOKEN_MIN_DELAY_MINUTES = 10;
     private static final int EMAIL_TOKEN_MAX_DELAY_MINUTES = 60;
+
     private static final int EMAIL_TOKEN_AVG_HOURLY_USERS = 100; // 5x reserve
+
     private final Cache<String, SecureEmailToken> emailTokenRequests = CacheBuilder.newBuilder()
             .expireAfterWrite(EMAIL_TOKEN_MAX_DELAY_MINUTES, TimeUnit.MINUTES)
             .build();
@@ -523,10 +528,13 @@ public class UserdataService {
         long now = System.currentTimeMillis();
         SecureEmailToken token = emailTokenRequests.getIfPresent(email);
         if (token == null || token.nextAllowedAt() <= now) {
-            // More emails issued tokens in the last hour increase the per-email pause from 10 to 60 minutes.
+            // More emails issued tokens in the last hour increase the delay and token length.
+            long users = emailTokenRequests.size();
             long delayMinutes = Math.min(EMAIL_TOKEN_MAX_DELAY_MINUTES, Math.max(EMAIL_TOKEN_MIN_DELAY_MINUTES,
-                    EMAIL_TOKEN_MIN_DELAY_MINUTES * emailTokenRequests.size() / EMAIL_TOKEN_AVG_HOURLY_USERS));
-            token = new SecureEmailToken(generateEmailToken(6), now + TimeUnit.MINUTES.toMillis(delayMinutes));
+                    EMAIL_TOKEN_MIN_DELAY_MINUTES * users / EMAIL_TOKEN_AVG_HOURLY_USERS));
+            int digits = (int) Math.min(EMAIL_TOKEN_MAX_DIGITS, Math.max(EMAIL_TOKEN_MIN_DIGITS,
+                    EMAIL_TOKEN_MIN_DIGITS * users / EMAIL_TOKEN_AVG_HOURLY_USERS));
+            token = new SecureEmailToken(generateEmailToken(digits), now + TimeUnit.MINUTES.toMillis(delayMinutes));
             emailTokenRequests.put(email, token);
             user.tokenTime = new Date(now);
         }

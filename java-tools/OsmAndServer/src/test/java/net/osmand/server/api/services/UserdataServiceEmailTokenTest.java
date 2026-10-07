@@ -19,23 +19,29 @@ import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
 @RunWith(Parameterized.class)
 public class UserdataServiceEmailTokenTest {
 
-    @Parameterized.Parameters(name = "{0} cached users -> {1} minutes")
-    public static Object[][] usersAndDelay() {
+    @Parameterized.Parameters(name = "{0} cached users -> {1} minutes, {2} digits")
+    public static Object[][] usersDelayAndDigits() {
         // Users already in the cache before issuing the next user's token.
         return new Object[][] {
-                {0, 10},
-                {50, 10},
-                {100, 10},
-                {109, 10},
-                {110, 11},
-                {150, 15},
-                {200, 20},
-                {300, 30},
-                {400, 40},
-                {500, 50},
-                {599, 59},
-                {600, 60},
-                {1000, 60}
+                {0, 10, 6},
+                {50, 10, 6},
+                {100, 10, 6},
+                {109, 10, 6},
+                {110, 11, 6},
+                {116, 11, 6},
+                {117, 11, 7},
+                {134, 13, 8},
+                {150, 15, 9},
+                {167, 16, 10},
+                {184, 18, 11},
+                {199, 19, 11},
+                {200, 20, 12},
+                {300, 30, 12},
+                {400, 40, 12},
+                {500, 50, 12},
+                {599, 59, 12},
+                {600, 60, 12},
+                {1000, 60, 12}
         };
     }
 
@@ -45,8 +51,11 @@ public class UserdataServiceEmailTokenTest {
     @Parameterized.Parameter(1)
     public int expectedDelayMinutes;
 
+    @Parameterized.Parameter(2)
+    public int expectedDigits;
+
     @Test
-    public void delayDependsOnUserCountAndResendPreservesToken() {
+    public void delayAndDigitsDependOnUserCountAndResendPreservesToken() {
         UserdataService service = new UserdataService();
         Cache<?, ?> cache = (Cache<?, ?>) ReflectionTestUtils.getField(service, "emailTokenRequests");
         for (int i = 0; i < cachedUsers; i++) {
@@ -59,7 +68,8 @@ public class UserdataServiceEmailTokenTest {
         Object cachedToken = cache.getIfPresent(user.email);
         long nextAllowedAt = (long) ReflectionTestUtils.getField(cachedToken, "nextAllowedAt");
         assertEquals(TimeUnit.MINUTES.toMillis(expectedDelayMinutes), nextAllowedAt - user.tokenTime.getTime());
-        assertTrue(user.token.matches("[1-9][0-9]{5}"));
+        assertEquals(expectedDigits, user.token.length());
+        assertTrue(user.token.matches("[1-9][0-9]*"));
 
         String token = user.token;
         Date tokenTime = user.tokenTime;
