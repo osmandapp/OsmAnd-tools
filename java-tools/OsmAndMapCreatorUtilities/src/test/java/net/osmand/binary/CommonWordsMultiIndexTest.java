@@ -113,6 +113,42 @@ public class CommonWordsMultiIndexTest {
 	}
 
 	@Test
+	public void groupOfAMapIsTheGroupOfItsLocale() {
+		// one table decides: a prefix without a group has none, whatever a shorter prefix has (rules-spec.md, 2)
+		CommonWordsMultiIndex real = CommonWordsMultiIndex.getInstance();
+		for (String prefix : SearchVariantRules.localeTable().groups().keySet()) {
+			String map = prefix + "_test_europe_2.obf";
+			Assert.assertEquals(map, SearchLocales.groupForMap(map), real.getGroupId(map));
+		}
+		Assert.assertNull(real.getGroupId("Zzqx_europe_2.obf"));
+	}
+
+	@Test
+	public void groupOfTheStatisticsIsAGroupOfTheRules() {
+		String data = "word\tzzq\t2\t100\tbas\n";
+		try {
+			CommonWordsMultiIndex.load(new ByteArrayInputStream(data.getBytes(StandardCharsets.UTF_8)));
+			Assert.fail("a group of the statistics is declared in <locales>");
+		} catch (IllegalStateException | IOException e) {
+			Assert.assertTrue(e.getMessage(), e.getMessage().contains("'zzq'"));
+		}
+	}
+
+	@Test
+	public void ownerOfANameIsOneDefinition() {
+		Assert.assertEquals(RuleOwner.STREET, RuleOwner.ofAtomType(BinaryMapAddressReaderAdapter.CityBlocks.STREET_TYPE.index));
+		// a building has the name of its street
+		Assert.assertEquals(RuleOwner.STREET, RuleOwner.ofAtomType(net.osmand.search.core.spatial.SpatialSearchToken.BUILDING_TYPE));
+		Assert.assertEquals(RuleOwner.POI, RuleOwner.ofAtomType(net.osmand.search.core.spatial.SpatialSearchToken.POI_REF_TYPE));
+		Assert.assertEquals(RuleOwner.BOUNDARY, RuleOwner.ofAtomType(BinaryMapAddressReaderAdapter.CityBlocks.BOUNDARY_TYPE.index));
+		Assert.assertEquals(RuleOwner.POSTCODE, RuleOwner.ofAtomType(BinaryMapAddressReaderAdapter.CityBlocks.POSTCODES_TYPE.index));
+		Assert.assertEquals(RuleOwner.LOCALITY, RuleOwner.ofAtomType(BinaryMapAddressReaderAdapter.CityBlocks.VILLAGES_TYPE.index));
+		Assert.assertEquals(RuleOwner.POSTCODE, RuleOwner.of(net.osmand.data.City.CityType.POSTCODE));
+		Assert.assertEquals(RuleOwner.LOCALITY, RuleOwner.of(net.osmand.data.City.CityType.TOWN));
+		Assert.assertEquals(RuleOwner.STREET, RuleOwner.of(new net.osmand.data.Street(null)));
+	}
+
+	@Test
 	public void mapWithoutGroupKeepsEveryWord() {
 		List<String> words = List.of("rue", "de", "la", "paix");
 		Assert.assertSame(words, index.getWordsToIndex("Us_texas_northamerica_2.obf", words));

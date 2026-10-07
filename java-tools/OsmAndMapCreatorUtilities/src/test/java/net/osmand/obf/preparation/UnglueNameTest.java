@@ -5,6 +5,9 @@ import static org.junit.Assert.assertEquals;
 import net.osmand.binary.SearchVariantRules;
 import org.junit.Test;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class UnglueNameTest {
 
 	@Test
@@ -54,7 +57,8 @@ public class UnglueNameTest {
 		check("П.И.Чайковский", "Чайковский");
 		check("Будинок творчості А. Ерделі", "Будинок творчості Ерделі");
 		check("ФАП с.Коноплівці", "ФАП Коноплівці");
-		check("Wijkopenauto's.nl", "Wijkopenauto nl");
+		// every <unglue> splits the name itself
+		check("Wijkopenauto's.nl", "Wijkopenauto's nl", "Wijkopenauto s.nl");
 	}
 
 	@Test
@@ -100,8 +104,14 @@ public class UnglueNameTest {
 		check("Colegio / Col·legi Santa Ana", null);
 	}
 
-	private static void check(String name, String expected) {
+	private static void check(String name, String... expected) {
 		// <unglue> of rules.xml applies to the names of every locale
-		assertEquals(name, expected, SearchVariantRules.forLocale("").unglue(name));
+		List<String> names = new ArrayList<>();
+		for (SearchVariantRules.Unglued u : SearchVariantRules.forLocale("").unglue(name)) {
+			names.add(u.name());
+		}
+		// check(name, null): no alternative name
+		List<String> list = expected == null ? List.of() : List.of(expected);
+		assertEquals(name, list, names);
 	}
 }

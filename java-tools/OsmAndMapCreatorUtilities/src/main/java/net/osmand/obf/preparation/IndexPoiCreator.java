@@ -1216,7 +1216,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		NameIndexCreator.addPoiCategories(namesIndex, obj, poiTypes);
 		int mainWords = -1;
 		if (name != null) {
-			namesIndex.addToNameIndex(name, obj, settings.charsToBuildPoiNameIndex, false);
+			namesIndex.addToNameIndex(name, null, obj, settings.charsToBuildPoiNameIndex, false);
 			mainWords = NameIndexCreator.countWords(name);
 			if (Algorithms.isEmpty(nameEn)) {
 				nameEn = Junidecode.unidecode(name);
@@ -1225,18 +1225,13 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		int[] variant = new int[1];
 		if (!Algorithms.objectEquals(nameEn, name) && !Algorithms.isEmpty(nameEn)) {
 			String indexed = altName(nameEn, mainWords, variant);
-			namesIndex.addToNameIndex(indexed, obj, settings.charsToBuildPoiNameIndex, false);
-			namesIndex.addAlternativeNamesToNameIndex(indexed, "en", obj, settings.charsToBuildPoiNameIndex);
-		}
-		if (name != null) {
-			namesIndex.addAlternativeNamesToNameIndex(name, null, obj, settings.charsToBuildPoiNameIndex);
+			namesIndex.addToNameIndex(indexed, "en", obj, settings.charsToBuildPoiNameIndex, false);
 		}
 		if (names != null) {
 			for (Map.Entry<String, String> nk : names.entrySet()) {
 				if (!Algorithms.objectEquals(nk.getKey(), name) && !Algorithms.isEmpty(nk.getKey())) {
 					String indexed = altName(nk.getKey(), mainWords, variant);
-					namesIndex.addToNameIndex(indexed, obj, settings.charsToBuildPoiNameIndex, false);
-					namesIndex.addAlternativeNamesToNameIndex(indexed, nk.getValue(), obj, settings.charsToBuildPoiNameIndex);
+					namesIndex.addToNameIndex(indexed, nk.getValue(), obj, settings.charsToBuildPoiNameIndex, false);
 				}
 			}
 		}

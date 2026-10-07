@@ -65,6 +65,7 @@ import net.osmand.obf.preparation.IndexCreator;
 import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.obf.preparation.IndexPoiCreator;
 import net.osmand.obf.preparation.NameIndexCreator;
+import net.osmand.obf.preparation.NameIndexPlan;
 import net.osmand.osm.AbstractPoiType;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.search.core.SearchCoreFactory;
@@ -115,7 +116,7 @@ public class SpatialSearchPipelineTest {
 	private static final boolean TEST_EXTRA_RESULTS = true;
 	private static final List<Class<?>> OBF_GENERATE_CLASSES = List.of(IndexCreator.class, IndexPoiCreator.class,
 			IndexAddressCreator.class, NameIndexCreator.class, CommonWordsMultiIndex.class,
-			AlternativeNameIndexGenerator.class, SearchVariantRules.class, SearchVariantRules.Rule.class,
+			AlternativeNameIndexGenerator.class, NameIndexPlan.class, SearchVariantRules.class, SearchVariantRules.Rule.class,
 			Abbreviations.class, SearchLocales.class, OBFDataCreator.class,
 			BinaryMerger.class);
 	// every rules file of OsmAnd-java resources, found by a scan so a new language file invalidates cached OBFs

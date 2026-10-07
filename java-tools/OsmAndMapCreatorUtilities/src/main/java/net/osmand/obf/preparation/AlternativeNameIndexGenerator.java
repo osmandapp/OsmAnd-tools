@@ -3,22 +3,16 @@ package net.osmand.obf.preparation;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
 import net.osmand.binary.CommonWordsMultiIndex;
-import net.osmand.binary.NameIndexReader;
 import net.osmand.binary.SearchLocales;
 import net.osmand.binary.SearchVariantRules;
 import net.osmand.binary.SearchVariantRules.Rule;
-import net.osmand.data.City;
-import net.osmand.data.Street;
-import net.osmand.obf.preparation.NameIndexCreator.NameKeys;
-import net.osmand.obf.preparation.NameIndexCreator.PoiNameObject;
+import net.osmand.binary.SearchVariantRules.RuleId;
 import net.osmand.util.Algorithms;
-import net.osmand.util.SearchAlgorithms;
 
 /**
  * Alternative spellings of a name that go to the name index next to the name itself, so the search finds an object
@@ -27,12 +21,9 @@ import net.osmand.util.SearchAlgorithms;
  * <p>
  * The alternative names come from {@code <index>} of the rules of the locale of the name ({@code rules.xml} and its
  * locale overlays in OsmAnd-java resources): {@code <unglue>} splits glued words, a {@code <rule>} replaces a phrase or
- * a glued form. A word of an alternative name is a key by its own class, whatever happened to the words it replaces
- * (rules-spec.md, 3.3): a word the name has keeps the decision of the name ({@link KeyDecision#ALT_SHADOWED} when the
- * name does not index it); a new word is a key ({@link KeyDecision#ALT}) when the statistics keep it among the words
- * of the alternative name, else it is attached to the keys of the name that the alternative name shares
- * ({@link KeyDecision#ALT_ATTACHED}); {@code keys="always"} and notable objects make every new word a key.
- * The index size has to be measured per rule: every alternative word is one more key or name of the object.
+ * a glued form. Which of their words become keys is decided with the words of the name ({@link NameIndexPlan}).
+ * The index size has to be measured per rule (file, object, from): every alternative word is one more key or name of
+ * the object.
  */
 public class AlternativeNameIndexGenerator<T> {
 
@@ -114,7 +105,7 @@ public class AlternativeNameIndexGenerator<T> {
 	public static class Stats extends KeyStats {
 		// names that got at least one alternative name
 		int names;
-		// alternative names and keys by rule ("unglue", "street SS$1")
+		// alternative names and keys by rule (RuleId: "rules_it.xml street (?iu)\bStrada\s+Statale\s+(\d+)\b")
 		final Map<String, KeyStats> byRule = new TreeMap<>();
 		// keys_report.tsv: words with a class of the statistics or the rules, or with a decision other than a key by
 		// the statistics; null when the report is off
@@ -146,7 +137,7 @@ public class AlternativeNameIndexGenerator<T> {
 			}
 		}
 
-		// "unglue: alternatives=.. keys=.. block=.. atom=.. join=.. dup=..; street $1str: ..."
+		// "rules.xml unglue .: alternatives=.. keys=.. block=.. atom=.. join=.. dup=..; rules_de.xml street ...: ..."
 		public String byRuleString() {
 			StringBuilder s = new StringBuilder();
 			byRule.forEach((rule, stats) -> s.append(s.length() == 0 ? "" : "; ").append(rule).append(": ").append(stats));
@@ -225,21 +216,23 @@ public class AlternativeNameIndexGenerator<T> {
 				: CommonWordsMultiIndex.getInstance().wordClass(keysMap, word);
 	}
 
-	// name can carry the marker of an alternative name (NameIndexReader.altNameMarker): the marker is a word of the name,
-	// so the alternative words refer to it and stay with that variant
-	public void addAlternativeNames(String name, String lang, T obj, int maxPrefixLength) {
+	/**
+	 * The alternative names of a name from {@code <index>} of the rules of the locale of the name. The name can carry
+	 * the marker of an alternative name (NameIndexReader.altNameMarker): the marker is a word of the name, so the
+	 * alternative words refer to it and stay with that variant.
+	 *
+	 * @param owner owner of the name for the rules (street, locality, boundary, postcode, poi), null for none
+	 */
+	List<NameIndexPlan.Alternative> alternatives(String name, String lang, String owner) {
 		if (Algorithms.isEmpty(name)) {
-			return;
+			return List.of();
 		}
 		// name and alt_name are in the language of the map, name:de in German in the country of the map
 		SearchVariantRules rules = SearchVariantRules.forLocale(SearchLocales.forName(lang, mapLocale));
-		NameKeys main = nameIndex.getNameKeys(obj, name);
-		int alternatives = stats.alternatives;
-		String unglued = rules.unglue(name);
-		if (unglued != null) {
-			addAlternativeName(main, name, unglued, obj, maxPrefixLength, "unglue", false);
+		List<NameIndexPlan.Alternative> alternatives = new ArrayList<>();
+		for (SearchVariantRules.Unglued unglued : rules.unglue(name)) {
+			alternatives.add(new NameIndexPlan.Alternative(unglued.id(), unglued.name(), false));
 		}
-		String owner = ownerType(obj);
 		if (owner != null) {
 			for (Rule rule : rules.index()) {
 				if (!rule.appliesTo(owner)) {
@@ -247,109 +240,42 @@ public class AlternativeNameIndexGenerator<T> {
 				}
 				String alternative = rule.apply(name);
 				if (alternative != null) {
-					addAlternativeName(main, name, alternative, obj, maxPrefixLength, owner + " " + rule.to().trim(),
-							rule.alwaysKeys());
+					alternatives.add(new NameIndexPlan.Alternative(rule.id(), alternative, rule.alwaysKeys()));
 				}
 			}
 		}
-		if (stats.alternatives > alternatives) {
+		return alternatives;
+	}
+
+	/** Counts the alternative names of one name: the statistics of their rules. */
+	void countAlternatives(List<NameIndexPlan.Variant> alternatives) {
+		if (!alternatives.isEmpty()) {
 			stats.names++;
 		}
-	}
-
-	private String ownerType(T obj) {
-		if (obj instanceof Street) {
-			return "street";
-		}
-		if (obj instanceof City city) {
-			return switch (city.getType()) {
-				case BOUNDARY -> "boundary";
-				case POSTCODE -> "postcode";
-				default -> "locality";
-			};
-		}
-		return obj instanceof PoiNameObject ? "poi" : null;
-	}
-
-	private void addAlternativeName(NameKeys main, String name, String alternative, T obj, int maxPrefixLength,
-			String rule, boolean alwaysKeys) {
-		List<String> alternativeWords = SearchAlgorithms.splitAndNormalize(alternative, false);
-		// a name the writer did not see (a test): its words are keys
-		List<String> nameWords = main != null ? main.words() : SearchAlgorithms.splitAndNormalize(name, false);
-		boolean notable = main != null && main.notable();
-		KeyStats ruleStats = stats.byRule.computeIfAbsent(rule, r -> new KeyStats());
-		stats.alternatives++;
-		ruleStats.alternatives++;
-		List<String> unique = new ArrayList<>(new LinkedHashSet<>(alternativeWords));
-		String keysMap = nameIndex.getKeysMapName();
-		// the class of a new word is decided among the words of the alternative name, as for a name
-		CommonWordsMultiIndex.KeyOutcome[] outcomes = alwaysKeys || notable || keysMap == null ? null
-				: CommonWordsMultiIndex.getInstance().selectKeys(keysMap, unique, false);
-		List<String> attached = new ArrayList<>();
-		for (int i = 0; i < unique.size(); i++) {
-			String word = unique.get(i);
-			String prefix = NameIndexCreator.nameIndexPreparePrefix(word, maxPrefixLength);
-			if (Algorithms.isEmpty(prefix) || NameIndexReader.isIndexMarker(word)) {
-				continue;
-			}
-			if (nameWords.contains(word)) {
-				if (main != null && !main.keys().contains(word)) {
-					decide(ruleStats, word, KeyDecision.ALT_SHADOWED, alternative);
-				}
-				continue;
-			}
-			KeyDecision decision;
-			if (alwaysKeys) {
-				decision = KeyDecision.ALWAYS;
-			} else if (notable) {
-				decision = KeyDecision.NOTABLE;
-			} else if (outcomes == null || outcomes[i].key) {
-				decision = KeyDecision.ALT;
-			} else {
-				attached.add(word);
-				continue;
-			}
-			decide(ruleStats, word, decision, alternative);
-			addKey(ruleStats, prefix, obj, word, alternativeWords);
-		}
-		if (!attached.isEmpty()) {
-			// the dropped new words stay words of the alternative name under the keys of the name it shares
-			List<String> shared = new ArrayList<>();
-			if (main != null) {
-				for (String key : unique) {
-					if (main.keys().contains(key)) {
-						shared.add(key);
-					}
-				}
-			}
-			for (String word : attached) {
-				// no shared key to attach to: the word is a key, else the alternative name could not be found
-				decide(ruleStats, word, shared.isEmpty() ? KeyDecision.ALT : KeyDecision.ALT_ATTACHED, alternative);
-				if (shared.isEmpty()) {
-					addKey(ruleStats, NameIndexCreator.nameIndexPreparePrefix(word, maxPrefixLength), obj, word,
-							alternativeWords);
-				}
-			}
-			for (String key : shared) {
-				addKey(ruleStats, NameIndexCreator.nameIndexPreparePrefix(key, maxPrefixLength), obj, key,
-						alternativeWords);
-			}
+		stats.alternatives += alternatives.size();
+		for (NameIndexPlan.Variant v : alternatives) {
+			ruleStats(v.rule()).alternatives++;
 		}
 	}
 
-	// a decision on a word of a name of the writer (NameIndexCreator.addToNameIndex)
+	KeyStats ruleStats(RuleId rule) {
+		return stats.byRule.computeIfAbsent(rule.toString(), r -> new KeyStats());
+	}
+
+	// a decision on a word of a name
 	void decide(String word, KeyDecision decision, String name) {
 		stats.decide(word, decision, name, wordClass(word));
 	}
 
-	private void decide(KeyStats ruleStats, String word, KeyDecision decision, String alternative) {
+	// a decision on a word of an alternative name of a rule
+	void decide(KeyStats ruleStats, String word, KeyDecision decision, String alternative) {
 		ruleStats.decisions[decision.ordinal()]++;
 		stats.decide(word, decision, alternative, wordClass(word));
 	}
 
-	private void addKey(KeyStats ruleStats, String prefix, T obj, String word, List<String> alternativeWords) {
-		int outcome = nameIndex.addAlternativeToken(prefix, obj, word, alternativeWords).ordinal();
-		stats.outcomes[outcome]++;
-		ruleStats.outcomes[outcome]++;
+	// where a key of an alternative name of a rule went
+	void outcome(KeyStats ruleStats, KeyOutcome outcome) {
+		stats.outcomes[outcome.ordinal()]++;
+		ruleStats.outcomes[outcome.ordinal()]++;
 	}
 }
