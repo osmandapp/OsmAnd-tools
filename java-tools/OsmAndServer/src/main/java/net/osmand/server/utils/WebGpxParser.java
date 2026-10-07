@@ -622,8 +622,8 @@ public class WebGpxParser {
                         int allPoints = 0;
                         for (int i = 0; i < t.points.size(); i++) {
                             Point point = t.points.get(i);
-                            List<WebGpxParser.Point> geo = point.geometry;
-                            if (geo.isEmpty()) {
+                            List<WebGpxParser.Point> geo = point.geometry != null ? point.geometry : Collections.emptyList();
+                            if (point.geometry != null && geo.isEmpty()) {
                                 if (!route.getPoints().isEmpty()) {
                                     gpxFile.getRoutes().add(route);
                                 }
@@ -639,11 +639,11 @@ public class WebGpxParser {
                             if (point.ele == NAN_MARKER) {
                                 routePoint.setEle(Double.NaN);
                             }
-                            if (!point.profile.equals(LINE_PROFILE_TYPE)) {
+                            if (point.profile != null && !point.profile.equals(LINE_PROFILE_TYPE)) {
                                 routePoint.getExtensionsToWrite().put(PROFILE_TYPE_EXTENSION, String.valueOf(point.profile));
                             }
                             allPoints += geo.isEmpty() ? 0 : geo.size();
-                            boolean isLast = i == t.points.size() - 1 || t.points.get(i + 1).geometry.isEmpty();
+                            boolean isLast = i == t.points.size() - 1 || (t.points.get(i + 1).geometry != null && t.points.get(i + 1).geometry.isEmpty());
                             //for last rtept trkpt_idx = last index of trkpt points
                             int ind = isLast ? allPoints - 1 : allPoints;
                             routePoint.getExtensionsToWrite().put(TRKPT_INDEX_EXTENSION, String.valueOf(allPoints == 0 ? 0 : ind));
