@@ -124,7 +124,7 @@ public class BinaryMapIndexWriter {
 
 	protected static final int SHIFT_COORDINATES = BinaryMapIndexReader.SHIFT_COORDINATES;
 	public int MASK_TO_READ = ~((1 << SHIFT_COORDINATES) - 1);
-	private static final int ROUTE_SHIFT_COORDINATES = 4;
+	static final int ROUTE_SHIFT_COORDINATES = 4;
 	private static final int LABEL_THRESHOLD = 1024; // 20 meters on equator
 	private static final int LABEL_ZOOM_ENCODE = BinaryMapIndexReader.LABEL_ZOOM_ENCODE; 
 	private static Log log = LogFactory.getLog(BinaryMapIndexWriter.class);
