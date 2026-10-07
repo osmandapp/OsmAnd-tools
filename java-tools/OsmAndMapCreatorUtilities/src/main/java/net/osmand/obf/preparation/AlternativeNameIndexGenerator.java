@@ -231,7 +231,7 @@ public class AlternativeNameIndexGenerator<T> {
 		SearchVariantRules rules = SearchVariantRules.forLocale(SearchLocales.forName(lang, mapLocale));
 		List<NameIndexPlan.Alternative> alternatives = new ArrayList<>();
 		for (SearchVariantRules.Unglued unglued : rules.unglue(name)) {
-			alternatives.add(new NameIndexPlan.Alternative(unglued.id(), unglued.name(), false));
+			alternatives.add(new NameIndexPlan.Alternative(unglued.ids(), unglued.name(), false));
 		}
 		if (owner != null) {
 			for (Rule rule : rules.index()) {
@@ -240,7 +240,7 @@ public class AlternativeNameIndexGenerator<T> {
 				}
 				String alternative = rule.apply(name);
 				if (alternative != null) {
-					alternatives.add(new NameIndexPlan.Alternative(rule.id(), alternative, rule.alwaysKeys()));
+					alternatives.add(new NameIndexPlan.Alternative(List.of(rule.id()), alternative, rule.alwaysKeys()));
 				}
 			}
 		}
@@ -254,12 +254,22 @@ public class AlternativeNameIndexGenerator<T> {
 		}
 		stats.alternatives += alternatives.size();
 		for (NameIndexPlan.Variant v : alternatives) {
-			ruleStats(v.rule()).alternatives++;
+			for (KeyStats s : ruleStats(v.rules())) {
+				s.alternatives++;
+			}
 		}
 	}
 
-	KeyStats ruleStats(RuleId rule) {
-		return stats.byRule.computeIfAbsent(rule.toString(), r -> new KeyStats());
+	/**
+	 * The statistics of the rules of one alternative name: every rule counts the name and the cost of storing it, as if
+	 * it were the only rule; the totals of the name index count it once.
+	 */
+	List<KeyStats> ruleStats(List<RuleId> rules) {
+		List<KeyStats> list = new ArrayList<>(rules.size());
+		for (RuleId rule : rules) {
+			list.add(stats.byRule.computeIfAbsent(rule.toString(), r -> new KeyStats()));
+		}
+		return list;
 	}
 
 	// a decision on a word of a name
@@ -267,15 +277,19 @@ public class AlternativeNameIndexGenerator<T> {
 		stats.decide(word, decision, name, wordClass(word));
 	}
 
-	// a decision on a word of an alternative name of a rule
-	void decide(KeyStats ruleStats, String word, KeyDecision decision, String alternative) {
-		ruleStats.decisions[decision.ordinal()]++;
+	// a decision on a word of an alternative name of rules
+	void decide(List<KeyStats> ruleStats, String word, KeyDecision decision, String alternative) {
+		for (KeyStats s : ruleStats) {
+			s.decisions[decision.ordinal()]++;
+		}
 		stats.decide(word, decision, alternative, wordClass(word));
 	}
 
-	// where a key of an alternative name of a rule went
-	void outcome(KeyStats ruleStats, KeyOutcome outcome) {
+	// where a key of an alternative name of rules went
+	void outcome(List<KeyStats> ruleStats, KeyOutcome outcome) {
 		stats.outcomes[outcome.ordinal()]++;
-		ruleStats.outcomes[outcome.ordinal()]++;
+		for (KeyStats s : ruleStats) {
+			s.outcomes[outcome.ordinal()]++;
+		}
 	}
 }

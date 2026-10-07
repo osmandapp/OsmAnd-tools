@@ -513,7 +513,7 @@ public class NameIndexCreator<T> {
 		}
 		alternativeNames.countAlternatives(plan.alternatives);
 		for (NameIndexPlan.Variant v : plan.alternatives) {
-			AlternativeNameIndexGenerator.KeyStats ruleStats = alternativeNames.ruleStats(v.rule());
+			List<AlternativeNameIndexGenerator.KeyStats> ruleStats = alternativeNames.ruleStats(v.rules());
 			for (NameIndexPlan.Word w : v.decisions()) {
 				alternativeNames.decide(ruleStats, w.word(), w.decision(), v.text());
 				switch (w.action()) {
@@ -524,7 +524,7 @@ public class NameIndexCreator<T> {
 					}
 				}
 			}
-			// the attached words stay words of the alternative name under the keys of the name it shares
+			// one more name under the keys of the name it shares: with its attached words, or without a key of its own
 			for (String key : v.sharedKeys()) {
 				alternativeNames.outcome(ruleStats, addAlternativeToken(nameIndexPreparePrefix(key, maxPrefixLength),
 						obj, key, v.words()));

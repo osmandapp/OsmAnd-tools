@@ -46,20 +46,22 @@ public final class NameIndexPlan {
 	/**
 	 * One variant: the name itself or an alternative name of a rule.
 	 *
-	 * @param rule       the rule of an alternative name, null for the name itself
+	 * @param rules      the rules that give an alternative name (one name of several rules is stored once and counted
+	 *                   for each of them), empty for the name itself
 	 * @param text       the name or the alternative name, the example of the statistics
 	 * @param words      every word of the variant: the names of its atoms
 	 * @param decisions  the words that the writer stores or counts, in the order it does
-	 * @param sharedKeys keys of the name that the alternative name shares: its attached words are stored under them
+	 * @param sharedKeys keys of the name the alternative name is stored under as one more name of the atom: when it
+	 *                   has attached words, or no key of its own ("E.T.A. Hoffmann" -> "Hoffmann")
 	 */
-	record Variant(RuleId rule, String text, List<String> words, List<Word> decisions, List<String> sharedKeys) {
+	record Variant(List<RuleId> rules, String text, List<String> words, List<Word> decisions, List<String> sharedKeys) {
 		boolean alternative() {
-			return rule != null;
+			return !rules.isEmpty();
 		}
 	}
 
-	/** An alternative name of a name: the rule and the text it gives. */
-	record Alternative(RuleId rule, String text, boolean alwaysKeys) {
+	/** An alternative name of a name: the rules and the text they give. */
+	record Alternative(List<RuleId> rules, String text, boolean alwaysKeys) {
 	}
 
 	/**
@@ -131,11 +133,13 @@ public final class NameIndexPlan {
 				// the other words of the name still refer to it, as they did before it became a key
 				decisions.add(new Word(token, prefix, KeyDecision.LEGACY, Action.KEY_AND_TABLE));
 			} else {
-				decisions.add(new Word(token, prefix, outcomes == null ? KeyDecision.KEPT : KeyDecision.of(outcomes[i]),
-						Action.KEY));
+				// a notable object keeps every word whether its map has statistics or not (rules-spec.md, 4.2)
+				KeyDecision decision = outcomes != null ? KeyDecision.of(outcomes[i])
+						: ctx.notable ? KeyDecision.NOTABLE : KeyDecision.KEPT;
+				decisions.add(new Word(token, prefix, decision, Action.KEY));
 			}
 		}
-		return new Variant(null, indexed, allNames, decisions, List.of());
+		return new Variant(List.of(), indexed, allNames, decisions, List.of());
 	}
 
 	// TODO remove when app versions with the legacy search (SearchCoreFactory) no longer download maps: it looks a name
@@ -180,29 +184,36 @@ public final class NameIndexPlan {
 			} else if (isSkippedNumber(word, ctx)) {
 				// numbers come first (rules-spec.md, 4.2): an alternative name follows the number policy of the name
 				decisions.add(new Word(word, prefix, KeyDecision.NUMBER, Action.NONE));
-			} else if (alternative.alwaysKeys) {
-				decisions.add(new Word(word, prefix, KeyDecision.ALWAYS, Action.KEY));
 			} else if (ctx.notable) {
+				// notable comes before keys="always" and <class0> (rules-spec.md, 4.2)
 				decisions.add(new Word(word, prefix, KeyDecision.NOTABLE, Action.KEY));
+			} else if (alternative.alwaysKeys || outcomes != null && outcomes[i] == CommonWordsMultiIndex.KeyOutcome.ALWAYS) {
+				decisions.add(new Word(word, prefix, KeyDecision.ALWAYS, Action.KEY));
 			} else if (outcomes == null || outcomes[i].key) {
 				decisions.add(new Word(word, prefix, KeyDecision.ALT, Action.KEY));
 			} else {
 				attached.add(new Word(word, prefix, KeyDecision.ALT_ATTACHED, Action.TABLE));
 			}
 		}
+		boolean ownKey = false;
+		for (Word w : decisions) {
+			ownKey |= w.action == Action.KEY;
+		}
 		List<String> shared = new ArrayList<>();
-		if (!attached.isEmpty()) {
+		// an alternative name without a key of its own is one more name under the keys it shares, else it is not
+		// stored and the words its rule removed still count against the object ("Hoffmann" of "E.T.A. Hoffmann")
+		if (!attached.isEmpty() || !ownKey) {
 			for (String key : unique) {
 				if (nameKeys.contains(key)) {
 					shared.add(key);
 				}
 			}
-			for (Word w : attached) {
-				// no shared key to attach to: the word is a key, else the alternative name could not be found
-				decisions.add(shared.isEmpty() ? new Word(w.word, w.prefix, KeyDecision.ALT, Action.KEY) : w);
-			}
 		}
-		return new Variant(alternative.rule, alternative.text, alternativeWords, decisions, shared);
+		for (Word w : attached) {
+			// no shared key to attach to: the word is a key, else the alternative name could not be found
+			decisions.add(shared.isEmpty() ? new Word(w.word, w.prefix, KeyDecision.ALT, Action.KEY) : w);
+		}
+		return new Variant(alternative.rules, alternative.text, alternativeWords, decisions, shared);
 	}
 
 	// a pure number is kept with the other words of the name ("6178/2.Sokak"), a number with letters is not: "33-я" of

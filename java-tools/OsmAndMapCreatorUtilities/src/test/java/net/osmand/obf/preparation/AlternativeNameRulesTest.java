@@ -142,6 +142,69 @@ public class AlternativeNameRulesTest {
 		assertFalse(byRule.toString(), byRule.containsKey(TEST_FILE + " unglue .'"));
 	}
 
+	@Test
+	public void alternativeOfWordsOfTheNameIsStoredUnderItsKeys() {
+		// "E.T.A. Hoffmann" -> "Hoffmann": no new word, the alternative name is one more name of the atom of "hoffmann"
+		NameIndexCreator<Street> names = new NameIndexCreator<>(CommonWords.getAddrInstance());
+		names.setMapName(US_MAP);
+		names.addToNameIndex("E.T.A. Hoffmann", null, new Street(null), 4, false);
+		AlternativeNameIndexGenerator.KeyStats rule = names.getAlternativeNameStats().byRule.get("rules.xml unglue .");
+		assertEquals(1, rule.alternatives);
+		assertEquals(1, rule.keys());
+		NameIndexCreator.PrepareWordsIndex common = names.buildCommonWords(names.namesIndex);
+		NameIndexCreator.NamedObjectsByPrefix<Street> hoff = names.namesIndex.get("hoff");
+		hoff.build(common);
+		NameIndexCreator.NamedObject<Street> atom = hoff.namedObjects.get(0);
+		int alone = -1;
+		for (int i = 0; i < atom.singleNames.size(); i++) {
+			if (atom.singleNames.get(i).listNames().equals(List.of("hoffmann"))) {
+				alone = i;
+			}
+		}
+		assertTrue(atom.singleNames.toString(), alone >= 0);
+		// the words the rule removed do not count against the object
+		assertEquals(0, atom.otherWordsCount.get(alone));
+	}
+
+	@Test
+	public void oneAlternativeOfTwoRulesIsCountedForEach() throws Exception {
+		install("en_US", "<index><unglue glue=\".\" minPart=\"3\"/><unglue glue=\"'\" minPart=\"3\"/></index>");
+		NameIndexCreator<Street> names = new NameIndexCreator<>(CommonWords.getAddrInstance());
+		names.setMapName(US_MAP);
+		names.addToNameIndex("A.'B Hoffmann", null, new Street(null), 4, false);
+		AlternativeNameIndexGenerator.Stats stats = names.getAlternativeNameStats();
+		assertEquals(1, stats.alternatives);
+		for (String id : List.of(TEST_FILE + " unglue .", TEST_FILE + " unglue '")) {
+			assertEquals(id, 1, stats.byRule.get(id).alternatives);
+			assertEquals(id, 1, stats.byRule.get(id).keys());
+		}
+		assertEquals(stats.byRule.toString(), 2, stats.byRule.size());
+	}
+
+	@Test
+	public void decisionsFollowThePriorityOfTheSpec() throws Exception {
+		// a new word of <class0>: ALWAYS, not ALT
+		install("en_US", "<index><class0>qzxway</class0>"
+				+ "<rule object=\"street\" from=\"\\bQzx\\s+Road\\b\" to=\"Qzxway\"/>"
+				+ "<rule object=\"locality\" from=\"\\bQzxtown\\b\" to=\"Qzxton\" keys=\"always\"/></index>");
+		NameIndexCreator<net.osmand.data.MapObject> names = new NameIndexCreator<>(CommonWords.getAddrInstance());
+		names.setMapName(US_MAP);
+		names.addToNameIndex("Qzx Road", null, new Street(null), 4, false);
+		AlternativeNameIndexGenerator.Stats stats = names.getAlternativeNameStats();
+		assertEquals(1, stats.decisions(KeyDecision.ALWAYS));
+		assertEquals(0, stats.decisions(KeyDecision.ALT));
+		// a notable object with keys="always": NOTABLE comes first
+		names.addToNameIndex("Qzxtown", null, new net.osmand.data.City(net.osmand.data.City.CityType.CITY), 4, false);
+		assertEquals(1, stats.decisions(KeyDecision.ALWAYS));
+		assertEquals(2, stats.decisions(KeyDecision.NOTABLE));
+		// a notable object of a map without a group: NOTABLE, not KEPT
+		NameIndexCreator<net.osmand.data.MapObject> noGroup = new NameIndexCreator<>(CommonWords.getAddrInstance());
+		noGroup.setMapName("Zzqx_europe");
+		noGroup.addToNameIndex("Qzx Town", null, new net.osmand.data.City(net.osmand.data.City.CityType.CITY), 4, false);
+		assertEquals(2, noGroup.getAlternativeNameStats().decisions(KeyDecision.NOTABLE));
+		assertEquals(0, noGroup.getAlternativeNameStats().decisions(KeyDecision.KEPT));
+	}
+
 	private void install(String locale, String body) throws Exception {
 		Method parse = SearchVariantRules.class.getDeclaredMethod("parseLayer", InputStream.class, String.class);
 		parse.setAccessible(true);
