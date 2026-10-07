@@ -51,10 +51,6 @@ public class UserdataController {
 
 	protected static final Log LOG = LogFactory.getLog(UserdataController.class);
 
-	// This is a permanent token for users who can't receive email but validated identity differently
-	public static final int SPECIAL_PERMANENT_TOKEN = 8;
-
-
 	Gson gson = new Gson();
 
 	@Autowired
@@ -218,14 +214,8 @@ public class UserdataController {
 			pu.orderid = orderid;
 		}
 		pu.tokendevice = deviceId;
-		if (pu.token == null || pu.token.length() < SPECIAL_PERMANENT_TOKEN) {
-			// see comment on constant
-			userdataService.updateSecureEmailToken(pu);
-			// TODO iOS: add lang in OARegisterUserCommand.m before sendRequestWithUrl params[@"lang"] = ...
-			emailSender.sendOsmAndCloudRegistrationEmail(pu.email, pu.token, lang, true);
-		} else {
-			pu.tokenTime = new Date(); // SPECIAL_PERMANENT_TOKEN
-		}
+		userdataService.updateSecureEmailToken(pu);
+		emailSender.sendOsmAndCloudRegistrationEmail(pu.email, pu.token, lang, true);
 		CloudUser saved = usersRepository.saveAndFlush(pu);
 	    if (orderid != null) {
 		    discardPreviousAccountOrderId(saved.id, orderid, email, request);

@@ -534,7 +534,6 @@ public class UserdataService {
     }
 
     private String generateEmailToken() {
-        // Maximum 7 digits: lengths >= SPECIAL_PERMANENT_TOKEN (8) are treated as permanent tokens.
         return Integer.toString(new SecureRandom().nextInt(900000) + 100000); // Generate 6 digits (100000-999999).
     }
 
@@ -571,11 +570,7 @@ public class UserdataService {
         }
 		if (pu != null) {
             pu.tokendevice = TOKEN_DEVICE_WEB;
-            if (pu.token == null || pu.token.length() < UserdataController.SPECIAL_PERMANENT_TOKEN) {
-                updateSecureEmailToken(pu);
-            } else {
-                pu.tokenTime = new Date(); // SPECIAL_PERMANENT_TOKEN
-            }
+            updateSecureEmailToken(pu);
             usersRepository.saveAndFlush(pu);
             emailSender.sendOsmAndCloudWebEmail(pu.email, pu.token, "@ACTION_SETUP@", lang);
 		} else {
@@ -659,9 +654,7 @@ public class UserdataService {
                 throw new OsmAndPublicApiException(ERROR_CODE_TOKEN_IS_NOT_VALID_OR_EXPIRED, "token is not valid or expired (24h)");
             }
         }
-        if (pu.token != null && pu.token.length() < UserdataController.SPECIAL_PERMANENT_TOKEN) {
-        	pu.token = null;
-        }
+        pu.token = null;
         pu.tokenTime = null;
         CloudUserDevicesRepository.CloudUserDevice device = new CloudUserDevicesRepository.CloudUserDevice();
 	    if (Algorithms.isEmpty(deviceId) || Algorithms.isEmpty(model)) {
