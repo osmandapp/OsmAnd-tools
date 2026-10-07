@@ -149,7 +149,9 @@ public class FastSpringController {
 
 			userSubService.verifyAndRefreshProOrderId(user);
 
-			emailSender.sendAfterCommit(() -> sendPurchaseReceipt(email, data, orderDate, purchases, subscriptions));
+			String userLang = emailSender.userLang(userId);
+			String lang = userLang != null ? userLang : data.language;
+			emailSender.sendAfterCommit(() -> sendPurchaseReceipt(email, lang, data, orderDate, purchases, subscriptions));
 
 			if (sendOsmAndAndSpecialGiftEmail) {
 				LOGGER.info("FastSpring: Sending special gift email to " + EmailSenderService.shorten(email) + " for orderId: " + data.order + ", purchaseToken: " + data.reference);
@@ -434,11 +436,11 @@ public class FastSpringController {
 		}
 	}
 
-	private void sendPurchaseReceipt(String email, FastSpringWebhookRequest.Data data, Date orderDate,
+	private void sendPurchaseReceipt(String email, String lang, FastSpringWebhookRequest.Data data, Date orderDate,
 	                                 List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> purchases,
 	                                 List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions) {
 		try {
-			emailSender.sendPurchaseReceiptEmail(email, data.language, data.order, orderDate, data.totalDisplay,
+			emailSender.sendPurchaseReceiptEmail(email, lang, data.order, orderDate, data.totalDisplay,
 					purchases, subscriptions);
 		} catch (Exception e) {
 			LOGGER.error("FastSpring: failed to send receipt for orderId " + data.order + ": " + e.getMessage(), e);
