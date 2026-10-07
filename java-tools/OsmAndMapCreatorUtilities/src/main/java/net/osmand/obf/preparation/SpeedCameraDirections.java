@@ -29,16 +29,16 @@ import java.util.PriorityQueue;
 // and read by RouteDataObject.isDirectionApplicable.
 public class SpeedCameraDirections {
 
-	// ponytail: the way along the roads from "from" to "to" is searched up to this many straight distances
-	private static final int MAX_WAY_TO_STRAIGHT_DISTANCE = 2;
+	// search radius limit. ignore ways farther that distance("from", "to") x 2.
+	private static final int SEARCH_DISTANCE_LIMIT_COEFFICIENT = 2;
 
 	private final MapRoutingTypes routeTypes;
-	private final List<Camera> cameras = new ArrayList<>();
+	private final List<SpeedCamera> cameras = new ArrayList<>();
 	// way id -> point index -> "direction" rule id
 	private final TLongObjectHashMap<TIntIntHashMap> directions = new TLongObjectHashMap<>();
 	private int forwardRule, backwardRule, bothRule;
 
-	private static class Camera {
+	private static class SpeedCamera {
 		int x31, y31;
 		TLongHashSet targets = new TLongHashSet();
 		double maxDistance;
@@ -49,29 +49,34 @@ public class SpeedCameraDirections {
 	}
 
 	public void addRelation(Relation relation, Node from) {
-		List<Entity> to = relation.getMemberEntities("to");
-		Camera camera = new Camera();
+		SpeedCamera camera = new SpeedCamera();
 		camera.x31 = getRoute31(MapUtils.get31TileNumberX(from.getLongitude()));
 		camera.y31 = getRoute31(MapUtils.get31TileNumberY(from.getLatitude()));
-		for (Entity target : to.isEmpty() ? relation.getMemberEntities("device") : to) {
+		List<Entity> to = relation.getMemberEntities("to");
+		to = to.isEmpty() ? relation.getMemberEntities("device") : to;
+		for (Entity target : to) {
 			if (target instanceof Node) {
 				int x31 = getRoute31(MapUtils.get31TileNumberX(((Node) target).getLongitude()));
 				int y31 = getRoute31(MapUtils.get31TileNumberY(((Node) target).getLatitude()));
 				camera.targets.add(getPointId(x31, y31));
 				camera.maxDistance = Math.max(camera.maxDistance,
-						MAX_WAY_TO_STRAIGHT_DISTANCE * MapUtils.squareRootDist31(camera.x31, camera.y31, x31, y31));
+						SEARCH_DISTANCE_LIMIT_COEFFICIENT * MapUtils.squareRootDist31(camera.x31, camera.y31, x31, y31));
 			}
 		}
 		if (camera.targets.isEmpty()) {
 			return;
 		}
+		registerDirectionRulesIfNeeded();
+		cameras.add(camera);
+	}
+	
+	private void registerDirectionRulesIfNeeded() {
+		// rules are written before the routing section, so they are registered here. add only for maps with founded speedcams. 
 		if (cameras.isEmpty()) {
-			// rules are written before the routing section, so they are registered here
 			forwardRule = routeTypes.registerRule("direction", "forward").getInternalId();
 			backwardRule = routeTypes.registerRule("direction", "backward").getInternalId();
 			bothRule = routeTypes.registerRule("direction", "both").getInternalId();
 		}
-		cameras.add(camera);
 	}
 
 	public void calculate(BinaryMapIndexReader reader) throws IOException {
@@ -82,7 +87,7 @@ public class SpeedCameraDirections {
 				RoutingConfiguration.DEFAULT_MEMORY_LIMIT, RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT));
 		RoutingContext ctx = new RoutePlannerFrontEnd().buildRoutingContext(config, null,
 				new BinaryMapIndexReader[] { reader }, RouteCalculationMode.NORMAL);
-		for (Camera camera : cameras) {
+		for (SpeedCamera camera : cameras) {
 			RouteSegment first = findFirstSegment(ctx, camera);
 			if (first == null) {
 				continue;
@@ -105,7 +110,7 @@ public class SpeedCameraDirections {
 	}
 
 	// the first segment from "from" of the shortest way along the roads to a "to"
-	private RouteSegment findFirstSegment(RoutingContext ctx, Camera camera) {
+	private RouteSegment findFirstSegment(RoutingContext ctx, SpeedCamera camera) {
 		PriorityQueue<RouteSegment> queue = new PriorityQueue<>(Comparator.comparingDouble(RouteSegment::getDistanceFromStart));
 		TLongHashSet visited = new TLongHashSet();
 		visited.add(getPointId(camera.x31, camera.y31));
