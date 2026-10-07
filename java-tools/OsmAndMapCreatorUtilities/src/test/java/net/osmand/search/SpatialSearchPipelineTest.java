@@ -1101,6 +1101,7 @@ public class SpatialSearchPipelineTest {
 		}
 	}
 
+	/** generator classes: the IDE and Gradle hash them differently, a few known hashes are kept (.obf.hash) */
 	private static String getObfGenerateHash() {
 		List<String> individualHashes = new ArrayList<>();
 
@@ -1110,6 +1111,17 @@ public class SpatialSearchPipelineTest {
 				individualHashes.add(hash);
 			}
 		}
+		String allHashesCombined = String.join("\n", individualHashes);
+		allHashesCombined += HASH_VERSION;
+		return DigestUtils.sha256Hex(allHashesCombined);
+	}
+
+	/**
+	 * Search rules the OBFs were generated with: one value whoever builds, so a generated OBF is reused only with the
+	 * very rules it was made with (a switch between two rule sets must not reuse the OBFs of the other one).
+	 */
+	private static String getRulesHash() {
+		List<String> individualHashes = new ArrayList<>();
 		for (String resource : OBF_RULE_RESOURCES) {
 			try (InputStream input = SearchVariantRules.class.getResourceAsStream(resource)) {
 				if (input == null) {

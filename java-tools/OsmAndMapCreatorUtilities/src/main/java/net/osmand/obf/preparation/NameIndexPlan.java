@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import net.osmand.binary.CommonWords;
@@ -60,8 +61,13 @@ public final class NameIndexPlan {
 		}
 	}
 
-	/** An alternative name of a name: the rules and the text they give. */
-	record Alternative(List<RuleId> rules, String text, boolean alwaysKeys) {
+	/**
+	 * An alternative name of a name: the rules and the text they give.
+	 *
+	 * @param replacedWords a new word that replaced one word of the name -> that word ("ave" -> "avenue"), empty for a
+	 *                      phrase or a glued form ({@link AlternativeNameIndexGenerator#replacedWords})
+	 */
+	record Alternative(List<RuleId> rules, String text, boolean alwaysKeys, Map<String, String> replacedWords) {
 	}
 
 	/**
@@ -160,7 +166,10 @@ public final class NameIndexPlan {
 	/**
 	 * A word of an alternative name is a key by its own class (rules-spec.md, 3.3): a word the name has keeps the
 	 * decision of the name; a new word is a key when the statistics keep it among the words of the alternative name,
-	 * else it is attached to the keys of the name that the alternative name shares.
+	 * else it is attached to the keys of the name that the alternative name shares. A new word that replaced one word of
+	 * the name (a mirror pair or an {@code <index>} rule of a word) is one meaning with it: it is not a key where the
+	 * name dropped that word, else "ave" of "Route 4 East At Forest Ave" (class 2, no word 10 times rarer) makes a key of
+	 * every Avenue the statistics left out ("avenue", class 1).
 	 */
 	private static Variant planAlternative(Alternative alternative, List<String> nameWords, Set<String> nameKeys,
 			Context ctx) {
@@ -189,6 +198,8 @@ public final class NameIndexPlan {
 				decisions.add(new Word(word, prefix, KeyDecision.NOTABLE, Action.KEY));
 			} else if (alternative.alwaysKeys || outcomes != null && outcomes[i] == CommonWordsMultiIndex.KeyOutcome.ALWAYS) {
 				decisions.add(new Word(word, prefix, KeyDecision.ALWAYS, Action.KEY));
+			} else if (droppedByName(alternative.replacedWords.get(word), nameWords, nameKeys)) {
+				attached.add(new Word(word, prefix, KeyDecision.ALT_ATTACHED, Action.TABLE));
 			} else if (outcomes == null || outcomes[i].key) {
 				decisions.add(new Word(word, prefix, KeyDecision.ALT, Action.KEY));
 			} else {
@@ -214,6 +225,10 @@ public final class NameIndexPlan {
 			decisions.add(shared.isEmpty() ? new Word(w.word, w.prefix, KeyDecision.ALT, Action.KEY) : w);
 		}
 		return new Variant(alternative.rules, alternative.text, alternativeWords, decisions, shared);
+	}
+
+	private static boolean droppedByName(String nameWord, List<String> nameWords, Set<String> nameKeys) {
+		return nameWord != null && nameWords.contains(nameWord) && !nameKeys.contains(nameWord);
 	}
 
 	// a pure number is kept with the other words of the name ("6178/2.Sokak"), a number with letters is not: "33-я" of

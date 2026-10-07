@@ -233,6 +233,72 @@ public class AlternativeNameRulesTest {
 		assertEquals(0, pois.getAlternativeNameStats().alternatives);
 	}
 
+	@Test
+	public void mirrorWordIsNoKeyWhereTheNameDroppedItsPair() throws Exception {
+		install("en_US", "<rule from=\"ave\" to=\"Avenue\"/>");
+		// "avenue" (class 1) is dropped next to the other words; "ave" (class 2) has no word 10 times rarer in
+		// "Route 4 East At Forest Ave" and would be a key of every such Avenue
+		NameIndexCreator<Street> names = new NameIndexCreator<>(CommonWords.getAddrInstance());
+		names.setMapName(US_MAP);
+		names.addToNameIndex("Route 4 East At Forest Avenue", null, new Street(null), 4, false);
+		AlternativeNameIndexGenerator.Stats stats = names.getAlternativeNameStats();
+		assertFalse(names.namesIndex.containsKey("aven"));
+		assertFalse(names.namesIndex.containsKey("ave"));
+		assertEquals(1, stats.decisions(KeyDecision.ALT_ATTACHED));
+		assertEquals(0, stats.decisions(KeyDecision.ALT));
+		// the name keeps "avenue" as a key: its pair is decided by its own class
+		NameIndexCreator<Street> alone = new NameIndexCreator<>(CommonWords.getAddrInstance());
+		alone.setMapName(US_MAP);
+		alone.addToNameIndex("Avenue", null, new Street(null), 4, false);
+		assertTrue(alone.namesIndex.containsKey("aven"));
+		assertTrue(alone.namesIndex.containsKey("ave"));
+	}
+
+	@Test
+	public void indexRuleOfAWordIsNoKeyWhereTheNameDroppedTheWord() throws Exception {
+		// the pair moved to <index> as two rules: the word "av" stands for "avenue" as the mirror word does
+		install("en_US", "<index><rule object=\"street\" mode=\"All\" from=\"(?iu)\\bAvenue\\b\" to=\"av\"/></index>");
+		NameIndexCreator<Street> names = new NameIndexCreator<>(CommonWords.getAddrInstance());
+		names.setMapName(US_MAP);
+		names.addToNameIndex("Route 4 East At Forest Avenue", null, new Street(null), 4, false);
+		assertFalse(names.namesIndex.containsKey("av"));
+		assertEquals(1, names.getAlternativeNameStats().decisions(KeyDecision.ALT_ATTACHED));
+		assertEquals(0, names.getAlternativeNameStats().decisions(KeyDecision.ALT));
+	}
+
+	@Test
+	public void attachedReplacedWordIsANameUnderTheKeysOfTheName() throws Exception {
+		install("en_US", "<index><rule object=\"street\" mode=\"All\" from=\"(?iu)\\bPlace\\b\" to=\"pl\"/></index>");
+		NameIndexCreator<Street> names = new NameIndexCreator<>(CommonWords.getAddrInstance());
+		names.setMapName(US_MAP);
+		names.addToNameIndex("Trinity Place", null, new Street(null), 4, false);
+		// "place" (class 1) is dropped: "pl" is no key but a word of the common words table
+		assertEquals(Set.of("trin"), names.namesIndex.keySet());
+		NameIndexCreator.PrepareWordsIndex common = names.buildCommonWords(names.namesIndex);
+		assertTrue(common.words().containsKey("pl"));
+		NameIndexCreator.NamedObjectsByPrefix<Street> trin = names.namesIndex.get("trin");
+		trin.build(common);
+		boolean alternative = false;
+		for (NameIndexCreator.NamedObject<Street> o : trin.namedObjects) {
+			for (NameIndexCreator.NameObjectSingleNameIndex n : o.singleNames) {
+				alternative |= n.listNames().equals(List.of("trinity", "pl"));
+			}
+		}
+		// "Trinity Pl" is one more name of the atom of "trinity"
+		assertTrue(alternative);
+	}
+
+	@Test
+	public void replacedWordsAreOneForOne() {
+		assertEquals(Map.of("ave", "avenue"),
+				AlternativeNameIndexGenerator.replacedWords("Route 4 East At Forest Avenue", "Route 4 East At Forest Ave"));
+		assertEquals(Map.of("blvd", "boulevard", "e", "east"),
+				AlternativeNameIndexGenerator.replacedWords("East Sunset Boulevard", "E Sunset Blvd"));
+		// a phrase becomes one word: no word it stands for
+		assertEquals(Map.of(), AlternativeNameIndexGenerator.replacedWords("Strada Statale 42 del Tonale",
+				"SS42 del Tonale"));
+	}
+
 	private void install(String locale, String body) throws Exception {
 		Method parse = SearchVariantRules.class.getDeclaredMethod("parseLayer", InputStream.class, String.class);
 		parse.setAccessible(true);

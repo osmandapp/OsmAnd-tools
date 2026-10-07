@@ -3,8 +3,10 @@ package net.osmand.obf.preparation;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 
 import net.osmand.binary.CommonWordsMultiIndex;
@@ -13,6 +15,7 @@ import net.osmand.binary.SearchVariantRules;
 import net.osmand.binary.SearchVariantRules.Rule;
 import net.osmand.binary.SearchVariantRules.RuleId;
 import net.osmand.util.Algorithms;
+import net.osmand.util.SearchAlgorithms;
 
 /**
  * Alternative spellings of a name that go to the name index next to the name itself, so the search finds an object
@@ -231,7 +234,7 @@ public class AlternativeNameIndexGenerator<T> {
 		SearchVariantRules rules = SearchVariantRules.forLocale(SearchLocales.forName(lang, mapLocale));
 		List<NameIndexPlan.Alternative> alternatives = new ArrayList<>();
 		for (SearchVariantRules.Unglued unglued : rules.unglue(name)) {
-			alternatives.add(new NameIndexPlan.Alternative(unglued.ids(), unglued.name(), false));
+			alternatives.add(new NameIndexPlan.Alternative(unglued.ids(), unglued.name(), false, Map.of()));
 		}
 		if (owner != null) {
 			for (Rule rule : rules.index()) {
@@ -240,11 +243,45 @@ public class AlternativeNameIndexGenerator<T> {
 				}
 				String alternative = rule.apply(name);
 				if (alternative != null) {
-					alternatives.add(new NameIndexPlan.Alternative(List.of(rule.id()), alternative, rule.alwaysKeys()));
+					alternatives.add(new NameIndexPlan.Alternative(List.of(rule.id()), alternative, rule.alwaysKeys(),
+							replacedWords(name, alternative)));
 				}
 			}
 		}
 		return alternatives;
+	}
+
+	/**
+	 * The words a rule put in place of words of the name, one for one: the name and the alternative name have as many
+	 * words and differ at some of them ("Forest Avenue" -> "Forest Ave": "ave" -> "avenue", a mirror pair or an
+	 * {@code <index>} rule of a word). A phrase or a glued form ("Strada Statale 42" -> "SS42") has no such
+	 * correspondence: its new words are decided by their own class (rules-spec.md, 3.3).
+	 *
+	 * @return a new word of the alternative name -> the word of the name at its place, normalized as words of names
+	 */
+	static Map<String, String> replacedWords(String name, String alternative) {
+		List<String> nameWords = SearchAlgorithms.splitAndNormalize(name, false);
+		List<String> alternativeWords = SearchAlgorithms.splitAndNormalize(alternative, false);
+		if (nameWords.size() != alternativeWords.size()) {
+			return Map.of();
+		}
+		Map<String, String> replaced = new TreeMap<>();
+		Set<String> ambiguous = new HashSet<>();
+		for (int i = 0; i < nameWords.size(); i++) {
+			String from = nameWords.get(i);
+			String to = alternativeWords.get(i);
+			// a pure number is a value of its own, not a spelling of the word it replaced ("Highway" -> "42")
+			if (from.equals(to) || nameWords.contains(to) || Algorithms.isInt(to)) {
+				continue;
+			}
+			String previous = replaced.putIfAbsent(to, from);
+			if (previous != null && !previous.equals(from)) {
+				// one new word for two words of the name: no single word it stands for
+				ambiguous.add(to);
+			}
+		}
+		replaced.keySet().removeAll(ambiguous);
+		return replaced;
 	}
 
 	/** Counts the alternative names of one name: the statistics of their rules. */
