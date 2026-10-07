@@ -295,6 +295,12 @@ public class SpatialSearchService {
 					}
 				}
 			}
+			if (res.typoSuggestion != null) {
+				// "did you mean": the query with a misspelled word corrected, searched when the row is clicked
+				response.features.add(0, new Feature(Geometry.point(new LatLon(0, 0)))
+						.prop(SearchResultConverter.PoiTypeField.TYPE.getFieldName(), ObjectType.SUGGESTION)
+						.prop(SearchResultConverter.PoiTypeField.NAME.getFieldName(), res.typoSuggestion));
+			}
 			// extra info shown in the UI
 			response.info = getSearchStats(res.stats, sTime, response.features.size());
 			response.info.put("words-matched", res.combinations == null || res.combinations.isEmpty() ? 0
