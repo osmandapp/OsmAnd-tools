@@ -680,6 +680,7 @@ public class UserdataService {
         }
         pu.token = null;
         pu.tokenTime = null;
+        emailTokenRequests.invalidate(pu.email.trim().toLowerCase(Locale.ROOT));
         CloudUserDevicesRepository.CloudUserDevice device = new CloudUserDevicesRepository.CloudUserDevice();
 	    if (Algorithms.isEmpty(deviceId) || Algorithms.isEmpty(model)) {
 		    LOG.error("device-register: avoid delete-anonymous-same-device (" + email + ")");
@@ -1486,6 +1487,7 @@ public class UserdataService {
                 if (deleteAllFiles(dev)) {
                     int numOfUsersDelete = usersRepository.deleteByEmailIgnoreCase(pu.email);
                     if (numOfUsersDelete != -1) {
+						emailTokenRequests.invalidate(pu.email.trim().toLowerCase(Locale.ROOT));
 						LOG.info("Deleted (/delete-account) users with email " + pu.email + " and id " + pu.id);
 						removeEmailFromSupporters(pu.id);
 						removeUserIdFromPurchases(pu.id);
@@ -1723,6 +1725,8 @@ public class UserdataService {
             return ResponseEntity.badRequest().body("User is not registered");
         }
         // change email
+        emailTokenRequests.invalidate(currentUser.email.trim().toLowerCase(Locale.ROOT));
+        emailTokenRequests.invalidate(tempUser.email.trim().toLowerCase(Locale.ROOT));
         usersRepository.delete(tempUser);
         currentUser.email = username;
         usersRepository.saveAndFlush(currentUser);
