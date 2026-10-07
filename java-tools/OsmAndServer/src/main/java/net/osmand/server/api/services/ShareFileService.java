@@ -262,32 +262,13 @@ public class ShareFileService {
 				access.access = (accessType);
 				shareFileRepository.saveAndFlush(access);
 				if (PermissionType.READ.name().equals(accessType)) {
-					notifyAccessRequest(access, true);
+					emailSender.sendShareFileAccessEmail(access, true);
 				} else if (PermissionType.BLOCKED.name().equals(accessType)) {
-					notifyAccessRequest(access, false);
+					emailSender.sendShareFileAccessEmail(access, false);
 				}
 			}
 		}
 		return true;
-	}
-
-	private void notifyAccessRequest(ShareFileRepository.ShareFilesAccess access, boolean approved) {
-		try {
-			ShareFileRepository.ShareFile file = access.file;
-			CloudUsersRepository.CloudUser requester = access.user;
-			if (file == null || requester == null || requester.email == null) {
-				return;
-			}
-			CloudUsersRepository.CloudUser owner = usersRepository.findById(file.ownerid);
-			if (owner == null) {
-				return;
-			}
-			CloudUserFilesRepository.UserFile userFile = getUserFile(file);
-			emailSender.sendShareFileAccessEmail(requester.email, emailSender.userLang(requester.id), approved,
-					owner, file.name, file.type, userFile == null ? 0 : userFile.filesize, file.uuid);
-		} catch (Exception e) {
-			LOGGER.error("Failed to send share access email: " + e.getMessage(), e);
-		}
 	}
 
 

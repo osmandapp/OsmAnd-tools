@@ -12,9 +12,11 @@ import java.util.regex.Pattern;
 import net.osmand.mailsender.EmailSenderTemplate;
 import net.osmand.server.PurchasesDataLoader;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
+import net.osmand.server.api.repo.CloudUserFilesRepository;
 import net.osmand.server.api.repo.CloudUsersRepository;
 import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
+import net.osmand.server.api.repo.ShareFileRepository;
 import net.osmand.util.Algorithms;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -34,6 +36,12 @@ public class EmailSenderService {
 
 	@Autowired
 	protected CloudUserDevicesRepository devicesRepository;
+
+	@Autowired
+	protected CloudUsersRepository usersRepository;
+
+	@Autowired
+	protected CloudUserFilesRepository filesRepository;
 
 	public void sendAfterCommit(Runnable send) {
 		if (TransactionSynchronizationManager.isSynchronizationActive()) {
@@ -122,7 +130,27 @@ public class EmailSenderService {
 		return sendOsmAndCloudAccountEmail(email, token, lang, action, null);
 	}
 
-	public void sendShareFileAccessEmail(String email, String lang, boolean approved,
+	public void sendShareFileAccessEmail(ShareFileRepository.ShareFilesAccess access, boolean approved) {
+		ShareFileRepository.ShareFile file = access.file;
+		CloudUsersRepository.CloudUser requester = access.user;
+		if (file == null || requester == null || requester.email == null) {
+			return;
+		}
+		try {
+			CloudUsersRepository.CloudUser owner = usersRepository.findById(file.ownerid);
+			if (owner == null) {
+				return;
+			}
+			CloudUserFilesRepository.UserFile userFile =
+					filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(file.ownerid, file.filepath, file.type);
+			sendShareFileAccessEmail(requester.email, userLang(requester.id), approved, owner,
+					file.name, file.type, userFile == null ? 0 : userFile.filesize, file.uuid);
+		} catch (Exception e) {
+			LOGGER.error("Failed to send share access email: " + e.getMessage(), e);
+		}
+	}
+
+	private void sendShareFileAccessEmail(String email, String lang, boolean approved,
 			CloudUsersRepository.CloudUser owner, String fileName, String fileType, long fileSize, UUID fileUuid) {
 		String ownerName = owner.nickname;
 		if (Algorithms.isEmpty(ownerName)) {
@@ -160,7 +188,18 @@ public class EmailSenderService {
 		return s == null ? "" : TEMPLATE_TOKEN_START.matcher(s.replaceAll("[\\r\\n]+", " ")).replaceAll("＠");
 	}
 
-	public void sendPurchaseReceiptEmail(String email, String lang, String orderId, Date orderDate, String orderTotal,
+	public void sendPurchaseReceiptEmail(String email, int userId, String checkoutLang, String orderId, Date orderDate,
+			String orderTotal, List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> purchases,
+			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions) {
+		try {
+			String lang = userLang(userId);
+			sendReceipt(email, lang != null ? lang : checkoutLang, orderId, orderDate, orderTotal, purchases, subscriptions);
+		} catch (Exception e) {
+			LOGGER.error("Failed to send receipt for orderId " + orderId + ": " + e.getMessage(), e);
+		}
+	}
+
+	private void sendReceipt(String email, String lang, String orderId, Date orderDate, String orderTotal,
 			List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> purchases,
 			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions) {
 		String productName;

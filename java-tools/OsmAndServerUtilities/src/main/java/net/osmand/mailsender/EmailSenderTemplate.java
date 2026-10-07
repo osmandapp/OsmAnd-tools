@@ -12,6 +12,8 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Year;
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -206,6 +208,7 @@ public class EmailSenderTemplate {
 
 	public EmailSenderTemplate load(String template, @Nullable String langNullable) {
 		String lang = safeLang(langNullable);
+		set("YEAR", String.valueOf(Year.now(ZoneOffset.UTC).getValue()));
 		include("defaults", lang, false); // settings (email-headers, vars, etc)
 
 		List<String> templateLines = readTemplate(template, lang, true);
