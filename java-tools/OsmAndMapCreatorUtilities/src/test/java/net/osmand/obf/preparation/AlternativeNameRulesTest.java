@@ -205,6 +205,34 @@ public class AlternativeNameRulesTest {
 		assertEquals(0, noGroup.getAlternativeNameStats().decisions(KeyDecision.KEPT));
 	}
 
+	@Test
+	public void mirrorPairAddsAlternativeNamesBothWays() throws Exception {
+		install("en_US", "<rule object=\"street\" from=\"blvd\" to=\"Boulevard\"/>");
+		NameIndexCreator<Street> names = new NameIndexCreator<>(CommonWords.getAddrInstance());
+		names.setMapName(US_MAP);
+		names.addToNameIndex("Sunset Boulevard", null, new Street(null), 4, false);
+		names.addToNameIndex("Hollywood Blvd.", null, new Street(null), 4, false);
+		Map<String, AlternativeNameIndexGenerator.KeyStats> byRule = names.getAlternativeNameStats().byRule;
+		assertEquals(1, byRule.get(TEST_FILE + " street Boulevard→blvd").alternatives);
+		assertEquals(1, byRule.get(TEST_FILE + " street blvd→Boulevard").alternatives);
+		// "blvd" is always a key: "Sunset Boulevard" is found by it now
+		assertTrue(names.namesIndex.containsKey("blvd"));
+		NameIndexCreator.NamedObjectsByPrefix<Street> blvd = names.namesIndex.get("blvd");
+		boolean sunset = false;
+		for (NameIndexCreator.NamedObject<Street> o : blvd.namedObjects) {
+			for (NameIndexCreator.NameObjectSingleNameIndex n : o.singleNames) {
+				sunset |= n.listNames().equals(List.of("sunset", "blvd"));
+			}
+		}
+		assertTrue(sunset);
+		// a poi is no street: the pair does not apply
+		NameIndexCreator<NameIndexCreator.PoiNameObject> pois = new NameIndexCreator<>(CommonWords.getAddrInstance());
+		pois.setMapName(US_MAP);
+		pois.addToNameIndex("Boulevard Cafe", null, new NameIndexCreator.PoiNameObject(null, 0, -1, "cafe", "cafe",
+				null, null, false), 4, false);
+		assertEquals(0, pois.getAlternativeNameStats().alternatives);
+	}
+
 	private void install(String locale, String body) throws Exception {
 		Method parse = SearchVariantRules.class.getDeclaredMethod("parseLayer", InputStream.class, String.class);
 		parse.setAccessible(true);
