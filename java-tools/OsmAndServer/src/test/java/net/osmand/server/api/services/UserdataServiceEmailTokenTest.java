@@ -2,9 +2,11 @@ package net.osmand.server.api.services;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Date;
+import java.util.Queue;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
@@ -15,6 +17,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import com.google.common.cache.Cache;
 
 import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
+import net.osmand.server.utils.exception.OsmAndPublicApiException;
 
 @RunWith(Parameterized.class)
 public class UserdataServiceEmailTokenTest {
@@ -59,11 +62,13 @@ public class UserdataServiceEmailTokenTest {
         UserdataService service = new UserdataService();
         Cache<?, ?> cache = (Cache<?, ?>) ReflectionTestUtils.getField(service, "emailTokenRequests");
         for (int i = 0; i < cachedUsers; i++) {
+            resetRate();
             service.updateSecureEmailToken(user("user" + i + "@example.com"));
         }
         assertEquals(cachedUsers, cache.size());
 
         CloudUser user = user("next@example.com");
+        resetRate();
         service.updateSecureEmailToken(user);
         Object cachedToken = cache.getIfPresent(user.email);
         long nextAllowedAt = (long) ReflectionTestUtils.getField(cachedToken, "nextAllowedAt");
@@ -78,6 +83,22 @@ public class UserdataServiceEmailTokenTest {
         assertSame(tokenTime, user.tokenTime);
         assertSame(cachedToken, cache.getIfPresent(user.email));
         assertEquals(cachedUsers + 1, cache.size());
+    }
+
+    @Test
+    public void noMoreThanFiveNewTokensPerSecond() {
+        UserdataService service = new UserdataService();
+        resetRate();
+        for (int i = 0; i < 5; i++) {
+            service.updateSecureEmailToken(user("rate" + i + "@example.com"));
+        }
+        // resend of an issued token is not a new token
+        service.updateSecureEmailToken(user("rate0@example.com"));
+        assertThrows(OsmAndPublicApiException.class, () -> service.updateSecureEmailToken(user("rate5@example.com")));
+    }
+
+    private static void resetRate() {
+        ((Queue<?>) ReflectionTestUtils.getField(UserdataService.class, "EMAIL_TOKEN_TIMES")).clear();
     }
 
     private static CloudUser user(String email) {
