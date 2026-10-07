@@ -11,6 +11,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
@@ -53,10 +54,10 @@ public class GenerateTurnLanesTest {
 	 * is another. Reading both at the same radius either tears the interchange into a dozen
 	 * junctions or swallows a whole neighbourhood into one.
 	 */
-	private static final int MOTORWAY = 0, TRUNK = 1, PRIMARY = 2, SECONDARY = 3, SMALLER = 9;
+	private static final int MOTORWAY = 0, TRUNK = 1, PRIMARY = 2, SECONDARY = 3, TERTIARY = 4, SMALLER = 9;
 
-	/** the class of road a junction is worth testing on at all */
-	private static final int LOWEST = SECONDARY;
+	/** the classes of road {@link Options#highway} can name, biggest first */
+	public static final List<String> HIGHWAYS = List.of("motorway", "trunk", "primary", "secondary", "tertiary");
 
 	private static int rank(String highway) {
 		if (highway == null) {
@@ -71,6 +72,8 @@ public class GenerateTurnLanesTest {
 			return PRIMARY;
 		} else if (base.equals("secondary")) {
 			return SECONDARY;
+		} else if (base.equals("tertiary")) {
+			return TERTIARY;
 		}
 		return SMALLER;
 	}
@@ -103,65 +106,220 @@ public class GenerateTurnLanesTest {
 		return clusterOf(rank) * 3;
 	}
 
-	private static int junctions = 100;
-	private static int perJunction = 2;
-	private static String profile = "car";
-	private static boolean linksOnly;
-	/** a case with no lane picture in it says nothing about lanes */
-	private static boolean anyTurn;
+	/** what to generate: how many junctions, how many drives through each, and which of them to keep */
+	public static class Options {
+		public int junctions = 100;
+		public int perJunction = 2;
+		public String profile = "car";
+		public boolean linksOnly;
+		/** a case with no lane picture in it says nothing about lanes */
+		public boolean anyTurn;
+		/**
+		 * Only drives that actually read an unpainted lane: somewhere along the route an instruction is
+		 * given off markings that leave a lane blank - "||right", "none|none|through". A junction with
+		 * such a road nearby is not enough; the drive has to pass through it.
+		 */
+		public boolean noneLanes;
+		/** where to read which side traffic keeps to; regions.ocbf beside the obf when not given */
+		public String regionsPath;
+		/**
+		 * The smallest class of road a junction is worth testing on: one of {@link #HIGHWAYS}. A tertiary junction is
+		 * read at the size of a secondary one.
+		 */
+		public String highway = "secondary";
+
+		int lowest() {
+			int i = HIGHWAYS.indexOf(highway);
+			if (i < 0) {
+				throw new IllegalArgumentException("Highway level: one of " + HIGHWAYS);
+			}
+			return i;
+		}
+	}
+
+	/** how far one obf has got, and whether whoever started it still wants the rest */
+	public interface Progress {
+		void junctions(int done, int total, int cases);
+
+		boolean isCancelled();
+	}
+
+	/** one drive through a junction and every instruction given on it, keyed by the road carrying it */
+	public static class Case {
+		public final String name;
+		public final LatLon start;
+		public final LatLon end;
+		public final String map;
+		public final boolean leftSide;
+		public final Map<String, String> results;
+		/** where each instruction is given, by the same keys: for a person to find it on the map */
+		public final Map<String, LatLon> points;
+
+		Case(String name, LatLon start, LatLon end, String map, boolean leftSide, Map<String, String> results,
+				Map<String, LatLon> points) {
+			this.name = name;
+			this.start = start;
+			this.end = end;
+			this.map = map;
+			this.leftSide = leftSide;
+			this.results = results;
+			this.points = points;
+		}
+	}
+
 	/**
-	 * Only drives that actually read an unpainted lane: somewhere along the route an instruction is
-	 * given off markings that leave a lane blank - "||right", "none|none|through". A junction with
-	 * such a road nearby is not enough; the drive has to pass through it.
+	 * Heap the router may take per drive. A city - Berlin - fills three times the default with the search alone,
+	 * and what is left for road tiles is then unloaded and read again at every step; it changes how fast a route is
+	 * found, not which one.
 	 */
-	private static boolean noneLanes;
-	/** where to read which side traffic keeps to; regions.ocbf beside the obf when not given */
-	private static String regionsPath;
+	public static final int MEMORY_LIMIT_MB = 512;
+
+	public static final String[] CSV_HEADER = {"num", "name", "start", "end", "segment", "expected", "left_side", "obf",
+			"point"};
+
+	private final Options options;
+	private final Progress progress;
+
+	public GenerateTurnLanesTest(Options options, Progress progress) {
+		this.options = options;
+		this.progress = progress;
+	}
 
 	public static void main(String[] args) throws IOException, InterruptedException {
 		if (args.length < 2) {
-			System.out.println("generate-turn-lanes-test <file.obf> <out.json>"
+			System.out.println("generate-turn-lanes-test <file.obf> <out.json|out.csv>"
 					+ " [--junctions=100] [--per-junction=2] [--profile=car] [--links-only] [--any-turn]"
-					+ " [--none-lanes] [--regions=regions.ocbf]");
+					+ " [--none-lanes] [--regions=regions.ocbf] [--highway=secondary]");
 			return;
 		}
 		File obf = new File(args[0]);
 		File out = new File(args[1]);
+		Options options = new Options();
 		for (int i = 2; i < args.length; i++) {
 			String a = args[i];
 			if (a.startsWith("--junctions=")) {
-				junctions = Integer.parseInt(a.substring(a.indexOf('=') + 1));
+				options.junctions = Integer.parseInt(a.substring(a.indexOf('=') + 1));
 			} else if (a.startsWith("--per-junction=")) {
-				perJunction = Integer.parseInt(a.substring(a.indexOf('=') + 1));
+				options.perJunction = Integer.parseInt(a.substring(a.indexOf('=') + 1));
 			} else if (a.startsWith("--profile=")) {
-				profile = a.substring(a.indexOf('=') + 1);
+				options.profile = a.substring(a.indexOf('=') + 1);
 			} else if (a.equals("--links-only")) {
-				linksOnly = true;
+				options.linksOnly = true;
 			} else if (a.equals("--any-turn")) {
-				anyTurn = true;
+				options.anyTurn = true;
+			} else if (a.startsWith("--highway=")) {
+				options.highway = a.substring(a.indexOf('=') + 1);
 			} else if (a.equals("--none-lanes")) {
-				noneLanes = true;
+				options.noneLanes = true;
 			} else if (a.startsWith("--regions=")) {
-				regionsPath = a.substring(a.indexOf('=') + 1);
+				options.regionsPath = a.substring(a.indexOf('=') + 1);
 			}
 		}
+		// one line per percent, auto_test.sh shows the last one
+		GenerateTurnLanesTest generator = new GenerateTurnLanesTest(options, new Progress() {
+			int percent = -1;
+
+			@Override
+			public void junctions(int done, int total, int cases) {
+				if (total > 0 && done * 100 / total != percent) {
+					percent = done * 100 / total;
+					System.out.printf("progress %d%% (%d/%d junctions, %d points)%n", percent, done, total, cases);
+				}
+			}
+
+			@Override
+			public boolean isCancelled() {
+				return false;
+			}
+		});
+		List<Case> cases = generator.generate(obf, loadRegions(obf, options.regionsPath));
+		System.out.printf("cases written %d%n", cases.size());
+		FileWriter w = new FileWriter(out);
+		if (out.getName().endsWith(".csv")) {
+			writeCsvRow(w, CSV_HEADER);
+			writeCsv(cases, w, 1);
+		} else {
+			new GsonBuilder().setPrettyPrinting().create().toJson(toJson(cases), w);
+		}
+		w.close();
+	}
+
+	/** regions.ocbf from the path given, or beside the obf; null (right-hand traffic everywhere) when there is none */
+	public static OsmandRegions loadRegions(File obf, String regionsPath) throws IOException {
+		File regionsFile = regionsPath != null && !regionsPath.isEmpty() ? new File(regionsPath)
+				: new File(obf.getAbsoluteFile().getParentFile(), OsmandRegions.REGIONS_OCBF);
+		if (!regionsFile.exists()) {
+			System.out.println("no " + regionsFile + ": every case is recorded as right-hand traffic");
+			return null;
+		}
+		return new OsmandRegions(regionsFile.getAbsolutePath());
+	}
+
+	/** the cases of one obf: junctions picked over the whole map, and the drives recorded through them */
+	public List<Case> generate(File obf, OsmandRegions regions) throws IOException, InterruptedException {
 		Graph graph = read(obf);
 		System.out.printf("roads %d, nodes %d%n", graph.roads.size(), graph.at.size());
 		List<Long> picked = pick(graph);
 		System.out.printf("junctions picked %d%n", picked.size());
-		File regionsFile = regionsPath != null ? new File(regionsPath)
-				: new File(obf.getAbsoluteFile().getParentFile(), OsmandRegions.REGIONS_OCBF);
-		OsmandRegions regions = null;
-		if (regionsFile.exists()) {
-			regions = new OsmandRegions(regionsFile.getAbsolutePath());
-		} else {
-			System.out.println("no " + regionsFile + ": every case is recorded as right-hand traffic");
+		return record(obf, graph, picked, regions);
+	}
+
+	/** the form test_turn_lanes.json and CheckTurnLanesTest read */
+	public static List<Object> toJson(List<Case> cases) {
+		List<Object> out = new ArrayList<>();
+		for (Case c : cases) {
+			Map<String, Object> entry = new LinkedHashMap<>();
+			entry.put("testName", c.name);
+			entry.put("startPoint", point(c.start));
+			entry.put("endPoint", point(c.end));
+			Map<String, String> params = new LinkedHashMap<>();
+			params.put("map", c.map);
+			if (c.leftSide) {
+				params.put("leftSide", "true");
+			}
+			entry.put("params", params);
+			entry.put("expectedResults", c.results);
+			out.add(entry);
 		}
-		List<Object> cases = record(obf, graph, picked, regions);
-		System.out.printf("cases written %d%n", cases.size());
-		FileWriter w = new FileWriter(out);
-		new GsonBuilder().setPrettyPrinting().create().toJson(cases, w);
-		w.close();
+		return out;
+	}
+
+	/**
+	 * One row per instruction, the drive numbered from {@code firstNum}: every row of a drive carries its
+	 * number, ends and map, so a row can be read - and routed again - on its own.
+	 *
+	 * @return the number the next drive would get
+	 */
+	public static int writeCsv(List<Case> cases, Appendable out, int firstNum) throws IOException {
+		int num = firstNum;
+		for (Case c : cases) {
+			for (Map.Entry<String, String> e : c.results.entrySet()) {
+				LatLon at = c.points.get(e.getKey());
+				writeCsvRow(out, String.valueOf(num), c.name, latLon(c.start), latLon(c.end), e.getKey(), e.getValue(),
+						String.valueOf(c.leftSide), c.map, at == null ? "" : latLon(at));
+			}
+			num++;
+		}
+		return num;
+	}
+
+	public static void writeCsvRow(Appendable out, String... values) throws IOException {
+		for (int i = 0; i < values.length; i++) {
+			if (i > 0) {
+				out.append(',');
+			}
+			String v = values[i] == null ? "" : values[i];
+			if (v.indexOf(',') >= 0 || v.indexOf('"') >= 0 || v.indexOf('\n') >= 0) {
+				out.append('"').append(v.replace("\"", "\"\"")).append('"');
+			} else {
+				out.append(v);
+			}
+		}
+		out.append('\n');
+	}
+
+	private static String latLon(LatLon p) {
+		return String.format(Locale.US, "%.6f,%.6f", p.getLatitude(), p.getLongitude());
 	}
 
 	// ------------------------------------------------------------------ the roads as a graph
@@ -289,7 +447,8 @@ public class GenerateTurnLanesTest {
 	 * The junctions worth a test, spread over the map: the ones offering the most ways out first,
 	 * and never two within {@link #APART}, so a single interchange does not fill the file.
 	 */
-	private static List<Long> pick(Graph graph) {
+	private List<Long> pick(Graph graph) {
+		int lowest = options.lowest();
 		List<long[]> candidates = new ArrayList<>();
 		for (Map.Entry<Long, List<Long>> e : graph.at.entrySet()) {
 			if (e.getValue().size() < 2) {
@@ -297,8 +456,8 @@ public class GenerateTurnLanesTest {
 			}
 			int a = arms(graph, e.getKey());
 			int rank = rankOf(graph, e.getKey());
-			if (a < 3 || rank > LOWEST || (linksOnly && !hasLink(graph, e.getKey()))
-					|| (noneLanes && !hasNoneLanes(graph, e.getKey()))) {
+			if (a < 3 || rank > lowest || (options.linksOnly && !hasLink(graph, e.getKey()))
+					|| (options.noneLanes && !hasNoneLanes(graph, e.getKey()))) {
 				continue;
 			}
 			// the biggest road first, then the most ways out: an interchange before a crossroads
@@ -328,7 +487,7 @@ public class GenerateTurnLanesTest {
 			}
 			cellList.add(key);
 			picked.add(key);
-			if (picked.size() >= junctions) {
+			if (picked.size() >= options.junctions) {
 				break;
 			}
 		}
@@ -477,18 +636,20 @@ public class GenerateTurnLanesTest {
 
 	// ------------------------------------------------------------------ what the route says today
 
-	private static List<Object> record(File obf, Graph graph, List<Long> picked, OsmandRegions regions)
+	private List<Case> record(File obf, Graph graph, List<Long> picked, OsmandRegions regions)
 			throws IOException, InterruptedException {
-		List<Object> cases = new ArrayList<>();
+		List<Case> cases = new ArrayList<>();
 		RandomAccessFile raf = new RandomAccessFile(obf, "r");
 		BinaryMapIndexReader reader = new BinaryMapIndexReader(raf, obf);
 		BinaryMapIndexReader[] readers = {reader};
-		int done = 0, percent = -1, points = 0;
+		int done = 0, points = 0;
 		for (long centre : picked) {
-			// one line per percent, auto_test.sh shows the last one
-			if (done * 100 / picked.size() != percent) {
-				percent = done * 100 / picked.size();
-				System.out.printf("progress %d%% (%d/%d junctions, %d points)%n", percent, done, picked.size(), points);
+			// a cancelled run keeps the drives recorded so far
+			if (progress != null && progress.isCancelled()) {
+				break;
+			}
+			if (progress != null) {
+				progress.junctions(done, picked.size(), points);
 			}
 			done++;
 			int rank = rankOf(graph, centre);
@@ -516,34 +677,28 @@ public class GenerateTurnLanesTest {
 			int written = 0;
 			Set<Long> usedIn = new HashSet<>(), usedOut = new HashSet<>();
 			for (Arm[] pair : pairs) {
-				if (written >= perJunction) {
+				if (written >= options.perJunction) {
 					break;
 				}
 				Arm from = pair[0], to = pair[1];
 				if (!usedIn.add(from.key) || !usedOut.add(to.key)) {
 					continue; // an arm already used: vary the drive rather than repeat it
 				}
-				Map<String, String> results = run(readers, from.at, to.at, cluster, leftSide);
+				Map<String, LatLon> at = new LinkedHashMap<>();
+				Map<String, String> results = run(readers, from.at, to.at, cluster, leftSide, at);
 				if (results == null || results.isEmpty() || !worthKeeping(results)) {
 					continue;
 				}
-				Map<String, Object> entry = new LinkedHashMap<>();
-				entry.put("testName", name(graph, centre, cluster) + " " + (written + 1));
-				entry.put("startPoint", point(from.at));
-				entry.put("endPoint", point(to.at));
-				Map<String, String> params = new LinkedHashMap<>();
-				params.put("map", obf.getName());
-				if (leftSide) {
-					params.put("leftSide", "true");
-				}
-				entry.put("params", params);
-				entry.put("expectedResults", results);
-				cases.add(entry);
+				cases.add(new Case(name(graph, centre, cluster) + " " + (written + 1), from.at, to.at, obf.getName(),
+						leftSide, results, at));
 				points += results.size();
 				written++;
 			}
 		}
 		reader.close();
+		if (progress != null) {
+			progress.junctions(done, picked.size(), points);
+		}
 		return cases;
 	}
 
@@ -593,7 +748,9 @@ public class GenerateTurnLanesTest {
 				RouteDataObject road = graph.roads.get(roadOf(p));
 				String called = called(road);
 				boolean link = road.getHighway() != null && road.getHighway().endsWith("_link");
-				int score = (called == null ? 100 : 0) + rank(road.getHighway()) * 2 + (link ? 1 : 0);
+				// tertiary or smaller alike, as before tertiary could be tested at all: the names stay as they were
+				int r = rank(road.getHighway());
+				int score = (called == null ? 100 : 0) + (r >= TERTIARY ? SMALLER : r) * 2 + (link ? 1 : 0);
 				if (score < bestScore) {
 					bestScore = score;
 					best = road;
@@ -623,7 +780,7 @@ public class GenerateTurnLanesTest {
 	 * maneuver belongs in the routing tests, not here; and one that starts with a u-turn is the
 	 * router turning the car round because the start landed on the wrong side of the road.
 	 */
-	private static boolean worthKeeping(Map<String, String> results) {
+	private boolean worthKeeping(Map<String, String> results) {
 		boolean first = true;
 		for (String value : results.values()) {
 			if (first && (value.startsWith("TU") || value.startsWith("[MUTE] TU"))) {
@@ -631,7 +788,7 @@ public class GenerateTurnLanesTest {
 			}
 			first = false;
 		}
-		if (anyTurn) {
+		if (options.anyTurn) {
 			return true;
 		}
 		for (String value : results.values()) {
@@ -642,7 +799,6 @@ public class GenerateTurnLanesTest {
 		return false;
 	}
 
-	/** the turn:lanes a segment is driven with: the unsuffixed tag on a one-way, the direction's own otherwise */
 	/** an unpainted lane: "none" or nothing at all between the bars. Not every branch has this on TurnType. */
 	private static boolean hasNoneLane(String turnLanes) {
 		if (turnLanes == null) {
@@ -656,6 +812,7 @@ public class GenerateTurnLanesTest {
 		return false;
 	}
 
+	/** the turn:lanes a segment is driven with: the unsuffixed tag on a one-way, the direction's own otherwise */
 	private static String turnLanesOf(RouteSegmentResult segment) {
 		RouteDataObject road = segment.getObject();
 		if (road.getOneway() == 0) {
@@ -683,41 +840,88 @@ public class GenerateTurnLanesTest {
 	 * them: the osm id of the road carrying the instruction, and its start point when that road
 	 * carries more than one.
 	 */
-	private static Map<String, String> run(BinaryMapIndexReader[] readers, LatLon from, LatLon to,
-			Set<Long> junction, boolean leftSide) throws IOException, InterruptedException {
+	private Map<String, String> run(BinaryMapIndexReader[] readers, LatLon from, LatLon to,
+			Set<Long> junction, boolean leftSide, Map<String, LatLon> points) throws IOException {
+		List<RouteSegmentResult> route;
+		try {
+			route = searchRoute(readers, from, to, leftSide);
+		} catch (RuntimeException | InterruptedException e) {
+			return null;
+		}
+		if (route == null || route.isEmpty() || !passes(route, junction)) {
+			return null;
+		}
+		if (options.noneLanes && !readsFromNone(route)) {
+			return null; // the drive never took an instruction off an unpainted lane
+		}
+		return instructions(route, points);
+	}
+
+	/** a drive routed again: the instructions it gets, and every road it takes, by osm id */
+	public static class Replay {
+		public final Map<String, String> instructions;
+		public final Set<Long> roads;
+
+		Replay(Map<String, String> instructions, Set<Long> roads) {
+			this.instructions = instructions;
+			this.roads = roads;
+		}
+	}
+
+	/**
+	 * The instructions a drive gets today, keyed as {@link #writeCsv} keys them, and the roads it takes: what a
+	 * dataset is checked against when it is replayed - an instruction gone from a road the drive still takes is not
+	 * the drive going elsewhere. Null when there is no route between the two points.
+	 */
+	public Replay replay(BinaryMapIndexReader[] readers, LatLon from, LatLon to, boolean leftSide)
+			throws IOException, InterruptedException {
+		List<RouteSegmentResult> route = searchRoute(readers, from, to, leftSide);
+		if (route == null || route.isEmpty()) {
+			return null;
+		}
+		Set<Long> roads = new HashSet<>();
+		for (RouteSegmentResult segment : route) {
+			roads.add(ObfConstants.getOsmObjectId(segment.getObject()));
+		}
+		return new Replay(instructions(route, null), roads);
+	}
+
+	private List<RouteSegmentResult> searchRoute(BinaryMapIndexReader[] readers, LatLon from, LatLon to,
+			boolean leftSide) throws IOException, InterruptedException {
 		RoutingMemoryLimits limits = new RoutingMemoryLimits(
-				RoutingConfiguration.DEFAULT_MEMORY_LIMIT * 3, RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT);
+				MEMORY_LIMIT_MB, RoutingConfiguration.DEFAULT_NATIVE_MEMORY_LIMIT);
 		Map<String, String> params = new HashMap<>();
-		params.put(profile, "true");
-		RoutingConfiguration config = RoutingConfiguration.getDefault().build(profile, limits, params);
+		params.put(options.profile, "true");
+		RoutingConfiguration config = RoutingConfiguration.getDefault().build(options.profile, limits, params);
 		RoutePlannerFrontEnd fe = new RoutePlannerFrontEnd();
 		RoutingContext ctx = fe.buildRoutingContext(config, null, readers,
 				RoutePlannerFrontEnd.RouteCalculationMode.NORMAL);
 		ctx.leftSideNavigation = leftSide;
-		List<RouteSegmentResult> route;
-		try {
-			route = fe.searchRoute(ctx, from, to, null).getList();
-		} catch (RuntimeException | InterruptedException e) {
-			return null;
+		return fe.searchRoute(ctx, from, to, null).getList();
+	}
+
+	/** some instruction of the drive is given off markings that leave a lane blank */
+	private static boolean readsFromNone(List<RouteSegmentResult> route) {
+		for (int i = 1; i < route.size(); i++) {
+			// the markings that gave this instruction are on the road the turn is taken from
+			if (route.get(i).getTurnType() != null && hasNoneLane(turnLanesOf(route.get(i - 1)))) {
+				return true;
+			}
 		}
-		if (route == null || !passes(route, junction)) {
-			return null;
-		}
+		return false;
+	}
+
+	private static Map<String, String> instructions(List<RouteSegmentResult> route, Map<String, LatLon> points) {
 		Map<String, String> results = new LinkedHashMap<>();
 		Map<Long, Integer> seen = new HashMap<>();
 		// the route opens with a "carry on" that the test sees like any other instruction: a later
 		// one on this same road has to name its start point, or the two cannot be told apart
 		seen.put(ObfConstants.getOsmObjectId(route.get(0).getObject()), route.get(0).getStartPointIndex());
-		boolean readFromNone = false;
 		for (int i = 1; i < route.size(); i++) {
 			RouteSegmentResult segment = route.get(i);
 			TurnType turn = segment.getTurnType();
 			if (turn == null) {
 				continue;
-			}
-			// the markings that gave this instruction are on the road the turn is taken from
-			if (hasNoneLane(turnLanesOf(route.get(i - 1)))) {
-				readFromNone = true;
 			}
 			long id = ObfConstants.getOsmObjectId(segment.getObject());
 			// RouteResultPreparationTest compares three forms - the instruction with its lanes, the
@@ -731,11 +935,14 @@ public class GenerateTurnLanesTest {
 			String key = had == null ? String.valueOf(id) : id + ":" + segment.getStartPointIndex();
 			if (had != null && results.containsKey(String.valueOf(id))) {
 				results.put(id + ":" + had, results.remove(String.valueOf(id)));
+				if (points != null) {
+					points.put(id + ":" + had, points.remove(String.valueOf(id)));
+				}
 			}
 			results.put(key, value);
-		}
-		if (noneLanes && !readFromNone) {
-			return null; // the drive never took an instruction off an unpainted lane
+			if (points != null) {
+				points.put(key, segment.getStartPoint());
+			}
 		}
 		return results;
 	}
