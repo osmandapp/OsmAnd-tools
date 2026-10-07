@@ -15,7 +15,7 @@ import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.CommonWords;
 import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.OsmandOdb;
-import net.osmand.binary.SearchModRules;
+import net.osmand.search.rules.SearchModRules;
 import net.osmand.data.*;
 import net.osmand.obf.preparation.*;
 import net.osmand.osm.MapRenderingTypesEncoder;
