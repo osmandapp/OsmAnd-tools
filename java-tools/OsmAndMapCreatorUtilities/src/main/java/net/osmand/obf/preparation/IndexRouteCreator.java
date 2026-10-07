@@ -148,18 +148,35 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION, EntityConvertApplyType.ROUTING);
 			if ("enforcement".equals(tags.get("type")) && "maxspeed".equals(tags.get("enforcement"))) {
 				ctx.loadEntityRelation((Relation) e);
-				Iterator<RelationMember> from = ((Relation) e).getMembers("from").iterator();
 				// mark as speed cameras
+				Iterator<RelationMember> from = ((Relation) e).getMembers("from").iterator();
 				while(from.hasNext()) {
 					Entity n = from.next().getEntity();
 					if (n instanceof Node) {
 						PropagateEntityTags pt = tagsTransformer
 								.getPropogateTagForEntity(new EntityId(EntityType.NODE, n.getId()));
 						pt.putThroughTags.put("highway", "speed_camera");
+						addSpeedCameraRelation(pt, e.getId(), "from");
+					}
+				}
+				// "to" only marks the direction, speed_camera_to keeps the point in the route section without an alarm
+				Iterator<RelationMember> to = ((Relation) e).getMembers("to").iterator();
+				while(to.hasNext()) {
+					Entity n = to.next().getEntity();
+					if (n instanceof Node) {
+						PropagateEntityTags pt = tagsTransformer
+								.getPropogateTagForEntity(new EntityId(EntityType.NODE, n.getId()));
+						pt.putThroughTags.putIfAbsent("highway", "speed_camera_to");
+						addSpeedCameraRelation(pt, e.getId(), "to");
 					}
 				}
 			}
 		}
+	}
+
+	private static void addSpeedCameraRelation(PropagateEntityTags pt, long relationId, String role) {
+		String tag = "osmand:speed_camera_relation_id";
+		pt.putThroughTags.put(tag, RelationTagsPropagation.sortAndAttachUniqueValue(pt.putThroughTags.get(tag), relationId + ":" + role));
 	}
 
 	public void indexLowEmissionZones(Entity e, OsmDbAccessorContext ctx) throws SQLException {

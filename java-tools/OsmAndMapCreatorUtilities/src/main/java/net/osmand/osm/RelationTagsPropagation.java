@@ -263,7 +263,7 @@ public class RelationTagsPropagation {
 	
 	
 	
-	private static String sortAndAttachUniqueValue(String list, String value) {
+	public static String sortAndAttachUniqueValue(String list, String value) {
 		if(list == null) {
 			list = "";
 		}
