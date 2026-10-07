@@ -526,15 +526,18 @@ public class UserdataService {
             // More emails issued tokens in the last hour increase the per-email pause from 10 to 60 minutes.
             long delayMinutes = Math.min(EMAIL_TOKEN_MAX_DELAY_MINUTES, Math.max(EMAIL_TOKEN_MIN_DELAY_MINUTES,
                     EMAIL_TOKEN_MIN_DELAY_MINUTES * emailTokenRequests.size() / EMAIL_TOKEN_AVG_HOURLY_USERS));
-            token = new SecureEmailToken(generateEmailToken(), now + TimeUnit.MINUTES.toMillis(delayMinutes));
+            token = new SecureEmailToken(generateEmailToken(6), now + TimeUnit.MINUTES.toMillis(delayMinutes));
             emailTokenRequests.put(email, token);
             user.tokenTime = new Date(now);
         }
         user.token = token.token();
     }
 
-    private String generateEmailToken() {
-        return Integer.toString(new SecureRandom().nextInt(900000) + 100000); // Generate 6 digits (100000-999999).
+    private String generateEmailToken(int digits) {
+        // Allow 6 (minimum) to 18 (Long max)
+        digits = Math.max(6, Math.min(18, digits));
+        long minValue = (long) Math.pow(10, digits - 1);
+        return Long.toString(new SecureRandom().nextLong(9 * minValue) + minValue);
     }
 
     public ResponseEntity<String> webUserActivate(String email, String token, String password, String lang) {
