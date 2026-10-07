@@ -871,6 +871,9 @@ public class IndexCreator {
 		line.append(", total [").append(total).append("]");
 		line.append(", by rule [").append(total.byRuleString()).append("]");
 		log.info(line.toString());
+		for (String rule : AlternativeNameIndexGenerator.Stats.byRuleLines(address, poi)) {
+			log.info("ALTERNATIVE_NAMES_RULE: " + mapFile.getName() + " " + rule);
+		}
 		if (keysReport) {
 			File report = new File(mapFile.getParentFile(), mapFile.getName() + ".keys_report.tsv");
 			try (Writer out = new OutputStreamWriter(new FileOutputStream(report), StandardCharsets.UTF_8)) {

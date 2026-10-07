@@ -206,6 +206,26 @@ public class AlternativeNameRulesTest {
 	}
 
 	@Test
+	public void everyRuleOfTheMapLocaleHasALogLine() throws Exception {
+		install("en_US", "<rule object=\"street\" from=\"blvd\" to=\"Boulevard\"/>"
+				+ "<index><rule object=\"street\" mode=\"All\" from=\"(?iu)(?&lt;![\\p{L}\\p{M}\\p{N}])pkwy"
+				+ "(?![\\p{L}\\p{M}\\p{N}])\\.?\" to=\"Parkway\"/></index>");
+		NameIndexCreator<Street> names = new NameIndexCreator<>(CommonWords.getAddrInstance());
+		names.setMapName(US_MAP);
+		names.addToNameIndex("Sunset Boulevard", null, new Street(null), 4, false);
+		names.addToNameIndex("Ocean Boulevard", null, new Street(null), 4, false);
+		List<String> lines = AlternativeNameIndexGenerator.Stats.byRuleLines(names.getAlternativeNameStats(), null);
+		// the rule with the most alternative names first, with its address part
+		assertTrue(lines.get(0), lines.get(0).startsWith(TEST_FILE + " street Boulevard→blvd: total [alternatives=2 "));
+		assertTrue(lines.get(0), lines.get(0).contains(", address [alternatives=2 "));
+		// a rule that never applied is listed with zeros, its whole-word bounds read as \b
+		String pkwy = TEST_FILE + " street (?iu)\\bpkwy\\b\\.?: total [alternatives=0 keys=0 ";
+		assertTrue(lines.toString(), lines.stream().anyMatch(l -> l.startsWith(pkwy) && !l.contains("address")));
+		// the line of the totals keeps only the rules that applied
+		assertFalse(names.getAlternativeNameStats().byRuleString().contains("pkwy"));
+	}
+
+	@Test
 	public void mirrorPairAddsAlternativeNamesBothWays() throws Exception {
 		install("en_US", "<rule object=\"street\" from=\"blvd\" to=\"Boulevard\"/>");
 		NameIndexCreator<Street> names = new NameIndexCreator<>(CommonWords.getAddrInstance());

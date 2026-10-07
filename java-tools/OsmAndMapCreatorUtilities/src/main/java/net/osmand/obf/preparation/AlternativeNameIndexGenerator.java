@@ -3,11 +3,13 @@ package net.osmand.obf.preparation;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 import net.osmand.binary.CommonWordsMultiIndex;
 import net.osmand.binary.SearchLocales;
@@ -110,6 +112,8 @@ public class AlternativeNameIndexGenerator<T> {
 		int names;
 		// alternative names and keys by rule (RuleId: "rules_it.xml street (?iu)\bStrada\s+Statale\s+(\d+)\b")
 		final Map<String, KeyStats> byRule = new TreeMap<>();
+		// the rules of <index> of the map locale, so a rule that never applied is reported too
+		final Set<String> mapRules = new TreeSet<>();
 		// keys_report.tsv: words with a class of the statistics or the rules, or with a decision other than a key by
 		// the statistics; null when the report is off
 		Map<String, WordReport> words;
@@ -118,6 +122,7 @@ public class AlternativeNameIndexGenerator<T> {
 			names += other.names;
 			super.add(other);
 			other.byRule.forEach((rule, s) -> byRule.computeIfAbsent(rule, r -> new KeyStats()).add(s));
+			mapRules.addAll(other.mapRules);
 			if (other.words != null) {
 				if (words == null) {
 					words = new TreeMap<>();
@@ -145,6 +150,57 @@ public class AlternativeNameIndexGenerator<T> {
 			StringBuilder s = new StringBuilder();
 			byRule.forEach((rule, stats) -> s.append(s.length() == 0 ? "" : "; ").append(rule).append(": ").append(stats));
 			return s.toString();
+		}
+
+		/**
+		 * One line per rule to weigh its role, the rules with the most alternative names first: what it added in the
+		 * address and the POI name index (alternative names, stored keys by outcome, decisions on its words); a rule
+		 * of the map locale that never applied has zeros.
+		 */
+		public static List<String> byRuleLines(Stats address, Stats poi) {
+			Map<String, KeyStats[]> rules = new TreeMap<>();
+			Stats[] indexes = { address, poi };
+			for (int i = 0; i < indexes.length; i++) {
+				if (indexes[i] == null) {
+					continue;
+				}
+				for (String rule : indexes[i].mapRules) {
+					rules.computeIfAbsent(rule, r -> new KeyStats[indexes.length]);
+				}
+				int index = i;
+				indexes[i].byRule.forEach((rule, s) -> rules.computeIfAbsent(rule, r -> new KeyStats[indexes.length])[index] = s);
+			}
+			Map<String, KeyStats> totals = new TreeMap<>();
+			rules.forEach((rule, byIndex) -> {
+				KeyStats total = new KeyStats();
+				for (KeyStats s : byIndex) {
+					if (s != null) {
+						total.add(s);
+					}
+				}
+				totals.put(rule, total);
+			});
+			List<String> sorted = new ArrayList<>(totals.keySet());
+			sorted.sort(Comparator.comparingInt((String rule) -> -totals.get(rule).alternatives));
+			List<String> lines = new ArrayList<>(sorted.size());
+			for (String rule : sorted) {
+				StringBuilder line = new StringBuilder(shortRule(rule)).append(": total [").append(totals.get(rule))
+						.append(']');
+				KeyStats[] byIndex = rules.get(rule);
+				if (byIndex[0] != null && byIndex[0].alternatives > 0) {
+					line.append(", address [").append(byIndex[0]).append(']');
+				}
+				if (byIndex[1] != null && byIndex[1].alternatives > 0) {
+					line.append(", poi [").append(byIndex[1]).append(']');
+				}
+				lines.add(line.toString());
+			}
+			return lines;
+		}
+
+		// the whole-word bounds of a word rule (a mirror pair is written so too) read as \b in the log
+		static String shortRule(String rule) {
+			return rule.replace("(?<![\\p{L}\\p{M}\\p{N}])", "\\b").replace("(?![\\p{L}\\p{M}\\p{N}])", "\\b");
 		}
 
 		/** Rows {@code index word class source decision count example} of keys_report.tsv. */
@@ -195,6 +251,13 @@ public class AlternativeNameIndexGenerator<T> {
 		this.languageGroup = languageGroup;
 		this.mapName = mapName;
 		this.mapLocale = SearchLocales.forMap(mapName);
+		SearchVariantRules rules = SearchVariantRules.forLocale(mapLocale);
+		for (SearchVariantRules.Unglue unglue : rules.unglues()) {
+			stats.mapRules.add(unglue.id().toString());
+		}
+		for (Rule rule : rules.index()) {
+			stats.mapRules.add(rule.id().toString());
+		}
 	}
 
 	public String getMapLocale() {
