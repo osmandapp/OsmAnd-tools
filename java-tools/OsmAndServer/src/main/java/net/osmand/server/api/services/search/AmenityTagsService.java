@@ -119,6 +119,7 @@ public class AmenityTagsService {
 			VisibleTag tag = switch (tagEntry.collapsableEntryType) {
 				case POI_TYPE_GROUP -> toGroupTag(tagEntry);
 				case PLAIN -> toLocalizedTag(tagEntry);
+				case TAG_GROUP -> toTagGroupTag(tagEntry);
 				case NONE -> toPlainTag(tagEntry);
 				case ELEVATION_PILLS, OPENING_HOURS -> throw new UnsupportedOperationException(
 						"AmenityTagEntry.CollapsableEntryType." + tagEntry.collapsableEntryType
@@ -134,6 +135,14 @@ public class AmenityTagsService {
 	private VisibleTag toGroupTag(AmenityTagEntry tagEntry) {
 		String key = Amenity.COLLAPSABLE_PREFIX + tagEntry.key;
 		return new VisibleTag(key, joinPoiTypeKeys(tagEntry), null);
+	}
+
+	// e.g. socket: the value lists the child keys, entries hold one row per child
+	private VisibleTag toTagGroupTag(AmenityTagEntry tagEntry) {
+		List<VisibleTag> entries = tagEntry.collapsableEntries.stream()
+				.map(child -> new VisibleTag(child.key, child.value, null))
+				.collect(Collectors.toList());
+		return new VisibleTag(tagEntry.key, tagEntry.value, null, null, entries);
 	}
 
 	private VisibleTag toPlainTag(AmenityTagEntry tagEntry) {
@@ -158,9 +167,14 @@ public class AmenityTagsService {
 				: new LangValue(child.value, null);
 	}
 
-	public record VisibleTag(String key, String value, String lang, List<LangValue> otherLangs) {
+	public record VisibleTag(String key, String value, String lang, List<LangValue> otherLangs,
+	                         List<VisibleTag> entries) {
 		public VisibleTag(String key, String value, String lang) {
-			this(key, value, lang, null);
+			this(key, value, lang, null, null);
+		}
+
+		public VisibleTag(String key, String value, String lang, List<LangValue> otherLangs) {
+			this(key, value, lang, otherLangs, null);
 		}
 	}
 
