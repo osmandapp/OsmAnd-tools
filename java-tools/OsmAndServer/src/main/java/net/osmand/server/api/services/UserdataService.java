@@ -580,10 +580,10 @@ public class UserdataService {
             return ResponseEntity.badRequest().body("Email is not valid.");
 		}
         CloudUsersRepository.CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
+        boolean newUser = pu == null || devicesRepository.findByUserid(pu.id).isEmpty();
         if (isNew) {
             if (pu != null) {
-                List<CloudUserDevicesRepository.CloudUserDevice> devices = devicesRepository.findByUserid(pu.id);
-                if (devices != null && !devices.isEmpty()) {
+                if (!newUser) {
 	                userSubService.verifyAndRefreshProOrderId(pu);
                     return ResponseEntity.badRequest().body("An account is already registered with this email address.");
                 }
@@ -598,7 +598,7 @@ public class UserdataService {
             updateSecureEmailToken(pu);
             usersRepository.saveAndFlush(pu);
             emailSender.sendOsmAndCloudAccountEmail(pu.email, pu.token, lang,
-                    isNew ? EmailSenderService.CloudAccountAction.SETUP
+                    newUser ? EmailSenderService.CloudAccountAction.SETUP
                           : EmailSenderService.CloudAccountAction.PASSWORD);
 		} else {
             return ResponseEntity.badRequest().body("error_email");
