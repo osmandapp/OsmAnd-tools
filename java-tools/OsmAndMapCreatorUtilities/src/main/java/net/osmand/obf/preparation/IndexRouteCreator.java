@@ -68,6 +68,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 
 
 	private TLongObjectHashMap<List<RestrictionInfo>> highwayRestrictions = new TLongObjectHashMap<List<RestrictionInfo>>();
+	private final RestrictionViaCopies viaCopies = new RestrictionViaCopies(highwayRestrictions);
 	private TLongObjectHashMap<WayNodeId> basemapRemovedNodes = new TLongObjectHashMap<WayNodeId>();
 	private TLongObjectHashMap<RouteMissingPoints> basemapNodesToReinsert = new TLongObjectHashMap<RouteMissingPoints> ();
 
@@ -249,6 +250,15 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				}
 				routeTypes.encodePointTypes(e, pointTypes, pointNames, tagsTransformer, renderingTypes, false);
 				addWayToIndex(e.getId(), e.getNodes(), mapRouteInsertStat, routeTree, outTypes, pointTypes, pointNames, names);
+				Map<String, String> wayTags = tags;
+				viaCopies.writeCopies(e, (copyId, nodes) -> {
+					Map<String, String> copyTags = new LinkedHashMap<>(wayTags);
+					copyTags.put("oneway", "yes");
+					if (routeTypes.encodeEntity(copyTags, outTypes, names)) {
+						addWayToIndex(copyId, nodes, mapRouteInsertStat, routeTree, outTypes, pointTypes, pointNames, names);
+					}
+				});
+				viaCopies.addEntryRestrictions(e.getId(), e.getNodes());
 			}
 			if (settings.generateLowLevel) {
 				encoded = routeTypes.encodeBaseEntity(tags, outTypes, names) && e.getNodes().size() >= 2;
@@ -632,6 +642,13 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					Collection<RelationMember> fromL = r.getMembers("from"); //$NON-NLS-1$
 					Collection<RelationMember> toL = r.getMembers("to"); //$NON-NLS-1$
 					Collection<RelationMember> viaL = r.getMembers("via"); //$NON-NLS-1$
+					List<Way> viaWays = new ArrayList<>();
+					for (RelationMember via : viaL) {
+						if (via.getEntity() instanceof Way) {
+							viaWays.add((Way) via.getEntity());
+						}
+					}
+					boolean viaChain = viaWays.size() > 1 && viaWays.size() == viaL.size();
 					if (!toL.isEmpty()) {
 						for (RelationMember from : fromL) {
 							if (from.getEntityId().getType() == EntityType.WAY) {
@@ -650,7 +667,10 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 											rd.viaWay = via.getEntityId().getId();
 										}
 									}
-									rdList.add(rd);
+									if (!viaChain || !(from.getEntity() instanceof Way)
+											|| !viaCopies.addRestriction((Way) from.getEntity(), viaWays, rd.toWay, type)) {
+										rdList.add(rd);
+									}
 
 									if (!allowMultipleTo) {
 										break;
