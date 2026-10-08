@@ -263,14 +263,8 @@ public class TurnLanesReviewService {
 		return Algorithms.isEmpty(actual) ? expected : actual;
 	}
 
-	/**
-	 * One drive of the compare as a test case, in the form test_turn_lanes.json has: a list of one. With other
-	 * points than the dataset's - moved on the map to make the drive shorter - it is routed again by the compare's
-	 * build, and every instruction of the new route is expected; the ones a person said something about as they
-	 * said it.
-	 */
-	public Map<String, Object> caseJson(String dataset, String id, String num, String start, String end)
-			throws IOException {
+	/** one drive of the compare as a test case, in the form test_turn_lanes.json has: a list of one */
+	public Map<String, Object> caseJson(String dataset, String id, String num) throws IOException {
 		List<Map<String, Object>> all = rows(dataset, id);
 		if (all == null) {
 			throw new IllegalArgumentException("No compare " + dataset + "/" + id);
@@ -284,53 +278,19 @@ public class TurnLanesReviewService {
 		if (drive.isEmpty()) {
 			throw new IllegalArgumentException("No drive " + num);
 		}
-		Map<String, Object> first = drive.get(0);
-		// written as the dataset writes points, so that the same point is the same string
-		String from = Algorithms.isEmpty(start) ? (String) first.get("start")
-				: TurnLanesFiles.format(TurnLanesFiles.latLon(start));
-		String to = Algorithms.isEmpty(end) ? (String) first.get("end") : TurnLanesFiles.format(TurnLanesFiles.latLon(end));
-		boolean moved = !from.equals(first.get("start")) || !to.equals(first.get("end"));
-		List<String> warnings = new ArrayList<>();
 		Map<String, String> expected = new LinkedHashMap<>();
-		if (!moved) {
-			for (Map<String, Object> r : drive) {
-				String e = expectation(r);
-				// an instruction that is not to be given has no place in the test
-				if (!Algorithms.isEmpty(e)) {
-					expected.put((String) r.get("segment"), e);
-				}
-			}
-		} else {
-			Map<String, String> routed = compares.routeOnce(dataset, id, (String) first.get("obf"), from, to,
-					(String) first.get("left_side"));
-			Map<String, Map<String, Object>> bySegment = new LinkedHashMap<>();
-			Map<String, String> asKeys = new LinkedHashMap<>();
-			for (Map<String, Object> r : drive) {
-				bySegment.put((String) r.get("segment"), r);
-				asKeys.put((String) r.get("segment"), "");
-			}
-			int kept = 0;
-			for (Map.Entry<String, String> e : routed.entrySet()) {
-				// the new route keys a road by its id alone when it carries one instruction: find the row either way
-				String segment = TurnLanesCompareService.findSegment(asKeys, e.getKey());
-				Map<String, Object> r = segment == null ? null : bySegment.get(segment);
-				if (r != null) {
-					kept++;
-				}
-				String value = r == null ? e.getValue() : expectation(r);
-				if (!Algorithms.isEmpty(value)) {
-					expected.put(e.getKey(), value);
-				}
-			}
-			if (kept < drive.size()) {
-				warnings.add((drive.size() - kept) + " of " + drive.size()
-						+ " checked instructions are not on the moved route");
+		for (Map<String, Object> r : drive) {
+			String e = expectation(r);
+			// an instruction that is not to be given has no place in the test
+			if (!Algorithms.isEmpty(e)) {
+				expected.put((String) r.get("segment"), e);
 			}
 		}
+		Map<String, Object> first = drive.get(0);
 		Map<String, Object> entry = new LinkedHashMap<>();
 		entry.put("testName", first.get("name") + " #" + num);
-		entry.put("startPoint", point(from));
-		entry.put("endPoint", point(to));
+		entry.put("startPoint", point((String) first.get("start")));
+		entry.put("endPoint", point((String) first.get("end")));
 		Map<String, String> params = new LinkedHashMap<>();
 		params.put("map", (String) first.get("obf"));
 		if ("true".equals(first.get("left_side"))) {
@@ -338,11 +298,7 @@ public class TurnLanesReviewService {
 		}
 		entry.put("params", params);
 		entry.put("expectedResults", expected);
-		Map<String, Object> out = new LinkedHashMap<>();
-		out.put("json", List.of(entry));
-		out.put("moved", moved);
-		out.put("warnings", warnings);
-		return out;
+		return Map.of("json", List.of(entry));
 	}
 
 	/** a point as test_turn_lanes.json writes it */

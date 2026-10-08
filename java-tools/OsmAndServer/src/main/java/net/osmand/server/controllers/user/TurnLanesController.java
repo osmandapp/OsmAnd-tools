@@ -34,7 +34,6 @@ import net.osmand.server.api.services.TurnLanesCompareService.Compare;
 import net.osmand.server.api.services.TurnLanesCompareService.CompareRequest;
 import net.osmand.server.api.services.TurnLanesReviewService;
 import net.osmand.server.api.services.TurnLanesReviewService.VerdictRequest;
-import net.osmand.server.api.services.TurnLanesRouteCapture;
 import net.osmand.server.api.services.TurnLanesService;
 import net.osmand.server.api.services.TurnLanesService.Dataset;
 import net.osmand.server.api.services.TurnLanesService.GenerateRequest;
@@ -55,9 +54,6 @@ public class TurnLanesController {
 
 	@Autowired
 	private TurnLanesReviewService reviews;
-
-	@Autowired
-	private TurnLanesRouteCapture captured;
 
 	@ExceptionHandler(IllegalArgumentException.class)
 	@ResponseBody
@@ -278,21 +274,14 @@ public class TurnLanesController {
 		sendCsv(reviews.getCommonFile(), TurnLanesReviewService.COMMON, response);
 	}
 
-	public record CaseRequest(String num, String start, String end) {
+	public record CaseRequest(String num) {
 	}
 
-	/** one drive as test_turn_lanes.json, between the points given when they were moved on the map */
+	/** one drive as test_turn_lanes.json */
 	@PostMapping(value = "/review/{dataset}/{id}/case", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public Map<String, Object> caseJson(@PathVariable String dataset, @PathVariable String id,
 	                                    @RequestBody CaseRequest req) throws IOException {
-		return reviews.caseJson(dataset, id, req.num(), req.start(), req.end());
-	}
-
-	/** the routes this user's map asked this server for lately: where the points moved in a local frame went */
-	@GetMapping(value = "/captured-routes", produces = MediaType.APPLICATION_JSON_VALUE)
-	@ResponseBody
-	public List<TurnLanesRouteCapture.Captured> capturedRoutes(Principal user) {
-		return captured.recent(userOf(user));
+		return reviews.caseJson(dataset, id, req.num());
 	}
 }

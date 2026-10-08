@@ -258,25 +258,6 @@ public class TurnLanesCompareService {
 		}
 	}
 
-	/**
-	 * One drive routed again by the compare's build, between points a person may have moved: what a test case of
-	 * it would expect.
-	 */
-	public Map<String, String> routeOnce(String dataset, String id, String obf, String start, String end,
-	                                     String leftSide) throws IOException {
-		Compare c = get(dataset, id);
-		Dataset d = lanes.getDataset(dataset);
-		if (c == null || d == null) {
-			throw new IllegalArgumentException("No compare " + dataset + "/" + id);
-		}
-		try (Checker checker = openChecker(c.build, d, new File(dir(dataset, id), RUNNER_LOG), phase -> {
-		}, () -> false)) {
-			return checker.route("1", obf, start, end, leftSide).instructions();
-		} catch (DriveError e) {
-			throw new IllegalArgumentException(e.getMessage());
-		}
-	}
-
 	/** the compare's checker, its build fetched first when it is a night build, the page told how that goes */
 	private Checker checker(Compare c, Dataset d, File dir) throws IOException {
 		Checker checker = openChecker(c.build, d, new File(dir, RUNNER_LOG), phase -> {

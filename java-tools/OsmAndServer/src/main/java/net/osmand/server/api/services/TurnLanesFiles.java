@@ -12,7 +12,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
@@ -107,10 +106,5 @@ final class TurnLanesFiles {
 			throw new IllegalArgumentException("Not a point: " + s);
 		}
 		return new LatLon(Double.parseDouble(p[0].trim()), Double.parseDouble(p[1].trim()));
-	}
-
-	/** a point as the datasets write it: "lat,lon" with six decimals */
-	static String format(LatLon p) {
-		return String.format(Locale.US, "%.6f,%.6f", p.getLatitude(), p.getLongitude());
 	}
 }
