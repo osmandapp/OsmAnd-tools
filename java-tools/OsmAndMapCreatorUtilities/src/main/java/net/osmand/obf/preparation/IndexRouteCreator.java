@@ -37,6 +37,7 @@ import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.io.OsmBaseStorage;
+import net.osmand.router.SpeedCameraFilter;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import org.apache.commons.logging.Log;
@@ -156,7 +157,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 						PropagateEntityTags pt = tagsTransformer
 								.getPropogateTagForEntity(new EntityId(EntityType.NODE, n.getId()));
 						pt.putThroughTags.put("highway", "speed_camera");
-						addSpeedCameraRelation(pt, e.getId(), "from");
+						addSpeedCameraRelationInfo(pt, e.getId(), "from");
 					}
 				}
 				// "to" only marks the direction, speed_camera_to keeps the point in the route section without an alarm
@@ -167,16 +168,18 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 						PropagateEntityTags pt = tagsTransformer
 								.getPropogateTagForEntity(new EntityId(EntityType.NODE, n.getId()));
 						pt.putThroughTags.putIfAbsent("highway", "speed_camera_to");
-						addSpeedCameraRelation(pt, e.getId(), "to");
+						addSpeedCameraRelationInfo(pt, e.getId(), "to");
 					}
 				}
 			}
 		}
 	}
 
-	private static void addSpeedCameraRelation(PropagateEntityTags pt, long relationId, String role) {
-		String tag = "osmand:speed_camera_relation_id";
-		pt.putThroughTags.put(tag, RelationTagsPropagation.sortAndAttachUniqueValue(pt.putThroughTags.get(tag), relationId + ":" + role));
+	private static void addSpeedCameraRelationInfo(PropagateEntityTags pt, long relationId, String role) {
+		// example:   { "osmand:speed_camera_relation_id"  :  "16276089:from, 16276090:to" }
+		String tag = SpeedCameraFilter.RELATIONS_INFO_TAG;
+		String relationsInfoValues = RelationTagsPropagation.sortAndAttachUniqueValue(pt.putThroughTags.get(tag), relationId + ":" + role);
+		pt.putThroughTags.put(tag, relationsInfoValues);
 	}
 
 	public void indexLowEmissionZones(Entity e, OsmDbAccessorContext ctx) throws SQLException {
