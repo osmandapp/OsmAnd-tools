@@ -357,6 +357,7 @@ public class UserdataController {
 		CloudUserDevice dev = checkToken(deviceId, accessToken);
 
 		if (dev == null || name.contains("/../")) {
+			LOG.warn(String.format("Upload rejected for device %d, file %s/%s: deviceid or token is not valid", deviceId, type, name));
 			return userdataService.tokenNotValidError();
 		}
 		return userdataService.uploadMultipartFile(file, dev, name, type, clienttime);

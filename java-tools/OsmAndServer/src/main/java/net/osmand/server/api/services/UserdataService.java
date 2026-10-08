@@ -265,14 +265,14 @@ public class UserdataService {
 		if (Algorithms.isEmpty(user.orderid)) {
 			if (res.totalFiles > MAX_NUMBER_OF_FILES_FREE_ACCOUNT) {
 				throw new OsmAndPublicApiException(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED,
-						"Maximum size of OsmAnd Cloud exceeded " + (MAXIMUM_ACCOUNT_SIZE / MB)
-								+ " MB. Please contact support in order to investigate possible solutions.");
+						String.format("Maximum number of files in OsmAnd Cloud for Free account exceeded, %d > %d!",
+								res.totalFiles, MAX_NUMBER_OF_FILES_FREE_ACCOUNT));
 			}
 		}
         if (errorMsg != null || Algorithms.isEmpty(user.orderid)) {
             UserdataController.UserFilesResults files = generateFiles(user.id, null, false, false, FREE_TYPES);
             if (files.totalZipSize + fileSize > MAXIMUM_FREE_ACCOUNT_SIZE) {
-                throw new OsmAndPublicApiException(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED, String.format("Not enough space to save file. Maximum size of OsmAnd Cloud for Free account %d!", MAXIMUM_FREE_ACCOUNT_FILE_SIZE / MB));
+                throw new OsmAndPublicApiException(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED, String.format("Not enough space to save file. Maximum size of OsmAnd Cloud for Free account %d MB!", MAXIMUM_FREE_ACCOUNT_SIZE / MB));
             }
         }
     }
@@ -407,6 +407,18 @@ public class UserdataService {
 
 	public ResponseEntity<String> uploadMultipartFile(MultipartFile file, CloudUserDevicesRepository.CloudUserDevice dev,
 			String name, String type, Long clienttime, HttpSession session) throws IOException {
+		InternalZipFile zipfile;
+		try {
+			zipfile = getUploadZipFile(file, name, type, session);
+			validateUserForUpload(dev, type, zipfile.getSize());
+		} catch (OsmAndPublicApiException e) {
+			LOG.warn(String.format("Upload rejected for user %d, file %s/%s: %s", dev.userid, type, name, e.getMessage()));
+			throw e;
+		}
+		return uploadFile(zipfile, dev, name, type, clienttime);
+	}
+
+	private InternalZipFile getUploadZipFile(MultipartFile file, String name, String type, HttpSession session) throws IOException {
 		ServerCommonFile serverCommonFile = checkThatObfFileisOnServer(name, type);
 		InternalZipFile zipfile;
 		if (serverCommonFile != null) {
@@ -430,8 +442,7 @@ public class UserdataService {
                 throw new OsmAndPublicApiException(ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD, "File is submitted not in gzip format");
 			}
 		}
-		validateUserForUpload(dev, type, zipfile.getSize());
-		return uploadFile(zipfile, dev, name, type, clienttime);
+		return zipfile;
 	}
 
 	private boolean isKmlKmzFileByName(String originalFilename) {
