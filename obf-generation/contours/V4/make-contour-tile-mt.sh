@@ -25,7 +25,7 @@ neighbors_dir=""
 function usage {
         echo "Usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] -m [tmp-dir] { -s -p -d -f -t [threads number] -n [neighbors-dir] -r -R [range]}"
 	echo "Recommended usage: ./make-contour-tile-mt.sh -i [input-dir] -o [output-directory] -spd -t 1"
-	echo "-s: smooth raster before processing. Downscale/upscale is applied for lat>65 tiles."
+	echo "-s: smooth raster before processing. Downscale/upscale is applied where |lat| >= 65 (per pixel row, see smooth_dem.py)."
 	echo "-p: split lines by lenth"
 	echo "-d: slightly simplify contours with Douglas-Pecker algorithm to reduce file size in half"
 	echo "-t: threads number"
@@ -481,7 +481,6 @@ process_tiff ()
 			src_tiff=${TMP_DIR}/$filename.tif
 		fi
 		echo "Using isolines_step="$isolines_step
-		lat=${filename:1:2}
 		smoothed_path=${TMP_DIR}/${filename}_smooth.tif
 		if [[ $smooth == "true" ]] ; then
 			for i in ${no_smoothing_array[@]}; do
@@ -492,17 +491,7 @@ process_tiff ()
 			done
 			if [[ $no_smooth == "false" ]] ; then
 				echo "Smoothing raster…"
-				if [[ $((10#$lat)) -ge 65 ]] ; then
-					width_mod=$(( $width / 2))
-					height_mod=$(( $height / 2))
-					width_mod_2=$(( $width ))
-					height_mod_2=$(( $height ))
-					gdalwarp -overwrite -ts $width_mod $height_mod -r cubicspline -co "COMPRESS=LZW" -ot Float32 -wo NUM_THREADS=4 -multi $src_tiff $smoothed_path
-					gdalwarp -overwrite -ts $width_mod_2 $height_mod_2 -of GTiff -r cubicspline -co "COMPRESS=LZW" -ot Float32 -wo NUM_THREADS=4 -multi $smoothed_path ${smoothed_path}_2
-					rm -f $smoothed_path && mv ${smoothed_path}_2 $smoothed_path
-				else
-					gdalwarp -overwrite -r cubicspline -co "COMPRESS=LZW" -ot Float32 -wo NUM_THREADS=4 -multi $src_tiff $smoothed_path
-				fi
+				python3 $working_dir/smooth_dem.py $src_tiff $smoothed_path
 				src_tiff=$smoothed_path
 			fi
 		fi
