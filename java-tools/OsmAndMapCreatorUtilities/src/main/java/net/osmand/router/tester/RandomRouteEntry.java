@@ -87,6 +87,12 @@ class RandomRouteEntry {
 		if ("hh-cpp".equals(TYPE)) {
 			typeParams.add("hhonly:true,nativerouting:true");
 		}
+		if ("brp-shared".equals(TYPE)) {
+			typeParams.add("hhoff:true"); // the site routes with java, the href shows the same request
+		}
+		if ("hh-shared".equals(TYPE)) {
+			typeParams.add("hhonly:true");
+		}
 		if (TYPE.startsWith("brp") && "car".equals(PROFILE)) {
 			typeParams.add("calcmode:" + (car2phase ? "COMPLEX" : "NORMAL"));
 		}
@@ -138,6 +144,30 @@ class RandomRouteResult {
 		if (segments != null) {
 			float untrustedDistance = 0;
 			for (RouteSegmentResult r : segments) {
+				untrustedDistance += r.getDistance();
+				this.distance += calcSegmentDistance(r);
+			}
+			if (Float.compare(this.distance, untrustedDistance) != 0) {
+				System.err.printf("WARN: %s got different distance (%f != %f)\n", type, this.distance, untrustedDistance);
+			}
+		}
+	}
+
+	// OsmAnd-shared Routing Result
+	RandomRouteResult(String type, RandomRouteEntry entry, long runTime,
+	                  net.osmand.shared.routing.RoutingContext ctx,
+	                  List<net.osmand.shared.routing.RouteSegmentResult> segments) {
+		this.type = type;
+		this.entry = entry;
+		this.runTime = runTime;
+
+		this.distance = 0;
+		this.cost = ctx.routingTime;
+		this.visitedSegments = ctx.getVisitedSegments();
+
+		if (segments != null) {
+			float untrustedDistance = 0;
+			for (net.osmand.shared.routing.RouteSegmentResult r : segments) {
 				untrustedDistance += r.getDistance();
 				this.distance += calcSegmentDistance(r);
 			}
@@ -205,6 +235,20 @@ class RandomRouteResult {
 		int next;
 		double distance = 0;
 		RouteDataObject road = rr.getObject();
+		boolean plus = rr.getStartPointIndex() < rr.getEndPointIndex();
+		for (int j = rr.getStartPointIndex(); j != rr.getEndPointIndex(); j = next) {
+			next = plus ? j + 1 : j - 1;
+			double d = measuredDist(road.getPoint31XTile(j), road.getPoint31YTile(j),
+					road.getPoint31XTile(next), road.getPoint31YTile(next));
+			distance += d;
+		}
+		return (float) distance;
+	}
+
+	private float calcSegmentDistance(net.osmand.shared.routing.RouteSegmentResult rr) {
+		int next;
+		double distance = 0;
+		net.osmand.shared.routing.RouteDataObject road = rr.getObject();
 		boolean plus = rr.getStartPointIndex() < rr.getEndPointIndex();
 		for (int j = rr.getStartPointIndex(); j != rr.getEndPointIndex(); j = next) {
 			next = plus ? j + 1 : j - 1;

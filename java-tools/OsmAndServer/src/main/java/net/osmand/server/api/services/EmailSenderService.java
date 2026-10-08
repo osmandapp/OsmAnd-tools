@@ -256,6 +256,28 @@ public class EmailSenderService {
 		boolean ok = sender.to(email).send().isSuccess();
 		LOGGER.info("sendPurchaseReceiptEmail order " + orderId + " to: " + shorten(email) + " (" + ok + ") [" + lang + "]");
 	}
+    
+    public void sendOsmAndCloudWebLinkEmail(String email, String cancelUrl) {
+	    boolean ok = new EmailSenderTemplate()
+			    .load("cloud/web-link")
+			    .set("CANCEL_URL", cancelUrl)
+			    .to(email)
+			    .send()
+			    .isSuccess();
+	    LOGGER.info("sendOsmAndCloudWebLinkEmail to: " + shorten(email) + " (" + ok + ")");
+	}
+
+    public void sendOsmAndCloudRegistrationEmail(String email, String token, String lang, boolean newUser) {
+		String subject = newUser ? "@SUBJECT_NEW@" : "@SUBJECT_OLD@";
+	    boolean ok = new EmailSenderTemplate()
+			    .load("cloud/register", lang)
+			    .set("SUBJECT", subject)
+			    .set("TOKEN", token)
+			    .to(email)
+			    .send()
+			    .isSuccess();
+	    LOGGER.info("sendOsmAndCloudRegistrationEmail to: " + shorten(email) + " (" + ok + ") [" + lang + "]");
+	}
 
 	public void sendPurchaseLinkedEmail(String email, String lang, String productName, boolean subscription) {
 		String kind = subscription ? "_SUBSCRIPTION@" : "_PURCHASE@";

@@ -28,6 +28,8 @@ public class IndexCreatorSettings {
 
 	// zoom smoothness for low level roads
 	public int zoomWaySmoothness = 2;
+	// map section zoom levels such as "13-" or "9-10;11-12", null for MapZooms.MAP_ZOOMS_DEFAULT
+	public String mapZooms = null;
 
 	// srtm data folder to amend roads with height profile (could be s3://, https:// url)
 	public String srtmDataFolderUrl;

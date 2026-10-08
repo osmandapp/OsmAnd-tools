@@ -410,9 +410,10 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		CityType ct = CityType.valueFromEntity(e);
 		// if a place that has addr_place is a neighbourhood mark it as a suburb (made for the suburbs of Venice)
 		boolean administrative = "administrative".equals(e.getTag(OSMTagKey.BOUNDARY));
+		boolean local_authority = "local_authority".equals(e.getTag(OSMTagKey.BOUNDARY));
 		boolean census = "census".equals(e.getTag(OSMTagKey.BOUNDARY));
 //		boolean postalCode = "postal_code".equals(e.getTag(OSMTagKey.BOUNDARY));
-		if (administrative || census || postalCode || ct != null) {
+		if (administrative || census || postalCode || ct != null || local_authority) {
 			if (e instanceof Way && visitedBoundaryWays.contains(e.getId())) {
 				return null;
 			}
@@ -1120,6 +1121,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			} else if(t.startsWith("alt_name")){
 				prefix = "";
 			} else if(t.startsWith("loc_name")){
+				prefix = "";
+			} else if(t.equals("int_name")){
 				prefix = "";
 			}
 			if (prefix != null) {

@@ -88,9 +88,9 @@ public abstract class ResultActuator implements Consumer<List<SearchResult>> {
 	private static final int SEARCH_DUPLICATE_NAME_RADIUS = 5000;
 	private static final int FOUND_DEDUPLICATE_RADIUS = 100;
 
+	// error is only for a failed query; no result or a result without a location is Not Found
 	public boolean isFound(List<SearchResult> searchResults) {
 		if (firstResult == null) {
-			error = searchResults.isEmpty() ? "Search result is empty" : "First search result is missing";
 			return false;
 		}
 
@@ -134,8 +134,6 @@ public abstract class ResultActuator implements Consumer<List<SearchResult>> {
 				found = actualResult.place() <= dupCount + firstResult.place();
 			}
 			found |= closestDuplicate < FOUND_DEDUPLICATE_RADIUS; // deduplication also count as found
-		} else {
-			error = "Result point location is null";
 		}
 		return found;
 	}

@@ -18,6 +18,7 @@ import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.IProgress;
 import net.osmand.IndexConstants;
 import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.NameIndexReader;
 import net.osmand.binary.BinaryMapPoiReaderAdapter;
 import net.osmand.binary.CommonWords;
 import net.osmand.binary.GeocodingUtilities;
@@ -27,6 +28,7 @@ import net.osmand.data.Amenity;
 import net.osmand.data.Boundary;
 import net.osmand.data.City;
 import net.osmand.data.LatLon;
+import net.osmand.data.MapObject;
 import net.osmand.data.Multipolygon;
 import net.osmand.data.MultipolygonBuilder;
 import net.osmand.data.QuadRect;
@@ -1022,7 +1024,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				List<GeocodingResult> res = geocodingUtilities.reverseGeocodingSearch(geocodingCtx,
 						latLon.getLatitude(), latLon.getLongitude(), false);
 				if (settings.poiGeocodingPrecise) {
-					res = geocodingUtilities.sortGeocodingResults(Collections.singletonList(geoReader), res);
+					res = geocodingUtilities.findAddresses(Collections.singletonList(geoReader), res);
 				}
 				geocodingCnt++;
 				if (res.size() > 0 && res.get(0).getDistance() < GEOCODING_DISTANCE) {
@@ -1109,7 +1111,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 				prevTree = subtree;
 			}
-			Set<String> otherNames = null;
+			Map<String, String> otherNames = null; // name -> language of the name tag
 			Set<String> idNames = null;
 			Iterator<Entry<PoiAdditionalType, String>> it = additionalTags.entrySet().iterator();
 			while (it.hasNext()) {
@@ -1118,9 +1120,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				if ((ObfConstants.isTagIndexedForSearchAsName(tag))
 						&& !"name:en".equals(tag)) {
 					if (otherNames == null) {
-						otherNames = new TreeSet<String>();
+						otherNames = new TreeMap<String, String>();
 					}
-					otherNames.add(e.getValue());
+					otherNames.putIfAbsent(e.getValue(), MapObject.isNameLangTag(tag) ? tag.substring("name:".length()) : null);
 				}
 				if (settings.charsToBuildPoiIdNameIndex > 0 && ObfConstants.isTagIndexedForSearchAsId(tag)) {
 					if (idNames == null) {
@@ -1199,21 +1201,31 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 	
 	public void putPoiObjectPrefix(NameIndexCreator<PoiNameObject> namesIndex, PoiNameObject obj, String name,
-			String nameEn, Set<String> names, Set<String> idNames, IndexCreatorSettings settings) {
+			String nameEn, Map<String, String> names, Set<String> idNames, IndexCreatorSettings settings) {
 		NameIndexCreator.addPoiCategories(namesIndex, obj, poiTypes);
+		int mainWords = -1;
 		if (name != null) {
 			namesIndex.addToNameIndex(name, obj, settings.charsToBuildPoiNameIndex, false);
+			mainWords = NameIndexCreator.countWords(name);
 			if (Algorithms.isEmpty(nameEn)) {
 				nameEn = Junidecode.unidecode(name);
 			}
 		}
+		int[] variant = new int[1];
 		if (!Algorithms.objectEquals(nameEn, name) && !Algorithms.isEmpty(nameEn)) {
-			namesIndex.addToNameIndex(nameEn, obj, settings.charsToBuildPoiNameIndex, false);
+			String indexed = altName(nameEn, mainWords, variant);
+			namesIndex.addToNameIndex(indexed, obj, settings.charsToBuildPoiNameIndex, false);
+			namesIndex.addAlternativeNamesToNameIndex(indexed, "en", obj, settings.charsToBuildPoiNameIndex);
+		}
+		if (name != null) {
+			namesIndex.addAlternativeNamesToNameIndex(name, null, obj, settings.charsToBuildPoiNameIndex);
 		}
 		if (names != null) {
-			for (String nk : names) {
-				if (!Algorithms.objectEquals(nk, name) && !Algorithms.isEmpty(nk)) {
-					namesIndex.addToNameIndex(nk, obj, settings.charsToBuildPoiNameIndex, false);
+			for (Map.Entry<String, String> nk : names.entrySet()) {
+				if (!Algorithms.objectEquals(nk.getKey(), name) && !Algorithms.isEmpty(nk.getKey())) {
+					String indexed = altName(nk.getKey(), mainWords, variant);
+					namesIndex.addToNameIndex(indexed, obj, settings.charsToBuildPoiNameIndex, false);
+					namesIndex.addAlternativeNamesToNameIndex(indexed, nk.getValue(), obj, settings.charsToBuildPoiNameIndex);
 				}
 			}
 		}
@@ -1224,6 +1236,16 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				}
 			}
 		}
+	}
+
+	/** another name with another number of words becomes its own object for the search (NameIndexReader.ALT_NAME_COMMON_PREFIX):
+	 *  alt_name 'Café des Deux Moulins' never takes the slots of 'Café des 2 Moulins' */
+	private static String altName(String other, int mainWords, int[] variant) {
+		if (mainWords < 0 || variant[0] >= NameIndexReader.ALT_NAME_VARIANTS || NameIndexCreator.countWords(other) == mainWords) {
+			return other;
+		}
+		variant[0]++;
+		return other + " " + NameIndexReader.altNameMarker(variant[0]);
 	}
 
 	private void writePoiBoxes(BinaryMapIndexWriter writer, Tree<PoiTileBox> tree,

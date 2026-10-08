@@ -1,0 +1,25 @@
+{
+  "events": [
+    {
+      "id": "EVENT_ID_TEST000000002",
+      "processed": false,
+      "created": 1820620800000,
+      "type": "subscription.charge.completed",
+      "live": true,
+      "data": {
+        "order": "MP_ORDER_ID_REBILL000",
+        "currency": "EUR",
+        "total": 19.99,
+        "status": "successful",
+        "timestamp": 1820620800000,
+        "timestampValue": 1820620800000,
+        "timestampInSeconds": 1820620800,
+        "timestampDisplay": "11-09-27",
+        "sequence": 2,
+        "periods": null,
+        "account": "ACCOUNT_ID_TEST0000002",
+        "subscription": "SUBSCRIPTION_ID_TEST01"
+      }
+    }
+  ]
+}

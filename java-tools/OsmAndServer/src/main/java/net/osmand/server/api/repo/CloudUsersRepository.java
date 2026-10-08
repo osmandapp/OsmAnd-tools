@@ -70,6 +70,18 @@ public interface CloudUsersRepository extends JpaRepository<CloudUser, Long> {
         @Column(name = "tokentime")
         @Temporal(TemporalType.TIMESTAMP)
         public Date tokenTime;
+
+        // one-off web login link created by support (see UserdataService.createWebLoginLink)
+        @Column(name = "weblinktoken")
+        public String webLinkToken;
+
+        @Column(name = "weblinktime")
+        @Temporal(TemporalType.TIMESTAMP)
+        public Date webLinkTime;
+
+        // access for OAuth clients (AI assistants): true/false = user's choice, null = never chosen (osmand.oauth.default-user-enabled)
+        @Column(name = "oauthenabled")
+        public Boolean oauthEnabled;
         
     }
 

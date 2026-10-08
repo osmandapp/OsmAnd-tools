@@ -31,8 +31,8 @@ public class SpatialSearchCombinationsTest extends SpatialSearchPipelineTest {
 
     @Override
     protected SpatialTestSearchEngine createSearchEngine(SpatialTextSearch.SpatialTextSearchSettings spatialSettings, 
-                                                  LatLon point, List<BinaryMapIndexReader> readers, boolean translation) {
+                                                  LatLon point, List<BinaryMapIndexReader> readers) {
         spatialSettings.DEV_USE_PIPELINE = false;
-		return super.createSearchEngine(spatialSettings, point, readers, translation);
+		return super.createSearchEngine(spatialSettings, point, readers);
     }
 }
