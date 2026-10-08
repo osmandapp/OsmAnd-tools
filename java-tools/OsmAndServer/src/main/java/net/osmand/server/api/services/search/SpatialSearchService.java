@@ -118,6 +118,8 @@ public class SpatialSearchService {
 	public static class SpatialResponse {
 		public List<Feature> features = new ArrayList<>();
 		public Map<String, Object> info = new LinkedHashMap<>();
+		// "did you mean": the query with a misspelled word corrected, null when every word is found
+		public String typoSuggestion;
 	}
 
 	public record SpatialResults(SpatialSearchResults results, SpatialSearchContext.SpatialSearchStats stats, int obfCount,
@@ -295,12 +297,7 @@ public class SpatialSearchService {
 					}
 				}
 			}
-			if (res.typoSuggestion != null) {
-				// "did you mean": the query with a misspelled word corrected, searched when the row is clicked
-				response.features.add(0, new Feature(Geometry.point(new LatLon(0, 0)))
-						.prop(SearchResultConverter.PoiTypeField.TYPE.getFieldName(), ObjectType.SUGGESTION)
-						.prop(SearchResultConverter.PoiTypeField.NAME.getFieldName(), res.typoSuggestion));
-			}
+			response.typoSuggestion = res.typoSuggestion;
 			// extra info shown in the UI
 			response.info = getSearchStats(res.stats, sTime, response.features.size());
 			response.info.put("words-matched", res.combinations == null || res.combinations.isEmpty() ? 0
