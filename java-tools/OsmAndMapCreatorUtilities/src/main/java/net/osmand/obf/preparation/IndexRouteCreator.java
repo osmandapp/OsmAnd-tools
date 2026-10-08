@@ -5,6 +5,7 @@ import gnu.trove.iterator.TIntIterator;
 import gnu.trove.iterator.TIntObjectIterator;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.list.array.TLongArrayList;
+import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongObjectHashMap;
 import gnu.trove.set.hash.TIntHashSet;
@@ -70,6 +71,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	private TLongObjectHashMap<List<RestrictionInfo>> highwayRestrictions = new TLongObjectHashMap<List<RestrictionInfo>>();
 	private TLongObjectHashMap<WayNodeId> basemapRemovedNodes = new TLongObjectHashMap<WayNodeId>();
 	private TLongObjectHashMap<RouteMissingPoints> basemapNodesToReinsert = new TLongObjectHashMap<RouteMissingPoints> ();
+	private final SpeedCameraDirections speedCameraDirections;
 
 	// local purpose to speed up processing cache allocation
 	TIntArrayList outTypes = new TIntArrayList();
@@ -129,6 +131,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		this.logMapDataWarn = logMapDataWarn;
 		this.settings = settings;
 		this.routeTypes = new MapRoutingTypes(renderingTypes);
+		this.speedCameraDirections = new SpeedCameraDirections(routeTypes);
 		this.propagateToNodes = propagateToNodes;
 	}
 
@@ -156,6 +159,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 						PropagateEntityTags pt = tagsTransformer
 								.getPropogateTagForEntity(new EntityId(EntityType.NODE, n.getId()));
 						pt.putThroughTags.put("highway", "speed_camera");
+						speedCameraDirections.addRelation((Relation) e, (Node) n);
 					}
 				}
 			}
@@ -710,7 +714,9 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 
 				// use file to recalulate tree
 				raf.seek(0);
-				appendMissingRoadsForBaseMap(mapConnection, new BinaryMapIndexReader(raf, fl));
+				BinaryMapIndexReader reader = new BinaryMapIndexReader(raf, fl);
+				appendMissingRoadsForBaseMap(mapConnection, reader);
+				speedCameraDirections.calculate(reader);
 				// repack
 				fname = baserouteTree.getFileName();
 				baserouteTree = packRtreeFile(baserouteTree, fname, fname + "p");
@@ -1240,6 +1246,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 
 		TLongObjectHashMap<List<RestrictionInfo>> highwayRestrictions = new TLongObjectHashMap<List<RestrictionInfo>>();
 		TLongObjectHashMap<RouteMissingPoints> basemapNodesToReinsert = new TLongObjectHashMap<RouteMissingPoints> ();
+		SpeedCameraDirections speedCameraDirections;
 
 		public RouteWriteContext(Log logMapDataWarn, TLongObjectHashMap<BinaryFileReference> treeHeader, MapRoutingTypes routeTypes,
 				PreparedStatement selectData) {
@@ -1349,6 +1356,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 						missingPoints = basemapNodesToReinsert.get(id);
 					}
 
+					TIntIntHashMap cameraDirections = speedCameraDirections == null ? null : speedCameraDirections.getDirections(id);
 					int typeInd = 0;
 					points = new ArrayList<RoutePointToWrite>(pointsLength);
 					for (int j = 0; j < pointsLength; j++) {
@@ -1377,6 +1385,9 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 								point.types.add(routeTypes.getTypeByInternalId(type).getTargetId());
 							}
 						} while (type != 0);
+						if (cameraDirections != null && cameraDirections.containsKey(j)) {
+							point.types.add(routeTypes.getTypeByInternalId(cameraDirections.get(j)).getTargetId());
+						}
 					}
 				}
 				return next;
@@ -1442,6 +1453,8 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				wc.highwayRestrictions = highwayRestrictions;
 				if(basemap) {
 					wc.basemapNodesToReinsert = basemapNodesToReinsert;
+				} else {
+					wc.speedCameraDirections = speedCameraDirections;
 				}
 				writeBinaryMapBlock(root, rootBounds, rte, writer, wc, basemap);
 				selectData.close();
