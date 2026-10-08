@@ -249,14 +249,14 @@ public class UserdataService {
 		if (Algorithms.isEmpty(user.orderid)) {
 			if (res.totalFiles > MAX_NUMBER_OF_FILES_FREE_ACCOUNT) {
 				throw new OsmAndPublicApiException(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED,
-						"Maximum size of OsmAnd Cloud exceeded " + (MAXIMUM_ACCOUNT_SIZE / MB)
-								+ " MB. Please contact support in order to investigate possible solutions.");
+						String.format("Maximum number of files in OsmAnd Cloud for Free account exceeded, %d > %d!",
+								res.totalFiles, MAX_NUMBER_OF_FILES_FREE_ACCOUNT));
 			}
 		}
         if (errorMsg != null || Algorithms.isEmpty(user.orderid)) {
             UserdataController.UserFilesResults files = generateFiles(user.id, null, false, false, FREE_TYPES);
             if (files.totalZipSize + fileSize > MAXIMUM_FREE_ACCOUNT_SIZE) {
-                throw new OsmAndPublicApiException(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED, String.format("Not enough space to save file. Maximum size of OsmAnd Cloud for Free account %d!", MAXIMUM_FREE_ACCOUNT_FILE_SIZE / MB));
+                throw new OsmAndPublicApiException(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED, String.format("Not enough space to save file. Maximum size of OsmAnd Cloud for Free account %d MB!", MAXIMUM_FREE_ACCOUNT_SIZE / MB));
             }
         }
     }
