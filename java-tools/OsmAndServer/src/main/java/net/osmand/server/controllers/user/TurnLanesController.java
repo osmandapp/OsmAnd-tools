@@ -38,6 +38,7 @@ import net.osmand.server.api.services.TurnLanesService;
 import net.osmand.server.api.services.TurnLanesService.Dataset;
 import net.osmand.server.api.services.TurnLanesService.GenerateRequest;
 import net.osmand.server.api.services.TurnLanesService.ObfFile;
+import net.osmand.tester.GenerateTurnLanesTest;
 
 @Controller
 @RequestMapping(path = "/admin/turn-lanes")
@@ -251,7 +252,7 @@ public class TurnLanesController {
 		Map<String, Object> m = new LinkedHashMap<>();
 		m.put("compare", c);
 		Dataset d = service.getDataset(dataset);
-		m.put("profile", d == null || d.params == null || d.params.profile == null ? "car" : d.params.profile);
+		m.put("profile", (d == null || d.params == null ? new GenerateTurnLanesTest.Options() : service.options(d.params)).profile);
 		m.put("rows", rows);
 		return ResponseEntity.ok(m);
 	}

@@ -21,7 +21,7 @@ import java.util.Set;
 
 /**
  * Replays turn-lanes drives on another OsmAndMapCreator build, in a JVM of its own: {@code java -cp
- * <this class>:<build>/lib/* net.osmand.server.api.services.TurnLanesRunner <profile>}.
+ * <this class>:<build>/lib/* net.osmand.server.api.services.TurnLanesRunner <profile> <memory MB>}.
  *
  * It names no OsmAnd class, so it loads against a build of any year - the routing API has changed under it
  * (searchRoute returned a List until 2023, a RouteCalcResult since) - and nothing of the server: the class file is
@@ -34,14 +34,16 @@ import java.util.Set;
 public class TurnLanesRunner {
 
 	private final String profile;
+	private final int memoryMb;
 	private final Class<?> latLonClass;
 	private final Class<?> readerClass;
 	private final Object frontEnd;
 	private Object reader;
 	private String readerPath;
 
-	private TurnLanesRunner(String profile) throws Exception {
+	private TurnLanesRunner(String profile, int memoryMb) throws Exception {
 		this.profile = profile;
+		this.memoryMb = memoryMb;
 		latLonClass = Class.forName("net.osmand.data.LatLon");
 		readerClass = Class.forName("net.osmand.binary.BinaryMapIndexReader");
 		frontEnd = Class.forName("net.osmand.router.RoutePlannerFrontEnd").getConstructor().newInstance();
@@ -51,7 +53,7 @@ public class TurnLanesRunner {
 		PrintStream out = new PrintStream(new FileOutputStream(FileDescriptor.out), true, "UTF-8");
 		// the router prints as it goes: keep that out of the answers
 		System.setOut(System.err);
-		TurnLanesRunner runner = new TurnLanesRunner(args.length > 0 ? args[0] : "car");
+		TurnLanesRunner runner = new TurnLanesRunner(args[0], Integer.parseInt(args[1]));
 		BufferedReader in = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
 		for (String line; (line = in.readLine()) != null; ) {
 			if (line.isEmpty()) {
@@ -166,8 +168,7 @@ public class TurnLanesRunner {
 		Object builder = config.getMethod("getDefault").invoke(null);
 		Map<String, String> params = new HashMap<>();
 		params.put(profile, "true");
-		// GenerateTurnLanesTest.MEMORY_LIMIT_MB: the same budget as the dataset was made with
-		int memory = 512;
+		int memory = memoryMb;
 		int nativeMemory = defaultLimit(config, "DEFAULT_NATIVE_MEMORY_LIMIT", 256);
 		Object cfg;
 		Class<?> limitsClass;

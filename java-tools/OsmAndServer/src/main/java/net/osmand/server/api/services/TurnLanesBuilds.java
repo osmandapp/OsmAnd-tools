@@ -31,8 +31,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+import net.osmand.tester.GenerateTurnLanesTest;
 
 /**
  * OsmAndMapCreator night builds to replay turn-lanes datasets on: the latest of main and test, and one a day kept
@@ -75,7 +74,6 @@ public class TurnLanesBuilds {
 	@Value("${osmand.turn-lanes.runner-xmx:4g}")
 	private String runnerXmx;
 
-	private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
 	/**
 	 * Fetching a build takes minutes: it holds this, not the service, so the list of builds the page asks for in
 	 * the meantime is not kept waiting behind it.
@@ -139,7 +137,7 @@ public class TurnLanesBuilds {
 			return null;
 		}
 		try (Reader r = Files.newBufferedReader(f.toPath(), StandardCharsets.UTF_8)) {
-			return gson.fromJson(r, Cached.class);
+			return TurnLanesFiles.GSON.fromJson(r, Cached.class);
 		} catch (IOException | RuntimeException e) {
 			return null;
 		}
@@ -231,7 +229,7 @@ public class TurnLanesBuilds {
 		c.size = size;
 		c.fetched = System.currentTimeMillis();
 		c.used = c.fetched;
-		Files.writeString(new File(tmp, INFO).toPath(), gson.toJson(c), StandardCharsets.UTF_8);
+		Files.writeString(new File(tmp, INFO).toPath(), TurnLanesFiles.GSON.toJson(c), StandardCharsets.UTF_8);
 		TurnLanesFiles.deleteTree(dir.toPath());
 		Files.move(tmp.toPath(), dir.toPath(), StandardCopyOption.ATOMIC_MOVE);
 		LOG.info("Turn-lanes build " + build + " (" + lastModified + "): " + jars + " jars");
@@ -241,7 +239,7 @@ public class TurnLanesBuilds {
 
 	private Cached touch(File dir, Cached c) throws IOException {
 		c.used = System.currentTimeMillis();
-		TurnLanesFiles.write(new File(dir, INFO).toPath(), gson.toJson(c));
+		TurnLanesFiles.write(new File(dir, INFO).toPath(), TurnLanesFiles.GSON.toJson(c));
 		return c;
 	}
 
@@ -285,7 +283,7 @@ public class TurnLanesBuilds {
 		String cp = runnerDir.getAbsolutePath() + File.pathSeparator
 				+ new File(new File(cacheDir(), build), "lib").getAbsolutePath() + File.separator + "*";
 		ProcessBuilder pb = new ProcessBuilder(java, "-Xmx" + runnerXmx, "-Djava.awt.headless=true", "-cp", cp,
-				TurnLanesRunner.class.getName(), profile);
+				TurnLanesRunner.class.getName(), profile, String.valueOf(GenerateTurnLanesTest.MEMORY_ROUTING_LIMIT_MB));
 		pb.redirectError(ProcessBuilder.Redirect.appendTo(log));
 		return pb.start();
 	}

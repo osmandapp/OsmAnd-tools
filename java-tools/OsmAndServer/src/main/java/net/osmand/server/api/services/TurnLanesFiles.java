@@ -20,6 +20,9 @@ import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+
 import net.osmand.data.LatLon;
 import net.osmand.tester.GenerateTurnLanesTest;
 
@@ -28,6 +31,8 @@ import net.osmand.tester.GenerateTurnLanesTest;
  * file is replaced whole, through a temporary one, so a reader never sees half of it.
  */
 final class TurnLanesFiles {
+
+	static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
 	private static final CSVFormat WITH_HEADER = CSVFormat.DEFAULT.builder().setHeader().setSkipHeaderRecord(true).build();
 

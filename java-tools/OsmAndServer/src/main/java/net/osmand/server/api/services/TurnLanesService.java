@@ -22,9 +22,6 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-
 import jakarta.annotation.PreDestroy;
 import net.osmand.map.OsmandRegions;
 import net.osmand.tester.GenerateTurnLanesTest;
@@ -73,6 +70,7 @@ public class TurnLanesService {
 		public String name;
 		public long size;
 		public Status status = Status.QUEUED;
+		// drives, named junctions for the admin page
 		public int junctionsDone;
 		public int junctionsTotal;
 		public int routes;
@@ -109,7 +107,6 @@ public class TurnLanesService {
 	@Value("${git.commit.format:}")
 	private String build;
 
-	private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
 	/** what is queued or running; the rest is read from disk */
 	private final Map<String, Dataset> active = new ConcurrentHashMap<>();
 	// one at a time: a whole obf is read into memory as a road graph, two big ones at once could take the heap
@@ -225,7 +222,7 @@ public class TurnLanesService {
 		executor.submit(job);
 	}
 
-	GenerateTurnLanesTest.Options options(GenerateRequest req) {
+	public GenerateTurnLanesTest.Options options(GenerateRequest req) {
 		GenerateTurnLanesTest.Options o = new GenerateTurnLanesTest.Options();
 		if (req.junctions != null && req.junctions > 0) {
 			o.junctions = req.junctions;
@@ -302,7 +299,7 @@ public class TurnLanesService {
 		p.status = Status.RUNNING;
 		GenerateTurnLanesTest generator = new GenerateTurnLanesTest(o, new GenerateTurnLanesTest.Progress() {
 			@Override
-			public void junctions(int done, int total, int cases) {
+			public void drives(int done, int total, int points) {
 				p.junctionsDone = done;
 				p.junctionsTotal = total;
 				p.elapsedMs = System.currentTimeMillis() - start;
@@ -381,7 +378,7 @@ public class TurnLanesService {
 			return null;
 		}
 		try (Reader r = Files.newBufferedReader(meta.toPath(), StandardCharsets.UTF_8)) {
-			d = gson.fromJson(r, Dataset.class);
+			d = TurnLanesFiles.GSON.fromJson(r, Dataset.class);
 			// the server stopped while it was running: nothing is going to finish it now
 			if (d.status == Status.QUEUED || d.status == Status.RUNNING) {
 				d.status = Status.FAILED;
@@ -422,6 +419,6 @@ public class TurnLanesService {
 	}
 
 	private synchronized void saveMeta(Dataset d) throws IOException {
-		TurnLanesFiles.write(new File(new File(getRoot(), d.name), META).toPath(), gson.toJson(d));
+		TurnLanesFiles.write(new File(new File(getRoot(), d.name), META).toPath(), TurnLanesFiles.GSON.toJson(d));
 	}
 }

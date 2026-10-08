@@ -31,9 +31,6 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-
 import jakarta.annotation.PreDestroy;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.server.api.services.TurnLanesService.Dataset;
@@ -54,7 +51,6 @@ public class TurnLanesCompareService {
 	public static final String COMPARES = "compares";
 	public static final String RESULT = "result.csv";
 	public static final String RUNNER_LOG = "runner.log";
-	public static final String REFERENCE_EXPECTED = "expected";
 	public static final String[] RESULT_HEADER = {"num", "name", "start", "end", "segment", "expected", "actual", "status",
 			"note", "left_side", "obf", "point"};
 	private static final int SAVE_EVERY = 50;
@@ -62,7 +58,6 @@ public class TurnLanesCompareService {
 	/**
 	 * How an instruction fares: SAME, DIFF - another instruction there, none any more (actual empty), or one the
 	 * dataset did not have (expected empty) - or ERROR, the drive not routed or not taking that road at all.
-	 * SIMILAR is to come, for differences that do not matter.
 	 */
 	public enum Verdict {
 		SAME, DIFF, ERROR
@@ -82,8 +77,6 @@ public class TurnLanesCompareService {
 		public String build;
 		/** what exactly it was: the server's git commit, or the night build's Last-Modified */
 		public String buildVersion;
-		/** what the checker is held to: {@link #REFERENCE_EXPECTED}, the generator's instructions */
-		public String reference;
 		public Status status;
 		public String error;
 		public long created;
@@ -123,7 +116,6 @@ public class TurnLanesCompareService {
 	@Autowired
 	private TurnLanesBuilds builds;
 
-	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 	/** dataset/id -> what is queued or running */
 	private final Map<String, Compare> active = new ConcurrentHashMap<>();
 
@@ -166,7 +158,6 @@ public class TurnLanesCompareService {
 		c.build = build;
 		// a night build's is known once it is fetched
 		c.buildVersion = TurnLanesBuilds.CURRENT.equals(build) ? lanes.getBuild() : build;
-		c.reference = REFERENCE_EXPECTED;
 		c.status = Status.QUEUED;
 		File dir = dir(c.dataset, c.id);
 		if (dir.exists() || active.containsKey(key(c.dataset, c.id))) {
@@ -369,7 +360,7 @@ public class TurnLanesCompareService {
 			if (line == null) {
 				throw new IOException("The runner stopped: " + tail(log));
 			}
-			RunnerAnswer a = GSON.fromJson(line, RunnerAnswer.class);
+			RunnerAnswer a = TurnLanesFiles.GSON.fromJson(line, RunnerAnswer.class);
 			if (!num.equals(a.num)) {
 				throw new IOException("The runner answered " + a.num + " to " + num);
 			}
@@ -570,7 +561,7 @@ public class TurnLanesCompareService {
 			return null;
 		}
 		try (Reader r = Files.newBufferedReader(meta.toPath(), StandardCharsets.UTF_8)) {
-			c = GSON.fromJson(r, Compare.class);
+			c = TurnLanesFiles.GSON.fromJson(r, Compare.class);
 			if (c.status == Status.QUEUED || c.status == Status.RUNNING) {
 				c.status = Status.FAILED;
 				c.error = "Interrupted by a server restart";
@@ -625,6 +616,6 @@ public class TurnLanesCompareService {
 	}
 
 	private synchronized void saveMeta(Compare c) throws IOException {
-		TurnLanesFiles.write(new File(dir(c.dataset, c.id), TurnLanesService.META).toPath(), GSON.toJson(c));
+		TurnLanesFiles.write(new File(dir(c.dataset, c.id), TurnLanesService.META).toPath(), TurnLanesFiles.GSON.toJson(c));
 	}
 }
