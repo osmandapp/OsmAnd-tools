@@ -207,6 +207,7 @@ public class EmailSenderService {
 		String planCount = "";
 		String renewalLabel;
 		Date renewalDate;
+		boolean renews = false;
 		if (subscriptions != null && !subscriptions.isEmpty()) {
 			DeviceSubscriptionsRepository.SupporterDeviceSubscription sub = subscriptions.get(0);
 			PurchasesDataLoader.Subscription skuData = purchasesDataLoader.getSubscriptions().get(sub.sku);
@@ -226,7 +227,8 @@ public class EmailSenderService {
 			} else {
 				planName = "@RECEIPT_PLAN_SUBSCRIPTION@";
 			}
-			renewalLabel = Boolean.TRUE.equals(sub.autorenewing) ? "@RECEIPT_RENEWS_ON@" : "@RECEIPT_EXPIRES_ON@";
+			renews = Boolean.TRUE.equals(sub.autorenewing);
+			renewalLabel = renews ? "@RECEIPT_RENEWS_ON@" : "@RECEIPT_EXPIRES_ON@";
 			renewalDate = sub.expiretime;
 		} else if (purchases != null && !purchases.isEmpty()) {
 			DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase iap = purchases.get(0);
@@ -252,6 +254,9 @@ public class EmailSenderService {
 			sender.set("RENEWAL_ROW", "@RENEWAL_ROW_T@")
 					.set("RENEWAL_LABEL", renewalLabel)
 					.set("RENEWAL_DATE", htmlText(formatReceiptDate(renewalDate, lang)));
+			if (renews) {
+				sender.set("FOOTER_MANAGE", "@FOOTER_MANAGE_T@");
+			}
 		}
 		boolean ok = sender.to(email).send().isSuccess();
 		LOGGER.info("sendPurchaseReceiptEmail order " + orderId + " to: " + shorten(email) + " (" + ok + ") [" + lang + "]");

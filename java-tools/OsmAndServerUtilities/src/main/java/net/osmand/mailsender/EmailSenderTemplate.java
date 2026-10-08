@@ -57,6 +57,9 @@ Special variables:
 		legacy (non-USE_BASE) templates never depend on it. Templates that do not set
 		USE_BASE are emitted exactly as before:
 			<!--Set USE_BASE=true-->
+		unsubscribe.html is appended to legacy templates only. In USE_BASE templates the footer tier
+		decides: FOOTER_LEGAL_T2 carries the Unsubscribe link (the template adds its own
+		List-Unsubscribe headers), the default tier has none.
 
 	Outlook conditional comments (VML bulletproof buttons) - in USE_BASE templates, exactly these
 	4 literal marker strings, each alone on its own line, are recognized and kept verbatim by the
@@ -66,11 +69,6 @@ Special variables:
 		<!--[if !mso]><!-->  ...  <!--<![endif]-->
 	Any other spelling (extra whitespace, [if gte mso 9], etc.) is not recognized and still
 	gets mangled by the generic comment handling below.
-
-	@TRANSACTIONAL@ - user-defined option to mark an email as transactional (verification codes,
-		account security, file-sharing notifications). Such emails cannot be opted out of, so
-		unsubscribe.html is not included for them. Set it in the template itself:
-			<!--Set TRANSACTIONAL=true-->
 
 Template variables:
 
@@ -221,10 +219,7 @@ public class EmailSenderTemplate {
 			include("footer", lang, false); // optional
 		} else {
 			parse(templateLines);
-		}
-
-		if (!"true".equals(vars.get(TRANSACTIONAL))) {
-			include("unsubscribe", lang, false);
+			include("unsubscribe", lang, false); // optional
 		}
 		return this;
 	}
@@ -368,7 +363,6 @@ public class EmailSenderTemplate {
 	private static final Pattern KEY_VALUE = Pattern.compile("^(.*?)\\s*=\\s*(.*?)$");
 	private static final Pattern HTML_COMMENT_REPLACE = Pattern.compile("(?s)<!--.*?-->"); // (?s) Pattern.DOTALL (multiline)
 	private final String HTML_NEWLINE_TO_BR = "HTML_NEWLINE_TO_BR"; // user-defined var from templates
-	private final String TRANSACTIONAL = "TRANSACTIONAL";
 	private final String USE_BASE = "USE_BASE";
 
 	private void parseCommandArgumentsFromComment(String line) {
