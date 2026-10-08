@@ -147,10 +147,9 @@ public class UserdataService {
     public static final String MODEL_DEVICE_WEB = "Web";
     public static final String TOKEN_DEVICE_WEB = "web";
     public static final int ERROR_CODE_PRO_USERS = 100;
-    public static final int CODE_EXPIRATION_TIME_MINUTES = 10;
-    public static final long CODE_EXPIRATION_TIME_MS = TimeUnit.MINUTES.toMillis(CODE_EXPIRATION_TIME_MINUTES);
-    public static final int CODE_MAX_ATTEMPTS = 4;
-    private static final String CODE_TTL_TEXT = "(" + CODE_EXPIRATION_TIME_MINUTES + " min)";
+    public static final int CODE_EXPIRATION_TIME_HOURS = 24;
+    public static final long CODE_EXPIRATION_TIME_MS = TimeUnit.HOURS.toMillis(CODE_EXPIRATION_TIME_HOURS);
+    private static final String CODE_TTL_TEXT = "(" + CODE_EXPIRATION_TIME_HOURS + " h)";
     private static final long MB = 1024 * 1024;
     public static final int BUFFER_SIZE = 1024 * 512;
     public static final long MAXIMUM_ACCOUNT_SIZE = 3000 * MB; // 3 (5 GB - std, 50 GB - ext, 1000 GB - pro)
@@ -198,7 +197,6 @@ public class UserdataService {
     private static final int EMAIL_TOKEN_MIN_DIGITS = 6;
     private static final int EMAIL_TOKEN_MAX_DIGITS = 12;
 
-    private static final int EMAIL_TOKEN_EXPIRATION_HOURS = 24;
     private static final int EMAIL_TOKEN_MIN_DELAY_MINUTES = 10;
     private static final int EMAIL_TOKEN_MAX_DELAY_MINUTES = 60;
 
@@ -615,7 +613,7 @@ public class UserdataService {
             return ResponseEntity.badRequest().body("error_email");
         }
         if (pu.token == null || !pu.token.equals(token) || pu.tokenTime == null || System.currentTimeMillis()
-                - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(EMAIL_TOKEN_EXPIRATION_HOURS, TimeUnit.HOURS)) {
+                - pu.tokenTime.getTime() > CODE_EXPIRATION_TIME_MS) {
             if (isWebLinkValid(pu, token)) {
                 return ok();
             }
@@ -670,8 +668,7 @@ public class UserdataService {
             throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_NOT_REGISTERED, "user with that email is not registered");
         }
         boolean tokenIsActive = pu.token != null && pu.tokenTime != null &&
-                (System.currentTimeMillis() - pu.tokenTime.getTime()) <
-                        TimeUnit.MILLISECONDS.convert(EMAIL_TOKEN_EXPIRATION_HOURS, TimeUnit.HOURS);
+                (System.currentTimeMillis() - pu.tokenTime.getTime()) < CODE_EXPIRATION_TIME_MS;
         boolean webLink = TOKEN_DEVICE_WEB.equals(deviceId) && isWebLinkValid(pu, token);
         if (webLink) {
             pu.webLinkToken = null;
@@ -1485,8 +1482,7 @@ public class UserdataService {
     public ResponseEntity<String> deleteAccount(String token, CloudUserDevicesRepository.CloudUserDevice dev, HttpServletRequest request) throws ServletException {
         CloudUsersRepository.CloudUser pu = usersRepository.findById(dev.userid);
         if (pu != null && pu.id == dev.userid) {
-            boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(EMAIL_TOKEN_EXPIRATION_HOURS, TimeUnit.HOURS);
-            boolean validToken = pu.token.equals(token) && !tokenExpired;
+            boolean validToken = isCodeValid(pu, token);
             wearOutToken(pu);
             if (validToken) {
                 if (deleteAllFiles(dev)) {
@@ -1596,7 +1592,6 @@ public class UserdataService {
         }
         updateSecureEmailToken(pu);
         String token = pu.token;
-        emailSender.sendOsmAndCloudWebEmail(pu.email, token, action, lang);
         usersRepository.saveAndFlush(pu);
         String email = pu.email;
         emailSender.sendAfterCommit(() -> {
@@ -1617,9 +1612,9 @@ public class UserdataService {
         if (pu == null) {
             return ResponseEntity.badRequest().body("User is not registered");
         }
-        boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(EMAIL_TOKEN_EXPIRATION_HOURS, TimeUnit.HOURS);
+        boolean validToken = isCodeValid(pu, code);
         wearOutToken(pu);
-        if (pu.token.equals(code) && !tokenExpired) {
+        if (validToken) {
             return ok();
         } else {
             return ResponseEntity.badRequest().body("Token is not valid or expired " + CODE_TTL_TEXT);
@@ -1634,9 +1629,9 @@ public class UserdataService {
         if (pu == null) {
             return ResponseEntity.badRequest().body("User is not registered");
         }
-        boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(EMAIL_TOKEN_EXPIRATION_HOURS, TimeUnit.HOURS);
+        boolean validToken = isCodeValid(pu, token);
         wearOutToken(pu);
-        if (pu.token.equals(token) && !tokenExpired) {
+        if (validToken) {
             return ok();
         } else {
             return ResponseEntity.badRequest().body("Token is not valid or expired " + CODE_TTL_TEXT);
@@ -1709,8 +1704,10 @@ public class UserdataService {
         if (pu == null || pu.tokenTime == null) {
             return;
         }
-        // each check ages the code, so it survives at most CODE_MAX_ATTEMPTS checks
-        pu.tokenTime = new Date(pu.tokenTime.getTime() - CODE_EXPIRATION_TIME_MS / CODE_MAX_ATTEMPTS);
+        Calendar cal = Calendar.getInstance();
+        cal.setTime(pu.tokenTime);
+        cal.add(Calendar.HOUR_OF_DAY, -7);
+        pu.tokenTime = cal.getTime();
 
         usersRepository.saveAndFlush(pu);
     }

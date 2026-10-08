@@ -267,18 +267,6 @@ public class EmailSenderService {
 	    LOGGER.info("sendOsmAndCloudWebLinkEmail to: " + shorten(email) + " (" + ok + ")");
 	}
 
-    public void sendOsmAndCloudRegistrationEmail(String email, String token, String lang, boolean newUser) {
-		String subject = newUser ? "@SUBJECT_NEW@" : "@SUBJECT_OLD@";
-	    boolean ok = new EmailSenderTemplate()
-			    .load("cloud/register", lang)
-			    .set("SUBJECT", subject)
-			    .set("TOKEN", token)
-			    .to(email)
-			    .send()
-			    .isSuccess();
-	    LOGGER.info("sendOsmAndCloudRegistrationEmail to: " + shorten(email) + " (" + ok + ") [" + lang + "]");
-	}
-
 	public void sendPurchaseLinkedEmail(String email, String lang, String productName, boolean subscription) {
 		String kind = subscription ? "_SUBSCRIPTION@" : "_PURCHASE@";
 		boolean ok = new EmailSenderTemplate()
@@ -314,7 +302,7 @@ public class EmailSenderService {
 		EmailSenderTemplate sender = new EmailSenderTemplate()
 				.load(action.template, lang)
 				.set("TOKEN", token == null ? "" : token)
-				.set("CODE_TTL_MINUTES", String.valueOf(UserdataService.CODE_EXPIRATION_TIME_MINUTES));
+				.set("CODE_TTL_HOURS", String.valueOf(UserdataService.CODE_EXPIRATION_TIME_HOURS));
 		if (newEmail != null) {
 			sender.set("NEW_EMAIL", htmlText(newEmail));
 		}
