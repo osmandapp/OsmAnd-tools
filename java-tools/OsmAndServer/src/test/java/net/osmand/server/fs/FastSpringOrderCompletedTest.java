@@ -5,6 +5,7 @@ import static org.mockito.Mockito.*;
 
 import java.io.IOException;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -83,6 +84,11 @@ public class FastSpringOrderCompletedTest {
 		expected.add(Calendar.YEAR, 1);
 		assertEquals(expected.getTime(), s.expiretime);
 		verify(userSubService).verifyAndRefreshProOrderId(user);
+
+		Receipt receipt = sentReceipt("ORDER_ID_SUB_TEST00000", "nl", "€ 19,99");
+		assertTrue(receipt.purchases.isEmpty());
+		assertEquals(1, receipt.subscriptions.size());
+		assertSame(s, receipt.subscriptions.get(0));
 	}
 
 	@Test
@@ -100,6 +106,29 @@ public class FastSpringOrderCompletedTest {
 		assertTrue(p.valid);
 		assertEquals(1789097070231L, p.purchaseTime.getTime());
 		verify(userSubService).verifyAndRefreshProOrderId(user);
+
+		Receipt receipt = sentReceipt("ORDER_ID_IAP_TEST00000", "es", "$1,299.00 MXN");
+		assertTrue(receipt.subscriptions.isEmpty());
+		assertEquals(1, receipt.purchases.size());
+		assertSame(p, receipt.purchases.get(0));
+		assertEquals(p.purchaseTime, receipt.orderDate);
+	}
+
+	private record Receipt(Date orderDate, List<SupporterDeviceInAppPurchase> purchases,
+	                       List<SupporterDeviceSubscription> subscriptions) {
+	}
+
+	@SuppressWarnings("unchecked")
+	private Receipt sentReceipt(String orderId, String lang, String total) {
+		ArgumentCaptor<Runnable> afterCommit = ArgumentCaptor.forClass(Runnable.class);
+		verify(emailSender, atLeastOnce()).sendAfterCommit(afterCommit.capture());
+		afterCommit.getAllValues().forEach(Runnable::run);
+		ArgumentCaptor<Date> orderDate = ArgumentCaptor.forClass(Date.class);
+		ArgumentCaptor<List<SupporterDeviceInAppPurchase>> purchases = ArgumentCaptor.forClass(List.class);
+		ArgumentCaptor<List<SupporterDeviceSubscription>> subscriptions = ArgumentCaptor.forClass(List.class);
+		verify(emailSender).sendPurchaseReceiptEmail(eq(user.email), eq(USER_ID), eq(lang), eq(orderId),
+				orderDate.capture(), eq(total), purchases.capture(), subscriptions.capture());
+		return new Receipt(orderDate.getValue(), purchases.getValue(), subscriptions.getValue());
 	}
 
 	@Test

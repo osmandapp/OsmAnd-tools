@@ -325,8 +325,8 @@ public class EmailSenderTemplate {
 					filled = filled.replace("@" + key + "@", vars.get(key));
 				}
 			} while (!filled.equals(previous));
-			if (filled.matches("(?s)^.*@[A-Z_]+@.*$")) {
-				throw new IllegalStateException(filled + ": error - please fill all tokens @A-Z@");
+			if (filled.matches("(?s)^.*@[A-Z0-9_]+@.*$")) {
+				throw new IllegalStateException(filled + ": error - please fill all tokens @A-Z0-9_@");
 			}
 		}
 		return filled;
