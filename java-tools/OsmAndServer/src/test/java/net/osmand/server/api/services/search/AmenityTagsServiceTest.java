@@ -53,6 +53,17 @@ public class AmenityTagsServiceTest {
 		assertEquals(Collections.emptySet(), visibleKeys(tags));
 	}
 
+	// phone numbers are shown formatted, other values as they are
+	@Test
+	public void phoneFormatted() {
+		Map<String, String> shown = service.convertToVisibleTags(Map.of("phone", "+33612345678", "mobile",
+				"+39 081 416 928", "website", "+33612345678"), "en").stream()
+				.collect(Collectors.toMap(AmenityTagsService.VisibleTag::key, AmenityTagsService.VisibleTag::value));
+		assertEquals("+33 6 12 34 56 78", shown.get("phone"));
+		assertEquals("+39 081 416 928", shown.get("mobile"));
+		assertEquals("+33612345678", shown.get("website"));
+	}
+
 	private Set<String> visibleKeys(Map<String, String> tags) {
 		return service.convertToVisibleTags(tags, "en").stream().map(AmenityTagsService.VisibleTag::key)
 				.collect(Collectors.toSet());
