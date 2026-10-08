@@ -247,7 +247,7 @@ public class MapTransportLayer implements MapPanelLayer {
 					}
 				}
 				GeneralRouter prouter = builder.getRouter("public_transport");
-				TransportRoutingConfiguration cfg = new TransportRoutingConfiguration(prouter, paramsR);
+				TransportRoutingConfiguration cfg = new TransportRoutingConfiguration(builder, prouter, paramsR);
 				cfg.useSchedule = schedule;
 				TransportRoutePlanner planner = new TransportRoutePlanner();
 
