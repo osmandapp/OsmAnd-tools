@@ -149,6 +149,7 @@ public class FastSpringController {
 						subscription.valid = true;
 
 						setInitialSubscriptionDates(subscription, sku);
+						setAutorenewingFromApi(subscription);
 
 						subscriptions.add(subscription);
 						LOGGER.info(String.format("FastSpring: Subscription recorded for user %s purchaseToken: %s", EmailSenderService.shorten(email), data.reference));
@@ -524,6 +525,25 @@ public class FastSpringController {
 			subscription.expiretime = cal.getTime();
 			subscription.autorenewing = true; // assume autorenew by default
 		}
+	}
+
+	private void setAutorenewingFromApi(DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription) {
+		if (!FastSpringHelper.isConfigured()) {
+			return;
+		}
+		String reason = "no autorenew data yet";
+		try {
+			FastSpringHelper.FastSpringSubscription fsSub =
+					FastSpringHelper.getSubscriptionByOrderIdAndSku(subscription.orderId, subscription.sku);
+			if (fsSub != null && fsSub.autoRenew != null && fsSub.state != null) {
+				subscription.autorenewing = fsSub.isAutoRenewing();
+				return;
+			}
+		} catch (Exception e) {
+			reason = e.getMessage();
+		}
+		LOGGER.warn("FastSpring: keeping estimated autorenew for orderId " + subscription.orderId
+				+ ", sku " + subscription.sku + ": " + reason);
 	}
 
 	public static class FastSpringWebhookRequest {
