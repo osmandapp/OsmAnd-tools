@@ -266,9 +266,9 @@ public class ShareFileService {
 				access.access = (accessType);
 				shareFileRepository.saveAndFlush(access);
 				if (PermissionType.READ.name().equals(accessType)) {
-					emailSender.sendShareFileAccessEmail(access, true);
+					emailSender.sendAfterCommit(() -> emailSender.sendShareFileAccessEmail(access, true));
 				} else if (PermissionType.BLOCKED.name().equals(accessType)) {
-					emailSender.sendShareFileAccessEmail(access, false);
+					emailSender.sendAfterCommit(() -> emailSender.sendShareFileAccessEmail(access, false));
 				}
 			}
 		}

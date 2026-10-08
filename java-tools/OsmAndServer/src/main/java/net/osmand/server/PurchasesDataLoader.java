@@ -59,6 +59,16 @@ public class PurchasesDataLoader {
 		return inapps;
 	}
 
+	public String subscriptionName(String sku) {
+		Subscription subscription = subscriptions.get(sku);
+		return subscription != null ? subscription.name() : sku;
+	}
+
+	public String inAppName(String sku) {
+		InApp inApp = inapps.get(sku);
+		return inApp != null ? inApp.name() : sku;
+	}
+
 	@JsonIgnoreProperties(ignoreUnknown = true)
 	public record Subscription(
 			@JsonProperty String name,

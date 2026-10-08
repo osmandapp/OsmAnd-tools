@@ -461,7 +461,7 @@ public class UserSubscriptionService {
 				}
 			}
 			if (linked) {
-				notifyPurchaseLinked(pu.id);
+				sendPurchaseLinkedEmailAfterCommit(pu.id);
 			}
 			return true;
 		}
@@ -484,7 +484,7 @@ public class UserSubscriptionService {
 				}
 			}
 			if (linked) {
-				notifyPurchaseLinked(pu.id);
+				sendPurchaseLinkedEmailAfterCommit(pu.id);
 			}
 			return true;
 		}
@@ -515,27 +515,25 @@ public class UserSubscriptionService {
 		LOG.info("Cleared orderId for previous user " + previousUser.id);
 
 		if (!iapList.isEmpty() || !subscriptionList.isEmpty()) {
-			notifyPurchaseLinked(newUserId);
+			sendPurchaseLinkedEmailAfterCommit(newUserId);
 		}
 	}
 
-	private void notifyPurchaseLinked(int newUserId) {
+	private void sendPurchaseLinkedEmailAfterCommit(int newUserId) {
 		CloudUsersRepository.CloudUser newUser = usersRepository.findById(newUserId);
 		if (newUser == null || newUser.email == null) {
 			return;
 		}
 		String productName;
-		List<SupporterDeviceSubscription> subscriptions = subscriptionsRepo.findByUserIdAndValidTrue(newUserId);
+		List<SupporterDeviceSubscription> subscriptions = subscriptionsRepo.findByUserIdAndValidTrue(newUserId);	
 		List<SupporterDeviceInAppPurchase> purchases = inAppPurchasesRepo.findByUserIdAndValidTrue(newUserId);
 		boolean subscription = !subscriptions.isEmpty();
 		if (subscription) {
 			SupporterDeviceSubscription sub = subscriptions.get(0);
-			PurchasesDataLoader.Subscription skuData = purchasesDataLoader.getSubscriptions().get(sub.sku);
-			productName = skuData != null ? skuData.name() : sub.sku;
+			productName = purchasesDataLoader.subscriptionName(sub.sku);
 		} else if (!purchases.isEmpty()) {
 			SupporterDeviceInAppPurchase iap = purchases.get(0);
-			PurchasesDataLoader.InApp skuData = purchasesDataLoader.getInApps().get(iap.sku);
-			productName = skuData != null ? skuData.name() : iap.sku;
+			productName = purchasesDataLoader.inAppName(iap.sku);
 		} else {
 			return;
 		}
