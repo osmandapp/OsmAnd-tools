@@ -391,6 +391,18 @@ public class UserdataService {
 
 	public ResponseEntity<String> uploadMultipartFile(MultipartFile file, CloudUserDevicesRepository.CloudUserDevice dev,
 			String name, String type, Long clienttime, HttpSession session) throws IOException {
+		InternalZipFile zipfile;
+		try {
+			zipfile = getUploadZipFile(file, name, type, session);
+			validateUserForUpload(dev, type, zipfile.getSize());
+		} catch (OsmAndPublicApiException e) {
+			LOG.warn(String.format("Upload rejected for user %d, file %s/%s: %s", dev.userid, type, name, e.getMessage()));
+			throw e;
+		}
+		return uploadFile(zipfile, dev, name, type, clienttime);
+	}
+
+	private InternalZipFile getUploadZipFile(MultipartFile file, String name, String type, HttpSession session) throws IOException {
 		ServerCommonFile serverCommonFile = checkThatObfFileisOnServer(name, type);
 		InternalZipFile zipfile;
 		if (serverCommonFile != null) {
@@ -414,8 +426,7 @@ public class UserdataService {
                 throw new OsmAndPublicApiException(ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD, "File is submitted not in gzip format");
 			}
 		}
-		validateUserForUpload(dev, type, zipfile.getSize());
-		return uploadFile(zipfile, dev, name, type, clienttime);
+		return zipfile;
 	}
 
 	private boolean isKmlKmzFileByName(String originalFilename) {
