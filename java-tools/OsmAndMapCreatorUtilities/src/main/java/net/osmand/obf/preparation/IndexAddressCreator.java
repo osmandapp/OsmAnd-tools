@@ -174,12 +174,12 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			List<City> citiesToSearch = cityDataStorage.getClosestObjects(boundaryCenter.getLatitude(), boundaryCenter.getLongitude());
 			// assumption order of citiesToSearch not important as we do step by step
 			City cityFound = null;
-			String boundaryName = boundary.getName().toLowerCase();
-			String altBoundaryName = Algorithms.isEmpty(boundary.getAltName()) ? "" : boundary.getAltName().toLowerCase();
+			String boundaryName = normalizeBoundaryName(boundary.getName());
+			String altBoundaryName = normalizeBoundaryName(boundary.getAltName());
 			if (boundary.hasAdminCenterId()) {
 				for (City c : citiesToSearch) {
 					if (c.getId() == boundary.getAdminCenterId() || c.getId() == boundary.getLabelId()) {
-						String cityLower = c.getName().toLowerCase();
+						String cityLower = normalizeBoundaryName(c.getName());
 						// Check names to not combine municipality Samolaco (that has many villages) with admin_center village Eva
 						if (!nameContains(boundaryName, cityLower) && !nameContains(altBoundaryName, cityLower) &&
 								!nameContains(cityLower, boundaryName)) {
@@ -200,7 +200,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			}
 			if (cityFound == null) {
 				for (City c : citiesToSearch) {
-					if ((boundaryName.equalsIgnoreCase(c.getName()) || altBoundaryName.equalsIgnoreCase(c.getName()))
+					String cityLower = normalizeBoundaryName(c.getName());
+					if ((boundaryName.equals(cityLower) || altBoundaryName.equals(cityLower))
 							&& boundary.containsPoint(c.getLocation())) {
 						cityFound = c;
 						break;
@@ -212,7 +213,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			// False case : London Borough of Richmond upon Thames (bigger) -> Richmond!
 			if (cityFound == null) {
 				for (City c : citiesToSearch) {
-					String lower = c.getName().toLowerCase();
+					String lower = normalizeBoundaryName(c.getName());
 					if (nameContains(boundaryName, lower) || nameContains(altBoundaryName, lower)) {
 						if (boundary.containsPoint(c.getLocation())) {
 							cityFound = c;
@@ -244,6 +245,14 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 	}
 
+
+	// "Erlenbach (ZH)" boundary vs "Erlenbach ZH" place
+	private String normalizeBoundaryName(String name) {
+		if (Algorithms.isEmpty(name)) {
+			return "";
+		}
+		return name.toLowerCase().replace('(', ' ').replace(')', ' ').replaceAll("\\s+", " ").trim();
+	}
 
 	private boolean nameContains(String part, String fullString) {
 		if (Algorithms.isEmpty(part)) {
@@ -307,9 +316,10 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 //	4. Zurich admin_level = 6 win admin_level = 4
 //  5. Bucurest admin_level = 4 win nothing
 	private int getCityBoundaryImportance(Boundary b, City c) {
-		boolean nameEq = b.getName().equalsIgnoreCase(c.getName());
+		String cityName = normalizeBoundaryName(c.getName());
+		boolean nameEq = normalizeBoundaryName(b.getName()).equals(cityName);
 		if (!Algorithms.isEmpty(b.getAltName()) && !nameEq) {
-			nameEq = b.getAltName().equalsIgnoreCase(c.getName());
+			nameEq = normalizeBoundaryName(b.getAltName()).equals(cityName);
 		}
 		boolean cityBoundary = b.getCityType() != null;
 		// max 10
@@ -1002,7 +1012,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 						building.setName(hname + additionalHname);
 					}
 					if (!Algorithms.isEmpty(street2)) {
-						String secondHno= e.getTag(OSMTagKey.ADDR2_HOUSE_NUMBER);
+						String secondHno = e.getTag(OSMTagKey.ADDR2_HOUSE_NUMBER);
 						String firstNo = building.getName();
 						int secondNumberInd = hname.indexOf('/');
 						if (secondNumberInd != -1 && secondNumberInd < hname.length() - 1 &&
@@ -1012,7 +1022,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 						}
 						if (secondHno != null) {
 							Building building2 = EntityParser.parseBuilding(e);
-							building2.setName(hname.substring(secondNumberInd + 1) + additionalHname);
+							building2.setName(secondHno + additionalHname);
 							Set<Long> ids2OfStreet = getStreetInCity(0, e.getIsInNames(), street2, false, null, l, icc);
 							ids2OfStreet.removeAll(idsOfStreet); // remove duplicated entries!
 							if (!ids2OfStreet.isEmpty()) {

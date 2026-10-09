@@ -38,8 +38,10 @@ import net.osmand.binary.GeocodingUtilities.GeocodingResult;
 import net.osmand.data.LatLon;
 import net.osmand.data.LatLonEle;
 import net.osmand.data.QuadRect;
-import net.osmand.gpx.GPXFile;
-import net.osmand.gpx.GPXUtilities;
+import net.osmand.shared.gpx.GpxFile;
+import net.osmand.shared.gpx.GpxUtilities;
+import okio.Buffer;
+import okio.Source;
 import net.osmand.router.GeneralRouter;
 import net.osmand.router.GeneralRouter.RoutingParameterType;
 import net.osmand.router.RouteCalculationProgress;
@@ -251,13 +253,14 @@ public class RoutingController {
 	@PostMapping(path = {"/gpx-approximate"}, produces = "application/json")
 	public ResponseEntity<String> uploadGpx(@RequestPart(name = "file") @Valid @NotNull @NotEmpty MultipartFile file,
 	                                        @RequestParam(defaultValue = "car") String routeMode) throws IOException {
-		InputStream is = file.getInputStream();
-		GPXFile gpxFile = GPXUtilities.loadGPXFile(is);
-		is.close();
-		if (gpxFile.error != null) {
+		GpxFile gpxFile;
+		try (InputStream is = file.getInputStream(); Source source = new Buffer().readFrom(is)) {
+			gpxFile = GpxUtilities.INSTANCE.loadGpxFile(source);
+		}
+		if (gpxFile.getError() != null) {
 			return ResponseEntity.badRequest().body("Error reading gpx!");
 		} else {
-			gpxFile.path = file.getOriginalFilename();
+			gpxFile.setPath(file.getOriginalFilename());
 			List<LatLon> resList = new ArrayList<>();
 			List<Feature> features = new ArrayList<>();
 			Map<String, Object> props = new TreeMap<>();
