@@ -23,6 +23,7 @@ import net.osmand.CollatorStringMatcher;
 import net.osmand.binary.CommonWords;
 import net.osmand.binary.CommonWordsMultiIndex;
 import net.osmand.binary.NameIndexReader;
+import net.osmand.binary.RuleOwner;
 import net.osmand.data.City;
 import net.osmand.data.City.CityType;
 import net.osmand.data.MapObject;
@@ -31,9 +32,7 @@ import net.osmand.obf.preparation.IndexPoiCreator.PoiAdditionalType;
 import net.osmand.obf.preparation.IndexPoiCreator.PoiTileBox;
 import net.osmand.osm.AbstractPoiType;
 import net.osmand.osm.MapPoiTypes;
-import net.osmand.search.core.SearchPhrase;
 import net.osmand.search.core.TopIndexFilter;
-import net.osmand.util.Algorithms;
 import net.osmand.util.SearchAlgorithms;
 
 public class NameIndexCreator<T> {
@@ -79,7 +78,7 @@ public class NameIndexCreator<T> {
 
 	// download name of the map ("Ukraine_kyiv-city_europe"), used when COMMON_WORDS_BY_LANGUAGE and a group covers it
 	public void setMapName(String mapName) {
-		// language group of the map (CommonWordsMultiIndex.DEFAULT_GROUPS), null when no group covers it
+		// statistics group of the map (<locales> of rules.xml), null when no group covers it
 		String languageGroup = mapName == null ? null : CommonWordsMultiIndex.getInstance().getGroupId(mapName);
 		boolean covered = COMMON_WORDS_BY_LANGUAGE && languageGroup != null;
 		this.mapName = covered ? mapName : null;
@@ -421,106 +420,153 @@ public class NameIndexCreator<T> {
 		}
 	}
 	
+	/** Collects the words of keys_report.tsv (IndexCreatorSettings.keysReport). */
+	public void enableKeysReport() {
+		alternativeNames.enableKeysReport();
+	}
+
+	/** @return map whose statistics group chooses the keys of names, null when the rare word rule applies */
+	String getKeysMapName() {
+		return mapName;
+	}
+
+	/** Indexes a name of an object without alternative names (ids of a poi). */
 	public void addToNameIndex(String name, T obj, int maxPrefixLength, boolean indexNumbers) {
+		addToNameIndex(name, obj, maxPrefixLength, indexNumbers, List.of());
+	}
+
+	/**
+	 * Indexes a name of an object with its alternative names (unglued words, synonyms by location and language, see
+	 * {@link AlternativeNameIndexGenerator}).
+	 *
+	 * @param lang language of the name: null for a name in the language of the map, "de" or "name:de"
+	 */
+	public void addToNameIndex(String name, String lang, T obj, int maxPrefixLength, boolean indexNumbers) {
+		addToNameIndex(name, obj, maxPrefixLength, indexNumbers,
+				alternativeNames.alternatives(name, lang, ownerType(obj)));
+	}
+
+	private void addToNameIndex(String name, T obj, int maxPrefixLength, boolean indexNumbers,
+			List<NameIndexPlan.Alternative> alternatives) {
+		String indexed = name;
 		if (obj instanceof Street s) {
-//			if(name.startsWith("<") && name.trim().endsWith(">") && 
+//			if(name.startsWith("<") && name.trim().endsWith(">") &&
 //				!name.startsWith("<<")) {
 //				name += " " + NameIndexReader.CITY_AS_STREET_COMMON;
-//			} else 
+//			} else
 			if (s.getNamesMap(false).containsKey(MapObject.NAME_PLACE_ATTR)) {
-				name += " " + NameIndexReader.CITY_AS_STREET_COMMON;
+				indexed += " " + NameIndexReader.CITY_AS_STREET_COMMON;
 			}
 		}
-		List<String> uniqueNames = SearchAlgorithms.splitAndNormalize(name, true);
-		List<String> allNames = SearchAlgorithms.splitAndNormalize(name, false);
 		// an object people know by any word of its name keeps every word as a key: a poi with a travel rating or a
 		// wikidata id ("national" finds Tongass National Forest), a city; towns and villages do not
 		boolean notable = obj instanceof PoiNameObject p && (p.eloRating() >= 0 || p.wikidata())
 				|| obj instanceof City c && c.getType() == CityType.CITY;
-		Set<String> keys = mapName == null ? null
-				: new HashSet<>(CommonWordsMultiIndex.getInstance().getWordsToIndex(mapName, uniqueNames, notable));
-		String legacyKey = null;
-		if (keys != null) {
-			// TODO remove when app versions with the legacy search (SearchCoreFactory) no longer download maps: it looks a
-			// name up by the one query word SearchPhrase picks, a word CommonWords does not know first, so the name keeps
-			// such a word ("amsterdam" of Amsterdam City Farm, frequent in the Netherlands); known words like "de" stay out
-			List<String> words = new ArrayList<>(uniqueNames);
-			words.removeIf(NameIndexReader::isIndexMarker);
-			String legacyWord = SearchPhrase.selectMainUnknownWordToSearch(words);
-			if (!legacyWord.isEmpty() && CommonWords.getInstance().getCommonSearch(legacyWord) == -1 && keys.add(legacyWord)) {
-				legacyKey = legacyWord;
-			}
-		}
+		NameIndexPlan plan = NameIndexPlan.plan(indexed, alternatives,
+				new NameIndexPlan.Context(mapName, maxPrefixLength, indexNumbers, notable));
+		apply(plan, obj, name, maxPrefixLength);
+	}
+
+	// writes the decisions of the plan: the keys, the words of the common words table and the statistics
+	private void apply(NameIndexPlan plan, T obj, String name, int maxPrefixLength) {
 		boolean hasRareName = false;
-		for (String token : uniqueNames) {
-			if (!NameIndexReader.isIndexMarker(token) &&
+		for (String token : SearchAlgorithms.splitAndNormalize(plan.name.text(), true)) {
+			if (!NameIndexReader.isIndexMarker(token) && predefinedGlobalWords != null &&
 					!predefinedGlobalWords.isCommon(token) && predefinedGlobalWords.getFrequentlyUsed(token) <= 0) {
 				hasRareName = true;
 				break;
 			}
 		}
-		for (String token : uniqueNames) {
-			if (Algorithms.isEmpty(token)) {
-				continue;
+		for (NameIndexPlan.Word w : plan.name.decisions()) {
+			alternativeNames.decide(w.word(), w.decision(), name);
+			String token = w.word();
+			switch (w.action()) {
+				case MARKER -> {
+					tokenFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
+					commonNonIndexedFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
+				}
+				case TABLE_NON_INDEXED -> {
+					addTableWord(token);
+					commonNonIndexedFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
+				}
+				case TABLE -> addTableWord(token);
+				case KEY, KEY_AND_TABLE -> {
+					if (w.action() == NameIndexPlan.Action.KEY_AND_TABLE) {
+						notKeyWords.add(token);
+					}
+					NamedObjectsByPrefix<T> entry = namesIndex.get(w.prefix());
+					if (entry == null) {
+						entry = new NamedObjectsByPrefix<T>();
+						entry.prefix = w.prefix();
+						namesIndex.put(w.prefix(), entry);
+					}
+					if (entry.addToken(obj, token, plan.name.words())) {
+						tokenFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
+						if (hasRareName && predefinedGlobalWords.isCommon(token)) {
+							commonNonIndexedFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
+						}
+					}
+				}
+				case NONE -> {
+				}
 			}
-			if (NameIndexReader.isIndexMarker(token)) {
-				tokenFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
-				commonNonIndexedFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
-				continue;
+		}
+		alternativeNames.countAlternatives(plan.alternatives);
+		for (NameIndexPlan.Variant v : plan.alternatives) {
+			List<AlternativeNameIndexGenerator.KeyStats> ruleStats = alternativeNames.ruleStats(v.rules());
+			for (NameIndexPlan.Word w : v.decisions()) {
+				alternativeNames.decide(ruleStats, w.word(), w.decision(), v.text());
+				switch (w.action()) {
+					case KEY, KEY_AND_TABLE ->
+							alternativeNames.outcome(ruleStats, addAlternativeToken(w.prefix(), obj, w.word(), v.words()));
+					case TABLE, TABLE_NON_INDEXED -> addTableWord(w.word());
+					case MARKER, NONE -> {
+					}
+				}
 			}
-			String prefix = nameIndexPreparePrefix(token, maxPrefixLength);
-			if (Algorithms.isEmpty(prefix)) {
-				continue;
+			// one more name under the keys of the name it shares: with its attached words, or without a key of its own
+			for (String key : v.sharedKeys()) {
+				alternativeNames.outcome(ruleStats, addAlternativeToken(nameIndexPreparePrefix(key, maxPrefixLength),
+						obj, key, v.words()));
 			}
-			// a pure number is kept with the other words of the name ("6178/2.Sokak"), a number with letters is not:
-			// "33-я" of "вулиця 33-я Лінія" is the only word telling apart its Лінія streets
-			if (!indexNumbers && SearchAlgorithms.isNumber2Letters(token) && parsePureIntegerSuffix(token) != null) {
-				continue;
-			}
-			if (keys != null && !keys.contains(token)) {
-				// not a key of this name: kept as a reference in the common words table
-				notKeyWords.add(token);
-				tokenFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
-				commonNonIndexedFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
-				continue;
-			}
-			if (token.equals(legacyKey)) {
-				// the other words of the name still refer to it, as they did before it became a key
-				notKeyWords.add(token);
-			}
-			NamedObjectsByPrefix<T> entry = namesIndex.get(prefix);
-			if (entry == null) {
-				entry = new NamedObjectsByPrefix<T>();
-				entry.prefix = prefix;
-				namesIndex.put(prefix, entry);
-			}
-			boolean added = entry.addToken(obj, token, allNames);
-			if (!added) {
-				continue;
-			}
-			tokenFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
-			boolean c = predefinedGlobalWords.isCommon(token);
-			if (c && hasRareName) {
-				commonNonIndexedFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
-			}
-			
-		}		
+		}
 	}
 
-	
-	// alternative names (unglued words, synonyms by location and language) - see AlternativeNameIndexGenerator
-	public void addAlternativeNamesToNameIndex(String name, String lang, T obj, int maxPrefixLength) {
-		alternativeNames.addAlternativeNames(name, lang, obj, maxPrefixLength);
+	// a word of names that is not a key: atoms refer to it in the common words table, else they store only a count of
+	// other words (INDEX_RARE_WORDS_FOR_*) and the word cannot cover a word of a query
+	void addTableWord(String token) {
+		notKeyWords.add(token);
+		tokenFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
 	}
 
-	void addAlternativeToken(String prefix, T obj, String word, List<String> alternativeWords) {
+	private static String ownerType(Object obj) {
+		if (obj instanceof PoiNameObject) {
+			return RuleOwner.POI;
+		}
+		return obj instanceof MapObject o ? RuleOwner.of(o) : null;
+	}
+
+	public AlternativeNameIndexGenerator.Stats getAlternativeNameStats() {
+		return alternativeNames.getStats();
+	}
+
+	// where the key went, at the time it is added: a later common-words build can still drop or merge the block
+	AlternativeNameIndexGenerator.KeyOutcome addAlternativeToken(String prefix, T obj, String word,
+			List<String> alternativeWords) {
 		NamedObjectsByPrefix<T> entry = namesIndex.get(prefix);
+		AlternativeNameIndexGenerator.KeyOutcome outcome;
 		if (entry == null) {
 			entry = new NamedObjectsByPrefix<T>();
 			entry.prefix = prefix;
 			namesIndex.put(prefix, entry);
+			outcome = AlternativeNameIndexGenerator.KeyOutcome.BLOCK;
+		} else if (entry.namedObjects.isEmpty() || entry.namedObjects.get(entry.namedObjects.size() - 1).object != obj) {
+			// addToken reuses only the last atom of the block
+			outcome = AlternativeNameIndexGenerator.KeyOutcome.ATOM;
+		} else {
+			outcome = AlternativeNameIndexGenerator.KeyOutcome.JOIN;
 		}
-		entry.addToken(obj, word, alternativeWords);
+		return entry.addToken(obj, word, alternativeWords) ? outcome : AlternativeNameIndexGenerator.KeyOutcome.DUP;
 	}
 
 	private static String substringByCodePoints(String value, int codePointCount) {
@@ -574,7 +620,7 @@ public class NameIndexCreator<T> {
 	}
 	
 
-	private static Integer parsePureIntegerSuffix(String token) {
+	static Integer parsePureIntegerSuffix(String token) {
 		if (token == null || token.length() == 0) {
 			return null;
 		}
@@ -639,10 +685,9 @@ public class NameIndexCreator<T> {
 		String name = o.getName();
 		// getOtherNames ignores "admin_level", "place"
 		boolean postcode = (o instanceof City c && c.getType() == CityType.POSTCODE);
-		nameIndex.addToNameIndex(removeBraces(name), o,  settings.charsToBuildAddressNameIndex, postcode);
+		nameIndex.addToNameIndex(removeBraces(name), null, o, settings.charsToBuildAddressNameIndex, postcode);
 		int mainWords = countWords(removeBraces(name));
 		int variant = 0;
-		nameIndex.addAlternativeNamesToNameIndex(removeBraces(name), null, o, settings.charsToBuildAddressNameIndex);
 		// language of every other name (key of the names map), null for the transliterated english name
 		Map<String, String> langs = new HashMap<>();
 		for (Map.Entry<String, String> e : o.getNamesMap(true).entrySet()) {
@@ -657,8 +702,7 @@ public class NameIndexCreator<T> {
 					variant++;
 					indexed += " " + NameIndexReader.altNameMarker(variant);
 				}
-				nameIndex.addToNameIndex(indexed, o,  settings.charsToBuildAddressNameIndex, postcode);
-				nameIndex.addAlternativeNamesToNameIndex(indexed, langs.get(oName), o, settings.charsToBuildAddressNameIndex);
+				nameIndex.addToNameIndex(indexed, langs.get(oName), o, settings.charsToBuildAddressNameIndex, postcode);
 			}
 		}
 		if (fileOffset > Integer.MAX_VALUE) {

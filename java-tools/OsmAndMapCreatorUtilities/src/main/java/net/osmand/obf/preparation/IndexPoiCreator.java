@@ -66,6 +66,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private static final Log log = LogFactory.getLog(IndexPoiCreator.class);
 
 	private Connection poiConnection;
+	// alternative names of the last written POI name index
+	private AlternativeNameIndexGenerator.Stats alternativeNameStats;
 	private File poiIndexFile;
 	private PreparedStatement poiPreparedStatement;
 	private PreparedStatement tagGroupsPreparedStatement;
@@ -755,6 +757,11 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 	}
 
+	// null before the POI index is written
+	public AlternativeNameIndexGenerator.Stats getAlternativeNameStats() {
+		return alternativeNameStats;
+	}
+
 	public void writeBinaryPoiIndex(File poiGeocoding, BinaryMapIndexWriter writer, String regionName,
 			IProgress progress) throws SQLException, IOException {
 		if (poiPreparedStatement != null) {
@@ -767,6 +774,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 		NameIndexCreator<PoiNameObject> namesIndex = new NameIndexCreator<>(CommonWords.getPoiInstance());
 		namesIndex.setMapName(settings.nameIndexMapName != null ? settings.nameIndexMapName : regionName);
+		if (settings.keysReport) {
+			namesIndex.enableKeysReport();
+		}
 
 		int zoomToStart = ZOOM_TO_SAVE_START;
 		IntBbox bbox = new IntBbox();
@@ -794,6 +804,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		// 2.5 write names table
 		Map<PoiTileBox, List<BinaryFileReference>> fpToWriteSeeks = writer.writePoiNameIndex(globalCategories,
 				namesIndex, startFpPoiIndex);
+		alternativeNameStats = namesIndex.getAlternativeNameStats();
 
 		// 3. write boxes
 		log.info("Poi box processing finished");
@@ -1205,7 +1216,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		NameIndexCreator.addPoiCategories(namesIndex, obj, poiTypes);
 		int mainWords = -1;
 		if (name != null) {
-			namesIndex.addToNameIndex(name, obj, settings.charsToBuildPoiNameIndex, false);
+			namesIndex.addToNameIndex(name, null, obj, settings.charsToBuildPoiNameIndex, false);
 			mainWords = NameIndexCreator.countWords(name);
 			if (Algorithms.isEmpty(nameEn)) {
 				nameEn = Junidecode.unidecode(name);
@@ -1214,18 +1225,13 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		int[] variant = new int[1];
 		if (!Algorithms.objectEquals(nameEn, name) && !Algorithms.isEmpty(nameEn)) {
 			String indexed = altName(nameEn, mainWords, variant);
-			namesIndex.addToNameIndex(indexed, obj, settings.charsToBuildPoiNameIndex, false);
-			namesIndex.addAlternativeNamesToNameIndex(indexed, "en", obj, settings.charsToBuildPoiNameIndex);
-		}
-		if (name != null) {
-			namesIndex.addAlternativeNamesToNameIndex(name, null, obj, settings.charsToBuildPoiNameIndex);
+			namesIndex.addToNameIndex(indexed, "en", obj, settings.charsToBuildPoiNameIndex, false);
 		}
 		if (names != null) {
 			for (Map.Entry<String, String> nk : names.entrySet()) {
 				if (!Algorithms.objectEquals(nk.getKey(), name) && !Algorithms.isEmpty(nk.getKey())) {
 					String indexed = altName(nk.getKey(), mainWords, variant);
-					namesIndex.addToNameIndex(indexed, obj, settings.charsToBuildPoiNameIndex, false);
-					namesIndex.addAlternativeNamesToNameIndex(indexed, nk.getValue(), obj, settings.charsToBuildPoiNameIndex);
+					namesIndex.addToNameIndex(indexed, nk.getValue(), obj, settings.charsToBuildPoiNameIndex, false);
 				}
 			}
 		}

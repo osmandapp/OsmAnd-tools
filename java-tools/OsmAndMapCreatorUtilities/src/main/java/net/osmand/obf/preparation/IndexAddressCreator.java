@@ -73,6 +73,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	// MEMORY address : choose what to use ?
 	private boolean loadInMemory = true;
+	// alternative names of the last written address name index
+	private AlternativeNameIndexGenerator.Stats alternativeNameStats;
 
 	// MEMORY address : address structure
 	// load it in memory
@@ -113,6 +115,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	public CityDataStorage getCityDataStorage() {
 		return cityDataStorage;
+	}
+
+	// null before the address index is written
+	public AlternativeNameIndexGenerator.Stats getAlternativeNameStats() {
+		return alternativeNameStats;
 	}
 
 
@@ -575,7 +582,6 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 		name = name.trim();
 		name = name.replace("’", "'");
-		name = icc.decryptAbbreviations(name, location, settings.addRegionTag);
 
 		if (normalizeStreets) {
 			String newName = name;
@@ -1274,6 +1280,9 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 		NameIndexCreator<MapObject> namesIndex = new NameIndexCreator<>(CommonWords.getAddrInstance());
 		namesIndex.setMapName(settings.nameIndexMapName != null ? settings.nameIndexMapName : regionName);
+		if (settings.keysReport) {
+			namesIndex.enableKeysReport();
+		}
 
 		progress.startTask(settings.getString("IndexCreator.SERIALIZING_ADDRESS"), cityTowns.size() + villages.size() / 100 + 1); //$NON-NLS-1$
 		TLongObjectHashMap<Long> streetIds = new TLongObjectHashMap<Long>();
@@ -1371,6 +1380,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		progress.finishTask();
 
 		writer.writeAddressNameIndex(namesIndex);
+		alternativeNameStats = namesIndex.getAlternativeNameStats();
 		writer.endWriteAddressIndex();
 		writer.flush();
 		streetstat.close();

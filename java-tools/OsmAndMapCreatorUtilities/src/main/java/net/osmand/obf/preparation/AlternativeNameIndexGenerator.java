@@ -1,49 +1,239 @@
 package net.osmand.obf.preparation;
 
+import java.io.IOException;
+import java.io.Writer;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 import net.osmand.binary.CommonWordsMultiIndex;
+import net.osmand.binary.SearchLocales;
+import net.osmand.binary.SearchVariantRules;
+import net.osmand.binary.SearchVariantRules.Rule;
+import net.osmand.binary.SearchVariantRules.RuleId;
 import net.osmand.util.Algorithms;
 import net.osmand.util.SearchAlgorithms;
 
 /**
  * Alternative spellings of a name that go to the name index next to the name itself, so the search finds an object
- * by a word its name does not have as a separate word: "L'abordage" is found by "abordage", "Garry's" by "garry".
+ * by a word its name does not have as a separate word: "L'abordage" is found by "abordage", "Strada Statale 42" by
+ * "SS42".
  * <p>
- * Every rule turns a name into one alternative name (or none). The words of the alternative name that the name does
- * not already have become keys of the object and refer to the other words of the alternative name, the same way
- * {@link NameIndexCreator#addToNameIndex} indexes a name.
- * <p>
- * Rules by location and language, as {@link CommonWordsMultiIndex} chooses service words by the language group
- * of the map ({@link #getLanguageGroup()}, a group of {@link CommonWordsMultiIndex#DEFAULT_GROUPS}):
- * <ul>
- * <li>abbreviations: "St." / "Saint" / "Sankt", "Dr." / "Doctor", "вул." / "вулиця", "пр." / "проспект";</li>
- * <li>spelling variants: "ß" / "ss" (de), "ё" / "е" (ru), "ij" / "y" (nl);</li>
- * <li>numerals: "3rd" / "third", "1-й" / "перший".</li>
- * </ul>
- * Such synonyms could come from a resource next to {@code common_words_groups.tsv}, lines
- * {@code synonym <group> <word> <synonym,synonym...>}, loaded once like {@link CommonWordsMultiIndex#getInstance()}.
- * The index size has to be measured per rule: every alternative word is one more key of the object.
+ * The alternative names come from {@code <index>} of the rules of the locale of the name ({@code rules.xml} and its
+ * locale overlays in OsmAnd-java resources): {@code <unglue>} splits glued words, a {@code <rule>} replaces a phrase or
+ * a glued form. Which of their words become keys is decided with the words of the name ({@link NameIndexPlan}).
+ * The index size has to be measured per rule (file, object, from): every alternative word is one more key or name of
+ * the object.
  */
 public class AlternativeNameIndexGenerator<T> {
 
-	public interface AlternativeNameRule {
-		// alternative name of the name, null when the rule does not apply; lang is the language of the name ("fr" of
-		// name:fr, null for the main name and alt_name), group is the language group of the map, both can be null
-		String alternativeName(String name, String lang, String group);
+	/** Where an alternative key went in the name index, from the most to the least expensive. */
+	public enum KeyOutcome {
+		// a new prefix block
+		BLOCK,
+		// a new atom (object) in an existing prefix block
+		ATOM,
+		// one more name of the atom the object already has in the block: only its suffixes are stored
+		JOIN,
+		// the object already has this key with the same words: nothing is stored
+		DUP
+	}
+
+	/** Alternative names, their keys by outcome and the decisions of words, per rule or per name index. */
+	public static class KeyStats {
+		// alternative names produced
+		int alternatives;
+		final int[] outcomes = new int[KeyOutcome.values().length];
+		final int[] decisions = new int[KeyDecision.values().length];
+
+		void add(KeyStats other) {
+			alternatives += other.alternatives;
+			for (int i = 0; i < outcomes.length; i++) {
+				outcomes[i] += other.outcomes[i];
+			}
+			for (int i = 0; i < decisions.length; i++) {
+				decisions[i] += other.decisions[i];
+			}
+		}
+
+		// keys stored in the name index (every outcome but DUP)
+		int keys() {
+			return outcomes[KeyOutcome.BLOCK.ordinal()] + outcomes[KeyOutcome.ATOM.ordinal()]
+					+ outcomes[KeyOutcome.JOIN.ordinal()];
+		}
+
+		public int decisions(KeyDecision decision) {
+			return decisions[decision.ordinal()];
+		}
+
+		// "kept=.. notable=.. dropped_class1=.." for the decisions that happened
+		String decisionsString() {
+			StringBuilder s = new StringBuilder();
+			for (KeyDecision d : KeyDecision.values()) {
+				if (decisions[d.ordinal()] > 0) {
+					s.append(s.length() == 0 ? "" : " ").append(d.name().toLowerCase()).append('=')
+							.append(decisions[d.ordinal()]);
+				}
+			}
+			return s.toString();
+		}
+
+		@Override
+		public String toString() {
+			StringBuilder s = new StringBuilder("alternatives=").append(alternatives).append(" keys=").append(keys());
+			for (KeyOutcome o : KeyOutcome.values()) {
+				s.append(' ').append(o.name().toLowerCase()).append('=').append(outcomes[o.ordinal()]);
+			}
+			String d = decisionsString();
+			return d.isEmpty() ? s.toString() : s.append(' ').append(d).toString();
+		}
+	}
+
+	/** One word of keys_report.tsv: its decisions and an example name. */
+	static class WordReport {
+		final String wordClass;
+		final int[] decisions = new int[KeyDecision.values().length];
+		final String example;
+
+		WordReport(String wordClass, String example) {
+			this.wordClass = wordClass;
+			this.example = example;
+		}
+	}
+
+	/** Keys of one name index: decisions of the words of names and the size of the alternative names. */
+	public static class Stats extends KeyStats {
+		// names that got at least one alternative name
+		int names;
+		// alternative names and keys by rule (RuleId: "rules_it.xml street (?iu)\bStrada\s+Statale\s+(\d+)\b")
+		final Map<String, KeyStats> byRule = new TreeMap<>();
+		// the rules of <index> of the map locale, so a rule that never applied is reported too
+		final Set<String> mapRules = new TreeSet<>();
+		// keys_report.tsv: words with a class of the statistics or the rules, or with a decision other than a key by
+		// the statistics; null when the report is off
+		Map<String, WordReport> words;
+
+		public void add(Stats other) {
+			names += other.names;
+			super.add(other);
+			other.byRule.forEach((rule, s) -> byRule.computeIfAbsent(rule, r -> new KeyStats()).add(s));
+			mapRules.addAll(other.mapRules);
+			if (other.words != null) {
+				if (words == null) {
+					words = new TreeMap<>();
+				}
+				other.words.forEach((word, r) -> {
+					WordReport report = words.computeIfAbsent(word, w -> new WordReport(r.wordClass, r.example));
+					for (int i = 0; i < report.decisions.length; i++) {
+						report.decisions[i] += r.decisions[i];
+					}
+				});
+			}
+		}
+
+		/** @param wordClass class and source of the word ("1 tsv", "0 rules"), null when it has none */
+		void decide(String word, KeyDecision decision, String name, String wordClass) {
+			decisions[decision.ordinal()]++;
+			if (words != null && (wordClass != null || (decision != KeyDecision.KEPT && decision != KeyDecision.NOTABLE
+					&& decision != KeyDecision.NUMBER))) {
+				words.computeIfAbsent(word, w -> new WordReport(wordClass, name)).decisions[decision.ordinal()]++;
+			}
+		}
+
+		// "rules.xml unglue .: alternatives=.. keys=.. block=.. atom=.. join=.. dup=..; rules_de.xml street ...: ..."
+		public String byRuleString() {
+			StringBuilder s = new StringBuilder();
+			byRule.forEach((rule, stats) -> s.append(s.length() == 0 ? "" : "; ").append(rule).append(": ").append(stats));
+			return s.toString();
+		}
+
+		/**
+		 * One line per rule to weigh its role, the rules with the most alternative names first: what it added in the
+		 * address and the POI name index (alternative names, stored keys by outcome, decisions on its words); a rule
+		 * of the map locale that never applied has zeros.
+		 */
+		public static List<String> byRuleLines(Stats address, Stats poi) {
+			Map<String, KeyStats[]> rules = new TreeMap<>();
+			Stats[] indexes = { address, poi };
+			for (int i = 0; i < indexes.length; i++) {
+				if (indexes[i] == null) {
+					continue;
+				}
+				for (String rule : indexes[i].mapRules) {
+					rules.computeIfAbsent(rule, r -> new KeyStats[indexes.length]);
+				}
+				int index = i;
+				indexes[i].byRule.forEach((rule, s) -> rules.computeIfAbsent(rule, r -> new KeyStats[indexes.length])[index] = s);
+			}
+			Map<String, KeyStats> totals = new TreeMap<>();
+			rules.forEach((rule, byIndex) -> {
+				KeyStats total = new KeyStats();
+				for (KeyStats s : byIndex) {
+					if (s != null) {
+						total.add(s);
+					}
+				}
+				totals.put(rule, total);
+			});
+			List<String> sorted = new ArrayList<>(totals.keySet());
+			sorted.sort(Comparator.comparingInt((String rule) -> -totals.get(rule).alternatives));
+			List<String> lines = new ArrayList<>(sorted.size());
+			for (String rule : sorted) {
+				StringBuilder line = new StringBuilder(shortRule(rule)).append(": total [").append(totals.get(rule))
+						.append(']');
+				KeyStats[] byIndex = rules.get(rule);
+				if (byIndex[0] != null && byIndex[0].alternatives > 0) {
+					line.append(", address [").append(byIndex[0]).append(']');
+				}
+				if (byIndex[1] != null && byIndex[1].alternatives > 0) {
+					line.append(", poi [").append(byIndex[1]).append(']');
+				}
+				lines.add(line.toString());
+			}
+			return lines;
+		}
+
+		// the whole-word bounds of a word rule (a mirror pair is written so too) read as \b in the log
+		static String shortRule(String rule) {
+			return rule.replace("(?<![\\p{L}\\p{M}\\p{N}])", "\\b").replace("(?![\\p{L}\\p{M}\\p{N}])", "\\b");
+		}
+
+		/** Rows {@code index word class source decision count example} of keys_report.tsv. */
+		public void writeKeysReport(String index, Writer out) throws IOException {
+			if (words == null) {
+				return;
+			}
+			for (Map.Entry<String, WordReport> e : words.entrySet()) {
+				WordReport r = e.getValue();
+				String[] cls = r.wordClass == null ? new String[] { "", "" } : r.wordClass.split(" ");
+				for (KeyDecision d : KeyDecision.values()) {
+					int count = r.decisions[d.ordinal()];
+					if (count > 0) {
+						out.write(index + "\t" + e.getKey() + "\t" + cls[0] + "\t" + cls[1] + "\t" + d.name() + "\t"
+								+ count + "\t" + r.example.replace('\t', ' ') + "\n");
+					}
+				}
+			}
+		}
+
+		@Override
+		public String toString() {
+			return "names=" + names + " " + super.toString();
+		}
 	}
 
 	private final NameIndexCreator<T> nameIndex;
-	// every rule applied to a name, in this order
-	private final AlternativeNameRule[] rules = {
-		new UnglueRule(),
-		// TODO new AbbreviationRule(), new SpellingRule(), new NumeralRule() by the language group (see the class comment)
-	};
-	// language group of the map (CommonWordsMultiIndex.DEFAULT_GROUPS), null when no group covers it
+	private final Stats stats = new Stats();
+	// statistics group of the map (<locales> of rules.xml), null when no group covers it
 	private String languageGroup;
 	private String mapName;
+	// rules locale of the map (SearchLocales.forMap: "en_US", "it_IT"), "" when no locale covers it
+	private String mapLocale = "";
 
 	public AlternativeNameIndexGenerator(NameIndexCreator<T> nameIndex) {
 		this.nameIndex = nameIndex;
@@ -56,96 +246,150 @@ public class AlternativeNameIndexGenerator<T> {
 	public String getMapName() {
 		return mapName;
 	}
-	
+
 	void setLanguageGroup(String languageGroup, String mapName) {
 		this.languageGroup = languageGroup;
 		this.mapName = mapName;
+		this.mapLocale = SearchLocales.forMap(mapName);
+		SearchVariantRules rules = SearchVariantRules.forLocale(mapLocale);
+		for (SearchVariantRules.Unglue unglue : rules.unglues()) {
+			stats.mapRules.add(unglue.id().toString());
+		}
+		for (Rule rule : rules.index()) {
+			stats.mapRules.add(rule.id().toString());
+		}
 	}
 
-	// name can carry the marker of an alternative name (NameIndexReader.altNameMarker): the marker is a word of the name,
-	// so the alternative words refer to it and stay with that variant
-	public void addAlternativeNames(String name, String lang, T obj, int maxPrefixLength) {
+	public String getMapLocale() {
+		return mapLocale;
+	}
+
+	public Stats getStats() {
+		return stats;
+	}
+
+	/** Collects the words of keys_report.tsv from now on. */
+	void enableKeysReport() {
+		if (stats.words == null) {
+			stats.words = new TreeMap<>();
+		}
+	}
+
+	// class and source of a word for keys_report.tsv, null when the report is off or the word has no class
+	String wordClass(String word) {
+		String keysMap = nameIndex.getKeysMapName();
+		return stats.words == null || keysMap == null ? null
+				: CommonWordsMultiIndex.getInstance().wordClass(keysMap, word);
+	}
+
+	/**
+	 * The alternative names of a name from {@code <index>} of the rules of the locale of the name. The name can carry
+	 * the marker of an alternative name (NameIndexReader.altNameMarker): the marker is a word of the name, so the
+	 * alternative words refer to it and stay with that variant.
+	 *
+	 * @param owner owner of the name for the rules (street, locality, boundary, postcode, poi), null for none
+	 */
+	List<NameIndexPlan.Alternative> alternatives(String name, String lang, String owner) {
 		if (Algorithms.isEmpty(name)) {
-			return;
+			return List.of();
 		}
-		List<String> nameWords = null;
-		for (AlternativeNameRule rule : rules) {
-			String alternative = rule.alternativeName(name, lang, languageGroup);
-			if (alternative == null) {
-				continue;
-			}
-			if (nameWords == null) {
-				nameWords = SearchAlgorithms.splitAndNormalize(name, false);
-			}
-			addAlternativeName(nameWords, alternative, obj, maxPrefixLength);
+		// name and alt_name are in the language of the map, name:de in German in the country of the map
+		SearchVariantRules rules = SearchVariantRules.forLocale(SearchLocales.forName(lang, mapLocale));
+		List<NameIndexPlan.Alternative> alternatives = new ArrayList<>();
+		for (SearchVariantRules.Unglued unglued : rules.unglue(name)) {
+			alternatives.add(new NameIndexPlan.Alternative(unglued.ids(), unglued.name(), false, Map.of()));
 		}
-	}
-
-	private void addAlternativeName(List<String> nameWords, String alternative, T obj, int maxPrefixLength) {
-		List<String> alternativeWords = SearchAlgorithms.splitAndNormalize(alternative, false);
-		for (String word : new TreeSet<>(alternativeWords)) {
-			String prefix = NameIndexCreator.nameIndexPreparePrefix(word, maxPrefixLength);
-			if (nameWords.contains(word) || Algorithms.isEmpty(prefix)) {
-				continue;
-			}
-			nameIndex.addAlternativeToken(prefix, obj, word, alternativeWords);
-		}
-	}
-
-	// words glued by a dot or, in latin names, an apostrophe ("L'Atelier d'Anaïs" -> "Atelier Anaïs")
-	class UnglueRule implements AlternativeNameRule {
-
-		private static final int MIN_WORD_LENGTH = 2;
-
-		@Override
-		public String alternativeName(String name, String lang, String group) {
-			List<String> words = new ArrayList<>();
-			boolean glued = false;
-			for (String word : SearchAlgorithms.canonicalizePunctuation(name).split(" ")) {
-				if (word.isEmpty()) {
+		if (owner != null) {
+			for (Rule rule : rules.index()) {
+				if (!rule.appliesTo(owner)) {
 					continue;
 				}
-				List<String> parts = unglueWord(word);
-				if (parts == null) {
-					words.add(word);
-				} else {
-					words.addAll(parts);
-					glued = true;
+				String alternative = rule.apply(name);
+				if (alternative != null) {
+					alternatives.add(new NameIndexPlan.Alternative(List.of(rule.id()), alternative, rule.alwaysKeys(),
+							replacedWords(name, alternative)));
 				}
 			}
-			String unglued = String.join(" ", words).trim();
-			return glued && !unglued.isEmpty() ? unglued : null;
 		}
+		return alternatives;
+	}
 
-		private List<String> unglueWord(String word) {
-			boolean apostropheGlues = isLatin(word);
-			if (word.chars().anyMatch(Character::isDigit) || word.chars().noneMatch(c -> isGlue((char) c, apostropheGlues))) {
-				return null;
+	/**
+	 * The words a rule put in place of words of the name, one for one: the name and the alternative name have as many
+	 * words and differ at some of them ("Forest Avenue" -> "Forest Ave": "ave" -> "avenue", a mirror pair or an
+	 * {@code <index>} rule of a word). A phrase or a glued form ("Strada Statale 42" -> "SS42") has no such
+	 * correspondence: its new words are decided by their own class (rules-spec.md, 3.3).
+	 *
+	 * @return a new word of the alternative name -> the word of the name at its place, normalized as words of names
+	 */
+	static Map<String, String> replacedWords(String name, String alternative) {
+		List<String> nameWords = SearchAlgorithms.splitAndNormalize(name, false);
+		List<String> alternativeWords = SearchAlgorithms.splitAndNormalize(alternative, false);
+		if (nameWords.size() != alternativeWords.size()) {
+			return Map.of();
+		}
+		Map<String, String> replaced = new TreeMap<>();
+		Set<String> ambiguous = new HashSet<>();
+		for (int i = 0; i < nameWords.size(); i++) {
+			String from = nameWords.get(i);
+			String to = alternativeWords.get(i);
+			// a pure number is a value of its own, not a spelling of the word it replaced ("Highway" -> "42")
+			if (from.equals(to) || nameWords.contains(to) || Algorithms.isInt(to)) {
+				continue;
 			}
-			List<String> parts = new ArrayList<>();
-			boolean letterDropped = false;
-			int start = 0;
-			for (int i = 0; i <= word.length(); i++) {
-				if (i == word.length() || isGlue(word.charAt(i), apostropheGlues)) {
-					String part = word.substring(start, i);
-					if (part.length() >= MIN_WORD_LENGTH) {
-						parts.add(part);
-					} else if (!part.isEmpty()) {
-						letterDropped = true;
-					}
-					start = i + 1;
-				}
+			String previous = replaced.putIfAbsent(to, from);
+			if (previous != null && !previous.equals(from)) {
+				// one new word for two words of the name: no single word it stands for
+				ambiguous.add(to);
 			}
-			return parts.size() > 1 || letterDropped ? parts : null;
 		}
+		replaced.keySet().removeAll(ambiguous);
+		return replaced;
+	}
 
-		private boolean isGlue(char c, boolean apostropheGlues) {
-			return c == '.' || (c == '\'' && apostropheGlues);
+	/** Counts the alternative names of one name: the statistics of their rules. */
+	void countAlternatives(List<NameIndexPlan.Variant> alternatives) {
+		if (!alternatives.isEmpty()) {
+			stats.names++;
 		}
+		stats.alternatives += alternatives.size();
+		for (NameIndexPlan.Variant v : alternatives) {
+			for (KeyStats s : ruleStats(v.rules())) {
+				s.alternatives++;
+			}
+		}
+	}
 
-		private boolean isLatin(String word) {
-			return word.codePoints().filter(Character::isLetter)
-					.allMatch(c -> Character.UnicodeScript.of(c) == Character.UnicodeScript.LATIN);
+	/**
+	 * The statistics of the rules of one alternative name: every rule counts the name and the cost of storing it, as if
+	 * it were the only rule; the totals of the name index count it once.
+	 */
+	List<KeyStats> ruleStats(List<RuleId> rules) {
+		List<KeyStats> list = new ArrayList<>(rules.size());
+		for (RuleId rule : rules) {
+			list.add(stats.byRule.computeIfAbsent(rule.toString(), r -> new KeyStats()));
+		}
+		return list;
+	}
+
+	// a decision on a word of a name
+	void decide(String word, KeyDecision decision, String name) {
+		stats.decide(word, decision, name, wordClass(word));
+	}
+
+	// a decision on a word of an alternative name of rules
+	void decide(List<KeyStats> ruleStats, String word, KeyDecision decision, String alternative) {
+		for (KeyStats s : ruleStats) {
+			s.decisions[decision.ordinal()]++;
+		}
+		stats.decide(word, decision, alternative, wordClass(word));
+	}
+
+	// where a key of an alternative name of rules went
+	void outcome(List<KeyStats> ruleStats, KeyOutcome outcome) {
+		stats.outcomes[outcome.ordinal()]++;
+		for (KeyStats s : ruleStats) {
+			s.outcomes[outcome.ordinal()]++;
 		}
 	}
 }

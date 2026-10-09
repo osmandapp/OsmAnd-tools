@@ -54,12 +54,18 @@ import net.osmand.binary.BinaryMapPoiReaderAdapter;
 import net.osmand.binary.BinaryMapRouteReaderAdapter;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.binary.CommonWordsMultiIndex;
+import net.osmand.binary.SearchVariantRules;
+import net.osmand.binary.SearchLocales;
+import net.osmand.binary.Abbreviations;
+import net.osmand.obf.BinaryMerger;
 import net.osmand.obf.OBFDataCreator;
+import net.osmand.obf.preparation.AlternativeNameIndexGenerator;
 import net.osmand.obf.preparation.IndexAddressCreator;
 import net.osmand.obf.preparation.IndexCreator;
 import net.osmand.obf.preparation.IndexCreatorSettings;
 import net.osmand.obf.preparation.IndexPoiCreator;
 import net.osmand.obf.preparation.NameIndexCreator;
+import net.osmand.obf.preparation.NameIndexPlan;
 import net.osmand.osm.AbstractPoiType;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.search.core.SearchCoreFactory;
@@ -109,7 +115,12 @@ public class SpatialSearchPipelineTest {
 	private static final boolean REGENERATE_OBF = true; // bypassed by LIVE_TESTING
 	private static final boolean TEST_EXTRA_RESULTS = true;
 	private static final List<Class<?>> OBF_GENERATE_CLASSES = List.of(IndexCreator.class, IndexPoiCreator.class,
-			IndexAddressCreator.class, NameIndexCreator.class, CommonWordsMultiIndex.class);
+			IndexAddressCreator.class, NameIndexCreator.class, CommonWordsMultiIndex.class,
+			AlternativeNameIndexGenerator.class, NameIndexPlan.class, SearchVariantRules.class, SearchVariantRules.Rule.class,
+			Abbreviations.class, SearchLocales.class, OBFDataCreator.class,
+			BinaryMerger.class);
+	// every rules file of OsmAnd-java resources, found by a scan so a new language file invalidates cached OBFs
+	private static final List<String> OBF_RULE_RESOURCES = listRuleResources();
 	private static final String HASH_VERSION = "2";
 	private static final String OBF_HASH_FILE_NAME = ".obf.hash";
 	private static final int MAX_KNOWN_HASHES = 4; // one per build that writes its own class files
@@ -406,7 +417,7 @@ public class SpatialSearchPipelineTest {
 	}
 
 	/**
-	 * The hash is taken over the compiled generator classes, and the IDE and Gradle write their own
+	 * The hash covers compiled generator classes and search rules. The IDE and Gradle write their own
 	 * class files: the same sources hash differently depending on who built them, and one hash per
 	 * file would throw the whole map cache away on every switch. The file keeps a hash per line, so
 	 * both builds are recognised, while a real change in the generators matches none of them.
@@ -1090,6 +1101,7 @@ public class SpatialSearchPipelineTest {
 		}
 	}
 
+	/** generator classes: the IDE and Gradle hash them differently, a few known hashes are kept (.obf.hash) */
 	private static String getObfGenerateHash() {
 		List<String> individualHashes = new ArrayList<>();
 
@@ -1099,10 +1111,62 @@ public class SpatialSearchPipelineTest {
 				individualHashes.add(hash);
 			}
 		}
+		String allHashesCombined = String.join("\n", individualHashes);
+		allHashesCombined += HASH_VERSION;
+		return DigestUtils.sha256Hex(allHashesCombined);
+	}
+
+	/**
+	 * Search rules the OBFs were generated with: one value whoever builds, so a generated OBF is reused only with the
+	 * very rules it was made with (a switch between two rule sets must not reuse the OBFs of the other one).
+	 */
+	private static String getRulesHash() {
+		List<String> individualHashes = new ArrayList<>();
+		for (String resource : OBF_RULE_RESOURCES) {
+			try (InputStream input = SearchVariantRules.class.getResourceAsStream(resource)) {
+				if (input == null) {
+					throw new IllegalStateException("Missing search rules: " + resource);
+				}
+				individualHashes.add(resource + ":" + DigestUtils.sha256Hex(input));
+			} catch (IOException e) {
+				throw new IllegalStateException("Cannot hash search rules: " + resource, e);
+			}
+		}
 
 		String allHashesCombined = String.join("\n", individualHashes);
 		allHashesCombined += HASH_VERSION;
 		return DigestUtils.sha256Hex(allHashesCombined);
+	}
+
+	// "rules.xml", "rules_de.xml", .. next to SearchVariantRules, from a resources folder or a jar, sorted for a stable hash
+	private static List<String> listRuleResources() {
+		java.net.URL base = SearchVariantRules.class.getResource("rules.xml");
+		if (base == null) {
+			throw new IllegalStateException("Missing search rules: rules.xml");
+		}
+		java.util.TreeSet<String> names = new java.util.TreeSet<>();
+		try {
+			if ("jar".equals(base.getProtocol())) {
+				java.net.JarURLConnection connection = (java.net.JarURLConnection) base.openConnection();
+				connection.setUseCaches(false);
+				String entry = connection.getEntryName();
+				String dir = entry.substring(0, entry.lastIndexOf('/') + 1);
+				try (java.util.jar.JarFile jar = connection.getJarFile()) {
+					jar.stream().map(java.util.jar.JarEntry::getName)
+							.filter(n -> n.startsWith(dir) && n.indexOf('/', dir.length()) < 0)
+							.map(n -> n.substring(dir.length())).forEach(names::add);
+				}
+			} else {
+				String[] files = new File(base.toURI()).getParentFile().list();
+				if (files != null) {
+					names.addAll(List.of(files));
+				}
+			}
+		} catch (IOException | java.net.URISyntaxException e) {
+			throw new IllegalStateException("Cannot list search rules near " + base, e);
+		}
+		names.removeIf(n -> !n.matches("rules(_[A-Za-z0-9_]+)?\\.xml"));
+		return new ArrayList<>(names);
 	}
 
 	private static String getClassHash(Class<?> clazz) {
