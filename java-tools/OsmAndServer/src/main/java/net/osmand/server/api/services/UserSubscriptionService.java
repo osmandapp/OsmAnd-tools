@@ -759,7 +759,8 @@ public class UserSubscriptionService {
 	public String getPurchaseType(String sku) {
 		PurchasesDataLoader.Subscription subscription = purchasesDataLoader.getSubscriptions().get(sku);
 		if (subscription != null) {
-			return subscription.duration() >= 12 ? "annual" : "monthly";
+			PurchasesDataLoader.Plan plan = subscription.plan();
+			return plan != null && plan.isAnnual() ? "annual" : "monthly";
 		}
 
 		return purchasesDataLoader.getInApps().containsKey(sku) ? PURCHASE_TYPE_ONE_TIME : null;

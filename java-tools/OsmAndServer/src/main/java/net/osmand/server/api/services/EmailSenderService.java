@@ -212,20 +212,21 @@ public class EmailSenderService {
 			DeviceSubscriptionsRepository.SupporterDeviceSubscription sub = subscriptions.get(0);
 			PurchasesDataLoader.Subscription skuData = purchasesDataLoader.getSubscriptions().get(sub.sku);
 			productName = purchasesDataLoader.subscriptionName(sub.sku);
-			int months = skuData == null ? 0
-					: "year".equals(skuData.durationUnit()) ? skuData.duration() * 12 : skuData.duration();
-			if (months == 1) {
-				planName = "@RECEIPT_PLAN_MONTHLY@";
-			} else if (months == 12) {
-				planName = "@RECEIPT_PLAN_ANNUAL@";
-			} else if (months > 0 && months % 12 == 0) {
-				planName = "@RECEIPT_PLAN_YEARS@";
-				planCount = String.valueOf(months / 12);
-			} else if (months > 0) {
-				planName = "@RECEIPT_PLAN_MONTHS@";
-				planCount = String.valueOf(months);
-			} else {
+			PurchasesDataLoader.Plan plan = skuData == null ? null : skuData.plan();
+			if (plan == null) {
 				planName = "@RECEIPT_PLAN_SUBSCRIPTION@";
+			} else {
+				planName = switch (plan) {
+					case MONTHLY -> "@RECEIPT_PLAN_MONTHLY@";
+					case ANNUAL -> "@RECEIPT_PLAN_ANNUAL@";
+					case YEARS -> "@RECEIPT_PLAN_YEARS@";
+					case MONTHS -> "@RECEIPT_PLAN_MONTHS@";
+				};
+				planCount = switch (plan) {
+					case YEARS -> String.valueOf(skuData.months() / 12);
+					case MONTHS -> String.valueOf(skuData.months());
+					default -> "";
+				};
 			}
 			renews = Boolean.TRUE.equals(sub.autorenewing);
 			renewalLabel = renews ? "@RECEIPT_RENEWS_ON@" : "@RECEIPT_EXPIRES_ON@";
