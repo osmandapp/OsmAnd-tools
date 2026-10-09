@@ -1,0 +1,126 @@
+<!doctype html><meta charset=utf-8><title>Depth maps side by side</title>
+<!-- Test only (OsmAnd-Issues#3341): two depth tile servers side by side, served at /tile/depth-test/compare.
+     left: the maps of the builder (depth-*), right: the ones of the work folder (work-*).
+     ?server=<base url> to look at another server, ?style=marine|nautical|default,
+     ?v=<anything> to get past the browser's tile cache,
+     #zoom/lat/lon is the view and follows the map. -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<style>
+html,body{margin:0;height:100%;font:13px/1.4 system-ui;display:flex;flex-direction:column}
+#bar{flex:0 0 auto;padding:6px 8px;background:#f4f4f4;border-bottom:1px solid #ccc;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center}
+#bar b{font-size:12px;color:#555;margin-left:6px}
+#bar button{font:12px system-ui;padding:3px 7px;border:1px solid #bbb;border-radius:4px;background:#fff;cursor:pointer}
+#bar button:hover{background:#e8f0fe}
+#wrap{flex:1 1 auto;display:flex;min-height:0}
+#a,#b{flex:1;height:100%}
+.lbl{position:absolute;z-index:1000;top:8px;left:8px;background:#fff;padding:3px 7px;border-radius:4px;box-shadow:0 1px 4px #0006;font-size:12px}
+</style>
+<div id=bar></div>
+<div id=wrap><div id=a></div><div id=b></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+const PLACES = [
+ ['США (Мексиканский залив)', [
+   ['Фрипорт', 13, 28.8811, -95.3730],
+   ['Брайан-Бич', 12, 28.8500, -95.3600],
+   ['Аранзас-Пасс', 13, 27.8300, -97.0600],
+   ['Порт-Арансас', 12, 27.8500, -97.0500],
+   ['Галвестон', 12, 29.3400, -94.7200],
+   ['Корпус-Кристи', 12, 27.8000, -97.2000],
+   ['Браунсвилл', 12, 26.0000, -97.1500],
+   ['Дельта Миссисипи', 11, 29.1500, -89.2500]]],
+ ['Норвегия', [
+   ['Осло-фьорд', 12, 59.7500, 10.6000],
+   ['Дрёбак', 14, 59.6600, 10.6300],
+   ['Линдёйа (Осло)', 15, 59.8930, 10.7050],
+   ['Рёдтанген', 16, 59.5335, 10.4120],
+   ['Берген', 13, 60.3900, 5.3000],
+   ['Ставангер', 13, 58.9700, 5.7000],
+   ['Тромсё', 12, 69.6500, 18.9500]]],
+ ['Новая Зеландия', [
+   ['Хаураки', 12, -36.8000, 175.0000],
+   ['Окленд', 13, -36.8300, 174.8000],
+   ['Веллингтон', 13, -41.2800, 174.8200],
+   ['Марлборо', 12, -41.1000, 174.0000]]],
+ ['Европа', [
+   ['Ден-Хелдер', 13, 52.9500, 4.7200],
+   ['Роттердам', 12, 51.9500, 4.0000],
+   ['Дублин', 12, 53.3000, -6.2000],
+   ['Кинсейл (локально)', 14, 51.6882, -8.4299],
+   ['Корк', 12, 51.7500, -8.3000],
+   ['Солент', 13, 50.7500, -1.1000],
+   ['Клайд', 12, 55.8000, -4.9000],
+   ['Брест', 12, 48.3500, -4.6000],
+   ['Ла-Рошель', 12, 46.1500, -1.2500]]],
+ ['Мир (GEBCO)', [
+   ['Гибралтар', 10, 36.0000, -5.5000],
+   ['Босфор', 11, 41.1000, 29.0000],
+   ['Сингапур', 11, 1.2500, 103.8000],
+   ['Панама', 11, 8.9000, -79.5000]]]
+];
+const h = (location.hash||'').replace('#','').split('/');
+const z0 = h.length===3 ? +h[0] : 13, c0 = h.length===3 ? [+h[1], +h[2]] : [28.8811,-95.3730];
+let style = new URLSearchParams(location.search).get('style') || 'nautical';
+const ver = new URLSearchParams(location.search).get('v') || Date.now();
+const q = new URLSearchParams(location.search);
+const here = location.origin;
+const base = (q.get('server') || here).replace(/\/$/, '');
+// the two sets of the same server: the maps of the builder and the ones built locally
+const sets = {a: 'depth', b: 'work'};
+const titles = {a: 'карты билдера', b: 'локальная сборка'};
+const layers = {};
+function mk(id, label){
+  const m = L.map(id, {center: c0, zoom: z0, zoomControl: id==='a'});
+  layers[id] = {map: m, set: sets[id]};
+  layers[id].layer = L.tileLayer(base + '/tile/' + sets[id] + '-' + style + '/{z}/{x}/{y}.png?v=' + ver,
+    {maxZoom:17, tileSize:512, zoomOffset:-1, attribution: label}).addTo(m);
+  const d = L.DomUtil.create('div','lbl'); d.textContent = label; m.getContainer().appendChild(d);
+  return m;
+}
+const ma = mk('a', titles.a), mb = mk('b', titles.b);
+let lock = false;
+function sync(src, dst){ src.on('move zoom', ()=>{ if(lock) return; lock=true; dst.setView(src.getCenter(), src.getZoom(), {animate:false}); lock=false; }); }
+sync(ma, mb); sync(mb, ma);
+let ownHash = '';
+function writeHash(m){
+  const c = m.getCenter();
+  ownHash = '#' + m.getZoom() + '/' + c.lat.toFixed(4) + '/' + c.lng.toFixed(4);
+  history.replaceState(null, '', location.pathname + location.search + ownHash);
+}
+ma.on('moveend zoomend', ()=>writeHash(ma));
+mb.on('moveend zoomend', ()=>writeHash(mb));
+window.addEventListener('hashchange', ()=>{ if(location.hash !== ownHash) location.reload(); });
+function setStyle(next){
+  style = next;
+  for (const id of Object.keys(layers)){
+    const l = layers[id];
+    l.map.removeLayer(l.layer);
+    l.layer = L.tileLayer(base + '/tile/' + l.set + '-' + style + '/{z}/{x}/{y}.png?v=' + ver,
+      {maxZoom:17, tileSize:512, zoomOffset:-1}).addTo(l.map);
+  }
+  for (const b of document.querySelectorAll('button[data-style]')){
+    b.style.background = b.dataset.style === style ? '#d6e4ff' : '#fff';
+  }
+}
+const bar = document.getElementById('bar');
+{
+  const t = document.createElement('b'); t.textContent = 'Стиль'; bar.appendChild(t);
+  for (const s of ['marine', 'nautical', 'default']){
+    const btn = document.createElement('button');
+    btn.textContent = s; btn.dataset.style = s;
+    btn.onclick = ()=>setStyle(s);
+    bar.appendChild(btn);
+  }
+}
+for (const [group, places] of PLACES){
+  const t = document.createElement('b'); t.textContent = group; bar.appendChild(t);
+  for (const [name, z, lat, lon] of places){
+    const btn = document.createElement('button');
+    btn.textContent = name;
+    btn.onclick = ()=>{ ma.setView([lat,lon], z); writeHash(ma); };
+    bar.appendChild(btn);
+  }
+}
+writeHash(ma);
+setStyle(style);
+</script>
