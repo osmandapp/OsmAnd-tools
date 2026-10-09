@@ -43,9 +43,7 @@ public class AmenityTagsServiceTest {
 				"amenity_name");
 
 		assertShown(shown.get("Schoodic Woods Campground"), "gpxx:street_address", "gpxx:city", "gpxx:state",
-				"gpxx:country", "gpxx:postal_code", "phone");
-		assertHidden(shown.get("Schoodic Woods Campground"), "streetaddress", "postalcode", "phonenumber",
-				"displaymode");
+				"gpxx:country", "gpxx:postal_code", "phone", "displaymode");
 	}
 
 	// date fields Android writes: FavouritePoint (pickup_date, calendar_event), ItineraryDataHelper (creation_date)

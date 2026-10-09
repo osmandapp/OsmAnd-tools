@@ -29,7 +29,7 @@ public class AmenityTagsService {
 		List<String> preferredLangs = lang != null ? List.of(lang) : List.of();
 		boolean allowNoteTag = false; // The "note" tag is enabled only for OSM editing.
 		List<AmenityTagEntry> tagEntries = infoBundle.getVisibleTags(allowNoteTag, preferredLangs,
-				AdditionalInfoBundle.getExternalNamespaceKeys(tags));
+				AdditionalInfoBundle.getGenericRowKeys(tags));
 
 		List<AmenityTagEntry> infoTagEntries = new ArrayList<>();
 		List<AmenityTagEntry> descriptionTagEntries = new ArrayList<>();
