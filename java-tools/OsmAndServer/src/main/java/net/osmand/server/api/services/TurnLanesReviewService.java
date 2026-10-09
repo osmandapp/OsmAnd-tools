@@ -29,8 +29,8 @@ public class TurnLanesReviewService {
 
 	public static final String REVIEW = "review.csv";
 	public static final String COMMON = "common.csv";
-	public static final String[] REVIEW_HEADER = {"num", "segment", "status", "expected", "actual", "verdict",
-			"turn_lanes", "note", "user", "time"};
+	public static final String[] REVIEW_HEADER = {"num", "start", "end", "segment", "status", "expected", "actual",
+			"verdict", "turn_lanes", "note", "user", "time"};
 	public static final String[] COMMON_HEADER = {"start", "end", "segment", "turn_lanes", "note", "obf", "left_side",
 			"dataset", "time"};
 	public static final Set<String> VERDICTS = Set.of("RED", "YELLOW", "GREEN");
@@ -42,6 +42,21 @@ public class TurnLanesReviewService {
 		public String turnLanes;
 		public String note;
 	}
+
+	/** a drive added by hand on the manual check: one instruction, its actual taken to be the expected */
+	public static class NewCaseRequest {
+		public String start;
+		public String end;
+		public String segment;
+		public String expected;
+		public String status;
+		public String verdict;
+		public String obf;
+		public boolean leftSide;
+	}
+
+	private static final java.util.regex.Pattern SEGMENT = java.util.regex.Pattern.compile("\\d+(:\\d+)?");
+	private static final String NEW_CASE_NAME = "Manual case";
 
 	@Autowired
 	private TurnLanesService lanes;
@@ -159,14 +174,18 @@ public class TurnLanesReviewService {
 		if (c == null || compares.getResultFile(dataset, id) == null) {
 			throw new IllegalArgumentException("No compare " + dataset + "/" + id);
 		}
+		if (compares.isRunning(dataset, id)) {
+			throw new IllegalArgumentException("Compare " + id + " is being recalculated");
+		}
 		if (req.verdict == null || !VERDICTS.contains(req.verdict)) {
 			throw new IllegalArgumentException("Verdict: one of " + VERDICTS);
 		}
 		Map<String, String> row = null;
+		Map<String, Map<String, String>> drives = new LinkedHashMap<>();
 		for (Map<String, String> r : compares.readRows(dataset, id, Set.of(), Integer.MAX_VALUE)) {
+			drives.putIfAbsent(r.get("num"), r);
 			if (r.get("num").equals(req.num) && r.get("segment").equals(req.segment)) {
 				row = r;
-				break;
 			}
 		}
 		if (row == null) {
@@ -208,6 +227,8 @@ public class TurnLanesReviewService {
 		}
 		Map<String, String> v = new LinkedHashMap<>();
 		v.put("num", row.get("num"));
+		v.put("start", row.get("start"));
+		v.put("end", row.get("end"));
 		v.put("segment", row.get("segment"));
 		v.put("status", row.get("status"));
 		v.put("expected", row.get("expected"));
@@ -219,6 +240,14 @@ public class TurnLanesReviewService {
 		v.put("user", user);
 		v.put("time", now);
 		review.put(rowKey(row.get("num"), row.get("segment")), v);
+		// rows saved before start and end were written get them from the compare
+		for (Map<String, String> r : review.values()) {
+			Map<String, String> drive = drives.get(r.get("num"));
+			if (Algorithms.isEmpty(r.get("start")) && drive != null) {
+				r.put("start", drive.get("start"));
+				r.put("end", drive.get("end"));
+			}
+		}
 		TurnLanesFiles.writeCsv(reviewFile(dataset, id), REVIEW_HEADER, review.values());
 
 		Map<String, Integer> counts = new LinkedHashMap<>();
@@ -233,6 +262,103 @@ public class TurnLanesReviewService {
 		out.put("time", now);
 		out.put("user", user);
 		return out;
+	}
+
+	/**
+	 * After a recalc: a verdict stays where the compare says there what it said when the verdict was given - the same
+	 * status and the same answer of the checker - and goes where that changed. common.csv is left as it is: what the
+	 * lanes there should be does not depend on the build.
+	 */
+	public synchronized void keepUnchanged(Compare c) {
+		try {
+			Map<String, Map<String, String>> review = review(c.dataset, c.id);
+			if (review.isEmpty()) {
+				compares.setRecalc(c.dataset, c.id, null, null);
+				return;
+			}
+			Map<String, Map<String, String>> now = new LinkedHashMap<>();
+			for (Map<String, String> r : compares.readRows(c.dataset, c.id, Set.of(), Integer.MAX_VALUE)) {
+				now.put(rowKey(r.get("num"), r.get("segment")), r);
+			}
+			Map<String, Map<String, String>> kept = new LinkedHashMap<>();
+			for (Map.Entry<String, Map<String, String>> e : review.entrySet()) {
+				Map<String, String> r = now.get(e.getKey());
+				Map<String, String> v = e.getValue();
+				if (r != null && Algorithms.objectEquals(r.get("status"), v.get("status"))
+						&& Algorithms.objectEquals(nullToEmpty(r.get("actual")), nullToEmpty(v.get("actual")))) {
+					kept.put(e.getKey(), v);
+				}
+			}
+			TurnLanesFiles.writeCsv(reviewFile(c.dataset, c.id), REVIEW_HEADER, kept.values());
+			Map<String, Integer> counts = new LinkedHashMap<>();
+			for (Map<String, String> r : kept.values()) {
+				counts.merge(r.get("verdict"), 1, Integer::sum);
+			}
+			compares.setRecalc(c.dataset, c.id, counts, "kept " + kept.size() + " of " + review.size() + " verdicts");
+		} catch (IOException e) {
+			throw new IllegalStateException("Cannot update the review of " + c.dataset + "/" + c.id, e);
+		}
+	}
+
+	/**
+	 * Adds a drive by hand to the compare's dataset and to the compare, nothing routed: one row, actual = expected,
+	 * the status as given, then the verdict on it as any other.
+	 *
+	 * @return the drive's num and the counts of the compare's verdicts after it
+	 */
+	public synchronized Map<String, Object> newCase(String dataset, String id, NewCaseRequest req, String user)
+			throws IOException {
+		Compare c = compares.get(dataset, id);
+		if (c == null || compares.getResultFile(dataset, id) == null || compares.isRunning(dataset, id)) {
+			throw new IllegalArgumentException("No finished compare " + dataset + "/" + id);
+		}
+		String start = point(req.start, "Start");
+		String end = point(req.end, "End");
+		String segment = req.segment == null ? "" : req.segment.trim();
+		if (!SEGMENT.matcher(segment).matches()) {
+			throw new IllegalArgumentException("Segment: a way id, or id:point");
+		}
+		String expected = req.expected == null ? "" : req.expected.trim();
+		if (expected.isEmpty()) {
+			throw new IllegalArgumentException("Expected is empty");
+		}
+		if (!"DIFF".equals(req.status) && !"SAME".equals(req.status)) {
+			throw new IllegalArgumentException("Status: DIFF or SAME");
+		}
+		if (req.verdict == null || !VERDICTS.contains(req.verdict)) {
+			throw new IllegalArgumentException("Verdict: one of " + VERDICTS);
+		}
+		String obf = req.obf == null ? "" : req.obf.trim();
+		if (!TurnLanesService.NAME.matcher(obf).matches()) {
+			throw new IllegalArgumentException("No map");
+		}
+		String leftSide = String.valueOf(req.leftSide);
+		int num = lanes.addCase(dataset, NEW_CASE_NAME, start, end, req.leftSide, obf, Map.of(segment, expected));
+		compares.addRows(dataset, id, List.<String[]>of(new String[] {String.valueOf(num), NEW_CASE_NAME, start, end,
+				segment, expected, expected, req.status, "", leftSide, obf, ""}));
+		VerdictRequest v = new VerdictRequest();
+		v.num = String.valueOf(num);
+		v.segment = segment;
+		v.verdict = req.verdict;
+		Map<String, Object> out = new LinkedHashMap<>(verdict(dataset, id, v, user));
+		out.put("num", v.num);
+		out.put("segment", segment);
+		return out;
+	}
+
+	/** "lat,lon" as the datasets write it, six digits */
+	private static String point(String s, String what) {
+		LatLon ll;
+		try {
+			ll = TurnLanesFiles.latLon(s == null ? "" : s.trim());
+		} catch (RuntimeException e) {
+			throw new IllegalArgumentException(what + ": lat,lon");
+		}
+		return String.format(java.util.Locale.US, "%.6f,%.6f", ll.getLatitude(), ll.getLongitude());
+	}
+
+	private static String nullToEmpty(String s) {
+		return s == null ? "" : s;
 	}
 
 	/**

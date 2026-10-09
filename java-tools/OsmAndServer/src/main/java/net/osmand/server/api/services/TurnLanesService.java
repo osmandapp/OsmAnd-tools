@@ -418,6 +418,42 @@ public class TurnLanesService {
 		return true;
 	}
 
+	/**
+	 * A drive added by hand, at the end of cases.csv under the next free num: {@code instructions} are its
+	 * segment -> expected. Counted in meta.json as one more route.
+	 *
+	 * @return the drive's num
+	 */
+	public synchronized int addCase(String dataset, String name, String start, String end, boolean leftSide, String obf,
+	                                Map<String, String> instructions) throws IOException {
+		Dataset d = getDataset(dataset);
+		File cases = getCasesFile(dataset);
+		if (d == null || cases == null || active.containsKey(dataset)) {
+			throw new IllegalArgumentException("No finished dataset '" + dataset + "' with cases");
+		}
+		int num = 0;
+		for (Map<String, String> row : TurnLanesFiles.readCsv(cases)) {
+			num = Math.max(num, Integer.parseInt(row.get("num")));
+		}
+		num++;
+		List<String[]> rows = new ArrayList<>();
+		for (Map.Entry<String, String> e : instructions.entrySet()) {
+			rows.add(new String[] {String.valueOf(num), name, start, end, e.getKey(), e.getValue(),
+					String.valueOf(leftSide), obf, ""});
+		}
+		TurnLanesFiles.appendCsv(cases, rows);
+		d.routes++;
+		d.rows += rows.size();
+		for (ObfProgress o : d.obfs) {
+			if (o.name.equals(obf)) {
+				o.routes++;
+				o.rows += rows.size();
+			}
+		}
+		saveMeta(d);
+		return num;
+	}
+
 	private synchronized void saveMeta(Dataset d) throws IOException {
 		TurnLanesFiles.write(new File(new File(getRoot(), d.name), META).toPath(), TurnLanesFiles.GSON.toJson(d));
 	}

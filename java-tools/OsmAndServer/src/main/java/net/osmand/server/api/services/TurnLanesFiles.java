@@ -85,6 +85,18 @@ final class TurnLanesFiles {
 		write(f.toPath(), w.toString());
 	}
 
+	/** rows added at the end of a CSV, the file replaced whole like any other write */
+	static void appendCsv(File f, List<String[]> rows) throws IOException {
+		StringBuilder sb = new StringBuilder(Files.readString(f.toPath(), StandardCharsets.UTF_8));
+		if (sb.length() > 0 && sb.charAt(sb.length() - 1) != '\n') {
+			sb.append('\n');
+		}
+		for (String[] row : rows) {
+			GenerateTurnLanesTest.writeCsvRow(sb, row);
+		}
+		write(f.toPath(), sb.toString());
+	}
+
 	/** the whole of a file, replaced at once */
 	static void write(Path file, String content) throws IOException {
 		Path tmp = file.resolveSibling(file.getFileName() + ".tmp");

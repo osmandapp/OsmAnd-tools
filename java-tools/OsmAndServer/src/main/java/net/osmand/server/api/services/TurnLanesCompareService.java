@@ -92,8 +92,14 @@ public class TurnLanesCompareService {
 		public String phase;
 		/** manual check: verdict -> how many rows have it */
 		public Map<String, Integer> reviewed;
+		/** what the last recalc did to the manual check: how many verdicts it kept */
+		public String recalc;
 		volatile transient boolean cancelRequested;
 		volatile transient Process process;
+		/** a recalc: the compare as it was, back in place when the recalc does not finish */
+		transient Compare previous;
+		/** a recalc: what to do with the manual check once the new results are in */
+		transient Consumer<Compare> onRecalc;
 	}
 
 	/** one drive of the dataset, with its rows in the order they were written */
@@ -137,6 +143,10 @@ public class TurnLanesCompareService {
 		return new File(new File(new File(lanes.getRoot(), dataset), COMPARES), id);
 	}
 
+	public boolean isRunning(String dataset, String id) {
+		return active.containsKey(key(dataset, id));
+	}
+
 	public boolean isActive(String dataset) {
 		return active.values().stream().anyMatch(c -> c.dataset.equals(dataset));
 	}
@@ -165,6 +175,43 @@ public class TurnLanesCompareService {
 		}
 		Files.createDirectories(dir.toPath());
 		saveMeta(c);
+		active.put(key(c.dataset, c.id), c);
+		lanes.submit(() -> run(c, d));
+		return c;
+	}
+
+	/**
+	 * Runs a finished compare again, in place: the same dataset and build - this server's code as it is now, or the
+	 * night build fetched again. Its results are replaced once the run finishes; {@code onDone} is then given the
+	 * compare, for the manual check to keep what still holds. Cancelled or failed, the old results stay.
+	 */
+	public synchronized Compare recalc(String dataset, String id, Consumer<Compare> onDone) throws IOException {
+		Compare old = get(dataset, id);
+		if (old == null) {
+			throw new IllegalArgumentException("No compare " + dataset + "/" + id);
+		}
+		if (active.containsKey(key(dataset, id))) {
+			throw new IllegalArgumentException("Compare " + id + " is still running");
+		}
+		Dataset d = lanes.getDataset(dataset);
+		if (d == null || lanes.getCasesFile(dataset) == null) {
+			throw new IllegalArgumentException("No dataset '" + dataset + "' with cases");
+		}
+		if (d.status == Status.QUEUED || d.status == Status.RUNNING) {
+			throw new IllegalArgumentException("Dataset '" + d.name + "' is still being generated");
+		}
+		Compare c = new Compare();
+		c.id = old.id;
+		c.dataset = old.dataset;
+		c.labels = old.labels;
+		c.build = old.build;
+		c.created = old.created;
+		c.reviewed = old.reviewed;
+		c.recalc = old.recalc;
+		c.buildVersion = TurnLanesBuilds.CURRENT.equals(c.build) ? lanes.getBuild() : c.build;
+		c.status = Status.QUEUED;
+		c.previous = old;
+		c.onRecalc = onDone;
 		active.put(key(c.dataset, c.id), c);
 		lanes.submit(() -> run(c, d));
 		return c;
@@ -231,7 +278,11 @@ public class TurnLanesCompareService {
 					}
 				}
 			}
-			Files.move(partial.toPath(), new File(dir, RESULT).toPath(), StandardCopyOption.REPLACE_EXISTING);
+			if (c.cancelRequested && c.previous != null) {
+				Files.deleteIfExists(partial.toPath()); // a recalc cut short: the old results stay
+			} else {
+				Files.move(partial.toPath(), new File(dir, RESULT).toPath(), StandardCopyOption.REPLACE_EXISTING);
+			}
 			c.status = c.cancelRequested ? Status.CANCELLED : Status.DONE;
 		} catch (Throwable e) {
 			LOG.error("Turn-lanes compare " + key(c.dataset, c.id) + " failed", e);
@@ -240,12 +291,30 @@ public class TurnLanesCompareService {
 		} finally {
 			c.phase = null;
 			c.finished = System.currentTimeMillis();
+			Compare saved = c;
+			if (c.previous != null && c.status != Status.DONE) {
+				// the recalc did not finish: the compare as it was, and why the recalc did not
+				saved = c.previous;
+				saved.error = "Recalc " + c.status.name().toLowerCase() + (c.error == null ? "" : ": " + c.error);
+				try {
+					Files.deleteIfExists(partial.toPath());
+				} catch (IOException e) {
+					LOG.warn("Cannot delete " + partial + ": " + e.getMessage());
+				}
+			}
 			try {
-				saveMeta(c);
+				saveMeta(saved);
 			} catch (IOException e) {
 				LOG.error("Cannot save meta of compare " + key(c.dataset, c.id), e);
 			}
 			active.remove(key(c.dataset, c.id));
+			if (c.previous != null && c.status == Status.DONE && c.onRecalc != null) {
+				try {
+					c.onRecalc.accept(c);
+				} catch (RuntimeException e) {
+					LOG.error("Manual check of compare " + key(c.dataset, c.id) + " after recalc", e);
+				}
+			}
 		}
 	}
 
@@ -590,6 +659,33 @@ public class TurnLanesCompareService {
 			c.reviewed = counts;
 			saveMeta(c);
 		}
+	}
+
+	/** what a recalc left of the manual check, kept in meta.json beside its counts */
+	public synchronized void setRecalc(String dataset, String id, Map<String, Integer> counts, String recalc)
+			throws IOException {
+		Compare c = get(dataset, id);
+		if (c != null && !active.containsKey(key(dataset, id))) {
+			c.reviewed = counts;
+			c.recalc = recalc;
+			saveMeta(c);
+		}
+	}
+
+	/** rows added by hand at the end of result.csv (in its columns), counted in meta.json; one more drive */
+	public synchronized void addRows(String dataset, String id, List<String[]> rows) throws IOException {
+		Compare c = get(dataset, id);
+		File result = getResultFile(dataset, id);
+		if (c == null || result == null || active.containsKey(key(dataset, id))) {
+			throw new IllegalArgumentException("No finished compare " + dataset + "/" + id);
+		}
+		TurnLanesFiles.appendCsv(result, rows);
+		c.routesTotal++;
+		c.routesDone++;
+		for (String[] row : rows) {
+			count(c, Verdict.valueOf(row[7]));
+		}
+		saveMeta(c);
 	}
 
 	public File getResultFile(String dataset, String id) {

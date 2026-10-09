@@ -33,6 +33,7 @@ import net.osmand.server.api.services.TurnLanesCompareService;
 import net.osmand.server.api.services.TurnLanesCompareService.Compare;
 import net.osmand.server.api.services.TurnLanesCompareService.CompareRequest;
 import net.osmand.server.api.services.TurnLanesReviewService;
+import net.osmand.server.api.services.TurnLanesReviewService.NewCaseRequest;
 import net.osmand.server.api.services.TurnLanesReviewService.VerdictRequest;
 import net.osmand.server.api.services.TurnLanesService;
 import net.osmand.server.api.services.TurnLanesService.Dataset;
@@ -186,6 +187,13 @@ public class TurnLanesController {
 		return c == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(c);
 	}
 
+	/** runs the compare again on its build, the manual check keeping the verdicts whose rows did not change */
+	@PostMapping(value = "/compares/{dataset}/{id}/recalc", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public Compare recalcCompare(@PathVariable String dataset, @PathVariable String id) throws IOException {
+		return compares.recalc(dataset, id, reviews::keepUnchanged);
+	}
+
 	@PostMapping(value = "/compares/{dataset}/{id}/cancel")
 	@ResponseBody
 	public ResponseEntity<Void> cancelCompare(@PathVariable String dataset, @PathVariable String id) {
@@ -276,6 +284,14 @@ public class TurnLanesController {
 	}
 
 	public record CaseRequest(String num) {
+	}
+
+	/** a drive added by hand to the compare and its dataset, with a verdict */
+	@PostMapping(value = "/review/{dataset}/{id}/new-case", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public Map<String, Object> newCase(@PathVariable String dataset, @PathVariable String id,
+	                                   @RequestBody NewCaseRequest req, Principal user) throws IOException {
+		return reviews.newCase(dataset, id, req, userOf(user));
 	}
 
 	/** one drive as test_turn_lanes.json */
