@@ -211,7 +211,7 @@ public class EmailSenderService {
 		if (subscriptions != null && !subscriptions.isEmpty()) {
 			DeviceSubscriptionsRepository.SupporterDeviceSubscription sub = subscriptions.get(0);
 			PurchasesDataLoader.Subscription skuData = purchasesDataLoader.getSubscriptions().get(sub.sku);
-			productName = purchasesDataLoader.subscriptionName(sub.sku);
+			productName = skuData != null ? skuData.name() : sub.sku;
 			PurchasesDataLoader.Plan plan = skuData == null ? null : skuData.plan();
 			if (plan == null) {
 				planName = "@RECEIPT_PLAN_SUBSCRIPTION@";
@@ -234,7 +234,7 @@ public class EmailSenderService {
 		} else if (purchases != null && !purchases.isEmpty()) {
 			DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase iap = purchases.get(0);
 			PurchasesDataLoader.InApp skuData = purchasesDataLoader.getInApps().get(iap.sku);
-			productName = purchasesDataLoader.inAppName(iap.sku);
+			productName = skuData != null ? skuData.name() : iap.sku;
 			planName = "@RECEIPT_PLAN_ONETIME@";
 			renewalLabel = "@RECEIPT_EXPIRES_ON@";
 			renewalDate = skuData != null ? skuData.getExpireDate(iap.purchaseTime) : null;
