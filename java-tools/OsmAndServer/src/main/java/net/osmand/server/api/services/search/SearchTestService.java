@@ -709,6 +709,15 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 		if (res == null) {
 			return null;
 		}
+		if (res.isPoiCategory()) {
+			// a category row takes no place; its objects (e.g. two streets) made it look like a street intersection
+			SearchResult category = new SearchResult();
+			category.objectType = ObjectType.POI_TYPE;
+			category.location = res.getLatLon();
+			category.localeName = res.getMainObject() == null ? null : spatialName(res.getMainObject(), locale);
+			category.spatialResult = res;
+			return category;
+		}
 		List<MapObject> objects = res.getObjects();
 		MapObject object = res.getMainObject();
 		List<Street> streets = spatialStreets(objects, locale);
