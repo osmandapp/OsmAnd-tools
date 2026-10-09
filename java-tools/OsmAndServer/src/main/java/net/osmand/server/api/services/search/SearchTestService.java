@@ -55,6 +55,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 @Service
 public class SearchTestService implements ReportService, DataService, DetectorService, InspectorService, AnalystService, TokenAnalystService, AddressPOIAnalystService {
@@ -427,9 +428,9 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 		}
 
 		try {
-			List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-					sql + (limit > 0 ? " LIMIT " + limit + " OFFSET " + offset : ""),
-					run.rerunId != null ? run.rerunId : run.caseId);
+			String chunkSql = sql + (limit > 0 ? " LIMIT " + limit + " OFFSET " + offset : "");
+			List<Map<String, Object>> rows = retryWhileLocked(() -> jdbcTemplate.queryForList(chunkSql,
+					run.rerunId != null ? run.rerunId : run.caseId));
 			if (rows.isEmpty())
 				return;
 
@@ -804,12 +805,44 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 
 		CompletableFuture<Void> f = CompletableFuture.runAsync(() -> {
 			try {
-				jdbcTemplate.batchUpdate(sql, batchArgs);
+				retryWhileLocked(() -> jdbcTemplate.batchUpdate(sql, batchArgs));
 			} catch (Exception ex) {
 				LOGGER.error("Failed batch insert for run {} ({} rows)", run.id, batchArgs.size(), ex);
 			}
 		}, SAVE_EXECUTOR);
 		runResultBatchTasks.computeIfAbsent(run.id, k -> Collections.synchronizedList(new ArrayList<>())).add(f);
+	}
+
+	private static final int LOCKED_RETRIES = 10;
+
+	// SQLite answers SQLITE_BUSY while another connection writes (results of a run, the run page polling the status):
+	// without a retry a 100-row chunk or a 10-row batch of results is lost and its rows show up as missing
+	private static <T> T retryWhileLocked(Supplier<T> call) {
+		for (int attempt = 1; ; attempt++) {
+			try {
+				return call.get();
+			} catch (RuntimeException e) {
+				if (!isLocked(e) || attempt >= LOCKED_RETRIES) {
+					throw e;
+				}
+				try {
+					Thread.sleep(100L * attempt);
+				} catch (InterruptedException ie) {
+					Thread.currentThread().interrupt();
+					throw e;
+				}
+			}
+		}
+	}
+
+	private static boolean isLocked(Throwable e) {
+		for (Throwable t = e; t != null; t = t.getCause()) {
+			String m = t.getMessage();
+			if (m != null && (m.contains("SQLITE_BUSY") || m.contains("database is locked"))) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	@Async
