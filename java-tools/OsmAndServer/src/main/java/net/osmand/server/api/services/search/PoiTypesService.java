@@ -2,6 +2,7 @@ package net.osmand.server.api.services.search;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
@@ -30,6 +31,27 @@ public class PoiTypesService {
 
 	private final ConcurrentHashMap<String, Map<String, String>> translationsCache = new ConcurrentHashMap<>();
 	private final ConcurrentHashMap<String, MapPoiTypes> poiTypesByLocale = new ConcurrentHashMap<>();
+	private volatile net.osmand.shared.osm.MapPoiTypes sharedPoiTypes;
+
+	// the point card rows (AdditionalInfoBundle of OsmAnd-shared) need the key names only, no translations
+	public net.osmand.shared.osm.MapPoiTypes getSharedPoiTypes() {
+		net.osmand.shared.osm.MapPoiTypes types = sharedPoiTypes;
+		if (types == null) {
+			synchronized (this) {
+				types = sharedPoiTypes;
+				if (types == null) {
+					types = new net.osmand.shared.osm.MapPoiTypes(null);
+					try (InputStream is = MapPoiTypes.class.getResourceAsStream("poi_types.xml")) {
+						types.initFromString(new String(Objects.requireNonNull(is).readAllBytes(), StandardCharsets.UTF_8));
+					} catch (IOException e) {
+						throw new IllegalStateException("poi_types.xml", e);
+					}
+					sharedPoiTypes = types;
+				}
+			}
+		}
+		return types;
+	}
 
 	public MapPoiTypes getMapPoiTypes(String locale) {
 		locale = locale == null ? DEFAULT_SEARCH_LANG : locale;

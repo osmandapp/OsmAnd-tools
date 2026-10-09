@@ -1,11 +1,11 @@
 package net.osmand.server.api.services.search;
 
-import net.osmand.data.AdditionalInfoBundle;
 import net.osmand.data.Amenity;
-import net.osmand.data.AmenityTagEntry;
-import net.osmand.data.AmenityTagEntriesBuilder;
-import net.osmand.osm.PoiCategory;
-import net.osmand.osm.PoiType;
+import net.osmand.shared.data.AdditionalInfoBundle;
+import net.osmand.shared.data.AmenityTagEntriesBuilder;
+import net.osmand.shared.data.AmenityTagEntry;
+import net.osmand.shared.osm.PoiCategory;
+import net.osmand.shared.osm.PoiType;
 import net.osmand.util.Algorithms;
 import org.springframework.stereotype.Service;
 
@@ -25,7 +25,7 @@ public class AmenityTagsService {
 		if (tags == null || tags.isEmpty()) {
 			return Collections.emptyList();
 		}
-		AdditionalInfoBundle infoBundle = new AdditionalInfoBundle(poiTypesService.getMapPoiTypes(lang), tags);
+		AdditionalInfoBundle infoBundle = new AdditionalInfoBundle(poiTypesService.getSharedPoiTypes(), tags);
 		List<String> preferredLangs = lang != null ? List.of(lang) : List.of();
 		boolean allowNoteTag = false; // The "note" tag is enabled only for OSM editing.
 		List<AmenityTagEntry> tagEntries = infoBundle.getVisibleTags(allowNoteTag, preferredLangs,
@@ -61,7 +61,7 @@ public class AmenityTagsService {
 		if (tagEntry.collapsableEntryType == AmenityTagEntry.CollapsableEntryType.POI_TYPE_GROUP) {
 			return resolveGroupSortName(tagEntry);
 		}
-		PoiType additionalType = infoBundle.resolvePoiType(category, tagEntry.key, tagEntry.value).additionalType();
+		PoiType additionalType = infoBundle.resolvePoiType(category, tagEntry.key, tagEntry.value).getAdditionalType();
 		return additionalType != null ? additionalType.getKeyName() : tagEntry.key;
 	}
 
