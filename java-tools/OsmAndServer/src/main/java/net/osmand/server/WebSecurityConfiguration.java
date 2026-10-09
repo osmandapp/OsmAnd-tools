@@ -244,6 +244,7 @@ public class WebSecurityConfiguration {
 //						.requestMatchers("/mcp/**").permitAll()
 //						.requestMatchers("/admin/issues/**").permitAll()
 						.requestMatchers("/admin/search-test/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
+						.requestMatchers("/admin/turn-lanes/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
 						.requestMatchers("/admin/order-mgmt/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
 						.requestMatchers("/admin/operations/**").hasAuthority(ROLE_ADMIN)
 						.requestMatchers("/admin/**").hasAuthority(ROLE_ADMIN)
