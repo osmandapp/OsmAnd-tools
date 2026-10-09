@@ -90,6 +90,9 @@ public class UserSubscriptionService {
 	@Autowired
 	private PromoService promoService;
 
+	@Autowired
+	private EmailSenderService emailSender;
+
 	Gson gson = new Gson();
 
 	private AndroidPublisher androidPublisher;
@@ -449,12 +452,15 @@ public class UserSubscriptionService {
 		}
 		List<SupporterDeviceSubscription> subscriptionList = subscriptionsRepo.findByOrderId(pu.orderid);
 		if (subscriptionList != null && !subscriptionList.isEmpty()) {
-			subscriptionList.forEach(s -> {
+			List<SupporterDeviceSubscription> linked = new ArrayList<>();
+			for (SupporterDeviceSubscription s : subscriptionList) {
 				if (s.userId == null) {
 					s.userId = pu.id;
 					subscriptionsRepo.saveAndFlush(s);
+					linked.add(s);
 				}
-			});
+			}
+			sendPurchaseLinkedEmailAfterCommit(pu.id, List.of(), linked);
 			return true;
 		}
 		return false;
@@ -467,12 +473,15 @@ public class UserSubscriptionService {
 		List<SupporterDeviceInAppPurchase> inAppPurchases = inAppPurchasesRepo.findByOrderId(pu.orderid);
 		Map<String, PurchasesDataLoader.InApp> inappMap = purchasesDataLoader.getInApps();
 		if (inAppPurchases != null && !inAppPurchases.isEmpty()) {
-			inAppPurchases.forEach(s -> {
+			List<SupporterDeviceInAppPurchase> linked = new ArrayList<>();
+			for (SupporterDeviceInAppPurchase s : inAppPurchases) {
 				if (s.userId == null && isProInappValid(s, inappMap) == null) {
 					s.userId = pu.id;
 					inAppPurchasesRepo.saveAndFlush(s);
+					linked.add(s);
 				}
-			});
+			}
+			sendPurchaseLinkedEmailAfterCommit(pu.id, linked, List.of());
 			return true;
 		}
 		return false;
@@ -500,6 +509,37 @@ public class UserSubscriptionService {
 		previousUser.orderid = null;
 		usersRepository.saveAndFlush(previousUser);
 		LOG.info("Cleared orderId for previous user " + previousUser.id);
+
+		sendPurchaseLinkedEmailAfterCommit(newUserId, iapList, subscriptionList);
+	}
+
+	private void sendPurchaseLinkedEmailAfterCommit(int newUserId, List<SupporterDeviceInAppPurchase> purchases,
+	                                                List<SupporterDeviceSubscription> subscriptions) {
+		SupporterDeviceSubscription sub = subscriptions.stream()
+				.filter(s -> !Boolean.FALSE.equals(s.valid)).findFirst().orElse(null);
+		SupporterDeviceInAppPurchase iap = purchases.stream()
+				.filter(p -> !Boolean.FALSE.equals(p.valid)).findFirst().orElse(null);
+		boolean subscription = sub != null;
+		String productName;
+		if (subscription) {
+			productName = purchasesDataLoader.subscriptionName(sub.sku);
+		} else if (iap != null) {
+			productName = purchasesDataLoader.inAppName(iap.sku);
+		} else {
+			return;
+		}
+		CloudUsersRepository.CloudUser newUser = usersRepository.findById(newUserId);
+		if (newUser == null || newUser.email == null) {
+			return;
+		}
+		emailSender.sendAfterCommit(() -> {
+			try {
+				emailSender.sendPurchaseLinkedEmail(newUser.email, emailSender.userLang(newUserId), productName,
+						subscription);
+			} catch (Exception e) {
+				LOG.error("Failed to send purchase linked email: " + e.getMessage(), e);
+			}
+		});
 	}
 
 	@NotNull
@@ -719,7 +759,8 @@ public class UserSubscriptionService {
 	public String getPurchaseType(String sku) {
 		PurchasesDataLoader.Subscription subscription = purchasesDataLoader.getSubscriptions().get(sku);
 		if (subscription != null) {
-			return subscription.duration() >= 12 ? "annual" : "monthly";
+			PurchasesDataLoader.Plan plan = subscription.plan();
+			return plan != null && plan.isAnnual() ? "annual" : "monthly";
 		}
 
 		return purchasesDataLoader.getInApps().containsKey(sku) ? PURCHASE_TYPE_ONE_TIME : null;
