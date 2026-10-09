@@ -70,6 +70,9 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	private TLongObjectHashMap<List<RestrictionInfo>> highwayRestrictions = new TLongObjectHashMap<List<RestrictionInfo>>();
 	private TLongObjectHashMap<WayNodeId> basemapRemovedNodes = new TLongObjectHashMap<WayNodeId>();
 	private TLongObjectHashMap<RouteMissingPoints> basemapNodesToReinsert = new TLongObjectHashMap<RouteMissingPoints> ();
+	
+	// "from" node of a speed camera relation -> its "to" (or "device") node
+	private TLongObjectHashMap<Node> speedCameraTargets = new TLongObjectHashMap<Node>();
 
 	// local purpose to speed up processing cache allocation
 	TIntArrayList outTypes = new TIntArrayList();
@@ -156,8 +159,50 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 						PropagateEntityTags pt = tagsTransformer
 								.getPropogateTagForEntity(new EntityId(EntityType.NODE, n.getId()));
 						pt.putThroughTags.put("highway", "speed_camera");
+						addSpeedCameraTarget((Relation) e, (Node) n);
 					}
 				}
+			}
+		}
+	}
+
+	// enforcement is checked from "from" towards "to" ("device" acts as "to" if there is none, see Relation:enforcement)
+	private void addSpeedCameraTarget(Relation relation, Node from) {
+		List<Entity> to = relation.getMemberEntities("to");
+		for (Entity target : to.isEmpty() ? relation.getMemberEntities("device") : to) {
+			if (target instanceof Node) {
+				speedCameraTargets.put(from.getId(), (Node) target);
+			}
+		}
+	}
+
+	// direction of the camera by the order of "from" and "to" in this way, read by RouteDataObject.isDirectionApplicable
+	private void addSpeedCameraDirections(List<Node> nodes) {
+		Node first = nodes.get(0);
+		Node last = nodes.get(nodes.size() - 1);
+		for (int fromIndex = 0; fromIndex < nodes.size(); fromIndex++) {
+			Node from = nodes.get(fromIndex);
+			Node to = from == null ? null : speedCameraTargets.get(from.getId());
+			if (to == null) {
+				continue;
+			}
+			int toIndex = nodes.indexOf(to);
+			String direction = null;
+			if (toIndex >= 0) {
+				//  "to" is the same way. 
+				//  |first----from----to---last|
+				if (toIndex != fromIndex) {
+					direction = toIndex > fromIndex ? "forward" : "backward";
+				}
+			} else if (first != null && last != null) {
+				//  "to" is on another way. we assume it connects with our current way (or it is close enough).
+				//  check which endpoint (first/last) of current way is closest for "to". we assume "to" follows in this direction.
+				//  |first1----from----last1|  -->   |first2----to----last2|
+				boolean lastNodeIsCloser = MapUtils.getDistance(last.getLatLon(), to.getLatLon()) < MapUtils.getDistance(first.getLatLon(), to.getLatLon());
+				direction = lastNodeIsCloser ? "forward" : "backward";
+			}
+			if (direction != null) {
+				pointTypes.get(from.getId()).add(routeTypes.registerRule("direction", direction).getInternalId());
 			}
 		}
 	}
@@ -248,6 +293,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					propagateToNodes.propagateTagsToWayNodesNoBorderRule(e);
 				}
 				routeTypes.encodePointTypes(e, pointTypes, pointNames, tagsTransformer, renderingTypes, false);
+				addSpeedCameraDirections(e.getNodes());
 				addWayToIndex(e.getId(), e.getNodes(), mapRouteInsertStat, routeTree, outTypes, pointTypes, pointNames, names);
 			}
 			if (settings.generateLowLevel) {
