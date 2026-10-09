@@ -29,8 +29,6 @@ public interface DeviceSubscriptionsRepository extends JpaRepository<SupporterDe
 
     List<SupporterDeviceSubscription> findAllByUserId(Integer userId);
 
-    List<SupporterDeviceSubscription> findByUserIdAndValidTrue(Integer userId);
-
     List<SupporterDeviceSubscription> findAllBySupporterId(Long supporterId);
 
 	// PRIMARY KEY is (orderId + SKU) or (purchaseToken + SKU), orderId could be restored from purchaseToken and sku
