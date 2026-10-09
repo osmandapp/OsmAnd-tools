@@ -54,6 +54,7 @@ import net.osmand.binary.BinaryMapPoiReaderAdapter;
 import net.osmand.binary.BinaryMapRouteReaderAdapter;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.binary.CommonWordsMultiIndex;
+import net.osmand.obf.BinaryMerger;
 import net.osmand.obf.OBFDataCreator;
 import net.osmand.obf.preparation.IndexAddressCreator;
 import net.osmand.obf.preparation.IndexCreator;
@@ -65,6 +66,7 @@ import net.osmand.osm.MapPoiTypes;
 import net.osmand.search.core.SearchCoreFactory;
 import net.osmand.search.core.spatial.test.SpatialSearchTestFile;
 import net.osmand.search.core.spatial.test.SpatialTestSearchEngine;
+import net.osmand.search.rules.SearchModLocales;
 import net.osmand.util.Algorithms;
 
 /**
@@ -109,7 +111,9 @@ public class SpatialSearchPipelineTest {
 	private static final boolean REGENERATE_OBF = true; // bypassed by LIVE_TESTING
 	private static final boolean TEST_EXTRA_RESULTS = true;
 	private static final List<Class<?>> OBF_GENERATE_CLASSES = List.of(IndexCreator.class, IndexPoiCreator.class,
-			IndexAddressCreator.class, NameIndexCreator.class, CommonWordsMultiIndex.class);
+			IndexAddressCreator.class, NameIndexCreator.class, CommonWordsMultiIndex.class,
+			// the region name of a test OBF gives the rules locale of its data
+			OBFDataCreator.class, BinaryMerger.class, SearchModLocales.class);
 	private static final String HASH_VERSION = "2";
 	private static final String OBF_HASH_FILE_NAME = ".obf.hash";
 	private static final int MAX_KNOWN_HASHES = 4; // one per build that writes its own class files
