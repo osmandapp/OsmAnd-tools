@@ -1012,7 +1012,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 						building.setName(hname + additionalHname);
 					}
 					if (!Algorithms.isEmpty(street2)) {
-						String secondHno= e.getTag(OSMTagKey.ADDR2_HOUSE_NUMBER);
+						String secondHno = e.getTag(OSMTagKey.ADDR2_HOUSE_NUMBER);
 						String firstNo = building.getName();
 						int secondNumberInd = hname.indexOf('/');
 						if (secondNumberInd != -1 && secondNumberInd < hname.length() - 1 &&
@@ -1022,7 +1022,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 						}
 						if (secondHno != null) {
 							Building building2 = EntityParser.parseBuilding(e);
-							building2.setName(hname.substring(secondNumberInd + 1) + additionalHname);
+							building2.setName(secondHno + additionalHname);
 							Set<Long> ids2OfStreet = getStreetInCity(0, e.getIsInNames(), street2, false, null, l, icc);
 							ids2OfStreet.removeAll(idsOfStreet); // remove duplicated entries!
 							if (!ids2OfStreet.isEmpty()) {
