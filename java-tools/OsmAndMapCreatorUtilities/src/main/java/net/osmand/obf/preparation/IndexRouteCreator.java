@@ -148,18 +148,48 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION, EntityConvertApplyType.ROUTING);
 			if ("enforcement".equals(tags.get("type")) && "maxspeed".equals(tags.get("enforcement"))) {
 				ctx.loadEntityRelation((Relation) e);
-				Iterator<RelationMember> from = ((Relation) e).getMembers("from").iterator();
 				// mark as speed cameras
-				while(from.hasNext()) {
-					Entity n = from.next().getEntity();
-					if (n instanceof Node) {
-						PropagateEntityTags pt = tagsTransformer
-								.getPropogateTagForEntity(new EntityId(EntityType.NODE, n.getId()));
-						pt.putThroughTags.put("highway", "speed_camera");
-					}
+				for (Node n : getSpeedCameraRoadNodes((Relation) e)) {
+					PropagateEntityTags pt = tagsTransformer
+							.getPropogateTagForEntity(new EntityId(EntityType.NODE, n.getId()));
+					pt.putThroughTags.put("highway", "speed_camera");
 				}
 			}
 		}
+	}
+
+	// speedcam "device" is usually off the road, near "to" but not always, so add alert at the "from" or "to" road node nearest to it:
+	// relations of both directions of one camera share it. Without exactly one "device" node keep all "from" nodes.
+	private List<Node> getSpeedCameraRoadNodes(Relation relation) {
+		List<Node> devices = getMemberNodes(relation, "device");
+		List<Node> from = getMemberNodes(relation, "from");
+		List<Node> to = getMemberNodes(relation, "to");
+		List<Node> roadNodes = new ArrayList<>(from);
+		roadNodes.addAll(to);
+		if (roadNodes.isEmpty() || devices.size() != 1) {
+			return from;
+		}
+
+		Node nearestNode = null;
+		double minDistance = Double.MAX_VALUE;
+		for (Node node : roadNodes) {
+			double distance = MapUtils.getDistance(node.getLatLon(), devices.get(0).getLatLon());
+			if (distance < minDistance) {
+				minDistance = distance;
+				nearestNode = node;
+			}
+		}
+		return Collections.singletonList(nearestNode);
+	}
+
+	private List<Node> getMemberNodes(Relation relation, String role) {
+		List<Node> nodes = new ArrayList<>();
+		for (Entity entity : relation.getMemberEntities(role)) {
+			if (entity instanceof Node) {
+				nodes.add((Node) entity);
+			}
+		}
+		return nodes;
 	}
 
 	public void indexLowEmissionZones(Entity e, OsmDbAccessorContext ctx) throws SQLException {
