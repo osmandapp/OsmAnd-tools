@@ -332,16 +332,20 @@ public class BinaryMerger {
 		return fileName;
 	}
 
+	private SearchModRules getSearchRules() {
+		if (searchRules == null) {
+			searchRules = new SearchModRules();
+		}
+		return searchRules;
+	}
+
 	// region name written to the address and POI parts; the search takes the rules locale of the data from it
 	protected String getRegionName(File fileToExtract) {
 		String nm = fileToExtract.getName();
 		int i = nm.indexOf('_');
 		String region = i > 0 ? nm.substring(0, i) : nm;
 		// keep a subregion with its own locale: "Switzerland_ticino_europe_2.obf" -> "Switzerland_ticino"
-		if (searchRules == null) {
-			searchRules = new SearchModRules();
-		}
-		String localePrefix = searchRules.locales().mapPrefix(nm);
+		String localePrefix = getSearchRules().locales().mapPrefix(nm);
 		return localePrefix != null && localePrefix.length() > region.length() ? localePrefix : region;
 	}
 
@@ -487,7 +491,7 @@ public class BinaryMerger {
 		attributeTagsTable.addAll(attributeTagsTableSet);
 		Map<String, Integer> tagRules = new HashMap<String, Integer>();
 		NameIndexCreator<MapObject> namesIndex = new NameIndexCreator<>(CommonWords.getAddrInstance());
-		namesIndex.setMapName(getNameIndexMapName(name));
+		namesIndex.setMapName(getNameIndexMapName(name), getSearchRules());
 		ListIterator<String> it = attributeTagsTable.listIterator();
 		while (it.hasNext()) {
 			tagRules.put(it.next(), it.previousIndex());

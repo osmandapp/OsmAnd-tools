@@ -59,6 +59,7 @@ import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
+import net.osmand.search.rules.SearchModRules;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
@@ -1273,7 +1274,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 
 		NameIndexCreator<MapObject> namesIndex = new NameIndexCreator<>(CommonWords.getAddrInstance());
-		namesIndex.setMapName(settings.nameIndexMapName != null ? settings.nameIndexMapName : regionName);
+		namesIndex.setMapName(settings.nameIndexMapName != null ? settings.nameIndexMapName : regionName,
+				new SearchModRules());
 
 		progress.startTask(settings.getString("IndexCreator.SERIALIZING_ADDRESS"), cityTowns.size() + villages.size() / 100 + 1); //$NON-NLS-1$
 		TLongObjectHashMap<Long> streetIds = new TLongObjectHashMap<Long>();

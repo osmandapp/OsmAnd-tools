@@ -53,6 +53,7 @@ import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
 import net.osmand.router.RoutingContext;
+import net.osmand.search.rules.SearchModRules;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.osmand.util.SearchAlgorithms;
@@ -766,7 +767,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		poiConnection.commit();
 
 		NameIndexCreator<PoiNameObject> namesIndex = new NameIndexCreator<>(CommonWords.getPoiInstance());
-		namesIndex.setMapName(settings.nameIndexMapName != null ? settings.nameIndexMapName : regionName);
+		namesIndex.setMapName(settings.nameIndexMapName != null ? settings.nameIndexMapName : regionName,
+				new SearchModRules());
 
 		int zoomToStart = ZOOM_TO_SAVE_START;
 		IntBbox bbox = new IntBbox();

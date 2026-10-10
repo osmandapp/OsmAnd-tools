@@ -21,7 +21,6 @@ import java.util.TreeSet;
 import gnu.trove.list.array.TIntArrayList;
 import net.osmand.CollatorStringMatcher;
 import net.osmand.binary.CommonWords;
-import net.osmand.binary.CommonWordsMultiIndex;
 import net.osmand.binary.NameIndexReader;
 import net.osmand.data.City;
 import net.osmand.data.City.CityType;
@@ -33,6 +32,9 @@ import net.osmand.osm.AbstractPoiType;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.search.core.SearchPhrase;
 import net.osmand.search.core.TopIndexFilter;
+import net.osmand.search.rules.SearchModLocaleRules;
+import net.osmand.search.rules.SearchModLocales;
+import net.osmand.search.rules.SearchModRules;
 import net.osmand.util.Algorithms;
 import net.osmand.util.SearchAlgorithms;
 
@@ -68,8 +70,10 @@ public class NameIndexCreator<T> {
 	
 	// words of names that are not keys in this map: they stay references of the common words table
 	final Set<String> notKeyWords = new HashSet<>();
-	// map whose language group chooses the keys of names, null for the rare word rule
-	private String mapName;
+	// statistics group of the map that chooses the keys of names, null for the rare word rule
+	private String wordsGroup;
+	// rules of the locale of the map: word classes and alternative names
+	private SearchModLocaleRules localeRules;
 
 	final AlternativeNameIndexGenerator<T> alternativeNames = new AlternativeNameIndexGenerator<>(this);
 
@@ -77,13 +81,13 @@ public class NameIndexCreator<T> {
 		this.predefinedGlobalWords = c;
 	}
 
-	// download name of the map ("Ukraine_kyiv-city_europe"), used when COMMON_WORDS_BY_LANGUAGE and a group covers it
-	public void setMapName(String mapName) {
-		// language group of the map (CommonWordsMultiIndex.DEFAULT_GROUPS), null when no group covers it
-		String languageGroup = mapName == null ? null : CommonWordsMultiIndex.getInstance().getGroupId(mapName);
-		boolean covered = COMMON_WORDS_BY_LANGUAGE && languageGroup != null;
-		this.mapName = covered ? mapName : null;
-		alternativeNames.setLanguageGroup(languageGroup, mapName);
+	// download name of the map ("Ukraine_kyiv-city_europe"): <locales> of the rules give its statistics group, used
+	// when COMMON_WORDS_BY_LANGUAGE, and its rules locale
+	public void setMapName(String mapName, SearchModRules searchRules) {
+		SearchModLocales locales = searchRules.locales();
+		wordsGroup = COMMON_WORDS_BY_LANGUAGE && mapName != null ? locales.groupForMap(mapName) : null;
+		localeRules = searchRules.rules(mapName == null ? "" : locales.forMap(mapName));
+		alternativeNames.setRules(localeRules);
 	}
 
 	public record PoiNameObject(PoiTileBox tileBox, int ind, int eloRating, 
@@ -344,7 +348,7 @@ public class NameIndexCreator<T> {
 			words.put(c, word);
 			wordsList.add(word);
 		}
-		commonWords = new PrepareWordsIndex(words, wordsList, mapName != null);
+		commonWords = new PrepareWordsIndex(words, wordsList, wordsGroup != null);
 		return commonWords;
 	}
 	
@@ -437,8 +441,8 @@ public class NameIndexCreator<T> {
 		// wikidata id ("national" finds Tongass National Forest), a city; towns and villages do not
 		boolean notable = obj instanceof PoiNameObject p && (p.eloRating() >= 0 || p.wikidata())
 				|| obj instanceof City c && c.getType() == CityType.CITY;
-		Set<String> keys = mapName == null ? null
-				: new HashSet<>(CommonWordsMultiIndex.getInstance().getWordsToIndex(mapName, uniqueNames, notable));
+		Set<String> keys = wordsGroup == null ? null
+				: new HashSet<>(CommonWordsMultiIndex.getInstance().getWordsToIndex(wordsGroup, localeRules, uniqueNames, notable));
 		String legacyKey = null;
 		if (keys != null) {
 			// TODO remove when app versions with the legacy search (SearchCoreFactory) no longer download maps: it looks a

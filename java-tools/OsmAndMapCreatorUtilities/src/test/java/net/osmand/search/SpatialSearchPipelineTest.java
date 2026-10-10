@@ -13,6 +13,7 @@ import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -53,9 +54,10 @@ import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapPoiReaderAdapter;
 import net.osmand.binary.BinaryMapRouteReaderAdapter;
 import net.osmand.binary.RouteDataObject;
-import net.osmand.binary.CommonWordsMultiIndex;
 import net.osmand.obf.BinaryMerger;
 import net.osmand.obf.OBFDataCreator;
+import net.osmand.obf.preparation.AlternativeNameIndexGenerator;
+import net.osmand.obf.preparation.CommonWordsMultiIndex;
 import net.osmand.obf.preparation.IndexAddressCreator;
 import net.osmand.obf.preparation.IndexCreator;
 import net.osmand.obf.preparation.IndexCreatorSettings;
@@ -66,6 +68,7 @@ import net.osmand.osm.MapPoiTypes;
 import net.osmand.search.core.SearchCoreFactory;
 import net.osmand.search.core.spatial.test.SpatialSearchTestFile;
 import net.osmand.search.core.spatial.test.SpatialTestSearchEngine;
+import net.osmand.search.rules.SearchModLocaleRules;
 import net.osmand.search.rules.SearchModLocales;
 import net.osmand.util.Algorithms;
 
@@ -112,6 +115,7 @@ public class SpatialSearchPipelineTest {
 	private static final boolean TEST_EXTRA_RESULTS = true;
 	private static final List<Class<?>> OBF_GENERATE_CLASSES = List.of(IndexCreator.class, IndexPoiCreator.class,
 			IndexAddressCreator.class, NameIndexCreator.class, CommonWordsMultiIndex.class,
+			AlternativeNameIndexGenerator.class, SearchModLocaleRules.class,
 			// the region name of a test OBF gives the rules locale of its data
 			OBFDataCreator.class, BinaryMerger.class, SearchModLocales.class);
 	private static final String HASH_VERSION = "2";
@@ -1104,14 +1108,34 @@ public class SpatialSearchPipelineTest {
 			}
 		}
 
+		// the word statistics and the <index> rules choose the keys too
+		individualHashes.add(getResourceHash(CommonWordsMultiIndex.class, CommonWordsMultiIndex.RESOURCE));
+		File[] rules = new File(RESOURCES_PATH, "abbr").listFiles((dir, name) -> name.endsWith(".xml"));
+		if (rules != null) {
+			Arrays.sort(rules);
+			for (File f : rules) {
+				individualHashes.add(getFileHash(f));
+			}
+		}
 		String allHashesCombined = String.join("\n", individualHashes);
 		allHashesCombined += HASH_VERSION;
 		return DigestUtils.sha256Hex(allHashesCombined);
 	}
 
 	private static String getClassHash(Class<?> clazz) {
-		String classResourcePath = "/" + clazz.getName().replace('.', '/') + ".class";
-		try (InputStream is = clazz.getResourceAsStream(classResourcePath)) {
+		return getResourceHash(clazz, clazz.getSimpleName() + ".class");
+	}
+
+	private static String getFileHash(File file) {
+		try (InputStream is = new FileInputStream(file)) {
+			return DigestUtils.sha256Hex(is);
+		} catch (IOException e) {
+			return "Error: " + e.getMessage();
+		}
+	}
+
+	private static String getResourceHash(Class<?> clazz, String resource) {
+		try (InputStream is = clazz.getResourceAsStream(resource)) {
 			if (is == null) {
 				return "Error. Class not found";
 			}
