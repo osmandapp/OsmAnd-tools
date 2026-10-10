@@ -14,7 +14,7 @@ public class UnglueNameTest {
 
 	@BeforeClass
 	public static void setUp() {
-		generator.setRules(new SearchModRules().rules(""));
+		generator.setRules(new SearchModRules(), "");
 	}
 
 	@Test
