@@ -117,6 +117,8 @@ import net.osmand.util.MapsCollection;
  * <li>{@code rerunFailed} - {@code true} checks only the tiles that failed in the previous run, listed by it
  * in {@code <out>/}{@value #FAILED_TILES_FILE}, plus {@value #RERUN_RANDOM_FACTOR} times as many random
  * tiles to catch regressions;</li>
+ * <li>{@code tiles} - checks only the given tiles, e.g. {@code -tiles=12/2675/1749,14/10246/8777}. Such a run
+ * keeps {@value #FAILED_TILES_FILE} of the previous run;</li>
  * <li>{@code scan}, {@code minzoom}, {@code maxzoom}, {@code bbox} - scan every tile of a zoom
  * range instead of the cases; {@code bbox} is {@code leftLon,bottomLat,rightLon,topLat} and
  * defaults to the whole world;</li>
@@ -697,7 +699,9 @@ public class CoastlineRenderingTester {
 		result.durationMs = System.currentTimeMillis() - start;
 		printSummary(result);
 		writeSummaryJson(result);
-		writeFailedTiles();
+		if (opt("tiles", "").isEmpty()) {
+			writeFailedTiles();
+		}
 		if (writeHtml) {
 			writeHtmlReport(result);
 		}
@@ -871,14 +875,13 @@ public class CoastlineRenderingTester {
 		if (Boolean.parseBoolean(opt("random", "false"))) {
 			return new ArrayList<>(Collections.singletonList(randomCase(randomTiles)));
 		}
+		String selected = opt("tiles", "");
+		if (!selected.isEmpty()) {
+			CaseDef tiles = tileListCase("Selected tiles", parseTiles(Arrays.asList(selected.split("[,\\s]+"))));
+			return new ArrayList<>(Collections.singletonList(tiles));
+		}
 		if (Boolean.parseBoolean(opt("rerunFailed", "false"))) {
-			CaseDef failed = new CaseDef();
-			failed.issue = 3291;
-			failed.title = "Failed tiles of the previous run";
-			failed.group = GROUP_RANDOM;
-			failed.maxExtraWater = Double.parseDouble(opt("maxExtraWater", "0.02"));
-			failed.maxMissingWater = Double.parseDouble(opt("maxMissingWater", "0.02"));
-			failed.tiles = readFailedTiles();
+			CaseDef failed = tileListCase("Failed tiles of the previous run", readFailedTiles());
 			System.out.printf("Rerun         : %d failed tiles of the previous run%n", failed.tiles.size());
 			return new ArrayList<>(Arrays.asList(failed, randomCase(failed.tiles.size() * RERUN_RANDOM_FACTOR)));
 		}
@@ -2379,17 +2382,37 @@ public class CoastlineRenderingTester {
 		Files.write(new File(outputDir, FAILED_TILES_FILE).toPath(), sb.toString().getBytes(StandardCharsets.UTF_8));
 	}
 
+	private CaseDef tileListCase(String title, List<int[]> tiles) {
+		CaseDef c = new CaseDef();
+		c.issue = 3291;
+		c.title = title;
+		c.group = GROUP_RANDOM;
+		c.maxExtraWater = Double.parseDouble(opt("maxExtraWater", "0.02"));
+		c.maxMissingWater = Double.parseDouble(opt("maxMissingWater", "0.02"));
+		c.tiles = tiles;
+		return c;
+	}
+
 	private List<int[]> readFailedTiles() throws IOException {
 		File f = new File(outputDir, FAILED_TILES_FILE);
 		if (!f.exists()) {
 			throw new IllegalStateException("-rerunFailed needs " + f + " of a previous run");
 		}
+		return parseTiles(Files.readAllLines(f.toPath(), StandardCharsets.UTF_8));
+	}
+
+	/** {@code z/x/y} strings, the blank ones are skipped. */
+	private static List<int[]> parseTiles(List<String> list) {
 		List<int[]> tiles = new ArrayList<>();
-		for (String line : Files.readAllLines(f.toPath(), StandardCharsets.UTF_8)) {
-			String[] zxy = line.trim().split("/");
-			if (zxy.length == 3) {
-				tiles.add(new int[] { Integer.parseInt(zxy[0]), Integer.parseInt(zxy[1]), Integer.parseInt(zxy[2]) });
+		for (String s : list) {
+			if (s.trim().isEmpty()) {
+				continue;
 			}
+			String[] zxy = s.trim().split("/");
+			if (zxy.length != 3) {
+				throw new IllegalArgumentException("A tile must be z/x/y but was " + s);
+			}
+			tiles.add(new int[] { Integer.parseInt(zxy[0]), Integer.parseInt(zxy[1]), Integer.parseInt(zxy[2]) });
 		}
 		return tiles;
 	}
