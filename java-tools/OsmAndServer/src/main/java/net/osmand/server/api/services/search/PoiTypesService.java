@@ -2,11 +2,15 @@ package net.osmand.server.api.services.search;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Service;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -30,6 +34,32 @@ public class PoiTypesService {
 
 	private final ConcurrentHashMap<String, Map<String, String>> translationsCache = new ConcurrentHashMap<>();
 	private final ConcurrentHashMap<String, MapPoiTypes> poiTypesByLocale = new ConcurrentHashMap<>();
+	private final CompletableFuture<net.osmand.shared.osm.MapPoiTypes> sharedPoiTypes = new CompletableFuture<>();
+	private final AtomicBoolean sharedPoiTypesLoading = new AtomicBoolean();
+
+	@PostConstruct
+	public void loadSharedPoiTypes() {
+		if (!sharedPoiTypesLoading.compareAndSet(false, true)) {
+			return;
+		}
+		Thread t = new Thread(() -> {
+			try (InputStream is = MapPoiTypes.class.getResourceAsStream("poi_types.xml")) {
+				net.osmand.shared.osm.MapPoiTypes types = new net.osmand.shared.osm.MapPoiTypes(null);
+				types.initFromString(new String(Objects.requireNonNull(is).readAllBytes(), StandardCharsets.UTF_8));
+				net.osmand.shared.osm.MapPoiTypes.setDefault(types);
+				sharedPoiTypes.complete(types);
+			} catch (IOException | RuntimeException e) {
+				sharedPoiTypes.completeExceptionally(e);
+			}
+		}, "shared-poi-types");
+		t.setDaemon(true);
+		t.start();
+	}
+
+	public net.osmand.shared.osm.MapPoiTypes getSharedPoiTypes() {
+		loadSharedPoiTypes();
+		return sharedPoiTypes.join();
+	}
 
 	public MapPoiTypes getMapPoiTypes(String locale) {
 		locale = locale == null ? DEFAULT_SEARCH_LANG : locale;
