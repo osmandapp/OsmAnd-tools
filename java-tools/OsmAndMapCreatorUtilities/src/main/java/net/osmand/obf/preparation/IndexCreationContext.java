@@ -55,7 +55,6 @@ public class IndexCreationContext {
 			String translit = locales().translitForMap(regionName);
 			this.translitJapaneseNames = JAPANESE.equals(translit);
 			this.translitChineseNames = CHINESE.equals(translit);
-			this.decryptAbbreviations = needDecryptAbbreviations(getRegionLang(allRegions, regionName));
             WorldRegion region = this.allRegions.getRegionDataByDownloadName(regionName);
             if (region != null) {
 				bboxFilter.initRegionQuads(region);
