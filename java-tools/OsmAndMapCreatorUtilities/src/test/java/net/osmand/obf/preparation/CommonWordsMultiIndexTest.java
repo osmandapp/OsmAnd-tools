@@ -1,4 +1,4 @@
-package net.osmand.binary;
+package net.osmand.obf.preparation;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
@@ -17,6 +17,9 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
+import net.osmand.binary.NameIndexReader;
+import net.osmand.search.rules.SearchModLocales;
+import net.osmand.search.rules.SearchModRules;
 import net.osmand.util.SearchAlgorithms;
 
 public class CommonWordsMultiIndexTest {
@@ -24,8 +27,6 @@ public class CommonWordsMultiIndexTest {
 	// names per million of a French-like group: rue, de, la are service words, chemin, école, gare frequent ones
 	private static final String DATA = String.join("\n",
 			"# test data",
-			"group\tfr\tfrance,belgium_wallonia,luxembourg",
-			"group\tnl\tnetherlands,belgium_flanders",
 			"word\tfr\t1\t130000\true",
 			"word\tfr\t1\t219000\tde",
 			"word\tfr\t1\t154000\tla",
@@ -53,86 +54,92 @@ public class CommonWordsMultiIndexTest {
 		index = CommonWordsMultiIndex.load(new ByteArrayInputStream(DATA.getBytes(StandardCharsets.UTF_8)));
 	}
 
-	private List<String> keys(String map, String... words) {
-		return index.getWordsToIndex(map, Arrays.asList(words));
+	private List<String> keys(String group, String... words) {
+		return index.getWordsToIndex(group, null, Arrays.asList(words), false);
 	}
 
 	@Test
 	public void serviceWordsGoWhenAnotherWordStays() {
-		Assert.assertEquals(List.of("paix"), keys("France_ile-de-france_europe_2.obf", "rue", "de", "la", "paix"));
+		Assert.assertEquals(List.of("paix"), keys("fr", "rue", "de", "la", "paix"));
 	}
 
 	@Test
 	public void onlyServiceWordsStay() {
-		Assert.assertEquals(List.of("rue", "de", "la"), keys("France_ile-de-france_europe_2.obf", "rue", "de", "la"));
+		Assert.assertEquals(List.of("rue", "de", "la"), keys("fr", "rue", "de", "la"));
 	}
 
 	@Test
 	public void frequentWordGoesWhenTenTimesRarerWordExists() {
 		// école 3000 >= jules 300 x 10
-		Assert.assertEquals(List.of("jules", "ferry"), keys("France_normandy_europe_2.obf", "école", "jules", "ferry"));
+		Assert.assertEquals(List.of("jules", "ferry"), keys("fr", "école", "jules", "ferry"));
 		// chemin 3900 < gare 1500 x 10: both frequent words stay, the service words go
-		Assert.assertEquals(List.of("chemin", "gare"), keys("France_normandy_europe_2.obf", "chemin", "de", "la", "gare"));
+		Assert.assertEquals(List.of("chemin", "gare"), keys("fr", "chemin", "de", "la", "gare"));
 	}
 
 	@Test
 	public void numbersStayAndDoNotCount() {
-		Assert.assertEquals(List.of("10", "paix"), keys("France_normandy_europe_2.obf", "rue", "10", "de", "la", "paix"));
-		Assert.assertEquals(List.of("rue", "10"), keys("France_normandy_europe_2.obf", "rue", "10"));
+		Assert.assertEquals(List.of("10", "paix"), keys("fr", "rue", "10", "de", "la", "paix"));
+		Assert.assertEquals(List.of("rue", "10"), keys("fr", "rue", "10"));
 	}
 
 	@Test
 	public void notableObjectKeepsEveryWord() {
 		List<String> words = List.of("rue", "de", "la", "paix");
-		Assert.assertEquals(words, index.getWordsToIndex("France_ile-de-france_europe_2.obf", words, true));
-		Assert.assertEquals(List.of("paix"), index.getWordsToIndex("France_ile-de-france_europe_2.obf", words, false));
+		Assert.assertEquals(words, index.getWordsToIndex("fr", null, words, true));
+		Assert.assertEquals(List.of("paix"), index.getWordsToIndex("fr", null, words, false));
 	}
 
 	@Test
 	public void wordsAreComparedAligned() throws IOException {
 		// the data names the stream "ru" and "rû": one aligned word with both frequencies, frequent against "bas"
-		String data = "group\tfr\tfrance\nword\tfr\t2\t2574\tbas\nword\tfr\t2\t1056\tru\nword\tfr\t0\t121\trû\nword\tfr\t1\t100000\tdu\n";
+		String data = "word\tfr\t2\t2574\tbas\nword\tfr\t2\t1056\tru\nword\tfr\t0\t121\trû\nword\tfr\t1\t100000\tdu\n";
 		CommonWordsMultiIndex aligned = CommonWordsMultiIndex.load(new ByteArrayInputStream(data.getBytes(StandardCharsets.UTF_8)));
-		Assert.assertEquals(List.of("bas", "rû"), aligned.getWordsToIndex("France_europe_2.obf", List.of("bas", "du", "rû")));
+		Assert.assertEquals(List.of("bas", "rû"), aligned.getWordsToIndex("fr", null, List.of("bas", "du", "rû"), false));
 	}
 
 	@Test
 	public void cityAsStreetMarkerIsNotAWord() {
 		String marker = NameIndexReader.CITY_AS_STREET_COMMON;
-		Assert.assertEquals(List.of("rue", "de", "la", marker), keys("France_normandy_europe_2.obf", "rue", "de", "la", marker));
-		Assert.assertEquals(List.of("paix", marker), keys("France_normandy_europe_2.obf", "rue", "paix", marker));
+		Assert.assertEquals(List.of("rue", "de", "la", marker), keys("fr", "rue", "de", "la", marker));
+		Assert.assertEquals(List.of("paix", marker), keys("fr", "rue", "paix", marker));
 	}
 
 	@Test
 	public void groupByLongestMapPrefix() {
-		Assert.assertEquals("fr", index.getGroupId("Belgium_wallonia_europe_2.obf"));
-		Assert.assertEquals("nl", index.getGroupId("/maps/Belgium_flanders_europe_2.obf"));
-		Assert.assertEquals("fr", index.getGroupId("Luxembourg_europe"));
-		Assert.assertNull(index.getGroupId("Belgium_europe_2.obf"));
-		Assert.assertNull(index.getGroupId("Us_texas_northamerica_2.obf"));
+		SearchModLocales locales = new SearchModRules().locales();
+		Assert.assertEquals("fr", locales.groupForMap("Belgium_wallonia_europe_2.obf"));
+		Assert.assertEquals("nl", locales.groupForMap("/maps/Belgium_flanders_europe_2.obf"));
+		Assert.assertEquals("fr", locales.groupForMap("Luxembourg_europe"));
+		Assert.assertNull(locales.groupForMap("Belgium_europe_2.obf"));
 	}
 
 	@Test
 	public void mapWithoutGroupKeepsEveryWord() {
 		List<String> words = List.of("rue", "de", "la", "paix");
-		Assert.assertSame(words, index.getWordsToIndex("Us_texas_northamerica_2.obf", words));
+		Assert.assertSame(words, index.getWordsToIndex(null, null, words, false));
+	}
+
+	@Test
+	public void groupWithoutWordsKeepsEveryWord() {
+		Assert.assertEquals(List.of("rue", "de", "la", "paix"), keys("it", "rue", "de", "la", "paix"));
 	}
 
 	@Test
 	public void wordsOfOneFrequencyDoNotDropEachOther() throws IOException {
 		// two frequent words of zero frequency: each would be ten times rarer than the other
-		String data = "group\tfr\tfrance\nword\tfr\t2\t0\taaa\nword\tfr\t2\t0\tbbb\n";
+		String data = "word\tfr\t2\t0\taaa\nword\tfr\t2\t0\tbbb\n";
 		CommonWordsMultiIndex zero = CommonWordsMultiIndex.load(new ByteArrayInputStream(data.getBytes(StandardCharsets.UTF_8)));
-		Assert.assertEquals(List.of("aaa", "bbb"), zero.getWordsToIndex("France_europe_2.obf", List.of("aaa", "bbb")));
+		Assert.assertEquals(List.of("aaa", "bbb"), zero.getWordsToIndex("fr", null, List.of("aaa", "bbb"), false));
 	}
 
 	@Test
 	public void randomNamesOfRealWords() throws IOException {
 		CommonWordsMultiIndex real = CommonWordsMultiIndex.getInstance();
+		SearchModLocales locales = new SearchModRules().locales();
 		Map<String, Map<String, int[]>> groups = readRealWords();
 		Random random = new Random(5);
 		for (String map : GROUP_MAPS) {
-			String group = real.getGroupId(map);
+			String group = locales.groupForMap(map);
 			Assert.assertNotNull(map, group);
 			Map<String, int[]> words = groups.get(group);
 			Assert.assertNotNull(group, words);
@@ -149,9 +156,9 @@ public class CommonWordsMultiIndexTest {
 					List<String> pool = pick < 3 ? byClass.get(pick) : null;
 					name.add(pool == null || pool.isEmpty() ? extra[random.nextInt(extra.length)] : pool.get(random.nextInt(pool.size())));
 				}
-				List<String> keys = real.getWordsToIndex(map, name);
+				List<String> keys = real.getWordsToIndex(group, null, name, false);
 				Assert.assertEquals(map + " " + name, expectedKeys(name, words), keys);
-				Assert.assertEquals(map + " " + name, name, real.getWordsToIndex(map, name, true));
+				Assert.assertEquals(map + " " + name, name, real.getWordsToIndex(group, null, name, true));
 			}
 		}
 	}

@@ -2,9 +2,20 @@ package net.osmand.obf.preparation;
 
 import static org.junit.Assert.assertEquals;
 
+import org.junit.BeforeClass;
 import org.junit.Test;
 
+import net.osmand.search.rules.SearchModRules;
+
+/** {@code <unglue>} of the base rules (rules.xml) as the OBF writer applies them to a name */
 public class UnglueNameTest {
+
+	private static final AlternativeNameIndexGenerator<Object> generator = new AlternativeNameIndexGenerator<>(null);
+
+	@BeforeClass
+	public static void setUp() {
+		generator.setRules(new SearchModRules().rules(""));
+	}
 
 	@Test
 	public void letterBeforeWord() {
@@ -100,6 +111,6 @@ public class UnglueNameTest {
 	}
 
 	private static void check(String name, String expected) {
-		assertEquals(name, expected, new AlternativeNameIndexGenerator<>(null).new UnglueRule().alternativeName(name, null, null));
+		assertEquals(name, expected, generator.alternativeName(name));
 	}
 }
