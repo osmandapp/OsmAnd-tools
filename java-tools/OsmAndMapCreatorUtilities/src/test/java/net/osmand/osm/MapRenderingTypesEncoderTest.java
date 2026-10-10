@@ -1,9 +1,11 @@
 package net.osmand.osm;
 
+import net.osmand.osm.edit.Entity.EntityType;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -29,6 +31,28 @@ public class MapRenderingTypesEncoderTest {
             actual = this.mapRenderingTypesEncoder.transformOsmcAndColorTags(tags);
             assertEquals(actual, resultTagsList.get(tagsList.indexOf(tags)));
         }
+    }
+
+    @Test
+    public void testPoiTransformIsNotOverwrittenByBuildingTransform() {
+        // way 364945549: the church tag is turned into building=christian_church, building=apartments must not replace it
+        Map<String, String> tags = new LinkedHashMap<>();
+        tags.put("amenity", "place_of_worship");
+        tags.put("building", "apartments");
+        tags.put("religion", "christian");
+        Map<String, String> poi = mapRenderingTypesEncoder.transformTags(tags, EntityType.WAY,
+                MapRenderingTypesEncoder.EntityConvertApplyType.POI);
+        assertEquals("christian_church", poi.get("building"));
+        Map<String, String> map = mapRenderingTypesEncoder.transformTags(tags, EntityType.WAY,
+                MapRenderingTypesEncoder.EntityConvertApplyType.MAP);
+        assertEquals("residential", map.get("building"));
+
+        // way 185793313: historic=building -> building=yes must not replace it either
+        tags.put("building", "church");
+        tags.put("historic", "building");
+        tags.put("denomination", "lutheran");
+        poi = mapRenderingTypesEncoder.transformTags(tags, EntityType.WAY, MapRenderingTypesEncoder.EntityConvertApplyType.POI);
+        assertEquals("lutheran_church", poi.get("building"));
     }
 
     private void createTransformOsmcCaseList() {

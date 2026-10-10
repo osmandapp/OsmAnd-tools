@@ -366,8 +366,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		Map<String, String> rtags = new LinkedHashMap<String, String>(tags);
 		if (listToTransform != null) {
+			Set<String> poiOnlyTags = new HashSet<>();
 			for (EntityConvert ec : listToTransform) {
-				applyTagTransforms(rtags, ec, tags);
+				applyTagTransforms(rtags, ec, tags, poiOnlyTags);
 			}
 		}
 		if (listToCombine != null) {
@@ -906,24 +907,28 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 	}
 
 
-	private void applyTagTransforms(Map<String, String> resultTags, EntityConvert ec, Map<String, String> originalTags) {
-		applyTagTransforms(resultTags, ec, originalTags, "");
+	private void applyTagTransforms(Map<String, String> resultTags, EntityConvert ec, Map<String, String> originalTags,
+	                                Set<String> poiOnlyTags) {
+		applyTagTransforms(resultTags, ec, originalTags, "", poiOnlyTags);
 		if (ec.lang) {
 			for (String lang : langs) {
-				applyTagTransforms(resultTags, ec, originalTags, lang);
+				applyTagTransforms(resultTags, ec, originalTags, lang, poiOnlyTags);
 			}
-			applyTagTransforms(resultTags, ec, originalTags, "en");
+			applyTagTransforms(resultTags, ec, originalTags, "en", poiOnlyTags);
 		}
 	}
 
+	// a tag written by a POI-only transform (map="no") is kept by the other transforms:
+	// amenity=place_of_worship + religion=christian -> building=christian_church on building=apartments / historic=building
 	private void applyTagTransforms(Map<String, String> tags, EntityConvert ec, Map<String, String> originaltags,
-	                                String lang) {
+	                                String lang, Set<String> poiOnlyTags) {
 		String langSuffix = lang.isEmpty() ? "" : ":" + lang;
 		String fromTag = ec.fromTag.tag + langSuffix;
 		String fromValue = originaltags.get(fromTag);
-		if (tags.remove(fromTag) == null) {
+		if (poiOnlyTags.contains(fromTag) || tags.remove(fromTag) == null) {
 			return;
 		}
+		boolean poiOnly = !ec.applyToType.contains(EntityConvertApplyType.MAP);
 		for (TagValuePattern ift : ec.toTags) {
 			String vl = ift.value;
 			if (vl == null) {
@@ -932,10 +937,19 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			vl = processSubstr(ift, vl);
 			if (ift.tagPrefix != null) {
 				for (String vlSplit : fromValue.split(";")) {
-					tags.put(ift.tagPrefix + vlSplit.trim(), vl);
+					putTransformed(tags, ift.tagPrefix + vlSplit.trim(), vl, poiOnly, poiOnlyTags);
 				}
 			} else {
-				tags.put(ift.tag + langSuffix, vl);
+				putTransformed(tags, ift.tag + langSuffix, vl, poiOnly, poiOnlyTags);
+			}
+		}
+	}
+
+	private void putTransformed(Map<String, String> tags, String tag, String value, boolean poiOnly, Set<String> poiOnlyTags) {
+		if (!poiOnlyTags.contains(tag)) {
+			tags.put(tag, value);
+			if (poiOnly) {
+				poiOnlyTags.add(tag);
 			}
 		}
 	}
