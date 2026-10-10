@@ -1,6 +1,5 @@
 package net.osmand.obf.preparation;
 
-import net.osmand.binary.Abbreviations;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
@@ -37,7 +36,6 @@ public class IndexCreationContext {
     public OsmandRegions allRegions;
     public boolean basemap;
 
-    private boolean decryptAbbreviations = false;
     private boolean translitJapaneseNames = false;
 	private boolean translitChineseNames = false;
 	private final IndexCreator indexCreator;
@@ -127,29 +125,6 @@ public class IndexCreationContext {
 		return regionsFinalFile;
 	}
 
-    private static String getRegionLang(OsmandRegions osmandRegions, String regionName) {
-		if (osmandRegions == null) {
-			return null;
-		}
-        WorldRegion wr = osmandRegions.getRegionDataByDownloadName(regionName);
-        if (wr != null) {
-            return wr.getParams().getRegionLang();
-        } else {
-            return null;
-        }
-    }
-
-    private static boolean needDecryptAbbreviations(String regionLang) {
-        if (regionLang != null) {
-            String[] langArr = regionLang.split(",");
-            for (String lang : langArr) {
-                if (lang.equals("en")) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
 
 	public void translitJapaneseNames(Entity e) {
 		if (needTranslitName(e, e.getTags(), translitJapaneseNames, JAPANESE)) {
@@ -195,26 +170,6 @@ public class IndexCreationContext {
 			}
 		}
 		return false;
-	}
-
-	public String decryptAbbreviations(String name, LatLon loc, boolean addRegionTag) {
-		boolean upd = false;
-		if (decryptAbbreviations) {
-			upd = true;
-		} else if (addRegionTag && loc != null) {
-			Set<String> dwNames = calcDownloadNames(null, false, allRegions,
-					new QuadRect(loc.getLongitude(), loc.getLatitude(), loc.getLongitude(), loc.getLatitude()));
-			for (String dwName : dwNames) {
-				if (needDecryptAbbreviations(getRegionLang(allRegions, dwName))) {
-					upd = true;
-					break;
-				}
-			}
-		}
-		if(upd) {
-			name = Abbreviations.replaceAll(name);
-		}
-		return name;
 	}
 
 	public Set<String> calcRegionTag(Entity entity, boolean add) {
