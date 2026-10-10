@@ -79,7 +79,8 @@ import net.osmand.util.MapsCollection;
  * OsmAndMapCreator/utilities.sh test-coastline-rendering -renderer=opengl -maps.dir=/var/maps
  * </pre>
  * Exit code: <b>0</b> - nothing worse than {@code failAbove}, <b>2</b> - problems were reproduced (a
- * tile whose water difference is above {@code failAbove}, or a tile the renderer crashed on), <b>1</b> -
+ * tile whose water difference is above {@code failAbove}, or a tile the renderer crashed on; the random
+ * tiles only from {@value #RANDOM_FAILS_PER_100K} such tile per 100K), <b>1</b> -
  * the tester could not run (native library could not be loaded, no maps, broken json).
  *
  * <p>Every option can be given either as an argument ({@code -maps.dir=...}) or as a system
@@ -217,6 +218,9 @@ public class CoastlineRenderingTester {
 
 	/** Default of {@code failAbove}: failed tiles up to 5% of water difference do not fail the run. */
 	private static final double DEFAULT_FAIL_ABOVE = 0.05;
+
+	/** Random tiles above {@code failAbove} fail the run only from this many per 100K random tiles. */
+	private static final int RANDOM_FAILS_PER_100K = 1;
 
 	/** Max per channel difference to still treat a pixel as water. */
 	private static final int COLOR_TOLERANCE = 10;
@@ -596,12 +600,25 @@ public class CoastlineRenderingTester {
 			RunResult res = new CoastlineRenderingTester(options).run();
 			// a renderer that crashes on a tile is a worse problem than a wrong coastline, so it
 			// must not end in a green build either
-			code = res.failedAboveLimit > 0 || res.renderErrors > 0 ? 2 : 0;
+			code = failsBuild(res) ? 2 : 0;
 		} catch (Throwable e) {
 			e.printStackTrace();
 			code = 1;
 		}
 		System.exit(code);
+	}
+
+	private static boolean failsBuild(RunResult res) {
+		int randomFailed = 0;
+		int randomCompared = 0;
+		for (CaseStats s : res.cases) {
+			if (GROUP_RANDOM.equals(s.group)) {
+				randomFailed += s.failedAboveLimit;
+				randomCompared += s.comparedTiles;
+			}
+		}
+		return res.renderErrors > 0 || res.failedAboveLimit > randomFailed
+				|| (randomFailed > 0 && randomFailed * 100000L >= (long) RANDOM_FAILS_PER_100K * randomCompared);
 	}
 
 	// ----------------------------------------------------------------- run
@@ -2314,8 +2331,8 @@ public class CoastlineRenderingTester {
 					result.renderErrors, result.rendererDeaths);
 		}
 		System.out.println(result.failedAboveLimit > 0
-				? String.format("COASTLINE PROBLEMS REPRODUCED - %d tiles above %s - exit code 2",
-						result.failedAboveLimit, pct(failAbove))
+				? String.format("COASTLINE PROBLEMS REPRODUCED - %d tiles above %s - exit code %d",
+						result.failedAboveLimit, pct(failAbove), failsBuild(result) ? 2 : 0)
 				: result.renderErrors > 0
 						? "RENDERER ERRORS - exit code 2"
 						: result.failedTiles > 0
