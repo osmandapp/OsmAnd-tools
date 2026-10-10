@@ -297,7 +297,9 @@ public class NameIndexCreator<T> {
 			}
 		});
 		for (Map.Entry<String, Integer> e : tokenFrequencies.entrySet()) {
-			if (!e.getKey().startsWith(NameIndexReader.POI_CATEGORY_PREFIX)) {
+			// the marker of a rule spelling is in the table anyway: it takes no place of a word among the most frequent
+			if (!e.getKey().startsWith(NameIndexReader.POI_CATEGORY_PREFIX)
+					&& !NameIndexReader.RULE_SPELLING_COMMON.equals(e.getKey())) {
 				queue.add(e.getKey());
 				if (queue.size() > maxSize) {
 					queue.poll();
