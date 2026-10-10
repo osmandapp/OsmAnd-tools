@@ -576,7 +576,6 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 		name = name.trim();
 		name = name.replace("’", "'");
-		name = icc.decryptAbbreviations(name, location, settings.addRegionTag);
 
 		if (normalizeStreets) {
 			String newName = name;
