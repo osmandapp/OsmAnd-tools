@@ -114,6 +114,9 @@ import net.osmand.util.MapsCollection;
  * outside the range, so a slow run can be split into parts that add up to the whole one -
  * {@code -minzoom=1 -maxzoom=6} and {@code -minzoom=7} together are the full run. {@code -random}
  * runs that part alone;</li>
+ * <li>{@code rerunFailed} - {@code true} checks only the tiles that failed in the previous run, listed by it
+ * in {@code <out>/}{@value #FAILED_TILES_FILE}, plus {@value #RERUN_RANDOM_FACTOR} times as many random
+ * tiles to catch regressions;</li>
  * <li>{@code scan}, {@code minzoom}, {@code maxzoom}, {@code bbox} - scan every tile of a zoom
  * range instead of the cases; {@code bbox} is {@code leftLon,bottomLat,rightLon,topLat} and
  * defaults to the whole world;</li>
@@ -262,6 +265,11 @@ public class CoastlineRenderingTester {
 
 	static final String GROUP_FIXED = "Fixed cases of coastline-tests.json";
 	static final String GROUP_RANDOM = "Random tiles";
+
+	/** Failed tiles of a run, one {@code z/x/y} per line - what {@code -rerunFailed} checks again. */
+	private static final String FAILED_TILES_FILE = "failed-tiles.txt";
+	/** {@code -rerunFailed} adds this many random tiles per failed tile. */
+	private static final int RERUN_RANDOM_FACTOR = 10;
 	static final String GROUP_SCAN = "Full scan";
 
 	/** {@code renderer} - the legacy native renderer (v1) and the OpenGL core renderer (v2). */
@@ -689,6 +697,7 @@ public class CoastlineRenderingTester {
 		result.durationMs = System.currentTimeMillis() - start;
 		printSummary(result);
 		writeSummaryJson(result);
+		writeFailedTiles();
 		if (writeHtml) {
 			writeHtmlReport(result);
 		}
@@ -857,10 +866,21 @@ public class CoastlineRenderingTester {
 		}
 	}
 
-	private List<CaseDef> selectCases() {
+	private List<CaseDef> selectCases() throws IOException {
 		int randomTiles = Integer.parseInt(opt("randomTilesK", String.valueOf(DEFAULT_RANDOM_TILES_K))) * 1000;
 		if (Boolean.parseBoolean(opt("random", "false"))) {
 			return new ArrayList<>(Collections.singletonList(randomCase(randomTiles)));
+		}
+		if (Boolean.parseBoolean(opt("rerunFailed", "false"))) {
+			CaseDef failed = new CaseDef();
+			failed.issue = 3291;
+			failed.title = "Failed tiles of the previous run";
+			failed.group = GROUP_RANDOM;
+			failed.maxExtraWater = Double.parseDouble(opt("maxExtraWater", "0.02"));
+			failed.maxMissingWater = Double.parseDouble(opt("maxMissingWater", "0.02"));
+			failed.tiles = readFailedTiles();
+			System.out.printf("Rerun         : %d failed tiles of the previous run%n", failed.tiles.size());
+			return new ArrayList<>(Arrays.asList(failed, randomCase(failed.tiles.size() * RERUN_RANDOM_FACTOR)));
 		}
 		if (Boolean.parseBoolean(opt("scan", "false"))) {
 			CaseDef scan = new CaseDef();
@@ -2347,6 +2367,31 @@ public class CoastlineRenderingTester {
 
 	private void writeSummaryJson(RunResult result) throws IOException {
 		writeSummaryJson(result, false);
+	}
+
+	private void writeFailedTiles() throws IOException {
+		StringBuilder sb = new StringBuilder();
+		for (TileResult t : reported) {
+			if (!t.ok() && !t.staleReference) {
+				sb.append(t.zoom).append('/').append(t.x).append('/').append(t.y).append('\n');
+			}
+		}
+		Files.write(new File(outputDir, FAILED_TILES_FILE).toPath(), sb.toString().getBytes(StandardCharsets.UTF_8));
+	}
+
+	private List<int[]> readFailedTiles() throws IOException {
+		File f = new File(outputDir, FAILED_TILES_FILE);
+		if (!f.exists()) {
+			throw new IllegalStateException("-rerunFailed needs " + f + " of a previous run");
+		}
+		List<int[]> tiles = new ArrayList<>();
+		for (String line : Files.readAllLines(f.toPath(), StandardCharsets.UTF_8)) {
+			String[] zxy = line.trim().split("/");
+			if (zxy.length == 3) {
+				tiles.add(new int[] { Integer.parseInt(zxy[0]), Integer.parseInt(zxy[1]), Integer.parseInt(zxy[2]) });
+			}
+		}
+		return tiles;
 	}
 
 	private void writeSummaryJson(RunResult result, boolean quiet) throws IOException {
