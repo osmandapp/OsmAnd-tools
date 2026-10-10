@@ -555,6 +555,12 @@ public class NameIndexCreator<T> {
 		return SearchModRuleOwner.LOCALITY;
 	}
 
+	// a marker of the index (NameIndexReader.isIndexMarker) in a name: a word of the common words table, never a key
+	void addMarkerWord(String marker) {
+		tokenFrequencies.compute(marker, (t, u) -> u == null ? 1 : u + 1);
+		commonNonIndexedFrequencies.compute(marker, (t, u) -> u == null ? 1 : u + 1);
+	}
+
 	// a word of the common words table that is not a key: the other words of a name refer to it
 	void addTableWord(String token) {
 		notKeyWords.add(token);

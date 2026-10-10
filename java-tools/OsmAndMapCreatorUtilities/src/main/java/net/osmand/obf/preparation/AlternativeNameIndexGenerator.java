@@ -82,48 +82,73 @@ public class AlternativeNameIndexGenerator<T> {
 	// so the alternative words refer to it and stay with that variant
 	public void addAlternativeNames(String name, String lang, T obj, SearchModRuleOwner owner, int maxPrefixLength) {
 		String unglued = alternativeName(name);
-		List<String> nameWords = null;
+		Map<String, String> alternatives = ruleAlternatives(name, lang, owner);
+		if (unglued == null && alternatives.isEmpty()) {
+			return;
+		}
+		List<String> nameWords = SearchAlgorithms.splitAndNormalize(name, false);
+		Set<String> nameKeys = nameIndex.nameKeys(name, obj);
 		if (unglued != null) {
-			nameWords = SearchAlgorithms.splitAndNormalize(name, false);
 			addUnglued(nameWords, unglued, obj, maxPrefixLength);
 		}
-		Map<String, String> alternatives = ruleAlternatives(name, lang, owner);
-		if (!alternatives.isEmpty()) {
-			if (nameWords == null) {
-				nameWords = SearchAlgorithms.splitAndNormalize(name, false);
-			}
-			Set<String> nameKeys = nameIndex.nameKeys(name, obj);
-			for (Map.Entry<String, String> e : alternatives.entrySet()) {
-				addRuleAlternative(nameWords, nameKeys, e.getValue(), obj, maxPrefixLength,
-						ruleStats.computeIfAbsent(e.getKey(), k -> new int[3]));
-			}
+		for (Map.Entry<String, String> e : alternatives.entrySet()) {
+			addRuleAlternative(nameWords, nameKeys, e.getValue(), obj, maxPrefixLength,
+					ruleStats.computeIfAbsent(e.getKey(), k -> new int[3]));
 		}
 	}
 
+	// words of an alternative name and the marker that tells the search it is a spelling made by a rule
+	private List<String> spellingWords(String alternative) {
+		List<String> words = SearchAlgorithms.splitAndNormalize(alternative, false);
+		words.add(NameIndexReader.RULE_SPELLING_COMMON);
+		nameIndex.addMarkerWord(NameIndexReader.RULE_SPELLING_COMMON);
+		return words;
+	}
+
+	// every new word of an unglued name is a key; an unglued name without new words ("Пасхи" of "о. Пасхи") is not
+	// stored: app versions that do not know the marker would take it for the name and lose the dropped word
 	private void addUnglued(List<String> nameWords, String alternative, T obj, int maxPrefixLength) {
-		List<String> alternativeWords = SearchAlgorithms.splitAndNormalize(alternative, false);
-		for (String word : new TreeSet<>(alternativeWords)) {
+		List<String> alternativeWords = null;
+		for (String word : new TreeSet<>(SearchAlgorithms.splitAndNormalize(alternative, false))) {
 			String prefix = NameIndexCreator.nameIndexPreparePrefix(word, maxPrefixLength);
 			if (nameWords.contains(word) || Algorithms.isEmpty(prefix)) {
 				continue;
+			}
+			if (alternativeWords == null) {
+				alternativeWords = spellingWords(alternative);
 			}
 			nameIndex.addAlternativeToken(prefix, obj, word, alternativeWords);
 		}
 	}
 
+	// one more name of the object under the keys of the name that the alternative name shares; false when it shares none
+	private boolean addUnderNameKeys(List<String> nameWords, Set<String> nameKeys, List<String> alternativeWords, T obj,
+			int maxPrefixLength) {
+		boolean shared = false;
+		for (String key : new TreeSet<>(alternativeWords)) {
+			String prefix = NameIndexCreator.nameIndexPreparePrefix(key, maxPrefixLength);
+			if (nameWords.contains(key) && (nameKeys == null || nameKeys.contains(key)) && !Algorithms.isEmpty(prefix)
+					&& !NameIndexReader.isIndexMarker(key)) {
+				nameIndex.addAlternativeToken(prefix, obj, key, alternativeWords);
+				shared = true;
+			}
+		}
+		return shared;
+	}
+
 	/**
-	 * A new word of the alternative name is a key, except a word that replaced one word of the name the statistics did
-	 * not keep as a key ("ave" of "Forest Avenue" where "avenue" is a service word): it would make a key of every such
-	 * name. That word is attached: the alternative name is one more name of the object under the keys of the name it
-	 * shares, so the search still reads it ("Forest Ave"); without a shared key the attached words are keys.
+	 * A new word of the alternative name is a key, except a word that replaced a word the statistics did not keep as a
+	 * key ("ave" of "Forest Avenue" where "avenue" is a service word): it would make a key of every such name. That word
+	 * is attached: the alternative name is one more name of the object under the keys of the name it shares, so the
+	 * search still reads it ("Forest Ave"); without a shared key the attached words are keys.
 	 *
 	 * @param nameKeys keys of the name, null when every word is a key
 	 * @param stats    alternative names, new keys, attached words of the rule
 	 */
 	private void addRuleAlternative(List<String> nameWords, Set<String> nameKeys, String alternative, T obj,
 			int maxPrefixLength, int[] stats) {
-		List<String> alternativeWords = SearchAlgorithms.splitAndNormalize(alternative, false);
-		Map<String, String> replaced = replacedWords(nameWords, alternativeWords);
+		List<String> alternativeWords = spellingWords(alternative);
+		Map<String, String> replaced = replacedWords(nameWords, SearchAlgorithms.splitAndNormalize(alternative, false));
 		List<String> attached = new ArrayList<>();
 		stats[0]++;
 		for (String word : new TreeSet<>(alternativeWords)) {
@@ -142,14 +167,7 @@ public class AlternativeNameIndexGenerator<T> {
 		if (attached.isEmpty()) {
 			return;
 		}
-		boolean shared = false;
-		for (String key : new TreeSet<>(alternativeWords)) {
-			String prefix = NameIndexCreator.nameIndexPreparePrefix(key, maxPrefixLength);
-			if (nameWords.contains(key) && (nameKeys == null || nameKeys.contains(key)) && !Algorithms.isEmpty(prefix)) {
-				nameIndex.addAlternativeToken(prefix, obj, key, alternativeWords);
-				shared = true;
-			}
-		}
+		boolean shared = addUnderNameKeys(nameWords, nameKeys, alternativeWords, obj, maxPrefixLength);
 		for (String word : attached) {
 			if (shared) {
 				nameIndex.addTableWord(word);
