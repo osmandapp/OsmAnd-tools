@@ -14,6 +14,7 @@ import java.util.Map;
 
 import static net.osmand.server.WebSecurityConfiguration.ROLE_ADMIN;
 import static net.osmand.server.WebSecurityConfiguration.ROLE_SUPPORT;
+import static net.osmand.server.WebSecurityConfiguration.ROLE_TEAM;
 
 @Component
 public class WebAccessConfig {
@@ -32,6 +33,8 @@ public class WebAccessConfig {
 				ROLE_ADMIN, om.convertValue(r.get("admin"), new TypeReference<>() {
 				}),
 				ROLE_SUPPORT, om.convertValue(r.get("support"), new TypeReference<>() {
+				}),
+				ROLE_TEAM, om.convertValue(r.get("team"), new TypeReference<>() {
 				})
 		);
 	}
@@ -46,5 +49,9 @@ public class WebAccessConfig {
 
 	public List<String> getSupport() {
 		return roles.getOrDefault(ROLE_SUPPORT, List.of());
+	}
+
+	public List<String> getTeam() {
+		return roles.getOrDefault(ROLE_TEAM, List.of());
 	}
 }
