@@ -64,7 +64,6 @@ public class SearchTestRepositoryConfiguration {
     // ddl-auto is validate: columns added to the entities after the db was created are added here, before validation
     private static final String[][] ADDED_COLUMNS = {
             {"run", "obf_path", "varchar(255)"},
-            {"test_case", "obf_path", "varchar(255)"},
     };
 
     private void addMissingColumns(DataSource ds) {

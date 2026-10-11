@@ -52,10 +52,6 @@ public interface SearchTestCaseRepository extends JpaRepository<TestCase, Long> 
 
 		@Column()
 		public Boolean spatial;
-
-		// server directory with the OBF files of the run, null = the server maps
-		@Column(name = "obf_path")
-		public String obfPath;
 		
 		// branch
 		@Column()

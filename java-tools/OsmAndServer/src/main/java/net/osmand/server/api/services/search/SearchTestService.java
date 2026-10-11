@@ -282,7 +282,8 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 		}, EXECUTOR);
 	}
 
-	public CompletableFuture<Run> runTestCase(Long caseId, RunParam payload, ClassicSearchService.SearchOption options) {
+	public CompletableFuture<Run> runTestCase(Long caseId, RunParam payload, String obfPath,
+			ClassicSearchService.SearchOption options) {
 		TestCase test = testCaseRepo.findById(caseId)
 				.orElseThrow(() -> new RuntimeException("Test-case not found with id: " + caseId));
 
@@ -318,7 +319,7 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 		test.skipFound = payload.skipFound;
 		run.spatial = payload.spatial;
 		test.spatial = payload.spatial;
-		String obfPath = payload.obfPath == null || payload.obfPath.isBlank() ? null : payload.obfPath.trim();
+		obfPath = obfPath == null || obfPath.isBlank() ? null : obfPath.trim();
 		if (obfPath != null && !Boolean.TRUE.equals(payload.spatial)) {
 			throw new RuntimeException("OBF directory is supported only for spatial runs");
 		}
@@ -326,7 +327,6 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 			throw new RuntimeException("OBF directory not found: " + obfPath);
 		}
 		run.obfPath = obfPath;
-		test.obfPath = obfPath;
 		run.shift = payload.shift;
 		test.shift = payload.shift;
 		run.setNorthWest(payload.getNorthWest());
