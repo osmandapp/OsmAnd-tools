@@ -535,7 +535,9 @@ public class McpSearch {
 		}
 		Map<String, String> tags = new LinkedHashMap<>();
 		for (AmenityTagsService.VisibleTag t : tagsService.convertToVisibleTags(raw, lang)) {
-			if (t.value() != null && !t.key().equals("name")) {
+			if (t.entries() != null) {
+				t.entries().forEach(e -> tags.put(e.key(), e.value()));
+			} else if (t.value() != null && !t.key().equals("name")) {
 				tags.put(t.key(), t.value());
 			}
 		}
