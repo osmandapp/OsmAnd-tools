@@ -75,6 +75,10 @@ public interface SearchTestRunRepository extends JpaRepository<Run, Long> {
 
 		@Column(name = "maps_count")
 		public Integer mapsCount;
+
+		// server directory with the OBF files of the run, null = the server maps
+		@Column(name = "obf_path")
+		public String obfPath;
 	}
 
 	@MappedSuperclass
