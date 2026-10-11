@@ -18,6 +18,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
@@ -206,6 +207,18 @@ public class UserdataService {
             .build();
 
     private record SecureEmailToken(String token, long nextAllowedAt) {
+    }
+
+    private static final int EMAIL_TOKEN_MAX_PER_SECOND = 5;
+    private static final Queue<Long> EMAIL_TOKEN_TIMES = new ConcurrentLinkedQueue<>();
+
+    private static boolean allowNewEmailToken(long now) {
+        EMAIL_TOKEN_TIMES.removeIf(t -> now - t >= 1000);
+        if (EMAIL_TOKEN_TIMES.size() >= EMAIL_TOKEN_MAX_PER_SECOND) {
+            return false;
+        }
+        EMAIL_TOKEN_TIMES.add(now);
+        return true;
     }
 
     private static class RequestData {
@@ -552,6 +565,10 @@ public class UserdataService {
         long now = System.currentTimeMillis();
         SecureEmailToken token = emailTokenRequests.getIfPresent(email);
         if (token == null || token.nextAllowedAt() <= now) {
+            if (!allowNewEmailToken(now)) {
+                LOG.error("email token rate exceeded (" + EmailSenderService.shorten(email) + ")");
+                throw new OsmAndPublicApiException(ERROR_CODE_TOKEN_IS_NOT_VALID_OR_EXPIRED, "Too many requests. Try again later.");
+            }
             // More emails issued tokens in the last hour increase the delay and token length.
             long users = emailTokenRequests.size();
             long delayMinutes = Math.min(EMAIL_TOKEN_MAX_DELAY_MINUTES, Math.max(EMAIL_TOKEN_MIN_DELAY_MINUTES,
