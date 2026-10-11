@@ -1,6 +1,7 @@
 package net.osmand.obf.preparation;
 
 import com.google.gson.Gson;
+import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.binary.ObfConstants;
 import net.osmand.data.Amenity;
@@ -79,6 +80,16 @@ public class IndexRouteRelationCreator {
 	public static final String ROUTE_ID_TAG = Amenity.ROUTE_ID;
 	public static final String ROUTE_TYPE = "route_type";
 	public static final String TRACK_COLOR = "track_color"; // Map-section tag
+	public static final String ROUTE_LANE = "route_lane"; // Map-section tag: parallel-lane index
+	public static final String ROUTE_LANE_END = "route_lane_end"; // lane at the far end, for ramps
+	public static final String ROUTE_LANE_SIDE = "route_lane_side"; // same order, stacked to one side
+
+	// A ramp slides the line sideways along its own length, so on a short connector the sideways
+	// move dominates and draws a spike instead of a transition. Such ways keep the lane of the
+	// bundle they belong to - dropping them onto the path instead tears the bundle apart mid-way -
+	// but the lane change is deferred to a longer piece.
+	private static final double MIN_LANE_LENGTH_M = 40.0;
+	public static final String ROUTE_SHARED_LANE = "route_shared_lane"; // lane shared with a look-alike
 	public static final String WPT_EXTRA_TAGS = "wpt_extra_tags"; // pass tags to WptPt using JSON
 
 	private static final String SHIELD_WAYCOLOR = "shield_waycolor"; // shield-specific
@@ -132,6 +143,16 @@ public class IndexRouteRelationCreator {
 
 	private final static NumberFormat distanceKmFormat = new DecimalFormat("0.0", new DecimalFormatSymbols(Locale.US));
 
+	// Lane assignment. Filled by a pre-pass over all route relations (collectRouteMembership) and
+	// used while emitting geometry, because a route's lane depends on which other routes share the
+	// very same way - knowledge a single relation does not have.
+	private final Map<Long, List<Long>> routesByWay = new LinkedHashMap<>();
+	private final Map<Long, String> appearanceByRoute = new LinkedHashMap<>();
+	private final Map<Long, long[]> endNodesByWay = new LinkedHashMap<>();
+	private Map<Long, Map<String, Integer>> laneByWay = null; // built lazily from the two above
+	private Map<Long, Map<String, Integer>> sideLaneByWay = null; // same ranking, stacked one side
+	private Map<Long, Boolean> forwardByWay = null; // orientation shared by every route on the way
+
 	private final Gson gson = new Gson();
 	private final int ICON_SEARCH_ZOOM = 19;
 	private final RenderingRulesStorage renderingRules;
@@ -171,6 +192,300 @@ public class IndexRouteRelationCreator {
 		net.osmand.shared.util.PlatformUtil.INSTANCE.initialize(new ToolsOsmAndContextImpl());
 	}
 
+	/**
+	 * Pre-pass over every route relation, recording which routes run over which way and what each
+	 * route looks like on the map. Must run before iterateRelation() emits any geometry.
+	 */
+	/**
+	 * Route types drawn as a coloured line next to each other, and therefore the only ones that
+	 * should take up a lane. A piste or horse route sharing a path is either drawn by different
+	 * rules or hidden behind a rendering property that is off by default; letting it occupy a lane
+	 * pushes the one visible route off its path with nothing beside it - measured on Krkonoše,
+	 * that was 14% of all ways carrying more than one route.
+	 */
+	private static final Set<String> LANE_ROUTE_TYPES =
+			Set.of("hiking", "foot", "walking", "running", "bicycle", "mtb");
+
+	/** -Dosmand.routeLanes=false turns lane assignment off entirely, for A/B against stock output. */
+	public static boolean isLaneAssignmentEnabled() {
+		return !"false".equals(System.getProperty("osmand.routeLanes"));
+	}
+
+	public void collectRouteMembership(Relation relation, OsmDbAccessorContext ctx) throws SQLException {
+		if (!isLaneAssignmentEnabled()) {
+			return;
+		}
+		if (!"route".equals(relation.getTag("type"))
+				|| !isSupportedRouteType(relation.getTag(Amenity.ROUTE))
+				|| !LANE_ROUTE_TYPES.contains(relation.getTag(Amenity.ROUTE))) {
+			return;
+		}
+		ctx.loadEntityRelation(relation); // members are not loaded for us
+		appearanceByRoute.put(relation.getId(), routeAppearance(relation.getTags()));
+		for (Relation.RelationMember member : relation.getMembers()) {
+			if (member.getEntityId() != null && member.getEntityId().getType() == Entity.EntityType.WAY) {
+				long wayId = member.getEntityId().getId();
+				routesByWay.computeIfAbsent(wayId, k -> new ArrayList<>()).add(relation.getId());
+				if (member.getEntity() instanceof Way way && way.getNodeIds().size() >= 2) {
+					TLongArrayList ids = way.getNodeIds();
+					endNodesByWay.put(wayId, new long[] { ids.get(0), ids.get(ids.size() - 1) });
+				}
+			}
+		}
+	}
+
+	/**
+	 * Assigns lanes per corridor instead of per way.
+	 * <p>
+	 * A corridor is a maximal set of ways that carry the same routes and hang together end to end.
+	 * Ranking route by route on each way separately makes a route hop sideways wherever the set of
+	 * its neighbours changes - measured on the High Tatras, a quarter of all routes took more than
+	 * one offset along their length, and one took four. Within a corridor the set is constant by
+	 * construction, so the lane cannot change; between corridors a route keeps the lane it already
+	 * had wherever that lane is still free, which is what stops the remaining hops at junctions.
+	 */
+	private void buildLanes() {
+		laneByWay = new LinkedHashMap<>();
+		sideLaneByWay = new LinkedHashMap<>();
+		forwardByWay = new LinkedHashMap<>();
+
+		// group ways by the set of routes on them, then split each group into connected corridors
+		Map<String, List<Long>> waysBySignature = new LinkedHashMap<>();
+		for (Map.Entry<Long, List<Long>> entry : routesByWay.entrySet()) {
+			waysBySignature.computeIfAbsent(signatureOf(entry.getValue()), k -> new ArrayList<>())
+					.add(entry.getKey());
+		}
+
+		List<List<Long>> corridors = new ArrayList<>();
+		for (List<Long> group : waysBySignature.values()) {
+			corridors.addAll(splitIntoConnected(group));
+		}
+		// largest first: long trails claim their lane before short spurs do
+		corridors.sort((a, b) -> b.size() - a.size());
+
+		for (List<Long> corridor : corridors) {
+			List<String> present = appearancesOn(corridor.get(0));
+			Map<String, Integer> assigned = new LinkedHashMap<>();
+			// Centred on the path: 2*index-(n-1), so a lone route is at 0 and a bundle straddles
+			// the path evenly. Where the lane changes between corridors the renderer slides the
+			// line across instead of jumping, so recentring costs nothing visually now.
+			Map<String, Integer> stacked = new LinkedHashMap<>();
+			for (int index = 0; index < present.size(); index++) {
+				assigned.put(present.get(index), 2 * index - (present.size() - 1));
+				stacked.put(present.get(index), index);
+			}
+			for (Long wayId : corridor) {
+				laneByWay.put(wayId, assigned);
+				sideLaneByWay.put(wayId, stacked);
+			}
+			orientCorridor(corridor);
+		}
+	}
+
+	/**
+	 * Picks one direction for a whole corridor and records, per way, whether its own node order
+	 * already follows it. The renderer takes the offset side from the direction of the geometry it
+	 * draws, and 21% of consecutive member ways in OSM are stored reversed relative to their
+	 * neighbour - without a shared orientation the line jumps to the other side of the path at
+	 * every one of those joints, which is what made the one-sided mode unusable.
+	 */
+	private void orientCorridor(List<Long> corridor) {
+		Map<Long, List<Long>> waysByNode = new LinkedHashMap<>();
+		for (Long wayId : corridor) {
+			long[] ends = endNodesByWay.get(wayId);
+			if (ends != null) {
+				waysByNode.computeIfAbsent(ends[0], k -> new ArrayList<>()).add(wayId);
+				waysByNode.computeIfAbsent(ends[1], k -> new ArrayList<>()).add(wayId);
+			}
+		}
+		Set<Long> visited = new HashSet<>();
+		for (Long start : corridor) {
+			if (!visited.add(start) || !endNodesByWay.containsKey(start)) {
+				continue;
+			}
+			forwardByWay.put(start, Boolean.TRUE);
+			Deque<Long> queue = new ArrayDeque<>();
+			queue.add(start);
+			while (!queue.isEmpty()) {
+				Long wayId = queue.poll();
+				long[] ends = endNodesByWay.get(wayId);
+				boolean forward = forwardByWay.getOrDefault(wayId, Boolean.TRUE);
+				long head = forward ? ends[0] : ends[1];
+				long tail = forward ? ends[1] : ends[0];
+				for (long node : new long[] { head, tail }) {
+					for (Long other : waysByNode.getOrDefault(node, Collections.emptyList())) {
+						long[] otherEnds = endNodesByWay.get(other);
+						if (otherEnds == null || !visited.add(other)) {
+							continue;
+						}
+						// keep its own order when it continues the corridor, flip it otherwise
+						boolean sameDirection = (node == tail && otherEnds[0] == node)
+								|| (node == head && otherEnds[1] == node);
+						forwardByWay.put(other, sameDirection);
+						queue.add(other);
+					}
+				}
+			}
+		}
+	}
+
+	/** Ways too short to carry a visible offset without turning into a sideways stub. */
+	private static boolean isTooShortForLane(Way way) {
+		List<Node> nodes = way.getNodes();
+		if (nodes.size() < 2) {
+			return true;
+		}
+		double length = 0;
+		for (int i = 1; i < nodes.size(); i++) {
+			length += MapUtils.getDistance(nodes.get(i - 1).getLatLon(), nodes.get(i).getLatLon());
+			if (length >= MIN_LANE_LENGTH_M) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/** True when the way should be emitted in its own node order for lanes to line up. */
+	private boolean isForwardOnWay(long wayId) {
+		if (laneByWay == null) {
+			buildLanes();
+		}
+		return forwardByWay.getOrDefault(wayId, Boolean.TRUE);
+	}
+
+	/** A copy of the way with its geometry reversed; tags and id are kept. */
+	private static Way reversedWay(Way way) {
+		List<Node> nodes = new ArrayList<>(way.getNodes());
+		Collections.reverse(nodes);
+		Way copy = new Way(way.getId(), nodes);
+		copy.replaceTags(way.getTags());
+		return copy;
+	}
+
+	private String signatureOf(List<Long> routeIds) {
+		return new TreeSet<>(routeIds).toString();
+	}
+
+	/** Distinct appearances on a way, ordered by relation id so builds agree. */
+	private List<String> appearancesOn(long wayId) {
+		List<String> distinct = new ArrayList<>();
+		for (Long id : new TreeSet<>(routesByWay.getOrDefault(wayId, Collections.emptyList()))) {
+			String appearance = appearanceByRoute.get(id);
+			if (appearance != null && !distinct.contains(appearance)) {
+				distinct.add(appearance);
+			}
+		}
+		return distinct;
+	}
+
+	/** Splits ways carrying the same routes into pieces that actually touch each other. */
+	private List<List<Long>> splitIntoConnected(List<Long> ways) {
+		Map<Long, List<Long>> waysByNode = new LinkedHashMap<>();
+		for (Long wayId : ways) {
+			long[] ends = endNodesByWay.get(wayId);
+			if (ends != null) {
+				waysByNode.computeIfAbsent(ends[0], k -> new ArrayList<>()).add(wayId);
+				waysByNode.computeIfAbsent(ends[1], k -> new ArrayList<>()).add(wayId);
+			}
+		}
+		List<List<Long>> components = new ArrayList<>();
+		Set<Long> seen = new HashSet<>();
+		for (Long start : ways) {
+			if (!seen.add(start)) {
+				continue;
+			}
+			List<Long> component = new ArrayList<>();
+			Deque<Long> queue = new ArrayDeque<>();
+			queue.add(start);
+			while (!queue.isEmpty()) {
+				Long wayId = queue.poll();
+				component.add(wayId);
+				long[] ends = endNodesByWay.get(wayId);
+				if (ends == null) {
+					continue;
+				}
+				for (long node : ends) {
+					for (Long neighbour : waysByNode.getOrDefault(node, Collections.emptyList())) {
+						if (seen.add(neighbour)) {
+							queue.add(neighbour);
+						}
+					}
+				}
+			}
+			components.add(component);
+		}
+		return components;
+	}
+
+	/**
+	 * How the route will be drawn. Routes agreeing on this are indistinguishable on the map unless
+	 * they carry different shields, so they share one lane instead of being drawn twice.
+	 */
+	private static String routeAppearance(Map<String, String> tags) {
+		String symbol = tags.get(OSMC_SYMBOL);
+		String color = symbol != null ? symbol.split(":")[0].trim()
+				: Algorithms.isEmpty(tags.get(COLOUR)) ? tags.get(COLOR) : tags.get(COLOUR);
+		String route = tags.get(Amenity.ROUTE);
+		String group = "bicycle".equals(route) || "mtb".equals(route) ? "cycling" : "foot";
+		return group + "|" + (color == null ? "" : color.toLowerCase());
+	}
+
+	/**
+	 * Lane of this route on this way: its rank among the distinct appearances present, ordered by
+	 * relation id so the result is stable between builds.
+	 * <p>
+	 * Lanes grow to one side instead of being centred on the path. Centring looks tidier on a
+	 * single way but recentres wherever the number of routes changes, so a route hops sideways at
+	 * every way boundary - measured on Krkonoše, one blue route took lanes +1, +2, +4, -1, -2 and
+	 * -3 along one trail. Ranking from a fixed side keeps a route still unless the set of
+	 * lower-ranked routes beside it actually changes, and leaves a solitary route on its path.
+	 * <p>
+	 * The renderer derives the offset side from the geometry direction, so the index is relative to
+	 * the way's own node order and the way must not be reversed when emitted.
+	 */
+	private int laneOnWay(long wayId, long relationId) {
+		List<Long> routes = routesByWay.get(wayId);
+		if (routes == null || routes.size() < 2) {
+			return 0;
+		}
+		if (laneByWay == null) {
+			buildLanes();
+		}
+		Map<String, Integer> lanes = laneByWay.get(wayId);
+		Integer lane = lanes == null ? null : lanes.get(appearanceByRoute.get(relationId));
+		return lane == null ? 0 : lane;
+	}
+
+	/** More than one route of the same appearance here, so the lane stands for several routes. */
+	/** Same order as the centred lane, but stacked to one side of the path, 0 being on it. */
+	private int sideLaneOnWay(long wayId, long relationId) {
+		List<Long> routes = routesByWay.get(wayId);
+		if (routes == null || routes.size() < 2) {
+			return 0;
+		}
+		if (laneByWay == null) {
+			buildLanes();
+		}
+		Map<String, Integer> lanes = sideLaneByWay.get(wayId);
+		Integer lane = lanes == null ? null : lanes.get(appearanceByRoute.get(relationId));
+		return lane == null ? 0 : lane;
+	}
+
+	private boolean sharedLaneOnWay(long wayId, long relationId) {
+		List<Long> routes = routesByWay.get(wayId);
+		if (routes == null || routes.size() < 2) {
+			return false;
+		}
+		String own = appearanceByRoute.get(relationId);
+		int sameLooking = 0;
+		for (Long id : routes) {
+			if (own != null && own.equals(appearanceByRoute.get(id))) {
+				sameLooking++;
+			}
+		}
+		return sameLooking > 1;
+	}
+
 	public void iterateRelation(Relation relation, OsmDbAccessorContext ctx, IndexCreationContext icc)
 			throws SQLException {
 		if (!isSupportedRouteType(relation.getTag(Amenity.ROUTE))) {
@@ -192,14 +507,15 @@ public class IndexRouteRelationCreator {
 
 			int hash = getRelationHash(relation);
 			if (hash == -1) {
-				log.error(String.format("Route relation %d is incomplete", relation.getId()));
-				return; // incomplete relation
+				log.error(String.format("Route relation %d has no usable geometry", relation.getId()));
+				return;
 			}
 
 			if (COLLECT_OSM_ROUTE_RELATION_NODES) {
 				collectOsmRouteRelationNodes(relation, pointsOfRelationNodes);
 			}
-			collectJoinedWaysAndShieldTags(relation, joinedWays, preparedTags, hash);
+			Map<Long, int[]> laneByJoinedWay = new LinkedHashMap<>();
+			collectJoinedWaysAndShieldTags(relation, joinedWays, preparedTags, hash, laneByJoinedWay);
 			calcRadiusDistanceAndPoiSearchPoints(relation.getId(), joinedWays, pointsForPoiSearch, preparedTags, hash);
 
 			Map<String, String> mapSectionTags = new LinkedHashMap<>();
@@ -210,7 +526,26 @@ public class IndexRouteRelationCreator {
 			for (Way way : joinedWays) {
 				for (Node node : way.getNodes()) {
 					if (geometryBeforeCompletion.contains(getNodeLongId(node))) {
-						way.replaceTags(mapSectionTags);
+						int[] lane = laneByJoinedWay.get(way.getId());
+						if (lane == null || (lane[0] == 0 && lane[1] == 0 && lane[2] == 0 && lane[3] == 0)) {
+							way.replaceTags(mapSectionTags);
+						} else {
+							Map<String, String> tags = new LinkedHashMap<>(mapSectionTags);
+							boolean ramp = lane[2] != lane[0];
+							if (lane[0] != 0 || ramp) {
+								tags.put(ROUTE_LANE, String.valueOf(lane[0]));
+							}
+							if (ramp) {
+								tags.put(ROUTE_LANE_END, String.valueOf(lane[2]));
+							}
+							if (lane[3] != 0) {
+								tags.put(ROUTE_LANE_SIDE, String.valueOf(lane[3]));
+							}
+							if (lane[1] == 1) {
+								tags.put(ROUTE_SHARED_LANE, "yes");
+							}
+							way.replaceTags(tags);
+						}
 						indexMapCreator.iterateMainEntity(way, ctx, icc);
 						break; // one-off
 					}
@@ -595,22 +930,124 @@ public class IndexRouteRelationCreator {
 
 	private void collectJoinedWaysAndShieldTags(@Nonnull Relation relation,
 	                                            @Nonnull List<Way> joinedWays,
-	                                            @Nonnull Map<String, String> shieldTags, int hash) {
+	                                            @Nonnull Map<String, String> shieldTags, int hash,
+	                                            @Nonnull Map<Long, int[]> laneByJoinedWay) {
 		List<Way> waysToJoin = new ArrayList<>();
+		List<Way> sharedWays = new ArrayList<>();
 
 		for (Relation.RelationMember member : relation.getMembers()) {
 			if (member.getEntity() instanceof Way way) {
 				if ("yes".equals(way.getTag(OSMTagKey.AREA))) {
 					continue; // skip (eg https://www.openstreetmap.org/way/746544031)
 				}
-				waysToJoin.add(way);
+				if (laneOnWay(way.getId(), relation.getId()) != 0
+						|| sideLaneOnWay(way.getId(), relation.getId()) != 0
+						|| sharedLaneOnWay(way.getId(), relation.getId())) {
+					if (!isForwardOnWay(way.getId()) && way.getNodes().size() >= 2) {
+						way = reversedWay(way);
+					}
+					// Carries other routes too. Splicing would reorient it to build a chain, and the
+					// renderer takes the offset side from the geometry direction, so it is emitted
+					// on its own in the corridor's orientation - the same one every other route
+					// here uses, which is what keeps them on consistent sides of the path.
+					sharedWays.add(way);
+				} else {
+					waysToJoin.add(way);
+				}
 				transformer.addPropogatedTags(renderingTypes,
 						MapRenderingTypesEncoder.EntityConvertApplyType.MAP, way, way.getModifiableTags());
 				shieldTags.putAll(getShieldTagsFromOsmcTags(way.getTags(), relation.getId()));
 			}
 		}
 		applyShieldTagsBySymbolOrActivity(shieldTags, relation.getTags());
-		spliceWaysIntoSegments(waysToJoin, joinedWays, relation.getId(), hash);
+
+		// A way whose lane differs from the one before it on this route is the ramp: it carries the
+		// previous lane at its start and its own at the end, and the renderer slides between them.
+		Map<Long, Integer> rampFrom = new LinkedHashMap<>();
+		Integer previousLane = null;
+		for (Relation.RelationMember member : relation.getMembers()) {
+			if (!(member.getEntity() instanceof Way way)) {
+				continue;
+			}
+			int lane = laneOnWay(way.getId(), relation.getId());
+			// no ramp on a short way: sliding several pixels sideways over a few metres of line
+			// draws a spike, not a transition
+			if (previousLane != null && previousLane != lane && !isTooShortForLane(way)) {
+				rampFrom.put(way.getId(), previousLane);
+			}
+			previousLane = lane;
+		}
+
+		List<Way> plainToJoin = new ArrayList<>();
+		List<Way> rampWays = new ArrayList<>();
+		for (Way way : waysToJoin) {
+			(rampFrom.containsKey(way.getId()) ? rampWays : plainToJoin).add(way);
+		}
+		spliceWaysIntoSegments(plainToJoin, joinedWays, relation.getId(), hash);
+
+		List<List<Way>> chains = new ArrayList<>();
+		for (Way way : rampWays) {
+			chains.add(Collections.singletonList(way));
+		}
+		for (List<Way> chain : chainSharedWays(sharedWays, relation.getId())) {
+			// a chain that starts on a ramp gets that first way split off, so the ramp stays short
+			if (chain.size() > 1 && rampFrom.containsKey(chain.get(0).getId())) {
+				chains.add(Collections.singletonList(chain.get(0)));
+				chains.add(chain.subList(1, chain.size()));
+			} else {
+				chains.add(chain);
+			}
+		}
+		for (List<Way> chain : chains) {
+			int before = joinedWays.size();
+			spliceWaysIntoSegments(chain, joinedWays, relation.getId(), hash);
+			Way first = chain.get(0);
+			int lane = laneOnWay(first.getId(), relation.getId());
+			int shared = sharedLaneOnWay(first.getId(), relation.getId()) ? 1 : 0;
+			int from = rampFrom.getOrDefault(first.getId(), lane);
+			int side = sideLaneOnWay(first.getId(), relation.getId());
+			for (int i = before; i < joinedWays.size(); i++) {
+				laneByJoinedWay.put(joinedWays.get(i).getId(), new int[] { from, shared, lane, side });
+			}
+		}
+	}
+
+	/**
+	 * Groups shared ways into chains that may safely be spliced into one object: same lane, same
+	 * shared flag, and connected tail-to-head in their own node order, so nothing gets reversed and
+	 * every route on the underlying path still agrees on which side is which. Without this a trail
+	 * cut into many OSM ways becomes many tiny objects, which renders as stubs and restarts the
+	 * dash pattern at every one of them.
+	 */
+	private List<List<Way>> chainSharedWays(List<Way> sharedWays, long relationId) {
+		List<List<Way>> chains = new ArrayList<>();
+		Map<Long, Way> byHeadNode = new LinkedHashMap<>();
+		List<Way> remaining = new ArrayList<>(sharedWays);
+
+		for (Way way : remaining) {
+			if (!way.getNodeIds().isEmpty()) {
+				byHeadNode.put(way.getNodeIds().get(0), way);
+			}
+		}
+		Set<Long> used = new HashSet<>();
+		for (Way way : remaining) {
+			if (used.contains(way.getId()) || way.getNodeIds().isEmpty()) {
+				continue;
+			}
+			List<Way> chain = new ArrayList<>();
+			Way current = way;
+			while (current != null && used.add(current.getId())) {
+				chain.add(current);
+				TLongArrayList ids = current.getNodeIds();
+				Way next = byHeadNode.get(ids.get(ids.size() - 1));
+				boolean sameSlot = next != null && !used.contains(next.getId())
+						&& laneOnWay(next.getId(), relationId) == laneOnWay(current.getId(), relationId)
+						&& sharedLaneOnWay(next.getId(), relationId) == sharedLaneOnWay(current.getId(), relationId);
+				current = sameSlot ? next : null;
+			}
+			chains.add(chain);
+		}
+		return chains;
 	}
 
 	public static void spliceWaysIntoSegments(@Nonnull List<Way> waysToJoin,
@@ -650,17 +1087,31 @@ public class IndexRouteRelationCreator {
 	}
 
 	private int getRelationHash(@Nonnull Relation relation) {
+		// The hash only spreads the generated object ids (6 bits of calcEntityIdFromRelationId); it
+		// has nothing to do with shields, names or geometry. Refusing to emit anything when a single
+		// member way failed to resolve threw away whole long-distance routes - Szlak Warowni
+		// Jurajskich, 510 member ways, disappeared because a handful never came back from Overpass.
+		// Fall back to a hash of what did resolve and keep the parts we have.
 		List<Node> allNodes = new ArrayList<>();
+		int unresolved = 0;
 		for (Relation.RelationMember member : relation.getMembers()) {
 			if (member.getEntity() instanceof Node node) {
 				allNodes.add(node);
 			}
 			if (member.getEntity() instanceof Way way) {
 				if (way.getNodes().isEmpty()) {
-					return -1; // incomplete
+					unresolved++;
+					continue;
 				}
 				allNodes.addAll(way.getNodes());
 			}
+		}
+		if (allNodes.isEmpty()) {
+			return -1; // nothing at all to draw
+		}
+		if (unresolved > 0) {
+			log.warn(String.format("Route relation %d is partial: %d member ways unresolved",
+					relation.getId(), unresolved));
 		}
 		LatLon center = OsmMapUtils.getWeightCenterForNodes(allNodes);
 		return center == null
