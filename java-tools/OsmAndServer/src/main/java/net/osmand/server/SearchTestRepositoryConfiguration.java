@@ -22,6 +22,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import javax.sql.DataSource;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -52,11 +53,33 @@ public class SearchTestRepositoryConfiguration {
         try {
             DataSource ds = searchTestDataSourceProperties().initializeDataSourceBuilder().build();
             searchTestDataSourceInitialized = true;
+            addMissingColumns(ds);
             return ds;
         } catch (Exception e) {
             LOG.warn("WARN - Search-test database is not configured: " + e.getMessage());
         }
         return DatasourceConfiguration.emptyDataSource();
+    }
+
+    // ddl-auto is validate: columns added to the entities after the db was created are added here, before validation
+    private static final String[][] ADDED_COLUMNS = {
+            {"run", "obf_path", "varchar(255)"},
+            {"test_case", "obf_path", "varchar(255)"},
+    };
+
+    private void addMissingColumns(DataSource ds) {
+        JdbcTemplate jdbc = new JdbcTemplate(ds);
+        for (String[] c : ADDED_COLUMNS) {
+            try {
+                List<String> columns = jdbc.queryForList("SELECT name FROM pragma_table_info(?)", String.class, c[0]);
+                if (!columns.isEmpty() && !columns.contains(c[1])) {
+                    jdbc.execute("ALTER TABLE " + c[0] + " ADD COLUMN " + c[1] + " " + c[2]);
+                    LOG.info("Search-test database: added column " + c[0] + "." + c[1]);
+                }
+            } catch (Exception e) {
+                LOG.warn("Search-test database: cannot add column " + c[0] + "." + c[1] + ": " + e.getMessage());
+            }
+        }
     }
 
     @Bean(name = "searchTestJdbcTemplate")

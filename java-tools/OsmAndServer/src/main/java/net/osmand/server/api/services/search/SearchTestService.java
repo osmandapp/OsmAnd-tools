@@ -45,6 +45,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -88,6 +89,8 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 	private static class RunWorker {
 		final SpatialTextSearch engine = new SpatialTextSearch();
 		final Map<String, BinaryMapIndexReader> readers = new HashMap<>();
+		// files of the run's own OBF directory by path, opened by this worker and closed at the end of the run
+		final Map<String, BinaryMapIndexReader> customReaders = new HashMap<>();
 	}
 
 	@Autowired
@@ -315,6 +318,15 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 		test.skipFound = payload.skipFound;
 		run.spatial = payload.spatial;
 		test.spatial = payload.spatial;
+		String obfPath = payload.obfPath == null || payload.obfPath.isBlank() ? null : payload.obfPath.trim();
+		if (obfPath != null && !Boolean.TRUE.equals(payload.spatial)) {
+			throw new RuntimeException("OBF directory is supported only for spatial runs");
+		}
+		if (obfPath != null && !new File(obfPath).isDirectory()) {
+			throw new RuntimeException("OBF directory not found: " + obfPath);
+		}
+		run.obfPath = obfPath;
+		test.obfPath = obfPath;
 		run.shift = payload.shift;
 		test.shift = payload.shift;
 		run.setNorthWest(payload.getNorthWest());
@@ -413,6 +425,7 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 			Map<Thread, RunWorker> engines = runSearchEngines.remove(run.id);
 			if (engines != null) {
 				engines.values().forEach(w -> mapsService.unlockReaders(new ArrayList<>(w.readers.values())));
+				engines.values().forEach(w -> closeReaders(w.customReaders.values()));
 			}
 			// readers nobody holds now; the next run opens its files again
 			mapsService.closeMapReaders();
@@ -520,8 +533,10 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 						if (isSpatial) {
 							// test rows are complete queries: suggestion settings match the last word as a prefix
 							RunWorker worker = runWorker(run.id);
-							SpatialSearchService.SpatialResults spatialResult = searchTestSpatial(ctx, options,
-									null, false, false, worker == null ? new SpatialTextSearch() : worker.engine,
+							SpatialSearchService.SpatialResults spatialResult = run.obfPath != null
+									? searchTestSpatialCustom(ctx, options, run.obfPath, worker)
+									: searchTestSpatial(ctx, options, null, false, false,
+									worker == null ? new SpatialTextSearch() : worker.engine,
 									worker == null ? null : worker.readers);
 							if (spatialResult != null) {
 								maxMapsCount.accumulateAndGet(spatialResult.obfCount(), Math::max);
@@ -639,6 +654,51 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 					(System.nanoTime() - startedNs) / 1_000_000);
 		}
 		return res;
+	}
+
+	// a run on the OBF files of one server directory instead of the server maps
+	private SpatialSearchService.SpatialResults searchTestSpatialCustom(ClassicSearchService.SearchContext ctx,
+			ClassicSearchService.SearchOption options, String obfPath, RunWorker worker) throws IOException {
+		List<String> paths = getCustomOBFs(options.getRadius(), ctx.lat(), ctx.lon(), true, obfPath);
+		if (paths.isEmpty()) {
+			throw new IOException(String.format(Locale.US, "No OBF maps in %s for spatial search at %.6f, %.6f within %.3f km",
+					obfPath, ctx.lat(), ctx.lon(), options.getRadius()));
+		}
+		List<BinaryMapIndexReader> readers = new ArrayList<>();
+		List<BinaryMapIndexReader> opened = new ArrayList<>();
+		try {
+			for (String path : paths) {
+				BinaryMapIndexReader r = worker == null ? null : worker.customReaders.get(path);
+				if (r == null) {
+					r = openObfReaders(Collections.singletonList(path)).get(0);
+					if (worker != null) {
+						worker.customReaders.put(path, r);
+					} else {
+						opened.add(r);
+					}
+				}
+				readers.add(r);
+			}
+			int obfCount = readers.size();
+			BinaryMapIndexReader regionsReader = spatialSearchService.regionsReaderForThread();
+			if (regionsReader != null) {
+				readers.add(regionsReader);
+			}
+			return searchTestSpatial(ctx, readers, false, obfCount, false,
+					worker == null ? new SpatialTextSearch() : worker.engine);
+		} finally {
+			closeReaders(opened);
+		}
+	}
+
+	private static void closeReaders(Collection<BinaryMapIndexReader> readers) {
+		for (BinaryMapIndexReader r : readers) {
+			try {
+				r.close();
+			} catch (IOException e) {
+				LOGGER.warn("Cannot close {}: {}", r.getFile(), e.getMessage());
+			}
+		}
 	}
 
 	private SpatialSearchService.SpatialResults searchTestSpatial(ClassicSearchService.SearchContext ctx, List<BinaryMapIndexReader> readers,
