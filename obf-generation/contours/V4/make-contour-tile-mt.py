@@ -262,22 +262,8 @@ def process_tile(tiff_path, args_dict):
 
             if not no_smooth:
                 smooth_tif = tmp / f"{filename}_smooth.tif"
-                if int(lat) >= 65:
-                    info = subprocess.check_output(['gdalinfo', str(src)]).decode()
-                    size_match = re.search(r'Size is (\d+), (\d+)', info)
-                    if size_match:
-                        w, h = int(size_match.group(1)), int(size_match.group(2))
-                        temp = tmp / "temp_smooth.tif"
-                        subprocess.run(['gdalwarp', '-overwrite', '-ts', str(w // 2), str(h // 2),
-                                        '-r', 'cubicspline', '-co', 'COMPRESS=LZW', '-ot', 'Float32',
-                                        '-wo', 'NUM_THREADS=4', '-multi', str(src), str(temp)], check=True)
-                        subprocess.run(['gdalwarp', '-overwrite', '-ts', str(w), str(h),
-                                        '-r', 'cubicspline', '-co', 'COMPRESS=LZW', '-ot', 'Float32',
-                                        '-wo', 'NUM_THREADS=4', '-multi', str(temp), str(smooth_tif)], check=True)
-                else:
-                    subprocess.run(['gdalwarp', '-overwrite', '-r', 'cubicspline',
-                                    '-co', 'COMPRESS=LZW', '-ot', 'Float32',
-                                    '-wo', 'NUM_THREADS=4', '-multi', str(src), str(smooth_tif)], check=True)
+                subprocess.run(['python3', f"{args_dict['working_dir']}/smooth_dem.py", str(src), str(smooth_tif)],
+                               check=True)
                 src = smooth_tif
                 print("Smoothing applied")
                 if args_dict.get('debug'):
