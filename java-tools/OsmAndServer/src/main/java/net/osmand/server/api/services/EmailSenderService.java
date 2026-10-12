@@ -251,6 +251,11 @@ public class EmailSenderService {
 				.set("PRODUCT_SHORT", htmlText(productShort(productName)))
 				.set("PLAN_NAME", planName)
 				.set("RECEIPT_PLAN_COUNT", planCount);
+		String productIcon = productIcon(productName);
+		if (productIcon != null) {
+			sender.set("PRODUCT_ICON", "@PRODUCT_ICON_IMG@")
+					.set("PRODUCT_ICON_FILE", productIcon);
+		}
 		if (renewalDate != null) {
 			sender.set("RENEWAL_ROW", "@RENEWAL_ROW_T@")
 					.set("RENEWAL_LABEL", renewalLabel)
@@ -291,6 +296,15 @@ public class EmailSenderService {
 
 	private static String productShort(String productName) {
 		return productName.startsWith("OsmAnd ") ? productName.substring("OsmAnd ".length()) : productName;
+	}
+
+	private static String productIcon(String productName) {
+		return switch (productName) {
+			case "OsmAnd Pro" -> "icon_osmand_pro.png";
+			case "OsmAnd Maps+" -> "icon_osmand_maps_plus.png";
+			case "OsmAnd XV" -> "icon_osmand_xv.png";
+			default -> null;
+		};
 	}
 
 	private static String formatReceiptDate(Date date, String lang) {
