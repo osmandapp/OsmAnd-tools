@@ -171,6 +171,16 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 						addSpeedCameraRelationInfo(pt, e.getId(), "to");
 					}
 				}
+				// a device on the road has its own highway=speed_camera: warned at "from" instead
+				Iterator<RelationMember> device = ((Relation) e).getMembers("device").iterator();
+				while(device.hasNext()) {
+					Entity n = device.next().getEntity();
+					if (n instanceof Node) {
+						PropagateEntityTags pt = tagsTransformer
+								.getPropogateTagForEntity(new EntityId(EntityType.NODE, n.getId()));
+						addSpeedCameraRelationInfo(pt, e.getId(), "device");
+					}
+				}
 			}
 		}
 	}
