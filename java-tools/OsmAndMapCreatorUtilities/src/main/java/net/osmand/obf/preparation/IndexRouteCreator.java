@@ -149,47 +149,33 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION, EntityConvertApplyType.ROUTING);
 			if ("enforcement".equals(tags.get("type")) && "maxspeed".equals(tags.get("enforcement"))) {
 				ctx.loadEntityRelation((Relation) e);
-				// mark as speed cameras
-				Iterator<RelationMember> from = ((Relation) e).getMembers("from").iterator();
-				while(from.hasNext()) {
-					Entity n = from.next().getEntity();
-					if (n instanceof Node) {
-						PropagateEntityTags pt = tagsTransformer
-								.getPropogateTagForEntity(new EntityId(EntityType.NODE, n.getId()));
-						pt.putThroughTags.put("highway", "speed_camera");
-						addSpeedCameraRelationInfo(pt, e.getId(), "from");
-					}
-				}
-				// "to" only marks the direction, speed_camera_to keeps the point in the route section without an alarm
-				Iterator<RelationMember> to = ((Relation) e).getMembers("to").iterator();
-				while(to.hasNext()) {
-					Entity n = to.next().getEntity();
-					if (n instanceof Node) {
-						PropagateEntityTags pt = tagsTransformer
-								.getPropogateTagForEntity(new EntityId(EntityType.NODE, n.getId()));
-						pt.putThroughTags.putIfAbsent("highway", "speed_camera_to");
-						addSpeedCameraRelationInfo(pt, e.getId(), "to");
-					}
-				}
-				// a device on the road has its own highway=speed_camera: warned at "from" instead
-				Iterator<RelationMember> device = ((Relation) e).getMembers("device").iterator();
-				while(device.hasNext()) {
-					Entity n = device.next().getEntity();
-					if (n instanceof Node) {
-						PropagateEntityTags pt = tagsTransformer
-								.getPropogateTagForEntity(new EntityId(EntityType.NODE, n.getId()));
-						addSpeedCameraRelationInfo(pt, e.getId(), "device");
-					}
-				}
+				// mark "from" point as speed camera alert.
+				addSpeedCameraRelationInfo((Relation) e, "from", "highway", "speed_camera", true);
+				// "to" is hidden technical point to detect the direction. tag speed_camera_to keeps the point in the route section but without an alarm.
+				addSpeedCameraRelationInfo((Relation) e, "to", "highway", "speed_camera_to", false);
+				// a "device" on the road already has its own highway=speed_camera tag. current tag needed to prevent adding extra alarm: it was at "from" point.
+				addSpeedCameraRelationInfo((Relation) e, "device", null, null, false);
 			}
 		}
 	}
 
-	private static void addSpeedCameraRelationInfo(PropagateEntityTags pt, long relationId, String role) {
-		// example:   { "osmand:speed_camera_relation_id"  :  "16276089:from, 16276090:to" }
-		String tag = SpeedCameraFilter.RELATIONS_INFO_TAG;
-		String relationsInfoValues = RelationTagsPropagation.sortAndAttachUniqueValue(pt.putThroughTags.get(tag), relationId + ":" + role);
-		pt.putThroughTags.put(tag, relationsInfoValues);
+	private void addSpeedCameraRelationInfo(Relation relation, String role, String tag, String value, boolean overwrite) {
+		String infoTag = SpeedCameraFilter.RELATIONS_INFO_TAG;
+		for (RelationMember member : relation.getMembers(role)) {
+			if (member.getEntity() instanceof Node) {
+				PropagateEntityTags pt = tagsTransformer.getPropogateTagForEntity(new EntityId(EntityType.NODE, member.getEntity().getId()));
+				if (tag != null) {
+					if (overwrite) {
+						pt.putThroughTags.put(tag, value);
+					} else {
+						pt.putThroughTags.putIfAbsent(tag, value);
+					}
+				}
+				// example:   { "osmand:speed_camera_relations_info"  :  "16276089:from, 16276090:to, 16276090:device" }
+				String relationsInfoValues = RelationTagsPropagation.sortAndAttachUniqueValue(pt.putThroughTags.get(infoTag), relation.getId() + ":" + role);
+				pt.putThroughTags.put(infoTag, relationsInfoValues);
+			}
+		}
 	}
 
 	public void indexLowEmissionZones(Entity e, OsmDbAccessorContext ctx) throws SQLException {
