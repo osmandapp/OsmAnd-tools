@@ -7,6 +7,7 @@ import net.osmand.data.AmenityTagEntriesBuilder;
 import net.osmand.osm.PoiCategory;
 import net.osmand.osm.PoiType;
 import net.osmand.shared.gpx.GpxUtilities;
+import net.osmand.shared.util.PhoneNumberFormatter;
 import net.osmand.util.Algorithms;
 import org.springframework.stereotype.Service;
 
@@ -137,7 +138,12 @@ public class AmenityTagsService {
 	}
 
 	private VisibleTag toPlainTag(AmenityTagEntry tagEntry) {
-		return tagEntry.value != null ? new VisibleTag(tagEntry.key, tagEntry.value, null) : null;
+		if (tagEntry.value == null) {
+			return null;
+		}
+		boolean phone = Amenity.PHONE.equals(tagEntry.key) || Amenity.MOBILE.equals(tagEntry.key);
+		String value = phone ? PhoneNumberFormatter.INSTANCE.format(tagEntry.value) : tagEntry.value;
+		return new VisibleTag(tagEntry.key, value, null);
 	}
 
 	private VisibleTag toLocalizedTag(AmenityTagEntry tagEntry) {
