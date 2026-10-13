@@ -187,7 +187,7 @@ public class TagValuesCollector {
 		String poiOut = null, poiCache = "poi-stats";
 		String[] tags = DEFAULT_TAGS;
 		int threads = Runtime.getRuntime().availableProcessors();
-		boolean force = false, poiOnly = false, allRegions = false;
+		boolean force = false, poiOnly = false, allRegions = false, analyze = false;
 		int minCount = 3;
 		for (String a : args) {
 			if (a.equals("--poi-stats")) {
@@ -215,6 +215,9 @@ public class TagValuesCollector {
 				tags = a.substring("--tags=".length()).split(",");
 			} else if (a.startsWith("--threads=")) {
 				threads = Integer.parseInt(a.substring("--threads=".length()));
+			} else if (a.equals("--analyze")) {
+				// run brand-analyzer --consolidate on the brand output: the whole job in one call
+				analyze = true;
 			} else if (a.equals("--force")) {
 				force = true;
 			} else {
@@ -251,7 +254,8 @@ public class TagValuesCollector {
 					+ "[--out=all_brands.csv] [--cache=brands] [--threads=N] [--tags=brand,brand:en,...] [--force]\n"
 					+ "       collect-tag-values --file=<file.pbf|file.o5m> [--tags=...] [--poi-out=x]\n"
 					+ "  in the same pass, poi stats of the leaf map regions: [--poi-out=poi_name_stats.tsv] [--poi-cache=poi-stats] "
-					+ "[--min-count=3] [--all-regions]; --poi-stats = poi stats only, no brand counts");
+					+ "[--min-count=3] [--all-regions]; --poi-stats = poi stats only, no brand counts; "
+					+ "--analyze = then brand-analyzer --consolidate on the brand output");
 			System.exit(1);
 		}
 		List<Region> regions = findRegions(new File(extracts), planet == null ? null : new File(planet));
@@ -262,6 +266,9 @@ public class TagValuesCollector {
 		}
 		c.run(regions, poiRegions, poiOnly ? null : new File(cache), poiOnly ? null : new File(out),
 				new File(poiCache), poiOut == null ? null : new File(poiOut), force);
+		if (analyze && !poiOnly) {
+			TopTagValuesAnalyzer.main(new String[] { out, "--consolidate" });
+		}
 	}
 
 	/**
