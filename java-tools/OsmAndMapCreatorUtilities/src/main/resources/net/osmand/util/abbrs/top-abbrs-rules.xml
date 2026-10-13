@@ -27,7 +27,11 @@
 		<group tag="operator"/>
 		<group tag="network"/>
 		<accept minGroup="3" minShare="0.25" acronym="required" glued="separate"
-				headWord="true" stripTail="legal place" min2LetterShare="0.6"/>
+				headWord="true" stripTail="legal place" min2LetterShare="0.6" minSupport="3"
+				shortTags="true"/>
+		<!-- a value of operator / network that is the acronym of another value: operator=MTA and
+			 operator=Metropolitan Transportation Authority -->
+		<values enabled="true" minSupport="5" minTypeOverlap="0.5"/>
 		<exclude brandValues="true"/>
 		<propagate enabled="false"/>
 	</groups>

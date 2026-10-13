@@ -2,6 +2,7 @@ package net.osmand.util.abbrs;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -144,6 +145,37 @@ public class TopAbbrsAnalyzerTest {
 		}
 		// H5 object: the phrase without the operator
 		ny.add(40.65, -73.95, "government", "name", "Kings County Department of Motor Vehicles");
+		// operator:short: USPS is the brand of the post offices too, the tag confirms the abbreviation
+		String usps = "United States Postal Service";
+		for (int i = 0; i < 4; i++) {
+			ny.add(40.70 + i * 0.01, -73.80, "post_office", "name", "Station " + (char) ('A' + i) + " Post Office",
+					"operator", usps, "operator:short", "USPS", "brand", i < 2 ? "USPS" : "");
+		}
+		// a value of the operator is the acronym of another value
+		for (int i = 0; i < 6; i++) {
+			ny.add(40.72 + i * 0.01, -73.99, "bus_stop", "name", "Broadway / " + (i + 10) + " Street", "operator", "MTA");
+		}
+		for (int i = 0; i < 4; i++) {
+			ny.add(40.62 + i * 0.01, -73.97, "bus_stop", "name", "Ocean Avenue / Avenue " + (char) ('J' + i),
+					"operator", "Metropolitan Transportation Authority");
+		}
+		// a short value of two unrelated long values; a loose acronym (psa of "post agency") is none
+		for (int i = 0; i < 5; i++) {
+			ny.add(40.55 + i * 0.01, -73.95, "parking", "name", "Lot " + (i + 1), "operator", "PSC");
+			ny.add(40.55 + i * 0.01, -73.94, "parking", "name", "Garage " + (i + 1), "operator", "PSA");
+		}
+		for (int i = 0; i < 3; i++) {
+			ny.add(40.50 + i * 0.01, -73.93, "parking", "name", "Deck " + (i + 1), "operator", "Parking Supply Company");
+			ny.add(40.50 + i * 0.01, -73.92, "parking", "name", "Yard " + (i + 1), "operator", "Public Safety Center");
+			ny.add(40.50 + i * 0.01, -73.91, "parking", "name", "Ramp " + (i + 1), "operator", "Post Agency");
+		}
+		// two objects of six with the abbreviation are below minSupport
+		String csi = "College of Staten Island";
+		ny.add(40.601, -74.149, "bus_stop", "name", "CSI Loop Bus Stop", "operator", csi);
+		ny.add(40.602, -74.148, "bus_stop", "name", "CSI Campus Loop Bus Stop", "operator", csi);
+		for (int i = 0; i < 4; i++) {
+			ny.add(40.603 + i * 0.001, -74.147, "university", "name", "Building " + (i + 1) + "N", "operator", csi);
+		}
 		ny.write(dir, NY, DATA);
 
 		MapWriter de = new MapWriter(1000);
@@ -520,5 +552,67 @@ public class TopAbbrsAnalyzerTest {
 		StringWriter w = new StringWriter();
 		TopAbbrRow.writeAll(w, rows);
 		return w.toString();
+	}
+	@Test
+	public void shortTagOfTheOperator() {
+		TopAbbrRow r = row("usps");
+		assertNotNull(String.valueOf(rows), r);
+		assertEquals("USPS", r.abbr);
+		assertEquals("united states postal service", r.full);
+		assertEquals(TopAbbrRow.BIND_OPERATOR, r.bind);
+		assertTrue(r.sources.toString(), r.sources.contains("short"));
+		// brand=USPS is a name of the name index: only the offices without it gain
+		assertEquals(Integer.valueOf(2), r.gainObjects);
+	}
+
+	@Test
+	public void valueOfTheOperatorIsAcronymOfAnother() {
+		List<TopAbbrRow> mta = new ArrayList<>();
+		for (TopAbbrRow r : rows) {
+			if (r.abbrNormalized().equals("mta")) {
+				mta.add(r);
+			}
+		}
+		assertEquals(String.valueOf(mta), 2, mta.size());
+		Set<String> bound = new TreeSet<>();
+		for (TopAbbrRow r : mta) {
+			assertEquals("metropolitan transportation authority", r.full);
+			assertTrue(r.sources.contains("value"));
+			bound.add(r.bindValue + " " + r.gainObjects);
+		}
+		// both groups get the alias: the full value and operator=MTA, not indexed as a name
+		assertEquals(Set.of("metropolitan transportation authority 4", "mta 6"), bound);
+	}
+
+	@Test
+	public void groupWordNeedsSupport() {
+		assertNull(row("csi"));
+		boolean found = false;
+		for (TopAbbrsAnalyzer.GroupCandidate g : analyzer.groups) {
+			if (g.abbr.equals("csi")) {
+				assertEquals("rejected", g.status);
+				assertTrue(g.reason, g.reason.startsWith("support 2"));
+				found = true;
+			}
+		}
+		assertTrue(found);
+	}
+
+	@Test
+	public void shortValueOfUnrelatedValuesIsAmbiguous() {
+		assertNull(row("psc"));
+		assertNull(row("psa"));
+		int psc = 0;
+		for (TopAbbrsAnalyzer.GroupCandidate g : analyzer.groups) {
+			if (TopAbbrsAnalyzer.SOURCE_VALUE.equals(g.source)) {
+				assertNotEquals("post agency", g.value);
+			}
+			if (g.abbr.equals("psc")) {
+				assertEquals("rejected", g.status);
+				assertTrue(g.reason, g.reason.startsWith("ambiguous short value"));
+				psc++;
+			}
+		}
+		assertEquals(2, psc);
 	}
 }

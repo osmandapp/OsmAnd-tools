@@ -55,6 +55,8 @@ import net.osmand.util.abbrs.PoiExtraction.ExtractedPoi;
 public class TopAbbrsAnalyzer {
 
 	public static final String RULES_RESOURCE = "top-abbrs-rules.xml";
+	public static final String SOURCE_NAMES = "names";
+	public static final String SOURCE_VALUE = "value";
 	static final Set<String> PLACE_SUBTYPES = Set.of("state", "province", "city", "town", "village", "hamlet",
 			"borough", "suburb", "county");
 	private static final int MAX_EXAMPLES = 6;
@@ -134,6 +136,16 @@ public class TopAbbrsAnalyzer {
 		public String map;
 		/** the noise filter of the word, kept with {@link TopAbbrsAnalyzer#keepNoise} */
 		public String noise;
+		/** {@link #SOURCE_NAMES}: names and short tags of the group; {@link #SOURCE_VALUE}: another value of the tag */
+		public String source = SOURCE_NAMES;
+		/** members with the word as {@code <tag>:short} */
+		public int withShort;
+		/** source value: the tag and the members of the short value, the share of them with the types of the group */
+		public String shortTag;
+		public List<ExtractedEntity> shortMembers = List.of();
+		public double typeOverlap = -1;
+		/** source value: the row of the short value comes from this pair, the one of the largest long group */
+		public boolean ownsShort;
 		public boolean agreed;
 		public String status = "";
 		public String reason = "";
@@ -570,6 +582,7 @@ public class TopAbbrsAnalyzer {
 			String statGroup = statGroups.isEmpty() ? null : top(statGroups);
 			List<String> valueWords = Arrays.asList(value.split(" "));
 			Map<String, GroupCandidate> tokens = new LinkedHashMap<>();
+			boolean shortTags = rules.boolAttr(loc, "groups/accept", "shortTags");
 			for (ExtractedEntity e : members) {
 				Map<String, Word> ws = new LinkedHashMap<>();
 				List<Word> nameWords = new ArrayList<>();
@@ -584,28 +597,45 @@ public class TopAbbrsAnalyzer {
 						}
 					}
 				}
-				for (Word w : ws.values()) {
-					String why = tokenNoise(w.word, valueWords, loc, statGroup);
+				// <tag>:short is the abbreviation of the value written by a mapper: one word or a phrase (NYC Parks)
+				Map<String, String> shorts = new LinkedHashMap<>();
+				if (shortTags) {
+					for (String v : AbbrText.values(e.tag(tag + ":short"))) {
+						String nv = AbbrText.normalize(v);
+						if (!nv.isEmpty() && !nv.equals(value) && AbbrText.hasLetters(nv)) {
+							shorts.putIfAbsent(nv, v);
+						}
+					}
+				}
+				Set<String> tokensOfEntity = new LinkedHashSet<>(ws.keySet());
+				tokensOfEntity.addAll(shorts.keySet());
+				for (String token : tokensOfEntity) {
+					Word w = ws.get(token);
+					String why = shorts.containsKey(token) ? null : tokenNoise(token, valueWords, loc, statGroup);
 					if (why != null && (why.equals(SKIP) || !keepNoise)) {
 						continue;
 					}
-					GroupCandidate c = tokens.computeIfAbsent(w.word,
-							k -> new GroupCandidate(tag, value, loc, members, k));
-					c.noise = why;
+					GroupCandidate c = tokens.computeIfAbsent(token, k -> new GroupCandidate(tag, value, loc, members, k));
+					if (why == null || c.withToken == 0) {
+						c.noise = why;
+					}
 					c.withToken++;
-					c.spellings.merge(w.original, 1, Integer::sum);
-					if (!(rules.boolAttr(loc, "case", "skipAllCapsNames") && AbbrText.isAllCapsName(nameWords))) {
+					if (shorts.containsKey(token)) {
+						c.withShort++;
+					}
+					c.spellings.merge(w != null ? w.original : shorts.get(token), 1, Integer::sum);
+					if (w != null && !(rules.boolAttr(loc, "case", "skipAllCapsNames") && AbbrText.isAllCapsName(nameWords))) {
 						c.caseCounted++;
 						if (AbbrText.isAllUpper(w.original)) {
 							c.upper++;
 						}
 					}
 					if (c.examples.size() < MAX_EXAMPLES) {
-						c.examples.add(e.tag("name") == null ? e.key() : e.tag("name"));
+						c.examples.add(e.tag("name") == null ? e.key() + (shorts.containsKey(token) ? " " + tag + ":short=" + shorts.get(token) : "")
+								: e.tag("name"));
 					}
 				}
-			}
-			double minShare = rules.doubleAttr(loc, "groups/accept", "minShare")
+			}			double minShare = rules.doubleAttr(loc, "groups/accept", "minShare")
 					* rules.doubleAttr(loc, "agree", "shareFactor");
 			List<String> stripped = stripTail(valueWords, loc);
 			boolean head = rules.boolAttr(loc, "groups/accept", "headWord");
@@ -627,6 +657,11 @@ public class TopAbbrsAnalyzer {
 						break;
 					}
 				}
+				if (c.withShort > 0 && !AbbrMatcher.ACRONYM.equals(c.h3)) {
+					// a short tag that is no acronym (NYC Parks) stands for the whole value
+					c.h3 = TAG;
+					c.full = List.copyOf(stripped);
+				}
 				// for the report: the initials of any run, not only the one up to the head word
 				Object[] free = AbbrMatcher.spanAcronym(c.abbr, valueWords, rules.intAttr(loc, "pairs/abbr", "maxLen"),
 						rules.intAttr(loc, "pairs/abbr", "maxChunk"), stop(loc), -1);
@@ -638,9 +673,110 @@ public class TopAbbrsAnalyzer {
 				groups.add(c);
 			}
 		}
+		mineValuePairs(byValue);
+	}
+
+	/**
+	 * Values of operator / network that are acronyms of other values: operator=MTA of 3053 objects and
+	 * operator=Metropolitan Transportation Authority of 4022. The pair is a candidate when the short group is large
+	 * enough and its objects have the types of the long group.
+	 */
+	private void mineValuePairs(Map<String, List<ExtractedEntity>> byValue) {
+		Map<Character, List<String>> longsByLastInitial = new HashMap<>();
+		List<String> shorts = new ArrayList<>();
+		for (Map.Entry<String, List<ExtractedEntity>> g : byValue.entrySet()) {
+			String value = g.getKey().substring(g.getKey().indexOf('|') + 1);
+			String loc = groupLocale(g.getValue());
+			if (!rules.boolAttr(loc, "groups/values", "enabled")) {
+				continue;
+			}
+			String[] ws = value.split(" ");
+			if (ws.length >= 2 && g.getValue().size() >= rules.intAttr(loc, "groups/accept", "minGroup")) {
+				longsByLastInitial.computeIfAbsent(ws[ws.length - 1].charAt(0), k -> new ArrayList<>()).add(g.getKey());
+			} else if (ws.length == 1 && g.getValue().size() >= rules.intAttr(loc, "groups/values", "minSupport")
+					&& tokenNoise(value, List.of(), loc, null) == null) {
+				shorts.add(g.getKey());
+			}
+		}
+		for (String sk : shorts) {
+			String shortTag = sk.substring(0, sk.indexOf('|'));
+			String s = sk.substring(sk.indexOf('|') + 1);
+			List<ExtractedEntity> shortMembers = byValue.get(sk);
+			String loc = groupLocale(shortMembers);
+			boolean head = rules.boolAttr(loc, "groups/accept", "headWord");
+			Set<String> seen = new HashSet<>();
+			for (int i = 0; i < s.length(); i++) {
+				for (String lk : longsByLastInitial.getOrDefault(s.charAt(i), List.of())) {
+					List<ExtractedEntity> members = byValue.get(lk);
+					if (!seen.add(lk) || !loc.equals(groupLocale(members))) {
+						continue;
+					}
+					List<String> valueWords = Arrays.asList(lk.substring(lk.indexOf('|') + 1).split(" "));
+					if (valueWords.contains(s)) {
+						// jet of "jet tankstelle": the same name, not an abbreviation
+						continue;
+					}
+					// strict initials: two values are not one name, a loose match pairs unrelated operators
+					Object[] h3 = AbbrMatcher.spanAcronym(s, valueWords, rules.intAttr(loc, "pairs/abbr", "maxLen"),
+							rules.intAttr(loc, "pairs/abbr", "maxChunk"), stop(loc), head ? valueWords.size() : -1, true);
+					if (h3 == null || !AbbrMatcher.ACRONYM.equals(h3[0])) {
+						continue;
+					}
+					String tag = lk.substring(0, lk.indexOf('|'));
+					GroupCandidate c = new GroupCandidate(tag, String.join(" ", valueWords), loc, members, s);
+					c.source = SOURCE_VALUE;
+					c.shortTag = shortTag;
+					c.shortMembers = shortMembers;
+					c.withToken = shortMembers.size();
+					c.share = 1;
+					c.h3 = AbbrMatcher.ACRONYM;
+					c.full = List.copyOf(valueWords.subList((int) h3[1], (int) h3[2]));
+					Set<String> longTypes = new HashSet<>();
+					for (ExtractedEntity e : members) {
+						longTypes.addAll(e.types());
+					}
+					int withTypes = 0;
+					for (ExtractedEntity e : shortMembers) {
+						if (!Collections.disjoint(longTypes, e.types())) {
+							withTypes++;
+						}
+						for (String v : AbbrText.values(e.tag(shortTag))) {
+							if (AbbrText.normalize(v).equals(s)) {
+								c.spellings.merge(v, 1, Integer::sum);
+								c.caseCounted++;
+								if (AbbrText.isAllUpper(v)) {
+									c.upper++;
+								}
+							}
+						}
+						if (c.examples.size() < MAX_EXAMPLES) {
+							c.examples.add((e.tag("name") == null ? e.key() : e.tag("name")) + " " + shortTag + "="
+									+ e.tag(shortTag));
+						}
+					}
+					c.typeOverlap = withTypes / (double) shortMembers.size();
+					Map<String, Integer> maps = new TreeMap<>();
+					for (ExtractedEntity e : members) {
+						maps.merge(e.map, 1, Integer::sum);
+					}
+					c.map = top(maps);
+					groups.add(c);
+				}
+			}
+		}
+	}
+
+	private String groupLocale(List<ExtractedEntity> members) {
+		Map<String, Integer> locs = new TreeMap<>();
+		for (ExtractedEntity e : members) {
+			locs.merge(locale(e), 1, Integer::sum);
+		}
+		return top(locs);
 	}
 
 	private static final String SKIP = "skip";
+	/** H3 of a {@code <tag>:short} that is not an acronym of the value */
+	public static final String TAG = "tag";
 
 	/** null for a word that can be an abbreviation; {@link #SKIP} never; else the noise filter that drops it */
 	private String tokenNoise(String w, List<String> valueWords, String loc, String statGroup) {
@@ -750,36 +886,96 @@ public class TopAbbrsAnalyzer {
 	private void acceptGroups() {
 		for (GroupCandidate g : groups) {
 			String loc = g.locale;
-			double f = g.agreed ? rules.doubleAttr(loc, "agree", "shareFactor") : 1;
-			double minShare = rules.doubleAttr(loc, "groups/accept", "minShare") * f;
-			String acronym = rules.attr(loc, "groups/accept", "acronym");
 			if (g.noise != null) {
 				g.status = "noise";
 				g.reason = g.noise;
-			} else if (g.share < minShare) {
-				g.status = "rejected";
-				g.reason = String.format(Locale.US, "share %.2f < %.2f", g.share, minShare);
-			} else if (g.abbr.length() == 2 && g.share < rules.doubleAttr(loc, "groups/accept", "min2LetterShare")) {
-				g.status = "rejected";
-				g.reason = String.format(Locale.US, "2 letters, share %.2f", g.share);
-			} else if (AbbrMatcher.GLUED.equals(g.h3)) {
-				g.status = "glued";
-				g.reason = "glued words of the value";
-			} else if (!AbbrMatcher.ACRONYM.equals(g.h3) && acronym.equals("required")) {
-				g.status = "rejected";
-				g.reason = "not an acronym of the value (H3)";
-			} else if (brands.contains(g.abbr) || brands.contains(String.join(" ", g.full))) {
-				g.status = "brand";
-				g.reason = "brand";
-			} else if (!caseAccepted(loc, false, firstSpelling(g.spellings), g.caseCounted, g.upper)) {
-				g.status = "rejected";
-				g.reason = "case " + g.upper + "/" + g.caseCounted;
+			} else if (SOURCE_VALUE.equals(g.source)) {
+				acceptValuePair(g);
 			} else {
-				g.status = "accepted";
+				acceptGroupWord(g);
+			}
+		}
+		resolveValuePairs();
+	}
+
+	/**
+	 * One short value of several long values: SP+ of "state parks", "street partnership" and "suny potsdam" is no
+	 * abbreviation of any (the head words differ); MTA of "metropolitan transit authority" and "metropolitan
+	 * transportation authority" is, and the short value gets the full of the largest long group.
+	 */
+	private void resolveValuePairs() {
+		Map<String, List<GroupCandidate>> byShort = new TreeMap<>();
+		for (GroupCandidate g : groups) {
+			if (SOURCE_VALUE.equals(g.source) && g.status.equals("accepted")) {
+				byShort.computeIfAbsent(g.locale + "|" + g.shortTag + "|" + g.abbr, k -> new ArrayList<>()).add(g);
+			}
+		}
+		for (List<GroupCandidate> gs : byShort.values()) {
+			Set<String> heads = new TreeSet<>();
+			GroupCandidate owner = null;
+			for (GroupCandidate g : gs) {
+				heads.add(g.full.get(g.full.size() - 1));
+				if (owner == null || g.members.size() > owner.members.size()) {
+					owner = g;
+				}
+			}
+			for (GroupCandidate g : gs) {
+				if (heads.size() > 1) {
+					reject(g, "ambiguous short value: " + String.join(" / ", heads));
+				}
+				g.ownsShort = g == owner;
 			}
 		}
 	}
 
+	private void acceptGroupWord(GroupCandidate g) {
+		String loc = g.locale;
+		double f = g.agreed ? rules.doubleAttr(loc, "agree", "shareFactor") : 1;
+		double minShare = rules.doubleAttr(loc, "groups/accept", "minShare") * f;
+		int minSupport = (int) Math.ceil(rules.intAttr(loc, "groups/accept", "minSupport")
+				* (g.agreed ? rules.doubleAttr(loc, "agree", "supportFactor") : 1));
+		String acronym = rules.attr(loc, "groups/accept", "acronym");
+		if (g.share < minShare) {
+			reject(g, String.format(Locale.US, "share %.2f < %.2f", g.share, minShare));
+		} else if (g.withToken < minSupport) {
+			reject(g, "support " + g.withToken + " < " + minSupport);
+		} else if (g.abbr.length() == 2 && g.share < rules.doubleAttr(loc, "groups/accept", "min2LetterShare")) {
+			reject(g, String.format(Locale.US, "2 letters, share %.2f", g.share));
+		} else if (AbbrMatcher.GLUED.equals(g.h3)) {
+			g.status = "glued";
+			g.reason = "glued words of the value";
+		} else if (!AbbrMatcher.ACRONYM.equals(g.h3) && !TAG.equals(g.h3) && acronym.equals("required")) {
+			reject(g, "not an acronym of the value (H3)");
+		} else if (g.withShort == 0 && (brands.contains(g.abbr) || brands.contains(String.join(" ", g.full)))) {
+			// a brand confirmed by <tag>:short is the abbreviation of the operator (USPS)
+			g.status = "brand";
+			g.reason = "brand";
+		} else if (!caseAccepted(loc, false, firstSpelling(g.spellings), g.caseCounted, g.upper)) {
+			reject(g, "case " + g.upper + "/" + g.caseCounted);
+		} else {
+			g.status = "accepted";
+		}
+	}
+
+	private void acceptValuePair(GroupCandidate g) {
+		String loc = g.locale;
+		int minSupport = rules.intAttr(loc, "groups/values", "minSupport");
+		double minOverlap = rules.doubleAttr(loc, "groups/values", "minTypeOverlap");
+		if (g.withToken < minSupport) {
+			reject(g, "support " + g.withToken + " < " + minSupport);
+		} else if (g.typeOverlap < minOverlap) {
+			reject(g, String.format(Locale.US, "types overlap %.2f < %.2f", g.typeOverlap, minOverlap));
+		} else if (!caseAccepted(loc, false, firstSpelling(g.spellings), g.caseCounted, g.upper)) {
+			reject(g, "case " + g.upper + "/" + g.caseCounted);
+		} else {
+			g.status = "accepted";
+		}
+	}
+
+	private static void reject(GroupCandidate g, String reason) {
+		g.status = "rejected";
+		g.reason = reason;
+	}
 	static String firstSpelling(Map<String, Integer> spellings) {
 		String best = null;
 		int n = -1;
@@ -811,10 +1007,23 @@ public class TopAbbrsAnalyzer {
 		for (GroupCandidate g : groups) {
 			if (g.status.equals("accepted")) {
 				found.add(orgRow(g));
+				if (SOURCE_VALUE.equals(g.source) && g.ownsShort) {
+					found.add(shortValueRow(g));
+				}
 			}
 		}
 		found.addAll(wordRows());
-		buildRows(found);
+		// one key from several sources (names of the group and a value pair): one row with every source
+		Map<String, TopAbbrRow> byKey = new LinkedHashMap<>();
+		for (TopAbbrRow r : found) {
+			TopAbbrRow old = byKey.putIfAbsent(r.key(), r);
+			if (old != null) {
+				old.sources.addAll(r.sources);
+				old.types.addAll(r.types);
+				old.supportObjects = Math.max(nz(old.supportObjects), nz(r.supportObjects));
+			}
+		}
+		buildRows(new ArrayList<>(byKey.values()));
 	}
 
 	TopAbbrRow orgRow(GroupCandidate g) {
@@ -832,14 +1041,41 @@ public class TopAbbrsAnalyzer {
 			}
 			r.groupSize = g.members.size();
 			r.supportObjects = g.withToken;
-			r.sources.add("h2");
-			r.sources.add("h3");
+			if (SOURCE_VALUE.equals(g.source)) {
+				r.sources.add("value");
+			} else {
+				r.sources.add("h2");
+				r.sources.add(TAG.equals(g.h3) ? "short" : "h3");
+				if (g.withShort > 0 && !TAG.equals(g.h3)) {
+					r.sources.add("short");
+				}
+			}
 			H1Candidate c = h1.get(g.key());
 			if (g.agreed && c != null) {
 				r.supportPairs = c.pairs;
 				r.sources.addAll(c.sources());
 			}
 			return r;
+	}
+
+	/** the row of a value pair for the objects with the short value: operator=MTA gets the alias MTA */
+	TopAbbrRow shortValueRow(GroupCandidate g) {
+		TopAbbrRow r = new TopAbbrRow();
+		r.kind = TopAbbrRow.KIND_ORG;
+		r.locale = g.locale;
+		r.abbr = canonical(g.spellings, g.abbr, true);
+		r.full = String.join(" ", g.full);
+		r.bind = g.shortTag;
+		r.bindValue = g.abbr;
+		for (ExtractedEntity e : g.shortMembers) {
+			for (ExtractedPoi p : e.pois) {
+				r.types.addAll(p.subtypes);
+			}
+		}
+		r.groupSize = g.shortMembers.size();
+		r.supportObjects = g.members.size();
+		r.sources.add("value");
+		return r;
 	}
 
 	private void buildRows(List<TopAbbrRow> found) {
@@ -1163,7 +1399,15 @@ public class TopAbbrsAnalyzer {
 			o.put("br", brands.contains(g.abbr) || brands.contains(String.join(" ", g.full)));
 			o.put("ag", g.agreed);
 			o.put("nz", g.noise);
-			o.put("g", applied(orgRow(g), null).size());
+			o.put("src", g.source);
+			o.put("ks", g.withShort);
+			if (SOURCE_VALUE.equals(g.source)) {
+				o.put("st", g.shortTag);
+				o.put("ov", Math.round(g.typeOverlap * 100) / 100.0);
+				o.put("g", applied(orgRow(g), null).size() + applied(shortValueRow(g), null).size());
+			} else {
+				o.put("g", applied(orgRow(g), null).size());
+			}
 			o.put("ex", g.examples.subList(0, Math.min(3, g.examples.size())));
 			gs.add(o);
 		}

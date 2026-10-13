@@ -63,23 +63,33 @@ public final class AbbrMatcher {
 	 * word; stop words may be skipped
 	 */
 	public static boolean abbrOfWords(String s, List<String> ws, int maxChunk, Set<String> stop) {
-		return ws.size() >= 2 && abbrOfWords(s, 0, ws, 0, maxChunk, stop);
+		return ws.size() >= 2 && abbrOfWords(s, 0, ws, 0, maxChunk, stop, false);
 	}
 
-	private static boolean abbrOfWords(String s, int si, List<String> ws, int wi, int maxChunk, Set<String> stop) {
+	/**
+	 * @param strict a chunk is the first letter of the word or the whole word of at most {@code maxChunk} letters
+	 *               (nycdot of "nyc department of transportation", not psa of "post ag")
+	 */
+	private static boolean abbrOfWords(String s, int si, List<String> ws, int wi, int maxChunk, Set<String> stop,
+			boolean strict) {
 		if (wi == ws.size()) {
 			return si == s.length();
 		}
 		String w = ws.get(wi);
-		if (stop.contains(w) && abbrOfWords(s, si, ws, wi + 1, maxChunk, stop)) {
+		if (stop.contains(w) && abbrOfWords(s, si, ws, wi + 1, maxChunk, stop, strict)) {
 			return true;
 		}
 		if (si >= s.length() || w.isEmpty() || s.charAt(si) != w.charAt(0)) {
 			return false;
 		}
+		if (strict) {
+			return abbrOfWords(s, si + 1, ws, wi + 1, maxChunk, stop, true)
+					|| (w.length() > 1 && w.length() <= maxChunk && s.startsWith(w, si)
+							&& abbrOfWords(s, si + w.length(), ws, wi + 1, maxChunk, stop, true));
+		}
 		for (int end = si + 1; end <= Math.min(s.length(), si + maxChunk); end++) {
 			if (isSubsequence(s.substring(si + 1, end), w.substring(1))
-					&& abbrOfWords(s, end, ws, wi + 1, maxChunk, stop)) {
+					&& abbrOfWords(s, end, ws, wi + 1, maxChunk, stop, false)) {
 				return true;
 			}
 		}
@@ -95,6 +105,12 @@ public final class AbbrMatcher {
 	 */
 	public static Object[] spanAcronym(String token, List<String> value, int maxLen, int maxChunk, Set<String> stop,
 			int headEnd) {
+		return spanAcronym(token, value, maxLen, maxChunk, stop, headEnd, false);
+	}
+
+	/** @param strict initials only, see {@link #abbrOfWords(String, int, List, int, int, Set, boolean)} */
+	public static Object[] spanAcronym(String token, List<String> value, int maxLen, int maxChunk, Set<String> stop,
+			int headEnd, boolean strict) {
 		int n = value.size();
 		Object[] best = null;
 		for (int i = 0; i < n; i++) {
@@ -121,7 +137,7 @@ public final class AbbrMatcher {
 					continue;
 				}
 				// the longest run wins: "new york state department of motor vehicles" -> department ... vehicles
-				if (token.length() <= maxLen && abbrOfWords(token, span, maxChunk, stop)
+				if (token.length() <= maxLen && span.size() >= 2 && abbrOfWords(token, 0, span, 0, maxChunk, stop, strict)
 						&& (best == null || best[0] != ACRONYM || j - i > (int) best[2] - (int) best[1])) {
 					best = new Object[] { ACRONYM, i, j };
 				}

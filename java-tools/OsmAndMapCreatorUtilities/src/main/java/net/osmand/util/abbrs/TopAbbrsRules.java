@@ -55,7 +55,9 @@ public class TopAbbrsRules {
 		def("groups/group.operator", "enabled", "true");
 		def("groups/group.network", "enabled", "true");
 		def("groups/accept", "minGroup", "3", "minShare", "0.25", "acronym", "required", "glued", "separate",
-				"headWord", "true", "stripTail", "legal place", "min2LetterShare", "0.6");
+				"headWord", "true", "stripTail", "legal place", "min2LetterShare", "0.6", "minSupport", "3",
+				"shortTags", "true");
+		def("groups/values", "enabled", "true", "minSupport", "5", "minTypeOverlap", "0.5");
 		def("groups/exclude", "brandValues", "true");
 		def("groups/propagate", "enabled", "false", "sameLocale", "true", "sameTypes", "true", "requireH1", "true",
 				"minPhraseWords", "2", "maxSpread", "5", "excludeBrands", "true");

@@ -108,9 +108,26 @@ All steps and thresholds are set in XML (section 6); code holds only mechanics:
    search (`same` only); noise filters (dot gluing, Roman numerals, compound parts with linking -s-/-es-, service
    words). Aggregated by key `(locale, abbr, full)` with counts per source and POI type.
 3. **H2 (by operator/network).** Groups by normalized value; a shared word with share ≥ threshold, not in the value,
-   not class 1/2.
+   not class 1/2, supported by at least `minSupport` entities (a group of 6 with "CSI" in two bus stop names is not
+   enough). `<tag>:short` of a member counts as one more spelling of the group: `operator:short=USPS` supports `usps`
+   like a name with the word, and a phrase (`operator:short=NYC Parks`) is a candidate too.
 4. **H3.** Acronym of a span of the value; check options (up to the last significant word after stripping legal forms
-   and places, minimum length) are schema parameters.
+   and places, minimum length) are schema parameters. A `<tag>:short` value that is no acronym of the value (NYC
+   Parks) stands for the whole value (`h3=tag`): the mapper wrote the abbreviation, H3 is not required.
+4a. **Value pairs.** A one-word value of `operator`/`network` that is the acronym of another value (H3 rules, up to its
+   last word): `operator=MTA` (3053 objects in NYC) and `operator=Metropolitan Transportation Authority` (4022). Names
+   do not have the abbreviation of a transport or government operator (stops are named after streets), the values
+   do. The pair needs `<values minSupport>` objects of the short value, a long group of `minGroup`, one locale, and
+   `minTypeOverlap` of the short value objects with a type of the long group (`mta ← michelle tampakis` has neither).
+   It gives two rows: `bind_value` the long value and `bind_value` the short value, because the operator is not a name
+   of the name index either.
+   Two values are not two spellings of one name, so the acronym is strict: one letter per word, or a whole word of
+   up to `maxChunk` letters (`NYCDOT ← nyc department of transportation`); a letter from inside a word is no match
+   (`PSA ← post ag`, `BEG ← breent gmbh`). A short value that is a word of the long one (`jet ← jet tankstelle`) is
+   the same name. A short value of long values with different head words is ambiguous and gives no rows
+   (`SP+ ← state parks / street partnership / suny potsdam`, `BP ← bawag p.s.k / best in parking`); with one head word
+   (`MTA ← metropolitan transit authority / metropolitan transportation authority`) every long value gets a row and
+   the short value row takes the full of the largest long group.
 5. **Agreement before thresholds.** H1 and H2+H3 candidates are first collected with lowered thresholds (`minSupport` ×
    `supportFactor`, `minShare` × `shareFactor`), then agreement is marked: pair found by both H1 and H2+H3 (DMV, USPS,
    DLRG, INPS, SUNY). Only then thresholds apply: relaxed for agreed, full for the rest. Agreement is also the
@@ -274,7 +291,8 @@ Purpose: tune selection without code changes — narrow (precision) or widen (re
         <group tag="operator"/>
         <group tag="network"/>
         <accept minGroup="3" minShare="0.25" acronym="required" glued="separate"
-                headWord="true" stripTail="legal place" min2LetterShare="0.6"/>
+                headWord="true" stripTail="legal place" min2LetterShare="0.6" minSupport="3" shortTags="true"/>
+        <values enabled="true" minSupport="5" minTypeOverlap="0.5"/>
         <exclude brandValues="true"/>
         <propagate enabled="false" sameLocale="true" sameTypes="true" requireH1="true"
                    minPhraseWords="2" maxSpread="5" excludeBrands="true"/>
@@ -318,6 +336,9 @@ Purpose: tune selection without code changes — narrow (precision) or widen (re
 | `pairs accept minTiles`, `tileZoom` | `2`, `10` | support from this many distinct zoom-10 tiles (~40 km) |
 | `groups accept minGroup`, `minShare` | `3`, `0.25` | `operator`/`network` group size and share of objects with the H2 word |
 | `groups accept stripTail` | `legal place` | before H3, strip trailing legal forms (`<legal>`) and places (`<places>`) |
+| `groups accept minSupport` | `3` | entities with the H2 word or `<tag>:short` (× `supportFactor` on agreement) |
+| `groups accept shortTags` | `true` | `operator:short` / `network:short` support the group word, a short phrase needs no H3 |
+| `groups values enabled`, `minSupport`, `minTypeOverlap` | `true`, `5`, `0.5` | value pairs (5.2.4a): objects of the short value, their share with a type of the long group |
 | `agree supportFactor`, `shareFactor` | `0.5`, `0.5` | threshold relaxation on H1 and H2+H3 agreement |
 | `propagate` | 12.7 | H5 |
 | `input maxExtractionAgeMonths` | `2` | oldest map extraction the analyzer accepts (5.3) |
@@ -360,7 +381,7 @@ UTF-8, header, one row = one application rule.
 | `support_objects` | `16`                                          | (from extraction)                          | unique entities supporting the row: in a group — with `abbr` in the name (16/25 = 0.64); for H1 — entities with the pair |
 | `support_pairs`   |                                               | `10173`                                    | H1 pairs (`same` + `near`); diagnostics only, not used in thresholds (5.2)                                 |
 | `gain_objects`    | `9`                                           |                                            | extraction POI identities (5.3) the row will apply to: predicate holds and the abbreviation is not in their indexed names |
-| `sources`         | `h2,h3,h1span`                                | `h1near,h1same`                            | how it was found                                                                                           |
+| `sources`         | `h2,h3,h1span`                                | `h1near,h1same`                            | how it was found (`short` — `<tag>:short`, `value` — value pair)                                                                                           |
 | `status`          | `auto`                                        | `auto`                                     | `auto` / `manual-include`                                                                                  |
 
 Empty cell — metric not applicable. `gain_objects` counts objects, not index size: OBF growth depends on shared keys,
@@ -642,6 +663,10 @@ thresholds (Not Found, target rank, any Hbf hit). Otherwise the wave uses last m
     `top_abbrs.csv`. `top_abbrs.html` shows such pairs in a "brand aliases" section: brand, both forms, support, whether
     the form is already in brand objects' `name:*`. This section decides whether to extend the brand mechanism (names
     without wikidata) as a separate task. Rule 5.1.6 (`bp ← blanco petroli`) remains as a special case.
+    Exception: an organization abbreviation confirmed by `<tag>:short` or by a value pair (5.2.4a) is the
+    abbreviation of the operator, not a brand alias, and stays (`brand=USPS` and `operator:short=USPS` of 2180 post
+    offices in NYC). Objects with `brand=USPS` already have the word in the name index and get no alias; the others
+    do.
 11. **Review process:** review by diff with last month, auto-publish by coverage.
     - `top_abbrs.html` shows changes vs the previous CSV: new, removed and changed rows (by key
       `(kind, locale, owner, abbr, full, bind, bind_value)`; change = `types` or a significant shift of
