@@ -148,22 +148,34 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			tagsTransformer.handleRelationPropogatedTags((Relation) e, renderingTypes, ctx, EntityConvertApplyType.ROUTING);
 			Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION, EntityConvertApplyType.ROUTING);
 			if ("enforcement".equals(tags.get("type")) && "maxspeed".equals(tags.get("enforcement"))) {
-				ctx.loadEntityRelation((Relation) e);
+				Relation relation = (Relation) e;
+				ctx.loadEntityRelation(relation);
+				List<Entity> from = relation.getMemberEntities("from");
+				List<Entity> to = relation.getMemberEntities("to");
+				List<Entity> devices = relation.getMemberEntities("device");
+				if (to.isEmpty()) {
+					// without "to" the device on the road acts as "to" (wiki Relation:enforcement)
+					to = devices;
+					devices = new ArrayList<>();
+				}
+				// one role per node in a relation: a "from" node is not also its "to" or "device" (from == to, device == from)
+				to.removeAll(from);
+				devices.removeAll(from);
 				// mark "from" point as speed camera alert.
-				addSpeedCameraRelationInfo((Relation) e, "from", "highway", "speed_camera", true);
+				addSpeedCameraRelationInfo(relation, from, "from", "highway", "speed_camera", true);
 				// "to" is hidden technical point to detect the direction. tag speed_camera_to keeps the point in the route section but without an alarm.
-				addSpeedCameraRelationInfo((Relation) e, "to", "highway", "speed_camera_to", false);
+				addSpeedCameraRelationInfo(relation, to, "to", "highway", "speed_camera_to", false);
 				// a "device" on the road already has its own highway=speed_camera tag. current tag needed to prevent adding extra alarm: it was at "from" point.
-				addSpeedCameraRelationInfo((Relation) e, "device", null, null, false);
+				addSpeedCameraRelationInfo(relation, devices, "device", null, null, false);
 			}
 		}
 	}
 
-	private void addSpeedCameraRelationInfo(Relation relation, String role, String tag, String value, boolean overwrite) {
+	private void addSpeedCameraRelationInfo(Relation relation, List<Entity> members, String role, String tag, String value, boolean overwrite) {
 		String infoTag = SpeedCameraFilter.RELATIONS_INFO_TAG;
-		for (RelationMember member : relation.getMembers(role)) {
-			if (member.getEntity() instanceof Node) {
-				PropagateEntityTags pt = tagsTransformer.getPropogateTagForEntity(new EntityId(EntityType.NODE, member.getEntity().getId()));
+		for (Entity member : members) {
+			if (member instanceof Node) {
+				PropagateEntityTags pt = tagsTransformer.getPropogateTagForEntity(new EntityId(EntityType.NODE, member.getId()));
 				if (tag != null) {
 					if (overwrite) {
 						pt.putThroughTags.put(tag, value);
