@@ -8,6 +8,7 @@ import net.osmand.map.WorldRegion;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.*;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
+import net.osmand.search.rules.SearchModLocaleRules.PoiService;
 import net.osmand.search.rules.SearchModLocales;
 import net.osmand.search.rules.SearchModRules;
 import net.osmand.util.Algorithms;
@@ -41,6 +42,9 @@ public class IndexCreationContext {
 	private final IndexCreator indexCreator;
 	// <locales> of the search rules, read on first use
 	private SearchModLocales locales;
+	private SearchModRules searchRules;
+	// <poi><service> of the rules of the locale of the map: their places get a searchable tag
+	private List<PoiService> poiServices = Collections.emptyList();
 
 	protected final IndexRegionBboxFilter bboxFilter = new IndexRegionBboxFilter();
 
@@ -55,6 +59,10 @@ public class IndexCreationContext {
 			String translit = locales().translitForMap(regionName);
 			this.translitJapaneseNames = JAPANESE.equals(translit);
 			this.translitChineseNames = CHINESE.equals(translit);
+			String mapLocale = locales().forMap(regionName);
+			if (!Algorithms.isEmpty(mapLocale)) {
+				this.poiServices = searchRules().rules(mapLocale).services();
+			}
             WorldRegion region = this.allRegions.getRegionDataByDownloadName(regionName);
             if (region != null) {
 				bboxFilter.initRegionQuads(region);
@@ -62,11 +70,22 @@ public class IndexCreationContext {
 		}
 	}
 
+	private SearchModRules searchRules() {
+		if (searchRules == null) {
+			searchRules = new SearchModRules();
+		}
+		return searchRules;
+	}
+
 	private SearchModLocales locales() {
 		if (locales == null) {
-			locales = new SearchModRules().locales();
+			locales = searchRules().locales();
 		}
 		return locales;
+	}
+
+	List<PoiService> poiServices() {
+		return poiServices;
 	}
 
 	IndexPoiCreator getIndexPoiCreator() {
