@@ -14,18 +14,18 @@ import net.osmand.util.abbrs.PoiExtraction.ExtractedPoi;
  * coverage) and the generator. The row applies when
  * <ul>
  * <li>{@code owner} is {@code *} or the region of the map or its ancestor;</li>
- * <li>{@code kind=org}: {@code locale} is the locale of the map; {@code kind=word}: a name of the locale
- * ({@link SearchModLocales#forName}) is checked, a language row covers every locale of the language;</li>
+ * <li>{@code kind=org}: {@code locale} matches the locale of the map; {@code kind=word}: the locale of a name
+ * ({@link SearchModLocales#forName}); a language row ("de") covers every locale of the language;</li>
  * <li>{@code types} is empty or holds the subtype or an additional type of the POI;</li>
  * <li>{@code bind=operator/network}: a normalized value of the tag equals {@code bind_value};
  * {@code bind=phrase}: a name has the words of {@code bind_value} in a row and the entity has no tag
  * {@code require_absent};</li>
  * <li>the abbreviation is not a word of an indexed name yet.</li>
  * </ul>
+ * Names are those of the name index of the POI ({@link ExtractedPoi#names}): the phrase and the abbreviation are
+ * looked for where the generator indexes them.
  */
 public class TopAbbrPredicate {
-
-	private static final String[] NAME_TAGS = { "name", "short_name", "alt_name", "official_name" };
 
 	private final SearchModLocales locales;
 	private final RegionTree regions;
@@ -51,7 +51,7 @@ public class TopAbbrPredicate {
 				return false;
 			}
 		}
-		if (TopAbbrRow.KIND_ORG.equals(row.kind) && !row.locale.equals(mapLocale)) {
+		if (TopAbbrRow.KIND_ORG.equals(row.kind) && !localeMatches(row.locale, mapLocale)) {
 			return false;
 		}
 		if (!row.types.isEmpty() && !poi.hasType(row.types)) {
@@ -61,22 +61,19 @@ public class TopAbbrPredicate {
 			if (!row.requireAbsent.isEmpty() && e.tag(row.requireAbsent) != null) {
 				return false;
 			}
-			if (!hasPhrase(row, e, mapLocale)) {
+			if (!hasPhrase(row, poi, mapLocale)) {
 				return false;
 			}
 		} else if (TopAbbrRow.KIND_WORD.equals(row.kind) || !hasBindValue(e, row.bind, row.bindValue)) {
 			// a word row binds only by phrase
 			return false;
 		}
-		return !hasWord(e, row.abbrNormalized());
+		return !hasWord(poi, row.abbrNormalized());
 	}
 
-	private boolean hasPhrase(TopAbbrRow row, ExtractedEntity e, String mapLocale) {
+	private boolean hasPhrase(TopAbbrRow row, ExtractedPoi poi, String mapLocale) {
 		List<String> phrase = row.bindWords();
-		for (Map.Entry<String, String> t : e.tags.entrySet()) {
-			if (!isNameTag(t.getKey())) {
-				continue;
-			}
+		for (Map.Entry<String, String> t : poi.names.entrySet()) {
 			if (TopAbbrRow.KIND_WORD.equals(row.kind)
 					&& !localeMatches(row.locale, locales.forName(nameLanguageTag(t.getKey()), mapLocale))) {
 				continue;
@@ -107,25 +104,13 @@ public class TopAbbrPredicate {
 		return false;
 	}
 
-	/** the word is a word of an indexed name of the entity */
-	public static boolean hasWord(ExtractedEntity e, String word) {
-		for (Map.Entry<String, String> t : e.tags.entrySet()) {
-			if (isNameTag(t.getKey())) {
-				for (String v : AbbrText.values(t.getValue())) {
-					if (AbbrText.words(v).contains(word)) {
-						return true;
-					}
+	/** the word is a word of an indexed name of the POI */
+	public static boolean hasWord(ExtractedPoi poi, String word) {
+		for (String name : poi.names.values()) {
+			for (String v : AbbrText.values(name)) {
+				if (AbbrText.words(v).contains(word)) {
+					return true;
 				}
-			}
-		}
-		return false;
-	}
-
-	/** name, name:xx, short_name, alt_name:xx, official_name... */
-	public static boolean isNameTag(String tag) {
-		for (String k : NAME_TAGS) {
-			if (tag.startsWith(k) && (tag.length() == k.length() || tag.charAt(k.length()) == ':')) {
-				return true;
 			}
 		}
 		return false;

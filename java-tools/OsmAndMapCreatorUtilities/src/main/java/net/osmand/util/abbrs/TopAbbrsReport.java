@@ -55,15 +55,16 @@ class TopAbbrsReport {
 	}
 
 	private void summary() throws IOException {
-		w.write("<h1>Top abbreviations</h1>\n<h2>Input</h2><table><tr><th>map</th><th>generated</th><th>entities</th>"
-				+ "<th>POI</th><th>used</th></tr>\n");
+		w.write("<h1>Top abbreviations</h1>\n<h2>Input</h2><p>Period " + a.period + "</p><table><tr><th>map</th>"
+				+ "<th>data</th><th>generated</th><th>entities</th><th>POI</th><th>stale POI</th><th>used</th></tr>\n");
 		for (ExtractedMap m : a.extraction.maps()) {
-			w.write(tr(m.name, String.format(Locale.US, "%tF", m.generated), m.entities, m.pois,
-					m.used ? "yes" : "no: " + m.skipReason));
+			w.write(tr(m.name, String.format(Locale.US, "%tF", m.dataDate), String.format(Locale.US, "%tF", m.generated),
+					m.entities, m.pois, m.stalePois, m.used ? "yes" : "no: " + m.skipReason));
 		}
 		w.write("</table>\n");
 		w.write("<p>Entities " + a.extraction.entities().size() + ", POI " + a.extraction.poiCount()
-				+ ", copies of maps removed " + a.extraction.duplicatePois() + ".</p>\n");
+				+ ", copies of maps removed " + a.extraction.duplicatePois() + ", stale POI removed "
+				+ a.extraction.stalePois() + ".</p>\n");
 		Map<String, Integer> h1 = new TreeMap<>();
 		for (H1Candidate c : a.h1.values()) {
 			h1.merge(c.status, 1, Integer::sum);

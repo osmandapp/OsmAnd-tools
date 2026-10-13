@@ -29,7 +29,7 @@ abbreviation list from real data. Code: `net.osmand.obf.preparation.PoiNamesExtr
 class.
 
 **Done when:** extracted abbreviations analyzed over all PBFs in `pbf\` (Bremen, Wien, Saarland, Upper Franconia,
-NYC): extractions via `generate-poi --poi-extraction-dir`, then `top-abbrs-analyzer`; row review (correct, false,
+NYC): extractions via `generate-poi --poi-extraction-dir`, then `top-abbrs-analyzer --period=<YYYY-MM>`; row review (correct, false,
 reasons) and rejected candidates go into the PR description. Debug on the smallest PBFs.
 
 **Deferred from S2–S4** (follow-up PRs before enabling the job):

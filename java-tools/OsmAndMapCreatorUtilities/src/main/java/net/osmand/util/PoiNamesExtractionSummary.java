@@ -1,18 +1,14 @@
 package net.osmand.util;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.zip.GZIPInputStream;
+import java.util.function.Consumer;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -160,29 +156,13 @@ public class PoiNamesExtractionSummary {
 		return all == 0 ? 0 : part * 100.0 / all;
 	}
 
-	private interface Row {
-		void accept(String[] columns);
-	}
-
-	private static void readTsv(File f, String header, Row row) throws IOException {
+	private static void readTsv(File f, String header, Consumer<String[]> row) throws IOException {
 		if (!f.exists()) {
 			System.out.println("WARN: no file " + f);
 			return;
 		}
-		int columns = header.split("\t").length;
-		try (BufferedReader r = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(f)),
-				StandardCharsets.UTF_8))) {
-			String l = r.readLine();
-			if (!header.equals(l)) {
-				throw new IOException("Unexpected header of " + f + ": " + l);
-			}
-			while ((l = r.readLine()) != null) {
-				String[] c = l.split("\t", -1);
-				if (c.length != columns) {
-					throw new IOException("Unexpected row of " + f + ": " + l);
-				}
-				row.accept(c);
-			}
+		if (PoiNamesExtractor.readTsv(f, header, row) == null) {
+			System.out.println("WARN: no meta line in " + f);
 		}
 	}
 }

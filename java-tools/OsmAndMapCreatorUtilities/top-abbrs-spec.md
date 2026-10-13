@@ -37,7 +37,8 @@ in the UK it is DVLA.
 - **Gain** (`gain_objects`) — objects that do not yet have the abbreviation in any indexed name.
 - **H1** — pairs of two spellings of one name:
     - source `same`: `name` vs `short_name`/`alt_name`/`official_name`/`name:<lang>` of one object;
-    - source `near`: names of neighboring objects (≤ 500 m, same first word);
+    - source `near`: names of neighboring objects (≤ 500 m, same first word; each relation center is a point, the
+      neighbor cells are chosen in meters, so their longitude span grows with latitude);
     - with sub-span search inside the long side.
 - **H2** — a word shared by names of objects in one `operator`/`network` group and absent from the tag value.
 - **H3** — H2 filter: the word is built from first letters of consecutive words of the value (DMV ⊂ Department of
@@ -78,7 +79,8 @@ published on builder next to `brands.lst`.
 
 1. **POI extraction** of last month's map generation (5.3): one record per POI — OSM type and ID, point, map, OsmAnd
    subtype and additional types, raw `name`, `name:*`, `short_name`, `alt_name`, `official_name`, `operator*`,
-   `network*`, `brand*`, wikidata. Same objects and types as in OBF.
+   `network*`, `brand*`, wikidata, and per POI the names the generator put into its name index. Same objects, types
+   and indexed names as in OBF.
 2. **Region tree** — `.parent`, `.depth`, `.map` from `/home/osm-planet/osm-extract/` (5.3).
 3. **Rules** `top-abbrs-rules.xml` (section 6).
 4. **Map locales** — `<locales>` table from `rules.xml`: region → locale → word-statistics group.
@@ -135,7 +137,9 @@ neighbor pairs inflate them.
 
 **Shared application code.** The predicate "CSV row applies to POI" (name locale, `owner`, `types`, binding,
 `require_absent`, "abbreviation not yet in names") is one class shared by analyzer and generator. The analyzer uses it
-for `gain_objects`, `maxSpread` and publish coverage; the generator to apply rows. Both work on the same object set.
+for `gain_objects`, `maxSpread` and publish coverage; the generator to apply rows. Both work on the same object set
+and the same names: the phrase of `bind=phrase` and "abbreviation not yet in names" are checked in the names of the
+POI name index (`names` of the extraction, 5.3), not in raw tags.
 
 ### 5.3. Extraction: by-product of map generation
 
@@ -143,8 +147,12 @@ The analyzer reads POIs as the OBF generator accepts them, not extracts. Map gen
 there is no separate data pass. Cost: one month delay — the M+1 list is built from month M maps (12.1, 12.12).
 
 **Where it is written.** Class `PoiNamesExtractor`, called from `IndexPoiCreator`. Two files in the extraction dir:
-`<map>.poi-entities.tsv.gz` and `<map>.poi-records.tsv.gz`, `<map>` = OBF name without `.obf`. Written as `*.tmp` and
-renamed only if the POI section was written to OBF; deleted if generation fails.
+`<map>.poi-entities.tsv.gz` and `<map>.poi-records.tsv.gz`, `<map>` = OBF name without `.obf`. Written as `*.tmp`,
+closed after the POI section and renamed only after the whole OBF is written and closed; deleted if generation fails
+at any step. The reader finds a map by its records file, so publishing removes the old records file first and renames
+the new one last; the first line of both files is the same meta line `# poi-extraction data_date=<ms> generated=<ms>`
+(`data_date` — date of the map's OSM source file, `IndexCreator.setLastModifiedDate`; `generated` — generation
+start), and a pair with different meta lines is not read.
 
 1. **Entity** — in `iterateEntityInternal`, together with its first POI that passed the generator's pre-insert
    filters: map bounds (`bboxFilter.shouldFilterPoiEntity`/`shouldFilterPoiAmenity`), relation centers
@@ -171,29 +179,39 @@ though in OBF it has a name from the brand.
 | POI | `obf_id` | POI ID in OBF (relation centers: `id + 2 * center`) |
 | POI | `type`, `subtype`, `additional` | category, subtype key (`government`) and keys of non-text additional types joined by `;` (`government_transportation`), without `top_index_*` |
 | POI | `lat`, `lon` | point of the written POI (31-bit coordinates of the `poi` row, 6 digits) |
+| POI | `names` | JSON object of the names of the POI name index as `putPoiObjectPrefix` gets them: text additional tags with `ObfConstants.isTagIndexedForSearchAsName` (`name`, `name:*`, `brand`, `name_etymology`…) and `name:en` — the transliteration of `name` when there is no `name:en` |
 
-First line of each file is a header. Tabs and newlines in `type`/`subtype` are replaced by spaces. Summary:
+The meta line is followed by a header. Tabs and newlines in `type`/`subtype` are replaced by spaces. Summary:
 `utilities.sh poi-extraction-summary <dir or files> [--top=20]` — entity and POI counts, size, share of entities with
 `operator`/`network`, frequent types and additional types.
 
 **Identity.**
 - **OSM entity** `(osm_type, osm_id)`: threshold counting (5.2), names and binding tags;
 - **POI** `(osm_type, osm_id, center, type, subtype)`: application and coverage. One entity may yield several POIs —
-  several categories/subtypes (station and stop) and several relation centers.
+  several categories/subtypes (station and stop) and several relation centers. `subtype` is the OBF subtype as is: a
+  tag with several values gives one POI with the keys joined by `;` (`amenity=cafe;restaurant` → `cafe;restaurant`);
+  its types are the keys `cafe` and `restaurant` (entity types, row `types`, type counts), never the joined value.
 
-**Duplicates across maps.** Generation is per map, not per leaf: a country map and its parts' maps share objects.
-Deduplicate by **POI** identity, not entity: different POIs of one entity are kept. Of several copies of one POI, take
-the copy from the **freshest** extraction, then the deepest map (largest `.depth`), then first by name. No separate leaf
-coverage check: an object in a "hole" between child polygons stays in the parent map.
+**Duplicates across maps.** Generation is per map, not per leaf: a country map and its parts' maps share objects,
+maybe of different OSM data (a map not rebuilt this month). An entity is taken in **one state**: of the maps with the
+newest `data_date` that have it. Its POIs from maps with older data are stale and dropped (`stale POI` in the report):
+a cafe turned restaurant must not yield both POIs with the new name. Within one `data_date`, deduplicate by **POI**
+identity, not entity: different POIs of one entity are kept (relation centers in different maps). Of several copies of
+one POI, take the copy of the latest generation, then the deepest map (largest `.depth`), then first by name; the
+entity's tags come from its first kept POI. No separate leaf coverage check: an object in a "hole" between child
+polygons stays in the parent map.
 
-**Per-entity statistics.** Entity types — union of `subtype` and `additional` of all its POIs; a row with `types` is
+**Per-entity statistics.** Entity types — union of subtype keys and `additional` of all its POIs; a row with `types` is
 supported by an entity if at least one POI matches. Entity region and point for ownership — center `0`; in `near`
 each relation center is a separate point, but the entity counts once.
 
-**Month and completeness.** The analyzer runs after month M generation finishes. If a map was not built this month,
-its latest extraction no older than `<input maxExtractionAgeMonths>` (2 months) is used; older ones are not, and the
-map's objects are not counted this month (listed in the report). A map missing from the region tree is not counted.
-The manifest (8.4) records each map's generation date and the hashes of both extraction files. The first list
+**Month and completeness.** The analyzer runs after month M generation finishes with the explicit period
+`--period=M` (`YYYY-MM`, the month of the OSM data of that generation); ages are counted from it, not from the newest
+input, so a stale input directory is not taken for a fresh one. If a map was not built this month, its latest
+extraction is used if its data month is no older than `<input maxExtractionAgeMonths>` (2) months before M; older
+ones and ones with data after M are not, and the map's objects are not counted this month (listed in the report). A
+map missing from the region tree is not counted.
+The manifest (8.4) records the period, each map's data and generation dates and the hashes of both extraction files. The first list
 release waits for one generation with extraction enabled.
 
 **Checks before enabling on all maps.** On one large map measure extraction size and generation time increase. Tests
@@ -348,7 +366,7 @@ UTF-8, header, one row = one application rule.
 Empty cell — metric not applicable. `gain_objects` counts objects, not index size: OBF growth depends on shared keys,
 other names and overlap with rules; index growth is measured by a paired build (section 11).
 
-**Types.** An object matches if its subtype or one of its additional types is in `types`. Each key is validated
+**Types.** An object matches if one of its subtype keys (5.3) or one of its additional types is in `types`. Each key is validated
 against `MapPoiTypes` on load: the job does not publish a CSV with an unknown key; the generator skips such a row with
 a log entry.
 
@@ -363,7 +381,8 @@ One organization may yield two rows: binding by `operator` (precise) and by `phr
   `poiTopIndexUrl`. Without it generation is unchanged. The URL points to the generation month's file
   (`top_abbrs-<YYYY-MM>.csv`, built from last month's maps, 12.12), not the latest.
 - **Rows for a map.** Those whose `owner` is `*`, the map region or its ancestor, and whose `locale` matches:
-    - `kind=org` — `locale` equals the map locale per `<locales>`;
+    - `kind=org` — `locale` equals the map locale per `<locales>`, or is its language (`<include kind="org"
+      locale="de">` applies on `de_DE` and `de_CH` maps);
     - `kind=word` — `locale` (language `de` or locale `de_CH`) matches the **name** locale
       (`SearchModLocales.forName`): `name:de` on an Italian map is `de_IT`.
 
@@ -401,12 +420,12 @@ Then each remaining row's binding is checked (during POI preparation, before `pu
 
 - **`operator`/`network`** — the object's normalized tag value (split by `;`) equals `bind_value`. The tag is
   available: `operator` is stored in the POI as a text attribute.
-- **`phrase`** — normalized name (`name` and indexed names) contains `bind_value` as consecutive words (5.2.1) **and**
+- **`phrase`** — a name of the POI name index contains `bind_value` as consecutive words (5.2.1) **and**
   the object lacks the `require_absent` tag, if set. For H5 rows `require_absent` is the group tag
   (`operator`/`network`): only objects without it get the alias — exactly those the job counted for `maxSpread` and
   `gain_objects`. An object with a different `operator` does not get the phrase alias.
-- **`types`**, if set — object's subtype or one of its additional types is in the list.
-- An object that already has the abbreviation among its indexed name words is unchanged.
+- **`types`**, if set — one of object's subtype keys or additional types is in the list.
+- An object that already has the abbreviation among the words of its name-index names is unchanged.
 
 ### 8.3. Writing to OBF
 

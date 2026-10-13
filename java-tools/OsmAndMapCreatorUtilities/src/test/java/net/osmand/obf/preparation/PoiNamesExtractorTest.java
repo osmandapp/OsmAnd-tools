@@ -1,22 +1,21 @@
 package net.osmand.obf.preparation;
 
-import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.zip.GZIPInputStream;
 
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
 import net.osmand.IProgress;
 import net.osmand.ResultMatcher;
@@ -24,6 +23,7 @@ import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
 import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.data.Amenity;
+import net.osmand.obf.preparation.PoiNamesExtractor.Meta;
 import net.osmand.util.PoiNamesExtractionSummary;
 
 import static org.junit.Assert.*;
@@ -53,13 +53,17 @@ public class PoiNamesExtractorTest {
 	}
 
 	private static File generate(File dir, String poiExtractionDir) throws Exception {
+		return generate(dir, poiExtractionDir, IProgress.EMPTY_PROGRESS);
+	}
+
+	private static File generate(File dir, String poiExtractionDir, IProgress progress) throws Exception {
 		IndexCreatorSettings settings = new IndexCreatorSettings();
 		settings.indexPOI = true;
 		settings.poiExtractionDir = poiExtractionDir;
 		IndexCreator creator = new IndexCreator(dir, settings);
 		creator.setMapFileName(MAP + ".obf");
 		creator.setLastModifiedDate(LAST_MODIFIED);
-		return creator.generateIndexes(source(), IProgress.EMPTY_PROGRESS, null, null, null, null);
+		return creator.generateIndexes(source(), progress, null, null, null, null);
 	}
 
 	private static File source() throws URISyntaxException {
@@ -103,6 +107,84 @@ public class PoiNamesExtractorTest {
 			s.add(b.toString());
 		}
 		return s;
+	}
+
+	@Test
+	public void filesOfOneExtraction() throws IOException {
+		Meta meta = PoiNamesExtractor.readMeta(new File(extractionDir, MAP + PoiNamesExtractor.RECORDS_EXT));
+		assertNotNull(meta);
+		assertEquals(LAST_MODIFIED, meta.dataDate);
+		assertEquals(meta, PoiNamesExtractor.readMeta(new File(extractionDir, MAP + PoiNamesExtractor.ENTITIES_EXT)));
+	}
+
+	@Test
+	public void notPublishedWhenGenerationFailsAfterPoi() throws Exception {
+		File dir = tmp.newFolder("failed-extraction");
+		// fails after the POI section is written, before the OBF is closed
+		IProgress failing = new IProgress() {
+			boolean poiWritten;
+
+			@Override
+			public void startTask(String taskName, int work) {
+				poiWritten |= taskName != null && taskName.startsWith("Writing poi index");
+			}
+
+			@Override
+			public void finishTask() {
+				if (poiWritten) {
+					throw new IllegalStateException("failure after the POI section");
+				}
+			}
+
+			@Override
+			public void startWork(int work) {
+			}
+
+			@Override
+			public void progress(int deltaWork) {
+			}
+
+			@Override
+			public void remaining(int remainingWork) {
+			}
+
+			@Override
+			public boolean isIndeterminate() {
+				return false;
+			}
+
+			@Override
+			public boolean isInterrupted() {
+				return false;
+			}
+
+			@Override
+			public void setGeneralProgress(String genProgress) {
+			}
+		};
+		try {
+			generate(tmp.newFolder("failed"), dir.getAbsolutePath(), failing);
+			fail("the generation must fail");
+		} catch (IllegalStateException e) {
+			assertEquals("failure after the POI section", e.getMessage());
+		}
+		assertEquals(List.of(), Arrays.asList(Objects.requireNonNull(dir.list())));
+	}
+
+	@Test
+	public void compositeSubtypeAndIndexedNames() {
+		List<String[]> poi = recordsOf("node", "1005");
+		assertEquals(1, poi.size());
+		// the identity keeps the subtype of the OBF
+		assertEquals("cafe;restaurant", poi.get(0)[5]);
+		Map<String, String> names = new Gson().fromJson(poi.get(0)[9], new TypeToken<TreeMap<String, String>>() {
+		}.getType());
+		// the names of the name index: brand; name:etymology is the additional type name_etymology, so the exclusion of
+		// "name:etymology" in ObfConstants.isTagIndexedForSearchAsName does not apply to it
+		assertEquals(Map.of("name", "Mixed Place", "name:en", "Mixed Place", "brand", "Mixed Brand", "name_etymology",
+				"Hbf"), names);
+		assertTrue(entity("node", "1005")[2].contains("\"name:etymology\":\"Hbf\""));
+		assertTrue(recordsOf("node", "1001").get(0)[9].contains("\"name:de\":\"Zwei Typen\""));
 	}
 
 	@Test
@@ -160,9 +242,9 @@ public class PoiNamesExtractorTest {
 			System.setOut(out);
 		}
 		String s = bytes.toString(StandardCharsets.UTF_8);
-		assertTrue(s, s.contains("entities: 3 "));
+		assertTrue(s, s.contains("entities: 4 "));
 		assertTrue(s, s.contains("with operator: 2 "));
-		assertTrue(s, s.contains("POI: 5 "));
+		assertTrue(s, s.contains("POI: 6 "));
 		assertTrue(s, s.contains("relation centers > 0: 1, entities with several POI: 2"));
 	}
 
@@ -190,17 +272,7 @@ public class PoiNamesExtractorTest {
 
 	private static List<String[]> read(File f, String header) throws IOException {
 		List<String[]> rows = new ArrayList<>();
-		try (BufferedReader r = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(f)),
-				StandardCharsets.UTF_8))) {
-			assertEquals(header, r.readLine());
-			int columns = header.split("\t").length;
-			String l;
-			while ((l = r.readLine()) != null) {
-				String[] c = l.split("\t", -1);
-				assertEquals(l, columns, c.length);
-				rows.add(c);
-			}
-		}
+		assertNotNull(PoiNamesExtractor.readTsv(f, header, rows::add));
 		return rows;
 	}
 

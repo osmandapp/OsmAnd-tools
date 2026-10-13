@@ -392,7 +392,7 @@ public class IndexCreator {
 		}
 		if (settings.indexPOI) {
 			indexPoiCreator.createDatabaseStructure(getPoiFile());
-			indexPoiCreator.startPoiExtraction(mapFile);
+			indexPoiCreator.startPoiExtraction(mapFile, lastModifiedDate);
 		}
 		if (settings.indexTransport) {
 			indexTransportCreator.createDatabaseStructure(mapConnection, mapIndexDBDialect,
@@ -676,6 +676,9 @@ public class IndexCreator {
 				writer.close();
 				mapRAFile.close();
 				log.info("Finish writing binary file"); //$NON-NLS-1$
+				if (settings.indexPOI) {
+					indexPoiCreator.publishPoiExtraction();
+				}
 			}
 		} catch (RuntimeException e) {
 			log.error("Log exception", e); //$NON-NLS-1$

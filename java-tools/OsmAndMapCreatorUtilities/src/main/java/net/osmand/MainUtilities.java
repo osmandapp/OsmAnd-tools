@@ -516,7 +516,7 @@ public class MainUtilities {
 		System.out.println("\t\t inspector <params>: powerful tool to inspect obf files and convert them to osm");
 		System.out.println("\t\t poi-extraction-summary <dir or extraction files> <--top=20>: summary of the POI extractions of generation "
 				+ "(--poi-extraction-dir=<dir> of generate-obf or POI_EXTRACTION_DIR)");
-		System.out.println("\t\t top-abbrs-analyzer <extraction dirs or files> --out=<dir> <--rules=top-abbrs-rules.xml> "
+		System.out.println("\t\t top-abbrs-analyzer <extraction dirs or files> --period=<YYYY-MM> --out=<dir> <--rules=top-abbrs-rules.xml> "
 				+ "<--brands=brands.lst> <--explorer=candidates.json>: top_abbrs.csv of abbreviations of organizations and words of POI names");
 		System.out.println("\t\t check-ocean-tile <lat> <lon> <zoom=11>: checks ocean or land tile is in bz2 list");
 		System.out.println("\t\t generate-ocean-tile <coastline osm file> <optional output file>: creates ocean tiles 12 zoom");

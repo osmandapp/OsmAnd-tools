@@ -11,9 +11,11 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -46,8 +48,9 @@ import net.osmand.util.abbrs.PoiExtraction.ExtractedPoi;
  * Not in this version: H5 ({@code <propagate>}), the difference with the last month, the sample for labeling,
  * automatic publication, the limit per map.
  * <p>
- * Usage: {@code top-abbrs-analyzer <extraction dir or file>... --out=<dir> [--rules=top-abbrs-rules.xml]
- * [--brands=brands.lst]}
+ * Usage: {@code top-abbrs-analyzer <extraction dir or file>... --period=<YYYY-MM> --out=<dir>
+ * [--rules=top-abbrs-rules.xml] [--brands=brands.lst]}: {@code period} is the month of the OSM data of the analyzed
+ * generation, the age of an extraction is counted from it.
  */
 public class TopAbbrsAnalyzer {
 
@@ -219,15 +222,12 @@ public class TopAbbrsAnalyzer {
 					brands.add(AbbrText.normalize(b));
 				}
 			}
-			for (ExtractedPoi p : e.pois) {
-				if (PLACE_SUBTYPES.contains(p.subtype)) {
-					for (String v : AbbrText.values(e.tag("name"))) {
-						List<String> w = AbbrText.words(v);
-						if (!w.isEmpty()) {
-							placeNames.computeIfAbsent(locale(e), k -> new HashSet<>()).add(w);
-						}
+			if (!Collections.disjoint(PLACE_SUBTYPES, e.types())) {
+				for (String v : AbbrText.values(e.tag("name"))) {
+					List<String> w = AbbrText.words(v);
+					if (!w.isEmpty()) {
+						placeNames.computeIfAbsent(locale(e), k -> new HashSet<>()).add(w);
 					}
-					break;
 				}
 			}
 		}
@@ -292,9 +292,53 @@ public class TopAbbrsAnalyzer {
 		return l;
 	}
 
+	/** a point of an entity for {@code near}: every relation center is a point */
+	private static class NearPoint {
+		final ExtractedEntity entity;
+		final List<Word> words;
+		final String name;
+		final double lat, lon;
+
+		NearPoint(ExtractedEntity entity, List<Word> words, String name, ExtractedPoi p) {
+			this.entity = entity;
+			this.words = words;
+			this.name = name;
+			this.lat = p.lat;
+			this.lon = p.lon;
+		}
+	}
+
+	/** cells of {@code near}: rows of {@code cellLat} degrees, a row is cut into cells at least that wide in meters */
+	private static class NearGrid {
+		final double cellLat;
+
+		NearGrid(int radiusM) {
+			// a degree of latitude is longer than 111 km
+			cellLat = Math.max(0.001, radiusM / 111_000.0);
+		}
+
+		int row(double lat) {
+			return (int) Math.floor(lat / cellLat);
+		}
+
+		/** degrees of longitude of radiusM at the latitudes from row r0 to row r1 */
+		double lonDegrees(int r0, int r1) {
+			double maxLat = Math.min(89.9, Math.max(Math.abs(r0 * cellLat), Math.abs((r1 + 1) * cellLat)));
+			return cellLat / Math.cos(Math.toRadians(maxLat));
+		}
+
+		double cellLon(int row) {
+			return lonDegrees(row, row);
+		}
+
+		int column(int row, double lon) {
+			return (int) Math.floor(lon / cellLon(row));
+		}
+	}
+
 	private void mineNear() {
-		Map<String, List<Object[]>> buckets = new HashMap<>();
-		Map<String, Double> cells = new HashMap<>();
+		Map<String, List<NearPoint>> buckets = new HashMap<>();
+		Map<String, NearGrid> grids = new HashMap<>();
 		for (ExtractedEntity e : extraction.entities()) {
 			String loc = locale(e);
 			if (!rules.boolAttr(loc, "pairs/source.near", "enabled")) {
@@ -308,22 +352,30 @@ public class TopAbbrsAnalyzer {
 			if (nw.size() < 2) {
 				continue;
 			}
-			double cell = cells.computeIfAbsent(loc,
-					l -> Math.max(0.001, rules.intAttr(l, "pairs/source.near", "radiusM") / 111_000.0));
-			ExtractedPoi p = e.mainPoi();
+			NearGrid grid = grids.computeIfAbsent(loc, l -> new NearGrid(rules.intAttr(l, "pairs/source.near", "radiusM")));
 			String first = rules.boolAttr(loc, "pairs/source.near", "sameFirstWord") ? nw.get(0).word : "";
-			String key = loc + "|" + first + "|" + (int) Math.floor(p.lat / cell) + "|" + (int) Math.floor(p.lon / cell);
-			buckets.computeIfAbsent(key, k -> new ArrayList<>()).add(new Object[] { e, nw, name });
+			Set<Integer> centers = new HashSet<>();
+			for (ExtractedPoi p : e.pois) {
+				if (centers.add(p.center)) {
+					int row = grid.row(p.lat);
+					buckets.computeIfAbsent(loc + "|" + first + "|" + row + "|" + grid.column(row, p.lon),
+							k -> new ArrayList<>()).add(new NearPoint(e, nw, name, p));
+				}
+			}
 		}
 		Set<String> seen = new HashSet<>();
-		for (Map.Entry<String, List<Object[]>> b : buckets.entrySet()) {
+		for (Map.Entry<String, List<NearPoint>> b : buckets.entrySet()) {
 			String[] k = b.getKey().split("\\|", -1);
 			String loc = k[0];
-			int cy = Integer.parseInt(k[2]), cx = Integer.parseInt(k[3]);
-			List<Object[]> others = new ArrayList<>();
-			for (int dy = -1; dy <= 1; dy++) {
-				for (int dx = -1; dx <= 1; dx++) {
-					List<Object[]> o = buckets.get(loc + "|" + k[1] + "|" + (cy + dy) + "|" + (cx + dx));
+			NearGrid grid = grids.get(loc);
+			int row = Integer.parseInt(k[2]), col = Integer.parseInt(k[3]);
+			// cells with a point within the radius of the cell: its neighbor rows, columns by the longitude of the radius
+			double west = col * grid.cellLon(row), east = (col + 1) * grid.cellLon(row);
+			double dLon = grid.lonDegrees(row - 1, row + 1);
+			List<NearPoint> others = new ArrayList<>();
+			for (int r = row - 1; r <= row + 1; r++) {
+				for (int c = grid.column(r, west - dLon); c <= grid.column(r, east + dLon); c++) {
+					List<NearPoint> o = buckets.get(loc + "|" + k[1] + "|" + r + "|" + c);
 					if (o != null) {
 						others.addAll(o);
 					}
@@ -335,14 +387,12 @@ public class TopAbbrsAnalyzer {
 			}
 			int radius = rules.intAttr(loc, "pairs/source.near", "radiusM");
 			int maxShort = rules.intAttr(loc, "pairs/source.near", "maxShortLen");
-			for (Object[] o1 : b.getValue()) {
-				ExtractedEntity e1 = (ExtractedEntity) o1[0];
-				@SuppressWarnings("unchecked")
-				List<Word> n1 = (List<Word>) o1[1];
-				for (Object[] o2 : others) {
-					ExtractedEntity e2 = (ExtractedEntity) o2[0];
-					@SuppressWarnings("unchecked")
-					List<Word> n2 = (List<Word>) o2[1];
+			for (NearPoint o1 : b.getValue()) {
+				ExtractedEntity e1 = o1.entity;
+				List<Word> n1 = o1.words;
+				for (NearPoint o2 : others) {
+					ExtractedEntity e2 = o2.entity;
+					List<Word> n2 = o2.words;
 					if (e1 == e2 || Math.abs(n1.size() - n2.size()) > 2 || words(n1).equals(words(n2))) {
 						continue;
 					}
@@ -350,18 +400,18 @@ public class TopAbbrsAnalyzer {
 					if (seen.contains(pk)) {
 						continue;
 					}
+					if (MapUtils.getDistance(o1.lat, o1.lon, o2.lat, o2.lon) > radius) {
+						continue;
+					}
 					AbbrMatcher.Pair d = pair(n1, n2, loc, false);
+					// the pair of entities is decided once: by its first pair of centers within the radius
+					seen.add(pk);
 					if (d == null || d.abbr.length() > maxShort) {
 						continue;
 					}
-					ExtractedPoi p1 = e1.mainPoi(), p2 = e2.mainPoi();
-					if (MapUtils.getDistance(p1.lat, p1.lon, p2.lat, p2.lon) > radius) {
-						continue;
-					}
-					seen.add(pk);
 					// the object with the long form gains the short form
 					ExtractedEntity gain = d.shortInFirst ? e2 : e1;
-					addPair(loc, d, "near", gain, d.shortInFirst ? n1 : n2, o1[2] + " | " + o2[2]);
+					addPair(loc, d, "near", gain, d.shortInFirst ? n1 : n2, o1.name + " | " + o2.name);
 				}
 			}
 		}
@@ -394,7 +444,9 @@ public class TopAbbrsAnalyzer {
 			c.perMap.merge(gain.map, 1, Integer::sum);
 			c.tiles.add(gain.tile(rules.intAttr(loc, "pairs/accept", "tileZoom")));
 			for (ExtractedPoi p : gain.pois) {
-				c.types.merge(p.subtype, 1, Integer::sum);
+				for (String t : p.subtypes) {
+					c.types.merge(t, 1, Integer::sum);
+				}
 			}
 			if (c.examples.size() < MAX_EXAMPLES) {
 				c.examples.add(example + " (" + gain.key() + ")");
@@ -775,7 +827,7 @@ public class TopAbbrsAnalyzer {
 			r.bindValue = g.value;
 			for (ExtractedEntity e : g.members) {
 				for (ExtractedPoi p : e.pois) {
-					r.types.add(p.subtype);
+					r.types.addAll(p.subtypes);
 				}
 			}
 			r.groupSize = g.members.size();
@@ -913,10 +965,11 @@ public class TopAbbrsAnalyzer {
 		byWord = new HashMap<>();
 		byValue = new HashMap<>();
 		for (ExtractedEntity e : extraction.entities()) {
+			// the phrase of a row is looked for in the names of the name index
 			Set<String> ws = new HashSet<>();
-			for (Map.Entry<String, String> t : e.tags.entrySet()) {
-				if (TopAbbrPredicate.isNameTag(t.getKey())) {
-					for (String v : AbbrText.values(t.getValue())) {
+			for (ExtractedPoi p : e.pois) {
+				for (String n : p.names.values()) {
+					for (String v : AbbrText.values(n)) {
 						ws.addAll(AbbrText.words(v));
 					}
 				}
@@ -1000,6 +1053,9 @@ public class TopAbbrsAnalyzer {
 	}
 
 	// ---------- outputs ----------
+
+	/** the analyzed month, for the manifest */
+	public YearMonth period;
 
 	public void write(File out, File regionsCsv, List<File> inputs) throws IOException {
 		File csv = new File(out, "top_abbrs.csv");
@@ -1123,21 +1179,14 @@ public class TopAbbrsAnalyzer {
 		if (regionsCsv != null) {
 			b.append("  \"regions_csv\": \"").append(hash(regionsCsv)).append("\",\n");
 		}
+		b.append("  \"period\": \"").append(period).append("\",\n");
 		b.append("  \"maps\": [\n");
-		Map<String, File> bases = new TreeMap<>();
-		for (File in : inputs) {
-			File[] fs = in.isDirectory() ? in.listFiles((d, n) -> n.endsWith(PoiNamesExtractor.RECORDS_EXT))
-					: new File[] { in };
-			for (File r : fs == null ? new File[0] : fs) {
-				String n = r.getName();
-				bases.put(n.substring(0, n.indexOf(".poi-")), new File(r.getParentFile(), n.substring(0, n.indexOf(".poi-"))));
-			}
-		}
+		Map<String, File> bases = PoiExtractionReader.mapFiles(inputs);
 		int i = 0;
 		for (PoiExtraction.ExtractedMap m : extraction.maps()) {
 			File base = bases.get(m.name);
-			b.append("    {\"map\": \"").append(m.name).append("\", \"generated\": ").append(m.generated)
-					.append(", \"used\": ").append(m.used);
+			b.append("    {\"map\": \"").append(m.name).append("\", \"data_date\": ").append(m.dataDate)
+					.append(", \"generated\": ").append(m.generated).append(", \"used\": ").append(m.used);
 			if (base != null) {
 				b.append(", \"entities\": \"").append(hash(new File(base.getPath() + PoiNamesExtractor.ENTITIES_EXT)))
 						.append("\", \"records\": \"").append(hash(new File(base.getPath() + PoiNamesExtractor.RECORDS_EXT)))
@@ -1158,8 +1207,11 @@ public class TopAbbrsAnalyzer {
 	public static void main(String[] args) throws IOException {
 		List<File> inputs = new ArrayList<>();
 		File out = null, rulesFile = null, brandsFile = null, explorer = null;
+		YearMonth period = null;
 		for (String a : args) {
-			if (a.startsWith("--out=")) {
+			if (a.startsWith("--period=")) {
+				period = YearMonth.parse(a.substring("--period=".length()));
+			} else if (a.startsWith("--out=")) {
 				out = new File(a.substring("--out=".length()));
 			} else if (a.startsWith("--rules=")) {
 				rulesFile = new File(a.substring("--rules=".length()));
@@ -1173,8 +1225,8 @@ public class TopAbbrsAnalyzer {
 				inputs.add(new File(a));
 			}
 		}
-		if (inputs.isEmpty() || out == null) {
-			System.out.println("Usage: top-abbrs-analyzer <extraction dir or file>... --out=<dir> "
+		if (inputs.isEmpty() || out == null || period == null) {
+			System.out.println("Usage: top-abbrs-analyzer <extraction dir or file>... --period=<YYYY-MM> --out=<dir> "
 					+ "[--rules=top-abbrs-rules.xml] [--brands=brands.lst]");
 			return;
 		}
@@ -1192,10 +1244,15 @@ public class TopAbbrsAnalyzer {
 		File regionsCsv = new File(out, "regions.csv");
 		regions.writeCsv(regionsCsv);
 		PoiExtraction extraction = new PoiExtractionReader(regions,
-				rules.intAttr("", "input", "maxExtractionAgeMonths")).read(inputs);
-		System.out.printf("Read %d maps: %d entities, %d POI (%d duplicates of maps removed) in %.1f s%n",
-				extraction.maps().size(), extraction.entities().size(), extraction.poiCount(),
-				extraction.duplicatePois(), (System.currentTimeMillis() - time) / 1e3);
+				rules.intAttr("", "input", "maxExtractionAgeMonths"), period).read(inputs);
+		System.out.printf("Read %d maps of %s: %d entities, %d POI (%d duplicates of maps, %d stale POI removed) "
+				+ "in %.1f s%n", extraction.maps().size(), period, extraction.entities().size(), extraction.poiCount(),
+				extraction.duplicatePois(), extraction.stalePois(), (System.currentTimeMillis() - time) / 1e3);
+		for (PoiExtraction.ExtractedMap m : extraction.maps()) {
+			if (!m.used) {
+				System.out.println("Skipped " + m.name + ": " + m.skipReason);
+			}
+		}
 		List<String> brandValues = new ArrayList<>();
 		if (brandsFile != null) {
 			try (BufferedReader r = new BufferedReader(new InputStreamReader(new FileInputStream(brandsFile),
@@ -1212,6 +1269,7 @@ public class TopAbbrsAnalyzer {
 		TopAbbrsAnalyzer analyzer = new TopAbbrsAnalyzer(extraction, rules, new SearchModRules().locales(),
 				CommonWordsMultiIndex.getInstance(), regions, poiTypes, brandValues);
 		analyzer.keepNoise = explorer != null;
+		analyzer.period = period;
 		List<TopAbbrRow> rows = analyzer.run();
 		analyzer.write(out, regionsCsv, inputs);
 		if (explorer != null) {

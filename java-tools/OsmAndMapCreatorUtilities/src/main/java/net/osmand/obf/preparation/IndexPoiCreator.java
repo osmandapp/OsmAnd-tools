@@ -364,14 +364,25 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 
 
-	/** starts the extraction of named POI of the map {@code mapFile} if it is enabled (see {@link PoiNamesExtractor}) */
-	public void startPoiExtraction(File mapFile) throws IOException {
-		poiExtraction = PoiNamesExtractor.create(settings, mapFile);
+	/**
+	 * starts the extraction of named POI of the map {@code mapFile} with the OSM data of {@code dataDate} if it is
+	 * enabled (see {@link PoiNamesExtractor})
+	 */
+	public void startPoiExtraction(File mapFile, Long dataDate) throws IOException {
+		poiExtraction = PoiNamesExtractor.create(settings, mapFile, dataDate);
+	}
+
+	/** the whole OBF is written and closed: publishes the extraction */
+	public void publishPoiExtraction() throws IOException {
+		if (poiExtraction != null) {
+			poiExtraction.publish();
+			poiExtraction = null;
+		}
 	}
 
 	public void commitAndClosePoiFile(Long lastModifiedDate) throws SQLException {
 		if (poiExtraction != null) {
-			// the OBF was not written
+			// the OBF was not written completely
 			poiExtraction.abort();
 			poiExtraction = null;
 		}
@@ -910,8 +921,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 		writer.endWritePoiIndex();
 		if (poiExtraction != null) {
-			poiExtraction.finish();
-			poiExtraction = null;
+			// published by publishPoiExtraction when the whole OBF is written
+			poiExtraction.close();
 		}
 	}
 

@@ -17,11 +17,15 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.zip.GZIPOutputStream;
 
 import org.junit.BeforeClass;
@@ -31,20 +35,26 @@ import org.junit.rules.TemporaryFolder;
 
 import com.google.gson.Gson;
 
+import net.osmand.binary.ObfConstants;
 import net.osmand.obf.preparation.CommonWordsMultiIndex;
 import net.osmand.obf.preparation.PoiNamesExtractor;
+import net.osmand.obf.preparation.PoiNamesExtractor.Meta;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.search.rules.SearchModLocales;
 import net.osmand.search.rules.SearchModRules;
+import net.osmand.util.MapUtils;
 import net.osmand.util.abbrs.PoiExtraction.ExtractedEntity;
+import net.osmand.util.abbrs.PoiExtraction.ExtractedMap;
 import net.osmand.util.abbrs.PoiExtraction.ExtractedPoi;
 
-/** {@link TopAbbrsAnalyzer} and the common code on a synthetic extraction of two maps */
+/** {@link TopAbbrsAnalyzer} and the common code on synthetic extractions */
 public class TopAbbrsAnalyzerTest {
 
 	private static final String NY = "Us_new-york_northamerica";
 	private static final String DE = "Germany_niedersachsen_europe";
 	private static final String IT = "Italy_trentino-alto-adige_europe";
+	private static final YearMonth PERIOD = YearMonth.of(2026, 10);
+	private static final long DATA = date(2026, 10, 1);
 
 	@ClassRule
 	public static TemporaryFolder tmp = new TemporaryFolder();
@@ -55,6 +65,7 @@ public class TopAbbrsAnalyzerTest {
 	private static List<TopAbbrRow> rows;
 	private static TopAbbrsAnalyzer analyzer;
 
+	/** an extraction of a map as {@link PoiNamesExtractor} writes it; the indexed names are the name tags */
 	private static class MapWriter {
 		final StringBuilder entities = new StringBuilder(PoiNamesExtractor.ENTITIES_HEADER + "\n");
 		final StringBuilder records = new StringBuilder(PoiNamesExtractor.RECORDS_HEADER + "\n");
@@ -64,20 +75,46 @@ public class TopAbbrsAnalyzerTest {
 			this.id = firstId;
 		}
 
-		void add(double lat, double lon, String subtype, String... tags) {
+		/** a node with one POI */
+		long add(double lat, double lon, String subtype, String... tags) {
+			long osmId = id++;
+			entity("node", osmId, tags);
+			poi("node", osmId, 0, subtype, lat, lon, tags);
+			return osmId;
+		}
+
+		void entity(String osmType, long osmId, String... tags) {
+			entities.append(osmType).append('\t').append(osmId).append('\t').append(new Gson().toJson(tags(tags)))
+					.append('\n');
+		}
+
+		void poi(String osmType, long osmId, int center, String subtype, double lat, double lon, String... tags) {
+			Map<String, String> names = new TreeMap<>();
+			tags(tags).forEach((k, v) -> {
+				if (ObfConstants.isTagIndexedForSearchAsName(k)) {
+					names.put(k, v);
+				}
+			});
+			records.append(osmType).append('\t').append(osmId).append('\t').append(center).append('\t')
+					.append(osmId * 2 + center * 2L).append("\tother\t").append(subtype).append("\t\t").append(lat)
+					.append('\t').append(lon).append('\t').append(new Gson().toJson(names)).append('\n');
+		}
+
+		private static Map<String, String> tags(String... tags) {
 			Map<String, String> t = new TreeMap<>();
 			for (int i = 0; i < tags.length; i += 2) {
 				t.put(tags[i], tags[i + 1]);
 			}
-			long osmId = id++;
-			entities.append("node\t").append(osmId).append('\t').append(new Gson().toJson(t)).append('\n');
-			records.append("node\t").append(osmId).append("\t0\t").append(osmId * 2).append("\tother\t")
-					.append(subtype).append("\t\t").append(lat).append('\t').append(lon).append('\n');
+			return t;
 		}
 
-		void write(File dir, String map) throws IOException {
-			gzip(new File(dir, map + PoiNamesExtractor.ENTITIES_EXT), entities.toString());
-			gzip(new File(dir, map + PoiNamesExtractor.RECORDS_EXT), records.toString());
+		void write(File dir, String map, long dataDate) throws IOException {
+			write(dir, map, new Meta(dataDate, dataDate), new Meta(dataDate, dataDate));
+		}
+
+		void write(File dir, String map, Meta entitiesMeta, Meta recordsMeta) throws IOException {
+			gzip(new File(dir, map + PoiNamesExtractor.ENTITIES_EXT), entitiesMeta.line() + "\n" + entities);
+			gzip(new File(dir, map + PoiNamesExtractor.RECORDS_EXT), recordsMeta.line() + "\n" + records);
 		}
 
 		private static void gzip(File f, String s) throws IOException {
@@ -85,6 +122,10 @@ public class TopAbbrsAnalyzerTest {
 				w.write(s);
 			}
 		}
+	}
+
+	private static long date(int y, int m, int d) {
+		return LocalDate.of(y, m, d).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli();
 	}
 
 	@BeforeClass
@@ -103,7 +144,7 @@ public class TopAbbrsAnalyzerTest {
 		}
 		// H5 object: the phrase without the operator
 		ny.add(40.65, -73.95, "government", "name", "Kings County Department of Motor Vehicles");
-		ny.write(dir, NY);
+		ny.write(dir, NY, DATA);
 
 		MapWriter de = new MapWriter(1000);
 		String[] cities = { "Hannover", "Braunschweig", "Oldenburg", "Osnabrueck", "Goettingen", "Wolfsburg" };
@@ -115,14 +156,18 @@ public class TopAbbrsAnalyzerTest {
 		}
 		// a station without the short name gains Hbf
 		de.add(at[5][0], at[5][1], "railway_station", "name", cities[5] + " Hauptbahnhof");
-		de.write(dir, DE);
+		de.write(dir, DE, DATA);
 
 		locales = new SearchModRules().locales();
 		regions = RegionTree.fromOsmandRegions();
-		extraction = new PoiExtractionReader(regions, 2).read(List.of(dir));
-		analyzer = new TopAbbrsAnalyzer(extraction, rules(null), locales, CommonWordsMultiIndex.getInstance(), regions,
-				MapPoiTypes.getDefault(), List.of());
+		extraction = new PoiExtractionReader(regions, 2, PERIOD).read(List.of(dir));
+		analyzer = analyzer(extraction, rules(null));
 		rows = analyzer.run();
+	}
+
+	private static TopAbbrsAnalyzer analyzer(PoiExtraction e, TopAbbrsRules r) {
+		return new TopAbbrsAnalyzer(e, r, locales, CommonWordsMultiIndex.getInstance(), regions,
+				MapPoiTypes.getDefault(), List.of());
 	}
 
 	private static TopAbbrsRules rules(String extra) throws IOException {
@@ -143,6 +188,32 @@ public class TopAbbrsAnalyzerTest {
 			}
 		}
 		return null;
+	}
+
+	private static TopAbbrRow hbfRow(String locale) {
+		TopAbbrRow r = new TopAbbrRow();
+		r.kind = TopAbbrRow.KIND_WORD;
+		r.locale = locale;
+		r.abbr = "Hbf";
+		r.full = "hauptbahnhof";
+		r.bind = TopAbbrRow.BIND_PHRASE;
+		r.bindValue = "hauptbahnhof";
+		return r;
+	}
+
+	private static ExtractedPoi poi(PoiExtraction e, String osmType, long osmId) {
+		ExtractedEntity entity = e.entity(osmType, osmId);
+		assertNotNull(osmType + "/" + osmId, entity);
+		return entity.pois.get(0);
+	}
+
+	private static ExtractedMap map(PoiExtraction e, String name) {
+		for (ExtractedMap m : e.maps()) {
+			if (m.name.equals(name)) {
+				return m;
+			}
+		}
+		throw new AssertionError(name);
 	}
 
 	@Test
@@ -191,9 +262,7 @@ public class TopAbbrsAnalyzerTest {
 
 	@Test
 	public void deterministic() throws IOException {
-		TopAbbrsAnalyzer again = new TopAbbrsAnalyzer(extraction, rules(null), locales,
-				CommonWordsMultiIndex.getInstance(), regions, MapPoiTypes.getDefault(), List.of());
-		assertEquals(csv(rows), csv(again.run()));
+		assertEquals(csv(rows), csv(analyzer(extraction, rules(null)).run()));
 	}
 
 	@Test
@@ -227,9 +296,7 @@ public class TopAbbrsAnalyzerTest {
 
 	@Test
 	public void excludeVetoes() throws IOException {
-		TopAbbrsAnalyzer a = new TopAbbrsAnalyzer(extraction, rules("<exclude abbr=\"dmv\"/>"), locales,
-				CommonWordsMultiIndex.getInstance(), regions, MapPoiTypes.getDefault(), List.of());
-		for (TopAbbrRow r : a.run()) {
+		for (TopAbbrRow r : analyzer(extraction, rules("<exclude abbr=\"dmv\"/>")).run()) {
 			assertFalse(r.abbrNormalized().equals("dmv"));
 		}
 	}
@@ -264,6 +331,170 @@ public class TopAbbrsAnalyzerTest {
 		// name:de of an Italian map is de_IT: a "de" word row covers it, an "it" row does not
 		assertTrue(p.localeMatches("de", locales.forName("name:de", "it_IT")));
 		assertFalse(p.localeMatches("it", locales.forName("name:de", "it_IT")));
+	}
+
+	@Test
+	public void orgRowOfLanguage() {
+		// <include kind="org" locale="de"> of the spec applies on a map of de_DE
+		TopAbbrPredicate p = new TopAbbrPredicate(locales, regions);
+		ExtractedPoi station = poi(extraction, "node", 1005);
+		assertEquals("de_DE", p.mapLocale(station.map));
+		TopAbbrRow r = hbfRow("de");
+		r.kind = TopAbbrRow.KIND_ORG;
+		assertTrue(p.applies(r, station));
+		r.locale = "de_DE";
+		assertTrue(p.applies(r, station));
+		r.locale = "de_AT";
+		assertFalse(p.applies(r, station));
+		r.locale = "en";
+		assertFalse(p.applies(r, station));
+	}
+
+	@Test
+	public void compositeSubtype() throws IOException {
+		File dir = tmp.newFolder("composite");
+		MapWriter ny = new MapWriter(1);
+		String op = "Metro Food Services";
+		for (int i = 0; i < 3; i++) {
+			// amenity=cafe;restaurant: one POI of the subtype "cafe;restaurant"
+			ny.add(40.7 + i * 0.01, -73.9, "cafe;restaurant", "name", "MFS " + i, "operator", op);
+		}
+		long diner = ny.add(40.75, -73.9, "cafe;restaurant", "name", "Downtown Diner", "operator", op);
+		ny.write(dir, NY, DATA);
+		PoiExtraction e = new PoiExtractionReader(regions, 2, PERIOD).read(List.of(dir));
+		ExtractedPoi p = poi(e, "node", 1);
+		// the identity keeps the subtype of the OBF, the types are its keys
+		assertTrue(p.identity(), p.identity().endsWith("/cafe;restaurant"));
+		assertTrue(p.hasType(Set.of("cafe")));
+		assertTrue(p.hasType(Set.of("restaurant")));
+		assertFalse(p.hasType(Set.of("cafe;restaurant")));
+		assertEquals(Set.of("cafe", "restaurant"), p.entity.types());
+
+		TopAbbrsAnalyzer a = analyzer(e, rules(null));
+		List<TopAbbrRow> found = a.run();
+		TopAbbrRow mfs = null;
+		for (TopAbbrRow r : found) {
+			if (r.abbrNormalized().equals("mfs")) {
+				mfs = r;
+			}
+		}
+		assertNotNull(String.valueOf(found), mfs);
+		assertEquals(Set.of("cafe", "restaurant"), mfs.types);
+		assertNull(TopAbbrRow.unknownType(mfs.types, MapPoiTypes.getDefault()));
+		assertEquals(Integer.valueOf(1), mfs.gainObjects);
+		// a row of one key applies
+		mfs.types = new TreeSet<>(Set.of("cafe"));
+		assertTrue(new TopAbbrPredicate(locales, regions).applies(mfs, poi(e, "node", diner)));
+	}
+
+	@Test
+	public void entityOfTheNewestData() throws IOException {
+		File dir = tmp.newFolder("versions");
+		// new data: a restaurant; old data: the cafe it was, the old map is generated later
+		MapWriter fresh = new MapWriter(5);
+		fresh.add(52.0, 9.0, "restaurant", "name", "New Restaurant");
+		fresh.entity("relation", 7, "name", "Twin Park");
+		fresh.poi("relation", 7, 0, "park", 52.1, 9.1, "name", "Twin Park");
+		fresh.write(dir, "Germany_europe", new Meta(DATA, date(2026, 10, 5)), new Meta(DATA, date(2026, 10, 5)));
+		MapWriter old = new MapWriter(5);
+		old.add(52.0, 9.0, "cafe", "name", "Old Cafe");
+		old.write(dir, "Germany_niedersachsen_europe", new Meta(date(2026, 9, 1), date(2026, 10, 9)),
+				new Meta(date(2026, 9, 1), date(2026, 10, 9)));
+		// the same data: another center of the park is in another map
+		MapWriter part = new MapWriter(100);
+		part.entity("relation", 7, "name", "Twin Park");
+		part.poi("relation", 7, 1, "park", 52.2, 9.2, "name", "Twin Park");
+		part.write(dir, "Germany_bremen_europe", DATA);
+
+		PoiExtraction e = new PoiExtractionReader(null, 2, PERIOD).read(List.of(dir));
+		ExtractedEntity restaurant = e.entity("node", 5);
+		assertEquals("New Restaurant", restaurant.tag("name"));
+		assertEquals(Set.of("restaurant"), restaurant.types());
+		assertEquals("Germany_europe", restaurant.map);
+		assertEquals(1, e.stalePois());
+		assertEquals(1, map(e, "Germany_niedersachsen_europe").stalePois);
+		ExtractedEntity park = e.entity("relation", 7);
+		assertEquals(2, park.pois.size());
+		assertEquals("Germany_europe", park.map);
+	}
+
+	@Test
+	public void ageOfTheAnalyzedPeriod() throws IOException {
+		File dir = tmp.newFolder("age");
+		MapWriter m = new MapWriter(1);
+		m.add(52.0, 9.0, "cafe", "name", "Cafe");
+		// 100 days before the period: the only extraction, it is still too old
+		m.write(dir, DE, date(2026, 7, 5));
+		PoiExtraction e = new PoiExtractionReader(regions, 2, PERIOD).read(List.of(dir));
+		assertFalse(map(e, DE).used);
+		assertTrue(map(e, DE).skipReason, map(e, DE).skipReason.contains("older than 2 months"));
+		assertTrue(e.entities().isEmpty());
+		// two months before the period
+		m.write(dir, DE, date(2026, 8, 1));
+		assertTrue(map(new PoiExtractionReader(regions, 2, PERIOD).read(List.of(dir)), DE).used);
+		// after the period
+		m.write(dir, DE, date(2026, 11, 1));
+		assertFalse(map(new PoiExtractionReader(regions, 2, PERIOD).read(List.of(dir)), DE).used);
+	}
+
+	@Test
+	public void filesOfDifferentExtractions() throws IOException {
+		File dir = tmp.newFolder("pair");
+		MapWriter m = new MapWriter(1);
+		m.add(52.0, 9.0, "cafe", "name", "Cafe");
+		m.write(dir, DE, new Meta(DATA, 1), new Meta(DATA, 2));
+		PoiExtraction e = new PoiExtractionReader(regions, 2, PERIOD).read(List.of(dir));
+		assertFalse(map(e, DE).used);
+		assertEquals("entities of another extraction", map(e, DE).skipReason);
+	}
+
+	@Test
+	public void gainByIndexedNames() throws IOException {
+		File dir = tmp.newFolder("names");
+		MapWriter de = new MapWriter(1);
+		// the names of the name index decide, not the raw tags: official_name is not indexed here
+		long notIndexed = de.id++;
+		de.entity("node", notIndexed, "name", "Celle Hauptbahnhof", "official_name", "Celle Hbf");
+		de.poi("node", notIndexed, 0, "railway_station", 52.0, 9.0, "name", "Celle Hauptbahnhof");
+		// brand is indexed: the station has Hbf
+		long brand = de.add(52.1, 9.1, "railway_station", "name", "Uelzen Hauptbahnhof", "brand", "Hbf");
+		de.write(dir, DE, DATA);
+		PoiExtraction e = new PoiExtractionReader(regions, 2, PERIOD).read(List.of(dir));
+		TopAbbrPredicate p = new TopAbbrPredicate(locales, regions);
+		assertTrue(p.applies(hbfRow("de"), poi(e, "node", notIndexed)));
+		assertTrue(TopAbbrPredicate.hasWord(poi(e, "node", brand), "hbf"));
+		assertFalse(p.applies(hbfRow("de"), poi(e, "node", brand)));
+	}
+
+	@Test
+	public void nearByLongitudeAndCenters() throws IOException {
+		File dir = tmp.newFolder("near");
+		MapWriter de = new MapWriter(1);
+		double cellLat = 500 / 111_000.0;
+		// at 60 degrees: 445 m of longitude are 0.008 degrees, two cells of the size of the latitude
+		double lon = 2220 * cellLat + 0.0044;
+		de.add(60.0, lon, "railway_station", "name", "Oslo Hauptbahnhof");
+		de.add(60.0, lon + 0.008, "railway_station", "name", "Oslo Hbf");
+		// control: 222 m
+		de.add(60.0, lon, "railway_station", "name", "Kiel Hauptbahnhof");
+		de.add(60.0, lon + 0.004, "railway_station", "name", "Kiel Hbf");
+		// a relation with its first center 1.37 km away and the second one next to the neighbor
+		de.entity("relation", 9, "name", "Bremen Hauptbahnhof");
+		de.poi("relation", 9, 0, "railway_station", 53.0, 8.0, "name", "Bremen Hauptbahnhof");
+		de.poi("relation", 9, 1, "railway_station", 53.0, 8.0205, "name", "Bremen Hauptbahnhof");
+		de.add(53.0, 8.021, "railway_station", "name", "Bremen Hbf");
+		de.write(dir, DE, DATA);
+		assertTrue(MapUtils.getDistance(60, lon, 60, lon + 0.008) < 500);
+		assertTrue(MapUtils.getDistance(53, 8.0, 53, 8.021) > 1000);
+
+		PoiExtraction e = new PoiExtractionReader(regions, 2, PERIOD).read(List.of(dir));
+		TopAbbrsAnalyzer a = analyzer(e, rules(null));
+		a.keepNoise = true;
+		a.run();
+		TopAbbrsAnalyzer.H1Candidate c = a.h1.get("de_DE|hbf|hauptbahnhof");
+		assertNotNull(String.valueOf(a.h1.keySet()), c);
+		assertEquals(3, c.near);
+		assertEquals(Set.of("node/1", "node/3", "relation/9"), c.entities);
 	}
 
 	@Test

@@ -20,6 +20,13 @@
     <tag k="amenity" v="cafe"/>
     <tag k="brand" v="Nameless"/>
   </node>
+  <!-- a tag with two values: one POI with the subtype "cafe;restaurant"; brand and name:etymology are indexed -->
+  <node id="1005" version="1" lat="49.6140" lon="6.1330">
+    <tag k="amenity" v="cafe;restaurant"/>
+    <tag k="name" v="Mixed Place"/>
+    <tag k="name:etymology" v="Hbf"/>
+    <tag k="brand" v="Mixed Brand"/>
+  </node>
   <!-- out of the map boundary (Paris) -->
   <node id="1004" version="1" lat="48.8566" lon="2.3522">
     <tag k="amenity" v="cafe"/>
