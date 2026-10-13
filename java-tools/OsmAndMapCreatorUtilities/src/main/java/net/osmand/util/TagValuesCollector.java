@@ -56,10 +56,17 @@ public class TagValuesCollector {
 	private final String[] tags;
 	private final byte[][] tagBytes;
 	private final int threads;
+	// --poi-stats mode: tags are PoiStats.TAGS and every object is handed over as a whole
+	private final PoiStats poi;
 
 	public TagValuesCollector(String[] tags, int threads) {
+		this(tags, threads, null);
+	}
+
+	public TagValuesCollector(String[] tags, int threads, PoiStats poi) {
 		this.tags = tags;
 		this.threads = threads;
+		this.poi = poi;
 		tagBytes = new byte[tags.length][];
 		for (int i = 0; i < tags.length; i++) {
 			tagBytes[i] = tags[i].getBytes(StandardCharsets.UTF_8);
@@ -82,9 +89,10 @@ public class TagValuesCollector {
 		}
 	}
 
-	/** key = tag + '\t' + normalized value */
+	/** key = tag + '\t' + normalized value; in --poi-stats mode key = kind + '\t' + a + '\t' + b, value = {count, extra} */
 	public static class Counts {
 		final Map<String, int[]> values = new HashMap<>();
+		final Map<String, String> samples = new HashMap<>();
 		long objects;
 
 		void add(String tag, String value, int cnt) {
@@ -96,6 +104,16 @@ public class TagValuesCollector {
 			}
 		}
 
+		void add(String key, int cnt, int extra) {
+			int[] c = values.get(key);
+			if (c == null) {
+				values.put(key, new int[] { cnt, extra });
+			} else {
+				c[0] += cnt;
+				c[1] += extra;
+			}
+		}
+
 		void addAll(Counts o) {
 			objects += o.objects;
 			for (Entry<String, int[]> e : o.values.entrySet()) {
@@ -103,8 +121,13 @@ public class TagValuesCollector {
 				if (c == null) {
 					values.put(e.getKey(), e.getValue());
 				} else {
-					c[0] += e.getValue()[0];
+					for (int i = 0; i < c.length; i++) {
+						c[i] += e.getValue()[i];
+					}
 				}
+			}
+			for (Entry<String, String> e : o.samples.entrySet()) {
+				samples.putIfAbsent(e.getKey(), e.getValue());
 			}
 		}
 
@@ -126,8 +149,25 @@ public class TagValuesCollector {
 		String extracts = null, planet = null, out = "all_brands.csv", cache = "brands", file = null;
 		String[] tags = DEFAULT_TAGS;
 		int threads = Runtime.getRuntime().availableProcessors();
-		boolean force = false;
+		boolean force = false, poiStats = false, allRegions = false;
+		int minCount = 3;
 		for (String a : args) {
+			if (a.equals("--poi-stats")) {
+				poiStats = true;
+				out = "poi_name_stats.tsv";
+				cache = "poi-stats";
+			}
+		}
+		for (String a : args) {
+			if (a.equals("--poi-stats")) {
+				continue;
+			} else if (a.equals("--all-regions")) {
+				allRegions = true;
+				continue;
+			} else if (a.startsWith("--min-count=")) {
+				minCount = Integer.parseInt(a.substring("--min-count=".length()));
+				continue;
+			}
 			if (a.startsWith("--extracts=")) {
 				extracts = a.substring("--extracts=".length());
 			} else if (a.startsWith("--planet=")) {
@@ -148,13 +188,21 @@ public class TagValuesCollector {
 				throw new IllegalArgumentException("Unknown argument " + a);
 			}
 		}
-		TagValuesCollector c = new TagValuesCollector(tags, threads);
+		PoiStats poi = poiStats ? new PoiStats(minCount) : null;
+		TagValuesCollector c = poiStats ? new TagValuesCollector(PoiStats.TAGS, threads, poi)
+				: new TagValuesCollector(tags, threads);
 		if (file != null) {
 			long t = System.currentTimeMillis();
 			Counts cnt = c.collect(new File(file));
 			long ms = System.currentTimeMillis() - t;
 			PrintWriter w = new PrintWriter(new OutputStreamWriter(System.out, StandardCharsets.UTF_8));
 			for (Entry<String, int[]> e : cnt.sorted()) {
+				if (poi != null) {
+					if (poi.keep(e.getKey(), e.getValue()[0])) {
+						w.println(PoiStats.line(e, cnt));
+					}
+					continue;
+				}
 				w.println(e.getValue()[0] + "\t" + e.getKey());
 			}
 			w.flush();
@@ -165,10 +213,22 @@ public class TagValuesCollector {
 		if (extracts == null) {
 			System.err.println("Usage: collect-tag-values --extracts=<osm-extract dir> [--planet=<planet.o5m|pbf>] "
 					+ "[--out=all_brands.csv] [--cache=brands] [--threads=N] [--tags=brand,brand:en,...] [--force]\n"
-					+ "       collect-tag-values --file=<file.pbf|file.o5m> [--tags=...]");
+					+ "       collect-tag-values --file=<file.pbf|file.o5m> [--tags=...]\n"
+					+ "       collect-tag-values --poi-stats --extracts=<dir> [--out=poi_name_stats.tsv] [--cache=poi-stats] "
+					+ "[--min-count=3] [--all-regions] [--planet=...]");
 			System.exit(1);
 		}
 		List<Region> regions = findRegions(new File(extracts), planet == null ? null : new File(planet));
+		if (poiStats) {
+			// map regions do not overlap, so their sum is the world; parents and the planet would count it again
+			List<Region> sel = new ArrayList<>();
+			for (Region r : regions) {
+				if ((r.map || allRegions) && (!r.name.equals(PLANET) || planet != null)) {
+					sel.add(r);
+				}
+			}
+			regions = sel;
+		}
 		c.run(regions, new File(cache), new File(out), force);
 	}
 
@@ -222,7 +282,8 @@ public class TagValuesCollector {
 		for (Region r : bySize) {
 			File cf = new File(cacheDir, r.name + ".tsv");
 			if (!force) {
-				Counts c = readCache(cf, r.file);
+				// poi stats of the whole world do not fit in memory: keep none, read each region back when writing
+				Counts c = poi != null ? (cacheValid(cf, r.file) ? new Counts() : null) : readCache(cf, r.file);
 				if (c != null) {
 					cached++;
 					results.put(r, CompletableFuture.completedFuture(c));
@@ -235,24 +296,34 @@ public class TagValuesCollector {
 				writeCache(cf, r.file, c);
 				System.out.printf("%s: %d objects, %d values, %.1f s%n", r.name, c.objects, c.values.size(),
 						(System.currentTimeMillis() - t) / 1000.0);
-				return c;
+				return poi != null ? new Counts() : c;
 			}));
 		}
 		System.out.printf("Regions %d, cached %d, threads %d%n", regions.size(), cached, threads);
 		List<String> failed = new ArrayList<>();
 		File tmp = new File(out.getAbsolutePath() + ".tmp");
 		try (Writer w = new OutputStreamWriter(new FileOutputStream(tmp), StandardCharsets.UTF_8)) {
-			w.write("region,count,parent,depth,map,tag,value\n");
+			w.write(poi != null ? "region\tparent\tdepth\tmap\t" + PoiStats.HEADER + "\n"
+					: "region,count,parent,depth,map,tag,value\n");
 			for (Region r : regions) {
 				Counts c;
 				try {
 					c = results.get(r).get();
+					if (poi != null) {
+						c = readCache(new File(cacheDir, r.name + ".tsv"), r.file);
+					}
 				} catch (Exception e) {
 					System.err.println("ERROR " + r.name + " " + r.file + ": " + e.getCause());
 					failed.add(r.name);
 					continue;
 				}
 				for (Entry<String, int[]> e : c.sorted()) {
+					if (poi != null) {
+						if (poi.keep(e.getKey(), e.getValue()[0])) {
+							w.write(r.name + "\t" + r.parent + "\t" + r.depth + "\t" + r.map + "\t" + PoiStats.line(e, c) + "\n");
+						}
+						continue;
+					}
 					String k = e.getKey();
 					int t = k.indexOf('\t');
 					w.write(r.name + "," + e.getValue()[0] + "," + r.parent + "," + r.depth + "," + r.map + ","
@@ -273,7 +344,17 @@ public class TagValuesCollector {
 		return src.getAbsolutePath() + " " + src.length() + " " + src.lastModified();
 	}
 
-	private static Counts readCache(File cf, File src) throws IOException {
+	private static boolean cacheValid(File cf, File src) throws IOException {
+		if (!cf.isFile()) {
+			return false;
+		}
+		try (BufferedReader r = new BufferedReader(
+				new InputStreamReader(new FileInputStream(cf), StandardCharsets.UTF_8))) {
+			return (CACHE_HEADER + sourceId(src)).equals(r.readLine());
+		}
+	}
+
+	private Counts readCache(File cf, File src) throws IOException {
 		if (!cf.isFile()) {
 			return null;
 		}
@@ -286,6 +367,16 @@ public class TagValuesCollector {
 			Counts c = new Counts();
 			String l;
 			while ((l = r.readLine()) != null) {
+				if (poi != null) {
+					// count, extra, kind, a, b, sample
+					String[] f = l.split("\t", -1);
+					String key = f[2] + '\t' + f[3] + '\t' + f[4];
+					c.add(key, Integer.parseInt(f[0]), Integer.parseInt(f[1]));
+					if (!f[5].isEmpty()) {
+						c.samples.put(key, f[5]);
+					}
+					continue;
+				}
 				int t1 = l.indexOf('\t');
 				int t2 = l.indexOf('\t', t1 + 1);
 				c.add(l.substring(t1 + 1, t2), l.substring(t2 + 1), Integer.parseInt(l.substring(0, t1)));
@@ -294,11 +385,18 @@ public class TagValuesCollector {
 		}
 	}
 
-	private static void writeCache(File cf, File src, Counts c) throws IOException {
+	private void writeCache(File cf, File src, Counts c) throws IOException {
 		File tmp = new File(cf.getAbsolutePath() + ".tmp");
 		try (Writer w = new OutputStreamWriter(new FileOutputStream(tmp), StandardCharsets.UTF_8)) {
 			w.write(CACHE_HEADER + sourceId(src) + "\n");
 			for (Entry<String, int[]> e : c.sorted()) {
+				if (poi != null) {
+					if (poi.keep(e.getKey(), e.getValue()[0])) {
+						w.write(e.getValue()[0] + "\t" + e.getValue()[1] + "\t" + e.getKey() + "\t"
+								+ c.samples.getOrDefault(e.getKey(), "") + "\n");
+					}
+					continue;
+				}
 				w.write(e.getValue()[0] + "\t" + e.getKey() + "\n");
 			}
 		}
@@ -464,6 +562,7 @@ public class TagValuesCollector {
 						for (int i = 0; i < keys.size; i++) {
 							bs.add(c, keys.a[i], vals.a[i]);
 						}
+						bs.endObject(c);
 					}
 				} else {
 					gp.skip(key);
@@ -492,6 +591,8 @@ public class TagValuesCollector {
 					int key = (int) e.varint();
 					if (key != 0) {
 						bs.add(c, key, (int) e.varint());
+					} else {
+						bs.endObject(c);
 					}
 				}
 			} else {
@@ -504,6 +605,8 @@ public class TagValuesCollector {
 		final byte[] data;
 		final int[] sOff, sLen, tagOf;
 		final String[] values;
+		final String[] raw;
+		final String[] object = new String[tags.length];
 
 		BlockStrings(byte[] data, int[] sOff, int[] sLen, int[] tagOf) {
 			this.data = data;
@@ -511,11 +614,25 @@ public class TagValuesCollector {
 			this.sLen = sLen;
 			this.tagOf = tagOf;
 			this.values = new String[tagOf.length];
+			this.raw = poi == null ? null : new String[tagOf.length];
+		}
+
+		void endObject(Counts c) {
+			if (poi != null) {
+				poi.object(c, object);
+			}
 		}
 
 		void add(Counts c, int k, int v) {
 			int t = tagOf[k];
 			if (t < 0) {
+				return;
+			}
+			if (poi != null) {
+				if (raw[v] == null) {
+					raw[v] = new String(data, sOff[v], sLen[v], StandardCharsets.UTF_8);
+				}
+				object[t] = raw[v];
 				return;
 			}
 			if (values[v] == null) {
@@ -639,6 +756,7 @@ public class TagValuesCollector {
 		private int s1, l1, s2, l2;
 
 		private final Counts counts = new Counts();
+		private final String[] object = new String[tags.length];
 
 		O5mReader(InputStream in) {
 			this.in = in;
@@ -737,12 +855,17 @@ public class TagValuesCollector {
 			while (pos < end) {
 				readString(true);
 				int t = tagIndex(sBuf, s1, l1);
-				if (t >= 0) {
+				if (t >= 0 && poi != null) {
+					object[t] = new String(sBuf, s2, l2, StandardCharsets.UTF_8);
+				} else if (t >= 0) {
 					String v = normalize(new String(sBuf, s2, l2, StandardCharsets.UTF_8));
 					if (!v.isEmpty()) {
 						counts.add(tags[t], v, 1);
 					}
 				}
+			}
+			if (poi != null) {
+				poi.object(counts, object);
 			}
 		}
 
