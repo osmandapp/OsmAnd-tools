@@ -21,7 +21,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
@@ -119,7 +118,10 @@ public class TagValuesCollector {
 	}
 
 	static String normalize(String v) {
-		return SPACES.matcher(v.toLowerCase(Locale.ROOT)).replaceAll(" ").trim();
+		// lower case per character like awk tolower: String.toLowerCase gives "i̇" for 'İ' and final 'ς' for 'Σ'
+		StringBuilder sb = new StringBuilder(v.length());
+		v.codePoints().forEach(c -> sb.appendCodePoint(Character.toLowerCase(c)));
+		return SPACES.matcher(sb).replaceAll(" ").trim();
 	}
 
 	public static void main(String[] args) throws Exception {
