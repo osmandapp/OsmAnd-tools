@@ -16,11 +16,9 @@ import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -219,7 +217,6 @@ public class TagValuesCollector {
 		// biggest first, so the planet does not start last
 		Collections.sort(bySize, (a, b) -> Long.compare(b.file.length(), a.file.length()));
 		ExecutorService files = Executors.newFixedThreadPool(threads);
-		ExecutorService blocks = Executors.newFixedThreadPool(threads);
 		Map<Region, Future<Counts>> results = new HashMap<>();
 		int cached = 0;
 		for (Region r : bySize) {
@@ -234,7 +231,7 @@ public class TagValuesCollector {
 			}
 			results.put(r, files.submit(() -> {
 				long t = System.currentTimeMillis();
-				Counts c = collect(r.file, blocks);
+				Counts c = collect(r.file);
 				writeCache(cf, r.file, c);
 				System.out.printf("%s: %d objects, %d values, %.1f s%n", r.name, c.objects, c.values.size(),
 						(System.currentTimeMillis() - t) / 1000.0);
@@ -264,7 +261,6 @@ public class TagValuesCollector {
 			}
 		} finally {
 			files.shutdown();
-			blocks.shutdown();
 		}
 		if (!failed.isEmpty()) {
 			throw new IOException("Failed regions " + failed.size() + ": " + failed);
@@ -310,15 +306,6 @@ public class TagValuesCollector {
 	}
 
 	public Counts collect(File f) throws Exception {
-		ExecutorService blocks = Executors.newFixedThreadPool(threads);
-		try {
-			return collect(f, blocks);
-		} finally {
-			blocks.shutdown();
-		}
-	}
-
-	public Counts collect(File f, ExecutorService blocks) throws Exception {
 		try (InputStream in = new FileInputStream(f)) {
 			byte[] magic = new byte[2];
 			try (InputStream peek = new FileInputStream(f)) {
@@ -329,17 +316,15 @@ public class TagValuesCollector {
 			if ((magic[0] & 0xff) == 0xff && (magic[1] & 0xff) == 0xe0) {
 				return new O5mReader(in).read();
 			}
-			return readPbf(in, blocks);
+			return readPbf(in);
 		}
 	}
 
 	// ---------------------------------------------------------------- PBF
 
-	private Counts readPbf(InputStream is, ExecutorService blocks) throws Exception {
+	private Counts readPbf(InputStream is) throws Exception {
 		DataInputStream in = new DataInputStream(new BufferedInputStream(is, 1 << 20));
 		Counts total = new Counts();
-		Deque<Future<Counts>> inFlight = new ArrayDeque<>();
-		int maxInFlight = threads * 4;
 		while (true) {
 			int hl;
 			try {
@@ -352,16 +337,9 @@ public class TagValuesCollector {
 			Fileformat.BlockHeader header = Fileformat.BlockHeader.parseFrom(hb);
 			byte[] bb = new byte[header.getDatasize()];
 			in.readFully(bb);
-			if (!header.getType().equals("OSMData")) {
-				continue;
+			if (header.getType().equals("OSMData")) {
+				total.addAll(parseBlock(bb));
 			}
-			inFlight.add(blocks.submit(() -> parseBlock(bb)));
-			if (inFlight.size() >= maxInFlight) {
-				total.addAll(inFlight.poll().get());
-			}
-		}
-		while (!inFlight.isEmpty()) {
-			total.addAll(inFlight.poll().get());
 		}
 		return total;
 	}
