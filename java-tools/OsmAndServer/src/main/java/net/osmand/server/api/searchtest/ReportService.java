@@ -67,6 +67,8 @@ public interface ReportService {
 	// older runs stored an empty search result as an error: it is Not Found
 	String RUN_ERROR_SQL = "%1$s.error IS NOT NULL AND %1$s.error NOT IN " +
 			"('Search result is empty', 'First search result is missing', 'Result point location is null')";
+	// a row without a search result (type ABSENCE) is Not Found; its exception text stays in the error column
+	String RUN_ERROR_GROUP_SQL = RUN_ERROR_SQL + " AND %1$s.row IS NOT NULL";
 	String REPORT_SQL = GEN_SQL + """
 			 SELECT CASE
 			    WHEN %s THEN 'Error'
@@ -76,17 +78,17 @@ public interface ReportService {
 				ELSE 'Not Found'
 			END AS "group", UPPER(COALESCE(json_extract(r.row, '$.web_type'), 'absence')) AS type,
 			    g.ds_id || '.' || g.tc_id AS row_id, g.id as gen_id, g.lat_lon, g.query, g.obj_id as id, g.in_row, res_count, res_place, CAST((r.res_distance/10) AS INTEGER)*10 as res_dist,
-			    r.lat || ', ' || r.lon as search_lat_lon, r.bbox as search_bbox, res_lat_lon, r.row AS out_row, r.stat_bytes, r.stat_time, r.duration AS time FROM gen AS g, run_result AS r WHERE g.id = r.gen_id AND run_id = ? """.formatted(RUN_ERROR_SQL.formatted("r"));
+			    r.lat || ', ' || r.lon as search_lat_lon, r.bbox as search_bbox, res_lat_lon, r.row AS out_row, r.stat_bytes, r.stat_time, r.duration AS time, r.error FROM gen AS g, run_result AS r WHERE g.id = r.gen_id AND run_id = ? """.formatted(RUN_ERROR_GROUP_SQL.formatted("r"));
 	String FULL_REPORT_SQL = REPORT_SQL + """
 			 UNION SELECT 'Generated' AS "group", CASE
 			    WHEN error IS NOT NULL THEN 'Error'
 			    WHEN gen_count <= 0 THEN 'Filtered'
 				WHEN query IS NULL OR trim(query) = '' THEN 'Empty' ELSE 'Processed' END AS type,
 			ds_id || '.' || tc_id AS row_id, id as gen_id, lat_lon, query, obj_id as id,
-			in_row, NULL, NULL, NULL, NULL, NULL, NULL, NULL as out_row, NULL, NULL, NULL FROM gen ORDER BY "group", gen_id""";
+			in_row, NULL, NULL, NULL, NULL, NULL, NULL, NULL as out_row, NULL, NULL, NULL, NULL FROM gen ORDER BY "group", gen_id""";
 	
 	enum InProp {
-		group, type, row_id, id, lat_lon, search_lat_lon, query, src_map_found
+		group, type, row_id, id, lat_lon, search_lat_lon, query, src_map_found, error
 	}
 
 	enum OutProp {

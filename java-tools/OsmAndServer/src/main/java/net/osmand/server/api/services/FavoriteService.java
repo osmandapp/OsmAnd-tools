@@ -1,7 +1,6 @@
 package net.osmand.server.api.services;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import jakarta.annotation.Nullable;
 import jakarta.servlet.http.HttpSession;
@@ -10,6 +9,7 @@ import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository;
 import net.osmand.server.controllers.pub.UserSessionResources;
+import net.osmand.server.utils.GpxJson;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import net.osmand.shared.gpx.GpxFile;
@@ -55,7 +55,7 @@ public class FavoriteService {
     
     Gson gson = new Gson();
     
-    Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
+    Gson gsonWithNans = GpxJson.createWithNans();
     
     @Transactional
     public ResponseEntity<String> renameFavFolder(String oldName, String newName, StorageService.InternalZipFile fl, CloudUserDevicesRepository.CloudUserDevice dev) throws IOException {

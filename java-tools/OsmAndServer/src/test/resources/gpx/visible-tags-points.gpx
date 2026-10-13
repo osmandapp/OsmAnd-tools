@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<gpx version="1.1" creator="OsmAnd" xmlns="http://www.topografix.com/GPX/1/1" xmlns:osmand="https://osmand.net/docs/technical/osmand-file-formats/osmand-gpx" xmlns:test="https://test.net" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1" xmlns:gpxx="http://www.garmin.com/xmlschemas/GpxExtensions/v3">
+  <!-- custom_extenstion.gpx of https://github.com/osmandapp/OsmAnd/issues/25226 -->
+  <wpt lat="37.5460870" lon="-77.4532843">
+    <time>2023-06-07T12:31:35Z</time>
+    <name>Test</name>
+    <type>SOTM</type>
+    <extensions>
+      <osmand:address>Floyd Avenue (The Fan) 907, Richmond</osmand:address>
+      <osmand:icon>place_town</osmand:icon>
+      <osmand:background>circle</osmand:background>
+      <osmand:color>#ff4e4eff</osmand:color>
+      <test:country>United States</test:country>
+      <test:state>Virginia</test:state>
+      <test:telephone>(804) 828-0100</test:telephone>
+      <test:postcode>23284</test:postcode>
+      <test:start_date>Thursday, June 8, 2023</test:start_date>
+    </extensions>
+  </wpt>
+  <!-- favorites-Cafe.gpx of https://github.com/osmandapp/OsmAnd/issues/19027 (OsmAnd 4.7.0) -->
+  <wpt lat="52.5194036" lon="13.3887345">
+    <ele>32</ele>
+    <time>2024-02-05T14:41:21Z</time>
+    <name>Starbucks</name>
+    <type>Cafe</type>
+    <extensions>
+      <gpxtpx:TrackPointExtension />
+      <osm_tag_official_name>Starbucks Coffee</osm_tag_official_name>
+      <osm_tag_outdoor_seating_yes>yes</osm_tag_outdoor_seating_yes>
+      <collapsable_cuisine>cuisine_cafe</collapsable_cuisine>
+      <address>Friedrichstraße (Spandau), Berlin</address>
+      <amenity_origin>Amenity:Starbucks: sustenance:cafe</amenity_origin>
+      <color>#a71de1</color>
+      <osm_tag_brand>Starbucks</osm_tag_brand>
+      <icon>amenity_cafe</icon>
+      <amenity_type>sustenance</amenity_type>
+      <amenity_subtype>cafe</amenity_subtype>
+      <osm_tag_diet_vegetarian_yes>yes</osm_tag_diet_vegetarian_yes>
+      <amenity_name>Starbucks</amenity_name>
+      <background>circle</background>
+      <osm_tag_takeaway_yes>yes</osm_tag_takeaway_yes>
+      <collapsable_wheelchair_accessibility>wheelchair_yes</collapsable_wheelchair_accessibility>
+      <osm_tag_toilets_wheelchair_yes>yes</osm_tag_toilets_wheelchair_yes>
+      <amenity_opening_hours>Mo-Fr 07:00-21:00; Sa 09:00-21:00; Su 09:00-19:30</amenity_opening_hours>
+    </extensions>
+  </wpt>
+  <!-- osmand_poi.gpx of https://github.com/ConservationMetrics/gc-scripts-hub (OsmAnd 5.1.3) -->
+  <wpt lat="6.8135605" lon="-58.1573677">
+    <time>2025-04-27T23:57:35Z</time>
+    <name>Cara Lodge</name>
+    <type>Guyana trip</type>
+    <extensions>
+      <osmand:amenity_subtype>hotel</osmand:amenity_subtype>
+      <osmand:address>Quamina Street, Alberttown</osmand:address>
+      <osmand:amenity_origin>Amenity:Cara Lodge: tourism:hotel</osmand:amenity_origin>
+      <osmand:amenity_name>Cara Lodge</osmand:amenity_name>
+      <osmand:osm_tag_wikidata>Q111880937</osmand:osm_tag_wikidata>
+      <osmand:icon>tourism_hotel</osmand:icon>
+      <osmand:visited_date>2025-05-20T16:14:43Z</osmand:visited_date>
+      <osmand:amenity_type>tourism</osmand:amenity_type>
+    </extensions>
+  </wpt>
+  <!-- reference/gdb-sample-v3-ilinks.gpx of https://github.com/GPSBabel/gpsbabel (Garmin) -->
+  <wpt lat="44.380860329" lon="-68.068499565">
+    <time>2020-06-08T11:09:27Z</time>
+    <name>Schoodic Woods Campground</name>
+    <cmt>Schoodic Woods Campground
+Schoodic Loop Rd
+Winter Harbor Twn, Maine, 04693, United States
+207-288-1300</cmt>
+    <desc>Schoodic Woods Campground
+Schoodic Loop Rd
+Winter Harbor Twn, Maine, 04693, United States
+207-288-1300</desc>
+    <sym>Campground</sym>
+    <extensions>
+      <gpxx:WaypointExtension>
+        <gpxx:DisplayMode>SymbolAndName</gpxx:DisplayMode>
+        <gpxx:Address>
+          <gpxx:StreetAddress>Schoodic Loop Rd</gpxx:StreetAddress>
+          <gpxx:City>Winter Harbor Twn</gpxx:City>
+          <gpxx:State>Maine</gpxx:State>
+          <gpxx:Country>United States</gpxx:Country>
+          <gpxx:PostalCode>04693</gpxx:PostalCode>
+        </gpxx:Address>
+        <gpxx:PhoneNumber>207-288-1300</gpxx:PhoneNumber>
+      </gpxx:WaypointExtension>
+    </extensions>
+  </wpt>
+</gpx>

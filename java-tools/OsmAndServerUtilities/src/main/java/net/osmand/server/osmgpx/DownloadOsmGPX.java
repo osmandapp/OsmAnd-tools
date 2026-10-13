@@ -328,6 +328,8 @@ public class DownloadOsmGPX {
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS track_stats json");
 			// reviews people give tracks on the heatmap (PubTracksController); parsing and classifying never write it
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS manual_review jsonb");
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_reviewed ON " + GPX_METADATA_TABLE_NAME
+					+ " (id) WHERE manual_review IS NOT NULL");
 			// ids of the tracks parse_tracks still has to parse: a restarted run starts at once instead of reading
 			// the parsed rows; built once per TRACK_STATS_VERSION, a parsed track leaves it
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_parse_v" + TRACK_STATS_VERSION
@@ -350,7 +352,8 @@ public class DownloadOsmGPX {
 					+ " GENERATED ALWAYS AS (ST_MakeEnvelope(minlon, minlat, maxlon, maxlat, " + SRID_WGS84 + ")) STORED");
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_bbox_geom ON " + GPX_METADATA_TABLE_NAME
 					+ " USING GIST (bbox)");
-			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_year ON " + GPX_METADATA_TABLE_NAME + " ((extract(year from date)))");
+			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_date ON " + GPX_METADATA_TABLE_NAME + " (date)");
+			statement.executeUpdate("DROP INDEX IF EXISTS idx_osm_gpx_year");
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_ranges_optimized ON " + GPX_METADATA_TABLE_NAME
 					+ " (minlat, maxlat, minlon, maxlon, activity) INCLUDE (distance, speed)"
 					+ " WHERE (distance > 0::double precision OR speed > 0::double precision)"
@@ -943,8 +946,7 @@ public class DownloadOsmGPX {
 				}
 				for (WptPt p : seg.getPoints()) {
 					WptPt last = points.isEmpty() ? null : points.get(points.size() - 1);
-					if (!(Math.abs(p.getLat()) <= 90 && Math.abs(p.getLon()) <= 180)
-							|| (Math.abs(p.getLat()) < 0.01 && Math.abs(p.getLon()) < 0.01)) {
+					if (!isValidPoint(p)) {
 						clean.invalidPoints++;
 					} else if (last != null && p.getLat() == last.getLat() && p.getLon() == last.getLon()) {
 						clean.frozenPoints++;
@@ -959,6 +961,12 @@ public class DownloadOsmGPX {
 		}
 		splitPieces(removeSpikes(points, clean), clean);
 		return clean;
+	}
+
+	// NaN fails the range check too
+	static boolean isValidPoint(WptPt p) {
+		return Math.abs(p.getLat()) <= 90 && Math.abs(p.getLon()) <= 180
+				&& !(Math.abs(p.getLat()) < 0.01 && Math.abs(p.getLon()) < 0.01);
 	}
 
 	private static List<WptPt> removeSpikes(List<WptPt> points, CleanTrack clean) {
@@ -1645,7 +1653,26 @@ public class DownloadOsmGPX {
 	private GpxFile calculateMinMaxLatLon(OsmGpxFile r) {
 		GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(new Buffer().write(r.gpx.getBytes()));
 		if (gpxFile.getError() == null) {
-			KQuadRect rect = gpxFile.getBounds(r.lat, r.lon);
+			// the bounds of the valid points only: one NaN point would make them all NaN
+			KQuadRect rect = null;
+			List<WptPt> points = new ArrayList<>(gpxFile.getAllPoints());
+			gpxFile.getRoutes().forEach(route -> points.addAll(route.getPoints()));
+			for (WptPt p : points) {
+				if (!isValidPoint(p)) {
+					continue;
+				}
+				if (rect == null) {
+					rect = new KQuadRect(p.getLon(), p.getLat(), p.getLon(), p.getLat());
+				} else {
+					rect.setLeft(Math.min(rect.getLeft(), p.getLon()));
+					rect.setRight(Math.max(rect.getRight(), p.getLon()));
+					rect.setTop(Math.max(rect.getTop(), p.getLat()));
+					rect.setBottom(Math.min(rect.getBottom(), p.getLat()));
+				}
+			}
+			if (rect == null) {
+				rect = new KQuadRect(r.lon, r.lat, r.lon, r.lat);
+			}
 			r.minlon = rect.getLeft();
 			r.minlat = rect.getBottom();
 			r.maxlon = rect.getRight();

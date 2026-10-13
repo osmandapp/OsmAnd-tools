@@ -386,7 +386,7 @@ public class GarminConnectService {
 		if (code / 100 != 2 && code != 404) {
 			LOG.warn("Garmin DELETE user/registration failed: HTTP " + code + " " + res.body());
 		}
-		garminUserConnectionRepository.delete(row);
+		garminUserConnectionRepository.deleteByUserid(userid);
 		return PartnerDisconnectResult.OK;
 	}
 

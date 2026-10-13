@@ -56,7 +56,8 @@ public class SearchTestController {
         return null;
     }
 
-	public record RunTestCaseRequest(RunParam payload, ClassicSearchService.SearchOption options) {}
+	// obfPath: server directory with the OBF files of the run, null = the server maps
+	public record RunTestCaseRequest(RunParam payload, ClassicSearchService.SearchOption options, String obfPath) {}
 	public record ObfSelection(String obfPath, List<String> obfs) {}
 	public record DetectorSearchRequest(ObfSelection selection, ClassicSearchService.SearchOption options) {}
 	public record DetectorUnitTestRequest(ObfSelection selection, DetectorService.UnitTestPayload unitTest) {}
@@ -174,7 +175,8 @@ public class SearchTestController {
 		ClassicSearchService.SearchOption options = request == null || request.options == null
 				? new ClassicSearchService.SearchOption(false, null, null, false, true, (net.osmand.search.core.ObjectType[]) null)
 				: request.options;
-		return testSearchService.runTestCase(caseId, payload, options).thenApply(ResponseEntity::ok);
+		return testSearchService.runTestCase(caseId, payload, request == null ? null : request.obfPath, options)
+				.thenApply(ResponseEntity::ok);
 	}
 
 	@PutMapping(value = "/cases/{caseId}", consumes = MediaType.APPLICATION_JSON_VALUE)

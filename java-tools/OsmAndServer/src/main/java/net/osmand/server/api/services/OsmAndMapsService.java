@@ -72,9 +72,6 @@ import net.osmand.binary.GeocodingUtilities.GeocodingResult;
 import net.osmand.binary.OsmandIndex.FileIndex;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
-import net.osmand.gpx.GPXFile;
-import net.osmand.gpx.GPXUtilities;
-import net.osmand.gpx.GPXUtilities.TrkSegment;
 import net.osmand.gpx.GPXUtilities.WptPt;
 import net.osmand.map.OsmandRegions;
 import net.osmand.map.WorldRegion;
@@ -105,6 +102,9 @@ import net.osmand.server.tileManager.VectorMetatile;
 import net.osmand.server.utils.TimezoneMapper;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.shared.gpx.GpxFile;
+import net.osmand.shared.gpx.GpxUtilities;
+import okio.Buffer;
+import okio.Source;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.osmand.util.RegionCodeUtils;
@@ -704,12 +704,22 @@ public class OsmAndMapsService {
 	}
 
 
-	public List<RouteSegmentResult> gpxApproximation(String routeMode, Map<String, Object> props, GPXFile file) throws IOException, InterruptedException {
+	public List<RouteSegmentResult> gpxApproximation(String routeMode, Map<String, Object> props, GpxFile file) throws IOException, InterruptedException {
 		if (!file.hasTrkPt()) {
 			return Collections.emptyList();
 		}
-		TrkSegment trkSegment = file.tracks.get(0).segments.get(0);
-		return approximateByWaypoints(trkSegment.points, routeMode, props);
+		return approximateByWaypoints(firstSegmentWaypoints(file), routeMode, props);
+	}
+
+	// the routing api (LocationsHolder) reads lat, lon and time of the legacy point type
+	private static List<WptPt> firstSegmentWaypoints(GpxFile file) {
+		List<WptPt> waypoints = new ArrayList<>();
+		for (net.osmand.shared.gpx.primitives.WptPt pt : file.getTracks().get(0).getSegments().get(0).getPoints()) {
+			WptPt wpt = new WptPt(pt.getLatitude(), pt.getLongitude());
+			wpt.time = pt.getTime();
+			waypoints.add(wpt);
+		}
+		return waypoints;
 	}
 
 	public List<RouteSegmentResult> approximateRoute(List<WebGpxParser.Point> points, String routeMode) throws IOException, InterruptedException {
@@ -1005,10 +1015,12 @@ public class OsmAndMapsService {
 		});
 		LOGGER.info("Online request: " + url.toString());
 		String gpx = restTemplate.getForObject(url.toString(), String.class);
-		GPXFile file = GPXUtilities.loadGPXFile(new ByteArrayInputStream(gpx.getBytes()));
-		if (file.error == null) {
-			TrkSegment trkSegment = file.tracks.get(0).segments.get(0);
-			routeRes = approximate(ctx, router, props, trkSegment.points, useExternalTimestamps);
+		GpxFile file;
+		try (Source source = new Buffer().readFrom(new ByteArrayInputStream(gpx.getBytes()))) {
+			file = GpxUtilities.INSTANCE.loadGpxFile(source);
+		}
+		if (file.getError() == null && file.hasTrkPt()) {
+			routeRes = approximate(ctx, router, props, firstSegmentWaypoints(file), useExternalTimestamps);
 			return routeRes;
 		}
 		LOGGER.error("Empty GPX from Rescuetrack: " + url);
@@ -1114,6 +1126,51 @@ public class OsmAndMapsService {
 			unlockCacheRoutingContext(ctx);
 		}
 		return routeRes;
+	}
+
+	/**
+	 * A boat route that mixes the water network with open water (OsmAnd-Issues #3170): the same routing context as
+	 * {@link #routing}, with {@link net.osmand.router.sea.BoatRoutePlanner} deciding where to join open water. One leg
+	 * per pair of neighbouring points.
+	 */
+	public List<net.osmand.router.sea.BoatRoutePlanner.BoatRoute> boatRouting(String routeMode, Map<String, Object> props,
+			List<LatLon> routePoints, net.osmand.router.sea.BoatRoutePlanner.ShoreProvider shores,
+			RouteCalculationProgress progress) throws IOException, InterruptedException {
+		LatLon start = routePoints.get(0), end = routePoints.get(routePoints.size() - 1);
+		QuadRect points = points(routePoints.subList(1, routePoints.size() - 1), start, end);
+		RoutePlannerFrontEnd router = new RoutePlannerFrontEnd();
+		List<BinaryMapIndexReader> usedMapList = new ArrayList<>();
+		RoutingContext ctx = null;
+		try {
+			RouteParameters rp = parseRouteParameters(routeMode);
+			DebugInfo di = new DebugInfo();
+			ctx = lockCacheRoutingContext(router, rp, di);
+			LOGGER.info(String.format("REQ boat routing (%s - %.1f sec, %s): %s -> %s - cache %s", di.selectedCache,
+					di.waitTime / 1e3, di.routeParametersStr, start, end, di.routingCacheInfo));
+			if (ctx == null) {
+				validateAndInitConfig();
+				List<BinaryMapIndexReaderReference> list = getObfReaders(withMargin(points, ROUTING_MAPS_MARGIN_KM),
+						ObfReason.ROUTING.value());
+				boolean[] incomplete = new boolean[1];
+				usedMapList = getReaders(list, incomplete);
+				ctx = prepareRouterContext(rp, router, usedMapList, false);
+			}
+			ctx.routingTime = 0;
+			ctx.calculationProgress = progress;
+			List<net.osmand.router.sea.BoatRoutePlanner.BoatRoute> legs = new net.osmand.router.sea.BoatRoutePlanner(shores)
+					.route(router, ctx, routePoints);
+			List<RouteSegmentResult> network = new ArrayList<>();
+			for (net.osmand.router.sea.BoatRoutePlanner.BoatRoute leg : legs) {
+				if (leg.network != null) {
+					network.addAll(leg.network);
+				}
+			}
+			putResultProps(ctx, network, props);
+			return legs;
+		} finally {
+			unlockReaders(usedMapList);
+			unlockCacheRoutingContext(ctx);
+		}
 	}
 
 	/**

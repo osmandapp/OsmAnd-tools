@@ -71,6 +71,9 @@ public class IndexCreatorSettings {
 
 	public int poiZipStringLimit = 100;
 
+	// the key of the POI / address name index: the first N code points of a word (--chars-build-poi-nameindex,
+	// --chars-build-addr-nameindex). The "did you mean" lookup of spatial search (SpatialTypoSuggestions.KEY_LETTERS
+	// in OsmAnd-java) tries typos in the first KEY_LETTERS letters only, so it must be at least the longer of the two
 	public int charsToBuildPoiNameIndex = 4;
 
 	public int charsToBuildPoiIdNameIndex = 8; // 0 to not create index at all

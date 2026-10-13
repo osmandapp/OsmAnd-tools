@@ -67,6 +67,10 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
     private static final int LOW_LEVEL_ZOOM_TO_COMBINE = 13; // 15 if use combination all the time
     private static final int LOW_LEVEL_ZOOM_COASTLINE = 1; // Don't simplify coastlines except basemap, this constant is
                                                            // not used by basemap
+    // The coastline of the level with this max zoom keeps the geometry of the next, more detailed level: the renderer
+    // decides land/sea of a tile by the coastlines around it read from this level, and simplifying each OSM way of a
+    // small island on its own turns the island into a sliver whose sides point the wrong way (sea drawn as land)
+    private static final int COASTLINE_KEEP_DETAILED_MAX_ZOOM = 12;
 
     private final Log logMapDataWarn;
     protected MapRenderingTypesEncoder renderingTypes;
@@ -436,6 +440,16 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
         }
     }
 
+    /** Zoom whose simplification tolerance a way of this level gets: the coastline of the 11-12 level keeps the 13-14 one. */
+    private int simplificationZoom(int level, TIntArrayList typeUse) {
+        int maxZoom = mapZooms.getLevel(level).getMaxZoom();
+        if (maxZoom == COASTLINE_KEEP_DETAILED_MAX_ZOOM && level > 0
+                && typeUse.contains(renderingTypes.getCoastlineRuleType().getInternalId())) {
+            return mapZooms.getLevel(level - 1).getMaxZoom();
+        }
+        return maxZoom;
+    }
+
     public static List<Node> simplifyCycleWay(List<Node> ns, int zoom, int zoomWaySmoothness) throws SQLException {
         if (checkForSmallAreas(ns, zoom + Math.min(zoomWaySmoothness / 2, 3), 2, 4)) {
             return null;
@@ -541,7 +555,6 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
             visitedWays.add(id);
 
             int level = rs.getInt(8);
-            int zoom = mapZooms.getLevel(level).getMaxZoom();
             int minZoom = mapZooms.getLevel(level).getMinZoom();
 
             long startNode = rs.getLong(2);
@@ -551,6 +564,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
             decodeNames(rs.getString(5), namesUse);
             parseAndSort(typeUse, rs.getBytes(6));
             parseAndSort(addtypeUse, rs.getBytes(7));
+            int zoom = simplificationZoom(level, typeUse);
 
             loadNodes(rs.getBytes(4), list);
             ArrayList<Float> wayNodes = new ArrayList<Float>(list);
@@ -850,7 +864,7 @@ public class IndexVectorMapCreator extends AbstractIndexPartCreator {
             // simplify route id>>1
             boolean mostDetailedLevel = level == 0 && !mapZooms.isDetailedZoomSimplified();
             if (!mostDetailedLevel) {
-                int zoomToSimplify = mapZooms.getLevel(level).getMaxZoom() - 1;
+                int zoomToSimplify = simplificationZoom(level, typeUse) - 1;
 
                 if (cycle) {
                     res = simplifyCycleWay(((Way) e).getNodes(), zoomToSimplify, settings.zoomWaySmoothness);

@@ -20,6 +20,10 @@ logging:
 
 
 osmand:
+  oauth.enabled: ${OAUTH_ENABLED:false}
+  oauth.default-user-enabled: ${OAUTH_DEFAULT_USER_ENABLED:false}
+  # data server of the MCP tools (routing, search, weather...)
+  mcp.server-api: ${MCP_SERVER_API:}
   night-builds-json.location: https://dl2.osmand.net/night-builds-json/
   # ! should contain folders or symlinks indexes, night-builds, gen !
   files.location: ${user.dir}/../../../
@@ -32,6 +36,7 @@ osmand:
   wiki.location: ${osmand.files.location}/wikidata/wikidata_commons_osm.sqlitedb
   heightmap.location: ${HEIGHTMAP_LOCATION:}
   crash-reports.location: ${CRASH_REPORTS_LOCATION:}
+  analytics.location: ${ANALYTICS_LOCATION:}
 
 server:
   port: 8080

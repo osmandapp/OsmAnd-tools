@@ -8,6 +8,7 @@ import net.osmand.server.api.services.GpxService;
 import net.osmand.server.api.services.StorageService.InternalZipFile;
 import net.osmand.server.api.services.UserdataService;
 import net.osmand.server.controllers.pub.UserSessionResources;
+import net.osmand.server.utils.GpxJson;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import net.osmand.shared.gpx.GpxFile;
@@ -47,7 +48,7 @@ public class FavoriteController {
     @Autowired
     UserSessionResources sessionResources;
     
-    Gson gson = new Gson();
+    Gson gson = GpxJson.create();
     
     @PostMapping(value = "/delete")
     @ResponseBody
@@ -188,7 +189,7 @@ public class FavoriteController {
     public ResponseEntity<String> addGroup(@RequestBody String data, @RequestParam String groupName,
                                            HttpSession session) throws IOException {
         CloudUserDevicesRepository.CloudUserDevice dev = favoriteService.getUserId();
-        WebGpxParser.TrackData trackData = new Gson().fromJson(data, WebGpxParser.TrackData.class);
+        WebGpxParser.TrackData trackData = gson.fromJson(data, WebGpxParser.TrackData.class);
         return favoriteService.addNewGroup(trackData, groupName, dev, session);
     }
 
@@ -201,7 +202,7 @@ public class FavoriteController {
                                               @RequestParam(required = false) Long clienttime,
                                               HttpSession session) throws IOException {
         CloudUserDevicesRepository.CloudUserDevice dev = favoriteService.getUserId();
-        WebGpxParser.TrackData groupData = new Gson().fromJson(data, WebGpxParser.TrackData.class);
+        WebGpxParser.TrackData groupData = gson.fromJson(data, WebGpxParser.TrackData.class);
         return favoriteService.updateGroup(fileName, groupData, groupName, dev, updatetime, clienttime, session);
     }
     

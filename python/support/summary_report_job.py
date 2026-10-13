@@ -94,6 +94,11 @@ class Report:
             print(f"Ticket #: {zend_ticket['id']}. Knowledge type: {Knowledge.knowledge_type()}. Asking LLM ...")
             ticket_response = self.llm.ask(prompt)
 
+            if (ticket_response is not None
+                    and ticket_response.get('category') == 'Error'
+                    and ticket_response.get('answer', '').strip() == 'Connection error.'):
+                raise RuntimeError(f"Ticket {zend_ticket['id']}: LLM Connection error.")
+
             if ticket_response is not None:
                 ticket_response['id'] = zend_ticket['id']
                 ticket_response['url'] = f"https://{Zendesk.domain}.zendesk.com/agent/tickets/{zend_ticket['id']}"

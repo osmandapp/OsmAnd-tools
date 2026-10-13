@@ -49,7 +49,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 
 import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
@@ -57,6 +56,7 @@ import net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFile;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFileNoData;
 import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
+import net.osmand.server.utils.GpxJson;
 import org.xmlpull.v1.XmlPullParserException;
 
 @RestController
@@ -113,7 +113,7 @@ public class MapApiController {
 
 	Gson gson = new Gson();
 
-	Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
+	Gson gsonWithNans = GpxJson.createWithNans();
 
 	public static class UserPasswordPost {
 		// security alert: don’t add fields to this class

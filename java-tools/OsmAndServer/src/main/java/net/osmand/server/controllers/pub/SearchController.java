@@ -116,6 +116,9 @@ public class SearchController {
 							sessionRoutingKey(request), maps);
 			JsonObject json = gson.toJsonTree(new FeatureCollection(res.features.toArray(new Feature[0]))).getAsJsonObject();
 			json.add("info", gson.toJsonTree(res.info));
+			if (res.typoSuggestion != null) {
+				json.addProperty("typoSuggestion", res.typoSuggestion);
+			}
 			return ResponseEntity.ok(gson.toJson(json));
 		}
 		List<Feature> features = classicSearchService.search(searchContext, timeZone);

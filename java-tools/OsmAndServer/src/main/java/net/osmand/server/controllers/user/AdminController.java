@@ -1568,6 +1568,11 @@ public class AdminController {
 			}
 		}
 	}
+	@GetMapping(path = {"/osmgpx-reviews", "/osmgpx-reviews/"})
+	public String osmGpxReviewsPage() {
+		return "admin/osmgpx-reviews";
+	}
+
 	@GetMapping(path = {"/releases"})
 	public String releasesPage(Model model) {
 		List<ReleaseInfo> releases = new ArrayList<>();

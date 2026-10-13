@@ -91,6 +91,16 @@ public class UserdataService {
 	@Autowired
 	ShareFileService shareFileService;
 
+	@Lazy
+	@Autowired
+	GarminConnectService garminConnectService;
+
+	@Autowired
+	GarminUserConnectionRepository garminUserConnectionRepository;
+
+	@Autowired
+	MapUserRepository mapUserRepository;
+
     @Autowired
     protected StorageService storageService;
 
@@ -112,6 +122,9 @@ public class UserdataService {
 
 	@Autowired
 	protected DeviceInAppPurchasesRepository inAppPurchasesRepo;
+
+	@Autowired
+	protected SupportersRepository supportersRepository;
 
 	@Autowired
 	JdbcTemplate jdbcTemplate;
@@ -178,7 +191,23 @@ public class UserdataService {
     private final Cache<String, RequestData> requestTracker = CacheBuilder.newBuilder()
             .expireAfterWrite(24, TimeUnit.HOURS)
             .build();
-    
+
+    private static final int EMAIL_TOKEN_MIN_DIGITS = 6;
+    private static final int EMAIL_TOKEN_MAX_DIGITS = 12;
+
+    private static final int EMAIL_TOKEN_EXPIRATION_HOURS = 24;
+    private static final int EMAIL_TOKEN_MIN_DELAY_MINUTES = 10;
+    private static final int EMAIL_TOKEN_MAX_DELAY_MINUTES = 60;
+
+    private static final int EMAIL_TOKEN_AVG_HOURLY_USERS = 100; // 5x reserve
+
+    private final Cache<String, SecureEmailToken> emailTokenRequests = CacheBuilder.newBuilder()
+            .expireAfterWrite(EMAIL_TOKEN_MAX_DELAY_MINUTES, TimeUnit.MINUTES)
+            .build();
+
+    private record SecureEmailToken(String token, long nextAllowedAt) {
+    }
+
     private static class RequestData {
         public int checkCount;
         public long lastCheckTime;
@@ -236,14 +265,14 @@ public class UserdataService {
 		if (Algorithms.isEmpty(user.orderid)) {
 			if (res.totalFiles > MAX_NUMBER_OF_FILES_FREE_ACCOUNT) {
 				throw new OsmAndPublicApiException(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED,
-						"Maximum size of OsmAnd Cloud exceeded " + (MAXIMUM_ACCOUNT_SIZE / MB)
-								+ " MB. Please contact support in order to investigate possible solutions.");
+						String.format("Maximum number of files in OsmAnd Cloud for Free account exceeded, %d > %d!",
+								res.totalFiles, MAX_NUMBER_OF_FILES_FREE_ACCOUNT));
 			}
 		}
         if (errorMsg != null || Algorithms.isEmpty(user.orderid)) {
             UserdataController.UserFilesResults files = generateFiles(user.id, null, false, false, FREE_TYPES);
             if (files.totalZipSize + fileSize > MAXIMUM_FREE_ACCOUNT_SIZE) {
-                throw new OsmAndPublicApiException(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED, String.format("Not enough space to save file. Maximum size of OsmAnd Cloud for Free account %d!", MAXIMUM_FREE_ACCOUNT_FILE_SIZE / MB));
+                throw new OsmAndPublicApiException(ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED, String.format("Not enough space to save file. Maximum size of OsmAnd Cloud for Free account %d MB!", MAXIMUM_FREE_ACCOUNT_SIZE / MB));
             }
         }
     }
@@ -378,6 +407,18 @@ public class UserdataService {
 
 	public ResponseEntity<String> uploadMultipartFile(MultipartFile file, CloudUserDevicesRepository.CloudUserDevice dev,
 			String name, String type, Long clienttime, HttpSession session) throws IOException {
+		InternalZipFile zipfile;
+		try {
+			zipfile = getUploadZipFile(file, name, type, session);
+			validateUserForUpload(dev, type, zipfile.getSize());
+		} catch (OsmAndPublicApiException e) {
+			LOG.warn(String.format("Upload rejected for user %d, file %s/%s: %s", dev.userid, type, name, e.getMessage()));
+			throw e;
+		}
+		return uploadFile(zipfile, dev, name, type, clienttime);
+	}
+
+	private InternalZipFile getUploadZipFile(MultipartFile file, String name, String type, HttpSession session) throws IOException {
 		ServerCommonFile serverCommonFile = checkThatObfFileisOnServer(name, type);
 		InternalZipFile zipfile;
 		if (serverCommonFile != null) {
@@ -401,8 +442,7 @@ public class UserdataService {
                 throw new OsmAndPublicApiException(ERROR_CODE_GZIP_ONLY_SUPPORTED_UPLOAD, "File is submitted not in gzip format");
 			}
 		}
-		validateUserForUpload(dev, type, zipfile.getSize());
-		return uploadFile(zipfile, dev, name, type, clienttime);
+		return zipfile;
 	}
 
 	private boolean isKmlKmzFileByName(String originalFilename) {
@@ -507,6 +547,31 @@ public class UserdataService {
         filesRepository.save(fl);
     }
 
+    public synchronized void updateSecureEmailToken(CloudUser user) {
+        String email = user.email.trim().toLowerCase(Locale.ROOT);
+        long now = System.currentTimeMillis();
+        SecureEmailToken token = emailTokenRequests.getIfPresent(email);
+        if (token == null || token.nextAllowedAt() <= now) {
+            // More emails issued tokens in the last hour increase the delay and token length.
+            long users = emailTokenRequests.size();
+            long delayMinutes = Math.min(EMAIL_TOKEN_MAX_DELAY_MINUTES, Math.max(EMAIL_TOKEN_MIN_DELAY_MINUTES,
+                    EMAIL_TOKEN_MIN_DELAY_MINUTES * users / EMAIL_TOKEN_AVG_HOURLY_USERS));
+            int digits = (int) Math.min(EMAIL_TOKEN_MAX_DIGITS, Math.max(EMAIL_TOKEN_MIN_DIGITS,
+                    EMAIL_TOKEN_MIN_DIGITS * users / EMAIL_TOKEN_AVG_HOURLY_USERS));
+            token = new SecureEmailToken(generateEmailToken(digits), now + TimeUnit.MINUTES.toMillis(delayMinutes));
+            emailTokenRequests.put(email, token);
+            user.tokenTime = new Date(now);
+        }
+        user.token = token.token();
+    }
+
+    private String generateEmailToken(int digits) {
+        // Allow 6 (minimum) to 18 (Long max)
+        digits = Math.max(6, Math.min(18, digits));
+        long minValue = (long) Math.pow(10, digits - 1);
+        return Long.toString(new SecureRandom().nextLong(9 * minValue) + minValue);
+    }
+
     public ResponseEntity<String> webUserActivate(String email, String token, String password, String lang) {
         if (password.length() < 8) {
             throw new OsmAndPublicApiException(ERROR_CODE_PASSWORD_IS_TO_SIMPLE, "enter password with at least 8 symbols");
@@ -540,10 +605,7 @@ public class UserdataService {
         }
 		if (pu != null) {
             pu.tokendevice = TOKEN_DEVICE_WEB;
-            if (pu.token == null || pu.token.length() < UserdataController.SPECIAL_PERMANENT_TOKEN) {
-                pu.token = (new Random().nextInt(8999) + 1000) + "";
-            }
-            pu.tokenTime = new Date();
+            updateSecureEmailToken(pu);
             usersRepository.saveAndFlush(pu);
             emailSender.sendOsmAndCloudWebEmail(pu.email, pu.token, "@ACTION_SETUP@", lang);
 		} else {
@@ -559,7 +621,7 @@ public class UserdataService {
             return ResponseEntity.badRequest().body("error_email");
         }
         if (pu.token == null || !pu.token.equals(token) || pu.tokenTime == null || System.currentTimeMillis()
-                - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS)) {
+                - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(EMAIL_TOKEN_EXPIRATION_HOURS, TimeUnit.HOURS)) {
             if (isWebLinkValid(pu, token)) {
                 return ok();
             }
@@ -615,7 +677,7 @@ public class UserdataService {
         }
         boolean tokenIsActive = pu.token != null && pu.tokenTime != null &&
                 (System.currentTimeMillis() - pu.tokenTime.getTime()) <
-                        TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
+                        TimeUnit.MILLISECONDS.convert(EMAIL_TOKEN_EXPIRATION_HOURS, TimeUnit.HOURS);
         boolean webLink = TOKEN_DEVICE_WEB.equals(deviceId) && isWebLinkValid(pu, token);
         if (webLink) {
             pu.webLinkToken = null;
@@ -627,10 +689,9 @@ public class UserdataService {
                 throw new OsmAndPublicApiException(ERROR_CODE_TOKEN_IS_NOT_VALID_OR_EXPIRED, "token is not valid or expired (24h)");
             }
         }
-        if (pu.token != null && pu.token.length() < UserdataController.SPECIAL_PERMANENT_TOKEN) {
-        	pu.token = null;
-        }
+        pu.token = null;
         pu.tokenTime = null;
+        emailTokenRequests.invalidate(pu.email.trim().toLowerCase(Locale.ROOT));
         CloudUserDevicesRepository.CloudUserDevice device = new CloudUserDevicesRepository.CloudUserDevice();
 	    if (Algorithms.isEmpty(deviceId) || Algorithms.isEmpty(model)) {
 		    LOG.error("device-register: avoid delete-anonymous-same-device (" + email + ")");
@@ -1430,15 +1491,20 @@ public class UserdataService {
     public ResponseEntity<String> deleteAccount(String token, CloudUserDevicesRepository.CloudUserDevice dev, HttpServletRequest request) throws ServletException {
         CloudUsersRepository.CloudUser pu = usersRepository.findById(dev.userid);
         if (pu != null && pu.id == dev.userid) {
-            boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
+            boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(EMAIL_TOKEN_EXPIRATION_HOURS, TimeUnit.HOURS);
             boolean validToken = pu.token.equals(token) && !tokenExpired;
             wearOutToken(pu);
             if (validToken) {
                 if (deleteAllFiles(dev)) {
                     int numOfUsersDelete = usersRepository.deleteByEmailIgnoreCase(pu.email);
                     if (numOfUsersDelete != -1) {
+						emailTokenRequests.invalidate(pu.email.trim().toLowerCase(Locale.ROOT));
 						LOG.info("Deleted (/delete-account) users with email " + pu.email + " and id " + pu.id);
+						removeEmailFromSupporters(pu.id);
 						removeUserIdFromPurchases(pu.id);
+						disconnectGarmin(pu.id);
+						shareFileService.deleteAllShareFiles(pu.id);
+						mapUserRepository.deleteAllByEmailIgnoreCase(pu.email);
                         int numOfUserDevicesDelete = devicesRepository.deleteByUserid(dev.userid);
                         if (numOfUserDevicesDelete != -1) {
 							LOG.info("Deleted (/delete-account) user devices for user " + pu.email + " and id " + pu.id);
@@ -1456,6 +1522,27 @@ public class UserdataService {
         return ResponseEntity.badRequest().body("Email doesn't match login username");
     }
 
+	private void removeEmailFromSupporters(int userId) {
+		Set<Long> supporterIds = new HashSet<>();
+		for (DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription : subscriptionsRepo.findAllByUserId(userId)) {
+			if (subscription.supporterId != null) {
+				supporterIds.add(subscription.supporterId);
+			}
+		}
+		for (DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase inAppPurchase : inAppPurchasesRepo.findByUserId(userId)) {
+			if (inAppPurchase.supporterId != null) {
+				supporterIds.add(inAppPurchase.supporterId);
+			}
+		}
+		for (SupportersRepository.Supporter supporter : supportersRepository.findAllById(supporterIds)) {
+			supporter.userEmail = null;
+			supportersRepository.save(supporter);
+		}
+		if (!supporterIds.isEmpty()) {
+			LOG.info("Removed email from supporters " + supporterIds + " for user with id " + userId);
+		}
+	}
+
 	private void removeUserIdFromPurchases(int userId) {
 		List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = subscriptionsRepo.findAllByUserId(userId);
 		if (subscriptions != null && !subscriptions.isEmpty()) {
@@ -1472,6 +1559,18 @@ public class UserdataService {
 				inAppPurchasesRepo.save(inAppPurchase);
 			}
 			LOG.info("Removed userid from in-app purchases for user with id " + userId);
+		}
+	}
+
+	private void disconnectGarmin(int userId) {
+		try {
+			garminConnectService.partnerDisconnect(userId);
+		} catch (Exception e) {
+			if (e instanceof InterruptedException) {
+				Thread.currentThread().interrupt();
+			}
+			LOG.warn("Garmin disconnect (/delete-account) failed for user with id " + userId, e);
+			garminUserConnectionRepository.deleteByUserid(userId);
 		}
 	}
 
@@ -1494,10 +1593,9 @@ public class UserdataService {
         if (pu == null) {
             return ResponseEntity.badRequest().body("Email is not registered");
         }
-        String token = (new Random().nextInt(8999) + 1000) + "";
+        updateSecureEmailToken(pu);
+        String token = pu.token;
         emailSender.sendOsmAndCloudWebEmail(pu.email, token, action, lang);
-        pu.token = token;
-        pu.tokenTime = new Date();
         usersRepository.saveAndFlush(pu);
 
 	    userSubService.verifyAndRefreshProOrderId(pu);
@@ -1510,7 +1608,7 @@ public class UserdataService {
         if (pu == null) {
             return ResponseEntity.badRequest().body("User is not registered");
         }
-        boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
+        boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(EMAIL_TOKEN_EXPIRATION_HOURS, TimeUnit.HOURS);
         wearOutToken(pu);
         if (pu.token.equals(code) && !tokenExpired) {
             return ok();
@@ -1527,7 +1625,7 @@ public class UserdataService {
         if (pu == null) {
             return ResponseEntity.badRequest().body("User is not registered");
         }
-        boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(24, TimeUnit.HOURS);
+        boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(EMAIL_TOKEN_EXPIRATION_HOURS, TimeUnit.HOURS);
         wearOutToken(pu);
         if (pu.token.equals(token) && !tokenExpired) {
             return ok();
@@ -1638,6 +1736,8 @@ public class UserdataService {
             return ResponseEntity.badRequest().body("User is not registered");
         }
         // change email
+        emailTokenRequests.invalidate(currentUser.email.trim().toLowerCase(Locale.ROOT));
+        emailTokenRequests.invalidate(tempUser.email.trim().toLowerCase(Locale.ROOT));
         usersRepository.delete(tempUser);
         currentUser.email = username;
         usersRepository.saveAndFlush(currentUser);

@@ -3,7 +3,6 @@ package net.osmand.server.api.services.search;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -27,14 +26,12 @@ import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.BinaryMapIndexReader.SearchPoiTypeFilter;
 import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
 import net.osmand.binary.BinaryMapPoiReaderAdapter;
-import net.osmand.binary.NameIndexReader;
 import net.osmand.binary.ObfConstants;
 import net.osmand.data.Amenity;
 import net.osmand.data.BaseDetailsObject;
 import net.osmand.data.City;
 import net.osmand.data.City.CityType;
 import net.osmand.data.LatLon;
-import net.osmand.data.MapObject;
 import net.osmand.data.QuadRect;
 import net.osmand.data.TransportStopMatcher;
 import net.osmand.osm.PoiType;
@@ -241,36 +238,8 @@ public class PoiSearchService {
 
 	private List<Amenity> searchPoiAmenities(SpatialSearchContext sscontext, String categoryKey, QuadRect bboxLatLon,
 	                                         int poiZoom, int limit) throws IOException {
-		SpatialPoiSearch poiTypeSearch = spatialSearchService.getSpatialPoiTypeSearch();
-		SpatialPoiType spatialType = null;
-		if (!categoryKey.startsWith(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX)) {
-			spatialType = poiTypeSearch.getByKey(categoryKey);
-			if (spatialType == null) {
-				LOGGER.debug(String.format("Unknown poi category '%s'", categoryKey));
-				return Collections.emptyList();
-			}
-			categoryKey = spatialType.getKey();
-		}
-		boolean indexed = spatialType == null
-				|| (spatialType.singleType instanceof PoiType poiType && !poiType.isNonIndx());
-		if (!indexed) {
-			return poiTypeSearch.loadPOIObjects(sscontext, spatialType, bboxLatLon, poiZoom, limit);
-		}
-
-		SpatialSearchResults res = spatialSearchService.getSpatialTextSearch()
-				.searchAPI(NameIndexReader.POI_CATEGORY_PREFIX + categoryKey, sscontext);
-
-		List<Amenity> amenities = new ArrayList<>();
-		if (res.mainResults != null) {
-			for (SpatialSearchResult r : res.mainResults) {
-				for (MapObject o : r.getObjects()) {
-					if (o instanceof Amenity amenity) {
-						amenities.add(amenity);
-					}
-				}
-			}
-		}
-		return amenities;
+		return spatialSearchService.getSpatialTextSearch().searchPoiByCategory(sscontext, categoryKey, bboxLatLon,
+				poiZoom, limit);
 	}
 
 	public Map<String, Map<String, String>> searchPoiCategories(String search, LatLon center) throws IOException {

@@ -39,11 +39,11 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 
 import net.osmand.server.api.services.GpxService;
 import net.osmand.server.controllers.pub.UserSessionResources.GPXSessionContext;
 import net.osmand.server.controllers.pub.UserSessionResources.GPXSessionFile;
+import net.osmand.server.utils.GpxJson;
 import net.osmand.server.utils.WebGpxParser;
 
 import static net.osmand.shared.IndexConstants.GPX_FILE_PREFIX;
@@ -55,9 +55,10 @@ public class GpxController {
     
 	protected static final Log LOGGER = LogFactory.getLog(GpxController.class);
 
-	Gson gson = new Gson();
+	Gson gson = GpxJson.create();
 	
-	Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
+	// point extensions as an object, as the web map reads them
+	Gson gsonWithNans = GpxJson.createWithNans();
 	
 	@Autowired
 	WebGpxParser webGpxParser;
@@ -254,7 +255,7 @@ public class GpxController {
 															   @RequestParam Boolean simplified,
 	                                                           HttpSession httpSession) throws IOException {
 		String jsonData = decompressGzip(data);
-		WebGpxParser.TrackData trackData = new Gson().fromJson(jsonData, WebGpxParser.TrackData.class);
+		WebGpxParser.TrackData trackData = gson.fromJson(jsonData, WebGpxParser.TrackData.class);
 
 		GpxFile gpxFile = webGpxParser.createGpxFileFromTrackData(trackData);
 		if (simplified != null && simplified) {

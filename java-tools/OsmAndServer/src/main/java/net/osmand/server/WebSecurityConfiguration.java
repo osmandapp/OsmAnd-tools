@@ -65,6 +65,7 @@ public class WebSecurityConfiguration {
 	public static final String ROLE_PRO_USER = "ROLE_PRO_USER"; // actually it's logged in user not necessarily pro
 	public static final String ROLE_ADMIN = "ROLE_ADMIN";
 	public static final String ROLE_SUPPORT = "ROLE_SUPPORT";
+	public static final String ROLE_TEAM = "ROLE_TEAM";
 	private static final int SESSION_TTL_SECONDS = 3600 * 24 * 30;
 
 	@Value("${spring.session.redisHost}")
@@ -175,6 +176,9 @@ public class WebSecurityConfiguration {
 			if (webAccessConfig.getSupport().contains(email)) {
 				auths.add(new SimpleGrantedAuthority(ROLE_SUPPORT));
 			}
+			if (webAccessConfig.getTeam().contains(email)) {
+				auths.add(new SimpleGrantedAuthority(ROLE_TEAM));
+			}
 		}
 
 		return new OsmAndProUser(username, pud.accesstoken, pud, new ArrayList<>(auths));
@@ -239,7 +243,7 @@ public class WebSecurityConfiguration {
 						.requestMatchers("/admin/security-error").permitAll()
 						.requestMatchers("/admin/releases/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
 						.requestMatchers("/admin/download-release/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
-						.requestMatchers("/admin/issues/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
+						.requestMatchers("/admin/issues/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT, ROLE_TEAM)
 						.requestMatchers("/admin/mcp/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
 //						.requestMatchers("/mcp/**").permitAll()
 //						.requestMatchers("/admin/issues/**").permitAll()
