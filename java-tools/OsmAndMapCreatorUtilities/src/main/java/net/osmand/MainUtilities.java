@@ -510,7 +510,7 @@ public class MainUtilities {
 				+ "one map section from many osm files (up to 2048), e.g. tiles of one region");
 		System.out.println("\t\t inspector <params>: powerful tool to inspect obf files and convert them to osm");
 		System.out.println("\t\t collect-tag-values --extracts=<osm-extract dir> [--out=all_brands.csv] [--cache=brands] [--threads=N] [--force]: counts brand tag values per region (pbf/o5m) for brand-analyzer");
-		System.out.println("\t\t collect-tag-values --poi-stats --extracts=<osm-extract dir> [--out=poi_name_stats.tsv] [--cache=poi-stats] [--min-count=3]: per map region, POI types, operator/network/brand values, name words and abbreviations for search synonyms");
+		System.out.println("\t\t collect-tag-values ... --poi-out=poi_name_stats.tsv.gz [--poi-cache=poi-stats] [--min-count=3]: in the same pass, per leaf map region POI types, operator/network/brand values, name words and abbreviations for search synonyms (--poi-stats: only these); .gz outputs are gzipped");
 		System.out.println("\t\t check-ocean-tile <lat> <lon> <zoom=11>: checks ocean or land tile is in bz2 list");
 		System.out.println("\t\t generate-ocean-tile <coastline osm file> <optional output file>: creates ocean tiles 12 zoom");
 		System.out.println("\t\t generate-java-style <pathtostyle> <pathtooutputfolder>: prints rendering style as java interpreted code");
