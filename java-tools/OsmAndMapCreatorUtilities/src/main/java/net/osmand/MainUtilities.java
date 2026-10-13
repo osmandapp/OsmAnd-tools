@@ -73,6 +73,10 @@ public class MainUtilities {
 				BinaryMerger.main(subArgsArray);
 			} else if (utl.equals("brand-analyzer") || utl.equals("tag-value-analyzer")) {
 				TopTagValuesAnalyzer.main(subArgsArray);
+			} else if (utl.equals("poi-extraction-summary")) {
+				PoiNamesExtractionSummary.main(subArgsArray);
+			} else if (utl.equals("top-abbrs-analyzer")) {
+				net.osmand.util.abbrs.TopAbbrsAnalyzer.main(subArgsArray);
 			} else if (utl.equals("test-style-rendering")) {
 				OsmAndTestStyleRenderer.main(subArgsArray);
 			} else if (utl.equals("test-coastline-rendering")) {
@@ -352,6 +356,9 @@ public class MainUtilities {
 			} else if (s.startsWith("--poi-top-index-list=")) {
 				settings.poiTopIndexUrl = s.substring(s.indexOf('=') + 1);
 				it.remove();
+			} else if (s.startsWith("--poi-extraction-dir=")) {
+				settings.poiExtractionDir = s.substring(s.indexOf('=') + 1);
+				it.remove();
 			} else if (s.startsWith("--map-zooms=")) {
 				settings.mapZooms = s.substring(s.indexOf('=') + 1);
 				it.remove();
@@ -507,6 +514,10 @@ public class MainUtilities {
 		System.out.println("\t\t generate-single-map <output obf> <osm files> <--name=region> <--map-zooms=...>: "
 				+ "one map section from many osm files (up to 2048), e.g. tiles of one region");
 		System.out.println("\t\t inspector <params>: powerful tool to inspect obf files and convert them to osm");
+		System.out.println("\t\t poi-extraction-summary <dir or extraction files> <--top=20>: summary of the POI extractions of generation "
+				+ "(--poi-extraction-dir=<dir> of generate-obf or POI_EXTRACTION_DIR)");
+		System.out.println("\t\t top-abbrs-analyzer <extraction dirs or files> --out=<dir> <--rules=top-abbrs-rules.xml> "
+				+ "<--brands=brands.lst> <--explorer=candidates.json>: top_abbrs.csv of abbreviations of organizations and words of POI names");
 		System.out.println("\t\t check-ocean-tile <lat> <lon> <zoom=11>: checks ocean or land tile is in bz2 list");
 		System.out.println("\t\t generate-ocean-tile <coastline osm file> <optional output file>: creates ocean tiles 12 zoom");
 		System.out.println("\t\t generate-java-style <pathtostyle> <pathtooutputfolder>: prints rendering style as java interpreted code");

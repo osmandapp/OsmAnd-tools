@@ -5,6 +5,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
+import java.io.UncheckedIOException;
 import java.net.URL;
 import java.sql.*;
 import java.util.*;
@@ -98,6 +99,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	private Map<String, Map<Integer, Integer>> tagGroupIdsByRegion = new HashMap<>();// region => <oldTagGroupId, newTagGroupId>
 	private int maxTagGroupId = 0;
 	private Map<Integer, PoiCreatorTagGroup> tagGroupsFromDB;
+	private PoiNamesExtractor poiExtraction;
 
 	// avoid add to name index a low rating wiki objects
 	private static final int MIN_WIKI_ELO = 1300;
@@ -276,6 +278,14 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
    						System.out.println("TODO FIX " + a.getId() + " " + excpt);
    						excpt.printStackTrace();
    					}
+					// a failed batch could hold other rows: the POI is extracted only if processPOIIntoTree reads it
+					if (poiExtraction != null && !icc.basemap) {
+						try {
+							poiExtraction.addPoi(e, a.getId(), relationCenters.size() > 1 ? i : 0);
+						} catch (IOException ex) {
+							throw new UncheckedIOException(ex);
+						}
+					}
                 }
 
 			}
@@ -354,7 +364,17 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
 
 
+	/** starts the extraction of named POI of the map {@code mapFile} if it is enabled (see {@link PoiNamesExtractor}) */
+	public void startPoiExtraction(File mapFile) throws IOException {
+		poiExtraction = PoiNamesExtractor.create(settings, mapFile);
+	}
+
 	public void commitAndClosePoiFile(Long lastModifiedDate) throws SQLException {
+		if (poiExtraction != null) {
+			// the OBF was not written
+			poiExtraction.abort();
+			poiExtraction = null;
+		}
 		closeAllPreparedStatements();
 		if (poiConnection != null) {
 			poiConnection.commit();
@@ -889,6 +909,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		prepareStatement.close();
 
 		writer.endWritePoiIndex();
+		if (poiExtraction != null) {
+			poiExtraction.finish();
+			poiExtraction = null;
+		}
 	}
 
 	private void collectTopIndexMap() throws SQLException, IOException {
@@ -1164,6 +1188,9 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				poiData.additionalTags.putAll(additionalTags);
 				poiData.tagGroups.addAll(tagGroupIds);
 				prevTree.getNode().poiData.add(poiData);
+				if (poiExtraction != null) {
+					poiExtraction.writeRecord(poiData.id, x, y, type, subtype, additionalTags);
+				}
 				int rawRating = poiData.getRating();
 				int elo = rawRating <= 1000 ? -1 : ((rawRating - 1000) / 50);
 				Set<PoiAdditionalType> encoded = null;

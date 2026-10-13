@@ -1,0 +1,59 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<osm version="0.6" generator="PoiNamesDumpTest">
+  <!-- two POI of one entity: amenity=cafe and shop=bakery -->
+  <node id="1001" version="1" lat="49.6110" lon="6.1300">
+    <tag k="amenity" v="cafe"/>
+    <tag k="shop" v="bakery"/>
+    <tag k="name" v="Two Types"/>
+    <tag k="name:de" v="Zwei Typen"/>
+    <tag k="operator" v="Bakery Co"/>
+    <tag k="cuisine" v="coffee_shop"/>
+  </node>
+  <!-- no name, only operator -->
+  <node id="1002" version="1" lat="49.6120" lon="6.1310">
+    <tag k="amenity" v="townhall"/>
+    <tag k="operator" v="New York State Department of Motor Vehicles"/>
+    <tag k="operator:short" v="NYSDMV"/>
+  </node>
+  <!-- no name, no operator, no network -->
+  <node id="1003" version="1" lat="49.6130" lon="6.1320">
+    <tag k="amenity" v="cafe"/>
+    <tag k="brand" v="Nameless"/>
+  </node>
+  <!-- out of the map boundary (Paris) -->
+  <node id="1004" version="1" lat="48.8566" lon="2.3522">
+    <tag k="amenity" v="cafe"/>
+    <tag k="name" v="Far Cafe"/>
+  </node>
+
+  <!-- multipolygon with two outer rings: two centers -->
+  <node id="2001" version="1" lat="49.6000" lon="6.1000"/>
+  <node id="2002" version="1" lat="49.6000" lon="6.1050"/>
+  <node id="2003" version="1" lat="49.6050" lon="6.1050"/>
+  <node id="2004" version="1" lat="49.6050" lon="6.1000"/>
+  <node id="2011" version="1" lat="49.6200" lon="6.1500"/>
+  <node id="2012" version="1" lat="49.6200" lon="6.1550"/>
+  <node id="2013" version="1" lat="49.6250" lon="6.1550"/>
+  <node id="2014" version="1" lat="49.6250" lon="6.1500"/>
+  <way id="3001" version="1">
+    <nd ref="2001"/>
+    <nd ref="2002"/>
+    <nd ref="2003"/>
+    <nd ref="2004"/>
+    <nd ref="2001"/>
+  </way>
+  <way id="3002" version="1">
+    <nd ref="2011"/>
+    <nd ref="2012"/>
+    <nd ref="2013"/>
+    <nd ref="2014"/>
+    <nd ref="2011"/>
+  </way>
+  <relation id="4001" version="1">
+    <member type="way" ref="3001" role="outer"/>
+    <member type="way" ref="3002" role="outer"/>
+    <tag k="type" v="multipolygon"/>
+    <tag k="leisure" v="park"/>
+    <tag k="name" v="Twin Park"/>
+  </relation>
+</osm>

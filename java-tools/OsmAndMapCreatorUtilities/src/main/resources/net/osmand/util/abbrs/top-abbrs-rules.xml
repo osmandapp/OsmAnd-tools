@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Rules of the top abbreviations analyzer (TopAbbrsAnalyzer), see top-org-abbrs-spec.md 6.
+     Every attribute has a default in TopAbbrsRules; a locale layer (language, then language_COUNTRY) replaces
+     attributes, word lists are replaced whole. -->
+<top-abbrs version="1">
+	<defaults>
+		<ownership share="0.7" wordLocales="2"/>
+		<case org="upper" word="capital" share="0.6" skipAllCapsNames="true"/>
+		<limit perMap="500" planet="20000"/>
+		<publish firstRelease="manual" maxMapChange="0.02" maxRowGain="2000"/>
+		<input maxExtractionAgeMonths="2"/>
+		<review perStratum="20" highGain="1000"/>
+	</defaults>
+
+	<!-- H1: pairs of two spellings of one name -->
+	<pairs>
+		<source id="same" tags="short_name alt_name official_name name:{lang}" span="true" spanMaxWords="6"/>
+		<source id="near" radiusM="500" sameFirstWord="true" maxShortLen="4"/>
+		<abbr minLen="2" maxLen="8" maxChunk="3"/>
+		<long maxWords="3"/>
+		<noise unglue="true" roman="true" compound="true" compoundLinks="s es" serviceWords="true"/>
+		<accept minSupport="3" minTiles="2" tileZoom="10"/>
+	</pairs>
+
+	<!-- H2 + H3: abbreviations of organizations -->
+	<groups>
+		<group tag="operator"/>
+		<group tag="network"/>
+		<accept minGroup="3" minShare="0.25" acronym="required" glued="separate"
+				headWord="true" stripTail="legal place" min2LetterShare="0.6"/>
+		<exclude brandValues="true"/>
+		<propagate enabled="false"/>
+	</groups>
+
+	<!-- a pair found by H1 and by H2 + H3: thresholds are multiplied -->
+	<agree supportFactor="0.5" shareFactor="0.5"/>
+
+	<stop words="of the and for a an at in on to by"/>
+
+	<locale id="en">
+		<stop words="of the and for a an at in on to by"/>
+		<legal words="inc llc ltd corp co corporation company"/>
+		<places words="county city state town village borough"/>
+	</locale>
+
+	<locale id="it">
+		<stop words="di del della dei degli delle da dal dalla e ed il lo la le i gli a al alla in per con su"/>
+		<legal words="spa s.p.a srl s.r.l snc sas onlus"/>
+		<places words="comune provincia regione citta"/>
+	</locale>
+
+	<locale id="de">
+		<pairs>
+			<accept minSupport="5"/>
+		</pairs>
+		<stop words="der die das den dem des und für von zu zum zur am im an in bei"/>
+		<legal words="gmbh mbh ag kg ev e.v gbr ug ohg"/>
+		<places words="stadt kreis landkreis gemeinde markt"/>
+	</locale>
+</top-abbrs>

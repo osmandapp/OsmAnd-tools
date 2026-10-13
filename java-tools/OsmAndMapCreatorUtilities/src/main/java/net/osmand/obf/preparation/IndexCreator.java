@@ -392,6 +392,7 @@ public class IndexCreator {
 		}
 		if (settings.indexPOI) {
 			indexPoiCreator.createDatabaseStructure(getPoiFile());
+			indexPoiCreator.startPoiExtraction(mapFile);
 		}
 		if (settings.indexTransport) {
 			indexTransportCreator.createDatabaseStructure(mapConnection, mapIndexDBDialect,

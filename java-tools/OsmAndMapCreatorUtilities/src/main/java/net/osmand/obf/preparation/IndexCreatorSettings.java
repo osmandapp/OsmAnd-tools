@@ -46,6 +46,10 @@ public class IndexCreatorSettings {
 	// lst file <tag>,<value> to index and store as poi category like default - (toilets, cafe)
 	public String poiTopIndexUrl;
 
+	// folder for the extraction of named POI (<map>.poi-entities.tsv.gz, <map>.poi-records.tsv.gz, see PoiNamesExtractor),
+	// null to use the environment variable POI_EXTRACTION_DIR, no extraction if both are empty
+	public String poiExtractionDir;
+
 	// for example file with low emissions polygons
 	public List<File> extraRelations = new ArrayList<>();
 
