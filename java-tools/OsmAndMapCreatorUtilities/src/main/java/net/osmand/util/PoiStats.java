@@ -32,7 +32,8 @@ public class PoiStats {
 	static final String HEADER = "kind\ta\tb\tcount\textra\tsample";
 
 	private static final int GOVERNMENT, RELIGION, NAME, OPERATOR, VALUES;
-	private static final Pattern WORD_SPLIT = Pattern.compile("[^\\p{L}]+");
+	// combining marks are part of a word: Thai vowels, Devanagari matras, Arabic harakat (\p{L} alone cut "विद्यालय" into letters)
+	private static final Pattern WORD_SPLIT = Pattern.compile("[^\\p{L}\\p{M}]+");
 	private static final Pattern ACRONYM = Pattern.compile("(?<![\\p{L}\\d])\\p{Lu}{2,7}(?![\\p{L}\\d])");
 
 	static {
