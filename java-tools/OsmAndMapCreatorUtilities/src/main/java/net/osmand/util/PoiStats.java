@@ -55,9 +55,12 @@ public class PoiStats {
 		this.minCount = minCount;
 	}
 
-	/** type rows are always written, the long tail of the rest only from minCount objects */
+	/**
+	 * Type and acronym rows are always written (an abbreviation spread over many small regions would vanish:
+	 * ЦНАП keeps 24 of 107 objects with a threshold of 3); the long tail of the rest only from minCount objects.
+	 */
 	boolean keep(String key, int count) {
-		return count >= minCount || key.startsWith("type\t");
+		return count >= minCount || key.startsWith("type\t") || key.startsWith("acronym\t");
 	}
 
 	static String line(Entry<String, int[]> e, Counts c) {
@@ -65,29 +68,29 @@ public class PoiStats {
 		return e.getKey() + "\t" + e.getValue()[0] + "\t" + e.getValue()[1] + "\t" + (sample == null ? "" : sample);
 	}
 
-	/** o = raw values indexed as {@link #TAGS}; cleared on return */
-	void object(Counts c, String[] o) {
+	/** o[base + i] = raw value of {@link #TAGS}[i]; the whole array is cleared on return */
+	void object(Counts c, String[] o, int base) {
 		try {
 			String type = null;
 			for (int i = 0; i < TYPE_KEYS.length && type == null; i++) {
-				if (!isEmpty(o[i])) {
-					type = TYPE_KEYS[i] + "=" + TagValuesCollector.normalize(o[i]);
+				if (!isEmpty(o[base + i])) {
+					type = TYPE_KEYS[i] + "=" + TagValuesCollector.normalize(o[base + i]);
 				}
 			}
 			if (type == null) {
 				return;
 			}
-			if (type.equals("office=government") && !isEmpty(o[GOVERNMENT])) {
-				type += ";government=" + TagValuesCollector.normalize(o[GOVERNMENT]);
-			} else if (type.equals("amenity=place_of_worship") && !isEmpty(o[RELIGION])) {
-				type += ";religion=" + TagValuesCollector.normalize(o[RELIGION]);
+			if (type.equals("office=government") && !isEmpty(o[base + GOVERNMENT])) {
+				type += ";government=" + TagValuesCollector.normalize(o[base + GOVERNMENT]);
+			} else if (type.equals("amenity=place_of_worship") && !isEmpty(o[base + RELIGION])) {
+				type += ";religion=" + TagValuesCollector.normalize(o[base + RELIGION]);
 			}
-			String name = isEmpty(o[NAME]) ? null : o[NAME];
+			String name = isEmpty(o[base + NAME]) ? null : o[base + NAME];
 			String lowName = name == null ? null : TagValuesCollector.normalize(name);
-			int withOperator = isEmpty(o[OPERATOR]) ? 0 : 1;
+			int withOperator = isEmpty(o[base + OPERATOR]) ? 0 : 1;
 			c.add("type\t" + type + "\t", 1, withOperator);
 			for (int i = 0; i < VALUE_KEYS.length; i++) {
-				String v = o[VALUES + i];
+				String v = o[base + VALUES + i];
 				if (!isEmpty(v)) {
 					v = TagValuesCollector.normalize(v);
 					c.add(VALUE_KEYS[i] + "\t" + v + "\t" + type, 1, lowName != null && lowName.contains(v) ? 1 : 0);
@@ -97,7 +100,8 @@ public class PoiStats {
 				return;
 			}
 			Set<String> seen = new HashSet<>();
-			for (String w : WORD_SPLIT.split(name.toLowerCase(Locale.ROOT))) {
+			// Locale.ROOT turns Turkish "İ" into "i" + U+0307, which split "İlkokulu" into "i", "lkokulu"
+			for (String w : WORD_SPLIT.split(name.toLowerCase(Locale.ROOT).replace("\u0307", ""))) {
 				if (w.length() >= 2 && seen.add(w)) {
 					c.add("word\t" + w + "\t" + type, 1, 0);
 					c.add("word\t" + w + "\t*", 1, 0);
