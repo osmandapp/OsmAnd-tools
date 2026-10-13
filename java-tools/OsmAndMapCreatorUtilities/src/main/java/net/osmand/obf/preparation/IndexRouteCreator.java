@@ -161,11 +161,11 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				// one role per node in a relation: a "from" node is not also its "to" or "device" (from == to, device == from)
 				to.removeAll(from);
 				devices.removeAll(from);
-				// mark "from" point as speed camera alert.
+				// mark the "from" point as a speed camera alarm
 				addSpeedCameraRelationInfo(relation, from, "from", "highway", "speed_camera", true);
-				// "to" is hidden technical point to detect the direction. tag speed_camera_to keeps the point in the route section but without an alarm.
+				// "to" is a hidden technical point that gives the direction: the speed_camera_to tag keeps the point in the route section without an alarm
 				addSpeedCameraRelationInfo(relation, to, "to", "highway", "speed_camera_to", false);
-				// a "device" on the road already has its own highway=speed_camera tag. current tag needed to prevent adding extra alarm: it was at "from" point.
+				// a "device" on the road already has its own highway=speed_camera tag: this role prevents a second alarm, it was already given at the "from" point
 				addSpeedCameraRelationInfo(relation, devices, "device", null, null, false);
 			}
 		}
