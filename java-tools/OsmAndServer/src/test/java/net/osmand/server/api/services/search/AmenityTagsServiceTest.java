@@ -22,7 +22,13 @@ import okio.Buffer;
 // /search/visible-tags for the extensions of a GPX point: every key is shown but OsmAnd's own fields
 public class AmenityTagsServiceTest {
 
-	private final AmenityTagsService service = new AmenityTagsService(new PoiTypesService());
+	private final AmenityTagsService service = new AmenityTagsService(loadedPoiTypesService());
+
+	private static PoiTypesService loadedPoiTypesService() {
+		PoiTypesService poiTypesService = new PoiTypesService();
+		poiTypesService.loadSharedPoiTypes();
+		return poiTypesService;
+	}
 
 	// real files of src/test/resources/gpx/visible-tags-points.gpx, sent as the web sends them: wpt.ext.extensions
 	@Test
@@ -42,7 +48,8 @@ public class AmenityTagsServiceTest {
 		assertHidden(shown.get("Cara Lodge"), "visited_date", "amenity_origin", "amenity_type", "amenity_subtype",
 				"amenity_name");
 
-		assertShown(shown.get("Schoodic Woods Campground"), "streetaddress", "postalcode", "phonenumber");
+		assertShown(shown.get("Schoodic Woods Campground"), "gpxx:street_address", "gpxx:city", "gpxx:state",
+				"gpxx:country", "gpxx:postal_code", "phone", "displaymode");
 	}
 
 	// date fields Android writes: FavouritePoint (pickup_date, calendar_event), ItineraryDataHelper (creation_date)
@@ -51,6 +58,18 @@ public class AmenityTagsServiceTest {
 		Map<String, String> tags = Map.of("creation_date", "2025-04-27T23:57:35Z", "pickup_date",
 				"2025-05-02T19:21:32Z", "calendar_event", "true", "visited_date", "2025-05-20T16:14:43Z");
 		assertEquals(Collections.emptySet(), visibleKeys(tags));
+	}
+
+	@Test
+	public void onlyUnknownKeysOfThePointAreGeneric() {
+		Map<String, String> tags = Map.of("amenity_type", "sustenance", "amenity_subtype", "cafe",
+				"internet_access:fee", "no", "authentication:phone_call:number", "+380441234567",
+				"test:country", "US", "my_note", "hello");
+		Set<String> generic = service.convertToVisibleTags(tags, "en").stream()
+				.filter(tag -> Boolean.TRUE.equals(tag.generic())).map(AmenityTagsService.VisibleTag::key)
+				.collect(Collectors.toSet());
+		assertEquals(Set.of("test:country", "my_note"), generic);
+		assertShown(visibleKeys(tags), "internet_access:fee", "authentication:phone_call:number");
 	}
 
 	private Set<String> visibleKeys(Map<String, String> tags) {
