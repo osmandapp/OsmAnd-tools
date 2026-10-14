@@ -1,31 +1,47 @@
 # Top organization and word abbreviations: specification
 
-Status: ready for implementation; 2026-10-13. Basis: prototype `alias-proto/` (hypotheses H1–H5, "POI Alias Prototype"
-report). Modeled on top brands (`TopTagValuesAnalyzer` → `brands.lst` → `POI_TOP_INDEXES_URL` →
-`IndexPoiCreator.collectTopIndexMap`).
+Status: ready for implementation; 2026-10-13. Revised 2026-10-14: an indexing mechanism per row kind (5.4), rating and
+top K per mechanism (5.5), map data rather than search logs as the source (12.16), relation to search-word-rules v5
+(12.18). Basis: prototype `alias-proto/` (hypotheses H1–H5, "POI Alias Prototype" report). Modeled on top brands
+(`TopTagValuesAnalyzer` → `brands.lst` → `POI_TOP_INDEXES_URL` → `IndexPoiCreator.collectTopIndexMap`).
 
 ## 1. Goal
 
 Search finds an object by a common abbreviation that is in neither its name nor `poi_types.xml`/`phrases.xml`:
 
-- **organization abbreviation**: "dmv college point" → office `name=Queens North Traffic Violations Bureau`, whose
-  only "DMV" is in `operator=New York State Department of Motor Vehicles`;
-- **name-word abbreviation**: "Hannover Hbf" → `name=Hannover Hauptbahnhof`.
+- **organization abbreviation**: "dmv college point" → office `name=Queens North Traffic Violations Bureau`, whose only
+  "DMV" is in `operator=New York State Department of Motor Vehicles`;
+- **name-word abbreviation**: "Hannover Hbf" → `name=Hannover Hauptbahnhof`;
+- **kind-of-place abbreviation**: "dmv" in Sacramento → every motor vehicle office, whether its name has "DMV",
+  "Department of Motor Vehicles" or only its `operator` does.
 
-The list is not hand-written: a periodic Jenkins job builds it from OSM data using rules in an XML schema. The OBF
-generator reads the list and adds abbreviations to the POI name index; search finds them as ordinary keys.
+The list is not hand-written: a monthly Jenkins job builds it from OSM data using rules in an XML schema and publishes
+the changes against last month for review (12.11). Each row goes to one indexing mechanism by its kind (5.4):
+
+| Row kind                                              | Mechanism                                  | Where it lives                                                                                                           |
+|-------------------------------------------------------|--------------------------------------------|--------------------------------------------------------------------------------------------------------------------------|
+| name word (Hbf, Str, KGV)                             | `query_rule`                               | `<query>` rule of `rules_<lang>[_<CC>].xml`, app side, no map change                                                     |
+| organization by `operator`/`network` (MTA, VBN, USPS) | `top_index_alias`, fallback `object_alias` | OBF: an alternative name of the tag value in the top index, or of each object                                            |
+| kind of place (DMV, HNO, ЦНАП)                        | `computed_subtype`                         | OBF: a tag the generator sets by a predicate (`<poi><service>` of `rules_<locale>.xml`), plus a synonym in `phrases.xml` |
+
+Rows are ranked by type weight × coverage × ambiguity penalty; each mechanism keeps its own top K (5.5).
 
 ## 2. Motivation
 
-| Case     | Why it is not found now                                                                                                                                                | Prototype result                                                                                                             |
-|----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|
+| Case     | Why it is not found now                                                                                                                                                | Prototype result                                                                                                                   |
+|----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------|
 | DMV (NY) | `operator` is not indexed for search (`ObfConstants.isTagIndexedForSearchAsName`: only `name`/`brand` tags); `operator:short=NYSDMV` is one word and not stored in OBF | baseline: 22/22 offices with "dmv" in name at #1, **0/27** without. H2+H3 derives `dmv` for the `operator` group (25 objects, 64%) |
-| Hbf (DE) | `Hbf` is not linked to `Hauptbahnhof` in the index; the `<query> hbf→Hauptbahnhof` rule in `rules_de.xml` matches with a form penalty                                  | with the rule at #1: target station 78–79/99, any hit 81–82/99 (71/74 without); at #2 the station loses to literal "Hbf" objects |
-| Others   | USPS, NYPD, SUNY, BRK, DLRG, INPS, MVV, Bf/Bhf, Str, Ffw…                                                                                                              | H1: 2640 pairs (top-50 precision 80–88%); H2+H3: 175 acronyms (94–97%)                                                       |
+| Hbf (DE) | `Hbf` is not linked to `Hauptbahnhof` in the index; the `<query> hbf→Hauptbahnhof` rule in `rules_de.xml` matches with a form penalty                                  | with the rule at #1: target station 78–79/99, any hit 81–82/99 (71/74 without); at #2 the station loses to literal "Hbf" objects   |
+| Others   | USPS, NYPD, SUNY, BRK, DLRG, INPS, MVV, Bf/Bhf, Str, Ffw…                                                                                                              | H1: 2640 pairs (top-50 precision 80–88%); H2+H3: 175 acronyms (94–97%)                                                             |
 
 Manual rules (`rules*.xml`, `phrases.xml`) do not scale to thousands of organizations and are bound to a language, not
-an organization: a "DMV" synonym for `government=transportation` in `phrases.xml` applies to all English maps, though
-in the UK it is DVLA.
+an organization: a "DMV" synonym for `government=transportation` in `phrases.xml` applies to all English maps, though in
+the UK it is DVLA. A synonym is safe only on a narrow type: the computed subtype (5.4) exists only on objects that pass
+its predicate, so "DMV" in the UK finds no category instead of every transport office.
+
+A query rule does not reach organizations: their full form is in `operator`, not in the name. On 8 maps (NYC, Utica,
+Wien, Bremen, Saarland, Upper Franconia, Molise, Valle d'Aosta) a rule `abbr → full` reaches 177 of the 25 779 objects
+the organization rows bind without the abbreviation in a name (0.7%); MTA, NYCTA, VGN, VBN, BSAG — 0%.
 
 ## 3. Terms
 
@@ -41,17 +57,23 @@ in the UK it is DVLA.
       neighbor cells are chosen in meters, so their longitude span grows with latitude);
     - with sub-span search inside the long side.
 - **H2** — a word shared by names of objects in one `operator`/`network` group and absent from the tag value.
-- **H3** — H2 filter: the word is built from first letters of consecutive words of the value (DMV ⊂ Department of
-  Motor Vehicles).
+- **H3** — H2 filter: the word is built from first letters of consecutive words of the value (DMV ⊂ Department of Motor
+  Vehicles).
 - **H5** — propagating a found organization abbreviation to objects with the full phrase in their name and no
   `operator` tag.
 - **Extraction** — by-product of map generation: entities and accepted POIs as the generator wrote them (5.3).
 - **OSM entity** — `(osm_type, osm_id)`; unit of threshold counting.
-- **POI identity** — `(osm_type, osm_id, center, type, subtype)`; unit of application and coverage. One entity may
-  yield several POIs.
+- **POI identity** — `(osm_type, osm_id, center, type, subtype)`; unit of application and coverage. One entity may yield
+  several POIs.
 - **Application predicate** — condition "CSV row applies to POI"; shared by analyzer and generator (5.2).
-- **Ownership** — region holding at least the `ownership` share of the row's supporting entities; the row applies in
-  it and its descendants (12.2).
+- **Ownership** — region holding at least the `ownership` share of the row's supporting entities; the row applies in it
+  and its descendants (12.2).
+- **Mechanism** — how a row reaches the index (5.4): `query_rule`, `top_index_alias`, `object_alias`,
+  `computed_subtype`.
+- **Kind of place** — a service with many places of one type in a country (DMV, ЦНАП, HNO): the abbreviation means the
+  kind, not one organization's tag value.
+- **Cover** — POI identities a row makes findable (5.5); **type weight** — how likely an object of the type is looked up
+  by an organization or kind name rather than by its address (5.5).
 
 ## 4. Data flow
 
@@ -69,24 +91,34 @@ in the UK it is DVLA.
  └──────────────────────────────┘                   └──────────────────────────┘      └──────────────────┘
 ```
 
+The diagram shows the OBF path (`top_index_alias`, `object_alias`). The job also writes proposals that are reviewed and
+merged by a PR, not read by the generator from the CSV: `query_rule` rows as a `rules_<lang>[_<CC>].xml` fragment and
+`computed_subtype` rows as `<poi><service>` entries with their `phrases.xml` synonyms (5.4).
+
 ## 5. Component A: `TopAbbrsAnalyzer` (Jenkins job)
 
 New class in `net.osmand.util` next to `TopTagValuesAnalyzer`, invoked via `MainUtilities` as a separate command. Runs
-as a separate job (`Planet_WorldAbbrs`) after the month's map generation (12.12); CSV, report and manifest are
-published on builder next to `brands.lst`.
+as a separate job (`Planet_WorldAbbrs`) after the month's map generation (12.12); CSV, report and manifest are published
+on builder next to `brands.lst`.
 
 ### 5.1. Input
 
 1. **POI extraction** of last month's map generation (5.3): one record per POI — OSM type and ID, point, map, OsmAnd
    subtype and additional types, raw `name`, `name:*`, `short_name`, `alt_name`, `official_name`, `operator*`,
-   `network*`, `brand*`, wikidata, and per POI the names the generator put into its name index. Same objects, types
-   and indexed names as in OBF.
+   `network*`, `brand*`, wikidata, and per POI the names the generator put into its name index. Same objects, types and
+   indexed names as in OBF.
 2. **Region tree** — `.parent`, `.depth`, `.map` from `/home/osm-planet/osm-extract/` (5.3).
 3. **Rules** `top-abbrs-rules.xml` (section 6).
 4. **Map locales** — `<locales>` table from `rules.xml`: region → locale → word-statistics group.
 5. **Word classes** — `common_words_groups.tsv`: service and frequent words never become abbreviations.
 6. **Brands** — `brands.lst`: an abbreviation equal to a `brand` value of group objects is dropped (`bp ← blanco
    petroli` error); brand pairs — 12.10.
+7. **Type weights** — `type-weights.tsv` in the repository: OsmAnd type key → weight 0..1 (5.5). Rebuilt rarely (a few
+   times a year), not by the monthly job.
+8. **Locale rules** — `rules*.xml` of the resources repository: the `<query>` rules and `<poi><service>` entries already
+   published, so the job proposes only what is new and flags conflicts (8.2).
+
+Search logs are not an input of the monthly job (12.16); they are used offline for type weights and acceptance runs.
 
 ### 5.2. Algorithm
 
@@ -107,27 +139,26 @@ All steps and thresholds are set in XML (section 6); code holds only mechanics:
    long" (one word: letters in order, same first letter; phrase: first letters of words, chunks ≤ N letters); sub-span
    search (`same` only); noise filters (dot gluing, Roman numerals, compound parts with linking -s-/-es-, service
    words). Aggregated by key `(locale, abbr, full)` with counts per source and POI type.
-3. **H2 (by operator/network).** Groups by normalized value; a shared word with share ≥ threshold, not in the value,
-   not class 1/2, supported by at least `minSupport` entities (a group of 6 with "CSI" in two bus stop names is not
-   enough). `<tag>:short` of a member counts as one more spelling of the group: `operator:short=USPS` supports `usps`
+3. **H2 (by operator/network).** Groups by normalized value; a shared word with share ≥ threshold, not in the value, not
+   class 1/2, supported by at least `minSupport` entities (a group of 6 with "CSI" in two bus stop names is not enough).
+   `<tag>:short` of a member counts as one more spelling of the group: `operator:short=USPS` supports `usps`
    like a name with the word, and a phrase (`operator:short=NYC Parks`) is a candidate too.
 4. **H3.** Acronym of a span of the value; check options (up to the last significant word after stripping legal forms
-   and places, minimum length) are schema parameters. A `<tag>:short` value that is no acronym of the value (NYC
-   Parks) stands for the whole value (`h3=tag`): the mapper wrote the abbreviation, H3 is not required.
-4a. **Value pairs.** A one-word value of `operator`/`network` that is the acronym of another value (H3 rules, up to its
-   last word): `operator=MTA` (3053 objects in NYC) and `operator=Metropolitan Transportation Authority` (4022). Names
-   do not have the abbreviation of a transport or government operator (stops are named after streets), the values
-   do. The pair needs `<values minSupport>` objects of the short value, a long group of `minGroup`, one locale, and
-   `minTypeOverlap` of the short value objects with a type of the long group (`mta ← michelle tampakis` has neither).
-   It gives two rows: `bind_value` the long value and `bind_value` the short value, because the operator is not a name
-   of the name index either.
-   Two values are not two spellings of one name, so the acronym is strict: one letter per word, or a whole word of
-   up to `maxChunk` letters (`NYCDOT ← nyc department of transportation`); a letter from inside a word is no match
-   (`PSA ← post ag`, `BEG ← breent gmbh`). A short value that is a word of the long one (`jet ← jet tankstelle`) is
-   the same name. A short value of long values with different head words is ambiguous and gives no rows
-   (`SP+ ← state parks / street partnership / suny potsdam`, `BP ← bawag p.s.k / best in parking`); with one head word
-   (`MTA ← metropolitan transit authority / metropolitan transportation authority`) every long value gets a row and
-   the short value row takes the full of the largest long group.
+   and places, minimum length) are schema parameters. A `<tag>:short` value that is no acronym of the value (NYC Parks)
+   stands for the whole value (`h3=tag`): the mapper wrote the abbreviation, H3 is not required. 4a. **Value pairs.** A
+   one-word value of `operator`/`network` that is the acronym of another value (H3 rules, up to its last word):
+   `operator=MTA` (3053 objects in NYC) and `operator=Metropolitan Transportation Authority` (4022). Names do not have
+   the abbreviation of a transport or government operator (stops are named after streets), the values do. The pair needs
+   `<values minSupport>` objects of the short value, a long group of `minGroup`, one locale, and
+   `minTypeOverlap` of the short value objects with a type of the long group (`mta ← michelle tampakis` has neither). It
+   gives two rows: `bind_value` the long value and `bind_value` the short value, because the operator is not a name of
+   the name index either. Two values are not two spellings of one name, so the acronym is strict: one letter per word,
+   or a whole word of up to `maxChunk` letters (`NYCDOT ← nyc department of transportation`); a letter from inside a
+   word is no match (`PSA ← post ag`, `BEG ← breent gmbh`). A short value that is a word of the long one
+   (`jet ← jet tankstelle`) is the same name. A short value of long values with different head words is ambiguous and
+   gives no rows (`SP+ ← state parks / street partnership / suny potsdam`, `BP ← bawag p.s.k / best in parking`); with
+   one head word (`MTA ← metropolitan transit authority / metropolitan transportation authority`) every long value gets
+   a row and the short value row takes the full of the largest long group.
 5. **Agreement before thresholds.** H1 and H2+H3 candidates are first collected with lowered thresholds (`minSupport` ×
    `supportFactor`, `minShare` × `shareFactor`), then agreement is marked: pair found by both H1 and H2+H3 (DMV, USPS,
    DLRG, INPS, SUNY). Only then thresholds apply: relaxed for agreed, full for the rest. Agreement is also the
@@ -135,9 +166,8 @@ All steps and thresholds are set in XML (section 6); code holds only mechanics:
 6. **Row kind** is determined by the full form's shape and binding, not by source:
     - `kind=word` — `full` is one word; alias is the object name with that word replaced (`Hannover Hbf`). Source: H1;
     - `kind=org` — `full` is a multi-word phrase; alias is the single word `abbr`. Binding `operator`/`network` (H2+H3)
-      or `phrase` (H5).
-   An H1 phrase pair without H2+H3 confirmation (ZOB ← zentraler omnibusbahnhof, DMV from names) enters the CSV in v1
-   only via `<include>`; the report shows such pairs in a separate section.
+      or `phrase` (H5). An H1 phrase pair without H2+H3 confirmation (ZOB ← zentraler omnibusbahnhof, DMV from names)
+      enters the CSV in v1 only via `<include>`; the report shows such pairs in a separate section.
 7. **Row scope** (12.2). `bind=phrase` — region ownership like brands: region with supporting entities ≥ `ownership`
    share (default 0.7); the row applies to the owner and its descendants. `bind=operator`/`network` — no region
    (`owner=*`). `kind=word` — language or locale by the number of locales with support (`ownership wordLocales`).
@@ -148,15 +178,15 @@ All steps and thresholds are set in XML (section 6); code holds only mechanics:
    sample objects and reason for inclusion or exclusion, for manual review.
 
 **Counting units.** All thresholds count **unique OSM entities** `(osm_type, osm_id)`: `minSupport`, `minGroup`,
-`minShare`, `minTiles`, `ownership`, `wordLocales`, `maxSpread`. Coverage — `gain_objects` and publishing limits — is
-in POI identities (5.3). H1 pairs (`support_pairs`) are diagnostics only: multiple names of one object and many
-neighbor pairs inflate them.
+`minShare`, `minTiles`, `ownership`, `wordLocales`, `maxSpread`. Coverage — `gain_objects` and publishing limits — is in
+POI identities (5.3). H1 pairs (`support_pairs`) are diagnostics only: multiple names of one object and many neighbor
+pairs inflate them.
 
 **Shared application code.** The predicate "CSV row applies to POI" (name locale, `owner`, `types`, binding,
 `require_absent`, "abbreviation not yet in names") is one class shared by analyzer and generator. The analyzer uses it
-for `gain_objects`, `maxSpread` and publish coverage; the generator to apply rows. Both work on the same object set
-and the same names: the phrase of `bind=phrase` and "abbreviation not yet in names" are checked in the names of the
-POI name index (`names` of the extraction, 5.3), not in raw tags.
+for `gain_objects`, `maxSpread` and publish coverage; the generator to apply rows. Both work on the same object set and
+the same names: the phrase of `bind=phrase` and "abbreviation not yet in names" are checked in the names of the POI name
+index (`names` of the extraction, 5.3), not in raw tags.
 
 ### 5.3. Extraction: by-product of map generation
 
@@ -165,14 +195,14 @@ there is no separate data pass. Cost: one month delay — the M+1 list is built 
 
 **Where it is written.** Class `PoiNamesExtractor`, called from `IndexPoiCreator`. Two files in the extraction dir:
 `<map>.poi-entities.tsv.gz` and `<map>.poi-records.tsv.gz`, `<map>` = OBF name without `.obf`. Written as `*.tmp`,
-closed after the POI section and renamed only after the whole OBF is written and closed; deleted if generation fails
-at any step. The reader finds a map by its records file, so publishing removes the old records file first and renames
-the new one last; the first line of both files is the same meta line `# poi-extraction data_date=<ms> generated=<ms>`
-(`data_date` — date of the map's OSM source file, `IndexCreator.setLastModifiedDate`; `generated` — generation
-start), and a pair with different meta lines is not read.
+closed after the POI section and renamed only after the whole OBF is written and closed; deleted if generation fails at
+any step. The reader finds a map by its records file, so publishing removes the old records file first and renames the
+new one last; the first line of both files is the same meta line `# poi-extraction data_date=<ms> generated=<ms>`
+(`data_date` — date of the map's OSM source file, `IndexCreator.setLastModifiedDate`; `generated` — generation start),
+and a pair with different meta lines is not read.
 
-1. **Entity** — in `iterateEntityInternal`, together with its first POI that passed the generator's pre-insert
-   filters: map bounds (`bboxFilter.shouldFilterPoiEntity`/`shouldFilterPoiAmenity`), relation centers
+1. **Entity** — in `iterateEntityInternal`, together with its first POI that passed the generator's pre-insert filters:
+   map bounds (`bboxFilter.shouldFilterPoiEntity`/`shouldFilterPoiAmenity`), relation centers
    (`collectRelationCenters`), skipping POIs without coordinates. Raw tags (`e.getTags()`, case kept) are written once
    per `(osm_type, osm_id)`. Here `obf_id → (osm_type, osm_id, center)` is also remembered: the entity cannot be
    recovered from `obf_id` because a relation id shifts by `+2` on collision.
@@ -188,30 +218,31 @@ no `PROPAGATE_NODE_BIT`) are written whose raw tags have a name (`name`, `short_
 with language variants), `operator*` or `network*`, plus their POIs. An object with only `brand` is not extracted,
 though in OBF it has a name from the brand.
 
-| File | Field | Source |
-|---|---|---|
-| entities | `osm_type`, `osm_id` | source entity (`node`/`way`/`relation`, real OSM ID: for nodes and ways `id >> ObfConstants.SHIFT_ID`) |
-| entities | `tags` | JSON object of raw tags with keys `name`, `short_name`, `alt_name`, `official_name`, `operator`, `network`, `brand` (each the key itself and `<key>:*`) and `wikidata`; keys sorted |
-| POI | `osm_type`, `osm_id`, `center` | entity reference; relation center number (`0` otherwise) |
-| POI | `obf_id` | POI ID in OBF (relation centers: `id + 2 * center`) |
-| POI | `type`, `subtype`, `additional` | category, subtype key (`government`) and keys of non-text additional types joined by `;` (`government_transportation`), without `top_index_*` |
-| POI | `lat`, `lon` | point of the written POI (31-bit coordinates of the `poi` row, 6 digits) |
-| POI | `names` | JSON object of the names of the POI name index as `putPoiObjectPrefix` gets them: text additional tags with `ObfConstants.isTagIndexedForSearchAsName` (`name`, `name:*`, `brand`, `name_etymology`…) and `name:en` — the transliteration of `name` when there is no `name:en` |
+| File     | Field                           | Source                                                                                                                                                                                                                                                                         |
+|----------|---------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| entities | `osm_type`, `osm_id`            | source entity (`node`/`way`/`relation`, real OSM ID: for nodes and ways `id >> ObfConstants.SHIFT_ID`)                                                                                                                                                                         |
+| entities | `tags`                          | JSON object of raw tags with keys `name`, `short_name`, `alt_name`, `official_name`, `operator`, `network`, `brand` (each the key itself and `<key>:*`) and `wikidata`; keys sorted                                                                                            |
+| POI      | `osm_type`, `osm_id`, `center`  | entity reference; relation center number (`0` otherwise)                                                                                                                                                                                                                       |
+| POI      | `obf_id`                        | POI ID in OBF (relation centers: `id + 2 * center`)                                                                                                                                                                                                                            |
+| POI      | `type`, `subtype`, `additional` | category, subtype key (`government`) and keys of non-text additional types joined by `;` (`government_transportation`), without `top_index_*`                                                                                                                                  |
+| POI      | `lat`, `lon`                    | point of the written POI (31-bit coordinates of the `poi` row, 6 digits)                                                                                                                                                                                                       |
+| POI      | `names`                         | JSON object of the names of the POI name index as `putPoiObjectPrefix` gets them: text additional tags with `ObfConstants.isTagIndexedForSearchAsName` (`name`, `name:*`, `brand`, `name_etymology`…) and `name:en` — the transliteration of `name` when there is no `name:en` |
 
 The meta line is followed by a header. Tabs and newlines in `type`/`subtype` are replaced by spaces. Summary:
 `utilities.sh poi-extraction-summary <dir or files> [--top=20]` — entity and POI counts, size, share of entities with
 `operator`/`network`, frequent types and additional types.
 
 **Identity.**
+
 - **OSM entity** `(osm_type, osm_id)`: threshold counting (5.2), names and binding tags;
 - **POI** `(osm_type, osm_id, center, type, subtype)`: application and coverage. One entity may yield several POIs —
-  several categories/subtypes (station and stop) and several relation centers. `subtype` is the OBF subtype as is: a
-  tag with several values gives one POI with the keys joined by `;` (`amenity=cafe;restaurant` → `cafe;restaurant`);
-  its types are the keys `cafe` and `restaurant` (entity types, row `types`, type counts), never the joined value.
+  several categories/subtypes (station and stop) and several relation centers. `subtype` is the OBF subtype as is: a tag
+  with several values gives one POI with the keys joined by `;` (`amenity=cafe;restaurant` → `cafe;restaurant`); its
+  types are the keys `cafe` and `restaurant` (entity types, row `types`, type counts), never the joined value.
 
-**Duplicates across maps.** Generation is per map, not per leaf: a country map and its parts' maps share objects,
-maybe of different OSM data (a map not rebuilt this month). An entity is taken in **one state**: of the maps with the
-newest `data_date` that have it. Its POIs from maps with older data are stale and dropped (`stale POI` in the report):
+**Duplicates across maps.** Generation is per map, not per leaf: a country map and its parts' maps share objects, maybe
+of different OSM data (a map not rebuilt this month). An entity is taken in **one state**: of the maps with the newest
+`data_date` that have it. Its POIs from maps with older data are stale and dropped (`stale POI` in the report):
 a cafe turned restaurant must not yield both POIs with the new name. Within one `data_date`, deduplicate by **POI**
 identity, not entity: different POIs of one entity are kept (relation centers in different maps). Of several copies of
 one POI, take the copy of the latest generation, then the deepest map (largest `.depth`), then first by name; the
@@ -224,18 +255,17 @@ each relation center is a separate point, but the entity counts once.
 
 **Month and completeness.** The analyzer runs after month M generation finishes with the explicit period
 `--period=M` (`YYYY-MM`, the month of the OSM data of that generation); ages are counted from it, not from the newest
-input, so a stale input directory is not taken for a fresh one. If a map was not built this month, its latest
-extraction is used if its data month is no older than `<input maxExtractionAgeMonths>` (2) months before M; older
-ones and ones with data after M are not, and the map's objects are not counted this month (listed in the report). A
-map missing from the region tree is not counted.
-The manifest (8.4) records the period, each map's data and generation dates and the hashes of both extraction files. The first list
-release waits for one generation with extraction enabled.
+input, so a stale input directory is not taken for a fresh one. If a map was not built this month, its latest extraction
+is used if its data month is no older than `<input maxExtractionAgeMonths>` (2) months before M; older ones and ones
+with data after M are not, and the map's objects are not counted this month (listed in the report). A map missing from
+the region tree is not counted. The manifest (8.4) records the period, each map's data and generation dates and the
+hashes of both extraction files. The first list release waits for one generation with extraction enabled.
 
 **Checks before enabling on all maps.** On one large map measure extraction size and generation time increase. Tests
-(`PoiNamesExtractorTest`): relation with several centers (all POIs extracted, `obf_id` match OBF); object dropped by
-the bounds filter (not extracted); entity with two subtypes (both POIs extracted); OBF with and without extraction
-match by decoded POIs. No byte comparison: two runs without extraction already differ because POI rows are written in
-different order.
+(`PoiNamesExtractorTest`): relation with several centers (all POIs extracted, `obf_id` match OBF); object dropped by the
+bounds filter (not extracted); entity with two subtypes (both POIs extracted); OBF with and without extraction match by
+decoded POIs. No byte comparison: two runs without extraction already differ because POI rows are written in different
+order.
 
 **Region tree.** Ownership and levels come from `.parent`, `.depth`, `.map` of extracts
 `/home/osm-planet/osm-extract/<region>/` — those the generator builds OBF from (`indexes-batch-generate*.xml`:
@@ -253,24 +283,112 @@ without `.map` (`east-asia`) are collapsed, as in `TopTagValuesAnalyzer.finishRe
    that has a polygon: for `afghanistan_asia` it is `east-asia`, a service region without a map. A region without a
    polygon or cut parent is skipped with `WARN` and gets no extract.
 3. **Cascade.** Top level is cut from `planet-latest.o5m` (`osmium extract -c extract.json --strategy=smart`), then
-   depths 1…8 each cut their children from their own PBF (`--strategy=smart -S types=multipolygon`). A child is a
-   subset of its parent; the whole tree has one data snapshot.
+   depths 1…8 each cut their children from their own PBF (`--strategy=smart -S types=multipolygon`). A child is a subset
+   of its parent; the whole tree has one data snapshot.
 4. **Border.** `smart` strategy: a line crossing the polygon goes into the extract whole, as does a multipolygon. An
    object on a border between neighbors is in both; a point node is in one.
 5. **Month.** With `REGENERATE=true` the previous `<region>.pbf` is renamed to `__<region>.pbf`, and the new file's
    mtime is set to the 1st of the month 00:00 UTC: file time is the month, not the cut moment. `.generated` marks
    "children of this region are cut", unrelated to OBF.
 
+### 5.4. Mechanism of a row
+
+The POI name index (`OsmAndPoiIndex.nameIndex`) is one search index for names and types: per object it holds the name
+words (`addToNameIndex`, `addAlternativeNamesToNameIndex`) and category keys with the prefix `#^` — the subtype
+(`#^government`) and top-index values (`#^top_index_brand_<key>`, `NameIndexCreator.addPoiCategories`). The app turns a
+query word into a category key through `phrases.xml` translations and synonyms and the names of top-index values
+(`SpatialPoiSearch.processPoiCategories`). `OsmAndCategoryTable` and `OsmAndSubtypesTable` are only the map's
+dictionaries of type and value ids. A row reaches the index in one of four ways:
+
+| Mechanism          | Key in the index                                                                                                                     | Written where                                                                            | Index growth                                          |
+|--------------------|--------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------|-------------------------------------------------------|
+| `query_rule`       | none: the query word gets the forms of the rule (`hbf` → `Hauptbahnhof`, reverse form generated)                                     | `<query><rule object="poi">` of `rules_<lang>[_<CC>].xml` (app)                          | 0                                                     |
+| `top_index_alias`  | `#^top_index_operator_<value>` / `#^top_index_network_<value>`, one per object; the abbreviations are alternative names of the value | OBF, like `brand`                                                                        | one category key per object, the aliases once per map |
+| `object_alias`     | the abbreviation as a name word of the object (8.3)                                                                                  | OBF                                                                                      | one key per object and alias                          |
+| `computed_subtype` | `#^top_index_service_abbreviation_<key>` (or a `poi_types` subtype), set by a predicate                                              | `<poi><service>` of `rules_<locale>.xml` read by the generator; synonym in `phrases.xml` | one category key per matching object                  |
+
+**Routing.** The mechanism follows from where the full form lives and what it names:
+
+1. `kind=word` (Hbf, Str, Ave, KGV, Bf) → `query_rule`: the full form is a word inside names. A form glued to another
+   word (`Hauptstr.`) needs an `<index>` rule instead (`straße → str`), still in the rules file.
+2. `kind=org` with `bind=operator`/`network` (MTA, VBN, USPS, NYPL) → `top_index_alias`: the full form is in the tag,
+   which is not in the name index. If the value does not make the top index of the map (its per-map limit), the row
+   falls back to `object_alias`.
+3. Kind of place (DMV, HNO, JVA, ZOB, ЗАГС) → `computed_subtype`. If OsmAnd already has the type (ЗАГС →
+   `government=register_office`, ZOB → `bus_station`), only a `phrases.xml` synonym is proposed and the generator is not
+   involved. Otherwise the predicate is: main tags, then any of a name pattern (`\bDMV\b|motor vehicles?|\b[RB]MV\b`),
+   an `operator` pattern, and `operator:wikidata` whose P31 is the kind's class (Q74330265 "state department of motor
+   vehicles"). On NYC data (414 `office=government` objects) this predicate takes 18: 8 by name and `operator`, 7 by
+   name only, 2 by `operator` only; a name pattern alone takes 14; without the main tags it also takes a motorcycle
+   shop. A predicate of main tags only is allowed when the type itself is unambiguous in the country.
+4. `kind=phrase` (H1 phrase pairs): a kind of place → 3; a name phrase → `query_rule` with a multi-word form
+   (`zob → Zentraler Omnibusbahnhof`).
+
+**Detecting a kind of place.** A `kind=org` candidate is a kind of place, not one organization, when the same
+`(abbr, full)` comes from at least `<kinds minGroups>` different `operator` groups of one country, or when the
+abbreviation stands in names of at least `<kinds minObjects>` objects of which `<kinds minTypeShare>` have one type and
+which share no `operator` (HNO: 44 of 46 doctors). Such rows get `mechanism=computed_subtype` and are proposals only.
+
+### 5.5. Rating and top K
+
+**Cover.** POI identities the row makes findable that are not findable now:
+
+| Mechanism                         | `cover`                                                                                                                                |
+|-----------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| `query_rule`                      | objects whose names have the full form and not the abbreviation, plus (reverse form) those with the abbreviation and not the full form |
+| `top_index_alias`, `object_alias` | objects with the bound value and without the abbreviation in their indexed names (`gain_objects`)                                      |
+| `computed_subtype`                | objects that pass the predicate and have the abbreviation in no indexed name                                                           |
+
+**Score.**
+
+```
+score(row) = Σ over entities e in cover  w(main type of e)  ×  (1 − amb(row))
+```
+
+- An entity counts once, with the largest weight of its POIs' subtype keys; additional types (`internet_access_yes`) do
+  not count.
+- `amb(row)` — the weighted cover of other full forms of the same `abbr` in the same data locale, divided by the total
+  weighted cover of that `abbr` there (DOT, CSI, MTA in Malta). For a `query_rule` whose meanings are split by owner
+  (`st`: street → Street, poi → Saint) the meanings do not compete, and `amb` is computed per owner.
+- Without weights, object counts favour infrastructure: on the 8 maps 75% of the organization gain is bus and rail stops
+  (NYCTA, MTA, VGN, VBN, BSAG), and DMV ranks 91st of 109.
+
+**Type weights** are per OsmAnd type (about a thousand keys), not per abbreviation, and are refreshed rarely
+(`type-weights.tsv`, 5.1). Sources, in order of preference:
+
+1. search logs aggregated by type: users whose queries contain a translation or synonym of the type, against the number
+   of objects of the type (sparse per abbreviation, dense per type);
+2. map signals of a destination: share of objects of the type with their own name (not a street name), with
+   `wikidata`, `website`, `opening_hours`;
+3. a one-time LLM scoring of the type list with anchor examples, checked against (1) on the head;
+
+with a floor for infrastructure (stops, hydrants, post boxes, power) set by hand.
+
+**Top K per mechanism.** One score, separate budgets, because the resources differ:
+
+| Mechanism          | Budget                                               | Limit                                                       |
+|--------------------|------------------------------------------------------|-------------------------------------------------------------|
+| `query_rule`       | rules per locale file                                | `<limit queryRules>` per locale: query parsing cost         |
+| `top_index_alias`  | values per map                                       | `<limit topIndexPerMap>`, like `max_per_map` of `brand`     |
+| `object_alias`     | name keys per map                                    | `<limit perMap>` rows and the 1% index growth check (11)    |
+| `computed_subtype` | services per country, synonyms per `phrases.xml` key | `<limit servicesPerCountry>`, `<limit synonymsPerKey>` (15) |
+
+Rows below the budget stay in `top_abbrs.html` as `below top K`, so the diff shows when one enters.
+
 ## 6. Rules schema `top-abbrs-rules.xml`
 
 Purpose: tune selection without code changes — narrow (precision) or widen (recall) the output.
 
 ```xml
+
 <top-abbrs version="1">
     <defaults>
         <ownership share="0.7" wordLocales="2"/>
         <case org="upper" word="capital" share="0.6" skipAllCapsNames="true"/>
-        <limit perMap="500" planet="20000"/>
+        <limit perMap="500" planet="20000" queryRules="200" topIndexPerMap="100" servicesPerCountry="50"
+               synonymsPerKey="15"/>
+        <rating typeWeights="type-weights.tsv" defaultWeight="0.5" ambiguity="true"/>
+        <kinds minGroups="3" minObjects="30" minTypeShare="0.6"/>
         <publish firstRelease="manual" maxMapChange="0.02" maxRowGain="2000"/>
         <input maxExtractionAgeMonths="2"/>
         <review perStratum="20" highGain="1000"/>
@@ -321,39 +439,42 @@ Purpose: tune selection without code changes — narrow (precision) or widen (re
 
 **Defaults and meaning**
 
-| Element, attribute | Default | Meaning |
-|---|---|---|
-| `ownership share` | `0.7` | owner region's support share for `bind=phrase` (12.2) |
-| `ownership wordLocales` | `2` | `kind=word` is language-level if supported in this many locales (12.2) |
-| `case` | `upper` / `capital` / `0.6` / `true` | case filter (12.8) |
-| `limit perMap`, `planet` | `500`, `20000` | rows per map and total; excess cut by descending `gain_objects` |
-| `publish` | `manual`, `0.02`, `2000` | auto-publishing (12.11) |
-| `source same span`, `spanMaxWords` | `true`, `6` | sub-span search in the long side, `same` only |
-| `source near radiusM`, `sameFirstWord`, `maxShortLen` | `500`, `true`, `4` | neighbors for `near`; short side at most `maxShortLen` |
-| `abbr minLen`, `maxLen`, `maxChunk` | `2`, `8`, `3` | abbreviation length; chunk of one word in a phrase abbreviation |
-| `long maxWords` | `3` | words in the long side of an H1 pair |
-| `pairs accept minSupport` | `3` | unique entities supporting an H1 pair |
-| `pairs accept minTiles`, `tileZoom` | `2`, `10` | support from this many distinct zoom-10 tiles (~40 km) |
-| `groups accept minGroup`, `minShare` | `3`, `0.25` | `operator`/`network` group size and share of objects with the H2 word |
-| `groups accept stripTail` | `legal place` | before H3, strip trailing legal forms (`<legal>`) and places (`<places>`) |
-| `groups accept minSupport` | `3` | entities with the H2 word or `<tag>:short` (× `supportFactor` on agreement) |
-| `groups accept shortTags` | `true` | `operator:short` / `network:short` support the group word, a short phrase needs no H3 |
-| `groups values enabled`, `minSupport`, `minTypeOverlap` | `true`, `5`, `0.5` | value pairs (5.2.4a): objects of the short value, their share with a type of the long group |
-| `agree supportFactor`, `shareFactor` | `0.5`, `0.5` | threshold relaxation on H1 and H2+H3 agreement |
-| `propagate` | 12.7 | H5 |
-| `input maxExtractionAgeMonths` | `2` | oldest map extraction the analyzer accepts (5.3) |
-| `review` | 12.13 | sample of rows for precision labeling |
+| Element, attribute                                                           | Default                              | Meaning                                                                                     |
+|------------------------------------------------------------------------------|--------------------------------------|---------------------------------------------------------------------------------------------|
+| `ownership share`                                                            | `0.7`                                | owner region's support share for `bind=phrase` (12.2)                                       |
+| `ownership wordLocales`                                                      | `2`                                  | `kind=word` is language-level if supported in this many locales (12.2)                      |
+| `case`                                                                       | `upper` / `capital` / `0.6` / `true` | case filter (12.8)                                                                          |
+| `limit perMap`, `planet`                                                     | `500`, `20000`                       | `object_alias` rows per map and all OBF rows; excess cut by descending `score` (5.5)        |
+| `limit queryRules`, `topIndexPerMap`, `servicesPerCountry`, `synonymsPerKey` | `200`, `100`, `50`, `15`             | top K of the other mechanisms (5.5)                                                         |
+| `rating typeWeights`, `defaultWeight`, `ambiguity`                           | `type-weights.tsv`, `0.5`, `true`    | type weights file, weight of a type missing from it, ambiguity penalty on/off (5.5)         |
+| `kinds minGroups`, `minObjects`, `minTypeShare`                              | `3`, `30`, `0.6`                     | a `kind=org` candidate is a kind of place (5.4)                                             |
+| `publish`                                                                    | `manual`, `0.02`, `2000`             | auto-publishing (12.11)                                                                     |
+| `source same span`, `spanMaxWords`                                           | `true`, `6`                          | sub-span search in the long side, `same` only                                               |
+| `source near radiusM`, `sameFirstWord`, `maxShortLen`                        | `500`, `true`, `4`                   | neighbors for `near`; short side at most `maxShortLen`                                      |
+| `abbr minLen`, `maxLen`, `maxChunk`                                          | `2`, `8`, `3`                        | abbreviation length; chunk of one word in a phrase abbreviation                             |
+| `long maxWords`                                                              | `3`                                  | words in the long side of an H1 pair                                                        |
+| `pairs accept minSupport`                                                    | `3`                                  | unique entities supporting an H1 pair                                                       |
+| `pairs accept minTiles`, `tileZoom`                                          | `2`, `10`                            | support from this many distinct zoom-10 tiles (~40 km)                                      |
+| `groups accept minGroup`, `minShare`                                         | `3`, `0.25`                          | `operator`/`network` group size and share of objects with the H2 word                       |
+| `groups accept stripTail`                                                    | `legal place`                        | before H3, strip trailing legal forms (`<legal>`) and places (`<places>`)                   |
+| `groups accept minSupport`                                                   | `3`                                  | entities with the H2 word or `<tag>:short` (× `supportFactor` on agreement)                 |
+| `groups accept shortTags`                                                    | `true`                               | `operator:short` / `network:short` support the group word, a short phrase needs no H3       |
+| `groups values enabled`, `minSupport`, `minTypeOverlap`                      | `true`, `5`, `0.5`                   | value pairs (5.2.4a): objects of the short value, their share with a type of the long group |
+| `agree supportFactor`, `shareFactor`                                         | `0.5`, `0.5`                         | threshold relaxation on H1 and H2+H3 agreement                                              |
+| `propagate`                                                                  | 12.7                                 | H5                                                                                          |
+| `input maxExtractionAgeMonths`                                               | `2`                                  | oldest map extraction the analyzer accepts (5.3)                                            |
+| `review`                                                                     | 12.13                                | sample of rows for precision labeling                                                       |
 
 **Places (`<places>`).** Place words for `stripTail="place"` — names of place POIs from the same map's extraction
 (`place` subtypes `state`, `province`, `city`, `town`, `village`, `hamlet`, `borough`) plus the locale layer's
 `<places words>`.
 
-**Layers.** `<defaults>` → `<locale id="<lang>">` → `<locale id="<lang>_<CC>">`; locale as in `rules.xml`. A lower
-layer replaces an element's **attribute**; word lists (`<stop>`, `<legal>`, `<places>`) are replaced whole.
+**Layers.** `<defaults>` → `<locale id="<lang>">` → `<locale id="<lang>_<CC>">`; locale as in `rules.xml`. A lower layer
+replaces an element's **attribute**; word lists (`<stop>`, `<legal>`, `<places>`) are replaced whole.
 
 **Manual edits.** `<include>` defines a full CSV row: `kind`, `locale`, `owner` (default `*`), `abbr`, `full`,
-`bind`, `bind_value`, `require_absent` (mandatory for `bind=phrase`, section 7), `types`. `<exclude>` sets any subset
-of key columns and removes all matching rows. Order and priority — 5.2.8.
+`bind`, `bind_value`, `require_absent` (mandatory for `bind=phrase`, section 7), `types`. `<exclude>` sets any subset of
+key columns and removes all matching rows. Order and priority — 5.2.8.
 
 **Schema requirements:**
 
@@ -366,30 +487,34 @@ of key columns and removes all matching rows. Order and priority — 5.2.8.
 
 UTF-8, header, one row = one application rule.
 
-| Column            | Example (DMV)                                 | Example (Hbf)                              | Description                                                                                                |
-|-------------------|-----------------------------------------------|--------------------------------------------|------------------------------------------------------------------------------------------------------------|
-| `kind`            | `org`                                         | `word`                                     | `org` — phrase → single word `abbr`; `word` — one name word → `abbr` (5.2.6)                               |
-| `locale`          | `en_US`                                       | `de`                                       | data locale; for `kind=word` — language or locale (12.2)                                                   |
-| `owner`           | `*`                                           | `*`                                        | owner region for `bind=phrase` with `kind=org` (5.2.7); `*` — no region                                    |
-| `abbr`            | `DMV`                                         | `Hbf`                                      | abbreviation in canonical spelling, for the report                                                         |
-| `full`            | `department of motor vehicles`                | `hauptbahnhof`                             | full form, normalized                                                                                      |
-| `bind`            | `operator`                                    | `phrase`                                   | `operator` / `network` / `phrase`                                                                          |
-| `bind_value`      | `new york state department of motor vehicles` | `hauptbahnhof`                             | normalized tag value or phrase                                                                             |
-| `require_absent`  |                                               |                                            | `bind=phrase` only: tag the object must lack (`operator` for H5 of an `operator` group); empty — applies to all objects with the phrase |
-| `types`           | `government`                                  | `railway_station public_transport_station` | `MapPoiTypes` keys: subtype or additional type (`government_transportation`); empty — any                 |
-| `group_size`      | `25`                                          |                                            | objects in the `operator`/`network` group (H2)                                                             |
-| `support_objects` | `16`                                          | (from extraction)                          | unique entities supporting the row: in a group — with `abbr` in the name (16/25 = 0.64); for H1 — entities with the pair |
-| `support_pairs`   |                                               | `10173`                                    | H1 pairs (`same` + `near`); diagnostics only, not used in thresholds (5.2)                                 |
-| `gain_objects`    | `9`                                           |                                            | extraction POI identities (5.3) the row will apply to: predicate holds and the abbreviation is not in their indexed names |
-| `sources`         | `h2,h3,h1span`                                | `h1near,h1same`                            | how it was found (`short` — `<tag>:short`, `value` — value pair)                                                                                           |
-| `status`          | `auto`                                        | `auto`                                     | `auto` / `manual-include`                                                                                  |
+| Column            | Example (DMV)                                 | Example (Hbf)                              | Description                                                                                                                                                                                     |
+|-------------------|-----------------------------------------------|--------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `kind`            | `org`                                         | `word`                                     | `org` — phrase → single word `abbr`; `word` — one name word → `abbr` (5.2.6)                                                                                                                    |
+| `locale`          | `en_US`                                       | `de`                                       | data locale; for `kind=word` — language or locale (12.2)                                                                                                                                        |
+| `owner`           | `*`                                           | `*`                                        | owner region for `bind=phrase` with `kind=org` (5.2.7); `*` — no region                                                                                                                         |
+| `abbr`            | `DMV`                                         | `Hbf`                                      | abbreviation in canonical spelling, for the report                                                                                                                                              |
+| `full`            | `department of motor vehicles`                | `hauptbahnhof`                             | full form, normalized                                                                                                                                                                           |
+| `bind`            | `operator`                                    | `phrase`                                   | `operator` / `network` / `phrase`                                                                                                                                                               |
+| `bind_value`      | `new york state department of motor vehicles` | `hauptbahnhof`                             | normalized tag value or phrase                                                                                                                                                                  |
+| `require_absent`  |                                               |                                            | `bind=phrase` only: tag the object must lack (`operator` for H5 of an `operator` group); empty — applies to all objects with the phrase                                                         |
+| `types`           | `government`                                  | `railway_station public_transport_station` | `MapPoiTypes` keys: subtype or additional type (`government_transportation`); empty — any                                                                                                       |
+| `group_size`      | `25`                                          |                                            | objects in the `operator`/`network` group (H2)                                                                                                                                                  |
+| `support_objects` | `16`                                          | (from extraction)                          | unique entities supporting the row: in a group — with `abbr` in the name (16/25 = 0.64); for H1 — entities with the pair                                                                        |
+| `support_pairs`   |                                               | `10173`                                    | H1 pairs (`same` + `near`); diagnostics only, not used in thresholds (5.2)                                                                                                                      |
+| `gain_objects`    | `9`                                           |                                            | extraction POI identities (5.3) the row will apply to: predicate holds and the abbreviation is not in their indexed names                                                                       |
+| `sources`         | `h2,h3,h1span`                                | `h1near,h1same`                            | how it was found (`short` — `<tag>:short`, `value` — value pair)                                                                                                                                |
+| `status`          | `auto`                                        | `auto`                                     | `auto` / `manual-include`                                                                                                                                                                       |
+| `mechanism`       | `top_index_alias`                             | `query_rule`                               | 5.4; the generator applies only `top_index_alias` and `object_alias` rows, the others are proposals for the rules and phrases PRs (DMV as a kind of place is a separate `computed_subtype` row) |
+| `type_weight`     | `1.0`                                         | `0.8`                                      | weight of the main type of the row's cover (largest share), for the report                                                                                                                      |
+| `ambiguity`       | `0.0`                                         | `0.0`                                      | `amb(row)` of 5.5                                                                                                                                                                               |
+| `score`           | `9.0`                                         | `640.0`                                    | 5.5; rows are cut to the top K of their mechanism by it                                                                                                                                         |
 
 Empty cell — metric not applicable. `gain_objects` counts objects, not index size: OBF growth depends on shared keys,
 other names and overlap with rules; index growth is measured by a paired build (section 11).
 
-**Types.** An object matches if one of its subtype keys (5.3) or one of its additional types is in `types`. Each key is validated
-against `MapPoiTypes` on load: the job does not publish a CSV with an unknown key; the generator skips such a row with
-a log entry.
+**Types.** An object matches if one of its subtype keys (5.3) or one of its additional types is in `types`. Each key is
+validated against `MapPoiTypes` on load: the job does not publish a CSV with an unknown key; the generator skips such a
+row with a log entry.
 
 One organization may yield two rows: binding by `operator` (precise) and by `phrase` (H5, broader), with different
 `bind`.
@@ -398,29 +523,34 @@ One organization may yield two rows: binding by `operator` (precise) and by `phr
 
 ### 8.1. Getting the list
 
+The generator reads the rows with `mechanism` `top_index_alias` and `object_alias`. `query_rule` rows reach the app
+through `rules_<lang>[_<CC>].xml`; `computed_subtype` rows reach the generator through the `<poi><service>` entries of
+`rules_<locale>.xml` (OsmAnd-tools#1825: `IndexCreationContext` loads the services of the map locale and
+`IndexPoiCreator` tags the places), both after review and a resources PR.
+
 - **Source.** Env `TOP_ABBRS_URL` or `IndexCreatorSettings.topAbbrsUrl`, like `POI_TOP_INDEXES_URL` /
   `poiTopIndexUrl`. Without it generation is unchanged. The URL points to the generation month's file
   (`top_abbrs-<YYYY-MM>.csv`, built from last month's maps, 12.12), not the latest.
 - **Rows for a map.** Those whose `owner` is `*`, the map region or its ancestor, and whose `locale` matches:
     - `kind=org` — `locale` equals the map locale per `<locales>`, or is its language (`<include kind="org"
       locale="de">` applies on `de_DE` and `de_CH` maps);
-    - `kind=word` — `locale` (language `de` or locale `de_CH`) matches the **name** locale
-      (`SearchModLocales.forName`): `name:de` on an Italian map is `de_IT`.
+    - `kind=word` — `locale` (language `de` or locale `de_CH`) matches the **name** locale (`SearchModLocales.forName`):
+      `name:de` on an Italian map is `de_IT`.
 
 ### 8.2. Matching objects
 
 Rows are first filtered by locale rules (`SearchModRules`, same layering `rules.xml` → `rules_<lang>.xml` →
-`rules_<lang>_<CC>.xml` as for the name index): for `kind=org` — map locale, for `kind=word` — name locale (8.1).
-Rules win (12.4): a **conflict** with a rule is forbidden, the **same pair** is allowed.
+`rules_<lang>_<CC>.xml` as for the name index): for `kind=org` — map locale, for `kind=word` — name locale (8.1). Rules
+win (12.4): a **conflict** with a rule is forbidden, the **same pair** is allowed.
 
 If `abbr` has a locale rule `<query><rule from="abbr">`:
 
-| Rule | Example | Row outcome |
-|---|---|---|
+| Rule                                                                            | Example                                                    | Row outcome                                                                             |
+|---------------------------------------------------------------------------------|------------------------------------------------------------|-----------------------------------------------------------------------------------------|
 | one value applicable to POI (`object` empty or contains `poi`), equal to `full` | `hbf → Hauptbahnhof object="poi"` with `full=hauptbahnhof` | **allowed** (`SAME_AS_RULE`): extends new OBF index; the rule keeps working on old OBFs |
-| one value applicable to POI, but different | `dr → Doktor` with `full=drive` | skip (`CONFLICT_RULE`) |
-| several values (`<to>` ≥ 2) for any `object` | `st` → Street / Saint | skip (`CONFLICT_RULE`): ambiguous; POI names also contain street names |
-| values only for other owners (`object="street"`) | `pl → Place object="street"` | rule does not concern POIs; row goes through other checks |
+| one value applicable to POI, but different                                      | `dr → Doktor` with `full=drive`                            | skip (`CONFLICT_RULE`)                                                                  |
+| several values (`<to>` ≥ 2) for any `object`                                    | `st` → Street / Saint                                      | skip (`CONFLICT_RULE`): ambiguous; POI names also contain street names                  |
+| values only for other owners (`object="street"`)                                | `pl → Place object="street"`                               | rule does not concern POIs; row goes through other checks                               |
 
 A row is also skipped if:
 
@@ -434,23 +564,31 @@ A row is also skipped if:
 - **a `types` key is unknown** to `MapPoiTypes` (section 7).
 
 Each outcome is logged (`TOP_ABBRS_RULE`: `SAME_AS_RULE`, `CONFLICT_RULE` with the rule's `RuleId`, `SKIPPED_TYPES`).
-The job applies the same checks to the report, but the generator decides: rules change more often than the list, and
-the rule version used for the map is recorded (8.4). These filters apply to `<include>` rows too.
+The job applies the same checks to the report, but the generator decides: rules change more often than the list, and the
+rule version used for the map is recorded (8.4). These filters apply to `<include>` rows too.
 
 Then each remaining row's binding is checked (during POI preparation, before `putPoiObjectPrefix`):
 
-- **`operator`/`network`** — the object's normalized tag value (split by `;`) equals `bind_value`. The tag is
-  available: `operator` is stored in the POI as a text attribute.
+- **`operator`/`network`** — the object's normalized tag value (split by `;`) equals `bind_value`. The tag is available:
+  `operator` is stored in the POI as a text attribute.
 - **`phrase`** — a name of the POI name index contains `bind_value` as consecutive words (5.2.1) **and**
-  the object lacks the `require_absent` tag, if set. For H5 rows `require_absent` is the group tag
-  (`operator`/`network`): only objects without it get the alias — exactly those the job counted for `maxSpread` and
+  the object lacks the `require_absent` tag, if set. For H5 rows `require_absent` is the group tag (`operator`/
+  `network`): only objects without it get the alias — exactly those the job counted for `maxSpread` and
   `gain_objects`. An object with a different `operator` does not get the phrase alias.
 - **`types`**, if set — one of object's subtype keys or additional types is in the list.
 - An object that already has the abbreviation among the words of its name-index names is unchanged.
 
 ### 8.3. Writing to OBF
 
-The abbreviation is written as an **additional object name in the POI name index**:
+**`top_index_alias`.** `operator` and `network` become top-index tags like `brand` (`top_index="true"` in
+`poi_types.xml`, per-map limit `<limit topIndexPerMap>`). Which values enter the top index of a map is decided by the
+CSV, not by the value count: a value with a row is taken, its abbreviations go to the value's alternative names
+(`PoiAdditionalType.getAltNames`, written with the value into `OsmAndSubtypesTable` as for brand names from wikidata),
+and each object with the value gets the category key `#^top_index_operator_<value>`
+(`NameIndexCreator.addPoiCategories`). The abbreviation text is stored once per map; the index grows by one category key
+per object, however many aliases the value has. A row whose value does not fit the limit falls back to `object_alias`.
+
+**`object_alias`.** The abbreviation is written as an **additional object name in the POI name index**:
 
 ```
 OsmAndPoiIndex.nameIndex (4)
@@ -478,20 +616,32 @@ OsmAndPoiIndex.nameIndex (4)
 
 - **Manifest, not an OBF field.** OBF has no place for a list hash (`OBF.proto` has only `version`/`versionConfirm`),
   and a new field contradicts 10.6. The job publishes `top_abbrs-<YYYY-MM>.manifest.json` next to the CSV: hashes of
-  `top_abbrs.csv`, `top-abbrs-rules.xml`, `rules*.xml`, `brands.lst`, `common_words_groups.tsv`, `poi_types.xml`,
-  region tree snapshot `regions.csv`; `OsmAndMapCreator` version; per map — generation date and extraction file hashes
-  (5.3). A regeneration within the month gives a different date and hash, so the input is unambiguous.
-  The generator logs (`TOP_ABBRS_MANIFEST`) the manifest URL and hash, plus the hashes of `rules*.xml` and
+  `top_abbrs.csv`, `top-abbrs-rules.xml`, `rules*.xml`, `brands.lst`, `common_words_groups.tsv`, `poi_types.xml`, region
+  tree snapshot `regions.csv`; `OsmAndMapCreator` version; per map — generation date and extraction file hashes (5.3). A
+  regeneration within the month gives a different date and hash, so the input is unambiguous. The generator logs
+  (`TOP_ABBRS_MANIFEST`) the manifest URL and hash, plus the hashes of `rules*.xml` and
   `poi_types.xml` it actually used (they may differ from what the job saw).
 - **Generator check.** The generator downloads CSV and manifest and verifies the CSV hash matches the manifest and the
   manifest sits next to and describes this CSV (URL — 8.1, fallback to last month — section 11). If `TOP_ABBRS_URL` is
   set but CSV or manifest is unavailable, corrupt or mismatched, map generation **fails**: a silent build without the
   list would mix maps with and without aliases in one wave. Without `TOP_ABBRS_URL` generation is unchanged.
 - **List change** means map regeneration.
-- **Generation log.** `TOP_ABBRS_RULE` lines: per CSV row — objects that got the abbreviation and keys added.
-  Analogous to `ALTERNATIVE_NAMES_RULE`.
+- **Generation log.** `TOP_ABBRS_RULE` lines: per CSV row — objects that got the abbreviation and keys added. Analogous
+  to `ALTERNATIVE_NAMES_RULE`.
 
 ## 9. Search
+
+By mechanism (5.4):
+
+- **`query_rule`** — existing `<query>` rules; works on old and new OBFs and in both search versions.
+- **`computed_subtype`** — existing top-index and category search; the `phrases.xml` synonym maps the query word to the
+  key. Works after the map is regenerated.
+- **`top_index_alias`** — to verify before enabling: the spatial search already matches the names of top-index values
+  (`SpatialPoiSearch.processPoiCategories`, wikidata names of brands); the legacy `matchTopIndex` compares the query
+  with the value and its translation only, and needs the alternative names too.
+- **`object_alias`** — as below.
+
+For `object_alias`:
 
 - **Only spatial search (v2) is supported**, with no changes: the alias is a POI name-index key with marker
   `spellvariantcommon` (8.3); the alias atom merges with the same object's atoms.
@@ -504,8 +654,8 @@ OsmAndPoiIndex.nameIndex (4)
   candidate (`BinaryMapPoiReaderAdapter`, `matcher.matches` on `getName`, `getEnName`, `getOtherNames`,
   `isTagIndexedForSearchAsName` tags etc.). The alias is not there, so the object is dropped. v1 support is a separate
   task, out of scope.
-- **Relation to `rules*.xml`.** The list only adds the abbreviation to objects with the full form; no reverse
-  direction (12.9). A pair equal to a `<query>` rule (`hbf → Hauptbahnhof`) is allowed (8.2): in new OBFs it adds key
+- **Relation to `rules*.xml`.** The list only adds the abbreviation to objects with the full form; no reverse direction
+  (12.9). A pair equal to a `<query>` rule (`hbf → Hauptbahnhof`) is allowed (8.2): in new OBFs it adds key
   `hbf`, the rule keeps working on old OBFs in both query directions. If a list pair needs the reverse direction, move
   it to `rules_<lang>.xml` manually.
 
@@ -513,11 +663,12 @@ OsmAndPoiIndex.nameIndex (4)
 
 1. **Stored name is not rewritten.** Abbreviations only add keys (as rule 2 of `rules-spec.md`).
 2. **Explicit beats automatic.** Manual `include`/`exclude` and `rules*.xml` rules win over automatic findings.
-3. **Data locale, not UI locale.** Bound to locale and owner region; the same `abbr` in different regions is
-   different rows.
-4. **Map data only.** `poi_types.xml`/`phrases.xml` untouched; object-type synonyms stay there.
-5. **Size budget.** Per-map and planet row limits in the schema; name index growth measured by a paired build of
-   control maps (section 11); the generation log (8.4) shows objects and keys per row.
+3. **Data locale, not UI locale.** Bound to locale and owner region; the same `abbr` in different regions is different
+   rows.
+4. **No synonyms in maps.** Category synonyms go to `phrases.xml` (app). Maps get only top-index values with their
+   aliases, object aliases and computed subtypes; brands stay as they are.
+5. **Size budget.** A top K per mechanism (5.5) plus per-map and planet row limits in the schema; name index growth
+   measured by a paired build of control maps (section 11); the generation log (8.4) shows objects and keys per row.
 6. **No new OBF fields.**
 7. **Determinism.** Same input and schema give the same CSV (stable sort, no randomness).
 
@@ -528,36 +679,39 @@ Metric kinds are reported separately: list quality (candidates), coverage (data)
 **Step 0 — trial paired build before implementing the job.** The alias gets the same `NAME_OTHER` name component as a
 `<query>` rule match plus the marker penalty (section 9), so a new key alone does not guarantee fixing Hbf losses to
 literal "Hbf" objects. Build DE maps with a manual CSV (Hbf, Bhf) and without, and analyze each query: which loss is
-fixed, which remains and why (name weight, type, distance). Hbf thresholds below are confirmed by step 0; if there is
-no gain, moving to `NAME_ALIAS` (12.6) is a separate task with its own search verification, since it affects all
-marker alternatives.
+fixed, which remains and why (name weight, type, distance). Hbf thresholds below are confirmed by step 0; if there is no
+gain, moving to `NAME_ALIAS` (12.6) is a separate task with its own search verification, since it affects all marker
+alternatives.
 
 **Stage 1 — first version (H5 off).**
 
-| Metric | Threshold | Prototype baseline |
-|---|---|---|
-| `kind=word` precision (sample labeling, 12.13) | ≥ 85% in each stratum | 81% top-50 (88% with `near maxShortLen=4`) |
-| `kind=org` precision | ≥ 95% in each stratum | 95% top-50 (97% with `headWord`) |
-| DMV: NY offices without "dmv" in name, target at #1 | ≥ 9/27 (by `operator`) | 0/27 |
-| Hbf: target station at #1 | goal ≥ 95/99, confirmed by step 0 | 78–79/99 |
-| Hbf: any hit at #1 (station or nearby "Hbf" object) | not below baseline | 81–82/99 |
-| Simulator (r27/r28 abbr and general rounds): Not Found | 0 new | — |
-| Simulator: target rank | no worse than baseline in any query; regressions listed in the report | — |
-| POI name index growth | ≤ 1% per map, by **paired build** of control maps (with and without list) | not measured |
+| Metric                                                                                                   | Threshold                                                                          | Prototype baseline                              |
+|----------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------|-------------------------------------------------|
+| `kind=word` precision (sample labeling, 12.13)                                                           | ≥ 85% in each stratum                                                              | 81% top-50 (88% with `near maxShortLen=4`)      |
+| `kind=org` precision                                                                                     | ≥ 95% in each stratum                                                              | 95% top-50 (97% with `headWord`)                |
+| DMV: NY offices without "dmv" in name, target at #1                                                      | ≥ 9/27 (by `operator`)                                                             | 0/27                                            |
+| Hbf: target station at #1                                                                                | goal ≥ 95/99, confirmed by step 0                                                  | 78–79/99                                        |
+| Hbf: any hit at #1 (station or nearby "Hbf" object)                                                      | not below baseline                                                                 | 81–82/99                                        |
+| Simulator (r27/r28 abbr and general rounds): Not Found                                                   | 0 new                                                                              | —                                               |
+| Simulator: target rank                                                                                   | no worse than baseline in any query; regressions listed in the report              | —                                               |
+| POI name index growth                                                                                    | ≤ 1% per map, by **paired build** of control maps (with and without list)          | not measured                                    |
+| `computed_subtype` precision: objects of a service that are that kind of place (20 per service, labeled) | ≥ 95%                                                                              | NYC DMV predicate: 18 of 414 government objects |
+| `computed_subtype` without a name, `operator` or wikidata condition                                      | only where the main tags are unambiguous in the country; each listed in the report | —                                               |
+| `query_rule` / `top_index_alias` reach: share of `cover` found at #1 on control maps                     | measured per row; rows with 0 reach removed                                        | —                                               |
 
 **Stage 2 — enabling H5.**
 
-| Metric | Threshold |
-|---|---|
-| `bind=phrase` row precision (20 objects per row, 12.7) | ≥ 95% |
-| DMV: target at #1 | ≥ 24/27 |
-| All stage 1 metrics | no regression |
+| Metric                                                 | Threshold     |
+|--------------------------------------------------------|---------------|
+| `bind=phrase` row precision (20 objects per row, 12.7) | ≥ 95%         |
+| DMV: target at #1                                      | ≥ 24/27       |
+| All stage 1 metrics                                    | no regression |
 
-**Control maps** — those holding the test sets (NY, DE states), plus one map with no list rows (nothing changes
-without rows). `gain_objects` in the job is only a review hint.
+**Control maps** — those holding the test sets (NY, DE states), plus one map with no list rows (nothing changes without
+rows). `gain_objects` in the job is only a review hint.
 
-**Map release gate.** Each month the control maps are built first with the list (pilot), test sets and simulator run
-on them. The full generation wave with this list starts only if the pilot meets the "no worse than baseline"
+**Map release gate.** Each month the control maps are built first with the list (pilot), test sets and simulator run on
+them. The full generation wave with this list starts only if the pilot meets the "no worse than baseline"
 thresholds (Not Found, target rank, any Hbf hit). Otherwise the wave uses last month's CSV, and regressing rows get
 `<exclude>`.
 
@@ -571,7 +725,7 @@ thresholds (Not Found, target rank, any Hbf hit). Otherwise the wave uses last m
 2. **Ownership granularity** depends on row kind:
 
    | Row kind                              | Scope                                                               | `locale`                         | `owner`       |
-   |---------------------------------------|---------------------------------------------------------------------|----------------------------------|---------------|
+      |---------------------------------------|---------------------------------------------------------------------|----------------------------------|---------------|
    | `kind=org`, `bind=operator`/`network` | tag value; no region, per-map row limit applies                     | group locale (`en_US`)           | `*`           |
    | `kind=org`, `bind=phrase` (H5)        | owner region, like brands (5.2.7)                                   | group locale                     | region (`us`) |
    | `kind=word`                           | data language, layered as `rules_<lang>.xml` → `rules_<lang>_<CC>.xml` | language (`de`) or locale (`de_CH`) | `*`        |
@@ -581,26 +735,30 @@ thresholds (Not Found, target rank, any Hbf hit). Otherwise the wave uses last m
    applies to all its locales, including data-poor ones (Liechtenstein). Name locale is by tag
    (`SearchModLocales.forName`): `name:de` on an Italian map is `de_IT`. Opting out in a country is done by that
    locale's rule (`rules_de_CH.xml`): the 8.2 filter uses the map locale.
-3. **What is written to OBF:** an additional name (8.3), not an `operator` category. It covers all row kinds
-   (`kind=word` and H5 included), needs no `poi_types.xml` changes and respects region ownership. An `operator`
-   "network category" (USPS, DB Station&Service) may come later as a separate feature; it does not conflict.
+3. **What is written to OBF depends on the mechanism (5.4)** (revised 2026-10-14; first version: an additional name for
+   every row). Words go to `<query>` rules and add nothing to maps; an organization bound to `operator`/`network`
+   becomes a top-index value with its abbreviations as alternative names (one category key per object, aliases once per
+   map); a kind of place becomes a computed tag set by a predicate. The additional object name (8.3) stays as the
+   fallback for values outside the top index and for H5 `bind=phrase` rows. Reason: a query rule reaches 0.7% of the
+   organization cover (section 2), and an alias per object costs one key per object and alias, while the top-index value
+   carries any number of aliases for one key per object.
 4. **Boundary with `rules*.xml`.** Rules win, but only a **value conflict** is forbidden; the **same pair** is allowed
    (8.2), otherwise Hbf — the main motivation — would be excluded. Conflict: a rule with a different POI value or an
-   ambiguous rule (`st`); a rule only for other owners (`pl` for streets) does not concern POIs. The generator
-   filters by locale rules; the job flags the same cases in `top_abbrs.html`. Reasons to filter at generation: rules
-   change more often than the job, the generator already loads locale rules, and the rule version is logged (8.4).
+   ambiguous rule (`st`); a rule only for other owners (`pl` for streets) does not concern POIs. The generator filters
+   by locale rules; the job flags the same cases in `top_abbrs.html`. Reasons to filter at generation: rules change more
+   often than the job, the generator already loads locale rules, and the rule version is logged (8.4).
 5. **Key decision:** as `<index><rule>` alternatives (`AlternativeNameIndexGenerator.addRuleAlternative`, SEARCH.md
    section 6): a new word is a key; a word that replaced a non-key name word one-to-one attaches to the name's shared
    keys (no shared keys — also a key). For `kind=org` `dmv` is always a key; for `kind=word` `hbf` is a key only where
    the full word was a key. No `keys` column in the CSV and no "always key" in v1; if needed later, it becomes a CSV
    column, not a schema attribute (the generator sees only the CSV).
 6. **Ranking:** marker `RULE_SPELLING_COMMON` (`spellvariantcommon`), as for `<index><rule>` alternatives: name
-   component `NAME_OTHER` (0.5), `wRuleSpelling` (0.02) subtracted from the final score; between a real-name atom and
-   an alias atom of one object the OSM name wins (`SpatialSearchToken.addAtom`). No search change needed (SEARCH.md
-   2.2, 8); app versions unaware of the marker see it as an extra name word, as with existing rule alternatives. This
-   and decision 5 are one choice: the `addRuleAlternative` path. An object with "DMV" in its own name
-   (`NAME_PREFIX`/`NAME_EXACT`) stays higher. Verify on the DMV set (section 11); if offices without "dmv" lose to
-   objects with "dmv" inside the name (`NAME_CONTAINS`, 0.65), introduce a `NAME_ALIAS` level (≈ 0.8, between
+   component `NAME_OTHER` (0.5), `wRuleSpelling` (0.02) subtracted from the final score; between a real-name atom and an
+   alias atom of one object the OSM name wins (`SpatialSearchToken.addAtom`). No search change needed (SEARCH.md 2.2,
+   8); app versions unaware of the marker see it as an extra name word, as with existing rule alternatives. This and
+   decision 5 are one choice: the `addRuleAlternative` path. An object with "DMV" in its own name (`NAME_PREFIX`/
+   `NAME_EXACT`) stays higher. Verify on the DMV set (section 11); if offices without "dmv" lose to objects with "dmv"
+   inside the name (`NAME_CONTAINS`, 0.65), introduce a `NAME_ALIAS` level (≈ 0.8, between
    `NAME_CONTAINS` and `NAME_PREFIX`) as one search change for aliases and rules.
 7. **H5 in v1:** implemented with restrictions, schema switch, off until labeled.
 
@@ -612,7 +770,7 @@ thresholds (Not Found, target rank, any Hbf hit). Otherwise the wave uses last m
    Conditions for a `bind=phrase` row (`<propagate>` attributes, section 6):
 
    | Attribute        | Default | Meaning                                                                                                   |
-   |------------------|---------|-----------------------------------------------------------------------------------------------------------|
+      |------------------|---------|-----------------------------------------------------------------------------------------------------------|
    | `enabled`        | `false` | H5 is enabled after labeling                                                                              |
    | `requireH1`      | `true`  | pair `(abbr, full)` found by both H1 and H2+H3 (5.2.5)                                                    |
    | `minPhraseWords` | `2`     | significant phrase words, excluding service words (class 1), `<legal>` and `stripTail` places             |
@@ -622,19 +780,19 @@ thresholds (Not Found, target rank, any Hbf hit). Otherwise the wave uses last m
    | `excludeBrands`  | `true`  | phrase does not equal a `brands.lst` value                                                                |
 
    **"Without tag" is carried in the CSV.** An H5 row has `require_absent` = group tag (`operator` or `network`); the
-   application predicate (5.2) checks it identically in the job (`maxSpread`, `gain_objects`, publish coverage) and
-   the generator (8.2). A manual `bind=phrase` row must set `require_absent` explicitly — a tag or empty for "all
-   objects with the phrase".
+   application predicate (5.2) checks it identically in the job (`maxSpread`, `gain_objects`, publish coverage) and the
+   generator (8.2). A manual `bind=phrase` row must set `require_absent` explicitly — a tag or empty for "all objects
+   with the phrase".
 
-   *Enabling condition* — stage 2 of section 11: label 20 objects per `bind=phrase` row in `top_abbrs.html`; precision
-   ≥ 95%. The generator finds phrases in `name` and indexed names via a locale phrase dictionary keyed by first word;
+   *Enabling condition* — stage 2 of section 11: label 20 objects per `bind=phrase` row in `top_abbrs.html`; precision ≥
+   95%. The generator finds phrases in `name` and indexed names via a locale phrase dictionary keyed by first word;
    written via `addRuleAlternative` (8.3): a multi-word phrase gives no one-to-one replacement, so `abbr` is always a
    key.
 8. **Letter case:** requirement by row kind.
 
-   Case affects only pair selection in the job: index and query are lower-cased. Acronyms in OSM are upper case
-   (`DMV`, `USPS`), ordinary words capitalized (`State`), word abbreviations mixed (`Hbf`, `Str.`). The filter matters
-   mostly for H1, especially `near`, where a short ordinary word accidentally matches a phrase's first letters
+   Case affects only pair selection in the job: index and query are lower-cased. Acronyms in OSM are upper case (`DMV`,
+   `USPS`), ordinary words capitalized (`State`), word abbreviations mixed (`Hbf`, `Str.`). The filter matters mostly
+   for H1, especially `near`, where a short ordinary word accidentally matches a phrase's first letters
    (`state → south arterial`); for H2+H3 H3 nearly replaces it. Raw case is in the extraction (5.3); only the analyzer
    normalizes (5.2.1); canonical `abbr` (section 7) is the most frequent raw spelling.
 
@@ -648,8 +806,9 @@ thresholds (Not Found, target rank, any Hbf hit). Otherwise the wave uses last m
 
    `share="0.6"` is a starting value. `top_abbrs.html` shows a "cut by case" column so the filter's cost is visible on
    the first run; if recall loss is large, switch to a soft signal (case adjusts thresholds instead of cutting).
-9. **Reverse direction:** none. The list only adds `abbr` to objects with the full form; a full-form query
-   ("department of motor vehicles") does not find an object with only the abbreviation in its name ("Harlem DMV"). No
+9. **Reverse direction:** none for the OBF mechanisms; a `query_rule` gets its reverse form from the rules parser, as
+   every `<query>` rule does. The list only adds `abbr` to objects with the full form; a full-form query ("department of
+   motor vehicles") does not find an object with only the abbreviation in its name ("Harlem DMV"). No
    `direction` column. Reasons: for `kind=org` a phrase instead of one word would make every phrase word a key on every
    abbreviated object, and the short form is ambiguous ("DMV" is also Deutscher Mieterverbund); acronyms are typed more
    often than full names. For `kind=word` the reverse direction, where needed, comes from `<query>` rules.
@@ -662,11 +821,10 @@ thresholds (Not Found, target rank, any Hbf hit). Otherwise the wave uses last m
     Rule: a pair whose `abbr` or `full` equals (after `normalizeTagValue`) a `brands.lst` value does not enter
     `top_abbrs.csv`. `top_abbrs.html` shows such pairs in a "brand aliases" section: brand, both forms, support, whether
     the form is already in brand objects' `name:*`. This section decides whether to extend the brand mechanism (names
-    without wikidata) as a separate task. Rule 5.1.6 (`bp ← blanco petroli`) remains as a special case.
-    Exception: an organization abbreviation confirmed by `<tag>:short` or by a value pair (5.2.4a) is the
-    abbreviation of the operator, not a brand alias, and stays (`brand=USPS` and `operator:short=USPS` of 2180 post
-    offices in NYC). Objects with `brand=USPS` already have the word in the name index and get no alias; the others
-    do.
+    without wikidata) as a separate task. Rule 5.1.6 (`bp ← blanco petroli`) remains as a special case. Exception: an
+    organization abbreviation confirmed by `<tag>:short` or by a value pair (5.2.4a) is the abbreviation of the
+    operator, not a brand alias, and stays (`brand=USPS` and `operator:short=USPS` of 2180 post offices in NYC). Objects
+    with `brand=USPS` already have the word in the name index and get no alias; the others do.
 11. **Review process:** review by diff with last month, auto-publish by coverage.
     - `top_abbrs.html` shows changes vs the previous CSV: new, removed and changed rows (by key
       `(kind, locale, owner, abbr, full, bind, bind_value)`; change = `types` or a significant shift of
@@ -674,8 +832,8 @@ thresholds (Not Found, target rank, any Hbf hit). Otherwise the wave uses last m
     - **Auto-publish by pair change, not by row or object count.** For each map, compare the sets of pairs "POI identity
       (5.3), normalized alias" of the old and new list on the current month's extraction. Change = added pairs **plus**
       removed, with no cancellation: replacing aliases on 1000 objects with aliases on 1000 others is 2000; changing
-      `abbr` on the same objects is removal plus addition. The CSV is auto-published if on every map the change is
-      ≤ `<publish maxMapChange>` (2%) of the map's named POIs and no row adds more than `<publish maxRowGain>` (2000)
+      `abbr` on the same objects is removal plus addition. The CSV is auto-published if on every map the change is ≤
+      `<publish maxMapChange>` (2%) of the map's named POIs and no row adds more than `<publish maxRowGain>` (2000)
       pairs. The row limit applies to changed rows too: widening `types`, `owner`, `locale` or dropping
       `require_absent` counts by added pairs. Otherwise the job waits for confirmation (Jenkins build parameter).
     - **First release** (`<publish firstRelease="manual">`) and any release after a schema or generator version change —
@@ -686,23 +844,22 @@ thresholds (Not Found, target rank, any Hbf hit). Otherwise the wave uses last m
     - Source is the map-generation extraction (5.3), so the cycle is shifted by a month: after month M generation the
       job builds the list from its extraction and publishes it as `top_abbrs-<M+1>.csv`; month M+1 generation applies
       it.
-    - The generator takes its month's file, not the latest: `TOP_ABBRS_URL` (8.1) points to the month file. All
-      regional builds of one wave get one list; the manifest (8.4) points to the specific file.
-    - Re-publishing the same month (after review) replaces the file only before map generation starts; after that,
-      edits wait for next month.
+    - The generator takes its month's file, not the latest: `TOP_ABBRS_URL` (8.1) points to the month file. All regional
+      builds of one wave get one list; the manifest (8.4) points to the specific file.
+    - Re-publishing the same month (after review) replaces the file only before map generation starts; after that, edits
+      wait for next month.
 13. **Metrics in the job:** list checks in the job; search quality and size after map builds.
     - **Labeling sample** (`<review>`): top-50 does not characterize a list of up to 20,000 rows. Each month these
-      strata are labeled: the month's new rows; each source (`h1same`, `h1near`, `h2h3`, `include`) separately; all
-      rows with `gain_objects` ≥ `<review highGain>` (1000) entirely; of the rest — random `<review perStratum>` (20)
+      strata are labeled: the month's new rows; each source (`h1same`, `h1near`, `h2h3`, `include`) separately; all rows
+      with `gain_objects` ≥ `<review highGain>` (1000) entirely; of the rest — random `<review perStratum>` (20)
       rows per stratum. Labels are stored in the repository and carried across months by row key.
-    - Auto-publish conditions (in the job): precision in **every** stratum (`kind=org` ≥ 95%, `kind=word` ≥ 85%,
-      section 11), row count within `<limit>`, per-map pair change (12.11). Unlabeled stratum rows block
-      auto-publishing. Failure means publishing only on confirmation. `gain_objects` is a review hint, not an index
-      size estimate.
+    - Auto-publish conditions (in the job): precision in **every** stratum (`kind=org` ≥ 95%, `kind=word` ≥ 85%, section
+      11), row count within `<limit>`, per-map pair change (12.11). Unlabeled stratum rows block auto-publishing.
+      Failure means publishing only on confirmation. `gain_objects` is a review hint, not an index size estimate.
     - Simulator, DMV/Hbf sets and index growth need built OBFs. They run after generation: sets and simulator on the
       month's maps, index growth by a paired build of control maps with and without the list (section 11). Results go
-      into the monthly report, separated by metric kind. Map wave release is gated by the control-map pilot
-      (section 11).
+      into the monthly report, separated by metric kind. Map wave release is gated by the control-map pilot (section
+      11).
 14. **Compatibility of old maps and versions:** accepted as is, no measures.
     - Old OBFs and new app: `Hbf` is found via `<query>` (rules ship with the app and work on any OBF); `DMV` is not
       found until regeneration. Maps are rebuilt monthly (12.12); the window lasts until the user updates the map.
@@ -721,6 +878,35 @@ thresholds (Not Found, target rank, any Hbf hit). Otherwise the wave uses last m
       `kind=word` row with locale `de` applies only to the German part;
     - if `name` has a separator, the object has more than one `name:<lang>`, and the parts do not match them, the name
       does not participate in H1; in the generator it gets the map locale, as now.
+16. **Source: map data, not search logs.** The job mines the map-generation extraction; search logs (`missing-search`,
+    server and web search, `query.db`) are not an input.
+    - Logs are too sparse per abbreviation: of 615 abbreviations of search-word-rules v4, 59% never occur in 598 608
+      logged queries and 92% have fewer than 5 users; of 716 v5 query rules, 52% have none. MTA, NYCTA, NYPD, LIRR, NYPL
+      and FDNY have 0 users, DMV and USPS 2.
+    - Raw counts mislead: 3% of the log rows are URLs and `data:` strings (`g.co/kgs/…` gave KGS 104 "users"), and a
+      word is counted across languages (CE 79 users in both en and pt).
+    - Logs are used where they are dense: type weights aggregated by type (5.5), the vocabulary of failed queries that
+      no map name has (ÖPNV 74 users, 0 in names of the 8 maps), and acceptance runs of failed queries before and after
+      a list (section 11).
+17. **Rating: type weight × cover × ambiguity, no LLM judge per row.** Object counts alone favour infrastructure (5.5);
+    the weight is per type, set once, so it costs nothing per row. An LLM is used where statistics fail — to reject name
+    fragments among new rows of the monthly diff (search-word-rules v3 found accept rates of 25–26% at every
+    `type_share` threshold) — and optionally to score the type list once (5.5). A pairwise ELO tournament over rows is
+    not used: O (n log n) comparisons per run and no reference to calibrate against.
+18. **Relation to search-word-rules (v1–v5, OsmAnd-resources#1546, OsmAnd-tools#1825).** That pipeline mines world name
+    statistics, reviews them with an LLM agent per language and exports category synonyms (`phrases.xml`),
+    `<abbr>` pairs and `<poi><service>` entries to `rules_<lang>[_<CC>].xml`.
+    - Shared: synonyms in the app, words as query rules, a kind of place as a tag the generator sets by a predicate (its
+      `<service>` is this spec's `computed_subtype`).
+    - Taken from it: the `<service>` format and generator code; the synonym rule "a synonym means the whole type, not a
+      narrower kind or a frequent name word" (OsmAnd#26605).
+    - Added here: organizations bound to `operator`/`network` (`top_index_alias`), a monthly diff instead of a full
+      review per version, cover and score per row, `operator` and wikidata in the service predicate, and the locale of a
+      short rule taken from its countries: `<abbr short="PG">` (247 objects, all in India) belongs in
+      `rules_en_IN.xml`, not `rules_en.xml`; `SS → Estación de Servicio` (278 of 285 in Bolivia) in `rules_es_BO.xml`.
+    - To fix in its export: 15 `<service>` entries without a name condition tag every object of the type in the country
+      (`Diconsa → shop=convenience` in Mexico, `IMSS → hospital | clinic`); they need a name, `operator` or wikidata
+      condition (11).
 
 ## 13. Prototype references
 
