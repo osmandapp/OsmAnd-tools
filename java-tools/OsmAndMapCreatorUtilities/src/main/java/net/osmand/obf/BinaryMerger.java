@@ -15,6 +15,7 @@ import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.CommonWords;
 import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.OsmandOdb;
+import net.osmand.search.rules.SearchModRules;
 import net.osmand.data.*;
 import net.osmand.obf.preparation.*;
 import net.osmand.osm.MapRenderingTypesEncoder;
@@ -44,6 +45,7 @@ public class BinaryMerger {
 	public static final String helpMessage = "output_file.obf [--address] [--poi] [input_file.obf] ...: merges all obf files and merges poi & address structure into 1";
 	private static final Map<String, Integer> COMBINE_ARGS = new HashMap<String, Integer>();
 	private BinaryMapIndexReader.OsmAndOwner osmAndOwner;
+	private SearchModRules searchRules;
 
 	static {
 		COMBINE_ARGS.put("--address", OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER);
@@ -330,6 +332,23 @@ public class BinaryMerger {
 		return fileName;
 	}
 
+	private SearchModRules getSearchRules() {
+		if (searchRules == null) {
+			searchRules = new SearchModRules();
+		}
+		return searchRules;
+	}
+
+	// region name written to the address and POI parts; the search takes the rules locale of the data from it
+	protected String getRegionName(File fileToExtract) {
+		String nm = fileToExtract.getName();
+		int i = nm.indexOf('_');
+		String region = i > 0 ? nm.substring(0, i) : nm;
+		// keep a subregion with its own locale: "Switzerland_ticino_europe_2.obf" -> "Switzerland_ticino"
+		String localePrefix = getSearchRules().locales().mapPrefix(nm);
+		return localePrefix != null && localePrefix.length() > region.length() ? localePrefix : region;
+	}
+
 	protected boolean shouldMergeCitiesByNameDistance() {
 		return true;
 	}
@@ -472,7 +491,7 @@ public class BinaryMerger {
 		attributeTagsTable.addAll(attributeTagsTableSet);
 		Map<String, Integer> tagRules = new HashMap<String, Integer>();
 		NameIndexCreator<MapObject> namesIndex = new NameIndexCreator<>(CommonWords.getAddrInstance());
-		namesIndex.setMapName(getNameIndexMapName(name));
+		namesIndex.setMapName(getNameIndexMapName(name), getSearchRules());
 		ListIterator<String> it = attributeTagsTable.listIterator();
 		while (it.hasNext()) {
 			tagRules.put(it.next(), it.previousIndex());
@@ -715,11 +734,7 @@ public class BinaryMerger {
 				}
 			}
 		}
-		String nm = fileToExtract.getName();
-		int i = nm.indexOf('_');
-		if (i > 0) {
-			nm = nm.substring(0, i);
-		}
+		String nm = getRegionName(fileToExtract);
 		if (combineParts.contains(OsmandOdb.OsmAndStructure.ADDRESSINDEX_FIELD_NUMBER)) {
 			combineAddressIndex(nm, writer, addressRegions, indexes);
 		}

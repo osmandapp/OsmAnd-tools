@@ -112,6 +112,12 @@ public class OBFDataCreator extends BinaryMerger {
 		return sourceMap != null ? sourceMap : fileName;
 	}
 
+	// as the source map names its region, so the search reads the test data with the rules locale of that map
+	@Override
+	protected String getRegionName(File fileToExtract) {
+		return sourceMap != null ? Algorithms.capitalizeFirstLetter(sourceMap) : super.getRegionName(fileToExtract);
+	}
+
 	@Override
 	protected boolean shouldMergeCitiesByNameDistance() {
 		return false;

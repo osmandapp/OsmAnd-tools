@@ -73,6 +73,8 @@ public class MainUtilities {
 				BinaryMerger.main(subArgsArray);
 			} else if (utl.equals("brand-analyzer") || utl.equals("tag-value-analyzer")) {
 				TopTagValuesAnalyzer.main(subArgsArray);
+			} else if (utl.equals("collect-tag-values")) {
+				TagValuesCollector.main(subArgsArray);
 			} else if (utl.equals("test-style-rendering")) {
 				OsmAndTestStyleRenderer.main(subArgsArray);
 			} else if (utl.equals("test-coastline-rendering")) {
@@ -507,6 +509,7 @@ public class MainUtilities {
 		System.out.println("\t\t generate-single-map <output obf> <osm files> <--name=region> <--map-zooms=...>: "
 				+ "one map section from many osm files (up to 2048), e.g. tiles of one region");
 		System.out.println("\t\t inspector <params>: powerful tool to inspect obf files and convert them to osm");
+		System.out.println("\t\t collect-tag-values --extracts=<osm-extract dir> [--out=all_brands.csv.gz] [--cache=brands] [--poi-out=poi_name_stats.tsv.gz] [--poi-cache=poi-stats] [--analyze] [--threads=N] [--force]: one pass over the region pbf/o5m files: brand counts per region, poi stats (types, operators, name words, abbreviations) per leaf map region, --analyze runs brand-analyzer --consolidate; .gz outputs are gzipped");
 		System.out.println("\t\t check-ocean-tile <lat> <lon> <zoom=11>: checks ocean or land tile is in bz2 list");
 		System.out.println("\t\t generate-ocean-tile <coastline osm file> <optional output file>: creates ocean tiles 12 zoom");
 		System.out.println("\t\t generate-java-style <pathtostyle> <pathtooutputfolder>: prints rendering style as java interpreted code");

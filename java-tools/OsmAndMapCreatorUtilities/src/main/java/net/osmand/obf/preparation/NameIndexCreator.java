@@ -21,7 +21,6 @@ import java.util.TreeSet;
 import gnu.trove.list.array.TIntArrayList;
 import net.osmand.CollatorStringMatcher;
 import net.osmand.binary.CommonWords;
-import net.osmand.binary.CommonWordsMultiIndex;
 import net.osmand.binary.NameIndexReader;
 import net.osmand.data.City;
 import net.osmand.data.City.CityType;
@@ -33,6 +32,10 @@ import net.osmand.osm.AbstractPoiType;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.search.core.SearchPhrase;
 import net.osmand.search.core.TopIndexFilter;
+import net.osmand.search.rules.SearchModLocaleRules;
+import net.osmand.search.rules.SearchModLocales;
+import net.osmand.search.rules.SearchModRules;
+import net.osmand.search.rules.SearchModRules.SearchModRuleOwner;
 import net.osmand.util.Algorithms;
 import net.osmand.util.SearchAlgorithms;
 
@@ -68,8 +71,10 @@ public class NameIndexCreator<T> {
 	
 	// words of names that are not keys in this map: they stay references of the common words table
 	final Set<String> notKeyWords = new HashSet<>();
-	// map whose language group chooses the keys of names, null for the rare word rule
-	private String mapName;
+	// statistics group of the map that chooses the keys of names, null for the rare word rule
+	private String wordsGroup;
+	// rules of the locale of the map: word classes and alternative names
+	private SearchModLocaleRules localeRules;
 
 	final AlternativeNameIndexGenerator<T> alternativeNames = new AlternativeNameIndexGenerator<>(this);
 
@@ -77,13 +82,14 @@ public class NameIndexCreator<T> {
 		this.predefinedGlobalWords = c;
 	}
 
-	// download name of the map ("Ukraine_kyiv-city_europe"), used when COMMON_WORDS_BY_LANGUAGE and a group covers it
-	public void setMapName(String mapName) {
-		// language group of the map (CommonWordsMultiIndex.DEFAULT_GROUPS), null when no group covers it
-		String languageGroup = mapName == null ? null : CommonWordsMultiIndex.getInstance().getGroupId(mapName);
-		boolean covered = COMMON_WORDS_BY_LANGUAGE && languageGroup != null;
-		this.mapName = covered ? mapName : null;
-		alternativeNames.setLanguageGroup(languageGroup, mapName);
+	// download name of the map ("Ukraine_kyiv-city_europe"): <locales> of the rules give its statistics group, used
+	// when COMMON_WORDS_BY_LANGUAGE, and its rules locale
+	public void setMapName(String mapName, SearchModRules searchRules) {
+		SearchModLocales locales = searchRules.locales();
+		wordsGroup = COMMON_WORDS_BY_LANGUAGE && mapName != null ? locales.groupForMap(mapName) : null;
+		String mapLocale = mapName == null ? "" : locales.forMap(mapName);
+		localeRules = searchRules.rules(mapLocale);
+		alternativeNames.setRules(searchRules, mapLocale);
 	}
 
 	public record PoiNameObject(PoiTileBox tileBox, int ind, int eloRating, 
@@ -279,6 +285,7 @@ public class NameIndexCreator<T> {
 	}
 	
 	public PrepareWordsIndex buildCommonWords(Map<String, NamedObjectsByPrefix<T>> map) {
+		alternativeNames.logStats();
 		List<String> commonStrings = new ArrayList<String>();
 		Set<String> topXFrequent = new HashSet<>();
 		int maxSize = Math.max(ADD_TOP_X_FREQ_WORDS, COMMON_CONVERT_NONINDX_TO_INDX_TOP_X);
@@ -290,7 +297,9 @@ public class NameIndexCreator<T> {
 			}
 		});
 		for (Map.Entry<String, Integer> e : tokenFrequencies.entrySet()) {
-			if (!e.getKey().startsWith(NameIndexReader.POI_CATEGORY_PREFIX)) {
+			// the marker of a rule spelling is in the table anyway: it takes no place of a word among the most frequent
+			if (!e.getKey().startsWith(NameIndexReader.POI_CATEGORY_PREFIX)
+					&& !NameIndexReader.RULE_SPELLING_COMMON.equals(e.getKey())) {
 				queue.add(e.getKey());
 				if (queue.size() > maxSize) {
 					queue.poll();
@@ -344,7 +353,7 @@ public class NameIndexCreator<T> {
 			words.put(c, word);
 			wordsList.add(word);
 		}
-		commonWords = new PrepareWordsIndex(words, wordsList, mapName != null);
+		commonWords = new PrepareWordsIndex(words, wordsList, wordsGroup != null);
 		return commonWords;
 	}
 	
@@ -433,21 +442,11 @@ public class NameIndexCreator<T> {
 		}
 		List<String> uniqueNames = SearchAlgorithms.splitAndNormalize(name, true);
 		List<String> allNames = SearchAlgorithms.splitAndNormalize(name, false);
-		// an object people know by any word of its name keeps every word as a key: a poi with a travel rating or a
-		// wikidata id ("national" finds Tongass National Forest), a city; towns and villages do not
-		boolean notable = obj instanceof PoiNameObject p && (p.eloRating() >= 0 || p.wikidata())
-				|| obj instanceof City c && c.getType() == CityType.CITY;
-		Set<String> keys = mapName == null ? null
-				: new HashSet<>(CommonWordsMultiIndex.getInstance().getWordsToIndex(mapName, uniqueNames, notable));
+		Set<String> keys = statisticsKeys(uniqueNames, obj);
 		String legacyKey = null;
 		if (keys != null) {
-			// TODO remove when app versions with the legacy search (SearchCoreFactory) no longer download maps: it looks a
-			// name up by the one query word SearchPhrase picks, a word CommonWords does not know first, so the name keeps
-			// such a word ("amsterdam" of Amsterdam City Farm, frequent in the Netherlands); known words like "de" stay out
-			List<String> words = new ArrayList<>(uniqueNames);
-			words.removeIf(NameIndexReader::isIndexMarker);
-			String legacyWord = SearchPhrase.selectMainUnknownWordToSearch(words);
-			if (!legacyWord.isEmpty() && CommonWords.getInstance().getCommonSearch(legacyWord) == -1 && keys.add(legacyWord)) {
+			String legacyWord = legacyWord(uniqueNames);
+			if (legacyWord != null && keys.add(legacyWord)) {
 				legacyKey = legacyWord;
 			}
 		}
@@ -508,9 +507,66 @@ public class NameIndexCreator<T> {
 	}
 
 	
-	// alternative names (unglued words, synonyms by location and language) - see AlternativeNameIndexGenerator
+	// the keys of a name chosen by the statistics group of the map, null when every word is a key
+	private Set<String> statisticsKeys(List<String> uniqueNames, T obj) {
+		// an object people know by any word of its name keeps every word as a key: a poi with a travel rating or a
+		// wikidata id ("national" finds Tongass National Forest), a city; towns and villages do not
+		boolean notable = obj instanceof PoiNameObject p && (p.eloRating() >= 0 || p.wikidata())
+				|| obj instanceof City c && c.getType() == CityType.CITY;
+		return wordsGroup == null ? null
+				: new HashSet<>(CommonWordsMultiIndex.getInstance().getWordsToIndex(wordsGroup, localeRules, uniqueNames, notable));
+	}
+
+	// TODO remove when app versions with the legacy search (SearchCoreFactory) no longer download maps: it looks a
+	// name up by the one query word SearchPhrase picks, a word CommonWords does not know first, so the name keeps
+	// such a word ("amsterdam" of Amsterdam City Farm, frequent in the Netherlands); known words like "de" stay out
+	private static String legacyWord(List<String> uniqueNames) {
+		List<String> words = new ArrayList<>(uniqueNames);
+		words.removeIf(NameIndexReader::isIndexMarker);
+		String legacyWord = SearchPhrase.selectMainUnknownWordToSearch(words);
+		return !legacyWord.isEmpty() && CommonWords.getInstance().getCommonSearch(legacyWord) == -1 ? legacyWord : null;
+	}
+
+	// the words of a name that are keys of the name index, null when every word is a key
+	Set<String> nameKeys(String name, T obj) {
+		List<String> uniqueNames = SearchAlgorithms.splitAndNormalize(name, true);
+		Set<String> keys = statisticsKeys(uniqueNames, obj);
+		String legacyWord = keys == null ? null : legacyWord(uniqueNames);
+		if (legacyWord != null) {
+			keys.add(legacyWord);
+		}
+		return keys;
+	}
+
+	// alternative names (unglued words, <index> rules of the locale of the name) - see AlternativeNameIndexGenerator
 	public void addAlternativeNamesToNameIndex(String name, String lang, T obj, int maxPrefixLength) {
-		alternativeNames.addAlternativeNames(name, lang, obj, maxPrefixLength);
+		alternativeNames.addAlternativeNames(name, lang, obj, ruleOwner(obj), maxPrefixLength);
+	}
+
+	// the owner of a name for the search rules, as the search reads it (SpatialSearchToken.ruleOwner)
+	private static SearchModRuleOwner ruleOwner(Object obj) {
+		if (obj instanceof PoiNameObject) {
+			return SearchModRuleOwner.POI;
+		} else if (obj instanceof Street) {
+			return SearchModRuleOwner.STREET;
+		} else if (obj instanceof City c && c.getType() == CityType.BOUNDARY) {
+			return SearchModRuleOwner.BOUNDARY;
+		} else if (obj instanceof City c && c.getType() == CityType.POSTCODE) {
+			return SearchModRuleOwner.POSTCODE;
+		}
+		return SearchModRuleOwner.LOCALITY;
+	}
+
+	// a marker of the index (NameIndexReader.isIndexMarker) in a name: a word of the common words table, never a key
+	void addMarkerWord(String marker) {
+		tokenFrequencies.compute(marker, (t, u) -> u == null ? 1 : u + 1);
+		commonNonIndexedFrequencies.compute(marker, (t, u) -> u == null ? 1 : u + 1);
+	}
+
+	// a word of the common words table that is not a key: the other words of a name refer to it
+	void addTableWord(String token) {
+		notKeyWords.add(token);
+		tokenFrequencies.compute(token, (t, u) -> u == null ? 1 : u + 1);
 	}
 
 	void addAlternativeToken(String prefix, T obj, String word, List<String> alternativeWords) {

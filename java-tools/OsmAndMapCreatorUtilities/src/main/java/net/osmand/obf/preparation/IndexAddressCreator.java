@@ -59,6 +59,7 @@ import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
+import net.osmand.search.rules.SearchModRules;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
@@ -575,7 +576,6 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 		name = name.trim();
 		name = name.replace("’", "'");
-		name = icc.decryptAbbreviations(name, location, settings.addRegionTag);
 
 		if (normalizeStreets) {
 			String newName = name;
@@ -1012,7 +1012,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 						building.setName(hname + additionalHname);
 					}
 					if (!Algorithms.isEmpty(street2)) {
-						String secondHno= e.getTag(OSMTagKey.ADDR2_HOUSE_NUMBER);
+						String secondHno = e.getTag(OSMTagKey.ADDR2_HOUSE_NUMBER);
 						String firstNo = building.getName();
 						int secondNumberInd = hname.indexOf('/');
 						if (secondNumberInd != -1 && secondNumberInd < hname.length() - 1 &&
@@ -1022,7 +1022,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 						}
 						if (secondHno != null) {
 							Building building2 = EntityParser.parseBuilding(e);
-							building2.setName(hname.substring(secondNumberInd + 1) + additionalHname);
+							building2.setName(secondHno + additionalHname);
 							Set<Long> ids2OfStreet = getStreetInCity(0, e.getIsInNames(), street2, false, null, l, icc);
 							ids2OfStreet.removeAll(idsOfStreet); // remove duplicated entries!
 							if (!ids2OfStreet.isEmpty()) {
@@ -1273,7 +1273,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 
 		NameIndexCreator<MapObject> namesIndex = new NameIndexCreator<>(CommonWords.getAddrInstance());
-		namesIndex.setMapName(settings.nameIndexMapName != null ? settings.nameIndexMapName : regionName);
+		namesIndex.setMapName(settings.nameIndexMapName != null ? settings.nameIndexMapName : regionName,
+				new SearchModRules());
 
 		progress.startTask(settings.getString("IndexCreator.SERIALIZING_ADDRESS"), cityTowns.size() + villages.size() / 100 + 1); //$NON-NLS-1$
 		TLongObjectHashMap<Long> streetIds = new TLongObjectHashMap<Long>();

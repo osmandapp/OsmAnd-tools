@@ -79,7 +79,8 @@ import net.osmand.util.MapsCollection;
  * OsmAndMapCreator/utilities.sh test-coastline-rendering -renderer=opengl -maps.dir=/var/maps
  * </pre>
  * Exit code: <b>0</b> - nothing worse than {@code failAbove}, <b>2</b> - problems were reproduced (a
- * tile whose water difference is above {@code failAbove}, or a tile the renderer crashed on), <b>1</b> -
+ * tile whose water difference is above {@code failAbove}, or a tile the renderer crashed on; the random
+ * tiles only from {@value #RANDOM_FAILS_PER_100K} such tile per 100K), <b>1</b> -
  * the tester could not run (native library could not be loaded, no maps, broken json).
  *
  * <p>Every option can be given either as an argument ({@code -maps.dir=...}) or as a system
@@ -113,6 +114,11 @@ import net.osmand.util.MapsCollection;
  * outside the range, so a slow run can be split into parts that add up to the whole one -
  * {@code -minzoom=1 -maxzoom=6} and {@code -minzoom=7} together are the full run. {@code -random}
  * runs that part alone;</li>
+ * <li>{@code rerunFailed} - {@code true} checks only the tiles that failed in the previous run, listed by it
+ * in {@code <out>/}{@value #FAILED_TILES_FILE}, plus {@value #RERUN_RANDOM_FACTOR} times as many random
+ * tiles to catch regressions;</li>
+ * <li>{@code tiles} - checks only the given tiles, e.g. {@code -tiles=12/2675/1749,14/10246/8777}. Such a run
+ * keeps {@value #FAILED_TILES_FILE} of the previous run;</li>
  * <li>{@code scan}, {@code minzoom}, {@code maxzoom}, {@code bbox} - scan every tile of a zoom
  * range instead of the cases; {@code bbox} is {@code leftLon,bottomLat,rightLon,topLat} and
  * defaults to the whole world;</li>
@@ -218,6 +224,9 @@ public class CoastlineRenderingTester {
 	/** Default of {@code failAbove}: failed tiles up to 5% of water difference do not fail the run. */
 	private static final double DEFAULT_FAIL_ABOVE = 0.05;
 
+	/** Random tiles above {@code failAbove} fail the run only from this many per 100K random tiles. */
+	private static final int RANDOM_FAILS_PER_100K = 1;
+
 	/** Max per channel difference to still treat a pixel as water. */
 	private static final int COLOR_TOLERANCE = 10;
 
@@ -258,6 +267,11 @@ public class CoastlineRenderingTester {
 
 	static final String GROUP_FIXED = "Fixed cases of coastline-tests.json";
 	static final String GROUP_RANDOM = "Random tiles";
+
+	/** Failed tiles of a run, one {@code z/x/y} per line - what {@code -rerunFailed} checks again. */
+	private static final String FAILED_TILES_FILE = "failed-tiles.txt";
+	/** {@code -rerunFailed} adds this many random tiles per failed tile. */
+	private static final int RERUN_RANDOM_FACTOR = 10;
 	static final String GROUP_SCAN = "Full scan";
 
 	/** {@code renderer} - the legacy native renderer (v1) and the OpenGL core renderer (v2). */
@@ -596,12 +610,25 @@ public class CoastlineRenderingTester {
 			RunResult res = new CoastlineRenderingTester(options).run();
 			// a renderer that crashes on a tile is a worse problem than a wrong coastline, so it
 			// must not end in a green build either
-			code = res.failedAboveLimit > 0 || res.renderErrors > 0 ? 2 : 0;
+			code = failsBuild(res) ? 2 : 0;
 		} catch (Throwable e) {
 			e.printStackTrace();
 			code = 1;
 		}
 		System.exit(code);
+	}
+
+	private static boolean failsBuild(RunResult res) {
+		int randomFailed = 0;
+		int randomCompared = 0;
+		for (CaseStats s : res.cases) {
+			if (GROUP_RANDOM.equals(s.group)) {
+				randomFailed += s.failedAboveLimit;
+				randomCompared += s.comparedTiles;
+			}
+		}
+		return res.renderErrors > 0 || res.failedAboveLimit > randomFailed
+				|| (randomFailed > 0 && randomFailed * 100000L >= (long) RANDOM_FAILS_PER_100K * randomCompared);
 	}
 
 	// ----------------------------------------------------------------- run
@@ -672,6 +699,9 @@ public class CoastlineRenderingTester {
 		result.durationMs = System.currentTimeMillis() - start;
 		printSummary(result);
 		writeSummaryJson(result);
+		if (opt("tiles", "").isEmpty()) {
+			writeFailedTiles();
+		}
 		if (writeHtml) {
 			writeHtmlReport(result);
 		}
@@ -840,10 +870,20 @@ public class CoastlineRenderingTester {
 		}
 	}
 
-	private List<CaseDef> selectCases() {
+	private List<CaseDef> selectCases() throws IOException {
 		int randomTiles = Integer.parseInt(opt("randomTilesK", String.valueOf(DEFAULT_RANDOM_TILES_K))) * 1000;
 		if (Boolean.parseBoolean(opt("random", "false"))) {
 			return new ArrayList<>(Collections.singletonList(randomCase(randomTiles)));
+		}
+		String selected = opt("tiles", "");
+		if (!selected.isEmpty()) {
+			CaseDef tiles = tileListCase("Selected tiles", parseTiles(Arrays.asList(selected.split("[,\\s]+"))));
+			return new ArrayList<>(Collections.singletonList(tiles));
+		}
+		if (Boolean.parseBoolean(opt("rerunFailed", "false"))) {
+			CaseDef failed = tileListCase("Failed tiles of the previous run", readFailedTiles());
+			System.out.printf("Rerun         : %d failed tiles of the previous run%n", failed.tiles.size());
+			return new ArrayList<>(Arrays.asList(failed, randomCase(failed.tiles.size() * RERUN_RANDOM_FACTOR)));
 		}
 		if (Boolean.parseBoolean(opt("scan", "false"))) {
 			CaseDef scan = new CaseDef();
@@ -2314,8 +2354,8 @@ public class CoastlineRenderingTester {
 					result.renderErrors, result.rendererDeaths);
 		}
 		System.out.println(result.failedAboveLimit > 0
-				? String.format("COASTLINE PROBLEMS REPRODUCED - %d tiles above %s - exit code 2",
-						result.failedAboveLimit, pct(failAbove))
+				? String.format("COASTLINE PROBLEMS REPRODUCED - %d tiles above %s - exit code %d",
+						result.failedAboveLimit, pct(failAbove), failsBuild(result) ? 2 : 0)
 				: result.renderErrors > 0
 						? "RENDERER ERRORS - exit code 2"
 						: result.failedTiles > 0
@@ -2330,6 +2370,51 @@ public class CoastlineRenderingTester {
 
 	private void writeSummaryJson(RunResult result) throws IOException {
 		writeSummaryJson(result, false);
+	}
+
+	private void writeFailedTiles() throws IOException {
+		StringBuilder sb = new StringBuilder();
+		for (TileResult t : reported) {
+			if (!t.ok() && !t.staleReference) {
+				sb.append(t.zoom).append('/').append(t.x).append('/').append(t.y).append('\n');
+			}
+		}
+		Files.write(new File(outputDir, FAILED_TILES_FILE).toPath(), sb.toString().getBytes(StandardCharsets.UTF_8));
+	}
+
+	private CaseDef tileListCase(String title, List<int[]> tiles) {
+		CaseDef c = new CaseDef();
+		c.issue = 3291;
+		c.title = title;
+		c.group = GROUP_RANDOM;
+		c.maxExtraWater = Double.parseDouble(opt("maxExtraWater", "0.02"));
+		c.maxMissingWater = Double.parseDouble(opt("maxMissingWater", "0.02"));
+		c.tiles = tiles;
+		return c;
+	}
+
+	private List<int[]> readFailedTiles() throws IOException {
+		File f = new File(outputDir, FAILED_TILES_FILE);
+		if (!f.exists()) {
+			throw new IllegalStateException("-rerunFailed needs " + f + " of a previous run");
+		}
+		return parseTiles(Files.readAllLines(f.toPath(), StandardCharsets.UTF_8));
+	}
+
+	/** {@code z/x/y} strings, the blank ones are skipped. */
+	private static List<int[]> parseTiles(List<String> list) {
+		List<int[]> tiles = new ArrayList<>();
+		for (String s : list) {
+			if (s.trim().isEmpty()) {
+				continue;
+			}
+			String[] zxy = s.trim().split("/");
+			if (zxy.length != 3) {
+				throw new IllegalArgumentException("A tile must be z/x/y but was " + s);
+			}
+			tiles.add(new int[] { Integer.parseInt(zxy[0]), Integer.parseInt(zxy[1]), Integer.parseInt(zxy[2]) });
+		}
+		return tiles;
 	}
 
 	private void writeSummaryJson(RunResult result, boolean quiet) throws IOException {
