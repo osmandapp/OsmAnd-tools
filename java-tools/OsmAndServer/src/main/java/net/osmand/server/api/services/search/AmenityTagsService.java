@@ -28,8 +28,8 @@ public class AmenityTagsService {
 		AdditionalInfoBundle infoBundle = new AdditionalInfoBundle(poiTypesService.getSharedPoiTypes(), tags);
 		List<String> preferredLangs = lang != null ? List.of(lang) : List.of();
 		boolean allowNoteTag = false; // The "note" tag is enabled only for OSM editing.
-		List<AmenityTagEntry> tagEntries = infoBundle.getVisibleTags(allowNoteTag, preferredLangs,
-				AdditionalInfoBundle.getGenericRowKeys(tags));
+		Set<String> genericRowKeys = AdditionalInfoBundle.getGenericRowKeys(tags);
+		List<AmenityTagEntry> tagEntries = infoBundle.getVisibleTags(allowNoteTag, preferredLangs, genericRowKeys);
 
 		List<AmenityTagEntry> infoTagEntries = new ArrayList<>();
 		List<AmenityTagEntry> descriptionTagEntries = new ArrayList<>();
@@ -44,7 +44,7 @@ public class AmenityTagsService {
 
 		List<AmenityTagEntry> sortedTagEntries = sortTagEntries(infoBundle, infoTagEntries);
 		sortedTagEntries.addAll(descriptionTagEntries);
-		return toVisibleTags(sortedTagEntries);
+		return toVisibleTags(sortedTagEntries, genericRowKeys);
 	}
 
 	private List<AmenityTagEntry> sortTagEntries(AdditionalInfoBundle infoBundle, List<AmenityTagEntry> tagEntries) {
@@ -86,13 +86,13 @@ public class AmenityTagsService {
 				.collect(Collectors.joining(Amenity.SEPARATOR));
 	}
 
-	private List<VisibleTag> toVisibleTags(List<AmenityTagEntry> tagEntries) {
+	private List<VisibleTag> toVisibleTags(List<AmenityTagEntry> tagEntries, Set<String> genericRowKeys) {
 		List<VisibleTag> result = new ArrayList<>();
 		for (AmenityTagEntry tagEntry : tagEntries) {
 			VisibleTag tag = switch (tagEntry.collapsableEntryType) {
 				case POI_TYPE_GROUP -> toGroupTag(tagEntry);
 				case PLAIN -> toLocalizedTag(tagEntry);
-				case NONE -> toPlainTag(tagEntry);
+				case NONE -> toPlainTag(tagEntry, genericRowKeys);
 				case ELEVATION_PILLS, OPENING_HOURS -> throw new UnsupportedOperationException(
 						"AmenityTagEntry.CollapsableEntryType." + tagEntry.collapsableEntryType
 								+ " is a UI-only rendering hint with no server-side tag representation");
@@ -109,8 +109,13 @@ public class AmenityTagsService {
 		return new VisibleTag(key, joinPoiTypeKeys(tagEntry), null);
 	}
 
-	private VisibleTag toPlainTag(AmenityTagEntry tagEntry) {
-		return tagEntry.value != null ? new VisibleTag(tagEntry.key, tagEntry.value, null) : null;
+	private VisibleTag toPlainTag(AmenityTagEntry tagEntry, Set<String> genericRowKeys) {
+		if (tagEntry.value == null) {
+			return null;
+		}
+		boolean generic = genericRowKeys.contains(tagEntry.key)
+				&& (tagEntry.resolvedType == null || tagEntry.resolvedType.getAdditionalType() == null);
+		return new VisibleTag(tagEntry.key, tagEntry.value, null, null, generic ? Boolean.TRUE : null);
 	}
 
 	private VisibleTag toLocalizedTag(AmenityTagEntry tagEntry) {
@@ -131,9 +136,13 @@ public class AmenityTagsService {
 				: new LangValue(child.value, null);
 	}
 
-	public record VisibleTag(String key, String value, String lang, List<LangValue> otherLangs) {
+	public record VisibleTag(String key, String value, String lang, List<LangValue> otherLangs, Boolean generic) {
 		public VisibleTag(String key, String value, String lang) {
-			this(key, value, lang, null);
+			this(key, value, lang, null, null);
+		}
+
+		public VisibleTag(String key, String value, String lang, List<LangValue> otherLangs) {
+			this(key, value, lang, otherLangs, null);
 		}
 	}
 
