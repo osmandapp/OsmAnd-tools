@@ -73,6 +73,8 @@ public class MainUtilities {
 				BinaryMerger.main(subArgsArray);
 			} else if (utl.equals("brand-analyzer") || utl.equals("tag-value-analyzer")) {
 				TopTagValuesAnalyzer.main(subArgsArray);
+			} else if (utl.equals("collect-tag-values")) {
+				TagValuesCollector.main(subArgsArray);
 			} else if (utl.equals("poi-extraction-summary")) {
 				PoiNamesExtractionSummary.main(subArgsArray);
 			} else if (utl.equals("top-abbrs-analyzer")) {
@@ -514,6 +516,7 @@ public class MainUtilities {
 		System.out.println("\t\t generate-single-map <output obf> <osm files> <--name=region> <--map-zooms=...>: "
 				+ "one map section from many osm files (up to 2048), e.g. tiles of one region");
 		System.out.println("\t\t inspector <params>: powerful tool to inspect obf files and convert them to osm");
+		System.out.println("\t\t collect-tag-values --extracts=<osm-extract dir> [--out=all_brands.csv.gz] [--cache=brands] [--poi-out=poi_name_stats.tsv.gz] [--poi-cache=poi-stats] [--analyze] [--threads=N] [--force]: one pass over the region pbf/o5m files: brand counts per region, poi stats (types, operators, name words, abbreviations) per leaf map region, --analyze runs brand-analyzer --consolidate; .gz outputs are gzipped");
 		System.out.println("\t\t poi-extraction-summary <dir or extraction files> <--top=20>: summary of the POI extractions of generation "
 				+ "(--poi-extraction-dir=<dir> of generate-obf or POI_EXTRACTION_DIR)");
 		System.out.println("\t\t top-abbrs-analyzer <extraction dirs or files> --period=<YYYY-MM> --out=<dir> <--rules=top-abbrs-rules.xml> "
