@@ -22,7 +22,13 @@ import okio.Buffer;
 // /search/visible-tags for the extensions of a GPX point: every key is shown but OsmAnd's own fields
 public class AmenityTagsServiceTest {
 
-	private final AmenityTagsService service = new AmenityTagsService(new PoiTypesService());
+	private final AmenityTagsService service = new AmenityTagsService(loadedPoiTypesService());
+
+	private static PoiTypesService loadedPoiTypesService() {
+		PoiTypesService poiTypesService = new PoiTypesService();
+		poiTypesService.loadSharedPoiTypes();
+		return poiTypesService;
+	}
 
 	// real files of src/test/resources/gpx/visible-tags-points.gpx, sent as the web sends them: wpt.ext.extensions
 	@Test
