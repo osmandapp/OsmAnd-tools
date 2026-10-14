@@ -58,9 +58,7 @@ public abstract class AbstractWikiFilesDownloader {
 				writeTimestampFile(destFolder);
 			}
 			log.info("Finish %s download".formatted(getFilePrefix()));
-		} catch (SQLException | IOException e) {
-			e.printStackTrace();
-		} catch (InterruptedException e) {
+		} catch (SQLException | IOException | InterruptedException e) {
 			throw new RuntimeException(e);
 		}
 	}
@@ -116,7 +114,8 @@ public abstract class AbstractWikiFilesDownloader {
 		}
 	}
 
-	private void downloadPageFiles(String destFolder, List<FileForDBUpdate> updateList, DownloadHandler dh) throws IOException {
+	private void downloadPageFiles(String destFolder, List<FileForDBUpdate> updateList, DownloadHandler dh)
+			throws IOException, InterruptedException {
 		for (FileForDBUpdate p : updateList) {
 			String fileName = p.url.substring(p.url.lastIndexOf("/") + 1);
 			String gzFile = fileName.replace(".bz2", ".gz");
@@ -130,7 +129,7 @@ public abstract class AbstractWikiFilesDownloader {
 				}
 				continue;
 			}
-			try (InputStream in = new BufferedInputStream(new URL(p.url).openStream());
+			try (InputStream in = new BufferedInputStream(openConnectionWithRetry(p.url).getInputStream());
 				 BZip2CompressorInputStream bzIn = new BZip2CompressorInputStream(in);
 				 GZIPOutputStream gzOut = new GZIPOutputStream(new FileOutputStream(gzFile))) {
 				byte[] buffer = new byte[8192];
