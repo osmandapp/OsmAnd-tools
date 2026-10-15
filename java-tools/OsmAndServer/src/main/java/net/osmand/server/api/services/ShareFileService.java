@@ -327,16 +327,17 @@ public class ShareFileService {
 			if (file.filepath.equals(name) && file.type.equals(type)) {
 				CloudUserFilesRepository.UserFile userFile = getUserFile(file);
 				if (userFile != null) {
-					StorageService.InternalZipFile zipFile = userdataService.getZipFile(userFile, newName);
-					if (zipFile != null) {
-						try {
-							userdataService.validateUserForUpload(dev, type, zipFile.getSize());
-						} catch (OsmAndPublicApiException e) {
-							return ResponseEntity.badRequest().body(e.getMessage());
+					try (StorageService.InternalZipFile zipFile = userdataService.getZipFile(userFile, newName)) {
+						if (zipFile != null) {
+							try {
+								userdataService.validateUserForUpload(dev, type, zipFile.getSize());
+							} catch (OsmAndPublicApiException e) {
+								return ResponseEntity.badRequest().body(e.getMessage());
+							}
+							return userdataService.uploadFile(zipFile, dev, newName, type, System.currentTimeMillis());
+						} else {
+							return ResponseEntity.badRequest().body("Zip file not found");
 						}
-						return userdataService.uploadFile(zipFile, dev, newName, type, System.currentTimeMillis());
-					} else {
-						return ResponseEntity.badRequest().body("Zip file not found");
 					}
 				}
 				return ResponseEntity.badRequest().body("Original file not found");

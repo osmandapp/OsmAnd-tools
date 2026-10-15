@@ -229,9 +229,9 @@ public class FavoriteController {
             
             File tmpGpx = gpxService.createTmpFileByGpxFile(gpxFile, fullNewName);
             sessionResources.addGpxTempFilesToSession(session, tmpGpx);
-            InternalZipFile fl = InternalZipFile.buildFromFileAndDelete(tmpGpx);
-            
-            return favoriteService.renameFavFolder(fullOldName, fullNewName, fl, dev);
+            try (InternalZipFile fl = InternalZipFile.buildFromFileAndDelete(tmpGpx)) {
+                return favoriteService.renameFavFolder(fullOldName, fullNewName, fl, dev);
+            }
         }
         return ResponseEntity.badRequest().body(FavoriteService.ERROR_READING_GPX_MSG);
     }
