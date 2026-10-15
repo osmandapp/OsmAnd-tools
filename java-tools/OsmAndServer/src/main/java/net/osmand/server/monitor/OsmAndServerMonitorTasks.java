@@ -84,7 +84,8 @@ public class OsmAndServerMonitorTasks {
 			"dl3.osmand.net",
 			"dl4.osmand.net",
 			"dl8.osmand.net",
-			"dl9.osmand.net"
+			"dl9.osmand.net",
+			"us1.osmand.net"
 	};
 	private static final String[] JAVA_HOSTS_TO_TEST = new String[]{
 			"download.osmand.net",
