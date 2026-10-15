@@ -820,7 +820,7 @@ public class WikiService {
 		}
 	}
 
-	private String retrieveArticleIdFromWikiUrl(String wiki) {
+	String retrieveArticleIdFromWikiUrl(String wiki) {
 		String title = wiki;
 		String lang = "";
 		int urlIndex = title.indexOf(".wikipedia.org/wiki/");
@@ -828,11 +828,18 @@ public class WikiService {
 			String prefix = title.substring(0, urlIndex);
 			lang = prefix.substring(prefix.lastIndexOf("/") + 1);
 			title = title.substring(urlIndex + ".wikipedia.org/wiki/".length());
+			try {
+				// '+' is literal in a URL path
+				title = URLDecoder.decode(title.replace("+", "%2B"), StandardCharsets.UTF_8);
+			} catch (IllegalArgumentException e) {
+				log.warn("wiki title decode failed: " + title, e);
+			}
 		} else if (title.indexOf(":") > 0) {
-			String[] s = wiki.split(":");
+			String[] s = wiki.split(":", 2);
 			title = s[1];
 			lang = s[0];
 		}
+		title = title.replace('_', ' ');
 
 		String id;
 		try {
