@@ -534,7 +534,7 @@ public class UserSubscriptionService {
 		}
 		emailSender.sendAfterCommit(() -> {
 			try {
-				emailSender.sendPurchaseLinkedEmail(newUser.email, emailSender.userLang(newUserId), productName,
+				emailSender.sendPurchaseLinkedEmail(newUser.email, emailSender.getLatestUserLang(newUserId), productName,
 						subscription);
 			} catch (Exception e) {
 				LOG.error("Failed to send purchase linked email: " + e.getMessage(), e);

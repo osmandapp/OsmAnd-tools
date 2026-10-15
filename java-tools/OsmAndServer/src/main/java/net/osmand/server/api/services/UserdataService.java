@@ -147,9 +147,6 @@ public class UserdataService {
     public static final String MODEL_DEVICE_WEB = "Web";
     public static final String TOKEN_DEVICE_WEB = "web";
     public static final int ERROR_CODE_PRO_USERS = 100;
-    public static final int CODE_EXPIRATION_TIME_HOURS = 24;
-    public static final long CODE_EXPIRATION_TIME_MS = TimeUnit.HOURS.toMillis(CODE_EXPIRATION_TIME_HOURS);
-    private static final String CODE_TTL_TEXT = "(" + CODE_EXPIRATION_TIME_HOURS + " h)";
     private static final long MB = 1024 * 1024;
     public static final int BUFFER_SIZE = 1024 * 512;
     public static final long MAXIMUM_ACCOUNT_SIZE = 3000 * MB; // 3 (5 GB - std, 50 GB - ext, 1000 GB - pro)
@@ -197,6 +194,9 @@ public class UserdataService {
     private static final int EMAIL_TOKEN_MIN_DIGITS = 6;
     private static final int EMAIL_TOKEN_MAX_DIGITS = 12;
 
+    public static final int EMAIL_TOKEN_EXPIRATION_HOURS = 24;
+    public static final long CODE_EXPIRATION_TIME_MS = TimeUnit.HOURS.toMillis(EMAIL_TOKEN_EXPIRATION_HOURS);
+    private static final String CODE_TTL_TEXT = "(" + EMAIL_TOKEN_EXPIRATION_HOURS + " h)";
     private static final int EMAIL_TOKEN_MIN_DELAY_MINUTES = 10;
     private static final int EMAIL_TOKEN_MAX_DELAY_MINUTES = 60;
 
@@ -580,10 +580,10 @@ public class UserdataService {
             return ResponseEntity.badRequest().body("Email is not valid.");
 		}
         CloudUsersRepository.CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
-        boolean newUser = pu == null || devicesRepository.findByUserid(pu.id).isEmpty();
+        boolean registered = pu != null && !devicesRepository.findByUserid(pu.id).isEmpty();
         if (isNew) {
             if (pu != null) {
-                if (!newUser) {
+                if (registered) {
 	                userSubService.verifyAndRefreshProOrderId(pu);
                     return ResponseEntity.badRequest().body("An account is already registered with this email address.");
                 }
@@ -598,8 +598,8 @@ public class UserdataService {
             updateSecureEmailToken(pu);
             usersRepository.saveAndFlush(pu);
             emailSender.sendOsmAndCloudAccountEmail(pu.email, pu.token, lang,
-                    newUser ? EmailSenderService.CloudAccountAction.SETUP
-                          : EmailSenderService.CloudAccountAction.PASSWORD);
+                    registered ? EmailSenderService.CloudAccountAction.PASSWORD
+                               : EmailSenderService.CloudAccountAction.SETUP);
 		} else {
             return ResponseEntity.badRequest().body("error_email");
         }

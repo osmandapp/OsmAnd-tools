@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
 import java.util.UUID;
-import java.util.regex.Pattern;
 
 import net.osmand.mailsender.EmailSenderTemplate;
 import net.osmand.server.PurchasesDataLoader;
@@ -18,6 +17,7 @@ import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.ShareFileRepository;
 import net.osmand.util.Algorithms;
+import jakarta.annotation.Nullable;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,8 +28,6 @@ import org.springframework.web.util.HtmlUtils;
 
 @Service
 public class EmailSenderService {
-
-	private static final Pattern TEMPLATE_TOKEN_START = Pattern.compile("@(?=[A-Z0-9_]+@)");
 
 	@Autowired
 	protected PurchasesDataLoader purchasesDataLoader;
@@ -56,11 +54,12 @@ public class EmailSenderService {
 		}
 	}
 
-	public String userLang(int userid) {
+	@Nullable
+	public String getLatestUserLang(int userid) {
 		String lang = null;
 		Date latest = null;
 		for (CloudUserDevicesRepository.CloudUserDevice device : devicesRepository.findByUserid(userid)) {
-			if (device.lang == null || device.lang.isEmpty()) {
+			if (Algorithms.isEmpty(device.lang)) {
 				continue;
 			}
 			if (lang == null || (device.udpatetime != null && (latest == null || device.udpatetime.after(latest)))) {
@@ -143,7 +142,7 @@ public class EmailSenderService {
 			}
 			CloudUserFilesRepository.UserFile userFile =
 					filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(file.ownerid, file.filepath, file.type);
-			sendShareFileAccessEmail(requester.email, userLang(requester.id), approved, owner,
+			sendShareFileAccessEmail(requester.email, getLatestUserLang(requester.id), approved, owner,
 					file.name, file.type, userFile == null ? 0 : userFile.filesize, file.uuid);
 		} catch (Exception e) {
 			LOGGER.error("Failed to send share access email: " + e.getMessage(), e);
@@ -185,14 +184,14 @@ public class EmailSenderService {
 	}
 
 	static String plainText(String s) {
-		return s == null ? "" : TEMPLATE_TOKEN_START.matcher(s.replaceAll("[\\r\\n]+", " ")).replaceAll("＠");
+		return s == null ? "" : s.replaceAll("[\\r\\n]+", " ");
 	}
 
 	public void sendPurchaseReceiptEmail(String email, int userId, String checkoutLang, String orderId, Date orderDate,
 			String orderTotal, List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> purchases,
 			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions) {
 		try {
-			String lang = userLang(userId);
+			String lang = getLatestUserLang(userId);
 			sendReceipt(email, lang != null ? lang : checkoutLang, orderId, orderDate, orderTotal, purchases, subscriptions);
 		} catch (Exception e) {
 			LOGGER.error("Failed to send receipt for orderId " + orderId + ": " + e.getMessage(), e);
@@ -322,7 +321,7 @@ public class EmailSenderService {
 		EmailSenderTemplate sender = new EmailSenderTemplate()
 				.load(action.template, lang)
 				.set("TOKEN", token == null ? "" : token)
-				.set("CODE_TTL_HOURS", String.valueOf(UserdataService.CODE_EXPIRATION_TIME_HOURS));
+				.set("CODE_TTL_HOURS", String.valueOf(UserdataService.EMAIL_TOKEN_EXPIRATION_HOURS));
 		if (newEmail != null) {
 			sender.set("NEW_EMAIL", htmlText(newEmail));
 		}

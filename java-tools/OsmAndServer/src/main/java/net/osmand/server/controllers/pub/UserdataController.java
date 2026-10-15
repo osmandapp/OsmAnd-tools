@@ -195,11 +195,11 @@ public class UserdataController {
                                                HttpServletRequest request) {
 		// allow to register only with small case
 		email = email.toLowerCase().trim();
-		CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
-		boolean newUser = pu == null || devicesRepository.findByUserid(pu.id).isEmpty();
-		if (!email.contains("@")) {
+		if (!emailSender.isEmail(email)) {
 			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
 		}
+		CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
+		boolean registered = pu != null && !devicesRepository.findByUserid(pu.id).isEmpty();
 		if (pu != null) {
 			if (!Boolean.TRUE.equals(login)) {
 				logErrorWithThrow(request, ERROR_CODE_USER_IS_ALREADY_REGISTERED, "user was already registered with such email");
@@ -219,7 +219,7 @@ public class UserdataController {
 		userdataService.updateSecureEmailToken(pu);
 		String regEmail = pu.email;
 		String regToken = pu.token;
-		CloudAccountAction action = newUser ? CloudAccountAction.SETUP : CloudAccountAction.LOGIN;
+		CloudAccountAction action = registered ? CloudAccountAction.LOGIN : CloudAccountAction.SETUP;
 		emailSender.sendAfterCommit(() -> emailSender.sendOsmAndCloudAccountEmail(regEmail, regToken, lang, action));
 		CloudUser saved = usersRepository.saveAndFlush(pu);
 	    if (orderid != null) {

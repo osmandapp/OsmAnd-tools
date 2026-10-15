@@ -21,12 +21,11 @@ public class EmailSenderServiceEscapeTest {
 	}
 
 	@Test
-	public void plainTextStripsLineBreaksAndTemplateTokens() {
-		String v = EmailSenderService.plainText("trip.gpx\r\nBcc: victim@example.com @TOKEN@ @A@B_1@");
+	public void plainTextStripsLineBreaks() {
+		String v = EmailSenderService.plainText("trip.gpx\r\nBcc: victim@example.com");
 		assertFalse(v.contains("\r"));
 		assertFalse(v.contains("\n"));
-		assertFalse("no @VAR@ token left", v.matches("(?s).*@[A-Z0-9_]+@.*"));
-		assertEquals("trip.gpx Bcc: victim@example.com ＠TOKEN@ ＠A＠B_1@", v);
+		assertEquals("trip.gpx Bcc: victim@example.com", v);
 	}
 
 	@Test
