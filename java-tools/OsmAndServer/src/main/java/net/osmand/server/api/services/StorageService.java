@@ -32,14 +32,10 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
-import static net.osmand.shared.IndexConstants.GPX_FILE_EXT;
-
 @Service
 public class StorageService {
 
 	private static final String FILE_SEPARATOR = "/";
-	private static final String GPX = "gpx";
-	private static final String GPX_GZ = "gpx.gz";
 	
 	protected static final Log LOGGER = LogFactory.getLog(StorageService.class);
 
@@ -375,18 +371,10 @@ public class StorageService {
 			}
 		}
 
-		private static File gzipOutputFile(String path) {
-			if (path.endsWith(GPX_FILE_EXT)) {
-				return new File(path.substring(0, path.lastIndexOf(GPX_FILE_EXT)) + GPX_GZ);
-			}
-			return new File(path + GZ_FILE_EXT);
-		}
-		
 		public static InternalZipFile buildFromFileAndDelete(File file) throws IOException {
 			InternalZipFile zipfile = new InternalZipFile();
 			byte[] buffer = new byte[1024];
-			String path = file.getPath();
-			zipfile.tempzipfile = gzipOutputFile(path);
+			zipfile.tempzipfile = new File(file.getPath() + GZ_FILE_EXT);
 			zipfile.contentSize = file.length();
 			try (FileInputStream fis = new FileInputStream(file);
 			     FileOutputStream fos = new FileOutputStream(zipfile.tempzipfile);

@@ -16,13 +16,15 @@ import net.osmand.shared.gpx.GpxFile;
 public class TmpFileNameTest {
 
 	private static final int NAME_MAX_BYTES = 255;
-	// buildFromFileAndDelete writes "<name>gpx.gz" next to "<name>.gpx"
-	private static final int GZ_EXTRA_BYTES = 2;
+	// buildFromFileAndDelete writes "<name>.gpx.gz" next to "<name>.gpx"
+	private static final int GZ_EXTRA_BYTES = 3;
+	// what a decoder puts in place of a character cut in half
+	private static final String UTF8_BROKEN_SYMBOL = "\uFFFD";
 
 	@Test
 	public void longAsciiNameIsZipped() throws IOException {
 		File tmp = new GpxService().createTmpFileByGpxFile(new GpxFile(OSMAND_ROUTER_V2), "a".repeat(240) + ".gpx");
-		File gz = new File(tmp.getParent(), tmp.getName().replace(".gpx", "gpx.gz"));
+		File gz = new File(tmp.getPath() + StorageService.GZ_FILE_EXT);
 		try (StorageService.InternalZipFile zip = StorageService.InternalZipFile.buildFromFileAndDelete(tmp)) {
 			assertTrue(zip.getSize() > 0);
 			assertTrue(gz.exists());
@@ -36,6 +38,6 @@ public class TmpFileNameTest {
 		tmp.deleteOnExit();
 		String name = tmp.getName();
 		assertTrue(name.getBytes(StandardCharsets.UTF_8).length + GZ_EXTRA_BYTES <= NAME_MAX_BYTES);
-		assertFalse(name.contains("�"));
+		assertFalse(name.contains(UTF8_BROKEN_SYMBOL));
 	}
 }
