@@ -196,13 +196,14 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 		File tmp = Files.createTempFile(TMP_PREFIX, TMP_SUFFIX).toFile();
 		try {
 			Files.write(tmp.toPath(), content);
-			InternalZipFile zip = InternalZipFile.buildFromFileAndDelete(tmp);
-			storageService.save(userdataService.userFolder(file), userdataService.storageFileName(file), zip);
-			if (storageService.storeLocally()) {
-				file.data = zip.getBytes();
-				file.filesize = zip.getContentSize();
-				file.zipfilesize = zip.getSize();
-				filesRepository.save(file);
+			try (InternalZipFile zip = InternalZipFile.buildFromFileAndDelete(tmp)) {
+				storageService.save(userdataService.userFolder(file), userdataService.storageFileName(file), zip);
+				if (storageService.storeLocally()) {
+					file.data = zip.getBytes();
+					file.filesize = zip.getContentSize();
+					file.zipfilesize = zip.getSize();
+					filesRepository.save(file);
+				}
 			}
 		} finally {
 			Files.deleteIfExists(tmp.toPath());

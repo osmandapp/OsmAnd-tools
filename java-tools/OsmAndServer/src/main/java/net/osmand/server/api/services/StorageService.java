@@ -317,7 +317,7 @@ public class StorageService {
 	}
 
 	
-	public static class InternalZipFile {
+	public static class InternalZipFile implements Closeable {
     	
     	
     	private long contentSize;
@@ -367,6 +367,13 @@ public class StorageService {
 			}
 			throw new IllegalStateException();
         }
+
+		@Override
+		public void close() throws IOException {
+			if (tempzipfile != null) {
+				Files.deleteIfExists(tempzipfile.toPath());
+			}
+		}
 
 		private static File gzipOutputFile(String path) {
 			if (path.endsWith(GPX_FILE_EXT)) {

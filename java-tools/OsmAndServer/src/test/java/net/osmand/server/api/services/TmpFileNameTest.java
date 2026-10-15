@@ -22,8 +22,12 @@ public class TmpFileNameTest {
 	@Test
 	public void longAsciiNameIsZipped() throws IOException {
 		File tmp = new GpxService().createTmpFileByGpxFile(new GpxFile(OSMAND_ROUTER_V2), "a".repeat(240) + ".gpx");
-		StorageService.InternalZipFile zip = StorageService.InternalZipFile.buildFromFileAndDelete(tmp);
-		assertTrue(zip.getSize() > 0);
+		File gz = new File(tmp.getParent(), tmp.getName().replace(".gpx", "gpx.gz"));
+		try (StorageService.InternalZipFile zip = StorageService.InternalZipFile.buildFromFileAndDelete(tmp)) {
+			assertTrue(zip.getSize() > 0);
+			assertTrue(gz.exists());
+		}
+		assertFalse(gz.exists());
 	}
 
 	@Test

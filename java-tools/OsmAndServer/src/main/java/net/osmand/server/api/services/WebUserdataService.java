@@ -618,21 +618,25 @@ public class WebUserdataService {
 			}
 			if (zipFile != null) {
 				try {
-					userdataService.validateUserForUpload(dev, type, zipFile.getSize());
-				} catch (OsmAndPublicApiException e) {
-					return ResponseEntity.badRequest().body(e.getMessage());
-				}
-				ResponseEntity<String> res = userdataService.uploadFile(zipFile, dev, newName, type, System.currentTimeMillis());
-				if (res.getStatusCode().is2xxSuccessful()) {
-					boolean renamed = renameInfoFile(oldName, newName, dev, saveCopy, session);
-					if (!renamed) {
-						return ResponseEntity.badRequest().body("Error rename info file!");
+					try {
+						userdataService.validateUserForUpload(dev, type, zipFile.getSize());
+					} catch (OsmAndPublicApiException e) {
+						return ResponseEntity.badRequest().body(e.getMessage());
 					}
-					if (!saveCopy) {
-						//delete file with old name
-						userdataService.deleteFile(oldName, type, null, null, dev);
+					ResponseEntity<String> res = userdataService.uploadFile(zipFile, dev, newName, type, System.currentTimeMillis());
+					if (res.getStatusCode().is2xxSuccessful()) {
+						boolean renamed = renameInfoFile(oldName, newName, dev, saveCopy, session);
+						if (!renamed) {
+							return ResponseEntity.badRequest().body("Error rename info file!");
+						}
+						if (!saveCopy) {
+							//delete file with old name
+							userdataService.deleteFile(oldName, type, null, null, dev);
+						}
+						return userdataService.ok();
 					}
-					return userdataService.ok();
+				} finally {
+					zipFile.close();
 				}
 			} else {
 				// skip deleted files
@@ -755,8 +759,10 @@ public class WebUserdataService {
 			}
 			// upload new file
 			sessionResources.addGpxTempFilesToSession(session, tmpInfo);
-			StorageService.InternalZipFile zipFile = StorageService.InternalZipFile.buildFromFileAndDelete(tmpInfo);
-			ResponseEntity<String> res = userdataService.uploadFile(zipFile, dev, newName + INFO_FILE_EXT, FILE_TYPE_GPX, System.currentTimeMillis());
+			ResponseEntity<String> res;
+			try (StorageService.InternalZipFile zipFile = StorageService.InternalZipFile.buildFromFileAndDelete(tmpInfo)) {
+				res = userdataService.uploadFile(zipFile, dev, newName + INFO_FILE_EXT, FILE_TYPE_GPX, System.currentTimeMillis());
+			}
 			if (res.getStatusCode().is2xxSuccessful()) {
 				if (!saveCopy) {
 					userdataService.deleteFile(oldName + INFO_FILE_EXT, FILE_TYPE_GPX, null, null, dev);

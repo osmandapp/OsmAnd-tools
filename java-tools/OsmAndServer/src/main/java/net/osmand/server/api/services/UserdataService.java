@@ -407,15 +407,13 @@ public class UserdataService {
 
 	public ResponseEntity<String> uploadMultipartFile(MultipartFile file, CloudUserDevicesRepository.CloudUserDevice dev,
 			String name, String type, Long clienttime, HttpSession session) throws IOException {
-		InternalZipFile zipfile;
-		try {
-			zipfile = getUploadZipFile(file, name, type, session);
+		try (InternalZipFile zipfile = getUploadZipFile(file, name, type, session)) {
 			validateUserForUpload(dev, type, zipfile.getSize());
+			return uploadFile(zipfile, dev, name, type, clienttime);
 		} catch (OsmAndPublicApiException e) {
 			LOG.warn(String.format("Upload rejected for user %d, file %s/%s: %s", dev.userid, type, name, e.getMessage()));
 			throw e;
 		}
-		return uploadFile(zipfile, dev, name, type, clienttime);
 	}
 
 	private InternalZipFile getUploadZipFile(MultipartFile file, String name, String type, HttpSession session) throws IOException {
@@ -531,11 +529,11 @@ public class UserdataService {
 			end--;
 		}
 		return new String(b, 0, end, StandardCharsets.UTF_8);
+	}
+
 	// temp and .gz file names are built from it, so a long basename is shortened to fit the 255-byte limit
 	static String tmpFilePrefix(String name) {
 		return GPX_FILE_PREFIX + shortBasename(name.substring(name.lastIndexOf('/') + 1));
-	}
-
 	}
 
     // remap an existing file's S3 object to the bounded key and persist storagename; no-op if not needed
@@ -849,30 +847,31 @@ public class UserdataService {
             return ResponseEntity.badRequest().body("Previous version of file not found");
         }
         CloudUserFilesRepository.UserFile usf = new CloudUserFilesRepository.UserFile();
-        InternalZipFile zipFile = getZipFile(prevFile, prevFile.name);
-        if (zipFile == null) {
-            return ResponseEntity.badRequest().body("Error restore file");
+        try (InternalZipFile zipFile = getZipFile(prevFile, prevFile.name)) {
+            if (zipFile == null) {
+                return ResponseEntity.badRequest().body("Error restore file");
+            }
+            try {
+                validateUserForUpload(dev, type, zipFile.getSize());
+            } catch (OsmAndPublicApiException e) {
+                return ResponseEntity.badRequest().body(e.getMessage());
+            }
+            usf.name = prevFile.name;
+            usf.type = type;
+            usf.updatetime = new Date();
+            usf.clienttime = prevFile.clienttime;
+            usf.userid = dev.userid;
+            usf.deviceid = dev.id;
+            usf.filesize = zipFile.getContentSize();
+            usf.zipfilesize = zipFile.getSize();
+            usf.storagename = computeStorageName(usf.type, usf.name, usf.updatetime);
+            usf.storage = storageService.save(userFolder(usf), storageFileName(usf), zipFile);
+            if (storageService.storeLocally()) {
+                usf.data = zipFile.getBytes();
+            }
+            filesRepository.saveAndFlush(usf);
+            return ResponseEntity.ok(gson.toJson(new UserFileNoData(usf)));
         }
-        try {
-            validateUserForUpload(dev, type, zipFile.getSize());
-        } catch (OsmAndPublicApiException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
-        usf.name = prevFile.name;
-        usf.type = type;
-        usf.updatetime = new Date();
-        usf.clienttime = prevFile.clienttime;
-        usf.userid = dev.userid;
-        usf.deviceid = dev.id;
-        usf.filesize = zipFile.getContentSize();
-        usf.zipfilesize = zipFile.getSize();
-        usf.storagename = computeStorageName(usf.type, usf.name, usf.updatetime);
-        usf.storage = storageService.save(userFolder(usf), storageFileName(usf), zipFile);
-        if (storageService.storeLocally()) {
-            usf.data = zipFile.getBytes();
-        }
-        filesRepository.saveAndFlush(usf);
-        return ResponseEntity.ok(gson.toJson(new UserFileNoData(usf)));
     }
     
     public boolean checkIfRestoredVersionExists(String name, String type, Long updatetime, CloudUserDevicesRepository.CloudUserDevice dev) {
@@ -1210,25 +1209,26 @@ public class UserdataService {
     public ResponseEntity<String> renameFile(String oldName, String newName, String type, CloudUserDevicesRepository.CloudUserDevice dev, boolean saveCopy) throws IOException {
         CloudUserFilesRepository.UserFile file = getLastFileVersion(dev.userid, oldName, type);
         if (file != null) {
-            InternalZipFile zipFile = getZipFile(file, newName);
-            if (zipFile != null) {
-                try {
-                    validateUserForUpload(dev, type, zipFile.getSize());
-                } catch (OsmAndPublicApiException e) {
-                    return ResponseEntity.badRequest().body(e.getMessage());
-                }
-                //create file with new name
-                ResponseEntity<String> res = uploadFile(zipFile, dev, newName, type, System.currentTimeMillis());
-                if (res.getStatusCode().is2xxSuccessful()) {
-                    if (!saveCopy) {
-                        //delete file with old name
-                        deleteFile(oldName, type, null, null, dev);
+            try (InternalZipFile zipFile = getZipFile(file, newName)) {
+                if (zipFile != null) {
+                    try {
+                        validateUserForUpload(dev, type, zipFile.getSize());
+                    } catch (OsmAndPublicApiException e) {
+                        return ResponseEntity.badRequest().body(e.getMessage());
                     }
+                    //create file with new name
+                    ResponseEntity<String> res = uploadFile(zipFile, dev, newName, type, System.currentTimeMillis());
+                    if (res.getStatusCode().is2xxSuccessful()) {
+                        if (!saveCopy) {
+                            //delete file with old name
+                            deleteFile(oldName, type, null, null, dev);
+                        }
+                        return ok();
+                    }
+                } else {
+                    // skip deleted files
                     return ok();
                 }
-            } else {
-                // skip deleted files
-                return ok();
             }
         }
         return ResponseEntity.badRequest().body(saveCopy ? "Error create duplicate file!" : "Error rename file!");
