@@ -36,7 +36,6 @@ import java.util.zip.GZIPInputStream;
 
 import static net.osmand.server.api.services.UserdataService.FILE_TYPE_GPX;
 import static net.osmand.shared.IndexConstants.GPX_FILE_EXT;
-import static net.osmand.shared.IndexConstants.GPX_FILE_PREFIX;
 
 @Service
 public class WebUserdataService {
@@ -693,7 +692,7 @@ public class WebUserdataService {
 			}
 			if (gpxFile != null) {
 				gpxFile.updateTrackName(preparedName);
-				File tmpGpx = File.createTempFile(GPX_FILE_PREFIX + preparedName.replace("/../", "/"), ".gpx");
+				File tmpGpx = File.createTempFile(UserdataService.tmpFilePrefix(preparedName), ".gpx");
 				Exception exception = GpxUtilities.INSTANCE.writeGpxFile(new KFile(tmpGpx.getAbsolutePath()), gpxFile);
 				if (exception != null) {
 					String isError = String.format(
@@ -750,7 +749,7 @@ public class WebUserdataService {
 					.replace("/", "\\/");
 			byte[] updated = jsonStr.getBytes(StandardCharsets.UTF_8);
 			// create new file
-			File tmpInfo = File.createTempFile(GPX_FILE_PREFIX + newName.replace("/../", "/") + INFO_FILE_EXT, INFO_FILE_EXT);
+			File tmpInfo = File.createTempFile(UserdataService.tmpFilePrefix(newName + INFO_FILE_EXT), INFO_FILE_EXT);
 			try (FileOutputStream fos = new FileOutputStream(tmpInfo)) {
 				fos.write(updated);
 			}

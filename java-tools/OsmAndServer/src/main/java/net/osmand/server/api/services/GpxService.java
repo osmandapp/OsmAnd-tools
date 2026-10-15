@@ -310,8 +310,7 @@ public class GpxService {
     }
     
     public File createTmpFileByGpxFile(GpxFile gpxFile, String fileName) throws IOException {
-        String sanitizedPrefix = fileName.replace("/../", "/");
-        File tmpGpx = File.createTempFile(GPX_FILE_PREFIX + sanitizedPrefix, GPX_FILE_EXT);
+        File tmpGpx = File.createTempFile(UserdataService.tmpFilePrefix(fileName), GPX_FILE_EXT);
         Exception exception = GpxUtilities.INSTANCE.writeGpxFile(new KFile(tmpGpx.getAbsolutePath()), gpxFile);
         if (exception != null) {
             throw new OsmAndPublicApiException(HttpStatus.BAD_REQUEST.value(), ERROR_WRITING_GPX_MSG);

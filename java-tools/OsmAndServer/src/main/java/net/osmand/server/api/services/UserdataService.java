@@ -521,7 +521,7 @@ public class UserdataService {
 		return storageFileName(type, shortName, updatetime);
 	}
 
-	private static String shortBasename(String base) {
+	static String shortBasename(String base) {
 		byte[] b = base.getBytes(StandardCharsets.UTF_8);
 		if (b.length <= SHORT_FILENAME) {
 			return base;
@@ -531,6 +531,11 @@ public class UserdataService {
 			end--;
 		}
 		return new String(b, 0, end, StandardCharsets.UTF_8);
+	// temp and .gz file names are built from it, so a long basename is shortened to fit the 255-byte limit
+	static String tmpFilePrefix(String name) {
+		return GPX_FILE_PREFIX + shortBasename(name.substring(name.lastIndexOf('/') + 1));
+	}
+
 	}
 
     // remap an existing file's S3 object to the bounded key and persist storagename; no-op if not needed
@@ -1235,7 +1240,7 @@ public class UserdataService {
 
     public InternalZipFile getZipFile(CloudUserFilesRepository.UserFile file, String newName, HttpSession session) throws IOException {
         InternalZipFile zipFile = null;
-        File tmpGpx = File.createTempFile(GPX_FILE_PREFIX + newName.replace("/../", "/"), ".gpx");
+        File tmpGpx = File.createTempFile(tmpFilePrefix(newName), ".gpx");
         if (file.filesize == 0 && file.name.endsWith(EMPTY_FILE_NAME)) {
             sessionResources.addGpxTempFilesToSession(session, tmpGpx);
             zipFile = InternalZipFile.buildFromFileAndDelete(tmpGpx);
