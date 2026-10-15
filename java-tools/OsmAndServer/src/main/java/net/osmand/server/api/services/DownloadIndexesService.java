@@ -22,7 +22,9 @@ import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
@@ -90,7 +92,9 @@ public class DownloadIndexesService  {
 	
 	public boolean reloadConfig(List<String> errors) {
     	try {
-    		DownloadServerLoadBalancer s = gson.fromJson(new FileReader(new File(websiteLocation, DOWNLOAD_SETTINGS)), DownloadServerLoadBalancer.class);
+		FileReader reader = new FileReader(new File(websiteLocation, DOWNLOAD_SETTINGS));
+		DownloadServerLoadBalancer s = gson.fromJson(reader, DownloadServerLoadBalancer.class);
+		reader.close();
     		s.prepare();
     		settings = s;
     	} catch (IOException ex) {
@@ -760,6 +764,7 @@ public class DownloadIndexesService  {
 	public static class DownloadServerFilterByHeaders {
 		String specialty;
 		List<String> userAgents = new ArrayList<String>();
+		List<String> countries = new ArrayList<>();
 		// after init
 		DownloadServerType mainType;
 	}
@@ -771,7 +776,7 @@ public class DownloadIndexesService  {
 		
 		// provided from settings.json
 		Map<String, DownloadServerFilterByHeaders> filterTypes = new TreeMap<>();
-		Map<String, Map<String, Integer>> servers = new TreeMap<>();
+		LinkedHashMap<String, Map<String, Integer>> servers = new LinkedHashMap<>();
 		List<DownloadServerRegion> regions = new ArrayList<>();
 		
 		DownloadFreeMapsConfig freemaps = new DownloadFreeMapsConfig();
@@ -783,14 +788,39 @@ public class DownloadIndexesService  {
 		}
 		
 		public DownloadServerType getServerType(PredefinedServerSpecialty type, String userAgent) {
-			for (DownloadServerFilterByHeaders filter : filterTypes.values()) {
-				if (filter.mainType.type == type) {
-					for (String us : filter.userAgents) {
-						if (userAgent.contains(us)) {
-							return filter.mainType;
-						}
+			return getServerType(type, userAgent, null, null);
+		}
+
+		public DownloadServerType getServerType(PredefinedServerSpecialty type, String userAgent,
+				String remoteAddr, IpLocationService locationService) {
+			String countryCode = null;
+			// Filter priority follows the order of pools in servers.
+			for (String key : servers.keySet()) {
+				DownloadServerFilterByHeaders filter = filterTypes.get(key);
+				if (filter == null || filter.mainType.type != type
+						|| (filter.userAgents.isEmpty() && filter.countries.isEmpty())) {
+					continue;
+				}
+				boolean matchesUserAgent = filter.userAgents.isEmpty();
+				for (String us : filter.userAgents) {
+					if (userAgent.contains(us)) {
+						matchesUserAgent = true;
+						break;
 					}
 				}
+				if (!matchesUserAgent) {
+					continue;
+				}
+				if (!filter.countries.isEmpty()) {
+					if (countryCode == null) {
+						countryCode = locationService == null ? ""
+								: locationService.getField(remoteAddr, IpLocationService.COUNTRY_CODE);
+					}
+					if (!filter.countries.contains(countryCode)) {
+						continue;
+					}
+				}
+				return filter.mainType;
 			}
 			for (DownloadServerType c : serverTypes) {
 				if (c.type == type) {
@@ -816,6 +846,7 @@ public class DownloadIndexesService  {
 				Entry<String, DownloadServerFilterByHeaders> e = it.next();
 				DownloadServerFilterByHeaders filter  = e.getValue();
 				PredefinedServerSpecialty ps = PredefinedServerSpecialty.valueOf(filter.specialty.toUpperCase());
+				filter.countries.replaceAll(country -> country.toUpperCase(Locale.ROOT));
 				DownloadServerType serverType = new DownloadServerType();
 				serverType.type = ps;
 				serverType.key = e.getKey();
