@@ -13,6 +13,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TimeZone;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import jakarta.annotation.PostConstruct;
 import net.osmand.util.Algorithms;
@@ -68,6 +70,8 @@ public class MotdService {
 	}
 
 	public static class MessageParams {
+		private static final Pattern APP_VERSION = Pattern.compile("^(\\D+) (\\d.*)$");
+
 		public Date now = new Date();
 		public String appVersion;
 		public String appPackage;
@@ -78,6 +82,19 @@ public class MotdService {
 		public List<String> features = Collections.emptyList();
 		public Integer numberOfDays;
 		public Integer numberOfStarts;
+
+		public void setVersion(String fullVersion) {
+			appVersion = "";
+			version = fullVersion;
+			if (fullVersion != null) {
+				// Android includes the app name (possibly multiple words); iOS sends only the version.
+				Matcher matcher = APP_VERSION.matcher(fullVersion);
+				if (matcher.matches()) {
+					appVersion = matcher.group(1);
+					version = matcher.group(2);
+				}
+			}
+		}
 	}
     
     public HashMap<String,Object> getMessage(MessageParams params) throws IOException, ParseException {
@@ -358,30 +375,8 @@ public class MotdService {
 					&& (params.appVersion == null || !params.appVersion.equalsIgnoreCase(this.appVersion))) {
 				return false;
 			}
-			if (this.version != null) {
-				if (this.version.startsWith(">=")) {
-					String checkVersion = this.version.substring(2).trim();
-					if (isVersion1Greater(checkVersion, params.version, false)) {
-						return false;
-					}
-				} else if (this.version.startsWith(">")) {
-					String checkVersion = this.version.substring(1).trim();
-					if (isVersion1Greater(checkVersion, params.version, true)) {
-						return false;
-					}
-				} else if (this.version.startsWith("<=")) {
-					String checkVersion = this.version.substring(2).trim();
-					if (!isVersion1Greater(checkVersion, params.version, true)) {
-						return false;
-					}
-				} else if (this.version.startsWith("<")) {
-					String checkVersion = this.version.substring(1).trim();
-					if (!isVersion1Greater(checkVersion, params.version, false)) {
-						return false;
-					}
-				} else if (!params.version.startsWith(this.version)) {
-					return false;
-				}
+			if (!checkVersion(params.version)) {
+				return false;
 			}
 
 			if (this.lang != null && (params.lang == null || !this.lang.contains(params.lang))) {
@@ -390,37 +385,53 @@ public class MotdService {
 			return true;
 		}
 
-		private boolean isVersion1Greater(String version1, String version2, boolean allowEquals) {
-			// Handle null or empty strings if necessary
-			if (version1 == null || version1.isEmpty())
+		private boolean checkVersion(String clientVersion) {
+			if (version == null) {
+				return true;
+			}
+			if (Algorithms.isEmpty(clientVersion)) {
 				return false;
-			if (version2 == null || version2.isEmpty())
-				return true; // Any version is greater than no version
-
-			String[] parts1 = version1.split("\\.");
-			String[] parts2 = version2.split("\\.");
-
-			int length = Math.max(parts1.length, parts2.length);
-			for (int i = 0; i < length; i++) {
-				// Get the numeric value for each part, defaulting to 0 if a part doesn't exist.
-				int num1 = (i < parts1.length) ? Integer.parseInt(parts1[i]) : 0;
-				int num2 = (i < parts2.length) ? Integer.parseInt(parts2[i]) : 0;
-
-				// If num1 is greater, version1 is greater.
-				if (num1 > num2) {
-					return true;
+			}
+			try {
+				if (version.startsWith(">=")) {
+					return compareVersions(clientVersion, version.substring(2).trim()) >= 0;
+				} else if (version.startsWith(">")) {
+					return compareVersions(clientVersion, version.substring(1).trim()) > 0;
+				} else if (version.startsWith("<=")) {
+					return compareVersions(clientVersion, version.substring(2).trim()) <= 0;
+				} else if (version.startsWith("<")) {
+					return compareVersions(clientVersion, version.substring(1).trim()) < 0;
 				}
+				return clientVersion.startsWith(version);
+			} catch (NumberFormatException e) {
+				return false;
+			}
+		}
 
-				// If num1 is smaller, version1 is not greater.
-				if (num1 < num2) {
-					return false;
-				}
-				// If they are equal, continue to the next part.
+		private int compareVersions(String clientVersion, String requiredVersion) {
+			if (requiredVersion.isEmpty()) {
+				return 1;
 			}
 
-			// If the loop completes, the versions are identical.
-			// Return true only if equality is allowed by the flag.
-			return allowEquals;
+			// Android dev builds append APK_VERSION_SUFFIX, e.g. 5.5.0#99999M.
+			int buildSuffix = clientVersion.indexOf('#');
+			if (buildSuffix >= 0) {
+				clientVersion = clientVersion.substring(0, buildSuffix);
+			}
+
+			String[] clientParts = clientVersion.split("\\.");
+			String[] requiredParts = requiredVersion.split("\\.");
+
+			int length = Math.max(clientParts.length, requiredParts.length);
+			for (int i = 0; i < length; i++) {
+				int clientPart = i < clientParts.length ? Integer.parseInt(clientParts[i]) : 0;
+				int requiredPart = i < requiredParts.length ? Integer.parseInt(requiredParts[i]) : 0;
+				int comparison = Integer.compare(clientPart, requiredPart);
+				if (comparison != 0) {
+					return comparison;
+				}
+			}
+			return 0;
 		}
 
 		public boolean checkActiveDate(Date date) {
