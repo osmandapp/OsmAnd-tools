@@ -42,15 +42,19 @@ import javax.xml.bind.Unmarshaller;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.net.util.SubnetUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonIOException;
 import com.google.gson.JsonSyntaxException;
 
 import net.osmand.IndexConstants;
+import net.osmand.server.monitor.OsmAndServerMonitorTasks;
 import net.osmand.util.Algorithms;
 
 @Service
@@ -74,6 +78,9 @@ public class DownloadIndexesService  {
 
 	private DownloadServerLoadBalancer settings;
 
+	@Autowired
+	private OsmAndServerMonitorTasks monitoring;
+
 	private Gson gson;
 
 	private Map<String, Double> mapSizesCache;
@@ -95,6 +102,7 @@ public class DownloadIndexesService  {
 		FileReader reader = new FileReader(new File(websiteLocation, DOWNLOAD_SETTINGS));
 		DownloadServerLoadBalancer s = gson.fromJson(reader, DownloadServerLoadBalancer.class);
 		reader.close();
+		s.downServerMap = monitoring.getDownServerMap();
     		s.prepare();
     		settings = s;
     	} catch (IOException ex) {
@@ -781,6 +789,7 @@ public class DownloadIndexesService  {
 		
 		DownloadFreeMapsConfig freemaps = new DownloadFreeMapsConfig();
 		DownloadServerRegion globalRegion = new DownloadServerRegion();
+		private Map<String, Boolean> downServerMap = Collections.emptyMap();
 
 		
 		public DownloadFreeMapsConfig getFreemaps() {
@@ -820,7 +829,9 @@ public class DownloadIndexesService  {
 						continue;
 					}
 				}
-				return filter.mainType;
+				if (getAvailableWeight(getCategory(filter.mainType, remoteAddr)) > 0) {
+					return filter.mainType;
+				}
 			}
 			for (DownloadServerType c : serverTypes) {
 				if (c.type == type) {
@@ -901,7 +912,7 @@ public class DownloadIndexesService  {
 			
 		}
 
-		public String getServer(DownloadServerType type, String remoteAddr) {
+		private DownloadServerCategory getCategory(DownloadServerType type, String remoteAddr) {
 			DownloadServerRegion region = globalRegion;
 			// avoid IPv6 ~/:/ as incompatible with matchesIp()
 			if (remoteAddr != null && !remoteAddr.contains(":")) {
@@ -912,24 +923,42 @@ public class DownloadIndexesService  {
 					}
 				}
 			}
-			DownloadServerCategory cat = region.specialties.get(type.key);
-			if (cat != null && cat.sum > 0) {
-				ThreadLocalRandom tlr = ThreadLocalRandom.current();
-				int val = tlr.nextInt(cat.sum);
+			return region.specialties.get(type.key);
+		}
+
+		private int getAvailableWeight(DownloadServerCategory cat) {
+			int sum = 0;
+			if (cat != null) {
 				for (int i = 0; i < cat.bounds.length; i++) {
-					if (val >= cat.bounds[i]) {
-						val -= cat.bounds[i];
-					} else {
-						String serverName = cat.serverNames.get(i);
-						cat.counts[i]++;
-						if (SELF.equals(serverName)) {
-							return null;
-						}
-						return serverName;
+					if (cat.bounds[i] > 0 && !downServerMap.containsKey(cat.serverNames.get(i))) {
+						sum += cat.bounds[i];
 					}
 				}
 			}
-			return null;
+			return sum;
+		}
+
+		public String getServer(DownloadServerType type, String remoteAddr) {
+			DownloadServerCategory cat = getCategory(type, remoteAddr);
+			synchronized (downServerMap) {
+				int sum = getAvailableWeight(cat);
+				if (sum > 0) {
+					int val = ThreadLocalRandom.current().nextInt(sum);
+					for (int i = 0; i < cat.bounds.length; i++) {
+						String serverName = cat.serverNames.get(i);
+						if (cat.bounds[i] <= 0 || downServerMap.containsKey(serverName)) {
+							continue;
+						}
+						if (val >= cat.bounds[i]) {
+							val -= cat.bounds[i];
+						} else {
+							cat.counts[i]++;
+							return SELF.equals(serverName) ? null : serverName;
+						}
+					}
+				}
+			}
+			throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "No available download servers for " + type.key);
 		}
 
 	}
