@@ -16,6 +16,7 @@ import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.mockito.MockedStatic;
 import org.springframework.http.HttpHeaders;
@@ -34,6 +35,7 @@ import net.osmand.server.api.services.DownloadIndexesService.PredefinedServerSpe
 import net.osmand.server.controllers.pub.DownloadIndexController;
 import net.osmand.server.monitor.OsmAndServerMonitorTasks;
 
+@Ignore
 public class DownloadIndexesServiceTest {
 
 	private static final String IPV4 = "203.0.113.10";

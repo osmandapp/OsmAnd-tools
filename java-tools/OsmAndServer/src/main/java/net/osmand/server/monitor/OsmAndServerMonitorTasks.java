@@ -17,7 +17,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -27,6 +26,7 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
@@ -183,7 +183,7 @@ public class OsmAndServerMonitorTasks {
 	// Index map validation
 	boolean mapIndexPrevValidation = true;
 	Map<String, DownloadTestResult> downloadTests = new TreeMap<>();
-	private final Map<String, Boolean> downServerMap = Collections.synchronizedMap(new HashMap<>());
+	private final Map<String, Boolean> downServerMap = new ConcurrentHashMap<>();
 
 	OsmAndServerMonitoringBot.Sender telegram;
 
