@@ -9,6 +9,7 @@ import java.io.InputStreamReader;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -198,6 +199,25 @@ public class DownloadIndexesServiceTest {
 	}
 
 	@Test
+	public void hostFrequenciesFollowWeightsBeforeDuringAndAfterDowntime() {
+		useDowntime();
+		DownloadServerType main = settings.getServerType(PredefinedServerSpecialty.MAIN, "");
+		DownloadServerType freeMain = pool(PredefinedServerSpecialty.MAIN, FREE, IPV4);
+		assertDistribution(main);
+		assertDistribution(freeMain);
+
+		monitor.failedHosts.add("dl2.osmand.net");
+		checkDownloads();
+		assertDistribution(main);
+		assertDistribution(freeMain);
+
+		monitor.failedHosts.remove("dl2.osmand.net");
+		checkDownloads();
+		assertDistribution(main);
+		assertDistribution(freeMain);
+	}
+
+	@Test
 	public void aPoolWithOnlyZeroWeightsIsSkipped() {
 		country(IPV4, "US");
 		settings.servers.get("usMain").put(US1, 0);
@@ -311,6 +331,30 @@ public class DownloadIndexesServiceTest {
 		assertPool(PredefinedServerSpecialty.WIKI, "wiki", ip);
 		assertPool(PredefinedServerSpecialty.SRTM, "srtm", ip);
 		assertPool(PredefinedServerSpecialty.HEIGHTMAP, "heightmap", ip);
+	}
+
+	private void assertDistribution(DownloadServerType type) {
+		int samples = 100_000;
+		Map<String, Integer> weights = settings.servers.get(type.key);
+		int totalWeight = 0;
+		for (String host : weights.keySet()) {
+			if (!monitor.failedHosts.contains(host)) {
+				totalWeight += weights.get(host);
+			}
+		}
+		Map<String, Integer> counts = new HashMap<>();
+		for (int i = 0; i < samples; i++) {
+			String host = settings.getServer(type, IPV4);
+			counts.put(host, counts.getOrDefault(host, 0) + 1);
+		}
+		assertTrue(weights.keySet().containsAll(counts.keySet()));
+		for (String host : weights.keySet()) {
+			double expected = monitor.failedHosts.contains(host) ? 0 : (double) weights.get(host) / totalWeight;
+			double actual = (double) counts.getOrDefault(host, 0) / samples;
+			// Allow six standard deviations for sampling noise; a down host must have exactly zero hits.
+			double tolerance = 6 * Math.sqrt(expected * (1 - expected) / samples);
+			assertEquals(type.key + ": " + host, expected, actual, tolerance);
+		}
 	}
 
 	private void assertUnavailable(Runnable selection) {
