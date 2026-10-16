@@ -52,6 +52,7 @@ public class IpLocationService {
 			try {
 				LookupService lookup = new LookupService(db);
 				Location location = ipv6 ? lookup.getLocationV6(ip) : lookup.getLocation(ip);
+				lookup.close();
 				if (location == null) {
 					LOG.warn(String.format("geoiplookup null location for %s", ip));
 					return fields;

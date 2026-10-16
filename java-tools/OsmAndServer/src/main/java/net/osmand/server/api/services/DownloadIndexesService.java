@@ -22,7 +22,9 @@ import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
@@ -40,15 +42,19 @@ import javax.xml.bind.Unmarshaller;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.net.util.SubnetUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonIOException;
 import com.google.gson.JsonSyntaxException;
 
 import net.osmand.IndexConstants;
+import net.osmand.server.monitor.OsmAndServerMonitorTasks;
 import net.osmand.util.Algorithms;
 
 @Service
@@ -72,6 +78,9 @@ public class DownloadIndexesService  {
 
 	private DownloadServerLoadBalancer settings;
 
+	@Autowired
+	private OsmAndServerMonitorTasks monitoring;
+
 	private Gson gson;
 
 	private Map<String, Double> mapSizesCache;
@@ -89,19 +98,22 @@ public class DownloadIndexesService  {
 	}
 	
 	public boolean reloadConfig(List<String> errors) {
-    	try {
-    		DownloadServerLoadBalancer s = gson.fromJson(new FileReader(new File(websiteLocation, DOWNLOAD_SETTINGS)), DownloadServerLoadBalancer.class);
-    		s.prepare();
-    		settings = s;
-    	} catch (IOException ex) {
-    		if(errors != null) {
-    			errors.add(DOWNLOAD_SETTINGS + " is invalid: " + ex.getMessage());
-    		}
-            LOGGER.warn(ex.getMessage(), ex);
-            return false;
-    	}
-        return true;
-    }
+		try {
+			FileReader reader = new FileReader(new File(websiteLocation, DOWNLOAD_SETTINGS));
+			DownloadServerLoadBalancer s = gson.fromJson(reader, DownloadServerLoadBalancer.class);
+			reader.close();
+			s.downServerMap = monitoring.getDownServerMap();
+			s.prepare();
+			settings = s;
+		} catch (IOException ex) {
+			if(errors != null) {
+				errors.add(DOWNLOAD_SETTINGS + " is invalid: " + ex.getMessage());
+			}
+			LOGGER.warn(ex.getMessage(), ex);
+			return false;
+		}
+		return true;
+	}
 	
 	
 
@@ -760,6 +772,7 @@ public class DownloadIndexesService  {
 	public static class DownloadServerFilterByHeaders {
 		String specialty;
 		List<String> userAgents = new ArrayList<String>();
+		List<String> countries = new ArrayList<>();
 		// after init
 		DownloadServerType mainType;
 	}
@@ -771,11 +784,12 @@ public class DownloadIndexesService  {
 		
 		// provided from settings.json
 		Map<String, DownloadServerFilterByHeaders> filterTypes = new TreeMap<>();
-		Map<String, Map<String, Integer>> servers = new TreeMap<>();
+		LinkedHashMap<String, Map<String, Integer>> servers = new LinkedHashMap<>();
 		List<DownloadServerRegion> regions = new ArrayList<>();
 		
 		DownloadFreeMapsConfig freemaps = new DownloadFreeMapsConfig();
 		DownloadServerRegion globalRegion = new DownloadServerRegion();
+		private Map<String, Boolean> downServerMap = Collections.emptyMap();
 
 		
 		public DownloadFreeMapsConfig getFreemaps() {
@@ -783,14 +797,39 @@ public class DownloadIndexesService  {
 		}
 		
 		public DownloadServerType getServerType(PredefinedServerSpecialty type, String userAgent) {
-			for (DownloadServerFilterByHeaders filter : filterTypes.values()) {
-				if (filter.mainType.type == type) {
-					for (String us : filter.userAgents) {
-						if (userAgent.contains(us)) {
-							return filter.mainType;
-						}
+			return getServerType(type, userAgent, null, null);
+		}
+
+		public DownloadServerType getServerType(PredefinedServerSpecialty type, String userAgent,
+				String remoteAddr, IpLocationService locationService) {
+			String countryCode = null;
+			// Filter priority follows the order of pools in servers.
+			for (String key : servers.keySet()) {
+				DownloadServerFilterByHeaders filter = filterTypes.get(key);
+				if (filter == null || filter.mainType.type != type
+						|| (filter.userAgents.isEmpty() && filter.countries.isEmpty())) {
+					continue;
+				}
+				boolean matchesUserAgent = filter.userAgents.isEmpty();
+				for (String us : filter.userAgents) {
+					if (userAgent.contains(us)) {
+						matchesUserAgent = true;
+						break;
 					}
 				}
+				if (!matchesUserAgent || getAvailableWeight(getCategory(filter.mainType, remoteAddr)) == 0) {
+					continue;
+				}
+				if (!filter.countries.isEmpty()) {
+					if (countryCode == null) {
+						countryCode = locationService == null ? ""
+								: locationService.getField(remoteAddr, IpLocationService.COUNTRY_CODE);
+					}
+					if (!filter.countries.contains(countryCode)) {
+						continue;
+					}
+				}
+				return filter.mainType;
 			}
 			for (DownloadServerType c : serverTypes) {
 				if (c.type == type) {
@@ -816,6 +855,7 @@ public class DownloadIndexesService  {
 				Entry<String, DownloadServerFilterByHeaders> e = it.next();
 				DownloadServerFilterByHeaders filter  = e.getValue();
 				PredefinedServerSpecialty ps = PredefinedServerSpecialty.valueOf(filter.specialty.toUpperCase());
+				filter.countries.replaceAll(country -> country.toUpperCase(Locale.ROOT));
 				DownloadServerType serverType = new DownloadServerType();
 				serverType.type = ps;
 				serverType.key = e.getKey();
@@ -870,35 +910,49 @@ public class DownloadIndexesService  {
 			
 		}
 
-		public String getServer(DownloadServerType type, String remoteAddr) {
-			DownloadServerRegion region = globalRegion;
+		private DownloadServerCategory getCategory(DownloadServerType type, String remoteAddr) {
 			// avoid IPv6 ~/:/ as incompatible with matchesIp()
 			if (remoteAddr != null && !remoteAddr.contains(":")) {
 				for (DownloadServerRegion r : regions) {
 					if (r.matchesIp(r.asInteger(remoteAddr))) {
-						region = r;
-						break;
+						return r.specialties.get(type.key);
 					}
 				}
 			}
-			DownloadServerCategory cat = region.specialties.get(type.key);
-			if (cat != null && cat.sum > 0) {
-				ThreadLocalRandom tlr = ThreadLocalRandom.current();
-				int val = tlr.nextInt(cat.sum);
+			return globalRegion.specialties.get(type.key);
+		}
+
+		private int getAvailableWeight(DownloadServerCategory cat, int index) {
+			return downServerMap.containsKey(cat.serverNames.get(index)) ? 0 : Math.max(0, cat.bounds[index]);
+		}
+
+		private int getAvailableWeight(DownloadServerCategory cat) {
+			int sum = 0;
+			if (cat != null) {
 				for (int i = 0; i < cat.bounds.length; i++) {
-					if (val >= cat.bounds[i]) {
-						val -= cat.bounds[i];
-					} else {
-						String serverName = cat.serverNames.get(i);
-						cat.counts[i]++;
-						if (SELF.equals(serverName)) {
-							return null;
+					sum += getAvailableWeight(cat, i);
+				}
+			}
+			return sum;
+		}
+
+		public String getServer(DownloadServerType type, String remoteAddr) {
+			DownloadServerCategory cat = getCategory(type, remoteAddr);
+			synchronized (downServerMap) {
+				int sum = getAvailableWeight(cat);
+				if (sum > 0) {
+					int val = ThreadLocalRandom.current().nextInt(sum);
+					for (int i = 0; i < cat.bounds.length; i++) {
+						val -= getAvailableWeight(cat, i);
+						if (val < 0) {
+							String serverName = cat.serverNames.get(i);
+							cat.counts[i]++;
+							return SELF.equals(serverName) ? null : serverName;
 						}
-						return serverName;
 					}
 				}
 			}
-			return null;
+			throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "No available download servers for " + type.key);
 		}
 
 	}

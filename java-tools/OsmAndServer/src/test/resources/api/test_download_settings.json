@@ -1,0 +1,33 @@
+{
+	"filterTypes" : {
+		"freeMain" : { "specialty" : "main", "userAgents" : ["OsmAnd~"]},
+		"usMain" : {"specialty": "main", "countries": ["CA", "MX", "US"]},
+		"usRoads" : {"specialty": "roads", "countries": ["CA", "MX", "US"]},
+		"usWiki" : {"specialty": "wiki", "countries": ["CA", "MX", "US"]},
+		"usSrtm" : {"specialty": "srtm", "countries": ["CA", "MX", "US"]},
+		"usHeightmap" : {"specialty": "heightmap", "countries": ["CA", "MX", "US"]}
+	},
+	"servers" : {
+		"freeMain" : {"dl3.osmand.net":5, "dl2.osmand.net":1},
+		"usMain" : {"us1.osmand.net": 1},
+		"usRoads" : {"us1.osmand.net": 1},
+		"usWiki" : {"us1.osmand.net": 1},
+		"usSrtm" : {"us1.osmand.net": 1},
+		"usHeightmap" : {"us1.osmand.net": 1},
+		"main" : {"dl2.osmand.net":9, "data.osmand.net":9, "dl4.osmand.net":9, "maptile.osmand.net":9, "dl8.osmand.net": 12, "dl9.osmand.net":12, "test.osmand.net":8, "download.osmand.net":1},
+		"roads" : {"dl2.osmand.net":1, "data.osmand.net":1, "dl4.osmand.net":1, "maptile.osmand.net":1},
+		"wiki" : {"dl2.osmand.net":1, "data.osmand.net":1, "dl4.osmand.net":1, "maptile.osmand.net":1},		
+		"osmlive" : { "dl2.osmand.net":1, "dl4.osmand.net":1, "data.osmand.net":1 },
+		"depth" : {"dl2.osmand.net":1, "data.osmand.net":1, "dl4.osmand.net":1, "maptile.osmand.net":1},
+		"hillshade" : {"dl4.osmand.net":1, "data.osmand.net":1},
+		"slope" : {"dl4.osmand.net":1, "data.osmand.net":1},
+		"srtm" : { "dl2.osmand.net":1, "data.osmand.net":1, "dl4.osmand.net":1, "maptile.osmand.net":1},
+		"heightmap" : { "dl2.osmand.net":1, "data.osmand.net":1, "dl4.osmand.net":1},
+		"weather" : { "dl2.osmand.net":1, "dl4.osmand.net":1, "data.osmand.net":1 }
+	},
+	"regions": [{
+		"name": "de_telekom",
+		"servers": ["dl4.osmand.net"],
+		"zones": ["46.80.0.0/12"]
+	}]
+}
