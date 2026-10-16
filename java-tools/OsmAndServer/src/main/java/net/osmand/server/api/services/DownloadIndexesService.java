@@ -98,22 +98,22 @@ public class DownloadIndexesService  {
 	}
 	
 	public boolean reloadConfig(List<String> errors) {
-    	try {
-		FileReader reader = new FileReader(new File(websiteLocation, DOWNLOAD_SETTINGS));
-		DownloadServerLoadBalancer s = gson.fromJson(reader, DownloadServerLoadBalancer.class);
-		reader.close();
-		s.downServerMap = monitoring.getDownServerMap();
-    		s.prepare();
-    		settings = s;
-    	} catch (IOException ex) {
-    		if(errors != null) {
-    			errors.add(DOWNLOAD_SETTINGS + " is invalid: " + ex.getMessage());
-    		}
-            LOGGER.warn(ex.getMessage(), ex);
-            return false;
-    	}
-        return true;
-    }
+		try {
+			FileReader reader = new FileReader(new File(websiteLocation, DOWNLOAD_SETTINGS));
+			DownloadServerLoadBalancer s = gson.fromJson(reader, DownloadServerLoadBalancer.class);
+			reader.close();
+			s.downServerMap = monitoring.getDownServerMap();
+			s.prepare();
+			settings = s;
+		} catch (IOException ex) {
+			if(errors != null) {
+				errors.add(DOWNLOAD_SETTINGS + " is invalid: " + ex.getMessage());
+			}
+			LOGGER.warn(ex.getMessage(), ex);
+			return false;
+		}
+		return true;
+	}
 	
 	
 
