@@ -19,7 +19,6 @@ import java.security.SecureRandom;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
@@ -195,7 +194,9 @@ public class UserdataService {
     private static final int EMAIL_TOKEN_MIN_DIGITS = 6;
     private static final int EMAIL_TOKEN_MAX_DIGITS = 12;
 
-    private static final int EMAIL_TOKEN_EXPIRATION_HOURS = 24;
+    public static final int EMAIL_TOKEN_EXPIRATION_HOURS = 24;
+    public static final long CODE_EXPIRATION_TIME_MS = TimeUnit.HOURS.toMillis(EMAIL_TOKEN_EXPIRATION_HOURS);
+    private static final String CODE_TTL_TEXT = "(" + EMAIL_TOKEN_EXPIRATION_HOURS + " h)";
     private static final int EMAIL_TOKEN_MIN_DELAY_MINUTES = 10;
     private static final int EMAIL_TOKEN_MAX_DELAY_MINUTES = 60;
 
@@ -593,10 +594,10 @@ public class UserdataService {
             return ResponseEntity.badRequest().body("Email is not valid.");
 		}
         CloudUsersRepository.CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
+        boolean registered = pu != null && !devicesRepository.findByUserid(pu.id).isEmpty();
         if (isNew) {
             if (pu != null) {
-                List<CloudUserDevicesRepository.CloudUserDevice> devices = devicesRepository.findByUserid(pu.id);
-                if (devices != null && !devices.isEmpty()) {
+                if (registered) {
 	                userSubService.verifyAndRefreshProOrderId(pu);
                     return ResponseEntity.badRequest().body("An account is already registered with this email address.");
                 }
@@ -610,7 +611,9 @@ public class UserdataService {
             pu.tokendevice = TOKEN_DEVICE_WEB;
             updateSecureEmailToken(pu);
             usersRepository.saveAndFlush(pu);
-            emailSender.sendOsmAndCloudWebEmail(pu.email, pu.token, "@ACTION_SETUP@", lang);
+            emailSender.sendOsmAndCloudAccountEmail(pu.email, pu.token, lang,
+                    registered ? EmailSenderService.CloudAccountAction.PASSWORD
+                               : EmailSenderService.CloudAccountAction.SETUP);
 		} else {
             return ResponseEntity.badRequest().body("error_email");
         }
@@ -624,7 +627,7 @@ public class UserdataService {
             return ResponseEntity.badRequest().body("error_email");
         }
         if (pu.token == null || !pu.token.equals(token) || pu.tokenTime == null || System.currentTimeMillis()
-                - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(EMAIL_TOKEN_EXPIRATION_HOURS, TimeUnit.HOURS)) {
+                - pu.tokenTime.getTime() > CODE_EXPIRATION_TIME_MS) {
             if (isWebLinkValid(pu, token)) {
                 return ok();
             }
@@ -679,8 +682,7 @@ public class UserdataService {
             throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_NOT_REGISTERED, "user with that email is not registered");
         }
         boolean tokenIsActive = pu.token != null && pu.tokenTime != null &&
-                (System.currentTimeMillis() - pu.tokenTime.getTime()) <
-                        TimeUnit.MILLISECONDS.convert(EMAIL_TOKEN_EXPIRATION_HOURS, TimeUnit.HOURS);
+                (System.currentTimeMillis() - pu.tokenTime.getTime()) < CODE_EXPIRATION_TIME_MS;
         boolean webLink = TOKEN_DEVICE_WEB.equals(deviceId) && isWebLinkValid(pu, token);
         if (webLink) {
             pu.webLinkToken = null;
@@ -689,7 +691,7 @@ public class UserdataService {
             wearOutToken(pu); // cut down on tries (even for web password)
             if ( ! (tokenIsActive && validateWithWebPassword(pu.id, token))) {
                 LOG.error("device-register: invalid token (" + email + ") [" + token + "]");
-                throw new OsmAndPublicApiException(ERROR_CODE_TOKEN_IS_NOT_VALID_OR_EXPIRED, "token is not valid or expired (24h)");
+                throw new OsmAndPublicApiException(ERROR_CODE_TOKEN_IS_NOT_VALID_OR_EXPIRED, "token is not valid or expired " + CODE_TTL_TEXT);
             }
         }
         pu.token = null;
@@ -1496,8 +1498,7 @@ public class UserdataService {
     public ResponseEntity<String> deleteAccount(String token, CloudUserDevicesRepository.CloudUserDevice dev, HttpServletRequest request) throws ServletException {
         CloudUsersRepository.CloudUser pu = usersRepository.findById(dev.userid);
         if (pu != null && pu.id == dev.userid) {
-            boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(EMAIL_TOKEN_EXPIRATION_HOURS, TimeUnit.HOURS);
-            boolean validToken = pu.token.equals(token) && !tokenExpired;
+            boolean validToken = isCodeValid(pu, token);
             wearOutToken(pu);
             if (validToken) {
                 if (deleteAllFiles(dev)) {
@@ -1522,7 +1523,7 @@ public class UserdataService {
                     return ResponseEntity.badRequest().body(String.format("Unable to delete user files (%s)", pu.email));
                 }
             }
-            return ResponseEntity.badRequest().body("Token is not valid or expired (24h), or password is not valid");
+            return ResponseEntity.badRequest().body("Token is not valid or expired " + CODE_TTL_TEXT + ", or password is not valid");
         }
         return ResponseEntity.badRequest().body("Email doesn't match login username");
     }
@@ -1591,17 +1592,31 @@ public class UserdataService {
     }
 
     @Transactional
-    public ResponseEntity<String> sendCode(String action, String lang, CloudUsersRepository.CloudUser pu) {
-        if (!("setup".equals(action) || "change".equals(action) || "delete".equals(action))) {
-            return ok();
+    public ResponseEntity<String> sendCode(EmailSenderService.CloudAccountAction action, String lang,
+            CloudUsersRepository.CloudUser pu) {
+        return sendCode(action, lang, pu, null);
+    }
+
+    @Transactional
+    public ResponseEntity<String> sendCode(EmailSenderService.CloudAccountAction action, String lang,
+            CloudUsersRepository.CloudUser pu, Runnable onSent) {
+        if (action == null) {
+            return ResponseEntity.badRequest().body("Unknown action");
         }
         if (pu == null) {
             return ResponseEntity.badRequest().body("Email is not registered");
         }
         updateSecureEmailToken(pu);
         String token = pu.token;
-        emailSender.sendOsmAndCloudWebEmail(pu.email, token, action, lang);
         usersRepository.saveAndFlush(pu);
+        String email = pu.email;
+        emailSender.sendAfterCommit(() -> {
+            boolean sent = emailSender.sendOsmAndCloudAccountEmail(email, token, lang, action,
+                    action == EmailSenderService.CloudAccountAction.EMAIL_CHANGE ? email : null);
+            if (sent && onSent != null) {
+                onSent.run();
+            }
+        });
 
 	    userSubService.verifyAndRefreshProOrderId(pu);
 
@@ -1613,12 +1628,12 @@ public class UserdataService {
         if (pu == null) {
             return ResponseEntity.badRequest().body("User is not registered");
         }
-        boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(EMAIL_TOKEN_EXPIRATION_HOURS, TimeUnit.HOURS);
+        boolean validToken = isCodeValid(pu, code);
         wearOutToken(pu);
-        if (pu.token.equals(code) && !tokenExpired) {
+        if (validToken) {
             return ok();
         } else {
-            return ResponseEntity.badRequest().body("Token is not valid or expired (24h)");
+            return ResponseEntity.badRequest().body("Token is not valid or expired " + CODE_TTL_TEXT);
         }
     }
 
@@ -1630,13 +1645,18 @@ public class UserdataService {
         if (pu == null) {
             return ResponseEntity.badRequest().body("User is not registered");
         }
-        boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(EMAIL_TOKEN_EXPIRATION_HOURS, TimeUnit.HOURS);
+        boolean validToken = isCodeValid(pu, token);
         wearOutToken(pu);
-        if (pu.token.equals(token) && !tokenExpired) {
+        if (validToken) {
             return ok();
         } else {
-            return ResponseEntity.badRequest().body("Token is not valid or expired (24h)");
+            return ResponseEntity.badRequest().body("Token is not valid or expired " + CODE_TTL_TEXT);
         }
+    }
+
+    private boolean isCodeValid(CloudUsersRepository.CloudUser pu, String code) {
+        return pu.token != null && pu.tokenTime != null && pu.token.equals(code)
+                && System.currentTimeMillis() - pu.tokenTime.getTime() < CODE_EXPIRATION_TIME_MS;
     }
 
     // Support creates the link, the owner gets an email that lets them cancel it.

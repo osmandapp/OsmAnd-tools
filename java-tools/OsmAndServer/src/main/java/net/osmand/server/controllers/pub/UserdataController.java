@@ -3,6 +3,7 @@ package net.osmand.server.controllers.pub;
 import static net.osmand.server.api.repo.DeviceInAppPurchasesRepository.*;
 import static net.osmand.server.api.repo.DeviceSubscriptionsRepository.*;
 import static net.osmand.server.api.repo.SupportersRepository.*;
+import static net.osmand.server.api.services.EmailSenderService.CloudAccountAction;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 import java.io.IOException;
@@ -194,10 +195,11 @@ public class UserdataController {
                                                HttpServletRequest request) {
 		// allow to register only with small case
 		email = email.toLowerCase().trim();
-		CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
-		if (!email.contains("@")) {
+		if (!emailSender.isEmail(email)) {
 			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
 		}
+		CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
+		boolean registered = pu != null && !devicesRepository.findByUserid(pu.id).isEmpty();
 		if (pu != null) {
 			if (!Boolean.TRUE.equals(login)) {
 				logErrorWithThrow(request, ERROR_CODE_USER_IS_ALREADY_REGISTERED, "user was already registered with such email");
@@ -215,7 +217,10 @@ public class UserdataController {
 		}
 		pu.tokendevice = deviceId;
 		userdataService.updateSecureEmailToken(pu);
-		emailSender.sendOsmAndCloudRegistrationEmail(pu.email, pu.token, lang, true);
+		String regEmail = pu.email;
+		String regToken = pu.token;
+		CloudAccountAction action = registered ? CloudAccountAction.LOGIN : CloudAccountAction.SETUP;
+		emailSender.sendAfterCommit(() -> emailSender.sendOsmAndCloudAccountEmail(regEmail, regToken, lang, action));
 		CloudUser saved = usersRepository.saveAndFlush(pu);
 	    if (orderid != null) {
 		    discardPreviousAccountOrderId(saved.id, orderid, email, request);
@@ -471,7 +476,7 @@ public class UserdataController {
 		if (pu == null) {
 			return ResponseEntity.badRequest().body("User not found");
 		}
-		return userdataService.sendCode(data.action, data.lang, pu);
+		return userdataService.sendCode(CloudAccountAction.fromCodeRequest(data.action, false), data.lang, pu);
 	}
 
 	public static class UserFilesResults {

@@ -44,6 +44,9 @@ public class ShareFileService {
 	@Autowired
 	UserdataService userdataService;
 
+	@Autowired
+	EmailSenderService emailSender;
+
 	protected static final Log LOGGER = LogFactory.getLog(ShareFileService.class);
 
 	Gson gson = new Gson();
@@ -262,10 +265,16 @@ public class ShareFileService {
 			if (access != null) {
 				access.access = (accessType);
 				shareFileRepository.saveAndFlush(access);
+				if (PermissionType.READ.name().equals(accessType)) {
+					emailSender.sendAfterCommit(() -> emailSender.sendShareFileAccessEmail(access, true));
+				} else if (PermissionType.BLOCKED.name().equals(accessType)) {
+					emailSender.sendAfterCommit(() -> emailSender.sendShareFileAccessEmail(access, false));
+				}
 			}
 		}
 		return true;
 	}
+
 
 	public UserdataController.UserFilesResults getSharedWithMe(int userid, String type) {
 		List<ShareFileRepository.ShareFilesAccess> list = shareFileRepository.findShareFilesAccessListByUserId(userid);

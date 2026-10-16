@@ -59,6 +59,16 @@ public class PurchasesDataLoader {
 		return inapps;
 	}
 
+	public String subscriptionName(String sku) {
+		Subscription subscription = subscriptions.get(sku);
+		return subscription != null ? subscription.name() : sku;
+	}
+
+	public String inAppName(String sku) {
+		InApp inApp = inapps.get(sku);
+		return inApp != null ? inApp.name() : sku;
+	}
+
 	@JsonIgnoreProperties(ignoreUnknown = true)
 	public record Subscription(
 			@JsonProperty String name,
@@ -82,6 +92,27 @@ public class PurchasesDataLoader {
 		
 		public boolean isMaps() {
 			return maps != null && maps.isBoolean() && maps.booleanValue();
+		}
+
+		public int months() {
+			return "year".equals(durationUnit) ? duration * 12 : duration;
+		}
+
+		public Plan plan() {
+			int months = months();
+			return switch (months) {
+				case 1 -> Plan.MONTHLY;
+				case 12 -> Plan.ANNUAL;
+				default -> months <= 0 ? null : months % 12 == 0 ? Plan.YEARS : Plan.MONTHS;
+			};
+		}
+	}
+
+	public enum Plan {
+		MONTHLY, ANNUAL, MONTHS, YEARS;
+
+		public boolean isAnnual() {
+			return this == ANNUAL || this == YEARS;
 		}
 	}
 

@@ -12,6 +12,8 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Year;
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -47,9 +49,30 @@ Special variables:
 		If it is enabled in defaults.html, particular template might disable it with:
 			<!--Set HTML_NEWLINE_TO_BR=false--> OR <!--Unset HTML_NEWLINE_TO_BR-->
 
+	@USE_BASE@ - user-defined option to wrap the template in the shared base layout:
+		base.html (design-system vars: LOGO_URL, H1_STYLE, CODE_BLOCK, footer tiers, ...),
+		header.html (doctype, head, container, logo) and footer.html (divider, footer,
+		closing tags) are pulled in around the template, so the template itself only
+		contains its own content. base.html is kept separate from defaults.html so that
+		legacy (non-USE_BASE) templates never depend on it. Templates that do not set
+		USE_BASE are emitted exactly as before:
+			<!--Set USE_BASE=true-->
+		unsubscribe.html is appended to legacy templates only. In USE_BASE templates the footer tier
+		decides: FOOTER_LEGAL_T2 carries the Unsubscribe link (the template adds its own
+		List-Unsubscribe headers), the default tier has none.
+
+	Outlook conditional comments (VML bulletproof buttons) - in USE_BASE templates, exactly these
+	4 literal marker strings, each alone on its own line, are recognized and kept verbatim by the
+	comment stripping below instead of being deleted (see stripCommentsKeepingMso()); the header
+	parser skips them in every template. Legacy (non-USE_BASE) templates strip them as before:
+		<!--[if mso]>  ...  <![endif]-->
+		<!--[if !mso]><!-->  ...  <!--<![endif]-->
+	Any other spelling (extra whitespace, [if gte mso 9], etc.) is not recognized and still
+	gets mangled by the generic comment handling below.
+
 Template variables:
 
-	The template engine supports 1st and 2nd level variables (e.g. FIRST=1 SECOND=@FIRST@ THIRD=@SECOND@)
+	Variables may reference other variables at any depth (e.g. FIRST=1 SECOND=@FIRST@ THIRD=@SECOND@)
 
 Public methods:
 
@@ -172,14 +195,46 @@ public class EmailSenderTemplate {
 		return this;
 	}
 
+	// lang comes from request parameters (e.g. the public /mapapi/auth/register) and becomes part of a template
+	// file path (<template>/<lang>.html), so only locale-shaped values are accepted - anything else, such as
+	// "../../some/file", falls back to English instead of loading an arbitrary .html file into the email.
+	private static final Pattern LANG_PATTERN = Pattern.compile("[a-zA-Z]{2,3}([-_][a-zA-Z0-9]{2,4})?");
+
+	public static String safeLang(@Nullable String lang) {
+		return lang != null && LANG_PATTERN.matcher(lang).matches() ? lang : "en";
+	}
+
 	public EmailSenderTemplate load(String template, @Nullable String langNullable) {
-		String lang = langNullable == null ? "en" : langNullable;
+		String lang = safeLang(langNullable);
+		set("YEAR", String.valueOf(Year.now(ZoneOffset.UTC).getValue()));
 		include("defaults", lang, false); // settings (email-headers, vars, etc)
-		include("header", lang, false); // optional
-		include(template, lang, true); // template required
-		include("footer", lang, false); // optional
-		include("unsubscribe", lang, false); // optional
+
+		List<String> templateLines = readTemplate(template, lang, true);
+		if (isUseBase(templateLines)) {
+			set(USE_BASE, "true"); // before the includes, so header/base keep their [if mso] blocks
+			include("base", lang, false); // optional
+			include("base-locale", lang, false); // optional
+			include("header", lang, false); // optional
+			parse(templateLines);
+			include("footer", lang, false); // optional
+		} else {
+			parse(templateLines);
+			include("unsubscribe", lang, false); // optional
+		}
 		return this;
+	}
+
+	private boolean isUseBase(List<String> lines) {
+		for (String line : lines) {
+			Matcher command = commandOf(line);
+			if (command != null && "Set".equalsIgnoreCase(command.group(1))) {
+				Matcher keyval = KEY_VALUE.matcher(command.group(2));
+				if (keyval.find() && USE_BASE.equals(keyval.group(1)) && "true".equals(keyval.group(2))) {
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
 	public EmailSenderTemplate load(String template) {
@@ -252,17 +307,26 @@ public class EmailSenderTemplate {
 		return toList.isEmpty();
 	}
 
+	Map<String, String> headers() {
+		return headers;
+	}
+
 	private String fill(String in) {
 		String filled = in;
 		if (filled != null) {
-			final int PASSES = 2; // enough
-			for (int i = 0; i < PASSES; i++) {
+			String previous;
+			int passes = 0;
+			do {
+				if (passes++ > vars.size()) {
+					throw new IllegalStateException("Template variables reference each other in a cycle");
+				}
+				previous = filled;
 				for (String key : vars.keySet()) {
 					filled = filled.replace("@" + key + "@", vars.get(key));
 				}
-			}
-			if (filled.matches("(?s)^.*@[A-Z_]+@.*$")) {
-				throw new IllegalStateException(filled + ": error - please fill all tokens @A-Z@");
+			} while (!filled.equals(previous));
+			if (filled.matches("(?s)^.*@[A-Z0-9_]+@.*$")) {
+				throw new IllegalStateException(filled + ": error - please fill all tokens @A-Z0-9_@");
 			}
 		}
 		return filled;
@@ -294,24 +358,24 @@ public class EmailSenderTemplate {
 		}
 	}
 
-	private final String HTML_COMMENT_MATCH = "(?s).*<!--.*?-->*.";
-	private final String HTML_COMMENT_REPLACE = "(?s)<!--.*?-->"; // (?s) Pattern.DOTALL (multiline)
+	private static final Pattern HTML_COMMENT_MATCH = Pattern.compile("(?s).*<!--.*?-->*.");
+	private static final Pattern COMMAND_COMMENT = Pattern.compile("<!--.*?([A-Za-z-]+)[:\\s]+(.*?)\\s*-->");
+	private static final Pattern KEY_VALUE = Pattern.compile("^(.*?)\\s*=\\s*(.*?)$");
+	private static final Pattern HTML_COMMENT_REPLACE = Pattern.compile("(?s)<!--.*?-->"); // (?s) Pattern.DOTALL (multiline)
 	private final String HTML_NEWLINE_TO_BR = "HTML_NEWLINE_TO_BR"; // user-defined var from templates
+	private final String USE_BASE = "USE_BASE";
 
 	private void parseCommandArgumentsFromComment(String line) {
 		// <!--  Name  OsmAnd and co    -->
 		// <!--From: @NOREPLY_MAIL_FROM@-->
 		// <!--Set: HTML_NEWLINE_TO_BR=true-->
 		// <!-- Set DEFAULT_MAIL_FROM = noreply@domain -->
-		if (!line.matches(HTML_COMMENT_MATCH)) {
-			return;
-		}
-		Matcher matcher = Pattern.compile("<!--.*?([A-Za-z-]+)[:\\s]+(.*?)\\s*-->").matcher(line);
-		if (matcher.find()) {
+		Matcher matcher = commandOf(line);
+		if (matcher != null) {
 			String command = matcher.group(1);
 			String argument = matcher.group(2);
 			if ("Set".equalsIgnoreCase(command)) {
-				Matcher keyval = Pattern.compile("^(.*?)\\s*=\\s*(.*?)$").matcher(argument);
+				Matcher keyval = KEY_VALUE.matcher(argument);
 				if (keyval.find()) {
 					set(keyval.group(1), keyval.group(2));
 				}
@@ -332,6 +396,14 @@ public class EmailSenderTemplate {
 				}
 			}
 		}
+	}
+
+	private Matcher commandOf(String line) {
+		if (isProtectedMsoSpan(line.trim()) || !HTML_COMMENT_MATCH.matcher(line).matches()) {
+			return null;
+		}
+		Matcher matcher = COMMAND_COMMENT.matcher(line);
+		return matcher.find() ? matcher : null;
 	}
 
 	private File findTemplateFile(String template, String lang) {
@@ -357,6 +429,13 @@ public class EmailSenderTemplate {
 	}
 
 	private void include(String template, String lang, boolean required) {
+		List<String> templateLines = readTemplate(template, lang, required);
+		if (templateLines != null) {
+			parse(templateLines);
+		}
+	}
+
+	private List<String> readTemplate(String template, String lang, boolean required) {
 		File foundFile = findTemplateFile(template, lang);
 
 		if (foundFile == null) {
@@ -364,7 +443,7 @@ public class EmailSenderTemplate {
 				throw new IllegalStateException(template + ": template not found in " + defaultTemplatesDirectory +
 						" - fetch web-server-config and set EMAIL_TEMPLATES=/path/to/templates/email (environment)");
 			}
-			return; // silent
+			return null; // silent
 		}
 
 		List<String> templateLines = new ArrayList<>();
@@ -378,8 +457,7 @@ public class EmailSenderTemplate {
 			templateLines.add(reader.nextLine());
 		}
 		reader.close();
-
-		parse(templateLines);
+		return templateLines;
 	}
 
 	private void parse(List<String> lines) {
@@ -389,7 +467,7 @@ public class EmailSenderTemplate {
 		for (String line : lines) {
 			parseCommandArgumentsFromComment(line);
 
-			String cleaned = line.replaceAll(HTML_COMMENT_REPLACE, "");
+			String cleaned = stripCommentsKeepingMso(line);
 
 			// allow to specify Subject-line at the beginning of the template
 			if (bodyLines.isEmpty() && cleaned.trim().startsWith("Subject:")) {
@@ -414,8 +492,34 @@ public class EmailSenderTemplate {
 			}
 		}
 
-		String joined = String.join("", bodyLines).replaceAll(HTML_COMMENT_REPLACE, "");
+		String joined = stripCommentsKeepingMso(String.join("", bodyLines));
 		body = body == null ? joined : body + joined; // concat bodies from all included templates
+	}
+
+	private String stripCommentsKeepingMso(String text) {
+		if (!"true".equals(vars.get(USE_BASE))) {
+			return HTML_COMMENT_REPLACE.matcher(text).replaceAll("");
+		}
+		Matcher m = HTML_COMMENT_REPLACE.matcher(text);
+		StringBuilder out = new StringBuilder();
+		int last = 0;
+		while (m.find()) {
+			out.append(text, last, m.start());
+			String match = m.group();
+			if (isProtectedMsoSpan(match)) {
+				out.append(match);
+			}
+			last = m.end();
+		}
+		out.append(text, last, text.length());
+		return out.toString();
+	}
+
+	// the whole <!--[if mso]>...<![endif]--> block is one span with multi-line VML inside, hence startsWith/endsWith
+	private static boolean isProtectedMsoSpan(String match) {
+		return (match.startsWith("<!--[if mso]>") && match.endsWith("<![endif]-->"))
+				|| match.equals("<!--[if !mso]><!-->")
+				|| match.equals("<!--<![endif]-->");
 	}
 
 	public String concealEmail(String email) {
