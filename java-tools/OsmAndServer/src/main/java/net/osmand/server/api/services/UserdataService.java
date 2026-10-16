@@ -671,7 +671,7 @@ public class UserdataService {
     public ResponseEntity<String> registerNewDevice(String email, String token, String deviceId, String accessToken,
                                                     String lang, String brand, String model) {
 		if (Algorithms.isEmpty(email)) {
-			LOG.error("device-register: email is empty (" + email + ")");
+			LOG.error("device-register: email is empty (" + EmailSenderService.shorten(email) + ")");
 			throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_NOT_REGISTERED, "empty email");
 		}
         email = email.toLowerCase().trim();
@@ -688,7 +688,7 @@ public class UserdataService {
         } else if (!isCodeValid(pu, token)) {
             wearOutToken(pu); // cut down on tries (even for web password)
             if ( ! (tokenIsActive && validateWithWebPassword(pu.id, token))) {
-                LOG.error("device-register: invalid token (" + email + ")");
+                LOG.error("device-register: invalid token (" + EmailSenderService.shorten(email) + ")");
                 throw new OsmAndPublicApiException(ERROR_CODE_TOKEN_IS_NOT_VALID_OR_EXPIRED, "token is not valid or expired " + CODE_TTL_TEXT);
             }
         }
@@ -697,14 +697,14 @@ public class UserdataService {
         emailTokenRequests.invalidate(pu.email.trim().toLowerCase(Locale.ROOT));
         CloudUserDevicesRepository.CloudUserDevice device = new CloudUserDevicesRepository.CloudUserDevice();
 	    if (Algorithms.isEmpty(deviceId) || Algorithms.isEmpty(model)) {
-		    LOG.error("device-register: avoid delete-anonymous-same-device (" + email + ")");
+		    LOG.error("device-register: avoid delete-anonymous-same-device (" + EmailSenderService.shorten(email) + ")");
 	    } else {
 		    CloudUserDevicesRepository.CloudUserDevice sameDevice;
 		    while ((sameDevice = devicesRepository
 				    .findTopByUseridAndDeviceidAndModelOrderByUdpatetimeDesc(pu.id, deviceId, model)) != null) {
 				LOG.error(String.format(
 						"device-register: delete-same-device (%s) id (%d) brand (%s) model (%s) deviceId (%s)",
-						email, sameDevice.id, brand, model, deviceId));
+						EmailSenderService.shorten(email), sameDevice.id, brand, model, deviceId));
 			    devicesRepository.delete(sameDevice);
 		    }
 	    }
