@@ -626,8 +626,7 @@ public class UserdataService {
         if (pu == null) {
             return ResponseEntity.badRequest().body("error_email");
         }
-        if (pu.token == null || !pu.token.equals(token) || pu.tokenTime == null || System.currentTimeMillis()
-                - pu.tokenTime.getTime() > CODE_EXPIRATION_TIME_MS) {
+        if (!isCodeValid(pu, token)) {
             if (isWebLinkValid(pu, token)) {
                 return ok();
             }
@@ -687,7 +686,7 @@ public class UserdataService {
         if (webLink) {
             pu.webLinkToken = null;
             pu.webLinkTime = null;
-        } else if ( ! (tokenIsActive && pu.token.equals(token))) {
+        } else if (!isCodeValid(pu, token)) {
             wearOutToken(pu); // cut down on tries (even for web password)
             if ( ! (tokenIsActive && validateWithWebPassword(pu.id, token))) {
                 LOG.error("device-register: invalid token (" + email + ") [" + token + "]");
@@ -1655,7 +1654,7 @@ public class UserdataService {
     }
 
     private boolean isCodeValid(CloudUsersRepository.CloudUser pu, String code) {
-        return pu.token != null && pu.tokenTime != null && pu.token.equals(code)
+        return pu.token != null && pu.tokenTime != null && pu.token.equals(Algorithms.trimIfNotNull(code))
                 && System.currentTimeMillis() - pu.tokenTime.getTime() < CODE_EXPIRATION_TIME_MS;
     }
 
