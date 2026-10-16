@@ -84,6 +84,15 @@ public class CommonWordsMultiIndex {
 	}
 
 	/**
+	 * @return class of the word in the statistics group (0, {@link SearchModLocaleRules#CLASS_SERVICE},
+	 * {@link SearchModLocaleRules#CLASS_FREQUENT}), -1 when the group or the file does not have the word
+	 */
+	public int wordClass(String group, String word) {
+		int[] v = group == null ? null : groups.getOrDefault(group, Map.of()).get(SearchAlgorithms.alignChars(word));
+		return v == null ? -1 : v[0];
+	}
+
+	/**
 	 * @param group statistics group of the map, null keeps every word
 	 * @param rules rules of the locale of the map: their word classes replace the classes of the file, can be null
 	 * @param words normalized words of one name (SearchAlgorithms.splitAndNormalize)
