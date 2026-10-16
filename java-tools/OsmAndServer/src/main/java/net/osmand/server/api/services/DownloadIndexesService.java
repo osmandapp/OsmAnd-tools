@@ -938,22 +938,15 @@ public class DownloadIndexesService  {
 
 		public String getServer(DownloadServerType type, String remoteAddr) {
 			DownloadServerCategory cat = getCategory(type, remoteAddr);
-			if (cat != null) {
-				int[] weights = new int[cat.bounds.length];
-				int sum = 0;
-				for (int i = 0; i < weights.length; i++) {
-					weights[i] = getAvailableWeight(cat, i);
-					sum += weights[i];
-				}
-				if (sum > 0) {
-					int val = ThreadLocalRandom.current().nextInt(sum);
-					for (int i = 0; i < weights.length; i++) {
-						val -= weights[i];
-						if (val < 0) {
-							String serverName = cat.serverNames.get(i);
-							cat.counts[i]++;
-							return SELF.equals(serverName) ? null : serverName;
-						}
+			int sum = getAvailableWeight(cat);
+			if (sum > 0) {
+				int val = ThreadLocalRandom.current().nextInt(sum);
+				for (int i = 0; i < cat.bounds.length; i++) {
+					val -= getAvailableWeight(cat, i);
+					if (val < 0) {
+						String serverName = cat.serverNames.get(i);
+						cat.counts[i]++;
+						return SELF.equals(serverName) ? null : serverName;
 					}
 				}
 			}
