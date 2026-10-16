@@ -817,7 +817,7 @@ public class DownloadIndexesService  {
 						break;
 					}
 				}
-				if (!matchesUserAgent) {
+				if (!matchesUserAgent || getAvailableWeight(getCategory(filter.mainType, remoteAddr)) == 0) {
 					continue;
 				}
 				if (!filter.countries.isEmpty()) {
@@ -829,9 +829,7 @@ public class DownloadIndexesService  {
 						continue;
 					}
 				}
-				if (getAvailableWeight(getCategory(filter.mainType, remoteAddr)) > 0) {
-					return filter.mainType;
-				}
+				return filter.mainType;
 			}
 			for (DownloadServerType c : serverTypes) {
 				if (c.type == type) {
@@ -913,26 +911,26 @@ public class DownloadIndexesService  {
 		}
 
 		private DownloadServerCategory getCategory(DownloadServerType type, String remoteAddr) {
-			DownloadServerRegion region = globalRegion;
 			// avoid IPv6 ~/:/ as incompatible with matchesIp()
 			if (remoteAddr != null && !remoteAddr.contains(":")) {
 				for (DownloadServerRegion r : regions) {
 					if (r.matchesIp(r.asInteger(remoteAddr))) {
-						region = r;
-						break;
+						return r.specialties.get(type.key);
 					}
 				}
 			}
-			return region.specialties.get(type.key);
+			return globalRegion.specialties.get(type.key);
+		}
+
+		private int getAvailableWeight(DownloadServerCategory cat, int index) {
+			return downServerMap.containsKey(cat.serverNames.get(index)) ? 0 : Math.max(0, cat.bounds[index]);
 		}
 
 		private int getAvailableWeight(DownloadServerCategory cat) {
 			int sum = 0;
 			if (cat != null) {
 				for (int i = 0; i < cat.bounds.length; i++) {
-					if (cat.bounds[i] > 0 && !downServerMap.containsKey(cat.serverNames.get(i))) {
-						sum += cat.bounds[i];
-					}
+					sum += getAvailableWeight(cat, i);
 				}
 			}
 			return sum;
@@ -945,13 +943,9 @@ public class DownloadIndexesService  {
 				if (sum > 0) {
 					int val = ThreadLocalRandom.current().nextInt(sum);
 					for (int i = 0; i < cat.bounds.length; i++) {
-						String serverName = cat.serverNames.get(i);
-						if (cat.bounds[i] <= 0 || downServerMap.containsKey(serverName)) {
-							continue;
-						}
-						if (val >= cat.bounds[i]) {
-							val -= cat.bounds[i];
-						} else {
+						val -= getAvailableWeight(cat, i);
+						if (val < 0) {
+							String serverName = cat.serverNames.get(i);
 							cat.counts[i]++;
 							return SELF.equals(serverName) ? null : serverName;
 						}
