@@ -374,17 +374,8 @@ public class ApiController {
 		params.lang = lang;
 		params.numberOfDays = nd;
 		params.numberOfStarts = ns;
-		params.appVersion = "";
 		params.appPackage = androidPackage;
-		if (version != null) {
-			int i = version.indexOf(" ");
-			if (i >= 0) {
-				params.appVersion = version.substring(0, i);
-				params.version = version.substring(i + 1);
-			} else {
-				params.version = version;
-			}
-		}
+		params.setVersion(version);
 
 		File file = motdService.getSubscriptions(params);
 		FileSystemResource fsr = new FileSystemResource(file);
@@ -569,21 +560,12 @@ public class ApiController {
         }
 		params.numberOfDays = nd;
 		params.numberOfStarts = ns;
-		params.appVersion = "";
 		params.os = os;
 		if (!Algorithms.isEmpty(features)) {
 			params.features = Arrays.asList(features.split(","));
 		}
 		params.lang = lang;
-		if (version != null) {
-			int i = version.indexOf(" ");
-			if (i >= 0) {
-				params.appVersion = version.substring(0, i);
-				params.version = version.substring(i + 1);
-			} else {
-				params.version = version;
-			}
-		}
+		params.setVersion(version);
 
         Map<String, Object> body = motdService.getMessage(params);
         if (body != null) {
