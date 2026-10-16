@@ -25,12 +25,6 @@
 		"heightmap" : { "dl2.osmand.net":1, "data.osmand.net":1, "dl4.osmand.net":1},
 		"weather" : { "dl2.osmand.net":1, "dl4.osmand.net":1, "data.osmand.net":1 }
 	},
-	"freemaps": {
-			"message": "Congo maps are free and updated twice daily. Les cartes du Congo sont gratuites et mises à jour deux fois par jour.",
-			"namepatterns": [ 
-				"Congo-democratic-republic_"
-			]
-	},
 	"regions": [{
 		"name": "de_telekom",
 		"servers": ["dl4.osmand.net"],
