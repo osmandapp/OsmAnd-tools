@@ -498,7 +498,9 @@ public class UserdataController {
 		String m = "";
 		for (Map.Entry<String, String[]> e : params.entrySet()) {
 			String v = e.getValue().length > 0 ? e.getValue()[0] : "EMPTY";
-			if (e.getKey().toLowerCase().contains("email") || emailSender.isEmail(v)) {
+			if (e.getKey().toLowerCase().contains("token")) {
+				v = "***";
+			} else if (e.getKey().toLowerCase().contains("email") || emailSender.isEmail(v)) {
 				v = EmailSenderService.shorten(v); // hide full email from logs
 			}
 			m += ", " + e.getKey() + ":" + v;
