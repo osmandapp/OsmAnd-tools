@@ -4,6 +4,7 @@ import net.osmand.data.Amenity;
 import net.osmand.shared.data.AdditionalInfoBundle;
 import net.osmand.shared.data.AmenityTagEntriesBuilder;
 import net.osmand.shared.data.AmenityTagEntry;
+import net.osmand.shared.osm.AbstractPoiType;
 import net.osmand.shared.osm.PoiCategory;
 import net.osmand.shared.osm.PoiType;
 import net.osmand.util.Algorithms;
@@ -104,9 +105,35 @@ public class AmenityTagsService {
 		return result;
 	}
 
+	// a group row; the web builds the labels from its translations like the apps: "Smoking" over "No" when
+	// all values of the group are one tag, "Rented boats" over "Kayaks" for a list of options
 	private VisibleTag toGroupTag(AmenityTagEntry tagEntry) {
 		String key = Amenity.COLLAPSABLE_PREFIX + tagEntry.key;
-		return new VisibleTag(key, joinPoiTypeKeys(tagEntry), null);
+		List<PoiType> types = tagEntry.collapsablePoiTypes;
+		if (!tagEntry.poiAdditional || Algorithms.isEmpty(types)) {
+			return new VisibleTag(key, joinPoiTypeKeys(tagEntry), null);
+		}
+		List<String> osmValues = types.stream().map(PoiType::getOsmValue).collect(Collectors.toList());
+		return new VisibleTag(key, joinPoiTypeKeys(tagEntry), null, null, null, isOneTagGroup(types.get(0)),
+				osmValues);
+	}
+
+	// all values of the group are one tag (smoking=yes/no/outside), not a list of options (boat:kayak:rental, ...)
+	private boolean isOneTagGroup(PoiType type) {
+		String category = type.getPoiAdditionalCategory();
+		AbstractPoiType parent = type.getParentType();
+		if (category == null || parent == null) {
+			return true;
+		}
+		Set<String> tags = new HashSet<>();
+		for (List<PoiType> additionals : List.of(parent.getPoiAdditionals(), parent.getPoiAdditionalsCategorized())) {
+			for (PoiType additional : additionals) {
+				if (category.equals(additional.getPoiAdditionalCategory()) && additional.getOsmTag() != null) {
+					tags.add(additional.getOsmTag());
+				}
+			}
+		}
+		return tags.size() <= 1;
 	}
 
 	private VisibleTag toPlainTag(AmenityTagEntry tagEntry, Set<String> genericRowKeys) {
@@ -115,7 +142,7 @@ public class AmenityTagsService {
 		}
 		boolean generic = genericRowKeys.contains(tagEntry.key)
 				&& (tagEntry.resolvedType == null || tagEntry.resolvedType.getAdditionalType() == null);
-		return new VisibleTag(tagEntry.key, tagEntry.value, null, null, generic ? Boolean.TRUE : null);
+		return new VisibleTag(tagEntry.key, tagEntry.value, null, null, generic ? Boolean.TRUE : null, null, null);
 	}
 
 	private VisibleTag toLocalizedTag(AmenityTagEntry tagEntry) {
@@ -136,13 +163,15 @@ public class AmenityTagsService {
 				: new LangValue(child.value, null);
 	}
 
-	public record VisibleTag(String key, String value, String lang, List<LangValue> otherLangs, Boolean generic) {
+	// oneTag / osmValues: for a group of additional values, see toGroupTag; osmValues in the order of value
+	public record VisibleTag(String key, String value, String lang, List<LangValue> otherLangs, Boolean generic,
+	                         Boolean oneTag, List<String> osmValues) {
 		public VisibleTag(String key, String value, String lang) {
-			this(key, value, lang, null, null);
+			this(key, value, lang, null, null, null, null);
 		}
 
 		public VisibleTag(String key, String value, String lang, List<LangValue> otherLangs) {
-			this(key, value, lang, otherLangs, null);
+			this(key, value, lang, otherLangs, null, null, null);
 		}
 	}
 
