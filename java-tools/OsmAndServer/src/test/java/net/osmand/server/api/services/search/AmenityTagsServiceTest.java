@@ -72,6 +72,24 @@ public class AmenityTagsServiceTest {
 		assertShown(visibleKeys(tags), "internet_access:fee", "authentication:phone_call:number");
 	}
 
+	// a group of one property (wheelchair=*) or of a list of options (boat:<kind>:rental=yes) with its OSM values
+	@Test
+	public void groupsTellOneTagAndValues() {
+		Map<String, String> tags = Map.of("amenity_type", "sustenance", "amenity_subtype", "cafe",
+				"collapsable_wheelchair_accessibility", "wheelchair_limited");
+		AmenityTagsService.VisibleTag wheelchair = service.convertToVisibleTags(tags, "en").stream()
+				.filter(tag -> tag.key().equals("collapsable_wheelchair_accessibility")).findFirst().orElseThrow();
+		assertEquals(Boolean.TRUE, wheelchair.oneTag());
+		assertEquals(List.of("limited"), wheelchair.osmValues());
+
+		Map<String, String> boats = Map.of("amenity_type", "service", "amenity_subtype", "boat_rental",
+				"collapsable_boat_rental_type", "boat_kayak_rental_yes;boat_canoe_rental_yes");
+		AmenityTagsService.VisibleTag rented = service.convertToVisibleTags(boats, "en").stream()
+				.filter(tag -> tag.key().equals("collapsable_boat_rental_type")).findFirst().orElseThrow();
+		assertEquals(Boolean.FALSE, rented.oneTag());
+		assertEquals(List.of("yes", "yes"), rented.osmValues());
+	}
+
 	private Set<String> visibleKeys(Map<String, String> tags) {
 		return service.convertToVisibleTags(tags, "en").stream().map(AmenityTagsService.VisibleTag::key)
 				.collect(Collectors.toSet());
