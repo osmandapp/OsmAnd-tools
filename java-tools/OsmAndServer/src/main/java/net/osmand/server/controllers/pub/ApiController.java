@@ -241,6 +241,18 @@ public class ApiController {
 		return "{\"status\":\"OK\"}";
 	}
 
+	/**
+	 * Free version of the app: maps of one country are free, and the app asks here before it
+	 * replaces that country with another one. Always allowed for now. A GET request on purpose:
+	 * package, version, nd, ns, aid and utm* stay in the access log for the later decision.
+	 */
+	@GetMapping(path = { "/replace-download-map" }, produces = "application/json")
+	@ResponseBody
+	public String replaceDownloadMap(@RequestParam(required = false) String from,
+			@RequestParam(required = false) String to) {
+		return "{\"status\":\"ok\"}";
+	}
+
 
     @PostMapping(path = {"/missing_search"}, produces = "application/json")
     @ResponseBody
