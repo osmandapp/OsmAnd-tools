@@ -14,7 +14,6 @@ import net.osmand.shared.gpx.primitives.Track;
 import net.osmand.shared.gpx.primitives.TrkSegment;
 import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.shared.io.KFile;
-import net.osmand.util.Algorithms;
 import okio.Buffer;
 import okio.Okio;
 import okio.Source;
@@ -32,6 +31,7 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.*;
+import java.nio.file.Files;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -49,6 +49,8 @@ public class GpxService {
     public static final int MAX_SIZE_FILES = 10;
     public static final int MAX_SIZE_FILES_AUTH = 100;
     public static final String ERROR_WRITING_GPX_MSG = "Error writing gpx!";
+    // a plain file is limited by nginx: 100M on maptile.osmand.net, the gzipped one the same once unzipped
+    private static final long MAX_UNZIPPED_FILE_SIZE = 100 << 20;
     
     @Autowired
     WebGpxParser webGpxParser;
@@ -301,11 +303,25 @@ public class GpxService {
 
     public File saveMultipartFileToTemp(MultipartFile file, String httpSessionId) throws IOException {
         File tmpFile = File.createTempFile(GPX_FILE_PREFIX + httpSessionId, GPX_FILE_EXT);
-        InputStream is = file.getInputStream();
-        FileOutputStream fous = new FileOutputStream(tmpFile);
-        Algorithms.streamCopy(is, fous);
-        is.close();
-        fous.close();
+        try (InputStream is = new BufferedInputStream(file.getInputStream());
+             InputStream in = isGzipStream(is) ? new GZIPInputStream(is) : is;
+             FileOutputStream fous = new FileOutputStream(tmpFile)) {
+            long maxSize = in instanceof GZIPInputStream ? MAX_UNZIPPED_FILE_SIZE : Long.MAX_VALUE;
+            byte[] buf = new byte[1 << 16];
+            long size = 0;
+            int read;
+            while ((read = in.read(buf)) != -1) {
+                size += read;
+                if (size > maxSize) {
+                    throw new OsmAndPublicApiException(HttpStatus.PAYLOAD_TOO_LARGE.value(),
+                            "The unzipped file is larger than " + (MAX_UNZIPPED_FILE_SIZE >> 20) + " MB");
+                }
+                fous.write(buf, 0, read);
+            }
+        } catch (IOException | RuntimeException e) {
+            Files.deleteIfExists(tmpFile.toPath());
+            throw e;
+        }
         return tmpFile;
     }
     
