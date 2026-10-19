@@ -6,6 +6,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -55,6 +56,8 @@ public class GpxJson {
 		private final Class<? super T> rawType;
 		private final Map<String, BoundField> fields = new LinkedHashMap<>();
 		private final TypeAdapter<Map<String, String>> mapAdapter;
+		// a field equal to its value in a new instance is not written: read() starts from a new instance
+		private final Object defaults;
 
 		ExtensionsAdapter(Gson gson, Class<? super T> rawType) {
 			this.gson = gson;
@@ -69,6 +72,15 @@ public class GpxJson {
 					field.setAccessible(true);
 					fields.putIfAbsent(field.getName(), new BoundField(field, gson.getAdapter(TypeToken.get(field.getGenericType()))));
 				}
+			}
+			this.defaults = createDefaults();
+		}
+
+		private Object createDefaults() {
+			try {
+				return newInstance();
+			} catch (JsonParseException e) {
+				return null;
 			}
 		}
 
@@ -85,7 +97,8 @@ public class GpxJson {
 					continue;
 				}
 				Object fieldValue = e.getValue().get(value);
-				if (fieldValue != value) {
+				boolean isDefault = defaults != null && Objects.equals(fieldValue, e.getValue().get(defaults));
+				if (fieldValue != value && !isDefault) {
 					out.name(name);
 					e.getValue().adapter(gson, fieldValue).write(out, fieldValue);
 				}
