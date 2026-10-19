@@ -81,6 +81,10 @@ public class PoiTypesService {
 		});
 	}
 
+	/**
+	 * English names the categories for every map; the phrases of another language name them only for the objects of
+	 * the maps in that language (the rules locale of the map), whatever the language of the request is.
+	 */
 	public MapPoiTypesTranslator parseGlobalTranslations() {
 		Map<String, String> enTranslations = getTranslations(DEFAULT_SEARCH_LANG);
 		MapPoiTypesTranslator translations = new MapPoiTypesTranslator(enTranslations, enTranslations);

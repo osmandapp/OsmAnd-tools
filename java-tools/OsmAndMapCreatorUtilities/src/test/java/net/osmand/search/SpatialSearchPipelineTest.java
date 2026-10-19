@@ -250,6 +250,19 @@ public class SpatialSearchPipelineTest {
 		poiTypes.setPoiTranslator(defaultPoiTranslator);
 	}
 
+	private static final Map<String, Map<String, String>> LANGUAGE_PHRASES = new HashMap<>();
+
+	private static synchronized Map<String, String> languagePhrases(String lang) {
+		return LANGUAGE_PHRASES.computeIfAbsent(lang, l -> {
+			File f = new File(getAndroidPath() + "OsmAnd/res/values" + ("en".equals(l) ? "" : "-" + l) + "/phrases.xml");
+			try {
+				return f.exists() ? Algorithms.parseStringsXml(f) : Collections.emptyMap();
+			} catch (IOException | XmlPullParserException e) {
+				throw new IllegalStateException("No phrases for " + l, e);
+			}
+		});
+	}
+
 	/** POI categories named as the app names them in that language ("phrasesLang": "de" makes "parkplatz" a
 	 *  category and not only a name); English where the language has no phrase */
 	private static synchronized MapPoiTypes.PoiTranslator androidPhrasesTranslator(String lang) {
@@ -564,16 +577,21 @@ public class SpatialSearchPipelineTest {
 		return parseExpectedResults(sourceJson, "results", phrasesSize);
 	}
 
-	protected SpatialTestSearchEngine createSearchEngine(SpatialTextSearch.SpatialTextSearchSettings spatialSettings, 
+	protected SpatialTestSearchEngine createSearchEngine(SpatialTextSearch.SpatialTextSearchSettings spatialSettings,
 												  LatLon point, List<BinaryMapIndexReader> readers) {
-		// the same instance the binary readers resolve POI types of map objects through
-		return new SpatialTestSearchEngine(spatialSettings, point, readers, MapPoiTypes.getDefault());
+		// the same instance the binary readers resolve POI types of map objects through, unless the phrase is
+		// searched in another app language: the categories are matched by key, the readers stay the same
+		return new SpatialTestSearchEngine(spatialSettings, point, readers,
+				phrasePoiTypes != null ? phrasePoiTypes : MapPoiTypes.getDefault());
 	}
 
-	private MapPoiTypes createPoiTypes(boolean translation) {
+	/** POI types of a phrase with its own "phrasesLang" (app language), null for the language of the test */
+	private MapPoiTypes phrasePoiTypes;
+
+	private MapPoiTypes createPoiTypes(boolean translation, String lang) {
 		MapPoiTypes poiTypes = new MapPoiTypes(null);
 		poiTypes.setPoiTranslator(
-				translation ? new SpatialTestSearchEngine.BogusPoiTranslator() : androidPhrasesTranslator(phrasesLang));
+				translation ? new SpatialTestSearchEngine.BogusPoiTranslator() : androidPhrasesTranslator(lang));
 		return poiTypes;
 	}
 	
@@ -610,7 +628,7 @@ public class SpatialSearchPipelineTest {
 		SpatialTestSearchEngine defaultEngine = null;
 		try {
 			// readers capture the default MapPoiTypes on open, set this test's one before loading them
-			MapPoiTypes.setDefault(createPoiTypes(translation));
+			MapPoiTypes.setDefault(createPoiTypes(translation, phrasesLang));
 			boolean useData = settingsJson.optBoolean("useData", true);
 			if (useData) {
 				loadReaders(sourceJson, point, readers);
@@ -638,7 +656,17 @@ public class SpatialSearchPipelineTest {
 					continue;
 				}
 				JSONObject mergedJson = SpatialSearchTestFile.merge(settingsJson, phraseAndSettings.settings());
-				engine = createSearchEngine(SpatialSearchTestFile.parseSettings(mergedJson), SpatialSearchTestFile.parseLocation(mergedJson), readers);
+				String lang = mergedJson.optString("phrasesLang", null);
+				if (!Algorithms.stringsEqual(lang, phrasesLang)) {
+					phrasePoiTypes = createPoiTypes(translation, lang);
+					phrasePoiTypes.init(); // MapPoiTypes.setDefault inits the types of the test
+				}
+				try {
+					engine = createSearchEngine(SpatialSearchTestFile.parseSettings(mergedJson),
+							SpatialSearchTestFile.parseLocation(mergedJson), readers);
+				} finally {
+					phrasePoiTypes = null;
+				}
 			}
 			
 			List<String> actualResults = engine.search(text, false);
@@ -1022,6 +1050,13 @@ public class SpatialSearchPipelineTest {
 		public TestSearchTranslator(Map<String, String> phrases, Map<String, String> enPhrases) {
 			this.phrases = phrases;
 			this.enPhrases = enPhrases;
+		}
+
+		/** the phrases of the language of the data of a map, as the app takes them from its resources */
+		@Override
+		public String getPhrases(AbstractPoiType type, String lang) {
+			AbstractPoiType baseLangType = type.getBaseLangType();
+			return languagePhrases(lang).get("poi_" + (baseLangType != null ? baseLangType : type).getFormattedKeyName());
 		}
 
 		@Override

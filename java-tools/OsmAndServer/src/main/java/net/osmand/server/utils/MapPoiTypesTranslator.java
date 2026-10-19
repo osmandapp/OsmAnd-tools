@@ -11,6 +11,8 @@ public class MapPoiTypesTranslator implements MapPoiTypes.PoiTranslator {
 
 	private final Map<String, Set<String>> enPhrases = new HashMap<>();
 	private final Map<String, Set<String>> phrases = new HashMap<>();
+	// language -> phrases.xml of that language, given to search per map language, never merged into the main phrases
+	private final Map<String, Map<String, String>> languagePhrases = new HashMap<>();
 
 	public MapPoiTypesTranslator(Map<String, String> main, Map<String, String> enPhrases) {
 		appendMap(this.phrases, main);
@@ -18,7 +20,15 @@ public class MapPoiTypesTranslator implements MapPoiTypes.PoiTranslator {
 	}
 
 	public void appendTranslations(String lang, Map<String, String> main) {
-		appendMap(phrases, main);
+		languagePhrases.put(lang, main);
+	}
+
+	@Override
+	public String getPhrases(AbstractPoiType type, String lang) {
+		AbstractPoiType baseLangType = type.getBaseLangType();
+		AbstractPoiType t = baseLangType != null ? baseLangType : type;
+		Map<String, String> lp = languagePhrases.get(lang);
+		return lp == null ? null : lp.get("poi_" + t.getFormattedKeyName());
 	}
 
 	private void appendMap(Map<String, Set<String>> phrases, Map<String, String> main) {
