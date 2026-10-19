@@ -56,7 +56,6 @@ public class GpxJson {
 		private final Class<? super T> rawType;
 		private final Map<String, BoundField> fields = new LinkedHashMap<>();
 		private final TypeAdapter<Map<String, String>> mapAdapter;
-		// a field equal to its value in a new instance is not written: read() starts from a new instance
 		private final Object defaults;
 
 		ExtensionsAdapter(Gson gson, Class<? super T> rawType) {

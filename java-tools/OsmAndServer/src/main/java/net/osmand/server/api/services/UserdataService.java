@@ -147,7 +147,7 @@ public class UserdataService {
     public static final String MODEL_DEVICE_WEB = "Web";
     public static final String TOKEN_DEVICE_WEB = "web";
     public static final int ERROR_CODE_PRO_USERS = 100;
-    private static final long MB = 1024 * 1024;
+    static final long MB = 1024 * 1024;
     public static final int BUFFER_SIZE = 1024 * 512;
     public static final long MAXIMUM_ACCOUNT_SIZE = 3000 * MB; // 3 (5 GB - std, 50 GB - ext, 1000 GB - pro)
     private static final String USER_FOLDER_PREFIX = "user-";
