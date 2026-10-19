@@ -195,7 +195,7 @@ public class WebGpxParser {
     public class WebTrack {
         private List<Point> points;
 
-        // the same points again, for the server only: the web reads points
+        // the same points as in points, not sent to the web
         private transient List<List<Point>> segments = new ArrayList<>();
         private Track ext;
         

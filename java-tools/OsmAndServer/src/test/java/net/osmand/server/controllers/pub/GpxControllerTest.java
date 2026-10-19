@@ -53,7 +53,6 @@ public class GpxControllerTest {
 		assertEquals("Starbucks", wpt.getAsJsonObject("ext").getAsJsonObject("extensions").get("osm_tag_brand").getAsString());
 	}
 
-	// /gpx/process-track-data: the web map sends the file gzipped, an old web map sends it as is
 	@Test
 	public void processTrackDataReadsGzippedFile() throws IOException {
 		byte[] gpx;
@@ -63,7 +62,6 @@ public class GpxControllerTest {
 		assertEquals(processTrackData(gpx), processTrackData(gzip(gpx)));
 	}
 
-	// /gpx/process-track-data: a gzipped file is limited once unzipped, as nginx limits a plain one
 	@Test
 	public void processTrackDataRejectsLargeUnzippedFile() throws IOException {
 		ByteArrayOutputStream out = new ByteArrayOutputStream();

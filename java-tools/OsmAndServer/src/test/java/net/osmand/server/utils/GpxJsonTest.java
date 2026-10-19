@@ -34,7 +34,6 @@ public class GpxJsonTest {
 		assertFalse(ext.has("extensions"));
 	}
 
-	// a field equal to its value in a new instance is not written
 	@Test
 	public void skipsDefaultValues() throws IOException {
 		JsonObject ext = new JsonParser().parse(trackDataJson(GpxJson.createWithNans())).getAsJsonObject()
@@ -45,7 +44,6 @@ public class GpxJsonTest {
 		assertTrue(ext.has("lat"));
 	}
 
-	// reading it back gives the same objects as reading the JSON with all the fields
 	@Test
 	public void readsSkippedFieldsAsDefaults() throws IOException {
 		WebGpxParser.TrackData all = GpxJson.create().fromJson(trackDataJson(PLAIN), WebGpxParser.TrackData.class);
