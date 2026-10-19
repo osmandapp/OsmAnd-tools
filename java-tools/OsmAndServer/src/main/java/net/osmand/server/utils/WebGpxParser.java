@@ -427,17 +427,16 @@ public class WebGpxParser {
     
     public int addTrkptToRoutePoint(int currTrkPointInd, int prevTrkPointInd, Point routePoint, List<Point> trackPoints, List<Point> routePoints) {
         if (currTrkPointInd != 0) {
-            for (Point pt : trackPoints) {
-                int pointInd = trackPoints.indexOf(pt);
-                if (pointInd > prevTrkPointInd && pointInd <= currTrkPointInd) {
-                    if (routePoint.geometry == null) {
-                        routePoint.geometry = new ArrayList<>();
-                    }
-                    if (Objects.equals(pt.profile, GAP_PROFILE_TYPE)) {
-                        routePoint.profile = GAP_PROFILE_TYPE;
-                    }
-                    routePoint.geometry.add(pt);
+            int lastInd = Math.min(currTrkPointInd, trackPoints.size() - 1);
+            for (int pointInd = Math.max(prevTrkPointInd + 1, 0); pointInd <= lastInd; pointInd++) {
+                Point pt = trackPoints.get(pointInd);
+                if (routePoint.geometry == null) {
+                    routePoint.geometry = new ArrayList<>();
                 }
+                if (Objects.equals(pt.profile, GAP_PROFILE_TYPE)) {
+                    routePoint.profile = GAP_PROFILE_TYPE;
+                }
+                routePoint.geometry.add(pt);
             }
         }
         routePoints.add(routePoint);
@@ -473,10 +472,11 @@ public class WebGpxParser {
             if (track.points == null || track.points.isEmpty() || analysis == null || analysis.getPointAttributes().isEmpty()) {
                 return;
             }
-            for (Point point : track.points) {
+            for (int pointInd = 0; pointInd < track.points.size(); pointInd++) {
+                Point point = track.points.get(pointInd);
                 if (point.geometry != null) {
-                    for (Point p : point.geometry) {
-                        int ind = point.geometry.indexOf(p);
+                    for (int ind = 0; ind < point.geometry.size(); ind++) {
+                        Point p = point.geometry.get(ind);
                         if (ind + pointsSize < analysis.getPointAttributes().size()) {
                             p.distance = analysis.getPointAttributes().get(ind + pointsSize).getDistance();
                             if (addSpeed) {
@@ -485,11 +485,10 @@ public class WebGpxParser {
                         }
                     }
                 } else {
-                    int ind = track.points.indexOf(point);
-                    if (ind < analysis.getPointAttributes().size()) {
-                        point.distance = analysis.getPointAttributes().get(ind).getDistance();
+                    if (pointInd < analysis.getPointAttributes().size()) {
+                        point.distance = analysis.getPointAttributes().get(pointInd).getDistance();
                         if (addSpeed) {
-                            point.speed = analysis.getPointAttributes().get(ind).getSpeed();
+                            point.speed = analysis.getPointAttributes().get(pointInd).getSpeed();
                         }
                     }
                 }
