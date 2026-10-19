@@ -195,7 +195,8 @@ public class WebGpxParser {
     public class WebTrack {
         private List<Point> points;
 
-        private List<List<Point>> segments = new ArrayList<>();
+        // the same points again, for the server only: the web reads points
+        private transient List<List<Point>> segments = new ArrayList<>();
         private Track ext;
         
         public WebTrack(Track track, List<GpxUtilities.RouteType> routeTypes) {
