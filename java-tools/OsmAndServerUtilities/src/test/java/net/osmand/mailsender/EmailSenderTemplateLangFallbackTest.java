@@ -29,8 +29,8 @@ public class EmailSenderTemplateLangFallbackTest {
 
 	@Test
 	public void languageWithoutFileFallsBackToEnglish() throws IOException {
-		assertTrue(load("de").contains("English"));
-		assertTrue(load("de-DE").contains("English"));
+		assertTrue(load("xx").contains("English"));
+		assertTrue(load("xx-XX").contains("English"));
 	}
 
 	private String load(String lang) throws IOException {
