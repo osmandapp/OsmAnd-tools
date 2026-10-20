@@ -1,5 +1,8 @@
 package net.osmand.server.api.services.search;
 
+import static net.osmand.shared.data.AmenityTagEntriesBuilder.ValueLabel.NAME;
+import static net.osmand.shared.data.AmenityTagEntriesBuilder.ValueLabel.NAME_OVER_VALUE;
+import static net.osmand.shared.data.AmenityTagEntriesBuilder.ValueLabel.WHOLE;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -12,12 +15,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.junit.Test;
 
 import net.osmand.server.utils.WebGpxParser;
+import net.osmand.shared.data.AmenityTagEntriesBuilder.ValueLabel;
 import net.osmand.shared.gpx.GpxUtilities;
 import okio.Buffer;
 
@@ -74,39 +77,32 @@ public class AmenityTagsServiceTest {
 		assertShown(visibleKeys(tags), "internet_access:fee", "authentication:phone_call:number");
 	}
 
-	// a group of one property (wheelchair=*) or of a list of options (boat:<kind>:rental=yes) with its OSM values
 	@Test
-	public void groupsTellOneTagAndValues() {
-		Map<String, String> tags = Map.of("amenity_type", "sustenance", "amenity_subtype", "cafe",
-				"collapsable_wheelchair_accessibility", "wheelchair_limited");
-		AmenityTagsService.VisibleTag wheelchair = service.convertToVisibleTags(tags, "en").stream()
-				.filter(tag -> tag.key().equals("collapsable_wheelchair_accessibility")).findFirst().orElseThrow();
-		assertEquals(Boolean.TRUE, wheelchair.oneTag());
-		assertEquals(List.of("limited"), wheelchair.osmValues());
-
-		Map<String, String> boats = Map.of("amenity_type", "service", "amenity_subtype", "boat_rental",
-				"collapsable_boat_rental_type", "boat_kayak_rental_yes;boat_canoe_rental_yes");
-		AmenityTagsService.VisibleTag rented = service.convertToVisibleTags(boats, "en").stream()
-				.filter(tag -> tag.key().equals("collapsable_boat_rental_type")).findFirst().orElseThrow();
-		assertEquals(Boolean.FALSE, rented.oneTag());
-		assertEquals(List.of("yes", "yes"), rented.osmValues());
+	public void valueLabels() {
+		assertEquals(List.of(NAME_OVER_VALUE), labels(Map.of("amenity_type", "sustenance", "amenity_subtype", "cafe",
+				"takeaway_yes", "yes"), "takeaway_yes"));
+		assertEquals(List.of(NAME_OVER_VALUE), labels(Map.of("amenity_type", "sustenance", "amenity_subtype", "cafe",
+				"collapsable_wheelchair_accessibility", "wheelchair_limited"), "collapsable_wheelchair_accessibility"));
+		assertEquals(List.of(NAME, NAME), labels(Map.of("amenity_type", "service", "amenity_subtype", "boat_rental",
+				"collapsable_boat_rental_type", "boat_kayak_rental_yes;boat_canoe_rental_yes"),
+				"collapsable_boat_rental_type"));
+		assertEquals(List.of(NAME, WHOLE), labels(Map.of("amenity_type", "transportation",
+				"amenity_subtype", "toll_booth", "collapsable_payment_toll_type",
+				"payment_e_zpass_yes;payment_pikepass_designated"), "collapsable_payment_toll_type"));
 	}
 
-	// only a group of additional values carries oneTag / osmValues
 	@Test
-	public void otherRowsHaveNoGroupFields() {
+	public void otherRowsHaveNoLabels() {
 		Map<String, String> tags = Map.of("amenity_type", "sustenance", "amenity_subtype", "cafe", "bar", "yes",
-				"phone", "+380441234567", "description:en", "Hello", "description:de", "Hallo",
-				"collapsable_smoking", "smoking_no");
-		Map<String, AmenityTagsService.VisibleTag> byKey = service.convertToVisibleTags(tags, "en").stream()
-				.collect(Collectors.toMap(AmenityTagsService.VisibleTag::key, Function.identity()));
-		assertEquals(Set.of("collapsable_sustenance", "phone", "description", "collapsable_smoking"), byKey.keySet());
+				"phone", "+380441234567", "description:en", "Hello", "description:de", "Hallo");
 		for (String key : List.of("collapsable_sustenance", "phone", "description")) {
-			assertNull(key, byKey.get(key).oneTag());
-			assertNull(key, byKey.get(key).osmValues());
+			assertNull(key, labels(tags, key));
 		}
-		assertEquals(Boolean.TRUE, byKey.get("collapsable_smoking").oneTag());
-		assertEquals(List.of("no"), byKey.get("collapsable_smoking").osmValues());
+	}
+
+	private List<ValueLabel> labels(Map<String, String> tags, String key) {
+		return service.convertToVisibleTags(tags, "en").stream().filter(tag -> tag.key().equals(key)).findFirst()
+				.orElseThrow().labels();
 	}
 
 	private Set<String> visibleKeys(Map<String, String> tags) {
