@@ -1,6 +1,7 @@
 package net.osmand.server.api.services.search;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
@@ -11,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.junit.Test;
@@ -88,6 +90,23 @@ public class AmenityTagsServiceTest {
 				.filter(tag -> tag.key().equals("collapsable_boat_rental_type")).findFirst().orElseThrow();
 		assertEquals(Boolean.FALSE, rented.oneTag());
 		assertEquals(List.of("yes", "yes"), rented.osmValues());
+	}
+
+	// only a group of additional values carries oneTag / osmValues
+	@Test
+	public void otherRowsHaveNoGroupFields() {
+		Map<String, String> tags = Map.of("amenity_type", "sustenance", "amenity_subtype", "cafe", "bar", "yes",
+				"phone", "+380441234567", "description:en", "Hello", "description:de", "Hallo",
+				"collapsable_smoking", "smoking_no");
+		Map<String, AmenityTagsService.VisibleTag> byKey = service.convertToVisibleTags(tags, "en").stream()
+				.collect(Collectors.toMap(AmenityTagsService.VisibleTag::key, Function.identity()));
+		assertEquals(Set.of("collapsable_sustenance", "phone", "description", "collapsable_smoking"), byKey.keySet());
+		for (String key : List.of("collapsable_sustenance", "phone", "description")) {
+			assertNull(key, byKey.get(key).oneTag());
+			assertNull(key, byKey.get(key).osmValues());
+		}
+		assertEquals(Boolean.TRUE, byKey.get("collapsable_smoking").oneTag());
+		assertEquals(List.of("no"), byKey.get("collapsable_smoking").osmValues());
 	}
 
 	private Set<String> visibleKeys(Map<String, String> tags) {

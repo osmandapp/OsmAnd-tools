@@ -4,7 +4,6 @@ import net.osmand.data.Amenity;
 import net.osmand.shared.data.AdditionalInfoBundle;
 import net.osmand.shared.data.AmenityTagEntriesBuilder;
 import net.osmand.shared.data.AmenityTagEntry;
-import net.osmand.shared.osm.AbstractPoiType;
 import net.osmand.shared.osm.PoiCategory;
 import net.osmand.shared.osm.PoiType;
 import net.osmand.util.Algorithms;
@@ -105,8 +104,7 @@ public class AmenityTagsService {
 		return result;
 	}
 
-	// a group row; the web builds the labels from its translations like the apps: "Smoking" over "No" when
-	// all values of the group are one tag, "Rented boats" over "Kayaks" for a list of options
+	// oneTag and osmValues let the web label the group like the apps: "Smoking" over "No", "Rented boats" over "Kayaks"
 	private VisibleTag toGroupTag(AmenityTagEntry tagEntry) {
 		String key = Amenity.COLLAPSABLE_PREFIX + tagEntry.key;
 		List<PoiType> types = tagEntry.collapsablePoiTypes;
@@ -114,26 +112,8 @@ public class AmenityTagsService {
 			return new VisibleTag(key, joinPoiTypeKeys(tagEntry), null);
 		}
 		List<String> osmValues = types.stream().map(PoiType::getOsmValue).collect(Collectors.toList());
-		return new VisibleTag(key, joinPoiTypeKeys(tagEntry), null, null, null, isOneTagGroup(types.get(0)),
-				osmValues);
-	}
-
-	// all values of the group are one tag (smoking=yes/no/outside), not a list of options (boat:kayak:rental, ...)
-	private boolean isOneTagGroup(PoiType type) {
-		String category = type.getPoiAdditionalCategory();
-		AbstractPoiType parent = type.getParentType();
-		if (category == null || parent == null) {
-			return true;
-		}
-		Set<String> tags = new HashSet<>();
-		for (List<PoiType> additionals : List.of(parent.getPoiAdditionals(), parent.getPoiAdditionalsCategorized())) {
-			for (PoiType additional : additionals) {
-				if (category.equals(additional.getPoiAdditionalCategory()) && additional.getOsmTag() != null) {
-					tags.add(additional.getOsmTag());
-				}
-			}
-		}
-		return tags.size() <= 1;
+		return new VisibleTag(key, joinPoiTypeKeys(tagEntry), null, null, null,
+				AmenityTagEntriesBuilder.isOneTagGroup(types.get(0)), osmValues);
 	}
 
 	private VisibleTag toPlainTag(AmenityTagEntry tagEntry, Set<String> genericRowKeys) {
