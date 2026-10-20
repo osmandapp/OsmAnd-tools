@@ -9,8 +9,8 @@ public class EmailSenderServiceShareSettingsPathTest {
 
 	@Test
 	public void trackOpensTracksShareMenu() {
-		assertEquals("mydata/tracks/info/c2hhcmUtNjQ4LXJlcXVlc3QuZ3B4/share/",
-				EmailSenderService.getShareSettingsPath(file("share-648-request.gpx", "GPX")));
+		assertEquals("mydata/tracks/info/dHJhY2suZ3B4/share/",
+				EmailSenderService.getShareSettingsPath(file("track.gpx", "GPX")));
 	}
 
 	@Test
