@@ -407,12 +407,16 @@ public class EmailSenderTemplate {
 	}
 
 	private File findTemplateFile(String template, String lang) {
-		List<String> search = Arrays.asList(
-				defaultTemplatesDirectory + "/" + template + "/" + lang + ".html", // dir/template/name/lang.html
-				defaultTemplatesDirectory + "/" + template + "/" + "en" + ".html", // dir/template/name/en.html
-				defaultTemplatesDirectory + "/" + template + "/" + "index" + ".html", // dir/template/name/index.html
-				defaultTemplatesDirectory + "/" + template + ".html" // dir/template/name.html
-		);
+		String dir = defaultTemplatesDirectory + "/" + template;
+		String baseLang = lang.split("[-_]")[0]; // ru-RU, pt_BR -> ru, pt
+		List<String> search = new ArrayList<>();
+		search.add(dir + "/" + lang + ".html"); // dir/template/name/lang.html
+		if (!baseLang.equals(lang)) {
+			search.add(dir + "/" + baseLang + ".html"); // dir/template/name/ru.html for ru-RU
+		}
+		search.add(dir + "/en.html"); // dir/template/name/en.html
+		search.add(dir + "/index.html"); // dir/template/name/index.html
+		search.add(dir + ".html"); // dir/template/name.html
 
 		for (String path : search) {
 			String cleaned = path

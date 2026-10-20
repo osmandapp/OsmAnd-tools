@@ -215,6 +215,10 @@ public class OrderManagementController {
 			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("OsmAnd Cloud account not found");
 		}
 		Date validFrom = userdataService.createWebLoginLink(pu);
+		if (validFrom == null) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+					.body("The owner email was not sent, the link was not created");
+		}
 		LOG.info("web-link: created by " + auth.getName() + " for " + pu.email);
 		Map<String, Object> res = new LinkedHashMap<>();
 		res.put("url", userdataService.getWebLinkUrl(pu));
