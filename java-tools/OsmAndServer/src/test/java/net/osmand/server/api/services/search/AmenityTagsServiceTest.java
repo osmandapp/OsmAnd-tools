@@ -63,13 +63,13 @@ public class AmenityTagsServiceTest {
 	@Test
 	public void onlyUnknownKeysOfThePointAreGeneric() {
 		Map<String, String> tags = Map.of("amenity_type", "sustenance", "amenity_subtype", "cafe",
-				"internet_access:fee", "no", "authentication:phone_call:number", "+380441234567",
+				"internet_access:ssid", "CafeWiFi", "authentication:phone_call:number", "+380441234567",
 				"test:country", "US", "my_note", "hello");
 		Set<String> generic = service.convertToVisibleTags(tags, "en").stream()
 				.filter(tag -> Boolean.TRUE.equals(tag.generic())).map(AmenityTagsService.VisibleTag::key)
 				.collect(Collectors.toSet());
 		assertEquals(Set.of("test:country", "my_note"), generic);
-		assertShown(visibleKeys(tags), "internet_access:fee", "authentication:phone_call:number");
+		assertShown(visibleKeys(tags), "internet_access:ssid", "authentication:phone_call:number");
 	}
 
 	private Set<String> visibleKeys(Map<String, String> tags) {
