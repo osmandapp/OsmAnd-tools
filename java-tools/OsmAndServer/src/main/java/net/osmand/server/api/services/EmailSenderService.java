@@ -297,14 +297,23 @@ public class EmailSenderService {
 		LOGGER.info("sendPurchaseReceiptEmail order " + orderId + " to: " + shorten(email) + " (" + ok + ") [" + lang + "]");
 	}
     
-    public void sendOsmAndCloudWebLinkEmail(String email, String cancelUrl) {
-	    boolean ok = new EmailSenderTemplate()
-			    .load("cloud/web-link")
-			    .set("CANCEL_URL", cancelUrl)
-			    .to(email)
-			    .send()
-			    .isSuccess();
-	    LOGGER.info("sendOsmAndCloudWebLinkEmail to: " + shorten(email) + " (" + ok + ")");
+    public boolean sendOsmAndCloudWebLinkEmail(String email, String lang, String cancelUrl) {
+	    boolean ok;
+	    try {
+		    ok = new EmailSenderTemplate()
+				    .load("cloud/account/web-link", lang)
+				    .set("CANCEL_URL", cancelUrl)
+				    .set("WEB_LINK_VALID_FROM_HOURS", String.valueOf(UserdataService.WEB_LINK_VALID_FROM_HOURS))
+				    .set("WEB_LINK_VALID_TO_HOURS", String.valueOf(UserdataService.WEB_LINK_VALID_TO_HOURS))
+				    .to(email)
+				    .send()
+				    .isSuccess();
+	    } catch (Exception e) {
+		    LOGGER.error("Failed to send web link email: " + e.getMessage(), e);
+		    ok = false;
+	    }
+	    LOGGER.info("sendOsmAndCloudWebLinkEmail to: " + shorten(email) + " (" + ok + ") [" + lang + "]");
+	    return ok;
 	}
 
 	public void sendPurchaseLinkedEmail(String email, String lang, String productName, boolean subscription) {
