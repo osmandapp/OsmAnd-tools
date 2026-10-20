@@ -40,6 +40,7 @@ import net.osmand.data.City;
 import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
 import net.osmand.osm.MapPoiTypes;
+import net.osmand.osm.PoiAdditionalLabels;
 import net.osmand.osm.PoiType;
 import net.osmand.search.core.ObjectType;
 import net.osmand.search.core.SearchCoreFactory;
@@ -360,11 +361,12 @@ public class SpatialSearchService {
 				SearchCoreFactory.PoiAdditionalCustomFilter filter =
 						new SearchCoreFactory.PoiAdditionalCustomFilter(MapPoiTypes.getDefault(), poiType);
 				Map<String, String> tags = searchResultConverter.getPoiTypeFields(filter);
-				tags.put(SearchResultConverter.PoiTypeField.NAME.getFieldName(), filter.getTranslation());
+				tags.put(SearchResultConverter.PoiTypeField.NAME.getFieldName(), PoiAdditionalLabels.getSearchName(poiType));
 				return tags;
 			}
 			Map<String, String> tags = searchResultConverter.getPoiTypeFields(type.singleType);
-			tags.put(SearchResultConverter.PoiTypeField.NAME.getFieldName(), type.singleType.getTranslation());
+			tags.put(SearchResultConverter.PoiTypeField.NAME.getFieldName(),
+					PoiAdditionalLabels.getSearchName(type.singleType));
 			if (type.getWikidataId() != null) {
 				tags.put(SearchResultConverter.PoiTypeField.WIKIDATA_ID.getFieldName(), type.getWikidataId());
 			}
