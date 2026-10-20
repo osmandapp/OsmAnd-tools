@@ -426,7 +426,7 @@ public class PoiSearchService {
 		if (poiFeature != null && wikidataId == null) {
 			Object wikiIdFromOsm = poiFeature.properties.get("osm_tag_wikidata");
 			if (wikiIdFromOsm != null) {
-				wikidataId = Long.parseLong(wikiIdFromOsm.toString().replace("Q", ""));
+				wikidataId = WikiService.parseWikidataId(wikiIdFromOsm.toString());
 			}
 		}
 

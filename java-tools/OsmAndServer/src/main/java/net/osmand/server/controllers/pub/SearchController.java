@@ -398,6 +398,13 @@ public class SearchController {
 		return ResponseEntity.ok(gson.toJson(content));
 	}
 
+	@GetMapping(path = {"/get-wiki-short-descriptions"}, produces = "application/json")
+	@ResponseBody
+	public ResponseEntity<String> getWikiShortDescriptions(@RequestParam String wikidata,
+	                                                       @RequestParam(required = false) String lang) {
+		return ResponseEntity.ok(gson.toJson(wikiService.getWikiShortDescriptions(wikidata, lang)));
+	}
+
 	@GetMapping(path = {"/get-wikivoyage-content"}, produces = "application/json")
 	@ResponseBody
 	public ResponseEntity<String> getWikivoyageContent(@RequestParam String title, @RequestParam String lang) {

@@ -17,6 +17,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import net.osmand.server.api.services.search.SearchResultConverter;
+import net.osmand.data.Amenity;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiType;
 import net.osmand.shared.wiki.WikiHelper;
@@ -30,6 +31,7 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.PreparedStatementSetter;
@@ -58,6 +60,7 @@ public class WikiService {
 	private static final String IMAGE_ROOT_URL = "https://upload.wikimedia.org/wikipedia/commons/";
 	private static final String OSMAND_IMAGE_ROOT_URL = "https://data.osmand.net/wikimedia/images-1280/";
 	private static final String THUMB_PREFIX = "320px-";
+	private static final String DEFAULT_SHORT_DESC_LANG = "en";
 	public static final String LANG_CODE_REGEX = "^[a-z]{2,3}(-[A-Za-z]{2,4})?$"; // "uk" "hsb" "zh-TW" "sr-Latn"
 	protected static int FILE_URL_TO_USE = 1;
 
@@ -302,6 +305,54 @@ public class WikiService {
 		});
 	}
 	
+	public Map<String, String> getWikiShortDescriptions(String wikidata, String lang) {
+		Long wikidataId = parseWikidataId(wikidata);
+		if (!config.wikiInitialized() || wikidataId == null) {
+			return Map.of();
+		}
+		String wikiLang = Algorithms.isEmpty(lang) ? "" : Locale.forLanguageTag(lang).getLanguage();
+		String query = "SELECT w.wikiArticleLangs AS langs, w.wikiArticleContents AS contents "
+				+ "FROM wiki.wikidata w WHERE w.id = ? LIMIT 1";
+		try {
+			return jdbcTemplate.query(query, ps -> ps.setLong(1, wikidataId), rs -> {
+				Map<String, String> result = new LinkedHashMap<>();
+				if (rs.next()) {
+					Array langsArray = rs.getArray("langs");
+					Array contentsArray = rs.getArray("contents");
+					if (langsArray != null && contentsArray != null) {
+						Object[] articleLangs = (Object[]) langsArray.getArray();
+						Object[] contents = (Object[]) contentsArray.getArray();
+						for (int i = 0; i < articleLangs.length && i < contents.length; i++) {
+							String articleLang = String.valueOf(articleLangs[i]);
+							String desc = contents[i] instanceof List<?> list ? getFromArray(list, 1) : null;
+							if (Algorithms.isEmpty(desc)) {
+								continue;
+							}
+							if (DEFAULT_SHORT_DESC_LANG.equals(articleLang)) {
+								result.put(Amenity.SHORT_DESCRIPTION, desc);
+							} else if (articleLang.equals(wikiLang)) {
+								result.put(Amenity.SHORT_DESCRIPTION + ":" + articleLang, desc);
+							}
+						}
+					}
+				}
+				return result;
+			});
+		} catch (DataAccessException e) {
+			log.warn("Failed to read wiki short descriptions for " + wikidata, e);
+			return Map.of();
+		}
+	}
+
+	public static Long parseWikidataId(String wikidata) {
+		if (Algorithms.isEmpty(wikidata)) {
+			return null;
+		}
+		String ind = wikidata.substring(wikidata.lastIndexOf('Q') + 1).trim();
+		long wikidataId = Algorithms.parseLongSilently(ind, 0);
+		return wikidataId > 0 ? wikidataId : null;
+	}
+
 	public String getWikivoyageContent(String title, String lang) {
 		String query = "SELECT hex(content_gz) AS ziphex FROM wiki.wikivoyage_articles WHERE title = ? AND lang = ?";
 		return jdbcTemplate.query(query, ps -> {
