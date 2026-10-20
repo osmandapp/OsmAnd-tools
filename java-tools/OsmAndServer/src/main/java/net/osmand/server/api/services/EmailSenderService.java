@@ -1,12 +1,14 @@
 package net.osmand.server.api.services;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.text.DateFormat;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
-import java.util.UUID;
 
 import net.osmand.mailsender.EmailSenderTemplate;
 import net.osmand.server.PurchasesDataLoader;
@@ -140,43 +142,71 @@ public class EmailSenderService {
 			if (owner == null) {
 				return;
 			}
-			CloudUserFilesRepository.UserFile userFile =
-					filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(file.ownerid, file.filepath, file.type);
-			sendShareFileAccessEmail(requester.email, getLatestUserLang(requester.id), approved, owner,
-					file.name, file.type, userFile == null ? 0 : userFile.filesize, file.uuid);
+			String ownerName = owner.nickname;
+			if (Algorithms.isEmpty(ownerName)) {
+				int at = Algorithms.isEmpty(owner.email) ? -1 : owner.email.indexOf('@');
+				ownerName = at > 0 ? owner.email.substring(0, at) : null;
+			}
+			String template = approved ? "cloud/share/approved" : "cloud/share/declined";
+			boolean ok = loadShareFileTemplate(template, getLatestUserLang(requester.id), file)
+					.set("OWNER_NAME", Algorithms.isEmpty(ownerName) ? "@OWNER_DEFAULT@" : htmlText(ownerName))
+					.to(requester.email)
+					.send()
+					.isSuccess();
+			LOGGER.info("sendShareFileAccessEmail approved=" + approved + " to: " + shorten(requester.email) + " (" + ok + ")");
 		} catch (Exception e) {
 			LOGGER.error("Failed to send share access email: " + e.getMessage(), e);
 		}
 	}
 
-	private void sendShareFileAccessEmail(String email, String lang, boolean approved,
-			CloudUsersRepository.CloudUser owner, String fileName, String fileType, long fileSize, UUID fileUuid) {
-		String ownerName = owner.nickname;
-		if (Algorithms.isEmpty(ownerName)) {
-			int at = Algorithms.isEmpty(owner.email) ? -1 : owner.email.indexOf('@');
-			ownerName = at > 0 ? owner.email.substring(0, at) : null;
+	public void sendShareFileRequestEmail(ShareFileRepository.ShareFilesAccess access) {
+		ShareFileRepository.ShareFile file = access.file;
+		CloudUsersRepository.CloudUser requester = access.user;
+		if (file == null || requester == null) {
+			return;
 		}
-		String name = fileName == null ? "" : fileName;
+		try {
+			CloudUsersRepository.CloudUser owner = usersRepository.findById(file.ownerid);
+			if (owner == null || Algorithms.isEmpty(owner.email)) {
+				return;
+			}
+			boolean ok = loadShareFileTemplate("cloud/share/requested", getLatestUserLang(owner.id), file)
+					.set("REQUESTER_NAME", htmlText(requester.nickname))
+					.set("FILE_SHARE_SETTINGS_PATH", getShareSettingsPath(file))
+					.to(owner.email)
+					.send()
+					.isSuccess();
+			LOGGER.info("sendShareFileRequestEmail to: " + shorten(owner.email) + " (" + ok + ")");
+		} catch (Exception e) {
+			LOGGER.error("Failed to send share request email: " + e.getMessage(), e);
+		}
+	}
+
+	private EmailSenderTemplate loadShareFileTemplate(String template, String lang, ShareFileRepository.ShareFile file) {
+		CloudUserFilesRepository.UserFile userFile =
+				filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(file.ownerid, file.filepath, file.type);
+		String name = file.name == null ? "" : file.name;
 		int dotIdx = name.lastIndexOf('.');
 		String ext = dotIdx > 0 && dotIdx < name.length() - 1
 				? name.substring(dotIdx + 1).toUpperCase(Locale.ROOT) : "FILE";
-		String meta = fileType == null ? ext : fileType;
-		if (fileSize > 0) {
-			meta = meta + " · " + Algorithms.formatFileSize(fileSize);
+		String meta = file.type == null ? ext : file.type;
+		if (userFile != null && userFile.filesize > 0) {
+			meta = meta + " · " + Algorithms.formatFileSize(userFile.filesize);
 		}
-		String template = approved ? "cloud/share/approved" : "cloud/share/declined";
-		boolean ok = new EmailSenderTemplate()
+		return new EmailSenderTemplate()
 				.load(template, lang)
-				.set("OWNER_NAME", Algorithms.isEmpty(ownerName) ? "@OWNER_DEFAULT@" : htmlText(ownerName))
 				.set("FILE_NAME", htmlText(name))
 				.set("FILE_NAME_PLAIN", plainText(name))
 				.set("FILE_EXT", htmlText(ext))
 				.set("FILE_META", htmlText(meta))
-				.set("FILE_UUID", fileUuid == null ? "" : fileUuid.toString())
-				.to(email)
-				.send()
-				.isSuccess();
-		LOGGER.info("sendShareFileAccessEmail approved=" + approved + " to: " + shorten(email) + " (" + ok + ")");
+				.set("FILE_UUID", file.uuid == null ? "" : file.uuid.toString());
+	}
+
+	// the same path as the web builds for the Share menu of a track or a favorites group
+	static String getShareSettingsPath(ShareFileRepository.ShareFile file) {
+		String dir = UserdataService.FILE_TYPE_FAVOURITES.equals(file.type) ? "favorites" : "tracks";
+		String id = Base64.getEncoder().encodeToString(file.filepath.getBytes(StandardCharsets.UTF_8));
+		return "mydata/" + dir + "/info/" + URLEncoder.encode(id, StandardCharsets.UTF_8) + "/share/";
 	}
 
 	static String htmlText(String s) {
