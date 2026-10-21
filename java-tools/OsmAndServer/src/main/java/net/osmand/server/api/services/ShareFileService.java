@@ -224,6 +224,7 @@ public class ShareFileService {
 		shareFile.addAccessRecord(access);
 
 		shareFileRepository.saveAndFlush(shareFile);
+		emailSender.sendAfterCommit(() -> emailSender.sendShareFileRequestEmail(access));
 	}
 
 	public CloudUserFilesRepository.UserFile getUserFile(ShareFileRepository.ShareFile file) {

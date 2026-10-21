@@ -25,6 +25,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
+import jakarta.annotation.Nullable;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -147,7 +148,7 @@ public class UserdataService {
     public static final String MODEL_DEVICE_WEB = "Web";
     public static final String TOKEN_DEVICE_WEB = "web";
     public static final int ERROR_CODE_PRO_USERS = 100;
-    private static final long MB = 1024 * 1024;
+    static final long MB = 1024 * 1024;
     public static final int BUFFER_SIZE = 1024 * 512;
     public static final long MAXIMUM_ACCOUNT_SIZE = 3000 * MB; // 3 (5 GB - std, 50 GB - ext, 1000 GB - pro)
     private static final String USER_FOLDER_PREFIX = "user-";
@@ -1663,17 +1664,27 @@ public class UserdataService {
 
     // Support creates the link, the owner gets an email that lets them cancel it.
     // The link works only after a delay, so whoever created it can't use it before the owner can react.
-    public static final long WEB_LINK_VALID_FROM = TimeUnit.HOURS.toMillis(6);
-    public static final long WEB_LINK_VALID_TO = TimeUnit.HOURS.toMillis(72);
+    public static final int WEB_LINK_VALID_FROM_HOURS = 6;
+    public static final int WEB_LINK_VALID_TO_HOURS = 72;
+    public static final long WEB_LINK_VALID_FROM = TimeUnit.HOURS.toMillis(WEB_LINK_VALID_FROM_HOURS);
+    public static final long WEB_LINK_VALID_TO = TimeUnit.HOURS.toMillis(WEB_LINK_VALID_TO_HOURS);
     public static final String WEB_LINK_URL = "https://osmand.net/map/account/";
 
+    // stored only after the owner email went out
+    @Nullable
     public Date createWebLoginLink(CloudUsersRepository.CloudUser pu) {
         byte[] bytes = new byte[24];
         new SecureRandom().nextBytes(bytes);
-        pu.webLinkToken = HexFormat.of().formatHex(bytes);
+        String token = HexFormat.of().formatHex(bytes);
+        boolean sent = emailSender.sendOsmAndCloudWebLinkEmail(pu.email, emailSender.getLatestUserLang(pu.id),
+                getWebLinkCancelUrl(pu.email, token));
+        if (!sent) {
+            LOG.error("web-link: owner email not sent, link not created for " + EmailSenderService.shorten(pu.email));
+            return null;
+        }
+        pu.webLinkToken = token;
         pu.webLinkTime = new Date();
         usersRepository.saveAndFlush(pu);
-        emailSender.sendOsmAndCloudWebLinkEmail(pu.email, getWebLinkCancelUrl(pu));
         LOG.info("web-link: created for " + EmailSenderService.shorten(pu.email));
         return new Date(pu.webLinkTime.getTime() + WEB_LINK_VALID_FROM);
     }
@@ -1682,15 +1693,15 @@ public class UserdataService {
         return WEB_LINK_URL + "?email=" + URLEncoder.encode(pu.email, StandardCharsets.UTF_8) + "&link=" + pu.webLinkToken;
     }
 
-    private String getWebLinkCancelUrl(CloudUsersRepository.CloudUser pu) {
-        return WEB_LINK_URL + "?email=" + URLEncoder.encode(pu.email, StandardCharsets.UTF_8) + "&cancel-link="
-                + getWebLinkCancelCode(pu);
+    private String getWebLinkCancelUrl(String email, String token) {
+        return WEB_LINK_URL + "?email=" + URLEncoder.encode(email, StandardCharsets.UTF_8) + "&cancel-link="
+                + getWebLinkCancelCode(token);
     }
 
     // the cancel code can't be turned back into the link token
-    private String getWebLinkCancelCode(CloudUsersRepository.CloudUser pu) {
+    private String getWebLinkCancelCode(String token) {
         try {
-            byte[] hash = MessageDigest.getInstance("SHA-256").digest(pu.webLinkToken.getBytes(StandardCharsets.UTF_8));
+            byte[] hash = MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hash, 0, 16);
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
@@ -1708,7 +1719,7 @@ public class UserdataService {
 
     public ResponseEntity<String> cancelWebLoginLink(String email, String cancelCode) {
         CloudUsersRepository.CloudUser pu = email == null ? null : usersRepository.findByEmailIgnoreCase(email.trim());
-        if (pu == null || pu.webLinkToken == null || cancelCode == null || !getWebLinkCancelCode(pu).equals(cancelCode)) {
+        if (pu == null || pu.webLinkToken == null || cancelCode == null || !getWebLinkCancelCode(pu.webLinkToken).equals(cancelCode)) {
             return ResponseEntity.badRequest().body("Link is not valid or already cancelled");
         }
         pu.webLinkToken = null;

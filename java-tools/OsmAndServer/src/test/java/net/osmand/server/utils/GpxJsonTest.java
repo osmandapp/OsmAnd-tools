@@ -9,8 +9,6 @@ import org.junit.Test;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
@@ -36,12 +34,22 @@ public class GpxJsonTest {
 		assertFalse(ext.has("extensions"));
 	}
 
-	// all but the extensions is written as Gson writes the fields
 	@Test
-	public void otherFieldsAsPlainGson() throws IOException {
-		JsonElement plain = new JsonParser().parse(trackDataJson(PLAIN));
-		arraysToObjects(plain);
-		assertEquals(plain, new JsonParser().parse(trackDataJson(GpxJson.createWithNans())));
+	public void skipsDefaultValues() throws IOException {
+		JsonObject ext = new JsonParser().parse(trackDataJson(GpxJson.createWithNans())).getAsJsonObject()
+				.getAsJsonArray("tracks").get(0).getAsJsonObject().getAsJsonArray("points").get(0).getAsJsonObject()
+				.getAsJsonObject("ext");
+		assertFalse(ext.has("hdop"));
+		assertFalse(ext.has("deleted"));
+		assertTrue(ext.has("lat"));
+	}
+
+	@Test
+	public void readsSkippedFieldsAsDefaults() throws IOException {
+		WebGpxParser.TrackData all = GpxJson.create().fromJson(trackDataJson(PLAIN), WebGpxParser.TrackData.class);
+		WebGpxParser.TrackData skipped = GpxJson.create().fromJson(trackDataJson(GpxJson.createWithNans()),
+				WebGpxParser.TrackData.class);
+		assertEquals(PLAIN.toJson(all), PLAIN.toJson(skipped));
 	}
 
 	// the JSON of the web map written before GpxJson carries the arrays
@@ -63,31 +71,5 @@ public class GpxJsonTest {
 	private static JsonObject wptExt(String json) {
 		return new JsonParser().parse(json).getAsJsonObject().getAsJsonArray("wpts").get(0).getAsJsonObject()
 				.getAsJsonObject("ext");
-	}
-
-	private static void arraysToObjects(JsonElement e) {
-		if (e.isJsonArray()) {
-			e.getAsJsonArray().forEach(GpxJsonTest::arraysToObjects);
-		} else if (e.isJsonObject()) {
-			JsonObject o = e.getAsJsonObject();
-			o.entrySet().forEach(entry -> arraysToObjects(entry.getValue()));
-			arrayToObject(o, "extensionsArray", "extensions");
-			arrayToObject(o, "deferredArray", "deferredExtensions");
-		}
-	}
-
-	private static void arrayToObject(JsonObject o, String arrayName, String objectName) {
-		JsonElement array = o.remove(arrayName);
-		if (array == null || !array.isJsonArray()) {
-			return;
-		}
-		JsonArray pairs = array.getAsJsonArray();
-		JsonObject map = new JsonObject();
-		for (int i = 0; i + 1 < pairs.size(); i += 2) {
-			if (!pairs.get(i + 1).isJsonNull()) {
-				map.add(pairs.get(i).getAsString(), pairs.get(i + 1));
-			}
-		}
-		o.add(objectName, map);
 	}
 }

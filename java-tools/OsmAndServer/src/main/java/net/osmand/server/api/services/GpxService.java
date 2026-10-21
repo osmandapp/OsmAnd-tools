@@ -32,6 +32,7 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.*;
+import java.nio.file.Files;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -49,6 +50,7 @@ public class GpxService {
     public static final int MAX_SIZE_FILES = 10;
     public static final int MAX_SIZE_FILES_AUTH = 100;
     public static final String ERROR_WRITING_GPX_MSG = "Error writing gpx!";
+    private static final long MAX_UNZIPPED_FILE_SIZE = 100 * UserdataService.MB;
     
     @Autowired
     WebGpxParser webGpxParser;
@@ -301,11 +303,22 @@ public class GpxService {
 
     public File saveMultipartFileToTemp(MultipartFile file, String httpSessionId) throws IOException {
         File tmpFile = File.createTempFile(GPX_FILE_PREFIX + httpSessionId, GPX_FILE_EXT);
-        InputStream is = file.getInputStream();
-        FileOutputStream fous = new FileOutputStream(tmpFile);
-        Algorithms.streamCopy(is, fous);
-        is.close();
-        fous.close();
+        try (InputStream is = new BufferedInputStream(file.getInputStream());
+             FileOutputStream fous = new FileOutputStream(tmpFile)) {
+            if (isGzipStream(is)) {
+                try (InputStream unzipped = new GZIPInputStream(is)) {
+                    if (!Algorithms.streamCopy(unzipped, fous, MAX_UNZIPPED_FILE_SIZE)) {
+                        throw new OsmAndPublicApiException(HttpStatus.PAYLOAD_TOO_LARGE.value(),
+                                "The unzipped file is larger than " + MAX_UNZIPPED_FILE_SIZE / UserdataService.MB + " MB");
+                    }
+                }
+            } else {
+                Algorithms.streamCopy(is, fous);
+            }
+        } catch (IOException | RuntimeException e) {
+            Files.deleteIfExists(tmpFile.toPath());
+            throw e;
+        }
         return tmpFile;
     }
     
