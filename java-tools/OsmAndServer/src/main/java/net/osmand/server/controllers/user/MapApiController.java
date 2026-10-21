@@ -130,7 +130,7 @@ public class MapApiController {
 	}
 
 	@GetMapping(path = { "/auth/info" }, produces = "application/json")
-	public String userInfo(java.security.Principal user) {
+	public String userInfo(java.security.Principal user, HttpServletRequest request) throws ServletException {
 		if (user == null) {
 			return gson.toJson(user);
 		}
@@ -138,6 +138,10 @@ public class MapApiController {
 			Object obj = ((Authentication) user).getPrincipal();
 			if (obj instanceof OsmAndProUser) {
 				OsmAndProUser pu = (OsmAndProUser) ((Authentication) user).getPrincipal();
+				if (usersRepository.findById(pu.getUserDevice().userid) == null) {
+					request.logout();
+					return gson.toJson(null);
+				}
 				List<String> roles = pu.getAuthorities().stream()
 						.map(GrantedAuthority::getAuthority)
 						.toList();
