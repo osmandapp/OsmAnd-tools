@@ -9,6 +9,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import jakarta.annotation.PostConstruct;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -17,12 +18,14 @@ import org.xmlpull.v1.XmlPullParserFactory;
 import net.osmand.osm.AbstractPoiType;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypes;
+import net.osmand.osm.PoiAdditionalLabels;
 import net.osmand.osm.PoiCategory;
 import net.osmand.osm.PoiType;
 import net.osmand.search.SearchUICore;
 import net.osmand.search.core.SearchCoreFactory;
 import net.osmand.search.core.SearchResult;
 import net.osmand.server.utils.MapPoiTypesTranslator;
+import net.osmand.util.Algorithms;
 
 @Service
 public class PoiTypesService {
@@ -51,7 +54,7 @@ public class PoiTypesService {
 	}
 
 	public MapPoiTypes getMapPoiTypes(String locale) {
-		String lang = locale != null && getTranslations(locale) != null ? locale : DEFAULT_SEARCH_LANG;
+		String lang = !Algorithms.isEmpty(locale) && getTranslations(locale) != null ? locale : DEFAULT_SEARCH_LANG;
 
 		return poiTypesByLocale.computeIfAbsent(lang, loc -> {
 			MapPoiTypes mapPoiTypes = new MapPoiTypes(null);
@@ -122,7 +125,7 @@ public class PoiTypesService {
 					break;
 				case XmlPullParser.END_TAG:
 					if (tagName.equals("string") && key != null && value != null) {
-						resultMap.put(key, value);
+						resultMap.put(key, unescapeAndroidQuotes(value));
 						key = null;
 						value = null;
 					}
@@ -134,12 +137,37 @@ public class PoiTypesService {
 		return resultMap;
 	}
 
+	private static String unescapeAndroidQuotes(String value) {
+		return value.replace("\\'", "'").replace("\\\"", "\"");
+	}
+
 	private String validateLocale(String locale) {
 		if (locale == null || locale.isEmpty()) {
 			throw new IllegalArgumentException("Locale cannot be null or empty");
 		}
 		// Remove potentially dangerous characters such as '/'
 		return locale.replaceAll("[/\\\\]", "");
+	}
+
+	public Map<String, String> getCategoryNames(List<String> keys, String locale) {
+		Map<String, String> names = new LinkedHashMap<>();
+		for (String key : keys) {
+			String name = getCategoryName(key, locale);
+			if (name != null) {
+				names.put(key, name);
+			}
+		}
+		return names;
+	}
+
+	@Nullable
+	public String getCategoryName(String key, String locale) {
+		MapPoiTypes poiTypes = getMapPoiTypes(locale);
+		AbstractPoiType type = poiTypes.getAnyPoiTypeByKey(key);
+		if (type == null) {
+			type = poiTypes.getAnyPoiAdditionalTypeByKey(key);
+		}
+		return type != null ? PoiAdditionalLabels.getSearchName(type) : null;
 	}
 
 	public List<String> getTopFilters() {
