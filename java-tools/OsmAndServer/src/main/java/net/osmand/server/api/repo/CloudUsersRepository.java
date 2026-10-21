@@ -2,6 +2,7 @@ package net.osmand.server.api.repo;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 
@@ -29,6 +30,8 @@ public interface CloudUsersRepository extends JpaRepository<CloudUser, Long> {
     int deleteByEmailIgnoreCase(String email);
 	
 	CloudUser findByOrderid(String orderid);
+
+	List<CloudUser> findByOrderidIn(Collection<String> orderids);
 
     List<CloudUser> findByEmailStartingWith(String prefix, Pageable pageable);
     

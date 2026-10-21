@@ -246,4 +246,37 @@ public class OrderManagementController {
 		}
 		return ResponseEntity.ok().build();
 	}
+
+	@GetMapping("/cloud/user")
+	@PreAuthorize("hasAnyAuthority(T(net.osmand.server.WebSecurityConfiguration).ROLE_ADMIN, T(net.osmand.server.WebSecurityConfiguration).ROLE_SUPPORT)")
+	@ResponseBody
+	public ResponseEntity<?> cloudUser(@RequestParam int id) {
+		CloudUsersRepository.CloudUser pu = usersRepository.findById(id);
+		if (pu == null) {
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("OsmAnd Cloud account not found");
+		}
+		Map<String, Object> res = new LinkedHashMap<>();
+		res.put("id", pu.id);
+		res.put("email", pu.email);
+		return ResponseEntity.ok(res);
+	}
+
+	@PostMapping("/orders/link-user")
+	@PreAuthorize("hasAnyAuthority(T(net.osmand.server.WebSecurityConfiguration).ROLE_ADMIN, T(net.osmand.server.WebSecurityConfiguration).ROLE_SUPPORT)")
+	@ResponseBody
+	public ResponseEntity<String> linkPurchaseToUser(Authentication auth,
+	                                                 @RequestParam String sku,
+	                                                 @RequestParam String orderId,
+	                                                 @RequestParam int userId) {
+		if (StringUtils.isBlank(sku) || StringUtils.isBlank(orderId)) {
+			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("sku and orderId are required");
+		}
+		try {
+			orderManagementService.linkPurchaseToUser(orderId.trim(), sku.trim(), userId);
+		} catch (IllegalArgumentException e) {
+			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+		}
+		LOG.info("link-user: " + auth.getName() + " linked " + sku + " / " + orderId + " to user " + userId);
+		return ResponseEntity.ok().build();
+	}
 }
