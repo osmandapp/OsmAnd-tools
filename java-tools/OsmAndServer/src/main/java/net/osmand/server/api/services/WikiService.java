@@ -760,12 +760,15 @@ public class WikiService {
 	}
 
 	private void moveWikidataPhotoToFirst(Set<Map<String, Object>> imagesWithDetails, String wikidataId) {
-		if (imagesWithDetails.isEmpty()) {
-			return;
-		}
-
 		Long photoId = getPhotoIdFromWikidata(wikidataId);
 		if (photoId == null || photoId == 0) {
+			// no P18 in the wikidata dump (new item or new image): read P18 live when nothing else was found
+			if (imagesWithDetails.isEmpty()) {
+				String fileName = fetchWikidataImageName(wikidataId);
+				if (!Algorithms.isEmpty(fileName) && !isBlockedImage(fileName)) {
+					imagesWithDetails.addAll(getTagImagesWithDetails(fileName));
+				}
+			}
 			return;
 		}
 
@@ -777,12 +780,74 @@ public class WikiService {
 			Map<String, Object> wikidataPhoto = fetchWikidataPhoto(photoId);
 			if (wikidataPhoto != null && !wikidataPhoto.isEmpty()) {
 				matched.add(wikidataPhoto);
+			} else {
+				String fileName = getImageNameByMediaId(photoId);
+				if (!Algorithms.isEmpty(fileName) && !isBlockedImage(fileName)) {
+					matched.addAll(getTagImagesWithDetails(fileName));
+				}
 			}
 		}
 
 		imagesWithDetails.clear();
 		imagesWithDetails.addAll(matched);
 		imagesWithDetails.addAll(partitioned.get(false));
+	}
+
+	private String getImageNameByMediaId(long mediaId) {
+		try {
+			List<String> names = jdbcTemplate.queryForList("SELECT name FROM wiki.common_meta WHERE id = ? LIMIT 1",
+					String.class, mediaId);
+			return names.isEmpty() ? null : names.get(0);
+		} catch (Exception e) {
+			log.error("Error getting image name for mediaId: " + mediaId, e);
+			return null;
+		}
+	}
+
+	private boolean isBlockedImage(String fileName) {
+		String title = fileName.replace(' ', '_');
+		try {
+			Long count = jdbcTemplate.queryForObject("SELECT (SELECT count() FROM wiki.blocked_images WHERE imageTitle = ?) + "
+					+ "(SELECT count() FROM wiki.blocked_images_pending WHERE imageTitle = ?)", Long.class, title, title);
+			return count != null && count > 0;
+		} catch (Exception e) {
+			log.error("Error checking blocked image: " + title, e);
+			return true;
+		}
+	}
+
+	private String fetchWikidataImageName(String wikidataId) {
+		String id = wikidataId.startsWith("Q") ? wikidataId : "Q" + wikidataId;
+		if (!DIGITS.matcher(id.substring(1)).matches()) {
+			return null;
+		}
+		String urlStr = "https://www.wikidata.org/w/api.php?action=wbgetclaims&property=P18&format=json&entity=" + id;
+		HttpURLConnection connection = null;
+		try {
+			connection = (HttpURLConnection) new URL(urlStr).openConnection();
+			connection.setRequestProperty("User-Agent", USER_AGENT);
+			connection.setConnectTimeout(3000);
+			connection.setReadTimeout(3000);
+			if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
+				return null;
+			}
+			try (Reader reader = new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8)) {
+				JsonObject claims = gson.fromJson(reader, JsonObject.class).getAsJsonObject("claims");
+				JsonArray p18 = claims == null ? null : claims.getAsJsonArray("P18");
+				if (p18 == null || p18.size() == 0) {
+					return null;
+				}
+				JsonObject dataValue = p18.get(0).getAsJsonObject().getAsJsonObject("mainsnak").getAsJsonObject("datavalue");
+				return dataValue == null ? null : dataValue.get("value").getAsString();
+			}
+		} catch (Exception e) {
+			log.warn("Error reading P18 of " + id + ": " + e.getMessage());
+			return null;
+		} finally {
+			if (connection != null) {
+				connection.disconnect();
+			}
+		}
 	}
 
 	private Long getPhotoIdFromWikidata(String wikidataId) {
