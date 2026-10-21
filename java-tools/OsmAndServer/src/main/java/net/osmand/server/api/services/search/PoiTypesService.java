@@ -51,9 +51,9 @@ public class PoiTypesService {
 	}
 
 	public MapPoiTypes getMapPoiTypes(String locale) {
-		locale = locale == null ? DEFAULT_SEARCH_LANG : locale;
+		String lang = locale != null && getTranslations(locale) != null ? locale : DEFAULT_SEARCH_LANG;
 
-		return poiTypesByLocale.computeIfAbsent(locale, loc -> {
+		return poiTypesByLocale.computeIfAbsent(lang, loc -> {
 			MapPoiTypes mapPoiTypes = new MapPoiTypes(null);
 			mapPoiTypes.init();
 			Map<String, String> translations = getTranslations(loc);
@@ -71,7 +71,7 @@ public class PoiTypesService {
 
 				InputStream phrasesStream = this.getClass().getResourceAsStream(AND_RES + localPath + "/phrases.xml");
 				if (phrasesStream == null) {
-					throw new IllegalArgumentException("Locale not found: " + loc);
+					return null;
 				}
 
 				return parseStringsXml(phrasesStream);
