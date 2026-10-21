@@ -3,6 +3,7 @@ package net.osmand.server.api.services.search;
 import net.osmand.data.Amenity;
 import net.osmand.shared.data.AdditionalInfoBundle;
 import net.osmand.shared.data.AmenityTagEntriesBuilder;
+import net.osmand.shared.data.AmenityTagEntriesBuilder.ValueLabel;
 import net.osmand.shared.data.AmenityTagEntry;
 import net.osmand.shared.osm.PoiCategory;
 import net.osmand.shared.osm.PoiType;
@@ -106,16 +107,24 @@ public class AmenityTagsService {
 
 	private VisibleTag toGroupTag(AmenityTagEntry tagEntry) {
 		String key = Amenity.COLLAPSABLE_PREFIX + tagEntry.key;
-		return new VisibleTag(key, joinPoiTypeKeys(tagEntry), null);
+		List<PoiType> types = tagEntry.collapsablePoiTypes;
+		if (!tagEntry.poiAdditional || Algorithms.isEmpty(types)) {
+			return new VisibleTag(key, joinPoiTypeKeys(tagEntry), null);
+		}
+		List<ValueLabel> labels = types.stream().map(AmenityTagEntriesBuilder::getValueLabel)
+				.collect(Collectors.toList());
+		return new VisibleTag(key, joinPoiTypeKeys(tagEntry), null, null, null, labels);
 	}
 
 	private VisibleTag toPlainTag(AmenityTagEntry tagEntry, Set<String> genericRowKeys) {
 		if (tagEntry.value == null) {
 			return null;
 		}
-		boolean generic = genericRowKeys.contains(tagEntry.key)
-				&& (tagEntry.resolvedType == null || tagEntry.resolvedType.getAdditionalType() == null);
-		return new VisibleTag(tagEntry.key, tagEntry.value, null, null, generic ? Boolean.TRUE : null);
+		PoiType type = tagEntry.resolvedType != null ? tagEntry.resolvedType.getAdditionalType() : null;
+		boolean generic = genericRowKeys.contains(tagEntry.key) && type == null;
+		List<ValueLabel> labels = type != null && !type.isText()
+				? List.of(AmenityTagEntriesBuilder.getValueLabel(type)) : null;
+		return new VisibleTag(tagEntry.key, tagEntry.value, null, null, generic ? Boolean.TRUE : null, labels);
 	}
 
 	private VisibleTag toLocalizedTag(AmenityTagEntry tagEntry) {
@@ -136,13 +145,14 @@ public class AmenityTagsService {
 				: new LangValue(child.value, null);
 	}
 
-	public record VisibleTag(String key, String value, String lang, List<LangValue> otherLangs, Boolean generic) {
+	public record VisibleTag(String key, String value, String lang, List<LangValue> otherLangs, Boolean generic,
+	                         List<ValueLabel> labels) {
 		public VisibleTag(String key, String value, String lang) {
-			this(key, value, lang, null, null);
+			this(key, value, lang, null, null, null);
 		}
 
 		public VisibleTag(String key, String value, String lang, List<LangValue> otherLangs) {
-			this(key, value, lang, otherLangs, null);
+			this(key, value, lang, otherLangs, null, null);
 		}
 	}
 

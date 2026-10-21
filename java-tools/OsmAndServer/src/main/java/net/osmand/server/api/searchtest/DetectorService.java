@@ -117,7 +117,7 @@ public interface DetectorService extends OBFService {
 				Collections.emptyList(), distance, true, true);
 		if (res.isPoiCategory()) {
 			var type = res.getPoiCategory(getSpatialSearchService().getSpatialPoiTypeSearch());
-			String name = type == null ? "" : getSpatialSearchService().getSpatialPoiTypeFields(type).getOrDefault("name", type.toString());
+			String name = type == null ? "" : getSpatialSearchService().getSpatialPoiTypeFields(type, ctx.locale()).getOrDefault("name", type.toString());
 			return new AddressResult(name, "poi_type", "", null, metric, location, null, null);
 		}
 		List<Street> streets = spatialStreets(objects, ctx.locale());
