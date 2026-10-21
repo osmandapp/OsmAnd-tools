@@ -178,7 +178,15 @@ public class UserdataService {
     public static final String FILE_TYPE_GPX = "GPX";
     public static final String FILE_TYPE_OSM_EDITS = "OSM_EDITS";
     public static final String FILE_TYPE_OSM_NOTES = "OSM_NOTES";
-    public static final Set<String> FREE_TYPES = Set.of(FILE_TYPE_FAVOURITES, FILE_TYPE_GLOBAL, FILE_TYPE_PROFILE, FILE_TYPE_OSM_EDITS, FILE_TYPE_OSM_NOTES);
+    public static final String FILE_TYPE_SEARCH_HISTORY = "SEARCH_HISTORY";
+    public static final String FILE_TYPE_NAVIGATION_HISTORY = "NAVIGATION_HISTORY";
+    public static final String FILE_TYPE_ITINERARY_GROUPS = "ITINERARY_GROUPS";
+    public static final String FILE_TYPE_HISTORY_MARKERS = "HISTORY_MARKERS";
+    public static final String FILE_TYPE_ACTIVE_MARKERS = "ACTIVE_MARKERS";
+    public static final String FILE_TYPE_QUICK_ACTIONS = "QUICK_ACTIONS";
+    public static final Set<String> FREE_TYPES = Set.of(FILE_TYPE_FAVOURITES, FILE_TYPE_GLOBAL, FILE_TYPE_PROFILE,
+            FILE_TYPE_OSM_EDITS, FILE_TYPE_OSM_NOTES, FILE_TYPE_SEARCH_HISTORY, FILE_TYPE_NAVIGATION_HISTORY,
+            FILE_TYPE_ITINERARY_GROUPS, FILE_TYPE_HISTORY_MARKERS, FILE_TYPE_ACTIVE_MARKERS, FILE_TYPE_QUICK_ACTIONS);
     public static final String EMPTY_FILE_NAME = "__folder__.info";
     public static final String INFO_EXT = ".info";
 
