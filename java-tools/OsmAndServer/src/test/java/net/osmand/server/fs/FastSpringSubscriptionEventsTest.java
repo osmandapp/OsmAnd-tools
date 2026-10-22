@@ -57,10 +57,15 @@ public class FastSpringSubscriptionEventsTest {
 
 	private void handle(SupporterDeviceSubscription s, String webhook, String apiResponse, String subscriptionId, boolean recorded,
 	                    Function<FastSpringWebhookRequest, ResponseEntity<String>> endpoint) throws IOException {
+		FastSpringWebhookRequest request = FsJson.read(webhook, FastSpringWebhookRequest.class);
 		if (recorded) {
 			when(subs.findByOrderIdAndSku(s.orderId, s.sku)).thenReturn(List.of(s));
+			long hookTime = request.events.get(0).created;
+			doAnswer(inv -> {
+				new UserSubscriptionService().applyFastSpringSubscription(inv.getArgument(0), inv.getArgument(1), hookTime);
+				return null;
+			}).when(userSubService).applyFastSpringSubscription(any(), any(), anyLong());
 		}
-		FastSpringWebhookRequest request = FsJson.read(webhook, FastSpringWebhookRequest.class);
 		try (MockedStatic<FastSpringHelper> fs = mockStatic(FastSpringHelper.class)) {
 			fs.when(() -> FastSpringHelper.getSubscription(subscriptionId))
 					.thenReturn(FsJson.read(apiResponse, FastSpringSubscription.class));
