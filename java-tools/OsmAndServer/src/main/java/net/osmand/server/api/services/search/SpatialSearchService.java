@@ -455,6 +455,8 @@ public class SpatialSearchService {
 		if (obj instanceof Amenity amenity) {
 			SearchResult result = searchResultConverter.buildPoiSearchResult(amenity, locale, dominatedCity);
 			result.localeName = amenity.getName(locale);
+			result.alternateName = SpatialTextSearchAPI.getMatchedOtherName(ssr, amenity, result.localeName,
+					amenity.getOtherNames(false, result.localeName));
 			if (Algorithms.isNotEmpty(extraNameMatch)) {
 				result.localeName += " (" + extraNameMatch + ")"; // ref
 			}
