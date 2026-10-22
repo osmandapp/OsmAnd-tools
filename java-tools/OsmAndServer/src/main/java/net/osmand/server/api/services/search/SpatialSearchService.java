@@ -6,8 +6,6 @@ import static net.osmand.search.SearchUICore.getMainCityName;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -164,14 +162,17 @@ public class SpatialSearchService {
 		return poiSearch;
 	}
 
-	// poi categories are matched by their names in English, the user's language and the languages of the location
+	// poi categories are matched by their names in English, the user's language and the main language of the location
 	public SpatialPoiSearch getSpatialPoiTypeSearch(String locale, LatLon location) {
 		Set<String> langs = new LinkedHashSet<>();
 		langs.add(PoiTypesService.DEFAULT_SEARCH_LANG);
 		if (!Algorithms.isEmpty(locale)) {
 			langs.add(locale);
 		}
-		langs.addAll(getRegionLangs(location));
+		String regionLang = getRegionLang(location);
+		if (regionLang != null) {
+			langs.add(regionLang);
+		}
 		return poiSearchByLangs.computeIfAbsent(String.join(",", langs), k -> {
 			MapPoiTypes poiTypes = new MapPoiTypes(null);
 			poiTypes.init();
@@ -180,19 +181,20 @@ public class SpatialSearchService {
 		});
 	}
 
-	private List<String> getRegionLangs(LatLon location) {
+	// the first language of the region: "uk" of "uk,ru", a user who needs another one can switch the UI language
+	private String getRegionLang(LatLon location) {
 		OsmandRegions regions = mapReadersService.getOsmandRegions();
 		if (regions == null) {
-			return Collections.emptyList();
+			return null;
 		}
 		try {
 			// ~1 ms: reads regions.ocbf under the lock of OsmandRegions, a search takes 300+ ms
 			Map.Entry<WorldRegion, BinaryMapDataObject> entry = regions.getSmallestBinaryMapDataObjectAt(location);
 			String lang = entry == null ? null : entry.getKey().getParams().getRegionLang();
-			return Algorithms.isEmpty(lang) ? Collections.emptyList() : Arrays.asList(lang.split(","));
+			return Algorithms.isEmpty(lang) ? null : lang.split(",")[0];
 		} catch (IOException e) {
-			LOGGER.warn("Region languages failed at " + location, e);
-			return Collections.emptyList();
+			LOGGER.warn("Region language failed at " + location, e);
+			return null;
 		}
 	}
 
