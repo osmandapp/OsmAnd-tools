@@ -135,6 +135,8 @@ public class SearchController {
 	                                        @RequestParam(required = false) Integer zoom,
 	                                        @RequestParam(required = false) String timeZone) throws IOException {
 		PoiSearchService.PoiSearchResult poiSearchResult = poiSearchService.searchPoi(searchData, locale, new LatLon(lat, lon), baseSearch != null && baseSearch, zoom != null ? zoom : -1, timeZone);
+		poiSearchResult.categoryNames = poiTypesService.getCategoryNames(
+				searchData.categories.stream().map(PoiSearchService.PoiSearchCategory::category).toList(), locale);
 		return ResponseEntity.ok(gson.toJson(poiSearchResult));
 	}
 
@@ -234,8 +236,9 @@ public class SearchController {
 	@ResponseBody
 	public ResponseEntity<String> searchPoiCategories(@RequestParam String search,
 	                                                  @RequestParam double lat,
-	                                                  @RequestParam double lon) throws IOException {
-		Map<String, Map<String, String>> res = poiSearchService.searchPoiCategories(search, new LatLon(lat, lon));
+	                                                  @RequestParam double lon,
+	                                                  @RequestParam(required = false) String locale) throws IOException {
+		Map<String, Map<String, String>> res = poiSearchService.searchPoiCategories(search, new LatLon(lat, lon), locale);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 

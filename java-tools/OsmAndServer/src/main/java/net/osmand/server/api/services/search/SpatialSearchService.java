@@ -39,7 +39,9 @@ import net.osmand.data.Amenity;
 import net.osmand.data.City;
 import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
+import net.osmand.osm.AbstractPoiType;
 import net.osmand.osm.MapPoiTypes;
+import net.osmand.osm.PoiAdditionalLabels;
 import net.osmand.osm.PoiType;
 import net.osmand.search.core.ObjectType;
 import net.osmand.search.core.SearchCoreFactory;
@@ -97,6 +99,9 @@ public class SpatialSearchService {
 
 	@Autowired
 	private SearchResultConverter searchResultConverter;
+
+	@Autowired
+	private PoiTypesService poiTypesService;
 
 	private static ThreadPoolExecutor[] createSpatialSearchExecutors(String name, int threads) {
 		ThreadPoolExecutor[] executors = new ThreadPoolExecutor[threads];
@@ -281,7 +286,7 @@ public class SpatialSearchService {
 					if (r.isPoiCategory()) {
 						SpatialPoiType type = r.getPoiCategory(poiTypeSearch);
 						if (type != null) {
-							f = getSpatialPoiTypeFeature(type);
+							f = getSpatialPoiTypeFeature(type, ctx.locale());
 						}
 					} else if (!objs.isEmpty()) {
 						LatLon l = r.getLatLon() == null ? new LatLon(ctx.lat(), ctx.lon()) : r.getLatLon();
@@ -343,28 +348,29 @@ public class SpatialSearchService {
 		return info;
 	}
 
-	private Feature getSpatialPoiTypeFeature(SpatialPoiType type) {
+	private Feature getSpatialPoiTypeFeature(SpatialPoiType type, String locale) {
 		Feature feature = new Feature(Geometry.point(new LatLon(0, 0)))
 				.prop(SearchResultConverter.PoiTypeField.TYPE.getFieldName(), ObjectType.POI_TYPE);
-		Map<String, String> tags = getSpatialPoiTypeFields(type);
+		Map<String, String> tags = getSpatialPoiTypeFields(type, locale);
 		for (Map.Entry<String, String> entry : tags.entrySet()) {
 			feature.prop(entry.getKey(), entry.getValue());
 		}
 		return feature;
 	}
 
-	public Map<String, String> getSpatialPoiTypeFields(SpatialPoiType type) {
+	public Map<String, String> getSpatialPoiTypeFields(SpatialPoiType type, String locale) {
 		if (type.singleType != null) {
+			String name = getSearchName(type.singleType, locale);
 			if (type.singleType instanceof PoiType poiType && poiType.isAdditional()
 					&& type.getParentTypes() != null && type.getParentTypes().size() > 1) {
 				SearchCoreFactory.PoiAdditionalCustomFilter filter =
 						new SearchCoreFactory.PoiAdditionalCustomFilter(MapPoiTypes.getDefault(), poiType);
 				Map<String, String> tags = searchResultConverter.getPoiTypeFields(filter);
-				tags.put(SearchResultConverter.PoiTypeField.NAME.getFieldName(), filter.getTranslation());
+				tags.put(SearchResultConverter.PoiTypeField.NAME.getFieldName(), name);
 				return tags;
 			}
 			Map<String, String> tags = searchResultConverter.getPoiTypeFields(type.singleType);
-			tags.put(SearchResultConverter.PoiTypeField.NAME.getFieldName(), type.singleType.getTranslation());
+			tags.put(SearchResultConverter.PoiTypeField.NAME.getFieldName(), name);
 			if (type.getWikidataId() != null) {
 				tags.put(SearchResultConverter.PoiTypeField.WIKIDATA_ID.getFieldName(), type.getWikidataId());
 			}
@@ -390,6 +396,11 @@ public class SpatialSearchService {
 			}
 		}
 		return tags;
+	}
+
+	private String getSearchName(AbstractPoiType type, String locale) {
+		String name = poiTypesService.getCategoryName(type.getKeyName(), locale);
+		return name != null ? name : PoiAdditionalLabels.getSearchName(type);
 	}
 
 	public SearchResult buildSpatialPoiSearchResult(Amenity amenity, String locale) {
