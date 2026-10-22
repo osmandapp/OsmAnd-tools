@@ -101,6 +101,19 @@ public class PoiTypesService {
 		return translations;
 	}
 
+	// English first: its translation is the main name, the other languages are synonyms
+	public MapPoiTypesTranslator parseTranslations(Collection<String> langs) {
+		Map<String, String> enTranslations = getTranslations(DEFAULT_SEARCH_LANG);
+		MapPoiTypesTranslator translations = new MapPoiTypesTranslator(enTranslations, enTranslations);
+		for (String l : langs) {
+			Map<String, String> stringsXml = DEFAULT_SEARCH_LANG.equals(l) ? null : getTranslations(l);
+			if (stringsXml != null) {
+				translations.appendTranslations(l, stringsXml);
+			}
+		}
+		return translations;
+	}
+
 	private Map<String, String> parseStringsXml(InputStream inputStream) throws XmlPullParserException, IOException {
 		Map<String, String> resultMap = new HashMap<>();
 
