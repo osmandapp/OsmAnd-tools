@@ -4,7 +4,6 @@ package net.osmand.obf.preparation;
 import java.text.Collator;
 import java.text.Normalizer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -12,16 +11,12 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 
 import gnu.trove.list.array.TIntArrayList;
 import net.osmand.CollatorStringMatcher;
@@ -45,8 +40,6 @@ import net.osmand.util.Algorithms;
 import net.osmand.util.SearchAlgorithms;
 
 public class NameIndexCreator<T> {
-
-	private static final Log log = LogFactory.getLog(NameIndexCreator.class);
 
 	private static final int NAMED_WORDS_SEPARATOR = 0;
 	// Minimum required to be common non-indexed -> (otherwise just frequent) - rare doesn't work as non-consistent tests
@@ -173,16 +166,6 @@ public class NameIndexCreator<T> {
 				for (NameObjectSingleNameIndex singleName : namesList.singleNames) {
 					boolean isCommonWord = commonWords.words.containsKey(singleName.token);
 					String suffix = calculateSuffix(singleName.token, prefix);
-					if (suffix == null) {
-						log.error("Null name index suffix: object=" + namesList.object
-								+ (namesList.object instanceof MapObject object
-										? ", id=" + object.getId() + ", names=" + object.getNamesMap(true) : "")
-								+ ", token='" + singleName.token + "', tokenCodePoints="
-								+ Arrays.toString(singleName.token.codePoints().toArray())
-								+ ", prefix='" + prefix + "', prefixCodePoints="
-								+ Arrays.toString(prefix.codePoints().toArray())
-								+ ", nameWords=" + singleName.listNames + ", locale=" + Locale.getDefault());
-					}
 					allSortedSuffixes.add(suffix);
 					for (String otherName : singleName.setNames) {
 						if (!otherName.equals(singleName.token)) {
