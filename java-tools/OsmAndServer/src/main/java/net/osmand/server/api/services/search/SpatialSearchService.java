@@ -286,7 +286,7 @@ public class SpatialSearchService {
 					if (r.isPoiCategory()) {
 						SpatialPoiType type = r.getPoiCategory(poiTypeSearch);
 						if (type != null) {
-							f = getSpatialPoiTypeFeature(type, ctx.locale());
+							f = getSpatialPoiTypeFeature(r, type, ctx.locale());
 						}
 					} else if (!objs.isEmpty()) {
 						LatLon l = r.getLatLon() == null ? new LatLon(ctx.lat(), ctx.lon()) : r.getLatLon();
@@ -348,12 +348,17 @@ public class SpatialSearchService {
 		return info;
 	}
 
-	private Feature getSpatialPoiTypeFeature(SpatialPoiType type, String locale) {
+	private Feature getSpatialPoiTypeFeature(SpatialSearchResult r, SpatialPoiType type, String locale) {
 		Feature feature = new Feature(Geometry.point(new LatLon(0, 0)))
 				.prop(SearchResultConverter.PoiTypeField.TYPE.getFieldName(), ObjectType.POI_TYPE);
 		Map<String, String> tags = getSpatialPoiTypeFields(type, locale);
 		for (Map.Entry<String, String> entry : tags.entrySet()) {
 			feature.prop(entry.getKey(), entry.getValue());
+		}
+		String name = tags.get(SearchResultConverter.PoiTypeField.NAME.getFieldName());
+		String altName = r.getPoiCategoryMatchedName(getSpatialPoiTypeSearch());
+		if (altName != null && !altName.equalsIgnoreCase(name)) {
+			feature.prop(SearchResultConverter.PoiTypeField.ALT_NAME.getFieldName(), altName);
 		}
 		return feature;
 	}
