@@ -6,11 +6,15 @@ import static net.osmand.search.SearchUICore.getMainCityName;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -34,11 +38,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import net.osmand.ResultMatcher;
+import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.Amenity;
 import net.osmand.data.City;
 import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
+import net.osmand.map.OsmandRegions;
+import net.osmand.map.WorldRegion;
 import net.osmand.osm.AbstractPoiType;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiAdditionalLabels;
@@ -75,6 +82,8 @@ public class SpatialSearchService {
 	// reused for cache
 	private SpatialPoiSearch poiSearch;
 	private MapPoiTypes poiTypesWithTranslations;
+	// web search: poi categories by languages "en,uk,de"
+	private final Map<String, SpatialPoiSearch> poiSearchByLangs = new ConcurrentHashMap<>();
 
 	private final ThreadLocal<SpatialTextSearch> spatialTextSearchLocal = ThreadLocal.withInitial(SpatialTextSearch::new);
 	private final ThreadLocal<RegionsReaderHolder> osmandRegionsLocal = ThreadLocal.withInitial(RegionsReaderHolder::new);
@@ -155,6 +164,38 @@ public class SpatialSearchService {
 		return poiSearch;
 	}
 
+	// poi categories are matched by their names in English, the user's language and the languages of the location
+	public SpatialPoiSearch getSpatialPoiTypeSearch(String locale, LatLon location) {
+		Set<String> langs = new LinkedHashSet<>();
+		langs.add(PoiTypesService.DEFAULT_SEARCH_LANG);
+		if (!Algorithms.isEmpty(locale)) {
+			langs.add(locale);
+		}
+		langs.addAll(getRegionLangs(location));
+		return poiSearchByLangs.computeIfAbsent(String.join(",", langs), k -> {
+			MapPoiTypes poiTypes = new MapPoiTypes(null);
+			poiTypes.init();
+			poiTypes.setPoiTranslator(poiTypesService.parseTranslations(langs));
+			return new SpatialPoiSearch(poiTypes);
+		});
+	}
+
+	private List<String> getRegionLangs(LatLon location) {
+		OsmandRegions regions = mapReadersService.getOsmandRegions();
+		if (regions == null) {
+			return Collections.emptyList();
+		}
+		try {
+			// ~1 ms: reads regions.ocbf under the lock of OsmandRegions, a search takes 300+ ms
+			Map.Entry<WorldRegion, BinaryMapDataObject> entry = regions.getSmallestBinaryMapDataObjectAt(location);
+			String lang = entry == null ? null : entry.getKey().getParams().getRegionLang();
+			return Algorithms.isEmpty(lang) ? Collections.emptyList() : Arrays.asList(lang.split(","));
+		} catch (IOException e) {
+			LOGGER.warn("Region languages failed at " + location, e);
+			return Collections.emptyList();
+		}
+	}
+
 	private static class RegionsReaderHolder {
 		BinaryMapIndexReader reader;
 		long fileTimestamp;
@@ -230,6 +271,7 @@ public class SpatialSearchService {
 				sr.localeName = ((float) coord.getLatitude()) + ", " + ((float) coord.getLongitude());
 				response.features.add(searchResultConverter.getFeature(sr, timeZone));
 			}
+			SpatialPoiSearch poiTypeSearch = getSpatialPoiTypeSearch(ctx.locale(), new LatLon(ctx.lat(), ctx.lon()));
 			// In future multiple spatialTextSearch & multiple osmand regions
 			SpatialTextSearchSettings settings = autocomplete
 					? SpatialTextSearchSettings.suggestionSettings()
@@ -261,7 +303,7 @@ public class SpatialSearchService {
 						readers.add(regionsReader);
 					}
 					SpatialSearchContext sscontext =
-							new SpatialSearchContext(settings, readers, getSpatialPoiTypeSearch(), new LatLon(ctx.lat(), ctx.lon()));
+							new SpatialSearchContext(settings, readers, poiTypeSearch, new LatLon(ctx.lat(), ctx.lon()));
 					sscontext.resultMatcher = matcher;
 					return getSpatialTextSearch().searchAPI(ctx.text(), sscontext);
 				} finally {
@@ -275,7 +317,6 @@ public class SpatialSearchService {
 			}
 			if (res.mainResults != null) {
 				String dominatedCity = calculateSpatialDominatedCity(res.mainResults, ctx.locale());
-				SpatialPoiSearch poiTypeSearch = getSpatialPoiTypeSearch();
 				Map<MapObject, Feature> amenityFeatureCache = new IdentityHashMap<>();
 				for (SpatialSearchResult r : res.mainResults) {
 					if (response.features.size() >= MAX_SPATIAL_FEATURES) {
@@ -286,7 +327,7 @@ public class SpatialSearchService {
 					if (r.isPoiCategory()) {
 						SpatialPoiType type = r.getPoiCategory(poiTypeSearch);
 						if (type != null) {
-							f = getSpatialPoiTypeFeature(r, type, ctx.locale());
+							f = getSpatialPoiTypeFeature(r, type, poiTypeSearch, ctx.locale());
 						}
 					} else if (!objs.isEmpty()) {
 						LatLon l = r.getLatLon() == null ? new LatLon(ctx.lat(), ctx.lon()) : r.getLatLon();
@@ -348,7 +389,8 @@ public class SpatialSearchService {
 		return info;
 	}
 
-	private Feature getSpatialPoiTypeFeature(SpatialSearchResult r, SpatialPoiType type, String locale) {
+	private Feature getSpatialPoiTypeFeature(SpatialSearchResult r, SpatialPoiType type, SpatialPoiSearch poiTypeSearch,
+	                                         String locale) {
 		Feature feature = new Feature(Geometry.point(new LatLon(0, 0)))
 				.prop(SearchResultConverter.PoiTypeField.TYPE.getFieldName(), ObjectType.POI_TYPE);
 		Map<String, String> tags = getSpatialPoiTypeFields(type, locale);
@@ -356,7 +398,7 @@ public class SpatialSearchService {
 			feature.prop(entry.getKey(), entry.getValue());
 		}
 		String name = tags.get(SearchResultConverter.PoiTypeField.NAME.getFieldName());
-		String altName = r.getPoiCategoryMatchedName(getSpatialPoiTypeSearch());
+		String altName = r.getPoiCategoryMatchedName(poiTypeSearch);
 		if (altName != null && !altName.equalsIgnoreCase(name)) {
 			feature.prop(SearchResultConverter.PoiTypeField.ALT_NAME.getFieldName(), altName);
 		}
