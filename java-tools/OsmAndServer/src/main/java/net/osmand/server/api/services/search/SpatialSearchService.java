@@ -186,10 +186,8 @@ public class SpatialSearchService {
 			return Collections.emptyList();
 		}
 		try {
-			Map.Entry<WorldRegion, BinaryMapDataObject> entry;
-			synchronized (regions) {
-				entry = regions.getSmallestBinaryMapDataObjectAt(location);
-			}
+			// ~1 ms: reads regions.ocbf under the lock of OsmandRegions, a search takes 300+ ms
+			Map.Entry<WorldRegion, BinaryMapDataObject> entry = regions.getSmallestBinaryMapDataObjectAt(location);
 			String lang = entry == null ? null : entry.getKey().getParams().getRegionLang();
 			return Algorithms.isEmpty(lang) ? Collections.emptyList() : Arrays.asList(lang.split(","));
 		} catch (IOException e) {
