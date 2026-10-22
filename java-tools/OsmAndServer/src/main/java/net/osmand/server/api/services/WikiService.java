@@ -17,7 +17,6 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import net.osmand.server.api.services.search.SearchResultConverter;
-import net.osmand.data.Amenity;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiType;
 import net.osmand.shared.wiki.WikiHelper;
@@ -31,7 +30,6 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.dao.DataAccessException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.PreparedStatementSetter;
@@ -60,7 +58,6 @@ public class WikiService {
 	private static final String IMAGE_ROOT_URL = "https://upload.wikimedia.org/wikipedia/commons/";
 	private static final String OSMAND_IMAGE_ROOT_URL = "https://data.osmand.net/wikimedia/images-1280/";
 	private static final String THUMB_PREFIX = "320px-";
-	private static final String DEFAULT_SHORT_DESC_LANG = "en";
 	public static final String LANG_CODE_REGEX = "^[a-z]{2,3}(-[A-Za-z]{2,4})?$"; // "uk" "hsb" "zh-TW" "sr-Latn"
 	protected static int FILE_URL_TO_USE = 1;
 
@@ -305,43 +302,6 @@ public class WikiService {
 		});
 	}
 	
-	public Map<String, String> getWikiShortDescriptions(String wikidata, String lang) {
-		Long wikidataId = parseWikidataId(wikidata);
-		if (!config.wikiInitialized() || wikidataId == null) {
-			return Map.of();
-		}
-		String wikiLang = Algorithms.isEmpty(lang) ? DEFAULT_SHORT_DESC_LANG : Locale.forLanguageTag(lang).getLanguage();
-		String query = "SELECT w.wikiArticleContents[indexOf(w.wikiArticleLangs, ?)] AS defaultContent, "
-				+ "w.wikiArticleContents[indexOf(w.wikiArticleLangs, ?)] AS langContent "
-				+ "FROM wiki.wikidata w WHERE w.id = ? LIMIT 1";
-		try {
-			return jdbcTemplate.query(query, ps -> {
-				ps.setString(1, DEFAULT_SHORT_DESC_LANG);
-				ps.setString(2, wikiLang);
-				ps.setLong(3, wikidataId);
-			}, rs -> {
-				Map<String, String> result = new LinkedHashMap<>();
-				if (rs.next()) {
-					putShortDescription(result, Amenity.SHORT_DESCRIPTION, rs.getObject("defaultContent"));
-					if (!DEFAULT_SHORT_DESC_LANG.equals(wikiLang)) {
-						putShortDescription(result, Amenity.SHORT_DESCRIPTION + ":" + wikiLang, rs.getObject("langContent"));
-					}
-				}
-				return result;
-			});
-		} catch (DataAccessException e) {
-			log.warn("Failed to read wiki short descriptions for " + wikidata, e);
-			return Map.of();
-		}
-	}
-
-	private static void putShortDescription(Map<String, String> result, String key, Object content) {
-		String desc = content instanceof List<?> list ? getFromArray(list, 1) : null;
-		if (!Algorithms.isEmpty(desc)) {
-			result.put(key, desc);
-		}
-	}
-
 	public static Long parseWikidataId(String wikidata) {
 		if (Algorithms.isEmpty(wikidata)) {
 			return null;

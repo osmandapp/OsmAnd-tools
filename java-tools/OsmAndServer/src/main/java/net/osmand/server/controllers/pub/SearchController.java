@@ -452,8 +452,7 @@ public class SearchController {
 
 	@PostMapping(path = {"/get-poi-photos"}, produces = "application/json")
 	@ResponseBody
-	public ResponseEntity<String> getPoiPhotos(@RequestBody Map<String, String> tags,
-	                                           @RequestParam(required = false) String lang) {
+	public ResponseEntity<String> getPoiPhotos(@RequestBody Map<String, String> tags) {
 		WikiHelper.WikiTagData wikiTagData = WikiHelper.INSTANCE.extractWikiTagData(tags);
 
 		String wikidataId = wikiTagData.getWikidataId();
@@ -462,13 +461,11 @@ public class SearchController {
 		List<WikiImage> wikiImages = wikiTagData.getWikiImages();
 		wikiService.fillWikiTagImagesMetadata(wikiImages);
 
-		JsonObject result = gson.toJsonTree(getPhotos(wikidataId, wikiCategory, wikiTitle, wikiImages)).getAsJsonObject();
-		result.add("shortDescriptions", gson.toJsonTree(wikiService.getWikiShortDescriptions(wikidataId, lang)));
-		return ResponseEntity.ok(gson.toJson(result));
+		return getPhotos(wikidataId, wikiCategory, wikiTitle, wikiImages);
 	}
 
-	private FeatureCollection getPhotos(String wikidataId, String wikiCategory, String wikiTitle,
-	                                    List<WikiImage> wikiImages) {
+	private ResponseEntity<String> getPhotos(String wikidataId, String wikiCategory, String wikiTitle,
+	                                         List<WikiImage> wikiImages) {
 		Set<Map<String, Object>> images = wikiService.processWikiImagesWithDetails(wikidataId, wikiCategory, wikiTitle);
 
 		images.forEach(img -> {
@@ -482,14 +479,15 @@ public class SearchController {
 
 			wikiImages.add(wikiImage);
 		});
-		return wikiService.convertToFeatureCollection(wikiImages);
+		FeatureCollection featureCollection = wikiService.convertToFeatureCollection(wikiImages);
+		return ResponseEntity.ok(gson.toJson(featureCollection));
 	}
 
 	@GetMapping(path = {"/get-photos"}, produces = "application/json")
 	@ResponseBody
 	public ResponseEntity<String> gePhotos(@RequestParam(required = false) String wikidataId,
 	                                       @RequestParam(required = false) String wikiCategory, @RequestParam(required = false) String wikiTitle) {
-		return ResponseEntity.ok(gson.toJson(getPhotos(wikidataId, wikiCategory, wikiTitle, new ArrayList<WikiImage>())));
+		return getPhotos(wikidataId, wikiCategory, wikiTitle, new ArrayList<WikiImage>());
 	}
 
 	@GetMapping(path = {"/parse-location"}, produces = "application/json")
