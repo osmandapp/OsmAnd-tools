@@ -356,8 +356,8 @@ public class SpatialSearchService {
 			feature.prop(entry.getKey(), entry.getValue());
 		}
 		String name = tags.get(SearchResultConverter.PoiTypeField.NAME.getFieldName());
-		String altName = r.getPoiCategoryMatchedName(getSpatialPoiTypeSearch(), name);
-		if (altName != null) {
+		String altName = r.getPoiCategoryMatchedName(getSpatialPoiTypeSearch());
+		if (altName != null && !altName.equalsIgnoreCase(name)) {
 			feature.prop(SearchResultConverter.PoiTypeField.ALT_NAME.getFieldName(), altName);
 		}
 		return feature;
