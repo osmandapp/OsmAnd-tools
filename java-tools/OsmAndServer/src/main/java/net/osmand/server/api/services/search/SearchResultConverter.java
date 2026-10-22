@@ -60,7 +60,7 @@ public class SearchResultConverter {
 		COMPARE_KEY("web_compare_key"), BBOX_LAT_LON("web_bbox_lat_lon"),
 		WIKIDATA_ID("web_wikidata_id"), CITY_TYPE("web_city_type"), ELO("web_poi_elo"),
 		TRANSPORT_STOP_ID("web_transport_stop_id"), POI_FROM_TAGS("web_poi_from_tags"),
-		// shown in brackets after the name, as Android does: the other name the query matched, else the native name
+		// the category name the query matched, shown in brackets after the translation: "Школа (Schule)"
 		ALT_NAME("web_alt_name");
 
 		private final String fieldName;
@@ -94,31 +94,12 @@ public class SearchResultConverter {
 				feature.prop(PoiTypeField.NAME.getFieldName(),
 						result.localeName + " - " + result.localeRelatedObjectName);
 			}
-			String altName = getAltName(result);
-			if (altName != null) {
-				feature.prop(PoiTypeField.ALT_NAME.getFieldName(), altName);
-			}
 			Map<String, String> tags = getPoiTypeFields(result.object);
 			for (Map.Entry<String, String> entry : tags.entrySet()) {
 				feature.prop(entry.getKey(), entry.getValue());
 			}
 		}
 		return feature;
-	}
-
-	private String getAltName(SearchResult result) {
-		if (result.objectType == ObjectType.STREET_INTERSECTION || Algorithms.isEmpty(result.localeName)) {
-			return null;
-		}
-		String altName = result.alternateName;
-		if (Algorithms.isEmpty(altName) && result.object instanceof MapObject mapObject) {
-			altName = mapObject.getName();
-		}
-		// localeName may carry the matched ref: "Name (12)"
-		if (Algorithms.isEmpty(altName) || result.localeName.contains(altName)) {
-			return null;
-		}
-		return altName;
 	}
 
 	public Feature getPoiFeature(SearchResult result, String timeZone) {

@@ -6,6 +6,7 @@ import static net.osmand.search.SearchUICore.getMainCityName;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -33,6 +34,8 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import net.osmand.CollatorStringMatcher;
+import net.osmand.CollatorStringMatcher.StringMatcherMode;
 import net.osmand.ResultMatcher;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.Amenity;
@@ -286,7 +289,7 @@ public class SpatialSearchService {
 					if (r.isPoiCategory()) {
 						SpatialPoiType type = r.getPoiCategory(poiTypeSearch);
 						if (type != null) {
-							f = getSpatialPoiTypeFeature(type, ctx.locale());
+							f = getSpatialPoiTypeFeature(type, ctx.locale(), ctx.text());
 						}
 					} else if (!objs.isEmpty()) {
 						LatLon l = r.getLatLon() == null ? new LatLon(ctx.lat(), ctx.lon()) : r.getLatLon();
@@ -348,14 +351,49 @@ public class SpatialSearchService {
 		return info;
 	}
 
-	private Feature getSpatialPoiTypeFeature(SpatialPoiType type, String locale) {
+	private Feature getSpatialPoiTypeFeature(SpatialPoiType type, String locale, String query) {
 		Feature feature = new Feature(Geometry.point(new LatLon(0, 0)))
 				.prop(SearchResultConverter.PoiTypeField.TYPE.getFieldName(), ObjectType.POI_TYPE);
 		Map<String, String> tags = getSpatialPoiTypeFields(type, locale);
 		for (Map.Entry<String, String> entry : tags.entrySet()) {
 			feature.prop(entry.getKey(), entry.getValue());
 		}
+		String name = tags.get(SearchResultConverter.PoiTypeField.NAME.getFieldName());
+		String altName = getMatchedPoiTypeName(type, name, query);
+		if (altName != null) {
+			feature.prop(SearchResultConverter.PoiTypeField.ALT_NAME.getFieldName(), altName);
+		}
 		return feature;
+	}
+
+	// the translation or synonym (any language) the query matched when the shown name does not: "schu" -> Schule
+	private String getMatchedPoiTypeName(SpatialPoiType type, String name, String query) {
+		if (type.singleType == null || Algorithms.isEmpty(name) || Algorithms.isEmpty(query)) {
+			return null;
+		}
+		List<CollatorStringMatcher> matchers = new ArrayList<>();
+		for (String word : query.trim().split("\\s+")) {
+			CollatorStringMatcher matcher = new CollatorStringMatcher(word, StringMatcherMode.CHECK_STARTS_FROM_SPACE);
+			if (matcher.matches(name)) {
+				return null;
+			}
+			matchers.add(matcher);
+		}
+		// spatial poi types use the translator of all languages: translation is English, synonyms are the rest
+		List<String> names = new ArrayList<>();
+		names.add(type.singleType.getTranslation());
+		String synonyms = type.singleType.getSynonyms();
+		if (!Algorithms.isEmpty(synonyms)) {
+			names.addAll(Arrays.asList(synonyms.split(";")));
+		}
+		for (String n : names) {
+			for (CollatorStringMatcher matcher : matchers) {
+				if (!Algorithms.isEmpty(n) && matcher.matches(n.trim())) {
+					return n.trim();
+				}
+			}
+		}
+		return null;
 	}
 
 	public Map<String, String> getSpatialPoiTypeFields(SpatialPoiType type, String locale) {
@@ -455,8 +493,6 @@ public class SpatialSearchService {
 		if (obj instanceof Amenity amenity) {
 			SearchResult result = searchResultConverter.buildPoiSearchResult(amenity, locale, dominatedCity);
 			result.localeName = amenity.getName(locale);
-			result.alternateName = SpatialTextSearchAPI.getMatchedOtherName(ssr, amenity, result.localeName,
-					amenity.getOtherNames(false, result.localeName));
 			if (Algorithms.isNotEmpty(extraNameMatch)) {
 				result.localeName += " (" + extraNameMatch + ")"; // ref
 			}
