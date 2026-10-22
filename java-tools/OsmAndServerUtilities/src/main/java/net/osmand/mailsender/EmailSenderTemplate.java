@@ -406,8 +406,8 @@ public class EmailSenderTemplate {
 		return matcher.find() ? matcher : null;
 	}
 
-	private File findTemplateFile(String template, String lang) {
-		String dir = defaultTemplatesDirectory + "/" + template;
+	static File findTemplateFile(String templatesDirectory, String template, String lang) {
+		String dir = templatesDirectory + "/" + template;
 		String baseLang = lang.split("[-_]")[0]; // ru-RU, pt_BR -> ru, pt
 		List<String> search = new ArrayList<>();
 		search.add(dir + "/" + lang + ".html"); // dir/template/name/lang.html
@@ -440,7 +440,7 @@ public class EmailSenderTemplate {
 	}
 
 	private List<String> readTemplate(String template, String lang, boolean required) {
-		File foundFile = findTemplateFile(template, lang);
+		File foundFile = findTemplateFile(defaultTemplatesDirectory, template, lang);
 
 		if (foundFile == null) {
 			if (required) {
