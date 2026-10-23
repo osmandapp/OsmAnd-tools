@@ -37,6 +37,7 @@ import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.io.OsmBaseStorage;
+import net.osmand.router.SpeedCameraFilter;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import org.apache.commons.logging.Log;
@@ -147,17 +148,44 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			tagsTransformer.handleRelationPropogatedTags((Relation) e, renderingTypes, ctx, EntityConvertApplyType.ROUTING);
 			Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION, EntityConvertApplyType.ROUTING);
 			if ("enforcement".equals(tags.get("type")) && "maxspeed".equals(tags.get("enforcement"))) {
-				ctx.loadEntityRelation((Relation) e);
-				Iterator<RelationMember> from = ((Relation) e).getMembers("from").iterator();
-				// mark as speed cameras
-				while(from.hasNext()) {
-					Entity n = from.next().getEntity();
-					if (n instanceof Node) {
-						PropagateEntityTags pt = tagsTransformer
-								.getPropogateTagForEntity(new EntityId(EntityType.NODE, n.getId()));
-						pt.putThroughTags.put("highway", "speed_camera");
+				Relation relation = (Relation) e;
+				ctx.loadEntityRelation(relation);
+				List<Entity> from = relation.getMemberEntities("from");
+				List<Entity> to = relation.getMemberEntities("to");
+				List<Entity> devices = relation.getMemberEntities("device");
+				if (to.isEmpty()) {
+					// without "to" the device on the road acts as "to" (wiki Relation:enforcement)
+					to = devices;
+					devices = new ArrayList<>();
+				}
+				// one role per node in a relation: a "from" node is not also its "to" or "device" (from == to, device == from)
+				to.removeAll(from);
+				devices.removeAll(from);
+				// mark the "from" point as a speed camera alarm
+				addSpeedCameraRelationInfo(relation, from, "from", "highway", "speed_camera", true);
+				// "to" is a hidden technical point that gives the direction: the speed_camera_to tag keeps the point in the route section without an alarm
+				addSpeedCameraRelationInfo(relation, to, "to", "highway", "speed_camera_to", false);
+				// a "device" on the road already has its own highway=speed_camera tag: this role prevents a second alarm, it was already given at the "from" point
+				addSpeedCameraRelationInfo(relation, devices, "device", null, null, false);
+			}
+		}
+	}
+
+	private void addSpeedCameraRelationInfo(Relation relation, List<Entity> members, String role, String tag, String value, boolean overwrite) {
+		String infoTag = SpeedCameraFilter.RELATIONS_INFO_TAG;
+		for (Entity member : members) {
+			if (member instanceof Node) {
+				PropagateEntityTags pt = tagsTransformer.getPropogateTagForEntity(new EntityId(EntityType.NODE, member.getId()));
+				if (tag != null) {
+					if (overwrite) {
+						pt.putThroughTags.put(tag, value);
+					} else {
+						pt.putThroughTags.putIfAbsent(tag, value);
 					}
 				}
+				// example:   { "osmand:speed_camera_relations_info"  :  "16276089:from, 16276090:to, 16276090:device" }
+				String relationsInfoValues = RelationTagsPropagation.sortAndAttachUniqueValue(pt.putThroughTags.get(infoTag), relation.getId() + ":" + role);
+				pt.putThroughTags.put(infoTag, relationsInfoValues);
 			}
 		}
 	}
