@@ -241,19 +241,16 @@ public class ApiController {
 		return "{\"status\":\"OK\"}";
 	}
 
-	/**
-	 * Free version of the app: maps of one country are free, and the app asks here before it
-	 * replaces that country with another one. Always allowed for now. A GET request on purpose:
-	 * package, version, nd, ns, aid and utm* stay in the access log for the later decision.
-	 */
-	// free version: how many replaces of the free region are allowed
+	// free version: replaces of the free country before the app asks for an email, and at all
 	private static final int FREE_REPLACES_BEFORE_EMAIL = 5;
 	private static final int FREE_REPLACES_MAX = 1000;
 
 	/**
-	 * Free version: may the free region be replaced once more. The app sends the number of replaces
-	 * it has already made and whether the user has left an email. Answers "ok", "request_email" (one
-	 * more replace for an email) or "no" (only Maps+).
+	 * Free version of the app: maps of one country are free, and the app asks here before it
+	 * replaces that country with another one. The app sends the number of replaces it has already
+	 * made and whether the user has left an email. Answers "ok", "request_email" (one more replace
+	 * for an email) or "no" (only Maps+). A GET request on purpose: package, version, nd, ns, aid
+	 * and utm* stay in the access log.
 	 */
 	@GetMapping(path = { "/replace-download-map" }, produces = "application/json")
 	@ResponseBody
