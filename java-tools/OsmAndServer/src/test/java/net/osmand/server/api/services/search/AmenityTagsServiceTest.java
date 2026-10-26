@@ -19,6 +19,7 @@ import java.util.stream.Collectors;
 
 import org.junit.Test;
 
+import net.osmand.data.Amenity;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.shared.data.AmenityTagEntriesBuilder.ValueLabel;
 import net.osmand.shared.gpx.GpxUtilities;
@@ -98,6 +99,19 @@ public class AmenityTagsServiceTest {
 		for (String key : List.of("collapsable_sustenance", "phone", "description")) {
 			assertNull(key, labels(tags, key));
 		}
+	}
+
+	// Lukas-Realschule (node 9422579452); as in Android a rule the parser cannot read is dropped,
+	// a value without any rule it can read is shown as it is
+	@Test
+	public void openingHoursAreRulesOfTheParser() {
+		assertEquals("Mo-Fr 08:00-11:00; PH, SH off", openingHours("Mo-Fr 08:00-11:00; PH,SH off; nach Vereinbarung"));
+		assertEquals("nach Vereinbarung", openingHours("nach Vereinbarung"));
+	}
+
+	private String openingHours(String value) {
+		return service.convertToVisibleTags(Map.of(GpxUtilities.AMENITY_PREFIX + Amenity.OPENING_HOURS, value), "en")
+				.stream().filter(tag -> tag.key().equals(Amenity.OPENING_HOURS)).findFirst().orElseThrow().value();
 	}
 
 	private List<ValueLabel> labels(Map<String, String> tags, String key) {
