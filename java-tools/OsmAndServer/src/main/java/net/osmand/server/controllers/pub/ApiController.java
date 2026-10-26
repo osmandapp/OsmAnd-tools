@@ -246,11 +246,30 @@ public class ApiController {
 	 * replaces that country with another one. Always allowed for now. A GET request on purpose:
 	 * package, version, nd, ns, aid and utm* stay in the access log for the later decision.
 	 */
+	// free version: how many replaces of the free region are allowed
+	private static final int FREE_REPLACES_BEFORE_EMAIL = 5;
+	private static final int FREE_REPLACES_MAX = 1000;
+
+	/**
+	 * Free version: may the free region be replaced once more. The app sends the number of replaces
+	 * it has already made and whether the user has left an email. Answers "ok", "request_email" (one
+	 * more replace for an email) or "no" (only Maps+).
+	 */
 	@GetMapping(path = { "/replace-download-map" }, produces = "application/json")
 	@ResponseBody
 	public String replaceDownloadMap(@RequestParam(required = false) String from,
-			@RequestParam(required = false) String to) {
-		return "{\"status\":\"ok\"}";
+			@RequestParam(required = false) String to,
+			@RequestParam(required = false, defaultValue = "0") int replaces,
+			@RequestParam(required = false, defaultValue = "false") boolean email) {
+		String status;
+		if (replaces >= FREE_REPLACES_MAX) {
+			status = "no";
+		} else if (replaces >= FREE_REPLACES_BEFORE_EMAIL && !email) {
+			status = "request_email";
+		} else {
+			status = "ok";
+		}
+		return "{\"status\":\"" + status + "\"}";
 	}
 
 
