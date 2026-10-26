@@ -166,11 +166,11 @@ public class SpatialSearchService {
 	public SpatialPoiSearch getSpatialPoiTypeSearch(String locale, LatLon location) {
 		Set<String> langs = new LinkedHashSet<>();
 		langs.add(PoiTypesService.DEFAULT_SEARCH_LANG);
-		if (!Algorithms.isEmpty(locale)) {
+		if (poiTypesService.hasTranslations(locale)) {
 			langs.add(locale);
 		}
 		String regionLang = getRegionLang(location);
-		if (regionLang != null) {
+		if (poiTypesService.hasTranslations(regionLang)) {
 			langs.add(regionLang);
 		}
 		return poiSearchByLangs.computeIfAbsent(String.join(",", langs), k -> {
