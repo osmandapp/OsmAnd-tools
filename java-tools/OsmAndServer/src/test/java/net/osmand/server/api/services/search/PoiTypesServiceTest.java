@@ -1,6 +1,8 @@
 package net.osmand.server.api.services.search;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import java.util.List;
 import java.util.Map;
@@ -40,6 +42,15 @@ public class PoiTypesServiceTest {
 		assertEquals("Туристична пам'ятка", service.getCategoryName("attraction", "uk"));
 		assertEquals("Subway station", service.getCategoryName("subway_station", null));
 		assertEquals("Subway station", service.getCategoryName("subway_station", ""));
+	}
+
+	@Test
+	public void onlyLanguagesWithPhrasesHaveTranslations() {
+		assertTrue(service.hasTranslations("uk"));
+		assertTrue(service.hasTranslations("iw"));
+		assertFalse(service.hasTranslations("he"));
+		assertFalse(service.hasTranslations("a1"));
+		assertFalse(service.hasTranslations(null));
 	}
 
 	private AbstractPoiType type(String key) {

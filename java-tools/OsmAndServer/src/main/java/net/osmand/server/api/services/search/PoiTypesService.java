@@ -54,7 +54,7 @@ public class PoiTypesService {
 	}
 
 	public MapPoiTypes getMapPoiTypes(String locale) {
-		String lang = !Algorithms.isEmpty(locale) && getTranslations(locale) != null ? locale : DEFAULT_SEARCH_LANG;
+		String lang = hasTranslations(locale) ? locale : DEFAULT_SEARCH_LANG;
 
 		return poiTypesByLocale.computeIfAbsent(lang, loc -> {
 			MapPoiTypes mapPoiTypes = new MapPoiTypes(null);
@@ -64,6 +64,10 @@ public class PoiTypesService {
 			mapPoiTypes.setPoiTranslator(new MapPoiTypesTranslator(translations, enTranslations));
 			return mapPoiTypes;
 		});
+	}
+
+	public boolean hasTranslations(String locale) {
+		return !Algorithms.isEmpty(locale) && getTranslations(locale) != null;
 	}
 
 	private Map<String, String> getTranslations(String locale) {
