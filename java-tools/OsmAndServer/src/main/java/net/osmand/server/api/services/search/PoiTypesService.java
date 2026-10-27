@@ -9,6 +9,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import jakarta.annotation.PostConstruct;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -17,12 +18,14 @@ import org.xmlpull.v1.XmlPullParserFactory;
 import net.osmand.osm.AbstractPoiType;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.MapRenderingTypes;
+import net.osmand.osm.PoiAdditionalLabels;
 import net.osmand.osm.PoiCategory;
 import net.osmand.osm.PoiType;
 import net.osmand.search.SearchUICore;
 import net.osmand.search.core.SearchCoreFactory;
 import net.osmand.search.core.SearchResult;
 import net.osmand.server.utils.MapPoiTypesTranslator;
+import net.osmand.util.Algorithms;
 
 @Service
 public class PoiTypesService {
@@ -51,9 +54,9 @@ public class PoiTypesService {
 	}
 
 	public MapPoiTypes getMapPoiTypes(String locale) {
-		locale = locale == null ? DEFAULT_SEARCH_LANG : locale;
+		String lang = hasTranslations(locale) ? locale : DEFAULT_SEARCH_LANG;
 
-		return poiTypesByLocale.computeIfAbsent(locale, loc -> {
+		return poiTypesByLocale.computeIfAbsent(lang, loc -> {
 			MapPoiTypes mapPoiTypes = new MapPoiTypes(null);
 			mapPoiTypes.init();
 			Map<String, String> translations = getTranslations(loc);
@@ -61,6 +64,10 @@ public class PoiTypesService {
 			mapPoiTypes.setPoiTranslator(new MapPoiTypesTranslator(translations, enTranslations));
 			return mapPoiTypes;
 		});
+	}
+
+	public boolean hasTranslations(String locale) {
+		return !Algorithms.isEmpty(locale) && getTranslations(locale) != null;
 	}
 
 	private Map<String, String> getTranslations(String locale) {
@@ -71,7 +78,7 @@ public class PoiTypesService {
 
 				InputStream phrasesStream = this.getClass().getResourceAsStream(AND_RES + localPath + "/phrases.xml");
 				if (phrasesStream == null) {
-					throw new IllegalArgumentException("Locale not found: " + loc);
+					return null;
 				}
 
 				return parseStringsXml(phrasesStream);
@@ -93,6 +100,19 @@ public class PoiTypesService {
 				} catch (XmlPullParserException | IOException e) {
 					throw new RuntimeException(e);
 				}
+			}
+		}
+		return translations;
+	}
+
+	// English first: its translation is the main name, the other languages are synonyms
+	public MapPoiTypesTranslator parseTranslations(Collection<String> langs) {
+		Map<String, String> enTranslations = getTranslations(DEFAULT_SEARCH_LANG);
+		MapPoiTypesTranslator translations = new MapPoiTypesTranslator(enTranslations, enTranslations);
+		for (String l : langs) {
+			Map<String, String> stringsXml = DEFAULT_SEARCH_LANG.equals(l) ? null : getTranslations(l);
+			if (stringsXml != null) {
+				translations.appendTranslations(l, stringsXml);
 			}
 		}
 		return translations;
@@ -122,7 +142,7 @@ public class PoiTypesService {
 					break;
 				case XmlPullParser.END_TAG:
 					if (tagName.equals("string") && key != null && value != null) {
-						resultMap.put(key, value);
+						resultMap.put(key, unescapeAndroidQuotes(value));
 						key = null;
 						value = null;
 					}
@@ -134,12 +154,37 @@ public class PoiTypesService {
 		return resultMap;
 	}
 
+	private static String unescapeAndroidQuotes(String value) {
+		return value.replace("\\'", "'").replace("\\\"", "\"");
+	}
+
 	private String validateLocale(String locale) {
 		if (locale == null || locale.isEmpty()) {
 			throw new IllegalArgumentException("Locale cannot be null or empty");
 		}
 		// Remove potentially dangerous characters such as '/'
 		return locale.replaceAll("[/\\\\]", "");
+	}
+
+	public Map<String, String> getCategoryNames(List<String> keys, String locale) {
+		Map<String, String> names = new LinkedHashMap<>();
+		for (String key : keys) {
+			String name = getCategoryName(key, locale);
+			if (name != null) {
+				names.put(key, name);
+			}
+		}
+		return names;
+	}
+
+	@Nullable
+	public String getCategoryName(String key, String locale) {
+		MapPoiTypes poiTypes = getMapPoiTypes(locale);
+		AbstractPoiType type = poiTypes.getAnyPoiTypeByKey(key);
+		if (type == null) {
+			type = poiTypes.getAnyPoiAdditionalTypeByKey(key);
+		}
+		return type != null ? PoiAdditionalLabels.getSearchName(type) : null;
 	}
 
 	public List<String> getTopFilters() {

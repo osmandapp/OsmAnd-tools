@@ -103,6 +103,7 @@ public class PoiSearchService {
 		public boolean zoomInHint;
 		public FeatureCollection features;
 		public Map<String, Object> info;
+		public Map<String, String> categoryNames;
 	}
 
 	public static class PoiSearchData {
@@ -242,7 +243,8 @@ public class PoiSearchService {
 				poiZoom, limit);
 	}
 
-	public Map<String, Map<String, String>> searchPoiCategories(String search, LatLon center) throws IOException {
+	public Map<String, Map<String, String>> searchPoiCategories(String search, LatLon center, String locale)
+			throws IOException {
 		Map<String, Map<String, String>> res = new LinkedHashMap<>();
 		List<BinaryMapIndexReader> readers = new ArrayList<>();
 		try {
@@ -260,7 +262,7 @@ public class PoiSearchService {
 				for (SpatialSearchResult r : results.mainResults) {
 					SpatialPoiType type = r.getPoiCategory(poiTypeSearch);
 					if (type != null) {
-						Map<String, String> fields = spatialSearchService.getSpatialPoiTypeFields(type);
+						Map<String, String> fields = spatialSearchService.getSpatialPoiTypeFields(type, locale);
 						res.put(fields.get(SearchResultConverter.PoiTypeField.NAME.getFieldName()), fields);
 					}
 				}

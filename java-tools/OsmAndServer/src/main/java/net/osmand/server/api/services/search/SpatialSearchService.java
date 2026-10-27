@@ -9,8 +9,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -34,12 +36,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import net.osmand.ResultMatcher;
+import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.Amenity;
 import net.osmand.data.City;
 import net.osmand.data.LatLon;
 import net.osmand.data.MapObject;
+import net.osmand.map.OsmandRegions;
+import net.osmand.map.WorldRegion;
+import net.osmand.osm.AbstractPoiType;
 import net.osmand.osm.MapPoiTypes;
+import net.osmand.osm.PoiAdditionalLabels;
 import net.osmand.osm.PoiType;
 import net.osmand.search.core.ObjectType;
 import net.osmand.search.core.SearchCoreFactory;
@@ -73,6 +80,8 @@ public class SpatialSearchService {
 	// reused for cache
 	private SpatialPoiSearch poiSearch;
 	private MapPoiTypes poiTypesWithTranslations;
+	// web search: poi categories by languages "en,uk,de"
+	private final Map<String, SpatialPoiSearch> poiSearchByLangs = new ConcurrentHashMap<>();
 
 	private final ThreadLocal<SpatialTextSearch> spatialTextSearchLocal = ThreadLocal.withInitial(SpatialTextSearch::new);
 	private final ThreadLocal<RegionsReaderHolder> osmandRegionsLocal = ThreadLocal.withInitial(RegionsReaderHolder::new);
@@ -97,6 +106,9 @@ public class SpatialSearchService {
 
 	@Autowired
 	private SearchResultConverter searchResultConverter;
+
+	@Autowired
+	private PoiTypesService poiTypesService;
 
 	private static ThreadPoolExecutor[] createSpatialSearchExecutors(String name, int threads) {
 		ThreadPoolExecutor[] executors = new ThreadPoolExecutor[threads];
@@ -148,6 +160,42 @@ public class SpatialSearchService {
 			poiSearch = new SpatialPoiSearch(getPoiTypesWithTranslations());
 		}
 		return poiSearch;
+	}
+
+	// poi categories are matched by their names in English, the user's language and the main language of the location
+	public SpatialPoiSearch getSpatialPoiTypeSearch(String locale, LatLon location) {
+		Set<String> langs = new LinkedHashSet<>();
+		langs.add(PoiTypesService.DEFAULT_SEARCH_LANG);
+		if (poiTypesService.hasTranslations(locale)) {
+			langs.add(locale);
+		}
+		String regionLang = getRegionLang(location);
+		if (poiTypesService.hasTranslations(regionLang)) {
+			langs.add(regionLang);
+		}
+		return poiSearchByLangs.computeIfAbsent(String.join(",", langs), k -> {
+			MapPoiTypes poiTypes = new MapPoiTypes(null);
+			poiTypes.init();
+			poiTypes.setPoiTranslator(poiTypesService.parseTranslations(langs));
+			return new SpatialPoiSearch(poiTypes);
+		});
+	}
+
+	// the first language of the region: "uk" of "uk,ru", a user who needs another one can switch the UI language
+	private String getRegionLang(LatLon location) {
+		OsmandRegions regions = mapReadersService.getOsmandRegions();
+		if (regions == null) {
+			return null;
+		}
+		try {
+			// ~1 ms: reads regions.ocbf under the lock of OsmandRegions, a search takes 300+ ms
+			Map.Entry<WorldRegion, BinaryMapDataObject> entry = regions.getSmallestBinaryMapDataObjectAt(location);
+			String lang = entry == null ? null : entry.getKey().getParams().getRegionLang();
+			return Algorithms.isEmpty(lang) ? null : lang.split(",")[0];
+		} catch (IOException e) {
+			LOGGER.warn("Region language failed at " + location, e);
+			return null;
+		}
 	}
 
 	private static class RegionsReaderHolder {
@@ -225,6 +273,7 @@ public class SpatialSearchService {
 				sr.localeName = ((float) coord.getLatitude()) + ", " + ((float) coord.getLongitude());
 				response.features.add(searchResultConverter.getFeature(sr, timeZone));
 			}
+			SpatialPoiSearch poiTypeSearch = getSpatialPoiTypeSearch(ctx.locale(), new LatLon(ctx.lat(), ctx.lon()));
 			// In future multiple spatialTextSearch & multiple osmand regions
 			SpatialTextSearchSettings settings = autocomplete
 					? SpatialTextSearchSettings.suggestionSettings()
@@ -256,7 +305,7 @@ public class SpatialSearchService {
 						readers.add(regionsReader);
 					}
 					SpatialSearchContext sscontext =
-							new SpatialSearchContext(settings, readers, getSpatialPoiTypeSearch(), new LatLon(ctx.lat(), ctx.lon()));
+							new SpatialSearchContext(settings, readers, poiTypeSearch, new LatLon(ctx.lat(), ctx.lon()));
 					sscontext.resultMatcher = matcher;
 					return getSpatialTextSearch().searchAPI(ctx.text(), sscontext);
 				} finally {
@@ -270,7 +319,6 @@ public class SpatialSearchService {
 			}
 			if (res.mainResults != null) {
 				String dominatedCity = calculateSpatialDominatedCity(res.mainResults, ctx.locale());
-				SpatialPoiSearch poiTypeSearch = getSpatialPoiTypeSearch();
 				Map<MapObject, Feature> amenityFeatureCache = new IdentityHashMap<>();
 				for (SpatialSearchResult r : res.mainResults) {
 					if (response.features.size() >= MAX_SPATIAL_FEATURES) {
@@ -281,7 +329,7 @@ public class SpatialSearchService {
 					if (r.isPoiCategory()) {
 						SpatialPoiType type = r.getPoiCategory(poiTypeSearch);
 						if (type != null) {
-							f = getSpatialPoiTypeFeature(type);
+							f = getSpatialPoiTypeFeature(r, type, poiTypeSearch, ctx.locale());
 						}
 					} else if (!objs.isEmpty()) {
 						LatLon l = r.getLatLon() == null ? new LatLon(ctx.lat(), ctx.lon()) : r.getLatLon();
@@ -343,28 +391,35 @@ public class SpatialSearchService {
 		return info;
 	}
 
-	private Feature getSpatialPoiTypeFeature(SpatialPoiType type) {
+	private Feature getSpatialPoiTypeFeature(SpatialSearchResult r, SpatialPoiType type, SpatialPoiSearch poiTypeSearch,
+	                                         String locale) {
 		Feature feature = new Feature(Geometry.point(new LatLon(0, 0)))
 				.prop(SearchResultConverter.PoiTypeField.TYPE.getFieldName(), ObjectType.POI_TYPE);
-		Map<String, String> tags = getSpatialPoiTypeFields(type);
+		Map<String, String> tags = getSpatialPoiTypeFields(type, locale);
 		for (Map.Entry<String, String> entry : tags.entrySet()) {
 			feature.prop(entry.getKey(), entry.getValue());
+		}
+		String name = tags.get(SearchResultConverter.PoiTypeField.NAME.getFieldName());
+		String altName = r.getPoiCategoryMatchedName(poiTypeSearch);
+		if (altName != null && !altName.equalsIgnoreCase(name)) {
+			feature.prop(SearchResultConverter.PoiTypeField.ALT_NAME.getFieldName(), altName);
 		}
 		return feature;
 	}
 
-	public Map<String, String> getSpatialPoiTypeFields(SpatialPoiType type) {
+	public Map<String, String> getSpatialPoiTypeFields(SpatialPoiType type, String locale) {
 		if (type.singleType != null) {
+			String name = getSearchName(type.singleType, locale);
 			if (type.singleType instanceof PoiType poiType && poiType.isAdditional()
 					&& type.getParentTypes() != null && type.getParentTypes().size() > 1) {
 				SearchCoreFactory.PoiAdditionalCustomFilter filter =
 						new SearchCoreFactory.PoiAdditionalCustomFilter(MapPoiTypes.getDefault(), poiType);
 				Map<String, String> tags = searchResultConverter.getPoiTypeFields(filter);
-				tags.put(SearchResultConverter.PoiTypeField.NAME.getFieldName(), filter.getTranslation());
+				tags.put(SearchResultConverter.PoiTypeField.NAME.getFieldName(), name);
 				return tags;
 			}
 			Map<String, String> tags = searchResultConverter.getPoiTypeFields(type.singleType);
-			tags.put(SearchResultConverter.PoiTypeField.NAME.getFieldName(), type.singleType.getTranslation());
+			tags.put(SearchResultConverter.PoiTypeField.NAME.getFieldName(), name);
 			if (type.getWikidataId() != null) {
 				tags.put(SearchResultConverter.PoiTypeField.WIKIDATA_ID.getFieldName(), type.getWikidataId());
 			}
@@ -390,6 +445,11 @@ public class SpatialSearchService {
 			}
 		}
 		return tags;
+	}
+
+	private String getSearchName(AbstractPoiType type, String locale) {
+		String name = poiTypesService.getCategoryName(type.getKeyName(), locale);
+		return name != null ? name : PoiAdditionalLabels.getSearchName(type);
 	}
 
 	public SearchResult buildSpatialPoiSearchResult(Amenity amenity, String locale) {

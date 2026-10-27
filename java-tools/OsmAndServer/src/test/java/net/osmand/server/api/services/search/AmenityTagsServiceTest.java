@@ -1,6 +1,10 @@
 package net.osmand.server.api.services.search;
 
+import static net.osmand.shared.data.AmenityTagEntriesBuilder.ValueLabel.NAME;
+import static net.osmand.shared.data.AmenityTagEntriesBuilder.ValueLabel.NAME_OVER_VALUE;
+import static net.osmand.shared.data.AmenityTagEntriesBuilder.ValueLabel.WHOLE;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
@@ -16,6 +20,7 @@ import java.util.stream.Collectors;
 import org.junit.Test;
 
 import net.osmand.server.utils.WebGpxParser;
+import net.osmand.shared.data.AmenityTagEntriesBuilder.ValueLabel;
 import net.osmand.shared.gpx.GpxUtilities;
 import okio.Buffer;
 
@@ -63,13 +68,41 @@ public class AmenityTagsServiceTest {
 	@Test
 	public void onlyUnknownKeysOfThePointAreGeneric() {
 		Map<String, String> tags = Map.of("amenity_type", "sustenance", "amenity_subtype", "cafe",
-				"internet_access:fee", "no", "authentication:phone_call:number", "+380441234567",
+				"internet_access:ssid", "CafeWiFi", "authentication:phone_call:number", "+380441234567",
 				"test:country", "US", "my_note", "hello");
 		Set<String> generic = service.convertToVisibleTags(tags, "en").stream()
 				.filter(tag -> Boolean.TRUE.equals(tag.generic())).map(AmenityTagsService.VisibleTag::key)
 				.collect(Collectors.toSet());
 		assertEquals(Set.of("test:country", "my_note"), generic);
-		assertShown(visibleKeys(tags), "internet_access:fee", "authentication:phone_call:number");
+		assertShown(visibleKeys(tags), "internet_access:ssid", "authentication:phone_call:number");
+	}
+
+	@Test
+	public void valueLabels() {
+		assertEquals(List.of(NAME_OVER_VALUE), labels(Map.of("amenity_type", "sustenance", "amenity_subtype", "cafe",
+				"takeaway_yes", "yes"), "takeaway_yes"));
+		assertEquals(List.of(NAME_OVER_VALUE), labels(Map.of("amenity_type", "sustenance", "amenity_subtype", "cafe",
+				"collapsable_wheelchair_accessibility", "wheelchair_limited"), "collapsable_wheelchair_accessibility"));
+		assertEquals(List.of(NAME, NAME), labels(Map.of("amenity_type", "service", "amenity_subtype", "boat_rental",
+				"collapsable_boat_rental_type", "boat_kayak_rental_yes;boat_canoe_rental_yes"),
+				"collapsable_boat_rental_type"));
+		assertEquals(List.of(NAME, WHOLE), labels(Map.of("amenity_type", "transportation",
+				"amenity_subtype", "toll_booth", "collapsable_payment_toll_type",
+				"payment_e_zpass_yes;payment_pikepass_designated"), "collapsable_payment_toll_type"));
+	}
+
+	@Test
+	public void otherRowsHaveNoLabels() {
+		Map<String, String> tags = Map.of("amenity_type", "sustenance", "amenity_subtype", "cafe", "bar", "yes",
+				"phone", "+380441234567", "description:en", "Hello", "description:de", "Hallo");
+		for (String key : List.of("collapsable_sustenance", "phone", "description")) {
+			assertNull(key, labels(tags, key));
+		}
+	}
+
+	private List<ValueLabel> labels(Map<String, String> tags, String key) {
+		return service.convertToVisibleTags(tags, "en").stream().filter(tag -> tag.key().equals(key)).findFirst()
+				.orElseThrow().labels();
 	}
 
 	private Set<String> visibleKeys(Map<String, String> tags) {

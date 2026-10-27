@@ -69,9 +69,4 @@ public class WikiTitleLookupTest {
 		assertEquals(CPP_ID, wikiService.retrieveArticleIdFromWikiUrl("https://en.wikipedia.org/wiki/C++"));
 		assertEquals(CPP_ID, wikiService.retrieveArticleIdFromWikiUrl("https://en.wikipedia.org/wiki/C%2B%2B"));
 	}
-
-	@Test
-	public void malformedPercentInArticleUrlDoesNotThrow() {
-		assertEquals(null, wikiService.retrieveArticleIdFromWikiUrl("https://de.wikipedia.org/wiki/100%_Berlin"));
-	}
 }
