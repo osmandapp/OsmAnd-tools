@@ -147,7 +147,8 @@ public class SearchController {
 	                                     @RequestParam(required = false) String name,
 	                                     @RequestParam(required = false) Long osmId,
 	                                     @RequestParam(required = false) Long wikidataId,
-	                                     @RequestParam(required = false) String timeZone) throws IOException {
+	                                     @RequestParam(required = false) String timeZone,
+	                                     @RequestParam(required = false) String lang) throws IOException {
 		Feature poiSearchResult;
 
 		if (pin == null || pin.isEmpty()) {
@@ -166,7 +167,8 @@ public class SearchController {
 			return ResponseEntity.badRequest().body("Invalid 'pin' coordinates, expected numeric values for 'lat,lon'");
 		}
 
-		poiSearchResult = poiSearchService.getPoiResultByShareLink(type, new LatLon(lat, lng), name, osmId, wikidataId, timeZone);
+		poiSearchResult = poiSearchService.getPoiResultByShareLink(type, new LatLon(lat, lng), name, osmId, wikidataId,
+				timeZone, lang);
 
 		return ResponseEntity.ok(gson.toJson(poiSearchResult));
 	}

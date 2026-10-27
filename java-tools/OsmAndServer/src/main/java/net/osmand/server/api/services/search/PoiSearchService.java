@@ -422,36 +422,34 @@ public class PoiSearchService {
 	}
 
 	public Feature getPoiResultByShareLink(String type, LatLon loc, String name, Long osmId, Long wikidataId,
-	                                       String timeZone) throws IOException {
+	                                       String timeZone, String lang) throws IOException {
 		Feature poiFeature = getPoi(type, name, loc, osmId, timeZone);
 
 		if (poiFeature != null && wikidataId == null) {
 			Object wikiIdFromOsm = poiFeature.properties.get("osm_tag_wikidata");
 			if (wikiIdFromOsm != null) {
-				wikidataId = Long.parseLong(wikiIdFromOsm.toString().replace("Q", ""));
+				wikidataId = WikiService.parseWikidataId(wikiIdFromOsm.toString());
 			}
 		}
 
-		Feature wikiFeature = getWikiPoiById(wikidataId);
+		Feature wikiFeature = getWikiPoiById(wikidataId, lang);
 		return SearchResultConverter.mergeFeatures(wikiFeature, poiFeature);
 	}
 
-	private Feature getWikiPoiById(Long wikidataId) {
+	private Feature getWikiPoiById(Long wikidataId, String lang) {
 		if (wikidataId == null) {
 			return null;
 		}
-		List<String> langs = List.of(PoiTypesService.DEFAULT_SEARCH_LANG);
-
-		String langListQuery = wikiService.getLangListQuery(langs);
+		List<String> langs = wikiService.buildLangPriorityList(lang);
 
 		String query = "SELECT w.id, w.photoId, w.wikiTitle, w.wikiLang, w.wikiDesc, w.photoTitle, "
 				+ "w.osmid, w.osmtype, w.poitype, w.poisubtype, " + "w.search_lat AS lat, w.search_lon AS lon, "
-				+ "arrayFirst(x -> has(w.wikiArticleLangs, x), " + langListQuery + ") AS lang, "
+				+ wikiService.getArticleLangQuery(langs) + " AS lang, "
 				+ "indexOf(w.wikiArticleLangs, lang) AS ind, " + "w.wikiArticleContents[ind] AS content, "
 				+ "w.wvLinks, w.elo AS elo, w.topic AS topic, w.categories AS categories, w.qrank, w.labelsJson "
 				+ "FROM wiki.wikidata w " + "WHERE w.id = " + wikidataId + " " + "ORDER BY w.elo DESC, w.qrank DESC";
 		FeatureCollection res = wikiService.getPoiData(null, null, query, "lat", "lon", langs);
-		return res.features.get(0);
+		return res.features.isEmpty() ? null : res.features.get(0);
 	}
 
 	private boolean matchesName(Amenity a, String name) {

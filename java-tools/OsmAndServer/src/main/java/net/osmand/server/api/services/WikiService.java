@@ -16,6 +16,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
+import jakarta.annotation.Nullable;
 import net.osmand.server.api.services.search.SearchResultConverter;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiType;
@@ -255,8 +256,6 @@ public class WikiService {
 
 	private String buildWikidataQuery(List<String> langPriority, boolean showAll, String filterQuery, int zoom) {
 
-		String langList = getLangListQuery(langPriority);
-
 		String table;
 		if (zoom <= 5)      table = "wiki.top1000_by_quad_z5";
 		else if (zoom <= 10) table = "wiki.top1000_by_quad_z10";
@@ -266,7 +265,7 @@ public class WikiService {
 		return "SELECT w.id, w.photoId, w.wikiTitle, w.wikiLang, w.wikiDesc, w.photoTitle, " +
 				"w.osmid, w.osmtype, w.poitype, w.poisubtype, " +
 				"w.search_lat AS lat, w.search_lon AS lon, " +
-				"arrayFirst(x -> has(w.wikiArticleLangs, x), " + langList + ") AS lang, " +
+				getArticleLangQuery(langPriority) + " AS lang, " +
 				"indexOf(w.wikiArticleLangs, lang) AS ind, " +
 				"w.wikiArticleContents[ind] AS content, " +
 				"w.wvLinks, w.elo AS elo, w.topic AS topic, w.categories AS categories, w.qrank, w.labelsJson " +
@@ -277,12 +276,18 @@ public class WikiService {
 				"LIMIT " + LIMIT_OBJS_QUERY;
 	}
 
-	public String getLangListQuery(List<String> langPriority) {
+	private String getLangListQuery(List<String> langPriority) {
 		return langPriority.stream()
 				.map(String::trim)
 				.filter(l -> l.matches(LANG_CODE_REGEX))
 				.map(l -> "'" + l + "'")
 				.collect(Collectors.joining(", ", "[", "]"));
+	}
+
+	public String getArticleLangQuery(List<String> langPriority) {
+		return "arrayFirst(x -> has(w.wikiArticleLangs, x) AND notEmpty(ifNull(tupleElement("
+				+ "w.wikiArticleContents[indexOf(w.wikiArticleLangs, x)], 2), '')), "
+				+ getLangListQuery(langPriority) + ")";
 	}
 
 	public String getWikipediaContent(String title, String lang) {
@@ -302,6 +307,16 @@ public class WikiService {
 		});
 	}
 	
+	@Nullable
+	public static Long parseWikidataId(String wikidata) {
+		if (Algorithms.isEmpty(wikidata)) {
+			return null;
+		}
+		String ind = wikidata.substring(wikidata.lastIndexOf('Q') + 1).trim();
+		long wikidataId = Algorithms.parseLongSilently(ind, 0);
+		return wikidataId > 0 ? wikidataId : null;
+	}
+
 	public String getWikivoyageContent(String title, String lang) {
 		String query = "SELECT hex(content_gz) AS ziphex FROM wiki.wikivoyage_articles WHERE title = ? AND lang = ?";
 		return jdbcTemplate.query(query, ps -> {
@@ -375,12 +390,12 @@ public class WikiService {
 					if (col.equals(lat) || col.equals(lon)) continue;
 
 					switch (col) {
-						case "wikiArticles" -> fillWikiArticles(rs, i, f, langPriority);
 						case "availableLangs" -> f.properties.put("wikiLangs", rs.getString(i));
 						case "wvLinks" -> fillWvLinks(rs, i, f, langPriority);
 						case "wikiTitle" -> fillWikiTitle(rs, f, i, langPriority);
 						case "wikiDesc" -> f.properties.putIfAbsent("wikiDesc", rs.getString(i));
 						case "wikiLang" -> f.properties.putIfAbsent("wikiLang", rs.getString(i));
+						case "content" -> fillWikiContent(rs, i, f);
 						case "poisubtype" -> fillPoiSubtype(rs.getString(i), f);
 						default -> f.properties.put(col, rs.getString(i));
 					}
@@ -469,28 +484,30 @@ public class WikiService {
 		}
 	}
 
-	private List<String> buildLangPriorityList(String preferredLangs) {
-		return Algorithms.isEmpty(preferredLangs)
-				? List.of("en")
-				: List.of(preferredLangs.split(","));
+	public List<String> buildLangPriorityList(String preferredLangs) {
+		if (Algorithms.isEmpty(preferredLangs)) {
+			return List.of("en");
+		}
+		List<String> langs = Arrays.stream(preferredLangs.split(","))
+				.map(String::trim)
+				.filter(l -> l.matches(LANG_CODE_REGEX))
+				.toList();
+		return langs.isEmpty() ? List.of("en") : langs;
 	}
 
-	private void fillWikiArticles(ResultSet rs, int index, Feature f, List<String> langPriority) throws SQLException {
-		Array array = rs.getArray(index);
-		if (array != null) {
-			Object[] articles = (Object[]) array.getArray();
-			for (Object article : articles) {
-				if (article instanceof List<?> list) {
-					String title = getFromArray(list, 0);
-					String desc = getFromArray(list, 1);
-					if (title != null || desc != null) {
-						if (title != null) f.properties.put("wikiTitle", title);
-						if (desc != null) f.properties.put("wikiDesc", desc);
-						f.properties.put("wikiLang", langPriority.get(list.indexOf(article)));
-						break;
-					}
-				}
-			}
+	private static void fillWikiContent(ResultSet rs, int index, Feature f) throws SQLException {
+		if (!(rs.getObject(index) instanceof List<?> content)) {
+			return;
+		}
+		String title = getFromArray(content, 0);
+		if (Algorithms.isEmpty(title)) {
+			return;
+		}
+		f.properties.put("wikiTitle", title);
+		f.properties.put("wikiLang", rs.getString("lang"));
+		String desc = getFromArray(content, 1);
+		if (!Algorithms.isEmpty(desc)) {
+			f.properties.put("wikiDesc", desc);
 		}
 	}
 
