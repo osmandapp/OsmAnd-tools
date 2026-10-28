@@ -297,7 +297,7 @@ public class RelationTagsPropagation {
 	}
 
 	// admin_level must be compared as numbers, otherwise "10" < "2"
-	private static int compareSortValues(String v1, String v2) {
+	private int compareSortValues(String v1, String v2) {
 		int i1 = Algorithms.parseIntSilently(v1, -1);
 		int i2 = Algorithms.parseIntSilently(v2, -1);
 		return i1 >= 0 && i2 >= 0 ? Integer.compare(i1, i2) : v1.compareTo(v2);
