@@ -1522,7 +1522,7 @@ public class UserdataService {
                     return ResponseEntity.badRequest().body(String.format("Unable to delete user files (%s)", pu.email));
                 }
             }
-            return ResponseEntity.badRequest().body("Token is not valid or expired " + CODE_TTL_TEXT + ", or password is not valid");
+            return ResponseEntity.badRequest().body("Token is not valid or expired " + CODE_TTL_TEXT);
         }
         return ResponseEntity.badRequest().body("Email doesn't match login username");
     }
