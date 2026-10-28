@@ -296,29 +296,11 @@ public class RelationTagsPropagation {
 		return r;
 	}
 
-	// numeric values (admin_level) must be compared as numbers, otherwise "10" wins over "2"
-	// and a way shared by a country and a local relation loses the country admin level
-	static int compareSortValues(String value1, String value2) {
-		if (isIntegerValue(value1) && isIntegerValue(value2)) {
-			return Long.compare(Long.parseLong(value1), Long.parseLong(value2));
-		}
-		return value1.compareTo(value2);
-	}
-
-	private static boolean isIntegerValue(String value) {
-		if (value == null || value.isEmpty()) {
-			return false;
-		}
-		int start = value.charAt(0) == '-' ? 1 : 0;
-		if (start == value.length()) {
-			return false;
-		}
-		for (int i = start; i < value.length(); i++) {
-			if (!Character.isDigit(value.charAt(i))) {
-				return false;
-			}
-		}
-		return true;
+	// admin_level must be compared as numbers, otherwise "10" < "2"
+	private static int compareSortValues(String v1, String v2) {
+		int i1 = Algorithms.parseIntSilently(v1, -1);
+		int i2 = Algorithms.parseIntSilently(v2, -1);
+		return i1 >= 0 && i2 >= 0 ? Integer.compare(i1, i2) : v1.compareTo(v2);
 	}
 
 	
