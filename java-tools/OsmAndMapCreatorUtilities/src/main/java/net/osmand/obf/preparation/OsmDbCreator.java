@@ -78,10 +78,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 
 	private final int shiftId;
 	private final int additionId;
-	private final boolean generateNewIds;
 	private final boolean addGeoHash;
-	
-	private long generatedId = -100;
 
 	private PropagateToNodes propagateToNodes;
 
@@ -91,21 +88,18 @@ public class OsmDbCreator implements IOsmStorageFilter {
 		this.additionId = additionId;
 		this.shiftId = shiftId;
 		// Before for basemap it was true but cause too much memory to keep, so it's simplified 
-		this.generateNewIds = false;
 		this.addGeoHash = true;
 	}
 	
 	public OsmDbCreator(boolean addGeoHash) {
 		this.additionId = 0;
 		this.shiftId = 0;
-		this.generateNewIds = false;
 		this.addGeoHash = addGeoHash;
 	}
 	
 	public OsmDbCreator() {
 		this.additionId = 0;
 		this.shiftId = 0;
-		this.generateNewIds = false;
 		this.addGeoHash = true;
 	}
 	
@@ -169,15 +163,6 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	}
 
 	private long getSimpleConvertId(long id, EntityType type, boolean newId) {
-		if (generateNewIds) {
-			long key = (id << 2) + type.ordinal();
-			if (!generatedIds.contains(key) || newId) {
-				id = generatedId--;
-				generatedIds.put(key, id);
-			} else {
-				id = generatedIds.get(key);
-			}
-		}
 		if (id < 0 && (shiftId > 0 || additionId > 0)) {
 			// Basemap or CombineSRTMIntoFile or generate-single-map
 			long shiftedPositive = ((-id) << shiftId);
