@@ -7,6 +7,8 @@ import net.osmand.shared.data.AmenityTagEntriesBuilder.ValueLabel;
 import net.osmand.shared.data.AmenityTagEntry;
 import net.osmand.shared.osm.PoiCategory;
 import net.osmand.shared.osm.PoiType;
+import net.osmand.shared.util.OpeningHoursParser;
+import net.osmand.shared.util.OpeningHoursParser.OpeningHours;
 import net.osmand.util.Algorithms;
 import org.springframework.stereotype.Service;
 
@@ -124,7 +126,13 @@ public class AmenityTagsService {
 		boolean generic = genericRowKeys.contains(tagEntry.key) && type == null;
 		List<ValueLabel> labels = type != null && !type.isText()
 				? List.of(AmenityTagEntriesBuilder.getValueLabel(type)) : null;
-		return new VisibleTag(tagEntry.key, tagEntry.value, null, null, generic ? Boolean.TRUE : null, labels);
+		String value = Amenity.OPENING_HOURS.equals(tagEntry.key) ? toOpeningHoursRules(tagEntry.value) : tagEntry.value;
+		return new VisibleTag(tagEntry.key, value, null, null, generic ? Boolean.TRUE : null, labels);
+	}
+
+	private String toOpeningHoursRules(String value) {
+		OpeningHours openingHours = OpeningHoursParser.parseOpenedHours(value);
+		return openingHours != null ? openingHours.toString() : value;
 	}
 
 	private VisibleTag toLocalizedTag(AmenityTagEntry tagEntry) {
