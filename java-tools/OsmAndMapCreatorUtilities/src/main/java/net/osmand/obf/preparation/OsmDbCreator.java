@@ -178,16 +178,17 @@ public class OsmDbCreator implements IOsmStorageFilter {
 				id = generatedIds.get(key);
 			}
 		}
-		if (id < 0) {
-			// for negative we do different
+		if (id < 0 && (shiftId > 0 || additionId > 0)) {
+			// Basemap or CombineSRTMIntoFile or generate-single-map
 			long shiftedPositive = ((-id) << shiftId);
 			return -(shiftedPositive + additionId);
+		} else if (id < 0) {
+			// Highly likely user OSM files, JOSM drafts, etc
+			return -((-id) << ObfConstants.SHIFT_ID);
 		} else {
 			// keep original id if it's positive
 			return id;
-//			return (id << shiftId) + additionId;
 		}
-		
 	}
 
 	private int getNodeHash(Entity e) {
@@ -217,13 +218,6 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	}
 
 	private long getConvertId(long id, int ord, long hash) {
-		if(id < 0 && (shiftId > 0 || additionId > 0)) {
-			long lid = (id << shiftId) + additionId;
-			long fid = (lid << 2) + ord;
-			generatedIds.put(fid, lid);
-			hashes.put(fid, hash);
-			return lid;
-		}
 		int l = (int) (hash & ((1 << (ObfConstants.SHIFT_ID - 1)) - 1));
 		long cid = (id << ObfConstants.SHIFT_ID) + (ord % 2) + (l << 1);
 		long fid = (id << 2) + ord;
