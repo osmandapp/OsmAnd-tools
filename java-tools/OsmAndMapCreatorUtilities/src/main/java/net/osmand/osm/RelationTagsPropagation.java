@@ -169,7 +169,7 @@ public class RelationTagsPropagation {
 				for (RelationRulePropagation p : lst) {
 					String sortKey = RELATION_SORT_TAG + p.relationGroupKeyString;
 					if (!entityTags.putThroughTags.containsKey(sortKey)
-							|| p.relationGroupValueString.compareTo(entityTags.putThroughTags.get(sortKey)) < 0) {
+							|| compareSortValues(p.relationGroupValueString, entityTags.putThroughTags.get(sortKey)) < 0) {
 						entityTags.putThroughTags.put(sortKey, p.relationGroupValueString);
 						entityTags.putThroughTags.putAll(p.relationAdditionalTags);
 
@@ -294,6 +294,31 @@ public class RelationTagsPropagation {
 			r+= a;
 		}
 		return r;
+	}
+
+	// numeric values (admin_level) must be compared as numbers, otherwise "10" wins over "2"
+	// and a way shared by a country and a local relation loses the country admin level
+	static int compareSortValues(String value1, String value2) {
+		if (isIntegerValue(value1) && isIntegerValue(value2)) {
+			return Long.compare(Long.parseLong(value1), Long.parseLong(value2));
+		}
+		return value1.compareTo(value2);
+	}
+
+	private static boolean isIntegerValue(String value) {
+		if (value == null || value.isEmpty()) {
+			return false;
+		}
+		int start = value.charAt(0) == '-' ? 1 : 0;
+		if (start == value.length()) {
+			return false;
+		}
+		for (int i = start; i < value.length(); i++) {
+			if (!Character.isDigit(value.charAt(i))) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	
