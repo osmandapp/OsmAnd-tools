@@ -323,7 +323,6 @@ public class EmailSenderTemplate {
 						return error();
 					}
 				};
-				LOG.error("SendGrid sender is not configured");
 			}
 		}
 
