@@ -81,6 +81,8 @@ public class WikiDatabasePreparation {
 	public static final String WIKI_ARTICLES_GZ = "wiki-latest-pages-articles.xml.gz";
 	public static final String OSM_WIKI_FILE_PREFIX = "osm_wiki_";
 
+	private static final Map<String, String[]> POI_POSITIONAL_FIELDS = Map.of(
+			"znacznik", new String[] {"name", "lat", "long"});
 	private static final int OPTIMAL_SHORT_DESCR = 250;
 	private static final int OPTIMAL_LONG_DESCR = 500;
 	private static final int SHORT_PARAGRAPH = 10;
@@ -862,6 +864,8 @@ public class WikiDatabasePreparation {
 			throws IOException, SQLException {
 		StringBuilder poiShortDescription = new StringBuilder();
 		String[] parts = val.split("\\|");
+		String[] positionalFields = POI_POSITIONAL_FIELDS.get(parts[0].trim().toLowerCase());
+		int positionalIndex = 0;
 		for (int i = 1; i < parts.length; i++) {
 			String field = parts[i].trim();
 			String value = "";
@@ -870,17 +874,29 @@ public class WikiDatabasePreparation {
 				value = appendSqareBracketsIfNeeded(i, parts, field.substring(index + 1, field.length()).trim())
 						.replaceAll("\n", " ").trim();
 				field = field.substring(0, index).trim();
+			} else if (positionalFields != null) {
+				value = appendSqareBracketsIfNeeded(i, parts, field);
+				i += StringUtils.countMatches(value, "|");
+				value = value.replace("'''", "").replaceAll("\n", " ").trim();
+				field = positionalIndex < positionalFields.length ? positionalFields[positionalIndex] : "";
+				positionalIndex++;
 			}
 			if (!value.isEmpty() && !value.contains("{{")) {
 				try {
 					if (field.equalsIgnoreCase(("name")) || field.equalsIgnoreCase("nome")
 							|| field.equalsIgnoreCase("nom") || field.equalsIgnoreCase("שם")
 							|| field.equalsIgnoreCase("نام")) {
-						poiShortDescription.append("'''").append(value).append("'''").append(", ");
+						if (positionalFields == null) {
+							poiShortDescription.append("'''").append(value).append("'''").append(", ");
+						}
 						int l = value.indexOf("[[");
 						int e = value.indexOf("]]");
+						int sp = value.indexOf(' ');
 						if (l >= 0 && e >= 0) {
 							poiFields.put(PoiFieldType.NAME, value.substring(l + 2, e).trim());
+						} else if (value.startsWith("[http") && value.endsWith("]") && sp > 0) {
+							poiFields.put(PoiFieldType.NAME, value.substring(sp + 1, value.length() - 1).trim());
+							poiFields.putIfAbsent(PoiFieldType.WEBSITE, value.substring(1, sp));
 						} else {
 							poiFields.put(PoiFieldType.NAME, value);
 						}
@@ -891,7 +907,8 @@ public class WikiDatabasePreparation {
 					} else if (field.equalsIgnoreCase("intl-area-code")) {
 						poiFields.put(PoiFieldType.AREA_CODE, value);
 					} else if (field.equalsIgnoreCase("address") || field.equalsIgnoreCase("addresse")
-							|| field.equalsIgnoreCase("כתובת") || field.equalsIgnoreCase("نشانی")) {
+							|| field.equalsIgnoreCase("כתובת") || field.equalsIgnoreCase("نشانی")
+							|| field.equalsIgnoreCase("adres")) {
 						poiShortDescription.append(value).append(", ");
 						poiFields.put(PoiFieldType.ADDRESS, value);
 					} else if (field.equalsIgnoreCase("lat") || field.equalsIgnoreCase("latitude")
@@ -904,7 +921,8 @@ public class WikiDatabasePreparation {
 						poiFields.put(PoiFieldType.LON, value);
 					} else if (field.equalsIgnoreCase("content") || field.equalsIgnoreCase("descrizione")
 							|| field.equalsIgnoreCase("description") || field.equalsIgnoreCase("sobre")
-							|| field.equalsIgnoreCase("תיאור") || field.equalsIgnoreCase("متن")) {
+							|| field.equalsIgnoreCase("תיאור") || field.equalsIgnoreCase("متن")
+							|| field.equalsIgnoreCase("opis") || field.equalsIgnoreCase("treść")) {
 						poiShortDescription.append(value).append(" ");
 						poiFields.put(PoiFieldType.DESCRIPTION, value);
 					} else if (field.equalsIgnoreCase("email") || field.equalsIgnoreCase("מייל")
@@ -929,15 +947,16 @@ public class WikiDatabasePreparation {
 						poiShortDescription.append("☎ " + "tel:").append(value).append(". ");
 					} else if (field.equalsIgnoreCase("price") || field.equalsIgnoreCase("prezzo")
 							|| field.equalsIgnoreCase("מחיר") || field.equalsIgnoreCase("prix")
-							|| field.equalsIgnoreCase("بها")) {
+							|| field.equalsIgnoreCase("بها") || field.equalsIgnoreCase("ceny")) {
 						poiFields.put(PoiFieldType.PRICE, value);
 						poiShortDescription.append(value).append(". ");
 					} else if (field.equalsIgnoreCase("hours") || field.equalsIgnoreCase("שעות")
-							|| field.equalsIgnoreCase("ساعت‌ها")) {
+							|| field.equalsIgnoreCase("ساعت‌ها") || field.equalsIgnoreCase("godziny")) {
 						poiFields.put(PoiFieldType.WORK_HOURS, value);
 						poiShortDescription.append("Working hours: ").append(value).append(". ");
 					} else if (field.equalsIgnoreCase("directions") || field.equalsIgnoreCase("direction")
-							|| field.equalsIgnoreCase("הוראות") || field.equalsIgnoreCase("مسیرها")) {
+							|| field.equalsIgnoreCase("הוראות") || field.equalsIgnoreCase("مسیرها")
+							|| field.equalsIgnoreCase("wskazówki")) {
 						poiFields.put(PoiFieldType.DIRECTIONS, value);
 						poiShortDescription.append(value).append(". ");
 					} else if (field.equalsIgnoreCase("indicazioni")) {
@@ -982,19 +1001,24 @@ public class WikiDatabasePreparation {
 				String key = info[i].substring(0, ind).trim();
 				if (key.equals("type") || key.equals("tipo") || key.equals("group") || key.equals("typ")) {
 					String val = info[i].substring(ind + 1).toLowerCase().trim();
+					// exact match wins over contains: "parking" contains "park"
+					PoiFieldCategory exact = null;
 					for (PoiFieldCategory p : PoiFieldCategory.values()) {
 						for (String s : p.names) {
 							if (val.contains(s)) {
 								res = p;
-								break;
+								exact = val.equals(s) ? p : exact;
 							}
 						}
 						for (String s : p.types) {
 							if (val.contains(s)) {
 								res = p;
-								break;
+								exact = val.equals(s) ? p : exact;
 							}
 						}
+					}
+					if (exact != null && exact != PoiFieldCategory.OTHER) {
+						return exact;
 					}
 					if (res != PoiFieldCategory.OTHER) {
 						return res;
