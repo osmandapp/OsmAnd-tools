@@ -74,6 +74,7 @@ Examples:
 public class EmailSenderTemplate {
 	private static final Log LOG = LogFactory.getLog(EmailSenderTemplate.class);
 	private static final String UNSUB_URL = "UNSUB_URL";
+	static final String TEMPLATES_ENV = "EMAIL_TEMPLATES";
 
 	public String defaultTemplatesDirectory = "./templates";
 
@@ -101,7 +102,7 @@ public class EmailSenderTemplate {
 
 	// configure by environment
 	public EmailSenderTemplate() {
-		final String templates = System.getenv("EMAIL_TEMPLATES");
+		final String templates = System.getenv(TEMPLATES_ENV);
 		if (templates != null) {
 			this.defaultTemplatesDirectory = templates;
 			// LOG.info("Using env EMAIL_TEMPLATES: " + templates);

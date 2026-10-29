@@ -16,9 +16,9 @@ class EmailTemplate {
 	private static final String PARAMS_FILE = "params.properties";
 	private static final String STYLES_FILE = "styles.properties";
 	private static final String TRANSLATIONS_DIR = "translations";
-	private static final String BLOCKS_DIR = "blocks";
-	private static final String LAYOUTS_DIR = "layouts";
-	private static final String HTML = ".html";
+	static final String BLOCKS_DIR = "blocks";
+	static final String LAYOUTS_DIR = "layouts";
+	static final String HTML = ".html";
 	private static final String PROPERTIES = ".properties";
 
 	private static final String FROM = "FROM";
@@ -121,7 +121,7 @@ class EmailTemplate {
 		return readText(file);
 	}
 
-	private static Properties readProperties(File file) {
+	static Properties readProperties(File file) {
 		Properties properties = new Properties();
 		if (file.isFile()) {
 			try (Reader reader = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
