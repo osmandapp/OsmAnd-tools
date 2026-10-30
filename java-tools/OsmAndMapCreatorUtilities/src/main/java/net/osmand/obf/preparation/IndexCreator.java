@@ -744,6 +744,9 @@ public class IndexCreator {
 				iterateMainEntity(e, ctx, icc);
 			}
 		});
+		if (settings.indexTransport) {
+			indexTransportCreator.resolveFerryJunctionStops(accessor);
+		}
 		setGeneralProgress(progress, "[85 / 100]");
 		progress.startTask(settings.getString("IndexCreator.PROCESS_OSM_REL"), accessor.getAllRelations());
 		accessor.iterateOverEntities(progress, EntityType.RELATION, new OsmDbVisitor() {
