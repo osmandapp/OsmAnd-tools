@@ -282,15 +282,15 @@ public class EmailSenderService {
 				.set("RECEIPT_PLAN_COUNT", planCount);
 		String productIcon = productIcon(productName);
 		if (productIcon != null) {
-			sender.set("PRODUCT_ICON", "@PRODUCT_ICON_IMG@")
-					.set("PRODUCT_ICON_FILE", productIcon);
+			sender.set("CARD_ICON", "@ICON_IMG@")
+					.set("ICON_FILE", productIcon);
 		}
 		if (renewalDate != null) {
-			sender.set("RENEWAL_ROW", "@RENEWAL_ROW_T@")
+			sender.set("RENEWAL_ROW", "@RECEIPT_RENEWAL_ROW@")
 					.set("RENEWAL_LABEL", renewalLabel)
 					.set("RENEWAL_DATE", htmlText(formatReceiptDate(renewalDate, lang)));
 			if (renews) {
-				sender.set("FOOTER_MANAGE", "@FOOTER_MANAGE_T@");
+				sender.set("FOOTER_MANAGE", "@MANAGE_SUBSCRIPTION_LINK@");
 			}
 		}
 		boolean ok = sender.to(email).send().isSuccess();
@@ -383,7 +383,7 @@ public class EmailSenderService {
 
 	public void sendOsmAndSpecialGiftEmail(String email) {
 		boolean ok = new EmailSenderTemplate()
-				.load("birthday/XV")
+				.load("cloud/xv")
 				.to(email)
 				.send()
 				.isSuccess();
