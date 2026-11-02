@@ -18,6 +18,7 @@ import net.osmand.search.core.spatial.SpatialSearchResult;
 public class SpatialTestSearchEngine {
 	private final SpatialTextSearch spatialSearch = new SpatialTextSearch();
 	private final SpatialSearchContext searchContext;
+	private final SpatialPoiSearch poiSearch;
 	private final SpatialResultFormatter resultFormatter;
 
 	/**
@@ -26,7 +27,8 @@ public class SpatialTestSearchEngine {
 	 */
 	public SpatialTestSearchEngine(SpatialTextSearch.SpatialTextSearchSettings spatialSettings, LatLon location,
 			List<BinaryMapIndexReader> readers, MapPoiTypes poiTypes) {
-		searchContext = new SpatialSearchContext(spatialSettings, readers, new SpatialPoiSearch(poiTypes), location);
+		poiSearch = new SpatialPoiSearch(poiTypes);
+		searchContext = new SpatialSearchContext(spatialSettings, readers, poiSearch, location);
 		resultFormatter = new SpatialResultFormatter(searchContext, location, poiTypes);
 	}
 
@@ -46,6 +48,11 @@ public class SpatialTestSearchEngine {
 
 	public String formatResult(SpatialSearchResult r) {
 		return resultFormatter.format(r);
+	}
+
+	/** the categories the results were matched with, to name a POI_TYPE row as the app does */
+	public SpatialPoiSearch getPoiSearch() {
+		return poiSearch;
 	}
 
 	/** the translations the translation tests were written with */

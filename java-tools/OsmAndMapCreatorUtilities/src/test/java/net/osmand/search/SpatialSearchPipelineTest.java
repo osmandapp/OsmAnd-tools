@@ -32,7 +32,9 @@ import java.util.zip.GZIPInputStream;
 import net.osmand.data.*;
 import net.osmand.map.OsmandRegions;
 import net.osmand.map.WorldRegion;
+import net.osmand.search.core.spatial.SpatialSearchResult;
 import net.osmand.search.core.spatial.SpatialTextSearch;
+import net.osmand.search.core.spatial.SpatialTextSearchAPI;
 import net.osmand.util.MapUtils;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.json.JSONArray;
@@ -66,6 +68,7 @@ import net.osmand.obf.preparation.NameIndexCreator;
 import net.osmand.osm.AbstractPoiType;
 import net.osmand.osm.MapPoiTypes;
 import net.osmand.search.core.SearchCoreFactory;
+import net.osmand.search.core.SearchResult;
 import net.osmand.search.core.spatial.test.SpatialSearchTestFile;
 import net.osmand.search.core.spatial.test.SpatialTestSearchEngine;
 import net.osmand.search.rules.SearchModLocaleRules;
@@ -671,6 +674,11 @@ public class SpatialSearchPipelineTest {
 				}
 				Assert.assertEquals(expected, present);
 			}
+			String expectedCategoryName = getExpectedCategoryName(sourceJson, k);
+			if (expectedCategoryName != null) {
+				Assert.assertEquals("Category name of phrase #" + (k + 1) + ": " + text, expectedCategoryName,
+						getCategoryName(engine, text));
+			}
 
 		}
 		} finally {
@@ -679,6 +687,29 @@ public class SpatialSearchPipelineTest {
 				reader.close();
 			}
         }
+	}
+
+	/**
+	 * "categoryNames" of the test: the name the app shows for the first POI_TYPE row of each phrase ("" - not checked).
+	 * The POI_TYPE row of "results" holds the category key ('top_index_brand_lidl'), not this name.
+	 */
+	private static String getExpectedCategoryName(JSONObject sourceJson, int phrase) {
+		JSONArray names = sourceJson.optJSONArray("categoryNames");
+		String name = names == null ? null : names.optString(phrase, null);
+		return Algorithms.isEmpty(name) ? null : name;
+	}
+
+	/** name of the first POI_TYPE row as {@link SpatialTextSearchAPI} gives it to the app */
+	private static String getCategoryName(SpatialTestSearchEngine engine, String text) throws IOException {
+		for (SpatialSearchResult r : engine.searchResults(text, false)) {
+			if (r.isPoiCategory()) {
+				SearchResult result = new SearchResult();
+				new SpatialTextSearchAPI(MapPoiTypes.getDefault()).convertSpatialSearchResult(r, result,
+						engine.getPoiSearch(), null, "", false);
+				return result.localeName;
+			}
+		}
+		return "#MISSING POI_TYPE";
 	}
 
 	/**
