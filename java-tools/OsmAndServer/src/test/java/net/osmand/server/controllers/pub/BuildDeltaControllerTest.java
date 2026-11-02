@@ -78,6 +78,13 @@ public class BuildDeltaControllerTest {
 	}
 
 	@Test
+	public void brokenManifestIsARequestError() throws Exception {
+		byte[] garbage = {1, 2, 3};
+		mvc.perform(post("/api/builds/delta/sizes").content(garbage)).andExpect(status().isBadRequest());
+		mvc.perform(post("/api/builds/delta").param("path", BUILD).content(garbage)).andExpect(status().isBadRequest());
+	}
+
+	@Test
 	public void noSizesForAPhoneWithAnotherApp() throws Exception {
 		File other = temp.newFile("other.apk");
 		zip(other, new byte[10]);

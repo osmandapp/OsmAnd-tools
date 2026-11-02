@@ -4,7 +4,9 @@ import net.osmand.apkdelta.ApkArchive;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.ResponseStatus;
 
 import java.io.File;
 import java.io.IOException;
@@ -61,6 +63,13 @@ public class BuildDeltaService {
 	public record BuildSize(String path, long size, long fullSize, boolean exact) {
 	}
 
+	@ResponseStatus(HttpStatus.BAD_REQUEST)
+	public static class BrokenManifestException extends RuntimeException {
+		BrokenManifestException(IOException cause) {
+			super("Broken manifest", cause);
+		}
+	}
+
 	public static class TooManyRequestsException extends IOException {
 		public TooManyRequestsException() {
 			super("Too many delta requests");
@@ -96,7 +105,7 @@ public class BuildDeltaService {
 		if (!target.isFile()) {
 			throw new IllegalArgumentException("Unknown build");
 		}
-		List<ApkArchive.Entry> entries = ApkArchive.readManifest(manifest);
+		List<ApkArchive.Entry> entries = readManifest(manifest);
 		String key = key(target, entries);
 		File delta = deltaFile(key);
 		if (!delta.exists()) {
@@ -121,7 +130,7 @@ public class BuildDeltaService {
 	 * estimate while the delta is built in the background for the download that may follow.
 	 */
 	public List<BuildSize> getSizes(InputStream manifest) throws IOException {
-		List<ApkArchive.Entry> entries = ApkArchive.readManifest(manifest);
+		List<ApkArchive.Entry> entries = readManifest(manifest);
 		List<File> builds = builds();
 		List<BuildSize> sizes = new ArrayList<>();
 		for (File build : builds) {
@@ -136,6 +145,14 @@ public class BuildDeltaService {
 			}
 		}
 		return sizes;
+	}
+
+	private static List<ApkArchive.Entry> readManifest(InputStream manifest) {
+		try {
+			return ApkArchive.readManifest(manifest);
+		} catch (IOException e) {
+			throw new BrokenManifestException(e);
+		}
 	}
 
 	private BuildSize getSize(File build, List<ApkArchive.Entry> entries, List<File> builds) throws IOException {
