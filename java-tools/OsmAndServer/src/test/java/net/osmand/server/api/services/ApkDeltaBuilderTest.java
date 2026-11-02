@@ -10,11 +10,13 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.ByteArrayInputStream;
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -67,6 +69,31 @@ public class ApkDeltaBuilderTest {
 		assertRebuilt(oldApk, delta(oldApk, newApk, List.of(broken, oldApk)), newApk);
 	}
 
+	@Test
+	public void sendsAnEntryWholeIfItsOldBuildWasReplaced() throws Exception {
+		File phoneApk = apk("phone.apk", stored, deflated, null);
+		File newApk = apk("new.apk", changed(stored), changed(deflated), null);
+		File serverCopy = temp.newFile();
+		Files.copy(phoneApk.toPath(), serverCopy.toPath(), StandardCopyOption.REPLACE_EXISTING);
+		Map<String, ApkArchive.Entry> manifest = manifest(phoneApk);
+		Map<String, File> oldBuilds = ApkDeltaBuilder.findOldBuilds(manifest, List.of(serverCopy));
+		// a nightly replaced under the same name while the delta waited in the queue
+		Files.copy(newApk.toPath(), serverCopy.toPath(), StandardCopyOption.REPLACE_EXISTING);
+		File delta = temp.newFile();
+		ApkDeltaBuilder.Result result = new ApkDeltaBuilder(newApk, manifest, oldBuilds).build(temp.newFolder(), delta);
+		Assert.assertEquals(0, result.patched());
+		assertRebuilt(phoneApk, delta, newApk);
+	}
+
+	@Test(expected = EOFException.class)
+	public void aShortDeltaIsNotAMismatch() throws Exception {
+		File oldApk = apk("old.apk", stored, deflated, null);
+		File delta = delta(oldApk, apk("new.apk", changed(stored), changed(deflated), new byte[100_000]), List.of());
+		byte[] bytes = Files.readAllBytes(delta.toPath());
+		Files.write(delta.toPath(), Arrays.copyOf(bytes, bytes.length - 40));
+		ApkDeltaApplier.apply(oldApk, delta, temp.newFile("out.apk"), temp.newFolder(), () -> false);
+	}
+
 	@Test(expected = IOException.class)
 	public void aBrokenDeltaIsAnIOException() throws Exception {
 		File oldApk = apk("old.apk", stored, deflated, null);
@@ -89,11 +116,14 @@ public class ApkDeltaBuilderTest {
 	}
 
 	private File delta(File oldApk, File newApk, List<File> builds) throws IOException {
-		Map<String, ApkArchive.Entry> manifest = BuildDeltaService.readManifest(
-				new ByteArrayInputStream(ApkArchive.writeManifest(ApkArchive.readEntries(oldApk))));
+		Map<String, ApkArchive.Entry> manifest = manifest(oldApk);
 		File delta = temp.newFile();
 		new ApkDeltaBuilder(newApk, manifest, ApkDeltaBuilder.findOldBuilds(manifest, builds)).build(temp.newFolder(), delta);
 		return delta;
+	}
+
+	private static Map<String, ApkArchive.Entry> manifest(File apk) throws IOException {
+		return BuildDeltaService.readManifest(new ByteArrayInputStream(ApkArchive.writeManifest(ApkArchive.readEntries(apk))));
 	}
 
 	private void assertRebuilt(File oldApk, File delta, File newApk) throws IOException {

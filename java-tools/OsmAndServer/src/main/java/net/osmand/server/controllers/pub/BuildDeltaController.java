@@ -7,10 +7,12 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.File;
 import java.io.IOException;
@@ -23,6 +25,12 @@ public class BuildDeltaController {
 
 	@Autowired
 	private BuildDeltaService deltaService;
+
+	/** Refusals are normal here, so they stay out of the error handling that logs a stack trace. */
+	@ExceptionHandler(ResponseStatusException.class)
+	public ResponseEntity<Void> onRefused(ResponseStatusException e) {
+		return ResponseEntity.status(e.getStatusCode()).build();
+	}
 
 	/** What the builds would take from a phone with this manifest; answers at once. */
 	@PostMapping("/sizes")

@@ -16,12 +16,12 @@ import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
+import java.nio.channels.Channels;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.zip.CRC32;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
 
@@ -50,6 +51,8 @@ public class ApkDeltaBuilder {
 
 	/** Below this a patch with its three compressed streams does not pay for itself. */
 	private static final int MIN_ENTRY_TO_PATCH = 4 * 1024;
+	/** The phone keeps the patch of an entry in memory; a larger entry is sent whole, as a stream. */
+	private static final int MAX_PATCH_SIZE = 16 * 1024 * 1024;
 
 	// measured on weekly pairs of nightly builds
 	private static final double DEFLATED_PATCH_RATIO = 0.5;
@@ -145,7 +148,7 @@ public class ApkDeltaBuilder {
 					tableOutput.writeByte(ApkDeltaFormat.KIND_COPY);
 					tableOutput.writeUTF(entry.name);
 					copied++;
-				} else if (patch != null && patch.length() < entry.compressedSize) {
+				} else if (patch != null && patch.length() < Math.min(entry.compressedSize, MAX_PATCH_SIZE)) {
 					tableOutput.writeByte(ApkDeltaFormat.KIND_DELTA);
 					tableOutput.writeUTF(entry.name);
 					tableOutput.writeByte(entry.method);
@@ -169,10 +172,11 @@ public class ApkDeltaBuilder {
 				container.writeTo(metadataOutput);
 				table.writeTo(metadataOutput);
 			}
-			try (DataOutputStream delta = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(output)));
-			     InputStream targetStream = new FileInputStream(target)) {
+			try (DataOutputStream delta = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(output)))) {
 				delta.write(ApkDeltaFormat.MAGIC);
-				delta.write(DigestUtils.sha256(targetStream));
+				// the file that is open: a new build can replace the one at this path at any moment
+				file.seek(0);
+				delta.write(DigestUtils.sha256(Channels.newInputStream(file.getChannel())));
 				delta.writeLong(metadata.size());
 				metadata.writeTo(delta);
 				for (Payload part : payload) {
@@ -190,14 +194,18 @@ public class ApkDeltaBuilder {
 				+ entry.compressedSize + ":" + entry.method);
 		File patch = new File(entryPatches, name + ".bsdiff");
 		if (!patch.exists()) {
-			byte[] content = zip.getInputStream(zipEntry).readAllBytes();
+			byte[] oldContent = oldContent(phoneEntry);
+			if (oldContent == null) {
+				return null;
+			}
+			byte[] content = readAll(zip.getInputStream(zipEntry));
 			File temp = File.createTempFile(name, ".tmp", entryPatches);
 			try {
 				// a file left empty remembers the answer
 				if (entry.method == ZipArchiveEntry.STORED
-						|| Arrays.equals(deflate(content), zip.getRawInputStream(zipEntry).readAllBytes())) {
+						|| Arrays.equals(deflate(content), readAll(zip.getRawInputStream(zipEntry)))) {
 					try (OutputStream output = new BufferedOutputStream(new FileOutputStream(temp))) {
-						Diff.diff(oldContent(phoneEntry), content, output);
+						Diff.diff(oldContent, content, output);
 					} catch (CompressorException | InvalidHeaderException e) {
 						throw new IOException(e);
 					}
@@ -210,9 +218,22 @@ public class ApkDeltaBuilder {
 		return patch.length() == 0 ? null : patch;
 	}
 
-	private byte[] oldContent(ApkArchive.Entry phoneEntry) throws IOException {
+	/** What the phone has, or null if the build is gone or was replaced since it was found. */
+	private byte[] oldContent(ApkArchive.Entry phoneEntry) {
 		try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(oldBuilds.get(phoneEntry.contentKey()));
 		     InputStream input = zip.getInputStream(zip.getEntry(phoneEntry.name))) {
+			byte[] content = input.readAllBytes();
+			CRC32 crc = new CRC32();
+			crc.update(content);
+			return crc.getValue() == phoneEntry.crc ? content : null;
+		} catch (IOException | RuntimeException e) {
+			LOGGER.warn("Old version of " + phoneEntry.name + " is not available: " + e.getMessage());
+			return null;
+		}
+	}
+
+	private static byte[] readAll(InputStream stream) throws IOException {
+		try (InputStream input = stream) {
 			return input.readAllBytes();
 		}
 	}

@@ -1,6 +1,7 @@
 package net.osmand.server.api.services;
 
 import net.osmand.apkdelta.ApkArchive;
+import net.osmand.apkdelta.ApkDeltaFormat;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -24,10 +25,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -50,14 +53,16 @@ public class BuildDeltaService {
 	private static final String DELTA_FOLDER = "apk-delta";
 	private static final String ENTRY_PATCHES_FOLDER = "entries";
 
-	/** A real manifest takes about 1 MB. */
-	private static final int MAX_MANIFEST_SIZE = 4 * 1024 * 1024;
+	/** A real manifest takes less than 1 MB. */
+	private static final int MAX_MANIFEST_SIZE = 2 * 1024 * 1024;
 	/** A delta close to the size of the APK is not worth building a new APK on the phone. */
 	private static final double MAX_DELTA_RATIO = 0.6;
 	private static final int MAX_BUILDS_TO_SEARCH = 60;
 	private static final int MAX_BUILDS_TO_SIZE = 4;
 	private static final int MAX_QUEUED_DELTAS = 4;
-	private static final int MAX_SIZE_REQUESTS = 4;
+	private static final int MAX_REQUESTS = 4;
+	/** Just below the time the client waits. */
+	private static final int MAX_BUILD_WAIT_SECONDS = 110;
 	private static final long MAX_CACHE_AGE_MS = TimeUnit.DAYS.toMillis(8);
 	private static final long MAX_CACHE_SIZE = 2L * 1024 * 1024 * 1024;
 
@@ -77,7 +82,8 @@ public class BuildDeltaService {
 		thread.setDaemon(true);
 		return thread;
 	});
-	private final Semaphore sizeRequests = new Semaphore(MAX_SIZE_REQUESTS);
+	private final Map<File, Future<?>> runningBuilds = new HashMap<>();
+	private final Semaphore requests = new Semaphore(MAX_REQUESTS);
 
 	/** Patches need the builds of the previous days, latest-night-build holds only the new ones. */
 	public boolean isSupported() {
@@ -87,58 +93,63 @@ public class BuildDeltaService {
 
 	/** @return null if the whole APK is the better download */
 	public File getDelta(String path, InputStream manifestStream) throws IOException {
-		if (!BUILD_PATH.matcher(path).matches() || !new File(filesLocation, path).isFile()) {
+		File target = new File(filesLocation, path);
+		if (!isBuildPath(path) || !target.isFile()) {
 			throw new ResponseStatusException(HttpStatus.NOT_FOUND);
 		}
-		File target = new File(filesLocation, path);
-		Map<String, ApkArchive.Entry> manifest = readManifest(manifestStream);
-		File delta = deltaFile(target, manifest);
-		if (!delta.exists()) {
-			ApkDeltaBuilder builder = new ApkDeltaBuilder(target, manifest, findOldBuilds(manifest));
-			if (!isWorthIt(builder.estimate(), target)) {
-				return null;
+		File delta;
+		Future<?> build = null;
+		acquireRequest();
+		try {
+			Map<String, ApkArchive.Entry> manifest = readManifest(manifestStream);
+			delta = deltaFile(target, manifest);
+			if (!delta.exists()) {
+				ApkDeltaBuilder builder = new ApkDeltaBuilder(target, manifest, findOldBuilds(manifest));
+				if (!isWorthIt(builder.estimate(), target)) {
+					return null;
+				}
+				build = buildOnce(builder, target, delta);
 			}
-			try {
-				deltaBuilds.submit(() -> build(builder, target, delta)).get();
-			} catch (RejectedExecutionException e) {
-				throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE);
-			} catch (InterruptedException | ExecutionException e) {
-				throw new IOException(e);
-			}
+		} catch (RejectedExecutionException e) {
+			throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE);
+		} finally {
+			requests.release();
+		}
+		if (build != null) {
+			waitFor(build);
 		}
 		return isWorthIt(delta.length(), target) ? delta : null;
 	}
 
 	/** Answers at once: the size of a ready delta, or an estimate while it is built in the background. */
 	public List<BuildSize> getSizes(List<String> paths, InputStream manifestStream) throws IOException {
-		if (!sizeRequests.tryAcquire()) {
-			throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE);
-		}
+		acquireRequest();
 		try {
 			Map<String, ApkArchive.Entry> manifest = readManifest(manifestStream);
-			Map<String, File> oldBuilds = findOldBuilds(manifest);
+			List<String> known = paths.stream().limit(MAX_BUILDS_TO_SIZE)
+					.filter(path -> isBuildPath(path) && new File(filesLocation, path).isFile()).toList();
+			boolean ready = known.stream().allMatch(path -> deltaFile(new File(filesLocation, path), manifest).exists());
+			Map<String, File> oldBuilds = ready ? Map.of() : findOldBuilds(manifest);
 			List<BuildSize> sizes = new ArrayList<>();
-			for (String path : paths.subList(0, Math.min(paths.size(), MAX_BUILDS_TO_SIZE))) {
-				File target = new File(filesLocation, path);
-				if (BUILD_PATH.matcher(path).matches() && target.isFile()) {
-					try {
-						BuildSize size = getSize(path, target, manifest, oldBuilds);
-						if (size != null) {
-							sizes.add(size);
-						}
-					} catch (IOException e) {
-						LOGGER.warn("Skipping the unreadable build " + path + ": " + e.getMessage());
+			for (String path : known) {
+				try {
+					BuildSize size = getSize(path, manifest, oldBuilds);
+					if (size != null) {
+						sizes.add(size);
 					}
+				} catch (IOException e) {
+					LOGGER.warn("Skipping the unreadable build " + path + ": " + e.getMessage());
 				}
 			}
 			return sizes;
 		} finally {
-			sizeRequests.release();
+			requests.release();
 		}
 	}
 
-	private BuildSize getSize(String path, File target, Map<String, ApkArchive.Entry> manifest,
-	                          Map<String, File> oldBuilds) throws IOException {
+	private BuildSize getSize(String path, Map<String, ApkArchive.Entry> manifest, Map<String, File> oldBuilds)
+			throws IOException {
+		File target = new File(filesLocation, path);
 		File delta = deltaFile(target, manifest);
 		if (delta.exists()) {
 			return isWorthIt(delta.length(), target) ? new BuildSize(path, delta.length(), true) : null;
@@ -148,12 +159,35 @@ public class BuildDeltaService {
 		if (!isWorthIt(estimate, target)) {
 			return null;
 		}
-		try {
-			deltaBuilds.execute(() -> build(builder, target, delta));
-		} catch (RejectedExecutionException e) {
-			LOGGER.info("APK delta queue is full");
+		// speculation never takes the place of a phone that is waiting
+		if (deltaBuilds.getQueue().isEmpty()) {
+			buildOnce(builder, target, delta);
 		}
 		return new BuildSize(path, estimate, false);
+	}
+
+	private synchronized Future<?> buildOnce(ApkDeltaBuilder builder, File target, File delta) {
+		runningBuilds.values().removeIf(Future::isDone);
+		return runningBuilds.computeIfAbsent(delta, file -> deltaBuilds.submit(() -> build(builder, target, delta)));
+	}
+
+	private void waitFor(Future<?> build) throws IOException {
+		try {
+			build.get(MAX_BUILD_WAIT_SECONDS, TimeUnit.SECONDS);
+		} catch (TimeoutException e) {
+			throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new IOException(e);
+		} catch (ExecutionException e) {
+			throw new IOException(e);
+		}
+	}
+
+	private void acquireRequest() {
+		if (!requests.tryAcquire()) {
+			throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE);
+		}
 	}
 
 	private void build(ApkDeltaBuilder builder, File target, File delta) {
@@ -178,19 +212,10 @@ public class BuildDeltaService {
 					System.currentTimeMillis() - start));
 		} catch (IOException | RuntimeException | OutOfMemoryError e) {
 			LOGGER.error("Could not build the APK delta to " + target.getName(), e);
-			rememberFailure(delta);
 		} finally {
 			if (temp != null) {
 				temp.delete();
 			}
-		}
-	}
-
-	private void rememberFailure(File delta) {
-		try {
-			delta.createNewFile();
-		} catch (IOException e) {
-			LOGGER.error("Could not remember the failed APK delta", e);
 		}
 	}
 
@@ -222,6 +247,10 @@ public class BuildDeltaService {
 		return ApkDeltaBuilder.findOldBuilds(manifest, builds.subList(0, Math.min(builds.size(), MAX_BUILDS_TO_SEARCH)));
 	}
 
+	private static boolean isBuildPath(String path) {
+		return BUILD_PATH.matcher(path).matches();
+	}
+
 	private static boolean isBuild(File file) {
 		return file.getName().endsWith(BUILD_EXTENSION);
 	}
@@ -235,7 +264,8 @@ public class BuildDeltaService {
 	}
 
 	private File deltaFile(File target, Map<String, ApkArchive.Entry> manifest) {
-		String key = target.getName() + ":" + target.length() + ":" + target.lastModified() + "\n"
+		String key = new String(ApkDeltaFormat.MAGIC, StandardCharsets.US_ASCII) + ":" + target.getName() + ":"
+				+ target.length() + ":" + target.lastModified() + "\n"
 				+ manifest.values().stream().map(entry -> entry.contentKey() + ":" + entry.compressedSize + ":" + entry.method)
 				.sorted().collect(Collectors.joining("\n"));
 		return new File(deltaFolder(), DigestUtils.sha1Hex(key) + ".delta");
