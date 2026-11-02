@@ -2,24 +2,23 @@ package net.osmand.server.api.services;
 
 import net.osmand.apkdelta.ApkArchive;
 import net.osmand.apkdelta.ApkDeltaApplier;
-import org.junit.After;
+import net.osmand.apkdelta.ApkDeltaFormat;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.zip.CRC32;
 import java.util.zip.Deflater;
 import java.util.zip.ZipEntry;
@@ -30,25 +29,18 @@ public class ApkDeltaBuilderTest {
 	@Rule
 	public TemporaryFolder temp = new TemporaryFolder();
 
-	private ExecutorService executor;
 	private byte[] stored;
 	private byte[] deflated;
 	private byte[] unchanged;
 
 	@Before
 	public void setUp() {
-		executor = Executors.newSingleThreadExecutor();
 		Random random = new Random(1);
 		stored = new byte[300_000];
 		random.nextBytes(stored);
 		deflated = "the same text again and again ".repeat(20_000).getBytes(StandardCharsets.UTF_8);
 		unchanged = new byte[50_000];
 		random.nextBytes(unchanged);
-	}
-
-	@After
-	public void tearDown() {
-		executor.shutdownNow();
 	}
 
 	@Test
@@ -67,7 +59,25 @@ public class ApkDeltaBuilderTest {
 		assertRebuilt(oldApk, delta(oldApk, newApk, List.of()), newApk);
 	}
 
+	@Test
+	public void skipsAnUnreadableBuild() throws Exception {
+		File oldApk = apk("old.apk", stored, deflated, null);
+		File newApk = apk("new.apk", changed(stored), changed(deflated), null);
+		File broken = temp.newFile("broken.apk");
+		assertRebuilt(oldApk, delta(oldApk, newApk, List.of(broken, oldApk)), newApk);
+	}
+
 	@Test(expected = IOException.class)
+	public void aBrokenDeltaIsAnIOException() throws Exception {
+		File oldApk = apk("old.apk", stored, deflated, null);
+		File delta = delta(oldApk, apk("new.apk", changed(stored), changed(deflated), null), List.of(oldApk));
+		byte[] bytes = Files.readAllBytes(delta.toPath());
+		bytes[ApkDeltaFormat.MAGIC.length + ApkDeltaFormat.SHA256_LENGTH] = (byte) 0xff;
+		Files.write(delta.toPath(), bytes);
+		ApkDeltaApplier.apply(oldApk, delta, temp.newFile("out.apk"), temp.newFolder(), () -> false);
+	}
+
+	@Test(expected = ApkDeltaApplier.MismatchException.class)
 	public void refusesAnotherOldApk() throws Exception {
 		File oldApk = apk("old.apk", stored, deflated, null);
 		File newApk = apk("new.apk", changed(stored), changed(deflated), null);
@@ -75,24 +85,20 @@ public class ApkDeltaBuilderTest {
 		byte[] otherLib = stored.clone();
 		new Random(2).nextBytes(otherLib);
 		File other = apk("other.apk", otherLib, deflated, null);
-		ApkDeltaApplier.apply(other, delta, temp.newFile("out.apk"), temp.newFolder(), null);
+		ApkDeltaApplier.apply(other, delta, temp.newFile("out.apk"), temp.newFolder(), () -> false);
 	}
 
 	private File delta(File oldApk, File newApk, List<File> builds) throws IOException {
-		List<ApkArchive.Entry> manifest;
-		try (RandomAccessFile file = new RandomAccessFile(oldApk, "r")) {
-			manifest = ApkArchive.readEntries(file);
-		}
-		manifest = ApkArchive.readManifest(new java.io.ByteArrayInputStream(ApkArchive.writeManifest(manifest)));
+		Map<String, ApkArchive.Entry> manifest = BuildDeltaService.readManifest(
+				new ByteArrayInputStream(ApkArchive.writeManifest(ApkArchive.readEntries(oldApk))));
 		File delta = temp.newFile();
-		new ApkDeltaBuilder(temp.newFolder(), executor).build(newApk, manifest,
-				ApkDeltaBuilder.findOldEntries(newApk, manifest, builds), delta);
+		new ApkDeltaBuilder(newApk, manifest, ApkDeltaBuilder.findOldBuilds(manifest, builds)).build(temp.newFolder(), delta);
 		return delta;
 	}
 
 	private void assertRebuilt(File oldApk, File delta, File newApk) throws IOException {
 		File result = temp.newFile();
-		ApkDeltaApplier.apply(oldApk, delta, result, temp.newFolder(), null);
+		ApkDeltaApplier.apply(oldApk, delta, result, temp.newFolder(), () -> false);
 		Assert.assertArrayEquals(Files.readAllBytes(newApk.toPath()), Files.readAllBytes(result.toPath()));
 	}
 

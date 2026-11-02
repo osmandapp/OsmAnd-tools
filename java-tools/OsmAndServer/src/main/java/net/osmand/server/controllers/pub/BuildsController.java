@@ -15,9 +15,11 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import net.osmand.PlatformUtil;
+import net.osmand.server.api.services.BuildDeltaService;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -40,6 +42,9 @@ public class BuildsController {
 	private static final long DELAY_TO_REBUILD = 15 * 1000;
 	private final SimpleDateFormat FMT = new SimpleDateFormat("dd.MM.yyyy");
 
+	@Autowired
+	private BuildDeltaService deltaService;
+
 	@Value("${osmand.night-builds-json.location}")
 	private String NIGHT_BUILDS_URL;
 
@@ -59,8 +64,9 @@ public class BuildsController {
 		serializer.startDocument("UTF-8", true);
 		serializer.startTag(null, "builds");
 		serializer.attribute(null, "version", "1.1");
-		// clients may ask for /api/builds/delta
-		serializer.attribute(null, "incremental", "true");
+		if (deltaService.isSupported()) {
+			serializer.attribute(null, "incremental", "true");
+		}
 		addBuilds(latestBuilds, serializer);
 		try {
 			addNightBuilds(allBuilds, serializer);
