@@ -30,7 +30,6 @@ import net.osmand.osm.PoiType;
 import net.osmand.server.api.services.WikiService;
 import net.osmand.server.api.services.search.AmenityTagsService;
 import net.osmand.server.api.services.search.SearchResultConverter;
-import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.shared.gpx.primitives.Link;
 import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.util.MapUtils;
@@ -358,7 +357,7 @@ public class McpSearch {
 			// the POI properties are Amenity.getAmenityExtensions (SearchResultConverter), as WptPtEditor stores them
 			for (String k : p.keySet()) {
 				String v = str(p, k);
-				if (v != null && !k.startsWith("web_") && !k.endsWith(SearchResultConverter.OPENING_HOURS_INFO_SUFFIX)) {
+				if (v != null && !k.startsWith("web_")) {
 					pt.getExtensionsToWrite().put(k, v);
 				}
 			}
