@@ -76,6 +76,7 @@ public class EmailSenderTemplate {
 	private static final Log LOG = LogFactory.getLog(EmailSenderTemplate.class);
 	private static final String LIST_UNSUBSCRIBE = "LIST_UNSUBSCRIBE";
 	static final String TEMPLATES_ENV = "EMAIL_TEMPLATES";
+	static final String TEMPLATES_HINT = TEMPLATES_ENV + "=/path/to/templates/email (environment)";
 
 	public String defaultTemplatesDirectory = "./templates";
 

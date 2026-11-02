@@ -41,7 +41,7 @@ public class EmailTemplatePreview {
 		}
 		String templates = System.getenv(EmailSenderTemplate.TEMPLATES_ENV);
 		if (templates == null) {
-			throw new IllegalStateException("set " + EmailSenderTemplate.TEMPLATES_ENV + "=/path/to/templates/email (environment)");
+			throw new IllegalStateException("set " + EmailSenderTemplate.TEMPLATES_HINT);
 		}
 		Properties samples = EmailTemplate.readProperties(new File(templates, SAMPLES_FILE));
 		String layoutTemplates = (String) samples.remove(LAYOUT_TEMPLATES);

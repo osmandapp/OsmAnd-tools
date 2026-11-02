@@ -1,6 +1,5 @@
 package net.osmand.mailsender;
 
-import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
@@ -49,18 +48,14 @@ class EmailTemplate {
 		// INTRO         = @PASSWORD_INTRO@
 		// NOTE          = @PASSWORD_NOTE@
 		NAME_TEXTS.forEach((key, suffix) -> vars.put(key, "@" + name + "_" + suffix + "@"));
-		putStyles();
+		putAll(readProperties(new File(directory, STYLES_FILE)));
 		putParams(template);
 		putBlocks();
 		putTranslations(lang);
 		from = vars.remove(FROM);
 		fromName = vars.remove(FROM_NAME);
-		body = read(vars.containsKey(LAYOUT) ? LAYOUTS_DIR + "/" + vars.get(LAYOUT) : template);
-	}
-
-	private void putStyles() {
-		Properties styles = readProperties(new File(directory, STYLES_FILE));
-		styles.stringPropertyNames().forEach(key -> vars.put(key, styles.getProperty(key)));
+		String layout = vars.remove(LAYOUT);
+		body = read(layout != null ? LAYOUTS_DIR + "/" + layout : template);
 	}
 
 	private void putParams(String template) {
@@ -91,32 +86,25 @@ class EmailTemplate {
 	}
 
 	private void putTranslations(String lang) {
-		File defaultFile = new File(directory, TRANSLATIONS_DIR + "/" + DEFAULT_LANG + PROPERTIES);
-		Properties translations = readProperties(defaultFile);
-		File langFile = findTranslationsFile(lang);
-		if (langFile != null && !langFile.equals(defaultFile)) {
-			translations.putAll(readProperties(langFile));
+		String baseLang = lang.split("[-_]")[0]; // ru-RU, pt_BR -> ru, pt
+		for (String fileLang : new LinkedHashSet<>(List.of(DEFAULT_LANG, baseLang, lang))) {
+			putAll(readProperties(translationsFile(fileLang)));
 		}
-		translations.stringPropertyNames().forEach(key -> vars.put(key, translations.getProperty(key)));
 	}
 
-	@Nullable
-	private File findTranslationsFile(String lang) {
-		String baseLang = lang.split("[-_]")[0]; // ru-RU, pt_BR -> ru, pt
-		for (String fileLang : new LinkedHashSet<>(List.of(lang, baseLang))) {
-			File file = new File(directory, TRANSLATIONS_DIR + "/" + fileLang + PROPERTIES);
-			if (file.isFile()) {
-				return file;
-			}
-		}
-		return null;
+	private File translationsFile(String lang) {
+		return new File(directory, TRANSLATIONS_DIR + "/" + lang + PROPERTIES);
+	}
+
+	private void putAll(Properties properties) {
+		properties.stringPropertyNames().forEach(key -> vars.put(key, properties.getProperty(key)));
 	}
 
 	private String read(String template) {
 		File file = new File(directory, template + HTML);
 		if (!file.isFile()) {
 			throw new IllegalStateException(template + ": template not found in " + directory +
-					" - fetch web-server-config and set EMAIL_TEMPLATES=/path/to/templates/email (environment)");
+					" - fetch web-server-config and set " + EmailSenderTemplate.TEMPLATES_HINT);
 		}
 		return readText(file);
 	}
