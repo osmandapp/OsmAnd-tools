@@ -1,5 +1,8 @@
 package net.osmand.server.api.services;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
 import net.osmand.apkdelta.ApkArchive;
 import net.osmand.apkdelta.ApkDeltaFormat;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -7,12 +10,18 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.net.URI;
+import java.net.URL;
+import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -20,9 +29,12 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -37,7 +49,11 @@ import java.util.stream.Stream;
 import java.util.zip.GZIPInputStream;
 
 /**
- * Deltas between what a phone has and the builds on this server. A patch of a large entry takes
+ * Deltas between what a phone has and the latest builds on this server. All old builds are on
+ * another host, so the last ones of each kind are kept here and the rest is removed; the entries
+ * of the manifest tell which of them the phone runs.
+ *
+ * A patch of a large entry takes
  * about 0.5 GB of heap, so deltas are built one at a time on one thread, and the server refuses
  * what does not fit in a short queue. The phone then takes the whole APK.
  */
@@ -46,10 +62,12 @@ public class BuildDeltaService {
 
 	private static final Log LOGGER = LogFactory.getLog(BuildDeltaService.class);
 
-	private static final String NIGHT_BUILDS = "night-builds";
 	private static final String LATEST_BUILDS = "latest-night-build";
 	private static final String BUILD_EXTENSION = ".apk";
-	private static final Pattern BUILD_PATH = Pattern.compile("(" + LATEST_BUILDS + "|" + NIGHT_BUILDS + ")/[A-Za-z0-9._-]+\\.apk");
+	private static final Pattern BUILD_PATH = Pattern.compile(LATEST_BUILDS + "/[A-Za-z0-9._-]+\\.apk");
+	private static final String OLD_BUILDS_URL = "../night-builds/";
+	private static final String OLD_BUILDS_FOLDER = "apk-old-builds";
+	private static final String[] OLD_BUILD_KINDS = {"OsmAnd-master-opengl-nb-", "OsmAnd-default-nb-"};
 	private static final String DELTA_FOLDER = "apk-delta";
 	private static final String ENTRY_PATCHES_FOLDER = "entries";
 
@@ -57,7 +75,11 @@ public class BuildDeltaService {
 	private static final int MAX_MANIFEST_SIZE = 2 * 1024 * 1024;
 	/** A delta close to the size of the APK is not worth building a new APK on the phone. */
 	private static final double MAX_DELTA_RATIO = 0.6;
-	private static final int MAX_BUILDS_TO_SEARCH = 60;
+	private static final int MAX_OLD_BUILDS_OF_KIND = 10;
+	private static final long OLD_BUILDS_SYNC_DELAY_MS = 60 * 1000L;
+	private static final long OLD_BUILDS_SYNC_INTERVAL_MS = 60 * 60 * 1000L;
+	private static final int CONNECT_TIMEOUT_MS = 10_000;
+	private static final int READ_TIMEOUT_MS = 60_000;
 	private static final int MAX_BUILDS_TO_SIZE = 4;
 	private static final int MAX_QUEUED_DELTAS = 4;
 	private static final int MAX_REQUESTS = 4;
@@ -69,6 +91,15 @@ public class BuildDeltaService {
 	/** {@code exact} is false while the delta is still to be built and its size is an estimate. */
 	public record BuildSize(String path, long size, boolean exact) {
 	}
+
+	public static class BuildFile {
+		public String name;
+		public long size;
+		public Date mtime;
+	}
+
+	@Value("${osmand.night-builds-json.location}")
+	private String nightBuildsUrl;
 
 	@Value("${osmand.files.location}")
 	private String filesLocation;
@@ -87,8 +118,77 @@ public class BuildDeltaService {
 
 	/** Patches need the builds of the previous days, latest-night-build holds only the new ones. */
 	public boolean isSupported() {
-		File[] builds = new File(filesLocation, NIGHT_BUILDS).listFiles(BuildDeltaService::isBuild);
+		File[] builds = oldBuildsFolder().listFiles(BuildDeltaService::isBuild);
 		return builds != null && builds.length > 0;
+	}
+
+	/** The builds of all days, the newest first. */
+	public List<BuildFile> getNightBuilds() throws IOException {
+		Gson gson = new GsonBuilder().setDateFormat("EEE, dd MMM yyyy HH:mm:ss Z").create();
+		try (Reader reader = new InputStreamReader(open(nightBuildsUrl), StandardCharsets.UTF_8)) {
+			List<BuildFile> builds = gson.fromJson(reader, new TypeToken<List<BuildFile>>() {
+			}.getType());
+			builds.sort((first, second) -> second.mtime.compareTo(first.mtime));
+			return builds;
+		}
+	}
+
+	@Scheduled(initialDelay = OLD_BUILDS_SYNC_DELAY_MS, fixedDelay = OLD_BUILDS_SYNC_INTERVAL_MS)
+	public void scheduleOldBuildsSync() {
+		try {
+			deltaBuilds.execute(this::syncOldBuilds);
+		} catch (RejectedExecutionException e) {
+			LOGGER.info("APK delta queue is full, old builds wait for the next sync");
+		}
+	}
+
+	/** Runs on the thread of the deltas, so a delta never reads a build that is being replaced. */
+	public void syncOldBuilds() {
+		try {
+			File folder = oldBuildsFolder();
+			Files.createDirectories(folder.toPath());
+			List<BuildFile> builds = getNightBuilds();
+			Set<String> kept = new HashSet<>();
+			for (String kind : OLD_BUILD_KINDS) {
+				for (BuildFile build : builds.stream().filter(build -> build.name.startsWith(kind)
+						&& build.name.endsWith(BUILD_EXTENSION)).limit(MAX_OLD_BUILDS_OF_KIND).toList()) {
+					fetch(build, new File(folder, build.name));
+					kept.add(build.name);
+				}
+			}
+			File[] files = folder.listFiles();
+			if (files != null && !kept.isEmpty()) {
+				for (File file : files) {
+					if (!kept.contains(file.getName())) {
+						file.delete();
+					}
+				}
+			}
+		} catch (IOException | RuntimeException e) {
+			LOGGER.error("Could not sync the old builds", e);
+		}
+	}
+
+	/** A nightly can be replaced under the same name, so its date tells whether the file is current. */
+	private void fetch(BuildFile build, File file) throws IOException {
+		if (file.lastModified() == build.mtime.getTime()) {
+			return;
+		}
+		File temp = File.createTempFile(build.name, ".tmp", file.getParentFile());
+		try (InputStream input = open(URI.create(nightBuildsUrl).resolve(OLD_BUILDS_URL + build.name).toString())) {
+			Files.copy(input, temp.toPath(), StandardCopyOption.REPLACE_EXISTING);
+			temp.setLastModified(build.mtime.getTime());
+			Files.move(temp.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+		} finally {
+			temp.delete();
+		}
+	}
+
+	private static InputStream open(String url) throws IOException {
+		URLConnection connection = new URL(url).openConnection();
+		connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
+		connection.setReadTimeout(READ_TIMEOUT_MS);
+		return connection.getInputStream();
 	}
 
 	/** @return null if the whole APK is the better download */
@@ -237,14 +337,14 @@ public class BuildDeltaService {
 
 	private Map<String, File> findOldBuilds(Map<String, ApkArchive.Entry> manifest) {
 		List<File> builds = new ArrayList<>();
-		for (String folder : new String[] {NIGHT_BUILDS, LATEST_BUILDS}) {
-			File[] files = new File(filesLocation, folder).listFiles(BuildDeltaService::isBuild);
+		for (File folder : new File[] {oldBuildsFolder(), new File(filesLocation, LATEST_BUILDS)}) {
+			File[] files = folder.listFiles(BuildDeltaService::isBuild);
 			if (files != null) {
 				builds.addAll(Arrays.asList(files));
 			}
 		}
 		builds.sort(Comparator.comparingLong(File::lastModified).reversed());
-		return ApkDeltaBuilder.findOldBuilds(manifest, builds.subList(0, Math.min(builds.size(), MAX_BUILDS_TO_SEARCH)));
+		return ApkDeltaBuilder.findOldBuilds(manifest, builds);
 	}
 
 	private static boolean isBuildPath(String path) {
@@ -257,6 +357,10 @@ public class BuildDeltaService {
 
 	private static boolean isWorthIt(long size, File target) {
 		return size > 0 && size <= target.length() * MAX_DELTA_RATIO;
+	}
+
+	private File oldBuildsFolder() {
+		return new File(genLocation, OLD_BUILDS_FOLDER);
 	}
 
 	private File deltaFolder() {

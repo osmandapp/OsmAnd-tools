@@ -1,19 +1,12 @@
 package net.osmand.server.controllers.pub;
 
 import java.io.*;
-import java.lang.reflect.Type;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 
 import jakarta.servlet.http.HttpServletResponse;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
 import net.osmand.PlatformUtil;
 import net.osmand.server.api.services.BuildDeltaService;
 
@@ -44,9 +37,6 @@ public class BuildsController {
 
 	@Autowired
 	private BuildDeltaService deltaService;
-
-	@Value("${osmand.night-builds-json.location}")
-	private String NIGHT_BUILDS_URL;
 
 	@Value("${osmand.files.location}")
 	private String ROOT_FOLDER;
@@ -93,22 +83,7 @@ public class BuildsController {
 	}
 
 	public void addNightBuilds(File buildsFolder, XmlSerializer serializer) throws Exception {
-		URL oracle = new URL(NIGHT_BUILDS_URL);
-		InputStream inputStream = oracle.openStream();
-		ByteArrayOutputStream result = new ByteArrayOutputStream();
-		byte[] buffer = new byte[1024];
-		for (int length; (length = inputStream.read(buffer)) != -1; ) {
-			result.write(buffer, 0, length);
-		}
-		String jsonStr = result.toString(StandardCharsets.UTF_8.name());
-
-		Gson gson = new GsonBuilder().setDateFormat("EEE, dd MMM yyyy HH:mm:ss Z").create();
-		Type userListType = new TypeToken<ArrayList<BuildFile>>() {
-		}.getType();
-		ArrayList<BuildFile> buildFileList = gson.fromJson(jsonStr, userListType);
-
-		buildFileList.sort((BuildFile o1, BuildFile o2) -> -Long.compare(o1.mtime.getTime(), o2.mtime.getTime()));
-		for (BuildFile file : buildFileList) {
+		for (BuildDeltaService.BuildFile file : deltaService.getNightBuilds()) {
 			serialize(serializer, buildsFolder.getName(), file.name, file.size, file.mtime.getTime());
 		}
 	}
@@ -166,9 +141,4 @@ public class BuildsController {
 		return ResponseEntity.ok().headers(headers).body(new FileSystemResource(output));
 	}
 
-	static class BuildFile {
-		String name;
-		long size;
-		Date mtime;
-	}
 }
