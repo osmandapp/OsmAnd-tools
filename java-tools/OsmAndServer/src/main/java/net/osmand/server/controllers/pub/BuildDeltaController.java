@@ -32,14 +32,14 @@ public class BuildDeltaController {
 		return ResponseEntity.status(e.getStatusCode()).build();
 	}
 
-	/** What the builds would take from a phone with this manifest; answers at once. */
+	/** What the builds this server has would take from a phone with this manifest; estimates, at once. */
 	@PostMapping("/sizes")
 	public List<BuildDeltaService.BuildSize> getSizes(@RequestParam List<String> path, HttpServletRequest request)
 			throws IOException {
 		return deltaService.getSizes(path, request.getInputStream());
 	}
 
-	/** Waits for the delta; 204 means the phone takes the whole APK. */
+	/** The phone has chosen a build: builds the delta and returns it; 204 means the whole APK is better. */
 	@PostMapping
 	public ResponseEntity<Resource> getDelta(@RequestParam String path, HttpServletRequest request) throws IOException {
 		File delta = deltaService.getDelta(path, request.getInputStream());

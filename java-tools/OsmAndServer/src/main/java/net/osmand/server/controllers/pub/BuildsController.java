@@ -54,9 +54,7 @@ public class BuildsController {
 		serializer.startDocument("UTF-8", true);
 		serializer.startTag(null, "builds");
 		serializer.attribute(null, "version", "1.1");
-		if (deltaService.isSupported()) {
-			serializer.attribute(null, "incremental", "true");
-		}
+		serializer.attribute(null, "incremental", "true");
 		addBuilds(latestBuilds, serializer);
 		try {
 			addNightBuilds(allBuilds, serializer);
