@@ -168,6 +168,7 @@ public class UserdataService {
     private static final int ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED = 8 + ERROR_CODE_PRO_USERS;
 //    private static final int ERROR_CODE_SUBSCRIPTION_WAS_EXPIRED_OR_NOT_PRESENT = 10 + ERROR_CODE_PRO_USERS;
     private static final int ERROR_CODE_PASSWORD_IS_TO_SIMPLE = 12 + ERROR_CODE_PRO_USERS;
+    public static final int ERROR_CODE_TOKEN_ATTEMPTS_EXCEEDED = 13 + ERROR_CODE_PRO_USERS;
 
     private static final int MAX_NUMBER_OF_FILES_FREE_ACCOUNT = 10000;
     public static final long MAXIMUM_FREE_ACCOUNT_SIZE = 5 * MB;
@@ -556,7 +557,8 @@ public class UserdataService {
         return email.trim().toLowerCase(Locale.ROOT);
     }
 
-    public synchronized void updateSecureEmailToken(CloudUser user) {
+    @Nullable
+    public synchronized String updateSecureEmailToken(CloudUser user) {
         String email = emailTokenKey(user.email);
         long now = System.currentTimeMillis();
         SecureEmailToken token = emailTokenRequests.getIfPresent(email);
@@ -570,8 +572,14 @@ public class UserdataService {
             token = new SecureEmailToken(generateEmailToken(digits), now + TimeUnit.MINUTES.toMillis(delayMinutes));
             emailTokenRequests.put(email, token);
             user.tokenTime = new Date(now);
+        } else {
+            String attemptsError = tokenAttemptsError(user, token, now);
+            if (attemptsError != null) {
+                return attemptsError;
+            }
         }
         user.token = token.token();
+        return null;
     }
 
     private String generateEmailToken(int digits) {
@@ -614,7 +622,10 @@ public class UserdataService {
         }
 		if (pu != null) {
             pu.tokendevice = TOKEN_DEVICE_WEB;
-            updateSecureEmailToken(pu);
+            String tokenError = updateSecureEmailToken(pu);
+            if (tokenError != null) {
+                return ResponseEntity.badRequest().body(tokenError);
+            }
             usersRepository.saveAndFlush(pu);
             emailSender.sendOsmAndCloudAccountEmail(pu.email, pu.token, lang,
                     registered ? EmailSenderService.CloudAccountAction.PASSWORD
@@ -698,6 +709,11 @@ public class UserdataService {
             wearOutToken(pu); // cut down on tries (even for web password)
             if ( ! (tokenIsActive && validateWithWebPassword(pu.id, token))) {
                 LOG.error("device-register: invalid token (" + EmailSenderService.shorten(email) + ")");
+                String attemptsError = tokenAttemptsError(pu, emailTokenRequests.getIfPresent(emailTokenKey(pu.email)),
+                        System.currentTimeMillis());
+                if (attemptsError != null) {
+                    throw new OsmAndPublicApiException(ERROR_CODE_TOKEN_ATTEMPTS_EXCEEDED, attemptsError);
+                }
                 throw tokenNotValidOrExpired();
             }
         }
@@ -1613,7 +1629,10 @@ public class UserdataService {
         if (pu == null) {
             return ResponseEntity.badRequest().body("Email is not registered");
         }
-        updateSecureEmailToken(pu);
+        String tokenError = updateSecureEmailToken(pu);
+        if (tokenError != null) {
+            return ResponseEntity.badRequest().body(tokenError);
+        }
         String token = pu.token;
         usersRepository.saveAndFlush(pu);
         String email = pu.email;
@@ -1668,6 +1687,16 @@ public class UserdataService {
 
     private boolean isCodeValid(CloudUsersRepository.CloudUser pu, String code) {
         return isCodeActive(pu) && pu.token.equals(Algorithms.trimIfNotNull(code));
+    }
+
+    @Nullable
+    private String tokenAttemptsError(CloudUsersRepository.CloudUser pu, @Nullable SecureEmailToken token, long now) {
+        if (token == null || token.nextAllowedAt() <= now || !token.token().equals(pu.token) || isCodeActive(pu)) {
+            return null;
+        }
+        LOG.error("email-token: attempts exceeded (" + EmailSenderService.shorten(pu.email) + ")");
+        long minutes = (long) Math.ceil((double) (token.nextAllowedAt() - now) / TimeUnit.MINUTES.toMillis(1));
+        return "too many attempts, request a new code in " + minutes + " min";
     }
 
     private static OsmAndPublicApiException tokenNotValidOrExpired() {

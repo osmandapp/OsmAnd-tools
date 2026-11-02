@@ -216,7 +216,10 @@ public class UserdataController {
 			pu.orderid = orderid;
 		}
 		pu.tokendevice = deviceId;
-		userdataService.updateSecureEmailToken(pu);
+		String tokenError = userdataService.updateSecureEmailToken(pu);
+		if (tokenError != null) {
+			throw new OsmAndPublicApiException(UserdataService.ERROR_CODE_TOKEN_ATTEMPTS_EXCEEDED, tokenError);
+		}
 		String regEmail = pu.email;
 		String regToken = pu.token;
 		CloudAccountAction action = registered ? CloudAccountAction.LOGIN : CloudAccountAction.SETUP;
