@@ -79,11 +79,16 @@ public class BuildDeltaService {
 	/** A real manifest takes less than 1 MB. */
 	private static final int MAX_MANIFEST_SIZE = 2 * 1024 * 1024;
 	/** A delta close to the size of the APK is not worth building a new APK on the phone. */
-	private static final double MAX_DELTA_RATIO = 0.6;
+	private static final double MAX_DELTA_RATIO = 0.5;
+	/** Other apps among the builds share nearly nothing with the phone: this leaves them out. */
+	private static final long MIN_DELTA_SAVING = 20 * 1024 * 1024;
 	private static final int MAX_OLD_BUILDS_OF_KIND = 5;
 	private static final long OLD_BUILDS_SYNC_INTERVAL_MS = TimeUnit.HOURS.toMillis(1);
 	private static final int CONNECT_TIMEOUT_MS = 10_000;
 	private static final int READ_TIMEOUT_MS = 60_000;
+	/** Builds of the previous days offered to a phone, of those kept here. */
+	private static final int MAX_OLD_BUILDS_TO_OFFER = 8;
+	/** For versions of the app that name the builds. */
 	private static final int MAX_BUILDS_TO_SIZE = 4;
 	private static final int MAX_QUEUED_DELTAS = 4;
 	private static final int MAX_REQUESTS = 4;
@@ -223,7 +228,12 @@ public class BuildDeltaService {
 		return isWorthIt(delta.length(), target) ? delta : null;
 	}
 
-	/** Answers at once: the size of a ready delta, or an estimate while it is built in the background. */
+	/**
+	 * Answers at once with what the builds this server offers would take: the size of a delta a
+	 * phone has chosen before, or an estimate.
+	 *
+	 * @param paths the builds to size, or null for all this server offers
+	 */
 	public List<BuildSize> getSizes(List<String> paths, InputStream manifestStream) throws IOException {
 		acquireRequest();
 		try {
@@ -231,7 +241,7 @@ public class BuildDeltaService {
 			requestOldBuildsSync();
 			Map<String, File> oldBuilds = findOldBuilds(manifest);
 			List<BuildSize> sizes = new ArrayList<>();
-			for (String path : paths.stream().limit(MAX_BUILDS_TO_SIZE).toList()) {
+			for (String path : paths == null ? offeredBuilds() : paths.stream().limit(MAX_BUILDS_TO_SIZE).toList()) {
 				File target = buildFile(path);
 				if (target == null) {
 					continue;
@@ -249,6 +259,22 @@ public class BuildDeltaService {
 		} finally {
 			requests.release();
 		}
+	}
+
+	private List<String> offeredBuilds() {
+		List<String> paths = new ArrayList<>();
+		File[] latest = new File(filesLocation, LATEST_BUILDS).listFiles(BuildDeltaService::isBuild);
+		if (latest != null) {
+			for (File build : latest) {
+				paths.add(LATEST_BUILDS + "/" + build.getName());
+			}
+		}
+		File[] old = oldBuildsFolder().listFiles(BuildDeltaService::isBuild);
+		if (old != null) {
+			Arrays.stream(old).sorted(Comparator.comparingLong(File::lastModified).reversed())
+					.limit(MAX_OLD_BUILDS_TO_OFFER).forEach(build -> paths.add(NIGHT_BUILDS + build.getName()));
+		}
+		return paths;
 	}
 
 	private BuildSize getSize(String path, File target, Map<String, ApkArchive.Entry> manifest,
@@ -357,7 +383,7 @@ public class BuildDeltaService {
 	}
 
 	private static boolean isWorthIt(long size, File target) {
-		return size > 0 && size <= target.length() * MAX_DELTA_RATIO;
+		return size > 0 && size <= target.length() * MAX_DELTA_RATIO && target.length() - size >= MIN_DELTA_SAVING;
 	}
 
 	private File oldBuildsFolder() {

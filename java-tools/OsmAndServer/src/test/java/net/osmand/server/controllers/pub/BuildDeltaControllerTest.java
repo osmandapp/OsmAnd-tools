@@ -40,16 +40,20 @@ public class BuildDeltaControllerTest {
 	private BuildDeltaService service;
 	private File root;
 	private File gen;
+	private File phoneApk;
+	private byte[] payload;
 
 	@Before
 	public void setUp() throws Exception {
 		root = temp.newFolder();
 		new File(root, "latest-night-build").mkdirs();
 		new File(root, "secret").mkdirs();
-		byte[] payload = new byte[2_000_000];
+		payload = new byte[30_000_000];
 		new Random(1).nextBytes(payload);
 		zip(new File(root, BUILD), payload);
 		zip(new File(root, "secret/x.apk"), payload);
+		phoneApk = temp.newFile("phone.apk");
+		zip(phoneApk, payload, "changed.bin", new byte[] {1, 2, 3});
 		service = new BuildDeltaService();
 		ReflectionTestUtils.setField(service, "filesLocation", root.getPath());
 		gen = temp.newFolder();
@@ -83,7 +87,7 @@ public class BuildDeltaControllerTest {
 		old.getParentFile().mkdirs();
 		Files.copy(new File(root, BUILD).toPath(), old.toPath());
 		String keptPath = "night-builds/OsmAnd-default-nb-01.apk";
-		byte[] manifest = manifest(new File(root, BUILD));
+		byte[] manifest = manifest(phoneApk);
 		String sizes = mvc.perform(post("/api/builds/delta/sizes").param("path", BUILD, keptPath, "night-builds/none.apk")
 						.content(manifest)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
 		assertTrue(sizes, sizes.contains(BUILD) && sizes.contains(keptPath));
@@ -99,7 +103,7 @@ public class BuildDeltaControllerTest {
 		File published = new File(root, "published/night-builds");
 		publish(published, publishedList(published), 1, 2);
 		File oldBuilds = new File(gen, "apk-old-builds");
-		mvc.perform(post("/api/builds/delta").param("path", BUILD).content(manifest(new File(root, BUILD))))
+		mvc.perform(post("/api/builds/delta").param("path", BUILD).content(manifest(phoneApk)))
 				.andExpect(status().isOk());
 		mvc.perform(post("/api/builds/delta/sizes").param("path", BUILD).content(new byte[] {1}))
 				.andExpect(status().isBadRequest());
@@ -134,14 +138,14 @@ public class BuildDeltaControllerTest {
 
 	@Test
 	public void deltaIsReturned() throws Exception {
-		byte[] delta = mvc.perform(post("/api/builds/delta").param("path", BUILD).content(manifest(new File(root, BUILD))))
+		byte[] delta = mvc.perform(post("/api/builds/delta").param("path", BUILD).content(manifest(phoneApk)))
 				.andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
 		assertArrayEquals(ApkDeltaFormat.MAGIC, Arrays.copyOf(delta, ApkDeltaFormat.MAGIC.length));
 	}
 
 	@Test
 	public void sizesAreAnsweredAtOnceAndBecomeExact() throws Exception {
-		byte[] manifest = manifest(new File(root, BUILD));
+		byte[] manifest = manifest(phoneApk);
 		String first = mvc.perform(post("/api/builds/delta/sizes").param("path", BUILD, "secret/x.apk").content(manifest))
 				.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
 		assertTrue(first, first.contains("\"path\":\"" + BUILD + "\""));
@@ -150,6 +154,41 @@ public class BuildDeltaControllerTest {
 		String second = mvc.perform(post("/api/builds/delta/sizes").param("path", BUILD).content(manifest))
 				.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
 		assertTrue(second, second.contains("\"exact\":true"));
+	}
+
+	@Test
+	public void offersAllLatestBuildsAndTheNewestOldOnes() throws Exception {
+		File oldBuilds = new File(gen, "apk-old-builds");
+		oldBuilds.mkdirs();
+		for (int day = 1; day <= 9; day++) {
+			File build = new File(oldBuilds, "OsmAnd-default-nb-0" + day + ".apk");
+			Files.copy(new File(root, BUILD).toPath(), build.toPath());
+			build.setLastModified(day * 86_400_000L);
+		}
+		String sizes = mvc.perform(post("/api/builds/delta/sizes").content(manifest(phoneApk)))
+				.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+		assertTrue(sizes, sizes.contains(BUILD));
+		assertTrue(sizes, sizes.contains("night-builds/OsmAnd-default-nb-02.apk"));
+		assertTrue(sizes, sizes.contains("night-builds/OsmAnd-default-nb-09.apk"));
+		assertFalse(sizes, sizes.contains("night-builds/OsmAnd-default-nb-01.apk"));
+		assertFalse(sizes, sizes.contains("secret"));
+	}
+
+	@Test
+	public void noOfferForTheInstalledBuildOrASmallSaving() throws Exception {
+		byte[] installed = manifest(new File(root, BUILD));
+		mvc.perform(post("/api/builds/delta").param("path", BUILD).content(installed)).andExpect(status().isNoContent());
+		String sizes = mvc.perform(post("/api/builds/delta/sizes").param("path", BUILD).content(installed))
+				.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+		assertEquals("[]", sizes);
+
+		String small = "latest-night-build/OsmAnd-small.apk";
+		zip(new File(root, small), new byte[1_000_000]);
+		File smallPhone = temp.newFile("small-phone.apk");
+		zip(smallPhone, new byte[1_000_000], "changed.bin", new byte[] {1});
+		sizes = mvc.perform(post("/api/builds/delta/sizes").param("path", small).content(manifest(smallPhone)))
+				.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+		assertEquals("[]", sizes);
 	}
 
 	@Test
@@ -193,9 +232,16 @@ public class BuildDeltaControllerTest {
 	}
 
 	private static void zip(File file, byte[] bytes) throws Exception {
+		zip(file, bytes, "changed.bin", new byte[] {4, 5, 6, 7});
+	}
+
+	private static void zip(File file, byte[] bytes, String name, byte[] small) throws Exception {
 		try (ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(file))) {
 			zip.putNextEntry(new ZipEntry("classes.dex"));
 			zip.write(bytes);
+			zip.closeEntry();
+			zip.putNextEntry(new ZipEntry(name));
+			zip.write(small);
 			zip.closeEntry();
 		}
 	}
