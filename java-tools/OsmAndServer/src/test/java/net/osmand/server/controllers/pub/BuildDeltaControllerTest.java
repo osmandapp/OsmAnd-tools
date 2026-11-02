@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
@@ -30,7 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 public class BuildDeltaControllerTest {
 
-	private static final String BUILD = "night-builds/OsmAnd-test-nb.apk";
+	private static final String BUILD = "latest-night-build/OsmAnd-test.apk";
 
 	@Rule
 	public TemporaryFolder temp = new TemporaryFolder();
@@ -38,11 +39,12 @@ public class BuildDeltaControllerTest {
 	private MockMvc mvc;
 	private BuildDeltaService service;
 	private File root;
+	private File gen;
 
 	@Before
 	public void setUp() throws Exception {
 		root = temp.newFolder();
-		new File(root, "night-builds").mkdirs();
+		new File(root, "latest-night-build").mkdirs();
 		new File(root, "secret").mkdirs();
 		byte[] payload = new byte[2_000_000];
 		new Random(1).nextBytes(payload);
@@ -50,17 +52,46 @@ public class BuildDeltaControllerTest {
 		zip(new File(root, "secret/x.apk"), payload);
 		service = new BuildDeltaService();
 		ReflectionTestUtils.setField(service, "filesLocation", root.getPath());
-		ReflectionTestUtils.setField(service, "genLocation", temp.newFolder().getPath());
+		gen = temp.newFolder();
+		ReflectionTestUtils.setField(service, "genLocation", gen.getPath());
 		BuildDeltaController controller = new BuildDeltaController();
 		ReflectionTestUtils.setField(controller, "deltaService", service);
 		mvc = MockMvcBuilders.standaloneSetup(controller).build();
 	}
 
 	@Test
-	public void supportedOnlyWithOldBuilds() {
-		assertTrue(service.isSupported());
-		new File(root, BUILD).delete();
+	public void keepsTheLastBuildsOfEachKindAndRemovesTheRest() throws Exception {
+		File published = new File(root, "published/night-builds");
+		published.mkdirs();
+		File list = new File(root, "published/night-builds-json/list.json");
+		list.getParentFile().mkdirs();
+		ReflectionTestUtils.setField(service, "nightBuildsUrl", list.toURI().toString());
+		publish(published, list, 1, 12);
 		assertFalse(service.isSupported());
+
+		service.syncOldBuilds();
+		assertTrue(service.isSupported());
+		File[] kept = new File(gen, "apk-old-builds").listFiles();
+		assertEquals(10, kept.length);
+		assertFalse(new File(gen, "apk-old-builds/OsmAnd-default-nb-02.apk").exists());
+		assertTrue(new File(gen, "apk-old-builds/OsmAnd-default-nb-12.apk").exists());
+		assertFalse(new File(gen, "apk-old-builds/OsmAnd-map-sample.apk").exists());
+
+		publish(published, list, 5, 14);
+		service.syncOldBuilds();
+		assertFalse(new File(gen, "apk-old-builds/OsmAnd-default-nb-04.apk").exists());
+		assertTrue(new File(gen, "apk-old-builds/OsmAnd-default-nb-14.apk").exists());
+	}
+
+	private static void publish(File folder, File list, int firstDay, int lastDay) throws Exception {
+		StringBuilder json = new StringBuilder("[{\"name\":\"OsmAnd-map-sample.apk\",\"size\":1,\"mtime\":\"Mon, 02 Nov 2026 12:00:00 GMT\"}");
+		Files.write(new File(folder, "OsmAnd-map-sample.apk").toPath(), new byte[1]);
+		for (int day = firstDay; day <= lastDay; day++) {
+			String name = String.format("OsmAnd-default-nb-%02d.apk", day);
+			Files.write(new File(folder, name).toPath(), new byte[day]);
+			json.append(String.format(",{\"name\":\"%s\",\"size\":%d,\"mtime\":\"Sun, %02d Nov 2026 12:00:00 GMT\"}", name, day, day));
+		}
+		Files.writeString(list.toPath(), json.append("]").toString());
 	}
 
 	@Test
