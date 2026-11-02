@@ -79,12 +79,15 @@ public class BuildDeltaService {
 	/** A real manifest takes less than 1 MB. */
 	private static final int MAX_MANIFEST_SIZE = 2 * 1024 * 1024;
 	/** A delta close to the size of the APK is not worth building a new APK on the phone. */
-	private static final double MAX_DELTA_RATIO = 0.6;
+	private static final double MAX_DELTA_RATIO = 0.5;
+	/** Other apps among the builds share nearly nothing with the phone: this leaves them out. */
+	private static final long MIN_DELTA_SAVING = 20 * 1024 * 1024;
 	private static final int MAX_OLD_BUILDS_OF_KIND = 5;
 	private static final long OLD_BUILDS_SYNC_INTERVAL_MS = TimeUnit.HOURS.toMillis(1);
 	private static final int CONNECT_TIMEOUT_MS = 10_000;
 	private static final int READ_TIMEOUT_MS = 60_000;
-	private static final int MAX_BUILDS_TO_SIZE = 4;
+	/** All latest builds and the first ones of the archive. */
+	private static final int MAX_BUILDS_TO_SIZE = 24;
 	private static final int MAX_QUEUED_DELTAS = 4;
 	private static final int MAX_REQUESTS = 4;
 	/** Just below the time the client waits. */
@@ -357,7 +360,7 @@ public class BuildDeltaService {
 	}
 
 	private static boolean isWorthIt(long size, File target) {
-		return size > 0 && size <= target.length() * MAX_DELTA_RATIO;
+		return size > 0 && size <= target.length() * MAX_DELTA_RATIO && target.length() - size >= MIN_DELTA_SAVING;
 	}
 
 	private File oldBuildsFolder() {

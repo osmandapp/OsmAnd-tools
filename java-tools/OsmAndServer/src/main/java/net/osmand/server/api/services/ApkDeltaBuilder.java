@@ -98,19 +98,24 @@ public class ApkDeltaBuilder {
 		return found;
 	}
 
-	/** The size of the delta without building it, with an average size in place of each patch. */
+	/**
+	 * The size of the delta without building it, with an average size in place of each patch;
+	 * 0 if the phone already has this build.
+	 */
 	public long estimate() throws IOException {
 		double size = 0;
+		boolean changed = false;
 		for (ApkArchive.Entry entry : ApkArchive.readEntries(target)) {
 			size += METADATA_PER_ENTRY;
 			byte kind = kind(entry);
+			changed |= kind != ApkDeltaFormat.KIND_COPY;
 			if (kind == ApkDeltaFormat.KIND_FULL) {
 				size += entry.compressedSize;
 			} else if (kind == ApkDeltaFormat.KIND_DELTA) {
 				size += entry.compressedSize * (entry.method == ZipArchiveEntry.DEFLATED ? DEFLATED_PATCH_RATIO : STORED_PATCH_RATIO);
 			}
 		}
-		return (long) size;
+		return changed ? (long) size : 0;
 	}
 
 	private byte kind(ApkArchive.Entry entry) {
