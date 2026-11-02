@@ -62,25 +62,63 @@ public class BuildDeltaControllerTest {
 	@Test
 	public void keepsTheLastBuildsOfEachKindAndRemovesTheRest() throws Exception {
 		File published = new File(root, "published/night-builds");
-		published.mkdirs();
-		File list = new File(root, "published/night-builds-json/list.json");
-		list.getParentFile().mkdirs();
-		ReflectionTestUtils.setField(service, "nightBuildsUrl", list.toURI().toString());
+		File list = publishedList(published);
 		publish(published, list, 1, 12);
-		assertFalse(service.isSupported());
 
 		service.syncOldBuilds();
-		assertTrue(service.isSupported());
-		File[] kept = new File(gen, "apk-old-builds").listFiles();
-		assertEquals(10, kept.length);
-		assertFalse(new File(gen, "apk-old-builds/OsmAnd-default-nb-02.apk").exists());
+		assertEquals(5, new File(gen, "apk-old-builds").listFiles().length);
+		assertFalse(new File(gen, "apk-old-builds/OsmAnd-default-nb-07.apk").exists());
 		assertTrue(new File(gen, "apk-old-builds/OsmAnd-default-nb-12.apk").exists());
 		assertFalse(new File(gen, "apk-old-builds/OsmAnd-map-sample.apk").exists());
 
 		publish(published, list, 5, 14);
 		service.syncOldBuilds();
-		assertFalse(new File(gen, "apk-old-builds/OsmAnd-default-nb-04.apk").exists());
+		assertFalse(new File(gen, "apk-old-builds/OsmAnd-default-nb-09.apk").exists());
 		assertTrue(new File(gen, "apk-old-builds/OsmAnd-default-nb-14.apk").exists());
+	}
+
+	@Test
+	public void offersOnlyTheBuildsItHasAndBuildsOnlyTheChosenOne() throws Exception {
+		File old = new File(gen, "apk-old-builds/OsmAnd-default-nb-01.apk");
+		old.getParentFile().mkdirs();
+		Files.copy(new File(root, BUILD).toPath(), old.toPath());
+		String keptPath = "night-builds/OsmAnd-default-nb-01.apk";
+		byte[] manifest = manifest(new File(root, BUILD));
+		String sizes = mvc.perform(post("/api/builds/delta/sizes").param("path", BUILD, keptPath, "night-builds/none.apk")
+						.content(manifest)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+		assertTrue(sizes, sizes.contains(BUILD) && sizes.contains(keptPath));
+		assertFalse(sizes, sizes.contains("none.apk"));
+		assertFalse(sizes, sizes.contains("\"exact\":true"));
+		Thread.sleep(300);
+		assertFalse(new File(gen, "apk-delta").exists());
+		mvc.perform(post("/api/builds/delta").param("path", keptPath).content(manifest)).andExpect(status().isOk());
+	}
+
+	@Test
+	public void onlyAPhoneAskingStartsTheDownloadOfOldBuilds() throws Exception {
+		File published = new File(root, "published/night-builds");
+		publish(published, publishedList(published), 1, 2);
+		File oldBuilds = new File(gen, "apk-old-builds");
+		mvc.perform(post("/api/builds/delta").param("path", BUILD).content(manifest(new File(root, BUILD))))
+				.andExpect(status().isOk());
+		mvc.perform(post("/api/builds/delta/sizes").param("path", BUILD).content(new byte[] {1}))
+				.andExpect(status().isBadRequest());
+		assertFalse(oldBuilds.exists());
+
+		mvc.perform(post("/api/builds/delta/sizes").param("path", BUILD).content(manifest(new File(root, BUILD))))
+				.andExpect(status().isOk());
+		for (int i = 0; i < 100 && !new File(oldBuilds, "OsmAnd-default-nb-02.apk").exists(); i++) {
+			Thread.sleep(50);
+		}
+		assertTrue(new File(oldBuilds, "OsmAnd-default-nb-02.apk").exists());
+	}
+
+	private File publishedList(File published) {
+		published.mkdirs();
+		File list = new File(root, "published/night-builds-json/list.json");
+		list.getParentFile().mkdirs();
+		ReflectionTestUtils.setField(service, "nightBuildsUrl", list.toURI().toString());
+		return list;
 	}
 
 	private static void publish(File folder, File list, int firstDay, int lastDay) throws Exception {
