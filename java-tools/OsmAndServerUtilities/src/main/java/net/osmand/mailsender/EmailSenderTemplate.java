@@ -73,8 +73,9 @@ public class EmailSenderTemplate {
 	private static final Log LOG = LogFactory.getLog(EmailSenderTemplate.class);
 	static final String TEMPLATES_ENV = "EMAIL_TEMPLATES";
 	static final String TEMPLATES_HINT = TEMPLATES_ENV + "=/path/to/templates/email (environment)";
+	static final Pattern VARIABLE = Pattern.compile("@([A-Z0-9_]+)@");
 
-	public String defaultTemplatesDirectory = "./templates";
+	public String defaultTemplatesDirectory = templatesDirectory();
 
 	private final SmtpSendGridSender sender;
 	private int totalEmails, sentEmails;
@@ -100,18 +101,21 @@ public class EmailSenderTemplate {
 
 	// configure by environment
 	public EmailSenderTemplate() {
-		final String templates = System.getenv(TEMPLATES_ENV);
-		if (templates != null) {
-			this.defaultTemplatesDirectory = templates;
-			// LOG.info("Using env EMAIL_TEMPLATES: " + templates);
-		}
-
 		final String smtpServer = System.getenv("SMTP_SERVER");
 		final String apiKey = System.getenv("SENDGRID_KEY");
 
 		testEmailCopy = System.getenv("TEST_EMAIL_COPY");
 
 		this.sender = new SmtpSendGridSender(smtpServer, apiKey);
+	}
+
+	static String templatesDirectory() {
+		final String templates = System.getenv(TEMPLATES_ENV);
+		if (templates == null) {
+			return "./templates";
+		}
+		// LOG.info("Using env EMAIL_TEMPLATES: " + templates);
+		return templates;
 	}
 
 	public EmailSenderTemplate send() {
@@ -164,7 +168,14 @@ public class EmailSenderTemplate {
 	}
 
 	public EmailSenderTemplate load(String template, @Nullable String lang) {
-		EmailTemplate emailTemplate = new EmailTemplate(defaultTemplatesDirectory, template, safeLang(lang));
+		return load(EmailTemplate.fromFile(defaultTemplatesDirectory, template, safeLang(lang)));
+	}
+
+	EmailSenderTemplate loadMarkup(String markup, @Nullable String lang) {
+		return load(EmailTemplate.fromMarkup(defaultTemplatesDirectory, markup, safeLang(lang)));
+	}
+
+	private EmailSenderTemplate load(EmailTemplate emailTemplate) {
 		vars.putAll(emailTemplate.vars);
 		headers.putAll(emailTemplate.headers);
 		set("YEAR", String.valueOf(Year.now(ZoneOffset.UTC).getValue()));
@@ -231,6 +242,14 @@ public class EmailSenderTemplate {
 	}
 
 	private String fill(String in) {
+		String filled = replaceVariables(in);
+		if (filled != null && VARIABLE.matcher(filled).find()) {
+			throw new IllegalStateException(filled + ": error - please fill all tokens @A-Z0-9_@");
+		}
+		return filled;
+	}
+
+	private String replaceVariables(String in) {
 		String filled = in;
 		if (filled != null) {
 			String previous;
@@ -244,9 +263,6 @@ public class EmailSenderTemplate {
 					filled = filled.replace("@" + key + "@", vars.get(key));
 				}
 			} while (!filled.equals(previous));
-			if (filled.matches("(?s)^.*@[A-Z0-9_]+@.*$")) {
-				throw new IllegalStateException(filled + ": error - please fill all tokens @A-Z0-9_@");
-			}
 		}
 		return filled;
 	}
@@ -265,6 +281,11 @@ public class EmailSenderTemplate {
 	String fillBody(String to) {
 		setVarsByTo(to);
 		return fill(body);
+	}
+
+	String fillBodyKeepingMissing(String to) {
+		setVarsByTo(to);
+		return replaceVariables(body);
 	}
 
 	private void validateLoadedTemplates() {

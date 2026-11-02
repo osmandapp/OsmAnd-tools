@@ -249,6 +249,7 @@ public class WebSecurityConfiguration {
 //						.requestMatchers("/admin/issues/**").permitAll()
 						.requestMatchers("/admin/search-test/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
 						.requestMatchers("/admin/order-mgmt/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
+						.requestMatchers("/admin/email-templates/**").hasAuthority(ROLE_ADMIN)
 						.requestMatchers("/admin/operations/**").hasAuthority(ROLE_ADMIN)
 						.requestMatchers("/admin/**").hasAuthority(ROLE_ADMIN)
 						.requestMatchers("/actuator/**").hasAuthority(ROLE_ADMIN)
