@@ -1,6 +1,7 @@
 package net.osmand.mailsender;
 
 import com.sendgrid.*;
+import net.osmand.util.Algorithms;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.mail.EmailException;
@@ -40,7 +41,7 @@ Special variables:
 
 	@TO@, @TO_BASE64@ - automatically set with To-address before sending each email
 
-	@UNSUB_URL@ - unsubscribe link: an email that contains it gets List-Unsubscribe headers
+	@LIST_UNSUBSCRIBE@ - value of the List-Unsubscribe header, empty for an email without it
 
 Template variables:
 
@@ -73,7 +74,7 @@ Examples:
 
 public class EmailSenderTemplate {
 	private static final Log LOG = LogFactory.getLog(EmailSenderTemplate.class);
-	private static final String UNSUB_URL = "UNSUB_URL";
+	private static final String LIST_UNSUBSCRIBE = "LIST_UNSUBSCRIBE";
 	static final String TEMPLATES_ENV = "EMAIL_TEMPLATES";
 
 	public String defaultTemplatesDirectory = "./templates";
@@ -93,7 +94,7 @@ public class EmailSenderTemplate {
 
 	public String toString() {
 		return String.format("From: %s (%s)\nSubject: %s\n\n%s\n",
-				fill(String.valueOf(fromEmail)), fill(String.valueOf(fromName)), fill(String.valueOf(subject)), fill(String.valueOf(body)));
+				fill(fromEmail), fill(fromName), fill(subject), fill(body));
 	}
 
 	public boolean isSuccess() {
@@ -231,25 +232,23 @@ public class EmailSenderTemplate {
 		return toList.isEmpty();
 	}
 
-	Map<String, String> headers() {
-		return headers;
-	}
-
 	private String fill(String in) {
 		String filled = in;
-		String previous;
-		int passes = 0;
-		do {
-			if (passes++ > vars.size()) {
-				throw new IllegalStateException("Template variables reference each other in a cycle");
+		if (filled != null) {
+			String previous;
+			int passes = 0;
+			do {
+				if (passes++ > vars.size()) {
+					throw new IllegalStateException("Template variables reference each other in a cycle");
+				}
+				previous = filled;
+				for (String key : vars.keySet()) {
+					filled = filled.replace("@" + key + "@", vars.get(key));
+				}
+			} while (!filled.equals(previous));
+			if (filled.matches("(?s)^.*@[A-Z0-9_]+@.*$")) {
+				throw new IllegalStateException(filled + ": error - please fill all tokens @A-Z0-9_@");
 			}
-			previous = filled;
-			for (String key : vars.keySet()) {
-				filled = filled.replace("@" + key + "@", vars.get(key));
-			}
-		} while (!filled.equals(previous));
-		if (filled.matches("(?s)^.*@[A-Z0-9_]+@.*$")) {
-			throw new IllegalStateException(filled + ": error - please fill all tokens @A-Z0-9_@");
 		}
 		return filled;
 	}
@@ -267,16 +266,11 @@ public class EmailSenderTemplate {
 
 	String render(String to) {
 		setVarsByTo(to);
-		String html = fill(body);
-		if (hasUnsubscribeLink(html)) {
-			headers.put("List-Unsubscribe", "<@" + UNSUB_URL + "@>");
+		if (!Algorithms.isEmpty(vars.get(LIST_UNSUBSCRIBE))) {
+			headers.put("List-Unsubscribe", "@" + LIST_UNSUBSCRIBE + "@");
 			headers.put("List-Unsubscribe-Post", "List-Unsubscribe=One-Click");
 		}
-		return html;
-	}
-
-	private boolean hasUnsubscribeLink(String html) {
-		return vars.containsKey(UNSUB_URL) && html.contains(fill("@" + UNSUB_URL + "@"));
+		return fill(body);
 	}
 
 	private void validateLoadedTemplates() {

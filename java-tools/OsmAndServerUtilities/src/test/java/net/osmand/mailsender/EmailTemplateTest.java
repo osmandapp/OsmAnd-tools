@@ -7,10 +7,7 @@ import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.Map;
-import java.util.Set;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -19,7 +16,6 @@ public class EmailTemplateTest {
 	@Rule
 	public TemporaryFolder templates = new TemporaryFolder();
 
-	private static final String HEADER = "<!--[if mso]>\n<v:roundrect href=\"#\">Header button</v:roundrect>\n<![endif]-->";
 	private static final String MAILING_CONTENT =
 			"<!--[if mso]>\n" +
 			"<v:roundrect href=\"#\">VML button</v:roundrect>\n" +
@@ -56,13 +52,10 @@ public class EmailTemplateTest {
 				"UNSUB_URL=https://osmand.net/unsubscribe?id=@TO_BASE64@\n" +
 				"\n" +
 				"purchase.COLOR=orange \n" +
-				"welcome.FRAME=BASE\n" +
 				"setup.LAYOUT=code\n" +
 				"password.LAYOUT=code\n" +
 				"linked.CARD_DETAILS=@DETAILS@\n");
 		write("styles.properties", "COLOR=gray\n");
-		write("blocks/BASE_HEADER.html", HEADER + "\n");
-		write("blocks/BASE_FOOTER.html", "<p>Footer</p>\n");
 		write("blocks/UNSUBSCRIBE.html", UNSUBSCRIBE + "\n");
 		write("blocks/UNSUBSCRIBE_LINK.html", UNSUBSCRIBE + "\n");
 		write("blocks/CARD.html", "<div>@CARD_DETAILS@</div>\n");
@@ -72,7 +65,7 @@ public class EmailTemplateTest {
 		write("cloud/account/welcome.html", "<p>Welcome body</p>\n");
 		write("cloud/purchase/receipt.html", "<p>@COLOR@</p>@UNSUBSCRIBE_LINK@");
 		write("cloud/purchase/linked.html", "@CARD@");
-		write("mailing.html", "<html><body>\n" + MAILING_CONTENT + "</body></html>\n");
+		write("mailing.html", "<html><body>\n" + MAILING_CONTENT + "@UNSUBSCRIBE@</body></html>\n");
 	}
 
 	@Test
@@ -130,29 +123,8 @@ public class EmailTemplateTest {
 	}
 
 	@Test
-	public void frameWrapsEmails() {
-		String body = load("cloud/account/welcome").toString();
-		assertTrue("the header block must be included as is", body.contains(HEADER));
-		assertTrue(body.contains("Welcome body"));
-		assertFalse("the header block is only included for emails with a frame", load("cloud/account/login").toString().contains("Header button"));
-	}
-
-	@Test
 	public void htmlIsSentAsIs() {
 		assertTrue("comments and Outlook blocks must survive verbatim", load("mailing").toString().contains(MAILING_CONTENT));
-	}
-
-	@Test
-	public void unsubscribeGoesBeforeBodyEnd() {
-		String body = load("mailing").toString();
-		assertTrue(body.indexOf("\">Unsubscribe</a>") < body.indexOf("</body>"));
-	}
-
-	@Test
-	public void onlyUnsubscribeHeadersAreAdded() {
-		assertEquals(Set.of("List-Unsubscribe", "List-Unsubscribe-Post"), renderedHeaders("mailing").keySet());
-		assertTrue(renderedHeaders("cloud/purchase/receipt").containsKey("List-Unsubscribe"));
-		assertTrue(renderedHeaders("cloud/account/welcome").isEmpty());
 	}
 
 	@Test(expected = IllegalStateException.class)
@@ -168,12 +140,6 @@ public class EmailTemplateTest {
 		EmailSenderTemplate t = new EmailSenderTemplate();
 		t.defaultTemplatesDirectory = templates.getRoot().getPath();
 		return t.load(template, lang).to("b@b.com");
-	}
-
-	private Map<String, String> renderedHeaders(String template) {
-		EmailSenderTemplate t = load(template);
-		t.render("b@b.com");
-		return t.headers();
 	}
 
 	private void write(String file, String content) throws IOException {

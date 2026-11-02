@@ -45,6 +45,9 @@ public class EmailTemplatePreview {
 		}
 		Properties samples = EmailTemplate.readProperties(new File(templates, SAMPLES_FILE));
 		String layoutTemplates = (String) samples.remove(LAYOUT_TEMPLATES);
+		if (layoutTemplates == null) {
+			throw new IllegalStateException(LAYOUT_TEMPLATES + " is missing in " + new File(templates, SAMPLES_FILE));
+		}
 		List<String> ids = id == null ? templateIds(Path.of(templates), layoutTemplates) : List.of(id);
 		Map<String, String> vars = new HashMap<>();
 		samples.stringPropertyNames().forEach(key -> vars.put(key, samples.getProperty(key)));

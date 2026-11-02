@@ -23,10 +23,7 @@ class EmailTemplate {
 
 	private static final String FROM = "FROM";
 	private static final String FROM_NAME = "FROM_NAME";
-	private static final String FRAME = "FRAME";
 	private static final String LAYOUT = "LAYOUT";
-
-	private static final String UNSUBSCRIBE = "@UNSUBSCRIBE@";
 
 	private static final Map<String, String> NAME_TEXTS = Map.of(
 			"EMAIL_TITLE", "TITLE", "PREHEADER", "PREHEADER", "FOOTER_REASON", "REASON", "INTRO", "INTRO", "NOTE", "NOTE");
@@ -47,15 +44,7 @@ class EmailTemplate {
 		putTranslations(lang);
 		from = vars.remove(FROM);
 		fromName = vars.remove(FROM_NAME);
-
-		String markup = read(vars.containsKey(LAYOUT) ? LAYOUTS_DIR + "/" + vars.get(LAYOUT) : template);
-		String frame = vars.get(FRAME);
-		body = frame == null ? withUnsubscribe(markup) : "@" + frame + "_HEADER@" + markup + "@" + frame + "_FOOTER@";
-	}
-
-	private static String withUnsubscribe(String html) {
-		int bodyEnd = html.toLowerCase(Locale.ROOT).lastIndexOf("</body>");
-		return bodyEnd < 0 ? html + UNSUBSCRIBE : html.substring(0, bodyEnd) + UNSUBSCRIBE + html.substring(bodyEnd);
+		body = read(vars.containsKey(LAYOUT) ? LAYOUTS_DIR + "/" + vars.get(LAYOUT) : template);
 	}
 
 	private void putStyles() {
