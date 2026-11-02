@@ -168,7 +168,6 @@ public class UserdataService {
     private static final int ERROR_CODE_SIZE_OF_SUPPORTED_BOX_IS_EXCEEDED = 8 + ERROR_CODE_PRO_USERS;
 //    private static final int ERROR_CODE_SUBSCRIPTION_WAS_EXPIRED_OR_NOT_PRESENT = 10 + ERROR_CODE_PRO_USERS;
     private static final int ERROR_CODE_PASSWORD_IS_TO_SIMPLE = 12 + ERROR_CODE_PRO_USERS;
-    public static final int ERROR_CODE_TOKEN_ATTEMPTS_EXCEEDED = 13 + ERROR_CODE_PRO_USERS;
 
     private static final int MAX_NUMBER_OF_FILES_FREE_ACCOUNT = 10000;
     public static final long MAXIMUM_FREE_ACCOUNT_SIZE = 5 * MB;
@@ -553,13 +552,8 @@ public class UserdataService {
         filesRepository.save(fl);
     }
 
-    private static String emailTokenKey(String email) {
-        return email.trim().toLowerCase(Locale.ROOT);
-    }
-
-    @Nullable
-    public synchronized String updateSecureEmailToken(CloudUser user) {
-        String email = emailTokenKey(user.email);
+    public synchronized void updateSecureEmailToken(CloudUser user) {
+        String email = user.email.trim().toLowerCase(Locale.ROOT);
         long now = System.currentTimeMillis();
         SecureEmailToken token = emailTokenRequests.getIfPresent(email);
         if (token == null || token.nextAllowedAt() <= now) {
@@ -572,14 +566,8 @@ public class UserdataService {
             token = new SecureEmailToken(generateEmailToken(digits), now + TimeUnit.MINUTES.toMillis(delayMinutes));
             emailTokenRequests.put(email, token);
             user.tokenTime = new Date(now);
-        } else {
-            String attemptsError = tokenAttemptsError(user, token, now);
-            if (attemptsError != null) {
-                return attemptsError;
-            }
         }
         user.token = token.token();
-        return null;
     }
 
     private String generateEmailToken(int digits) {
@@ -622,10 +610,7 @@ public class UserdataService {
         }
 		if (pu != null) {
             pu.tokendevice = TOKEN_DEVICE_WEB;
-            String tokenError = updateSecureEmailToken(pu);
-            if (tokenError != null) {
-                return ResponseEntity.badRequest().body(tokenError);
-            }
+            updateSecureEmailToken(pu);
             usersRepository.saveAndFlush(pu);
             emailSender.sendOsmAndCloudAccountEmail(pu.email, pu.token, lang,
                     registered ? EmailSenderService.CloudAccountAction.PASSWORD
@@ -646,9 +631,7 @@ public class UserdataService {
             if (isWebLinkValid(pu, token)) {
                 return ok();
             }
-            if (!Algorithms.isEmpty(token)) {
-                wearOutToken(pu);
-            }
+            wearOutToken(pu, token);
             return ResponseEntity.badRequest().body("error_token");
         }
         return ok();
@@ -703,23 +686,18 @@ public class UserdataService {
         if (webLink) {
             pu.webLinkToken = null;
             pu.webLinkTime = null;
-        } else if (Algorithms.isEmpty(token)) {
-            throw tokenNotValidOrExpired();
         } else if (!isCodeValid(pu, token)) {
-            wearOutToken(pu); // cut down on tries (even for web password)
+            wearOutToken(pu, token); // cut down on tries (even for web password)
             if ( ! (tokenIsActive && validateWithWebPassword(pu.id, token))) {
-                LOG.error("device-register: invalid token (" + EmailSenderService.shorten(email) + ")");
-                String attemptsError = tokenAttemptsError(pu, emailTokenRequests.getIfPresent(emailTokenKey(pu.email)),
-                        System.currentTimeMillis());
-                if (attemptsError != null) {
-                    throw new OsmAndPublicApiException(ERROR_CODE_TOKEN_ATTEMPTS_EXCEEDED, attemptsError);
+                if (!Algorithms.isEmpty(token)) {
+                    LOG.error("device-register: invalid token (" + EmailSenderService.shorten(email) + ")");
                 }
-                throw tokenNotValidOrExpired();
+                throw new OsmAndPublicApiException(ERROR_CODE_TOKEN_IS_NOT_VALID_OR_EXPIRED, "token is not valid or expired " + CODE_TTL_TEXT);
             }
         }
         pu.token = null;
         pu.tokenTime = null;
-        emailTokenRequests.invalidate(emailTokenKey(pu.email));
+        emailTokenRequests.invalidate(pu.email.trim().toLowerCase(Locale.ROOT));
         CloudUserDevicesRepository.CloudUserDevice device = new CloudUserDevicesRepository.CloudUserDevice();
 	    if (Algorithms.isEmpty(deviceId) || Algorithms.isEmpty(model)) {
 		    LOG.error("device-register: avoid delete-anonymous-same-device (" + EmailSenderService.shorten(email) + ")");
@@ -1522,12 +1500,12 @@ public class UserdataService {
         CloudUsersRepository.CloudUser pu = usersRepository.findById(dev.userid);
         if (pu != null && pu.id == dev.userid) {
             boolean validToken = isCodeValid(pu, token);
-            wearOutToken(pu);
+            wearOutToken(pu, token);
             if (validToken) {
                 if (deleteAllFiles(dev)) {
                     int numOfUsersDelete = usersRepository.deleteByEmailIgnoreCase(pu.email);
                     if (numOfUsersDelete != -1) {
-						emailTokenRequests.invalidate(emailTokenKey(pu.email));
+						emailTokenRequests.invalidate(pu.email.trim().toLowerCase(Locale.ROOT));
 						LOG.info("Deleted (/delete-account) users with email " + pu.email + " and id " + pu.id);
 						removeEmailFromSupporters(pu.id);
 						removeUserIdFromPurchases(pu.id);
@@ -1629,10 +1607,7 @@ public class UserdataService {
         if (pu == null) {
             return ResponseEntity.badRequest().body("Email is not registered");
         }
-        String tokenError = updateSecureEmailToken(pu);
-        if (tokenError != null) {
-            return ResponseEntity.badRequest().body(tokenError);
-        }
+        updateSecureEmailToken(pu);
         String token = pu.token;
         usersRepository.saveAndFlush(pu);
         String email = pu.email;
@@ -1655,7 +1630,7 @@ public class UserdataService {
             return ResponseEntity.badRequest().body("User is not registered");
         }
         boolean validToken = isCodeValid(pu, code);
-        wearOutToken(pu);
+        wearOutToken(pu, code);
         if (validToken) {
             return ok();
         } else {
@@ -1672,7 +1647,7 @@ public class UserdataService {
             return ResponseEntity.badRequest().body("User is not registered");
         }
         boolean validToken = isCodeValid(pu, token);
-        wearOutToken(pu);
+        wearOutToken(pu, token);
         if (validToken) {
             return ok();
         } else {
@@ -1687,20 +1662,6 @@ public class UserdataService {
 
     private boolean isCodeValid(CloudUsersRepository.CloudUser pu, String code) {
         return isCodeActive(pu) && pu.token.equals(Algorithms.trimIfNotNull(code));
-    }
-
-    @Nullable
-    private String tokenAttemptsError(CloudUsersRepository.CloudUser pu, @Nullable SecureEmailToken token, long now) {
-        if (token == null || token.nextAllowedAt() <= now || !token.token().equals(pu.token) || isCodeActive(pu)) {
-            return null;
-        }
-        LOG.error("email-token: attempts exceeded (" + EmailSenderService.shorten(pu.email) + ")");
-        long minutes = (long) Math.ceil((double) (token.nextAllowedAt() - now) / TimeUnit.MINUTES.toMillis(1));
-        return "too many attempts, request a new code in " + minutes + " min";
-    }
-
-    private static OsmAndPublicApiException tokenNotValidOrExpired() {
-        return new OsmAndPublicApiException(ERROR_CODE_TOKEN_IS_NOT_VALID_OR_EXPIRED, "token is not valid or expired " + CODE_TTL_TEXT);
     }
 
     // Support creates the link, the owner gets an email that lets them cancel it.
@@ -1770,8 +1731,8 @@ public class UserdataService {
         return ok();
     }
 
-    public void wearOutToken(CloudUsersRepository.CloudUser pu) {
-        if (pu == null || pu.tokenTime == null) {
+    public void wearOutToken(CloudUsersRepository.CloudUser pu, String token) {
+        if (pu == null || pu.tokenTime == null || Algorithms.isEmpty(token)) {
             return;
         }
         Calendar cal = Calendar.getInstance();
@@ -1815,8 +1776,8 @@ public class UserdataService {
             return ResponseEntity.badRequest().body("User is not registered");
         }
         // change email
-        emailTokenRequests.invalidate(emailTokenKey(currentUser.email));
-        emailTokenRequests.invalidate(emailTokenKey(tempUser.email));
+        emailTokenRequests.invalidate(currentUser.email.trim().toLowerCase(Locale.ROOT));
+        emailTokenRequests.invalidate(tempUser.email.trim().toLowerCase(Locale.ROOT));
         usersRepository.delete(tempUser);
         currentUser.email = username;
         usersRepository.saveAndFlush(currentUser);
