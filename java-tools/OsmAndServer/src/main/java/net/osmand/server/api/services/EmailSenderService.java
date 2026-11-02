@@ -423,6 +423,6 @@ public class EmailSenderService {
 
 	// hide full email from logs
 	public static String shorten(String full) {
-		return full == null ? null : full.replaceFirst(".....", "....."); // osmand@t-online.de -> .....d@t-online.de
+		return full == null ? null : full.replaceFirst("....", "...."); // osmand@t-online.de -> ....nd@t-online.de
 	}
  }
