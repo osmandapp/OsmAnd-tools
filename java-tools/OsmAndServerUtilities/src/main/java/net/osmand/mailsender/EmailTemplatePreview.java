@@ -27,7 +27,6 @@ public class EmailTemplatePreview {
 	private static final String PREVIEW_DIR = "email-preview";
 	private static final String LAYOUT_TEMPLATES = "LAYOUT_TEMPLATES";
 	private static final String SAMPLE_TO = "user@example.com";
-	private static final Set<String> SHARED_DIRS = Set.of(EmailTemplate.BLOCKS_DIR, EmailTemplate.LAYOUTS_DIR);
 
 	public static void main(String[] args) throws IOException {
 		String id = null;
@@ -61,10 +60,10 @@ public class EmailTemplatePreview {
 
 	private static List<String> templateIds(Path templates, String layoutTemplates) throws IOException {
 		List<String> ids = new ArrayList<>(List.of(layoutTemplates.split(",")));
-		try (Stream<Path> files = Files.walk(templates)) {
-			files.map(templates::relativize)
+		Path emails = templates.resolve(EmailTemplate.EMAILS_DIR);
+		try (Stream<Path> files = Files.walk(emails)) {
+			files.map(emails::relativize)
 					.filter(file -> file.toString().endsWith(EmailTemplate.HTML))
-					.filter(file -> !SHARED_DIRS.contains(file.getName(0).toString()))
 					.map(file -> file.toString().replace(File.separatorChar, '/'))
 					.map(file -> file.substring(0, file.length() - EmailTemplate.HTML.length()))
 					.forEach(ids::add);

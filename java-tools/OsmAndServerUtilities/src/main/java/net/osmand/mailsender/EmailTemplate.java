@@ -16,8 +16,9 @@ class EmailTemplate {
 	private static final String STYLES_FILE = "styles.properties";
 	private static final String HEADERS_FILE = "headers.properties";
 	private static final String TRANSLATIONS_DIR = "translations";
-	static final String BLOCKS_DIR = "blocks";
-	static final String LAYOUTS_DIR = "layouts";
+	static final String EMAILS_DIR = "emails";
+	private static final String BLOCKS_DIR = "blocks";
+	private static final String LAYOUTS_DIR = "layouts";
 	static final String HTML = ".html";
 	private static final String PROPERTIES = ".properties";
 
@@ -57,7 +58,7 @@ class EmailTemplate {
 		from = vars.remove(FROM);
 		fromName = vars.remove(FROM_NAME);
 		String layout = vars.remove(LAYOUT);
-		body = read(layout != null ? LAYOUTS_DIR + "/" + layout : template);
+		body = read(layout != null ? LAYOUTS_DIR + "/" + layout : EMAILS_DIR + "/" + template);
 		headers = readScoped(HEADERS_FILE, template);
 		headers.values().removeIf(String::isEmpty);
 	}
@@ -102,10 +103,10 @@ class EmailTemplate {
 		return new File(directory, TRANSLATIONS_DIR + "/" + lang + PROPERTIES);
 	}
 
-	private String read(String template) {
-		File file = new File(directory, template + HTML);
+	private String read(String path) {
+		File file = new File(directory, path + HTML);
 		if (!file.isFile()) {
-			throw new IllegalStateException(template + ": template not found in " + directory +
+			throw new IllegalStateException(path + ": template not found in " + directory +
 					" - fetch web-server-config and set " + EmailSenderTemplate.TEMPLATES_HINT);
 		}
 		return readText(file);

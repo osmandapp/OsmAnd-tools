@@ -32,8 +32,8 @@ public class EmailTemplateTest {
 		templates.newFolder("translations");
 		templates.newFolder("blocks");
 		templates.newFolder("layouts");
-		templates.newFolder("cloud", "account");
-		templates.newFolder("cloud", "purchase");
+		templates.newFolder("emails", "cloud", "account");
+		templates.newFolder("emails", "cloud", "purchase");
 		write("translations/en.properties",
 				"LOGIN_SUBJECT=Login\n" +
 				"LOGIN_TITLE=Title\n" +
@@ -61,11 +61,11 @@ public class EmailTemplateTest {
 		write("blocks/CARD.html", "<div>@CARD_DETAILS@</div>\n");
 		write("blocks/DETAILS.html", "<i>@COLOR@</i>\n");
 		write("layouts/code.html", "<p>@INTRO@</p>");
-		write("cloud/account/login.html", "<h1>@EMAIL_TITLE@</h1><p>@COLOR@</p>");
-		write("cloud/account/welcome.html", "<p>Welcome body</p>\n");
-		write("cloud/purchase/receipt.html", "<p>@COLOR@</p>@UNSUBSCRIBE_LINK@");
-		write("cloud/purchase/linked.html", "@CARD@");
-		write("mailing.html", "<html><body>\n" + MAILING_CONTENT + "@UNSUBSCRIBE@</body></html>\n");
+		write("emails/cloud/account/login.html", "<h1>@EMAIL_TITLE@</h1><p>@COLOR@</p>");
+		write("emails/cloud/account/welcome.html", "<p>Welcome body</p>\n");
+		write("emails/cloud/purchase/receipt.html", "<p>@COLOR@</p>@UNSUBSCRIBE_LINK@");
+		write("emails/cloud/purchase/linked.html", "@CARD@");
+		write("emails/mailing.html", "<html><body>\n" + MAILING_CONTENT + "@UNSUBSCRIBE@</body></html>\n");
 	}
 
 	@Test
