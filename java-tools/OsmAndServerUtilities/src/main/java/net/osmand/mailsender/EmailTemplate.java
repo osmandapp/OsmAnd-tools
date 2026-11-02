@@ -37,6 +37,17 @@ class EmailTemplate {
 		this.directory = directory;
 		String name = template.substring(template.lastIndexOf('/') + 1).toUpperCase(Locale.ROOT).replace('-', '_');
 		subject = "@" + name + "_SUBJECT@";
+		// EMAIL_TITLE   → TITLE
+		// PREHEADER     → PREHEADER
+		// FOOTER_REASON → REASON
+		// INTRO         → INTRO
+		// NOTE          → NOTE
+		// For cloud/account/password the name is PASSWORD, and the line puts into the variables:
+		// EMAIL_TITLE   = @PASSWORD_TITLE@
+		// PREHEADER     = @PASSWORD_PREHEADER@
+		// FOOTER_REASON = @PASSWORD_REASON@
+		// INTRO         = @PASSWORD_INTRO@
+		// NOTE          = @PASSWORD_NOTE@
 		NAME_TEXTS.forEach((key, suffix) -> vars.put(key, "@" + name + "_" + suffix + "@"));
 		putStyles();
 		putParams(template);
