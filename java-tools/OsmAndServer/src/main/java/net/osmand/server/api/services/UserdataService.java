@@ -635,7 +635,9 @@ public class UserdataService {
             if (isWebLinkValid(pu, token)) {
                 return ok();
             }
-            wearOutToken(pu);
+            if (!Algorithms.isEmpty(token)) {
+                wearOutToken(pu);
+            }
             return ResponseEntity.badRequest().body("error_token");
         }
         return ok();
@@ -690,11 +692,13 @@ public class UserdataService {
         if (webLink) {
             pu.webLinkToken = null;
             pu.webLinkTime = null;
+        } else if (Algorithms.isEmpty(token)) {
+            throw tokenNotValidOrExpired();
         } else if (!isCodeValid(pu, token)) {
             wearOutToken(pu); // cut down on tries (even for web password)
             if ( ! (tokenIsActive && validateWithWebPassword(pu.id, token))) {
                 LOG.error("device-register: invalid token (" + EmailSenderService.shorten(email) + ")");
-                throw new OsmAndPublicApiException(ERROR_CODE_TOKEN_IS_NOT_VALID_OR_EXPIRED, "token is not valid or expired " + CODE_TTL_TEXT);
+                throw tokenNotValidOrExpired();
             }
         }
         pu.token = null;
@@ -1664,6 +1668,10 @@ public class UserdataService {
 
     private boolean isCodeValid(CloudUsersRepository.CloudUser pu, String code) {
         return isCodeActive(pu) && pu.token.equals(Algorithms.trimIfNotNull(code));
+    }
+
+    private static OsmAndPublicApiException tokenNotValidOrExpired() {
+        return new OsmAndPublicApiException(ERROR_CODE_TOKEN_IS_NOT_VALID_OR_EXPIRED, "token is not valid or expired " + CODE_TTL_TEXT);
     }
 
     // Support creates the link, the owner gets an email that lets them cancel it.
