@@ -92,7 +92,7 @@ public class EmailSenderService {
 				.to(email)
 				.send()
 				.isSuccess();
-	    LOGGER.info("sendOsmAndCloudPromoEmail to: " + shorten(email) + " (" + ok + ")");
+	    LOGGER.info("sendOsmAndCloudPromoEmail to: " + shortenEmail(email) + " (" + ok + ")");
 	}
     
 	public enum CloudAccountAction {
@@ -153,7 +153,7 @@ public class EmailSenderService {
 					.to(requester.email)
 					.send()
 					.isSuccess();
-			LOGGER.info("sendShareFileAccessEmail approved=" + approved + " to: " + shorten(requester.email) + " (" + ok + ")");
+			LOGGER.info("sendShareFileAccessEmail approved=" + approved + " to: " + shortenEmail(requester.email) + " (" + ok + ")");
 		} catch (Exception e) {
 			LOGGER.error("Failed to send share access email: " + e.getMessage(), e);
 		}
@@ -176,7 +176,7 @@ public class EmailSenderService {
 					.to(owner.email)
 					.send()
 					.isSuccess();
-			LOGGER.info("sendShareFileRequestEmail to: " + shorten(owner.email) + " (" + ok + ")");
+			LOGGER.info("sendShareFileRequestEmail to: " + shortenEmail(owner.email) + " (" + ok + ")");
 		} catch (Exception e) {
 			LOGGER.error("Failed to send share request email: " + e.getMessage(), e);
 		}
@@ -294,7 +294,7 @@ public class EmailSenderService {
 			}
 		}
 		boolean ok = sender.to(email).send().isSuccess();
-		LOGGER.info("sendPurchaseReceiptEmail order " + orderId + " to: " + shorten(email) + " (" + ok + ") [" + lang + "]");
+		LOGGER.info("sendPurchaseReceiptEmail order " + orderId + " to: " + shortenEmail(email) + " (" + ok + ") [" + lang + "]");
 	}
     
     public boolean sendOsmAndCloudWebLinkEmail(String email, String lang, String cancelUrl) {
@@ -312,7 +312,7 @@ public class EmailSenderService {
 		    LOGGER.error("Failed to send web link email: " + e.getMessage(), e);
 		    ok = false;
 	    }
-	    LOGGER.info("sendOsmAndCloudWebLinkEmail to: " + shorten(email) + " (" + ok + ") [" + lang + "]");
+	    LOGGER.info("sendOsmAndCloudWebLinkEmail to: " + shortenEmail(email) + " (" + ok + ") [" + lang + "]");
 	    return ok;
 	}
 
@@ -329,7 +329,7 @@ public class EmailSenderService {
 				.to(email)
 				.send()
 				.isSuccess();
-		LOGGER.info("sendPurchaseLinkedEmail to: " + shorten(email) + " (" + ok + ") [" + lang + "]");
+		LOGGER.info("sendPurchaseLinkedEmail to: " + shortenEmail(email) + " (" + ok + ") [" + lang + "]");
 	}
 
 	private static String productShort(String productName) {
@@ -355,7 +355,7 @@ public class EmailSenderService {
 	public boolean sendOsmAndCloudAccountEmail(String email, String token, String lang, CloudAccountAction action,
 			String newEmail) {
 		if (token == null && action != CloudAccountAction.EMAIL_CHANGED) {
-			throw new IllegalArgumentException("Token is required for " + action.name() + " email:" + shorten(email));
+			throw new IllegalArgumentException("Token is required for " + action.name() + " email:" + shortenEmail(email));
 		}
 		EmailSenderTemplate sender = new EmailSenderTemplate()
 				.load(action.template, lang)
@@ -365,7 +365,7 @@ public class EmailSenderService {
 			sender.set("NEW_EMAIL", htmlText(newEmail));
 		}
 		boolean ok = sender.to(email).send().isSuccess();
-		LOGGER.info("sendOsmAndCloudAccountEmail " + action.name() + " to: " + shorten(email)
+		LOGGER.info("sendOsmAndCloudAccountEmail " + action.name() + " to: " + shortenEmail(email)
 				+ " (" + ok + ") [" + lang + "]");
 		return ok;
 	}
@@ -377,7 +377,7 @@ public class EmailSenderService {
 			    .set("PROMOCODE", promocodes)
 			    .send()
 			    .isSuccess();
-	    LOGGER.info("sendPromocodesEmails to: " + shorten(mailTo) + " (" + ok + ")");
+	    LOGGER.info("sendPromocodesEmails to: " + shortenEmail(mailTo) + " (" + ok + ")");
 		return ok;
     }
 
@@ -388,7 +388,7 @@ public class EmailSenderService {
 				.send()
 				.isSuccess();
 
-		LOGGER.info("sendOsmAndSpecialGiftEmail to: " + shorten(email) + " (" + ok + ")");
+		LOGGER.info("sendOsmAndSpecialGiftEmail to: " + shortenEmail(email) + " (" + ok + ")");
 	}
 
 	public boolean isEmail(String comment) {
@@ -422,7 +422,7 @@ public class EmailSenderService {
 	}
 
 	// hide full email from logs
-	public static String shorten(String full) {
+	public static String shortenEmail(String full) {
 		return full == null ? null : full.replaceFirst("....", "...."); // osmand@t-online.de -> ....nd@t-online.de
 	}
  }

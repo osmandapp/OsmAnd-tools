@@ -672,13 +672,13 @@ public class UserdataService {
     public ResponseEntity<String> registerNewDevice(String email, String token, String deviceId, String accessToken,
                                                     String lang, String brand, String model) {
 		if (Algorithms.isEmpty(email)) {
-			LOG.error("device-register: email is empty (" + EmailSenderService.shorten(email) + ")");
+			LOG.error("device-register: email is empty (" + EmailSenderService.shortenEmail(email) + ")");
 			throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_NOT_REGISTERED, "empty email");
 		}
         email = email.toLowerCase().trim();
         CloudUsersRepository.CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
         if (pu == null) {
-            LOG.error("device-register: email is not found (" + EmailSenderService.shorten(email) + ")");
+            LOG.error("device-register: email is not found (" + EmailSenderService.shortenEmail(email) + ")");
             throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_NOT_REGISTERED, "user with that email is not registered");
         }
         boolean tokenIsActive = isCodeActive(pu);
@@ -690,7 +690,7 @@ public class UserdataService {
             wearOutToken(pu, token); // cut down on tries (even for web password)
             if ( ! (tokenIsActive && validateWithWebPassword(pu.id, token))) {
                 if (!Algorithms.isEmpty(token)) {
-                    LOG.error("device-register: invalid token (" + EmailSenderService.shorten(email) + ")");
+                    LOG.error("device-register: invalid token (" + EmailSenderService.shortenEmail(email) + ")");
                 }
                 throw new OsmAndPublicApiException(ERROR_CODE_TOKEN_IS_NOT_VALID_OR_EXPIRED, "token is not valid or expired " + CODE_TTL_TEXT);
             }
@@ -700,14 +700,14 @@ public class UserdataService {
         emailTokenRequests.invalidate(pu.email.trim().toLowerCase(Locale.ROOT));
         CloudUserDevicesRepository.CloudUserDevice device = new CloudUserDevicesRepository.CloudUserDevice();
 	    if (Algorithms.isEmpty(deviceId) || Algorithms.isEmpty(model)) {
-		    LOG.error("device-register: avoid delete-anonymous-same-device (" + EmailSenderService.shorten(email) + ")");
+		    LOG.error("device-register: avoid delete-anonymous-same-device (" + EmailSenderService.shortenEmail(email) + ")");
 	    } else {
 		    CloudUserDevicesRepository.CloudUserDevice sameDevice;
 		    while ((sameDevice = devicesRepository
 				    .findTopByUseridAndDeviceidAndModelOrderByUdpatetimeDesc(pu.id, deviceId, model)) != null) {
 				LOG.error(String.format(
 						"device-register: delete-same-device (%s) id (%d) brand (%s) model (%s) deviceId (%s)",
-						EmailSenderService.shorten(email), sameDevice.id, brand, model, deviceId));
+						EmailSenderService.shortenEmail(email), sameDevice.id, brand, model, deviceId));
 			    devicesRepository.delete(sameDevice);
 		    }
 	    }
@@ -723,7 +723,7 @@ public class UserdataService {
 	    userSubService.verifyAndRefreshProOrderId(pu);
 
         devicesRepository.saveAndFlush(device);
-        LOG.info("device-register: success (" + EmailSenderService.shorten(email) + ")");
+        LOG.info("device-register: success (" + EmailSenderService.shortenEmail(email) + ")");
         return ResponseEntity.ok(gson.toJson(device));
     }
 
@@ -1681,13 +1681,13 @@ public class UserdataService {
         boolean sent = emailSender.sendOsmAndCloudWebLinkEmail(pu.email, emailSender.getLatestUserLang(pu.id),
                 getWebLinkCancelUrl(pu.email, token));
         if (!sent) {
-            LOG.error("web-link: owner email not sent, link not created for " + EmailSenderService.shorten(pu.email));
+            LOG.error("web-link: owner email not sent, link not created for " + EmailSenderService.shortenEmail(pu.email));
             return null;
         }
         pu.webLinkToken = token;
         pu.webLinkTime = new Date();
         usersRepository.saveAndFlush(pu);
-        LOG.info("web-link: created for " + EmailSenderService.shorten(pu.email));
+        LOG.info("web-link: created for " + EmailSenderService.shortenEmail(pu.email));
         return new Date(pu.webLinkTime.getTime() + WEB_LINK_VALID_FROM);
     }
 
@@ -1727,7 +1727,7 @@ public class UserdataService {
         pu.webLinkToken = null;
         pu.webLinkTime = null;
         usersRepository.saveAndFlush(pu);
-        LOG.info("web-link: cancelled by owner " + EmailSenderService.shorten(pu.email));
+        LOG.info("web-link: cancelled by owner " + EmailSenderService.shortenEmail(pu.email));
         return ok();
     }
 
