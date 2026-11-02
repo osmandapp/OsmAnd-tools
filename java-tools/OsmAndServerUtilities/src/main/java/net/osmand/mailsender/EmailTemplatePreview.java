@@ -1,5 +1,6 @@
 package net.osmand.mailsender;
 
+import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -28,6 +29,19 @@ public class EmailTemplatePreview {
 	private static final String LAYOUT_TEMPLATES = "LAYOUT_TEMPLATES";
 	private static final String SAMPLE_TO = "user@example.com";
 
+	private final String templates;
+	private final Map<String, String> samples;
+	private final String layoutTemplates;
+
+	public EmailTemplatePreview() {
+		templates = EmailSenderTemplate.templatesDirectory();
+		samples = EmailTemplate.readProperties(new File(templates, SAMPLES_FILE));
+		layoutTemplates = samples.remove(LAYOUT_TEMPLATES);
+		if (layoutTemplates == null) {
+			throw new IllegalStateException(LAYOUT_TEMPLATES + " is missing in " + new File(templates, SAMPLES_FILE));
+		}
+	}
+
 	public static void main(String[] args) throws IOException {
 		String id = null;
 		String lang = EmailTemplate.DEFAULT_LANG;
@@ -38,29 +52,21 @@ public class EmailTemplatePreview {
 				lang = EmailSenderTemplate.safeLang(arg.substring(LANG_ARG.length()));
 			}
 		}
-		String templates = System.getenv(EmailSenderTemplate.TEMPLATES_ENV);
-		if (templates == null) {
-			throw new IllegalStateException("set " + EmailSenderTemplate.TEMPLATES_HINT);
-		}
-		Map<String, String> samples = EmailTemplate.readProperties(new File(templates, SAMPLES_FILE));
-		String layoutTemplates = samples.remove(LAYOUT_TEMPLATES);
-		if (layoutTemplates == null) {
-			throw new IllegalStateException(LAYOUT_TEMPLATES + " is missing in " + new File(templates, SAMPLES_FILE));
-		}
-		List<String> ids = id == null ? templateIds(Path.of(templates), layoutTemplates) : List.of(id);
+		EmailTemplatePreview preview = new EmailTemplatePreview();
+		List<String> ids = id == null ? preview.templateIds() : List.of(id);
 
-		Path out = Path.of(templates).toAbsolutePath().normalize().resolveSibling(PREVIEW_DIR).resolve(lang);
+		Path out = Path.of(preview.templates).toAbsolutePath().normalize().resolveSibling(PREVIEW_DIR).resolve(lang);
 		for (String template : ids) {
 			Path file = out.resolve(template + EmailTemplate.HTML);
 			Files.createDirectories(file.getParent());
-			Files.writeString(file, new EmailSenderTemplate().load(template, lang).set(samples).fillBody(SAMPLE_TO));
+			Files.writeString(file, preview.render(template, lang));
 			System.out.println(file.toUri());
 		}
 	}
 
-	private static List<String> templateIds(Path templates, String layoutTemplates) throws IOException {
+	public List<String> templateIds() throws IOException {
 		List<String> ids = new ArrayList<>(List.of(layoutTemplates.split(",")));
-		Path emails = templates.resolve(EmailTemplate.EMAILS_DIR);
+		Path emails = Path.of(templates, EmailTemplate.EMAILS_DIR);
 		try (Stream<Path> files = Files.walk(emails)) {
 			files.map(emails::relativize)
 					.filter(file -> file.toString().endsWith(EmailTemplate.HTML))
@@ -70,5 +76,13 @@ public class EmailTemplatePreview {
 		}
 		Collections.sort(ids);
 		return ids;
+	}
+
+	public List<String> languages() {
+		return EmailTemplate.languages(templates);
+	}
+
+	public String render(String id, @Nullable String lang) {
+		return new EmailSenderTemplate().load(id, lang).set(samples).fillBody(SAMPLE_TO);
 	}
 }

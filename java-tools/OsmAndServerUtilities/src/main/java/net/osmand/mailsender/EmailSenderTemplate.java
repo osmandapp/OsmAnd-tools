@@ -74,7 +74,7 @@ public class EmailSenderTemplate {
 	static final String TEMPLATES_ENV = "EMAIL_TEMPLATES";
 	static final String TEMPLATES_HINT = TEMPLATES_ENV + "=/path/to/templates/email (environment)";
 
-	public String defaultTemplatesDirectory = "./templates";
+	public String defaultTemplatesDirectory = templatesDirectory();
 
 	private final SmtpSendGridSender sender;
 	private int totalEmails, sentEmails;
@@ -100,18 +100,21 @@ public class EmailSenderTemplate {
 
 	// configure by environment
 	public EmailSenderTemplate() {
-		final String templates = System.getenv(TEMPLATES_ENV);
-		if (templates != null) {
-			this.defaultTemplatesDirectory = templates;
-			// LOG.info("Using env EMAIL_TEMPLATES: " + templates);
-		}
-
 		final String smtpServer = System.getenv("SMTP_SERVER");
 		final String apiKey = System.getenv("SENDGRID_KEY");
 
 		testEmailCopy = System.getenv("TEST_EMAIL_COPY");
 
 		this.sender = new SmtpSendGridSender(smtpServer, apiKey);
+	}
+
+	static String templatesDirectory() {
+		final String templates = System.getenv(TEMPLATES_ENV);
+		if (templates == null) {
+			return "./templates";
+		}
+		// LOG.info("Using env EMAIL_TEMPLATES: " + templates);
+		return templates;
 	}
 
 	public EmailSenderTemplate send() {

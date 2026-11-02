@@ -112,6 +112,19 @@ class EmailTemplate {
 		return readText(file);
 	}
 
+	static List<String> languages(String directory) {
+		List<String> languages = new ArrayList<>();
+		File[] files = new File(directory, TRANSLATIONS_DIR).listFiles((dir, file) -> file.endsWith(PROPERTIES));
+		if (files != null) {
+			for (File file : files) {
+				String name = file.getName();
+				languages.add(name.substring(0, name.length() - PROPERTIES.length()));
+			}
+		}
+		Collections.sort(languages);
+		return languages;
+	}
+
 	static Map<String, String> readProperties(File file) {
 		Properties properties = new Properties();
 		if (file.isFile()) {
