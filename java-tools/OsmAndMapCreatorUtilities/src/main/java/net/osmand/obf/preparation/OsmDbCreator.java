@@ -104,7 +104,7 @@ public class OsmDbCreator implements IOsmStorageFilter {
 	
 	public OsmDbCreator() {
 		this.additionId = 0;
-		this.shiftId = 0;
+		this.shiftId = ObfConstants.SHIFT_ID;
 		this.generateNewIds = false;
 		this.addGeoHash = true;
 	}
