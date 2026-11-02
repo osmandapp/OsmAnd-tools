@@ -220,7 +220,7 @@ public class OrderManagementController {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
 					.body("The owner email was not sent, the link was not created");
 		}
-		LOG.info("web-link: created by " + EmailSenderService.shortenEmail(auth.getName()) + " for " + EmailSenderService.shortenEmail(pu.email));
+		LOG.info("web-link: created by " + EmailSenderService.shorten(auth.getName()) + " for " + EmailSenderService.shorten(pu.email));
 		Map<String, Object> res = new LinkedHashMap<>();
 		res.put("url", userdataService.getWebLinkUrl(pu));
 		res.put("validFrom", validFrom);
@@ -277,7 +277,7 @@ public class OrderManagementController {
 		} catch (IllegalArgumentException e) {
 			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
 		}
-		LOG.info("link-user: " + EmailSenderService.shortenEmail(auth.getName()) + " linked " + sku + " / " + orderId + " to user " + userId);
+		LOG.info("link-user: " + EmailSenderService.shorten(auth.getName()) + " linked " + sku + " / " + orderId + " to user " + userId);
 		return ResponseEntity.ok().build();
 	}
 }
