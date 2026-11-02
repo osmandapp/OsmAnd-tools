@@ -34,8 +34,8 @@ public class BuildDeltaController {
 
 	/** What the builds this server has would take from a phone with this manifest; estimates, at once. */
 	@PostMapping("/sizes")
-	public List<BuildDeltaService.BuildSize> getSizes(@RequestParam List<String> path, HttpServletRequest request)
-			throws IOException {
+	public List<BuildDeltaService.BuildSize> getSizes(@RequestParam(required = false) List<String> path,
+	                                                  HttpServletRequest request) throws IOException {
 		return deltaService.getSizes(path, request.getInputStream());
 	}
 

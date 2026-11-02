@@ -157,6 +157,24 @@ public class BuildDeltaControllerTest {
 	}
 
 	@Test
+	public void offersAllLatestBuildsAndTheNewestOldOnes() throws Exception {
+		File oldBuilds = new File(gen, "apk-old-builds");
+		oldBuilds.mkdirs();
+		for (int day = 1; day <= 9; day++) {
+			File build = new File(oldBuilds, "OsmAnd-default-nb-0" + day + ".apk");
+			Files.copy(new File(root, BUILD).toPath(), build.toPath());
+			build.setLastModified(day * 86_400_000L);
+		}
+		String sizes = mvc.perform(post("/api/builds/delta/sizes").content(manifest(phoneApk)))
+				.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+		assertTrue(sizes, sizes.contains(BUILD));
+		assertTrue(sizes, sizes.contains("night-builds/OsmAnd-default-nb-02.apk"));
+		assertTrue(sizes, sizes.contains("night-builds/OsmAnd-default-nb-09.apk"));
+		assertFalse(sizes, sizes.contains("night-builds/OsmAnd-default-nb-01.apk"));
+		assertFalse(sizes, sizes.contains("secret"));
+	}
+
+	@Test
 	public void noOfferForTheInstalledBuildOrASmallSaving() throws Exception {
 		byte[] installed = manifest(new File(root, BUILD));
 		mvc.perform(post("/api/builds/delta").param("path", BUILD).content(installed)).andExpect(status().isNoContent());
