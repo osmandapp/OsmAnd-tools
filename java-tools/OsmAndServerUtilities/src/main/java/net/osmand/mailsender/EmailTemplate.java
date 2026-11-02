@@ -1,5 +1,6 @@
 package net.osmand.mailsender;
 
+import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
@@ -35,22 +36,34 @@ class EmailTemplate {
 
 	private final String directory;
 
-	EmailTemplate(String directory, String template, String lang) {
+	static EmailTemplate fromFile(String directory, String template, String lang) {
+		return new EmailTemplate(directory, template, lang, null);
+	}
+
+	static EmailTemplate fromMarkup(String directory, String markup, String lang) {
+		return new EmailTemplate(directory, null, lang, markup);
+	}
+
+	private EmailTemplate(String directory, @Nullable String template, String lang, @Nullable String markup) {
 		this.directory = directory;
-		String name = template.substring(template.lastIndexOf('/') + 1).toUpperCase(Locale.ROOT).replace('-', '_');
-		subject = "@" + name + "_SUBJECT@";
-		// EMAIL_TITLE   → TITLE
-		// PREHEADER     → PREHEADER
-		// FOOTER_REASON → REASON
-		// INTRO         → INTRO
-		// NOTE          → NOTE
-		// For cloud/account/password the name is PASSWORD, and the line puts into the variables:
-		// EMAIL_TITLE   = @PASSWORD_TITLE@
-		// PREHEADER     = @PASSWORD_PREHEADER@
-		// FOOTER_REASON = @PASSWORD_REASON@
-		// INTRO         = @PASSWORD_INTRO@
-		// NOTE          = @PASSWORD_NOTE@
-		NAME_TEXTS.forEach((key, suffix) -> vars.put(key, "@" + name + "_" + suffix + "@"));
+		if (template == null) {
+			subject = null;
+		} else {
+			String name = template.substring(template.lastIndexOf('/') + 1).toUpperCase(Locale.ROOT).replace('-', '_');
+			subject = "@" + name + "_SUBJECT@";
+			// EMAIL_TITLE   → TITLE
+			// PREHEADER     → PREHEADER
+			// FOOTER_REASON → REASON
+			// INTRO         → INTRO
+			// NOTE          → NOTE
+			// For cloud/account/password the name is PASSWORD, and the line puts into the variables:
+			// EMAIL_TITLE   = @PASSWORD_TITLE@
+			// PREHEADER     = @PASSWORD_PREHEADER@
+			// FOOTER_REASON = @PASSWORD_REASON@
+			// INTRO         = @PASSWORD_INTRO@
+			// NOTE          = @PASSWORD_NOTE@
+			NAME_TEXTS.forEach((key, suffix) -> vars.put(key, "@" + name + "_" + suffix + "@"));
+		}
 		vars.putAll(readProperties(new File(directory, STYLES_FILE)));
 		vars.putAll(readScoped(PARAMS_FILE, template));
 		putBlocks();
@@ -58,12 +71,12 @@ class EmailTemplate {
 		from = vars.remove(FROM);
 		fromName = vars.remove(FROM_NAME);
 		String layout = vars.remove(LAYOUT);
-		body = read(layout != null ? LAYOUTS_DIR + "/" + layout : EMAILS_DIR + "/" + template);
+		body = markup != null ? markup : read(layout != null ? LAYOUTS_DIR + "/" + layout : EMAILS_DIR + "/" + template);
 		headers = readScoped(HEADERS_FILE, template);
 		headers.values().removeIf(String::isEmpty);
 	}
 
-	private Map<String, String> readScoped(String file, String template) {
+	private Map<String, String> readScoped(String file, @Nullable String template) {
 		Map<String, String> properties = readProperties(new File(directory, file));
 		Map<String, String> values = new HashMap<>();
 		for (String key : properties.keySet()) {
@@ -71,11 +84,13 @@ class EmailTemplate {
 				values.put(key, properties.get(key));
 			}
 		}
-		for (String scope : template.split("/")) {
-			String prefix = scope + ".";
-			for (String key : properties.keySet()) {
-				if (key.startsWith(prefix)) {
-					values.put(key.substring(prefix.length()), properties.get(key));
+		if (template != null) {
+			for (String scope : template.split("/")) {
+				String prefix = scope + ".";
+				for (String key : properties.keySet()) {
+					if (key.startsWith(prefix)) {
+						values.put(key.substring(prefix.length()), properties.get(key));
+					}
 				}
 			}
 		}
@@ -126,13 +141,22 @@ class EmailTemplate {
 	}
 
 	static Map<String, String> readProperties(File file) {
+		if (!file.isFile()) {
+			return new HashMap<>();
+		}
+		try (Reader reader = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
+			return readProperties(reader);
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
+	}
+
+	static Map<String, String> readProperties(Reader reader) {
 		Properties properties = new Properties();
-		if (file.isFile()) {
-			try (Reader reader = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
-				properties.load(reader);
-			} catch (IOException e) {
-				throw new UncheckedIOException(e);
-			}
+		try {
+			properties.load(reader);
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
 		}
 		Map<String, String> values = new HashMap<>();
 		properties.stringPropertyNames().forEach(key -> values.put(key, properties.getProperty(key).strip()));

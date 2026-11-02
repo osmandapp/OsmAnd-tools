@@ -3,9 +3,11 @@ package net.osmand.mailsender;
 import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
+import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.regex.Matcher;
 import java.util.stream.Stream;
 
 /*
@@ -84,5 +86,19 @@ public class EmailTemplatePreview {
 
 	public String render(String id, @Nullable String lang) {
 		return new EmailSenderTemplate().load(id, lang).set(samples).fillBody(SAMPLE_TO);
+	}
+
+	public String renderMarkup(String markup, String values, @Nullable String lang) {
+		return new EmailSenderTemplate().loadMarkup(markup, lang).set(samples)
+				.set(EmailTemplate.readProperties(new StringReader(values))).fillBodyKeepingMissing(SAMPLE_TO);
+	}
+
+	public static List<String> missingVariables(String html) {
+		Set<String> missing = new TreeSet<>();
+		Matcher matcher = EmailSenderTemplate.VARIABLE.matcher(html);
+		while (matcher.find()) {
+			missing.add(matcher.group(1));
+		}
+		return new ArrayList<>(missing);
 	}
 }

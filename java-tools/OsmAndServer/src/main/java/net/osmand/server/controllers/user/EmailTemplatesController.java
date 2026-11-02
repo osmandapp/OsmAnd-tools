@@ -35,4 +35,12 @@ public class EmailTemplatesController {
 		}
 		return ResponseEntity.ok(preview.render(id, lang));
 	}
+
+	@PostMapping(value = "/render-markup", produces = MediaType.APPLICATION_JSON_VALUE)
+	@ResponseBody
+	public Map<String, Object> renderMarkup(@RequestParam String html, @RequestParam(defaultValue = "") String values,
+	                                        @RequestParam(required = false) String lang) {
+		String rendered = new EmailTemplatePreview().renderMarkup(html, values, lang);
+		return Map.of("html", rendered, "missing", EmailTemplatePreview.missingVariables(rendered));
+	}
 }
