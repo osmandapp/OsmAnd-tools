@@ -631,7 +631,7 @@ public class UserdataService {
             if (isWebLinkValid(pu, token)) {
                 return ok();
             }
-            wearOutToken(pu);
+            wearOutToken(pu, token);
             return ResponseEntity.badRequest().body("error_token");
         }
         return ok();
@@ -687,9 +687,11 @@ public class UserdataService {
             pu.webLinkToken = null;
             pu.webLinkTime = null;
         } else if (!isCodeValid(pu, token)) {
-            wearOutToken(pu); // cut down on tries (even for web password)
+            wearOutToken(pu, token); // cut down on tries (even for web password)
             if ( ! (tokenIsActive && validateWithWebPassword(pu.id, token))) {
-                LOG.error("device-register: invalid token (" + EmailSenderService.shortenEmail(email) + ")");
+                if (!Algorithms.isEmpty(token)) {
+                    LOG.error("device-register: invalid token (" + EmailSenderService.shortenEmail(email) + ")");
+                }
                 throw new OsmAndPublicApiException(ERROR_CODE_TOKEN_IS_NOT_VALID_OR_EXPIRED, "token is not valid or expired " + CODE_TTL_TEXT);
             }
         }
@@ -1498,7 +1500,7 @@ public class UserdataService {
         CloudUsersRepository.CloudUser pu = usersRepository.findById(dev.userid);
         if (pu != null && pu.id == dev.userid) {
             boolean validToken = isCodeValid(pu, token);
-            wearOutToken(pu);
+            wearOutToken(pu, token);
             if (validToken) {
                 if (deleteAllFiles(dev)) {
                     int numOfUsersDelete = usersRepository.deleteByEmailIgnoreCase(pu.email);
@@ -1628,7 +1630,7 @@ public class UserdataService {
             return ResponseEntity.badRequest().body("User is not registered");
         }
         boolean validToken = isCodeValid(pu, code);
-        wearOutToken(pu);
+        wearOutToken(pu, code);
         if (validToken) {
             return ok();
         } else {
@@ -1645,7 +1647,7 @@ public class UserdataService {
             return ResponseEntity.badRequest().body("User is not registered");
         }
         boolean validToken = isCodeValid(pu, token);
-        wearOutToken(pu);
+        wearOutToken(pu, token);
         if (validToken) {
             return ok();
         } else {
@@ -1729,13 +1731,13 @@ public class UserdataService {
         return ok();
     }
 
-    public void wearOutToken(CloudUsersRepository.CloudUser pu) {
-        if (pu == null || pu.tokenTime == null) {
+    public void wearOutToken(CloudUsersRepository.CloudUser pu, String token) {
+        if (pu == null || pu.tokenTime == null || Algorithms.isEmpty(token)) {
             return;
         }
         Calendar cal = Calendar.getInstance();
         cal.setTime(pu.tokenTime);
-        cal.add(Calendar.HOUR_OF_DAY, -7);
+        cal.add(Calendar.HOUR_OF_DAY, -2);
         pu.tokenTime = cal.getTime();
 
         usersRepository.saveAndFlush(pu);
