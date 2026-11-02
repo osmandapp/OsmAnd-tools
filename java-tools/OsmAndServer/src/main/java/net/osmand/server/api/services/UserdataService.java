@@ -1737,7 +1737,7 @@ public class UserdataService {
         }
         Calendar cal = Calendar.getInstance();
         cal.setTime(pu.tokenTime);
-        cal.add(Calendar.HOUR_OF_DAY, -7);
+        cal.add(Calendar.HOUR_OF_DAY, -2);
         pu.tokenTime = cal.getTime();
 
         usersRepository.saveAndFlush(pu);
