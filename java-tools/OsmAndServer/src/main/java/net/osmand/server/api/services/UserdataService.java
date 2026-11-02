@@ -552,8 +552,12 @@ public class UserdataService {
         filesRepository.save(fl);
     }
 
+    private static String emailTokenKey(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
+    }
+
     public synchronized void updateSecureEmailToken(CloudUser user) {
-        String email = user.email.trim().toLowerCase(Locale.ROOT);
+        String email = emailTokenKey(user.email);
         long now = System.currentTimeMillis();
         SecureEmailToken token = emailTokenRequests.getIfPresent(email);
         if (token == null || token.nextAllowedAt() <= now) {
@@ -695,7 +699,7 @@ public class UserdataService {
         }
         pu.token = null;
         pu.tokenTime = null;
-        emailTokenRequests.invalidate(pu.email.trim().toLowerCase(Locale.ROOT));
+        emailTokenRequests.invalidate(emailTokenKey(pu.email));
         CloudUserDevicesRepository.CloudUserDevice device = new CloudUserDevicesRepository.CloudUserDevice();
 	    if (Algorithms.isEmpty(deviceId) || Algorithms.isEmpty(model)) {
 		    LOG.error("device-register: avoid delete-anonymous-same-device (" + EmailSenderService.shorten(email) + ")");
@@ -1503,7 +1507,7 @@ public class UserdataService {
                 if (deleteAllFiles(dev)) {
                     int numOfUsersDelete = usersRepository.deleteByEmailIgnoreCase(pu.email);
                     if (numOfUsersDelete != -1) {
-						emailTokenRequests.invalidate(pu.email.trim().toLowerCase(Locale.ROOT));
+						emailTokenRequests.invalidate(emailTokenKey(pu.email));
 						LOG.info("Deleted (/delete-account) users with email " + pu.email + " and id " + pu.id);
 						removeEmailFromSupporters(pu.id);
 						removeUserIdFromPurchases(pu.id);
@@ -1774,8 +1778,8 @@ public class UserdataService {
             return ResponseEntity.badRequest().body("User is not registered");
         }
         // change email
-        emailTokenRequests.invalidate(currentUser.email.trim().toLowerCase(Locale.ROOT));
-        emailTokenRequests.invalidate(tempUser.email.trim().toLowerCase(Locale.ROOT));
+        emailTokenRequests.invalidate(emailTokenKey(currentUser.email));
+        emailTokenRequests.invalidate(emailTokenKey(tempUser.email));
         usersRepository.delete(tempUser);
         currentUser.email = username;
         usersRepository.saveAndFlush(currentUser);
