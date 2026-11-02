@@ -43,20 +43,18 @@ public class EmailTemplatePreview {
 		if (templates == null) {
 			throw new IllegalStateException("set " + EmailSenderTemplate.TEMPLATES_HINT);
 		}
-		Properties samples = EmailTemplate.readProperties(new File(templates, SAMPLES_FILE));
-		String layoutTemplates = (String) samples.remove(LAYOUT_TEMPLATES);
+		Map<String, String> samples = EmailTemplate.readProperties(new File(templates, SAMPLES_FILE));
+		String layoutTemplates = samples.remove(LAYOUT_TEMPLATES);
 		if (layoutTemplates == null) {
 			throw new IllegalStateException(LAYOUT_TEMPLATES + " is missing in " + new File(templates, SAMPLES_FILE));
 		}
 		List<String> ids = id == null ? templateIds(Path.of(templates), layoutTemplates) : List.of(id);
-		Map<String, String> vars = new HashMap<>();
-		samples.stringPropertyNames().forEach(key -> vars.put(key, samples.getProperty(key)));
 
 		Path out = Path.of(templates).toAbsolutePath().normalize().resolveSibling(PREVIEW_DIR).resolve(lang);
 		for (String template : ids) {
 			Path file = out.resolve(template + EmailTemplate.HTML);
 			Files.createDirectories(file.getParent());
-			Files.writeString(file, new EmailSenderTemplate().load(template, lang).set(vars).fillBody(SAMPLE_TO));
+			Files.writeString(file, new EmailSenderTemplate().load(template, lang).set(samples).fillBody(SAMPLE_TO));
 			System.out.println(file.toUri());
 		}
 	}

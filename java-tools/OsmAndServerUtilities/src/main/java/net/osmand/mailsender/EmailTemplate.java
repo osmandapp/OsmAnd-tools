@@ -50,7 +50,7 @@ class EmailTemplate {
 		// INTRO         = @PASSWORD_INTRO@
 		// NOTE          = @PASSWORD_NOTE@
 		NAME_TEXTS.forEach((key, suffix) -> vars.put(key, "@" + name + "_" + suffix + "@"));
-		putAll(readProperties(new File(directory, STYLES_FILE)));
+		vars.putAll(readProperties(new File(directory, STYLES_FILE)));
 		vars.putAll(readScoped(PARAMS_FILE, template));
 		putBlocks();
 		putTranslations(lang);
@@ -63,18 +63,18 @@ class EmailTemplate {
 	}
 
 	private Map<String, String> readScoped(String file, String template) {
-		Properties properties = readProperties(new File(directory, file));
+		Map<String, String> properties = readProperties(new File(directory, file));
 		Map<String, String> values = new HashMap<>();
-		for (String key : properties.stringPropertyNames()) {
+		for (String key : properties.keySet()) {
 			if (!key.contains(".")) {
-				values.put(key, properties.getProperty(key));
+				values.put(key, properties.get(key));
 			}
 		}
 		for (String scope : template.split("/")) {
 			String prefix = scope + ".";
-			for (String key : properties.stringPropertyNames()) {
+			for (String key : properties.keySet()) {
 				if (key.startsWith(prefix)) {
-					values.put(key.substring(prefix.length()), properties.getProperty(key));
+					values.put(key.substring(prefix.length()), properties.get(key));
 				}
 			}
 		}
@@ -94,16 +94,12 @@ class EmailTemplate {
 	private void putTranslations(String lang) {
 		String baseLang = lang.split("[-_]")[0]; // ru-RU, pt_BR -> ru, pt
 		for (String fileLang : new LinkedHashSet<>(List.of(DEFAULT_LANG, baseLang, lang))) {
-			putAll(readProperties(translationsFile(fileLang)));
+			vars.putAll(readProperties(translationsFile(fileLang)));
 		}
 	}
 
 	private File translationsFile(String lang) {
 		return new File(directory, TRANSLATIONS_DIR + "/" + lang + PROPERTIES);
-	}
-
-	private void putAll(Properties properties) {
-		properties.stringPropertyNames().forEach(key -> vars.put(key, properties.getProperty(key)));
 	}
 
 	private String read(String template) {
@@ -115,17 +111,18 @@ class EmailTemplate {
 		return readText(file);
 	}
 
-	static Properties readProperties(File file) {
+	static Map<String, String> readProperties(File file) {
 		Properties properties = new Properties();
 		if (file.isFile()) {
 			try (Reader reader = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
 				properties.load(reader);
-				properties.replaceAll((key, value) -> ((String) value).strip());
 			} catch (IOException e) {
 				throw new UncheckedIOException(e);
 			}
 		}
-		return properties;
+		Map<String, String> values = new HashMap<>();
+		properties.stringPropertyNames().forEach(key -> values.put(key, properties.getProperty(key).strip()));
+		return values;
 	}
 
 	private static String readText(File file) {
