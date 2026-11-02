@@ -421,16 +421,17 @@ public class EmailSenderService {
 		return email.charAt(0) + "***" + email.substring(at);
 	}
 
-	// hide full email from logs
+	private static final int EMAIL_MASK_CHARS = 5;
+
 	public static String shorten(String full) {
 		if (full == null) {
 			return null;
 		}
-		int at = full.indexOf('@');
-		int hidden = at < 0 ? 5 : Math.min(5, at - 5);
-		if (hidden <= 0) {
+		int nameLength = full.contains("@") ? full.indexOf('@') : full.length();
+		int charsToHide = Math.min(EMAIL_MASK_CHARS, nameLength - EMAIL_MASK_CHARS);
+		if (charsToHide <= 0) {
 			return full;
 		}
-		return full.replaceFirst(".{" + hidden + "}", ".".repeat(hidden)); // osmand@t-online.de -> .smand@t-online.de
+		return full.replaceFirst(".{" + charsToHide + "}", ".".repeat(charsToHide)); // osmand@t-online.de -> .smand@t-online.de
 	}
  }
