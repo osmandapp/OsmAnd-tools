@@ -61,8 +61,10 @@ public class EmailTemplatePreview {
 		for (String template : ids) {
 			Path file = out.resolve(template + EmailTemplate.HTML);
 			Files.createDirectories(file.getParent());
-			Files.writeString(file, preview.render(template, lang));
-			System.out.println(file.toUri());
+			String html = preview.render(template, lang);
+			Files.writeString(file, html);
+			List<String> missing = missingVariables(html);
+			System.out.println(file.toUri() + (missing.isEmpty() ? "" : " - no value for " + String.join(", ", missing)));
 		}
 	}
 
@@ -85,7 +87,7 @@ public class EmailTemplatePreview {
 	}
 
 	public String render(String id, @Nullable String lang) {
-		return new EmailSenderTemplate().load(id, lang).set(samples).fillBody(SAMPLE_TO);
+		return new EmailSenderTemplate().load(id, lang).set(samples).fillBodyKeepingMissing(SAMPLE_TO);
 	}
 
 	public String renderMarkup(String markup, String values, @Nullable String lang) {

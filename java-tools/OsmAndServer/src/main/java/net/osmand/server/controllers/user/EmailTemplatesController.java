@@ -26,21 +26,25 @@ public class EmailTemplatesController {
 		return Map.of("templates", preview.templateIds(), "languages", preview.languages());
 	}
 
-	@GetMapping(value = "/render", produces = MediaType.TEXT_HTML_VALUE)
+	@GetMapping(value = "/render", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
-	public ResponseEntity<String> render(@RequestParam String id, @RequestParam(required = false) String lang) throws IOException {
+	public ResponseEntity<Map<String, Object>> render(@RequestParam String id, @RequestParam(required = false) String lang)
+			throws IOException {
 		EmailTemplatePreview preview = new EmailTemplatePreview();
 		if (!preview.templateIds().contains(id)) {
 			return ResponseEntity.notFound().build();
 		}
-		return ResponseEntity.ok(preview.render(id, lang));
+		return ResponseEntity.ok(withMissing(preview.render(id, lang)));
 	}
 
 	@PostMapping(value = "/render-markup", produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
 	public Map<String, Object> renderMarkup(@RequestParam String html, @RequestParam(defaultValue = "") String values,
 	                                        @RequestParam(required = false) String lang) {
-		String rendered = new EmailTemplatePreview().renderMarkup(html, values, lang);
-		return Map.of("html", rendered, "missing", EmailTemplatePreview.missingVariables(rendered));
+		return withMissing(new EmailTemplatePreview().renderMarkup(html, values, lang));
+	}
+
+	private static Map<String, Object> withMissing(String html) {
+		return Map.of("html", html, "missing", EmailTemplatePreview.missingVariables(html));
 	}
 }
