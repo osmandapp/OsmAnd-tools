@@ -14,6 +14,7 @@ class EmailTemplate {
 
 	private static final String PARAMS_FILE = "params.properties";
 	private static final String STYLES_FILE = "styles.properties";
+	private static final String HEADERS_FILE = "headers.properties";
 	private static final String TRANSLATIONS_DIR = "translations";
 	static final String BLOCKS_DIR = "blocks";
 	static final String LAYOUTS_DIR = "layouts";
@@ -28,6 +29,7 @@ class EmailTemplate {
 			"EMAIL_TITLE", "TITLE", "PREHEADER", "PREHEADER", "FOOTER_REASON", "REASON", "INTRO", "INTRO", "NOTE", "NOTE");
 
 	final Map<String, String> vars = new HashMap<>();
+	final Map<String, String> headers;
 	final String from, fromName, subject, body;
 
 	private final String directory;
@@ -49,30 +51,34 @@ class EmailTemplate {
 		// NOTE          = @PASSWORD_NOTE@
 		NAME_TEXTS.forEach((key, suffix) -> vars.put(key, "@" + name + "_" + suffix + "@"));
 		putAll(readProperties(new File(directory, STYLES_FILE)));
-		putParams(template);
+		vars.putAll(readScoped(PARAMS_FILE, template));
 		putBlocks();
 		putTranslations(lang);
 		from = vars.remove(FROM);
 		fromName = vars.remove(FROM_NAME);
 		String layout = vars.remove(LAYOUT);
 		body = read(layout != null ? LAYOUTS_DIR + "/" + layout : template);
+		headers = readScoped(HEADERS_FILE, template);
+		headers.values().removeIf(String::isEmpty);
 	}
 
-	private void putParams(String template) {
-		Properties params = readProperties(new File(directory, PARAMS_FILE));
-		for (String key : params.stringPropertyNames()) {
+	private Map<String, String> readScoped(String file, String template) {
+		Properties properties = readProperties(new File(directory, file));
+		Map<String, String> values = new HashMap<>();
+		for (String key : properties.stringPropertyNames()) {
 			if (!key.contains(".")) {
-				vars.put(key, params.getProperty(key));
+				values.put(key, properties.getProperty(key));
 			}
 		}
 		for (String scope : template.split("/")) {
 			String prefix = scope + ".";
-			for (String key : params.stringPropertyNames()) {
+			for (String key : properties.stringPropertyNames()) {
 				if (key.startsWith(prefix)) {
-					vars.put(key.substring(prefix.length()), params.getProperty(key));
+					values.put(key.substring(prefix.length()), properties.getProperty(key));
 				}
 			}
 		}
+		return values;
 	}
 
 	private void putBlocks() {

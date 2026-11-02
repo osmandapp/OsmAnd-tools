@@ -56,7 +56,7 @@ public class EmailTemplatePreview {
 		for (String template : ids) {
 			Path file = out.resolve(template + EmailTemplate.HTML);
 			Files.createDirectories(file.getParent());
-			Files.writeString(file, new EmailSenderTemplate().load(template, lang).set(vars).render(SAMPLE_TO));
+			Files.writeString(file, new EmailSenderTemplate().load(template, lang).set(vars).fillBody(SAMPLE_TO));
 			System.out.println(file.toUri());
 		}
 	}

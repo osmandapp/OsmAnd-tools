@@ -1,7 +1,6 @@
 package net.osmand.mailsender;
 
 import com.sendgrid.*;
-import net.osmand.util.Algorithms;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.commons.mail.EmailException;
@@ -41,8 +40,6 @@ Special variables:
 
 	@TO@, @TO_BASE64@ - automatically set with To-address before sending each email
 
-	@LIST_UNSUBSCRIBE@ - value of the List-Unsubscribe header, empty for an email without it
-
 Template variables:
 
 	Variables may reference other variables at any depth (e.g. FIRST=1 SECOND=@FIRST@ THIRD=@SECOND@)
@@ -74,7 +71,6 @@ Examples:
 
 public class EmailSenderTemplate {
 	private static final Log LOG = LogFactory.getLog(EmailSenderTemplate.class);
-	private static final String LIST_UNSUBSCRIBE = "LIST_UNSUBSCRIBE";
 	static final String TEMPLATES_ENV = "EMAIL_TEMPLATES";
 	static final String TEMPLATES_HINT = TEMPLATES_ENV + "=/path/to/templates/email (environment)";
 
@@ -86,7 +82,7 @@ public class EmailSenderTemplate {
 	private final List<String> toList = new ArrayList<>(); // added by to()
 	private final HashMap<String, String> vars = new HashMap<>(); // set by set()
 	private String fromEmail, fromName, subject, body; // read from the template
-	private final HashMap<String, String> headers = new HashMap<>(); // List-Unsubscribe headers (added by render())
+	private final HashMap<String, String> headers = new HashMap<>(); // optional email headers (read from the template)
 
 	private final String defaultEngine = System.getenv("DEFAULT_ENGINE");
 	private final String excludedDomains = System.getenv("EXCLUDE_DOMAINS");
@@ -131,7 +127,7 @@ public class EmailSenderTemplate {
 		}
 
 		for (String to : toList) {
-			String html = render(to);
+			String html = fillBody(to);
 
 			// build SendGrid-compatible objects
 
@@ -170,6 +166,7 @@ public class EmailSenderTemplate {
 	public EmailSenderTemplate load(String template, @Nullable String lang) {
 		EmailTemplate emailTemplate = new EmailTemplate(defaultTemplatesDirectory, template, safeLang(lang));
 		vars.putAll(emailTemplate.vars);
+		headers.putAll(emailTemplate.headers);
 		set("YEAR", String.valueOf(Year.now(ZoneOffset.UTC).getValue()));
 		fromEmail = emailTemplate.from;
 		fromName = emailTemplate.fromName;
@@ -265,12 +262,8 @@ public class EmailSenderTemplate {
 		set("TO_BASE64", to64); // @TO_BASE64@
 	}
 
-	String render(String to) {
+	String fillBody(String to) {
 		setVarsByTo(to);
-		if (!Algorithms.isEmpty(vars.get(LIST_UNSUBSCRIBE))) {
-			headers.put("List-Unsubscribe", "@" + LIST_UNSUBSCRIBE + "@");
-			headers.put("List-Unsubscribe-Post", "List-Unsubscribe=One-Click");
-		}
 		return fill(body);
 	}
 
