@@ -171,8 +171,9 @@ public class EmailSenderTemplate {
 		return load(EmailTemplate.fromFile(defaultTemplatesDirectory, template, safeLang(lang)));
 	}
 
-	EmailSenderTemplate loadMarkup(String markup, @Nullable String lang) {
-		return load(EmailTemplate.fromMarkup(defaultTemplatesDirectory, markup, safeLang(lang)));
+	EmailSenderTemplate loadMarkup(String template, String markup, Map<String, Map<String, String>> addedLines,
+	                               @Nullable String lang) {
+		return load(EmailTemplate.fromMarkup(defaultTemplatesDirectory, template, markup, addedLines, safeLang(lang)));
 	}
 
 	private EmailSenderTemplate load(EmailTemplate emailTemplate) {
@@ -286,6 +287,16 @@ public class EmailSenderTemplate {
 	String fillBodyKeepingMissing(String to) {
 		setVarsByTo(to);
 		return replaceVariables(body);
+	}
+
+	String subjectKeepingMissing() {
+		return replaceVariables(subject);
+	}
+
+	Map<String, String> headersKeepingMissing() {
+		Map<String, String> filled = new TreeMap<>();
+		headers.forEach((key, value) -> filled.put(key, replaceVariables(value)));
+		return filled;
 	}
 
 	private void validateLoadedTemplates() {

@@ -90,9 +90,14 @@ public class EmailTemplatePreview {
 		return new EmailSenderTemplate().load(id, lang).set(samples).fillBodyKeepingMissing(SAMPLE_TO);
 	}
 
-	public String renderMarkup(String markup, String values, @Nullable String lang) {
-		return new EmailSenderTemplate().loadMarkup(markup, lang).set(samples)
-				.set(EmailTemplate.readProperties(new StringReader(values))).fillBodyKeepingMissing(SAMPLE_TO);
+	public Draft renderMarkup(String id, String markup, String texts, String params, String styles, String headers,
+	                          @Nullable String lang) {
+		Map<String, Map<String, String>> addedLines = Map.of(
+				EmailTemplate.translationsFile(EmailTemplate.DEFAULT_LANG), lines(texts), EmailTemplate.PARAMS_FILE, lines(params),
+				EmailTemplate.STYLES_FILE, lines(styles), EmailTemplate.HEADERS_FILE, lines(headers));
+		EmailSenderTemplate email = new EmailSenderTemplate().loadMarkup(id, markup, addedLines, lang).set(samples);
+		String html = email.fillBodyKeepingMissing(SAMPLE_TO);
+		return new Draft(email.subjectKeepingMissing(), html, email.headersKeepingMissing());
 	}
 
 	public static List<String> missingVariables(String html) {
@@ -102,5 +107,12 @@ public class EmailTemplatePreview {
 			missing.add(matcher.group(1));
 		}
 		return new ArrayList<>(missing);
+	}
+
+	private static Map<String, String> lines(String properties) {
+		return EmailTemplate.readProperties(new StringReader(properties));
+	}
+
+	public record Draft(String subject, String html, Map<String, String> headers) {
 	}
 }

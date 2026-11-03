@@ -9,10 +9,13 @@ import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 @Controller
 @RequestMapping("/admin/email-templates")
 public class EmailTemplatesController {
+
+	private static final Pattern TEMPLATE_ID = Pattern.compile("[a-z0-9-]+(/[a-z0-9-]+)+");
 
 	@GetMapping(path = { "", "/" })
 	public String emailTemplatesPage() {
@@ -37,11 +40,22 @@ public class EmailTemplatesController {
 		return ResponseEntity.ok(withMissing(preview.render(id, lang)));
 	}
 
-	@PostMapping(value = "/render-markup", produces = MediaType.APPLICATION_JSON_VALUE)
+	@PostMapping("/render-markup")
 	@ResponseBody
-	public Map<String, Object> renderMarkup(@RequestParam String html, @RequestParam(defaultValue = "") String values,
-	                                        @RequestParam(required = false) String lang) {
-		return withMissing(new EmailTemplatePreview().renderMarkup(html, values, lang));
+	public ResponseEntity<?> renderMarkup(@RequestParam(defaultValue = "") String id, @RequestParam String html,
+	                                      @RequestParam(defaultValue = "") String texts,
+	                                      @RequestParam(defaultValue = "") String params,
+	                                      @RequestParam(defaultValue = "") String styles,
+	                                      @RequestParam(defaultValue = "") String headers,
+	                                      @RequestParam(required = false) String lang) {
+		String templateId = id.trim();
+		if (!TEMPLATE_ID.matcher(templateId).matches()) {
+			return ResponseEntity.badRequest().body("Template id is the path inside emails/ without .html, e.g. marketing/summer-sale");
+		}
+		EmailTemplatePreview.Draft draft = new EmailTemplatePreview().renderMarkup(templateId, html, texts, params, styles, headers, lang);
+		String filled = String.join("\n", draft.subject(), draft.html(), String.join("\n", draft.headers().values()));
+		return ResponseEntity.ok(Map.of("subject", draft.subject(), "html", draft.html(), "headers", draft.headers(),
+				"missing", EmailTemplatePreview.missingVariables(filled)));
 	}
 
 	private static Map<String, Object> withMissing(String html) {
