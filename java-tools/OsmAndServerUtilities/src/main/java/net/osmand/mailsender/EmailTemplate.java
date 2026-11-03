@@ -13,9 +13,9 @@ class EmailTemplate {
 
 	static final String DEFAULT_LANG = "en";
 
-	private static final String PARAMS_FILE = "params.properties";
-	private static final String STYLES_FILE = "styles.properties";
-	private static final String HEADERS_FILE = "headers.properties";
+	static final String PARAMS_FILE = "params.properties";
+	static final String STYLES_FILE = "styles.properties";
+	static final String HEADERS_FILE = "headers.properties";
 	private static final String TRANSLATIONS_DIR = "translations";
 	static final String EMAILS_DIR = "emails";
 	private static final String BLOCKS_DIR = "blocks";
@@ -27,6 +27,7 @@ class EmailTemplate {
 	private static final String FROM_NAME = "FROM_NAME";
 	private static final String LAYOUT = "LAYOUT";
 
+	private static final String SUBJECT = "_SUBJECT";
 	private static final Map<String, String> NAME_TEXTS = Map.of(
 			"EMAIL_TITLE", "TITLE", "PREHEADER", "PREHEADER", "FOOTER_REASON", "REASON", "INTRO", "INTRO", "NOTE", "NOTE");
 
@@ -35,39 +36,39 @@ class EmailTemplate {
 	final String from, fromName, subject, body;
 
 	private final String directory;
+	private final Map<String, Map<String, String>> addedLines;
 
 	static EmailTemplate fromFile(String directory, String template, String lang) {
-		return new EmailTemplate(directory, template, lang, null);
+		return new EmailTemplate(directory, template, lang, null, Map.of());
 	}
 
-	static EmailTemplate fromMarkup(String directory, String markup, String lang) {
-		return new EmailTemplate(directory, null, lang, markup);
+	static EmailTemplate fromMarkup(String directory, String template, String markup,
+	                                Map<String, Map<String, String>> addedLines, String lang) {
+		return new EmailTemplate(directory, template, lang, markup, addedLines);
 	}
 
-	private EmailTemplate(String directory, @Nullable String template, String lang, @Nullable String markup) {
+	private EmailTemplate(String directory, String template, String lang, @Nullable String markup,
+	                      Map<String, Map<String, String>> addedLines) {
 		this.directory = directory;
-		if (template == null) {
-			subject = null;
-		} else {
-			String name = template.substring(template.lastIndexOf('/') + 1).toUpperCase(Locale.ROOT).replace('-', '_');
-			subject = "@" + name + "_SUBJECT@";
-			// EMAIL_TITLE   → TITLE
-			// PREHEADER     → PREHEADER
-			// FOOTER_REASON → REASON
-			// INTRO         → INTRO
-			// NOTE          → NOTE
-			// For cloud/account/password the name is PASSWORD, and the line puts into the variables:
-			// EMAIL_TITLE   = @PASSWORD_TITLE@
-			// PREHEADER     = @PASSWORD_PREHEADER@
-			// FOOTER_REASON = @PASSWORD_REASON@
-			// INTRO         = @PASSWORD_INTRO@
-			// NOTE          = @PASSWORD_NOTE@
-			NAME_TEXTS.forEach((key, suffix) -> vars.put(key, "@" + name + "_" + suffix + "@"));
-		}
-		vars.putAll(readProperties(new File(directory, STYLES_FILE)));
+		this.addedLines = addedLines;
+		vars.putAll(readFile(STYLES_FILE));
 		vars.putAll(readScoped(PARAMS_FILE, template));
 		putBlocks();
 		putTranslations(lang);
+		String name = textsName(template);
+		subject = "@" + name + SUBJECT + "@";
+		// EMAIL_TITLE   → TITLE
+		// PREHEADER     → PREHEADER
+		// FOOTER_REASON → REASON
+		// INTRO         → INTRO
+		// NOTE          → NOTE
+		// For cloud/account/password the name is PASSWORD, and the line puts into the variables:
+		// EMAIL_TITLE   = @PASSWORD_TITLE@
+		// PREHEADER     = @PASSWORD_PREHEADER@
+		// FOOTER_REASON = @PASSWORD_REASON@
+		// INTRO         = @PASSWORD_INTRO@
+		// NOTE          = @PASSWORD_NOTE@
+		NAME_TEXTS.forEach((key, suffix) -> vars.putIfAbsent(key, "@" + name + "_" + suffix + "@"));
 		from = vars.remove(FROM);
 		fromName = vars.remove(FROM_NAME);
 		String layout = vars.remove(LAYOUT);
@@ -76,21 +77,27 @@ class EmailTemplate {
 		headers.values().removeIf(String::isEmpty);
 	}
 
-	private Map<String, String> readScoped(String file, @Nullable String template) {
-		Map<String, String> properties = readProperties(new File(directory, file));
+	private String textsName(String template) {
+		String path = template.toUpperCase(Locale.ROOT).replace('-', '_');
+		String fullName = path.replace('/', '_');
+		String fileName = path.substring(path.lastIndexOf('/') + 1);
+		boolean oldName = vars.containsKey(fileName + SUBJECT) && !vars.containsKey(fullName + SUBJECT);
+		return oldName ? fileName : fullName;
+	}
+
+	private Map<String, String> readScoped(String file, String template) {
+		Map<String, String> properties = readFile(file);
 		Map<String, String> values = new HashMap<>();
 		for (String key : properties.keySet()) {
 			if (!key.contains(".")) {
 				values.put(key, properties.get(key));
 			}
 		}
-		if (template != null) {
-			for (String scope : template.split("/")) {
-				String prefix = scope + ".";
-				for (String key : properties.keySet()) {
-					if (key.startsWith(prefix)) {
-						values.put(key.substring(prefix.length()), properties.get(key));
-					}
+		for (String scope : template.split("/")) {
+			String prefix = scope + ".";
+			for (String key : properties.keySet()) {
+				if (key.startsWith(prefix)) {
+					values.put(key.substring(prefix.length()), properties.get(key));
 				}
 			}
 		}
@@ -110,12 +117,18 @@ class EmailTemplate {
 	private void putTranslations(String lang) {
 		String baseLang = lang.split("[-_]")[0]; // ru-RU, pt_BR -> ru, pt
 		for (String fileLang : new LinkedHashSet<>(List.of(DEFAULT_LANG, baseLang, lang))) {
-			vars.putAll(readProperties(translationsFile(fileLang)));
+			vars.putAll(readFile(translationsFile(fileLang)));
 		}
 	}
 
-	private File translationsFile(String lang) {
-		return new File(directory, TRANSLATIONS_DIR + "/" + lang + PROPERTIES);
+	static String translationsFile(String lang) {
+		return TRANSLATIONS_DIR + "/" + lang + PROPERTIES;
+	}
+
+	private Map<String, String> readFile(String path) {
+		Map<String, String> properties = readProperties(new File(directory, path));
+		properties.putAll(addedLines.getOrDefault(path, Map.of()));
+		return properties;
 	}
 
 	private String read(String path) {
