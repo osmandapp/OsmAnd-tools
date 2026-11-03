@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.*;
 
+import net.osmand.NativeLibrary;
 import net.osmand.server.tileManager.TileMemoryCache;
 import net.osmand.server.tileManager.TileServerConfig;
 import net.osmand.server.tileManager.MapboxVectorTile;
@@ -51,6 +52,18 @@ public class MapboxVectorTileController {
 	public ResponseEntity<?> getTile(@PathVariable int z, @PathVariable int x, @PathVariable int y,
 			@RequestParam(defaultValue = "true") boolean cache, @RequestParam(defaultValue = "0") int shift)
 			throws IOException {
+		return renderTileResponse(z, x, y, cache, shift, NativeLibrary.CONTOUR_LINES_MODE_WITHOUT);
+	}
+
+	@RequestMapping(path = "/contours/{z}/{x}/{y}.mvt", produces = MediaType.APPLICATION_PROTOBUF_VALUE)
+	public ResponseEntity<?> getContourLinesTile(@PathVariable int z, @PathVariable int x, @PathVariable int y,
+			@RequestParam(defaultValue = "true") boolean cache, @RequestParam(defaultValue = "0") int shift)
+			throws IOException {
+		return renderTileResponse(z, x, y, cache, shift, NativeLibrary.CONTOUR_LINES_MODE_ONLY);
+	}
+
+	private ResponseEntity<?> renderTileResponse(int z, int x, int y, boolean cache, int shift, int contourLinesMode)
+			throws IOException {
 		if (shift < MapboxVectorTile.MIN_SHIFT || shift > MapboxVectorTile.MAX_SHIFT) {
 			return errorConfig("shift must be between " + MapboxVectorTile.MIN_SHIFT + " and " + MapboxVectorTile.MAX_SHIFT);
 		}
@@ -65,10 +78,10 @@ public class MapboxVectorTileController {
 		}
 
 		int effectiveShift = MapboxVectorTile.normalizeShift(z, shift);
-		String tileId = config.createTileId(MapboxVectorTile.getCacheNamespace(effectiveShift), x, y, z, -1, -1);
-        MapboxVectorTile tile = tileMemoryCache.getTile(tileId, k -> new MapboxVectorTile(config, x, y, z, effectiveShift));
+		String tileId = config.createTileId(MapboxVectorTile.getCacheNamespace(effectiveShift, contourLinesMode), x, y, z, -1, -1);
+        MapboxVectorTile tile = tileMemoryCache.getTile(tileId, k -> new MapboxVectorTile(config, x, y, z, effectiveShift, contourLinesMode));
         // for testing
-        //MapboxVectorTile tile = new MapboxVectorTile(config, x, y, z, shift);
+        //MapboxVectorTile tile = new MapboxVectorTile(config, x, y, z, shift, contourLinesMode);
         tileMemoryCache.conditionalCleanupCache();
 		byte[] data = cache ? tile.getCacheRuntimeTile() : null;
 		if (cache) {
@@ -144,7 +157,7 @@ public class MapboxVectorTileController {
 		if (DEBUG) {
 			LOGGER.info("Start rendering tile [" + tile.getTileId() + "] on thread: " + Thread.currentThread().getId());
 		}
-        Future<byte[]> future = executor.submit(() -> osmAndMapsService.renderMapboxVectorTile(tile.z, tile.x, tile.y, tile.shift));
+        Future<byte[]> future = executor.submit(() -> osmAndMapsService.renderMapboxVectorTile(tile.z, tile.x, tile.y, tile.shift, tile.contourLinesMode));
         byte[] data;
 		try {
             data = future.get(30, TimeUnit.SECONDS);

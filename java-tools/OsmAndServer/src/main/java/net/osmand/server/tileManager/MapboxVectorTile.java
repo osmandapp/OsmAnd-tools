@@ -1,5 +1,6 @@
 package net.osmand.server.tileManager;
 
+import net.osmand.NativeLibrary;
 import net.osmand.server.controllers.pub.MapboxVectorTileController;
 import org.jetbrains.annotations.NotNull;
 
@@ -21,14 +22,16 @@ public class MapboxVectorTile implements TileCacheProvider, Comparable<MapboxVec
 	public final int y;
 	public final int z;
 	public final int shift;
+	public final int contourLinesMode;
 	private static final long THREE_HOURS_IN_MILLIS = 3 * 60 * 60 * 1000L;
 
-	public MapboxVectorTile(TileServerConfig cfg, int x, int y, int z, int shift) {
+	public MapboxVectorTile(TileServerConfig cfg, int x, int y, int z, int shift, int contourLinesMode) {
 		this.cfg = cfg;
 		this.x = x;
 		this.y = y;
 		this.z = z;
 		this.shift = normalizeShift(z, shift);
+		this.contourLinesMode = contourLinesMode;
 		setTileId();
 		touch();
 	}
@@ -59,13 +62,14 @@ public class MapboxVectorTile implements TileCacheProvider, Comparable<MapboxVec
 		return dataZoom == Math.min(MAX_MVT_TILES_ZOOM, baseDataZoom) ? 0 : dataZoom - baseDataZoom;
 	}
 
-	// vector, vector-shift-1, vector-shift+1, etc.
-	public static String getCacheNamespace(int shift) {
-		return shift == 0 ? "vector" : "vector-shift" + (shift > 0 ? "+" : "") + shift;
+	// vector, vector-shift-1, vector-shift+1, vector-contours, vector-contours-shift+1, etc.
+	public static String getCacheNamespace(int shift, int contourLinesMode) {
+		String namespace = contourLinesMode == NativeLibrary.CONTOUR_LINES_MODE_ONLY ? "vector-contours" : "vector";
+		return shift == 0 ? namespace : namespace + "-shift" + (shift > 0 ? "+" : "") + shift;
 	}
 
 	public void setTileId() {
-		this.tileId = this.cfg.createTileId(getCacheNamespace(shift), x, y, z, -1, -1);
+		this.tileId = this.cfg.createTileId(getCacheNamespace(shift, contourLinesMode), x, y, z, -1, -1);
 	}
 
 	public synchronized byte[] getCacheRuntimeTile() throws IOException {
@@ -85,7 +89,7 @@ public class MapboxVectorTile implements TileCacheProvider, Comparable<MapboxVec
 		return TileCacheProvider.super.getCacheFile(
 				cfg.mvtsLocation, ext, z, x, y,
 				-1, -1,
-				getCacheNamespace(shift), null, MAX_ZOOM
+				getCacheNamespace(shift, contourLinesMode), null, MAX_ZOOM
 		);
 	}
 
