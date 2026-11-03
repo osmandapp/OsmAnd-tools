@@ -1067,6 +1067,10 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		// accepted roles restricted to: <empty>, stop, platform, ^(stop|platform)_(entry|exit)_only$
 		String version = rel.getTag("public_transport:version");
 		try {
+            if (IndexFerryHelper.hasFerryTags(rel)) {
+				// return to use processTransportRelationV1(), which creates and forward and backward routes.
+                return false;
+            }
 			if (Algorithms.isEmpty(version) || Integer.parseInt(version) < 2) {
 				for (RelationMember entry : rel.getMembers()) {
 					// ignore ways (cause with even with new relations there could be a mix of forward/backward ways)
