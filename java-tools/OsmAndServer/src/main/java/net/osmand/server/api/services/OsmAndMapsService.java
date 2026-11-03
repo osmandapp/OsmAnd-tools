@@ -694,10 +694,10 @@ public class OsmAndMapsService {
 		return image;
 	}
 
-	public byte[] renderMapboxVectorTile(int zoom, int x, int y, int shift, int contourLinesMode) throws IOException {
+	public byte[] renderMapboxVectorTile(int zoom, int x, int y, int shift, boolean contourLinesOnly) throws IOException {
 		byte[] tile = null;
 		if (nativelib != null) {
-			tile = nativelib.getMapboxVectorTileFile(zoom, x, y, shift, contourLinesMode);
+			tile = nativelib.getMapboxVectorTileFile(zoom, x, y, shift, contourLinesOnly);
 		}
 		return tile;
 	}
