@@ -493,7 +493,7 @@ public class EmailSenderMain {
 		}
 
 		EmailSenderTemplate sender = new EmailSenderTemplate()
-				.load(p.templateId) // should be "giveaway" for OsmAnd giveaway campaign
+				.load(p.templateId) // should be "marketing/giveaway" for OsmAnd giveaway campaign
 				.set("UNSUBGROUP", p.topic)
 				.from(p.mailFrom)
 				.name("OsmAnd")

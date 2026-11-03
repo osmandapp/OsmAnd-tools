@@ -107,7 +107,7 @@ public class FastSpringController {
 			boolean sendOsmAndAndSpecialGiftEmail = false;
 			for (FastSpringWebhookRequest.Item item : data.items) {
 				String sku = item.sku;
-				LOGGER.info(String.format("FastSpring: hook recorded for user %s %d with orderId: %s, sku: %s, purchaseToken: %s", EmailSenderService.shorten(email), userId, orderId, sku, data.reference));
+				LOGGER.info(String.format("FastSpring: hook recorded for user %s %d with orderId: %s, sku: %s, purchaseToken: %s", EmailSenderService.shortenEmail(email), userId, orderId, sku, data.reference));
 				if (FastSpringHelper.productSkuMap.contains(sku)) {
 					// Handle product purchase
 					List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> existingInApps = deviceInAppPurchasesRepository.findByOrderId(orderId);
@@ -131,7 +131,7 @@ public class FastSpringController {
 					iap.valid = true;
 
 					purchases.add(iap);
-					LOGGER.info(String.format("FastSpring: InApp recorded for user %s purchaseToken: %s", EmailSenderService.shorten(email), data.reference));
+					LOGGER.info(String.format("FastSpring: InApp recorded for user %s purchaseToken: %s", EmailSenderService.shortenEmail(email), data.reference));
 				} else if (FastSpringHelper.subscriptionSkuMap.contains(sku)) {
 					// Handle subscription purchase
 					List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> existingSubscriptions = deviceSubscriptionsRepository.findByOrderId(orderId);
@@ -152,7 +152,7 @@ public class FastSpringController {
 						setAutorenewingFromApi(subscription);
 
 						subscriptions.add(subscription);
-						LOGGER.info(String.format("FastSpring: Subscription recorded for user %s purchaseToken: %s", EmailSenderService.shorten(email), data.reference));
+						LOGGER.info(String.format("FastSpring: Subscription recorded for user %s purchaseToken: %s", EmailSenderService.shortenEmail(email), data.reference));
 					}
 				} else {
 					LOGGER.error("FastSpring: Unknown product " + sku);
@@ -168,11 +168,11 @@ public class FastSpringController {
 					orderDate, data.totalDisplay, purchases, subscriptions));
 
 			if (sendOsmAndAndSpecialGiftEmail) {
-				LOGGER.info("FastSpring: Sending special gift email to " + EmailSenderService.shorten(email) + " for orderId: " + data.order + ", purchaseToken: " + data.reference);
+				LOGGER.info("FastSpring: Sending special gift email to " + EmailSenderService.shortenEmail(email) + " for orderId: " + data.order + ", purchaseToken: " + data.reference);
 				emailSender.sendAfterCommit(() -> emailSender.sendOsmAndSpecialGiftEmail(email));
 			}
 		} else {
-			LOGGER.error("FastSpring: User not found for email " + EmailSenderService.shorten(email) + " orderId: " + data.order + ", purchaseToken: " + data.reference);
+			LOGGER.error("FastSpring: User not found for email " + EmailSenderService.shortenEmail(email) + " orderId: " + data.order + ", purchaseToken: " + data.reference);
 		}
 
 		return null;
