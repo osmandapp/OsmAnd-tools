@@ -373,7 +373,7 @@ public class SearchResultConverter {
 	}
 
 	@Nullable
-	private static OpeningHoursTime getClientTime(String timeZone) {
+	public static OpeningHoursTime getClientTime(String timeZone) {
 		if (Algorithms.isBlank(timeZone)) {
 			return null;
 		}

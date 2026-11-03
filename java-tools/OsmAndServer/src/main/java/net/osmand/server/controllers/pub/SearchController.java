@@ -11,7 +11,6 @@ import java.util.*;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.services.TransportStopsService;
 import net.osmand.server.utils.MultiPlatform;
-import net.osmand.shared.util.OpeningHoursTime;
 import net.osmand.shared.wiki.WikiHelper;
 import net.osmand.shared.wiki.WikiImage;
 import net.osmand.shared.wiki.WikiMetadata;
@@ -391,10 +390,8 @@ public class SearchController {
 	@GetMapping(path = {"/get-opening-hours-info"}, produces = "application/json")
 	@ResponseBody
 	public ResponseEntity<String> getOpeningHoursInfo(@RequestParam String openingHours,
-	                                                  @RequestParam long clientTime,
 	                                                  @RequestParam String timeZone) {
-		OpeningHoursTime time = OpeningHoursTime.ofEpochMillis(clientTime, timeZone);
-		return ResponseEntity.ok(gson.toJson(searchResultConverter.getOpeningHoursInfo(openingHours, time)));
+		return ResponseEntity.ok(gson.toJson(searchResultConverter.getOpeningHoursInfo(openingHours, SearchResultConverter.getClientTime(timeZone))));
 	}
 
 	@GetMapping(path = {"/get-poi-by-name"}, produces = "application/json")
