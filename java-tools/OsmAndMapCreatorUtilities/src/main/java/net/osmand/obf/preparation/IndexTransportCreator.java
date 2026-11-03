@@ -75,6 +75,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	private RTree transportStopsTree;
 	private Map<Long, Relation> masterRoutes = new HashMap<Long, Relation>();
 	private Connection gtfsConnection;
+	private final TransportFerryIndexHelper ferries = new TransportFerryIndexHelper();
 
 	private static final long TEST_ROUTE_ID_MISSING_STOPS = 192037l;
 	
@@ -258,6 +259,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	}
 
 	public void indexRelations(Relation e, OsmDbAccessorContext ctx) throws SQLException {
+		ferries.indexRelation(e, ctx);
 		if (e.getTag(OSMTagKey.ROUTE_MASTER) != null) {
 			ctx.loadEntityRelation(e);
 			for (RelationMember child : ((Relation) e).getMembers()) {
@@ -305,14 +307,22 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	}
 
 	public void iterateMainEntity(Entity e, OsmDbAccessorContext ctx, IndexCreationContext icc) throws SQLException {
-		if (e instanceof Relation && e.getTag(OSMTagKey.ROUTE) != null) {
-			ctx.loadEntityRelation((Relation) e);
+		boolean routeRelation = e instanceof Relation && e.getTag(OSMTagKey.ROUTE) != null;
+		if (routeRelation || ferries.isFerryWayRoute(e)) {
+			if (routeRelation) {
+				ctx.loadEntityRelation((Relation) e);
+			}
 			List<TransportRoute> troutes = new ArrayList<>();
-			indexTransportRoute((Relation) e, troutes, icc);
+			indexTransportRoute(e, troutes, icc);
 			for(TransportRoute route : troutes) {
 				insertTransportIntoIndex(route);
 			}
 		}
+	}
+
+	// call after all ways are processed
+	public void resolveFerryJunctionStops(OsmDbAccessor accessor) throws SQLException {
+		ferries.resolveJunctionStops(accessor);
 	}
 
 	public void createDatabaseStructure(Connection conn, DBDialect dialect, String rtreeStopsFileName) throws SQLException, IOException {
@@ -613,6 +623,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 					byte[] bytes = rset.getBytes(1);
 					directGeometry.add(bytes);
 				}
+				ferries.getRouteTags(idRoute, directStops).forEach((tag, value) -> transportRouteTagValues.addTagValue(idRoute, tag, value));
 				TransportSchedule schedule = readSchedule(ref, directStops);
 				long ptr = writer.writeTransportRoute(idRoute, routeName, routeEnName, ref, operator, type, dist, color, directStops,
 						directGeometry, stringTable, transportRoutes, schedule, transportRouteTagValues);
@@ -710,12 +721,13 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	}
 
 
-	private void indexTransportRoute(Relation rel, List<TransportRoute> troutes, IndexCreationContext icc) throws SQLException {
-		String ref = rel.getTag(OSMTagKey.REF);
-		String route = rel.getTag(OSMTagKey.ROUTE);
-		String operator = rel.getTag(OSMTagKey.OPERATOR);
-		String color = rel.getTag(OSMTagKey.COLOUR);
-		Relation master = masterRoutes.get(rel.getId());
+	private void indexTransportRoute(Entity entity, List<TransportRoute> troutes, IndexCreationContext icc) throws SQLException {
+		Relation rel = entity instanceof Relation ? (Relation) entity : null; // a route=ferry way otherwise
+		String ref = entity.getTag(OSMTagKey.REF);
+		String route = entity.getTag(OSMTagKey.ROUTE);
+		String operator = entity.getTag(OSMTagKey.OPERATOR);
+		String color = entity.getTag(OSMTagKey.COLOUR);
+		Relation master = rel != null ? masterRoutes.get(rel.getId()) : null;
 		if (master != null) {
 			if (ref == null) {
 				ref = master.getTag(OSMTagKey.REF);
@@ -731,7 +743,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			}
 		}
 		if (ref == null && route != null) {
-			String name = rel.getTag(OSMTagKey.NAME);
+			String name = entity.getTag(OSMTagKey.NAME);
 			if (name != null) {
 				if (name.length() <= 5) {
 					ref = name.toUpperCase();
@@ -744,6 +756,8 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 						}
 					}
 					ref = newRef.length <= 5 ? new String(newRef).toUpperCase() : new String(newRef).substring(0, 4).toUpperCase();
+				} else {
+					ref = name.substring(0, 4).toUpperCase();
 				}
 			}
 		}
@@ -758,16 +772,17 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			String tmp = MapRenderingTypesEncoder.formatColorToPalette(color, false).replaceAll("_", "");
 			color = "subwayText" + Algorithms.capitalizeFirstLetter(tmp) + "Color";
 		}
-		TransportRoute directRoute = EntityParser.parserRoute(rel, ref);
+		TransportRoute directRoute = EntityParser.parserRoute(entity, ref);
 		directRoute.setOperator(operator);
 		directRoute.setColor(color);
 		directRoute.setType(route);
 		directRoute.setRef(ref);
 		directRoute.setId(directRoute.getId() << 1);
-		transportRouteTagValues.registerTagValues(rel, directRoute.getId());
-		if (processTransportRelationV2(rel, directRoute, icc)) { // try new transport relations first
+		transportRouteTagValues.registerTagValues(directRoute.getId(), entity.getTags());
+		if (rel != null && processTransportRelationV2(rel, directRoute, icc)) { // try new transport relations first
 			List<Entity> incompleteNodes = getIncompleteStops(rel, directRoute);
 			List<TransportStop> forwardStops = directRoute.getForwardStops();
+			ferries.registerFerryCrossings(directRoute);
 			if (directRoute.getId().longValue() / 2  == TEST_ROUTE_ID_MISSING_STOPS) {
 				System.out.println(directRoute.getName() + ":");
 			}
@@ -788,7 +803,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 				}
 			}
 		} else {
-			TransportRoute backwardRoute = EntityParser.parserRoute(rel, ref);
+			TransportRoute backwardRoute = EntityParser.parserRoute(entity, ref);
 			backwardRoute.setOperator(operator);
 			backwardRoute.setColor(color);
 			backwardRoute.setType(route);
@@ -797,11 +812,15 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			if(!Algorithms.isEmpty(backwardRoute.getEnName(false))) {
 				backwardRoute.setEnName(reverseName(ref, backwardRoute.getEnName(false)));
 			}
-			if (processTransportRelationV1(rel, directRoute, backwardRoute)) { // old relation style otherwise
+			boolean processed = rel != null ? processTransportRelationV1(rel, directRoute, backwardRoute) // old relation style
+					: ferries.processFerryWay((Way) entity, directRoute, backwardRoute);
+			if (processed) {
 				backwardRoute.setId((backwardRoute.getId() << 1) + 1);
+				ferries.registerFerryCrossings(directRoute);
+				ferries.registerFerryCrossings(backwardRoute);
 				troutes.add(directRoute);
 				troutes.add(backwardRoute);
-				transportRouteTagValues.registerTagValues(rel, backwardRoute.getId());
+				transportRouteTagValues.registerTagValues(backwardRoute.getId(), entity.getTags());
 			}
 		}
 	}
@@ -1066,6 +1085,9 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		// first, verify we can accept this relation as new transport relation
 		// accepted roles restricted to: <empty>, stop, platform, ^(stop|platform)_(entry|exit)_only$
 		String version = rel.getTag("public_transport:version");
+		if ("ferry".equals(rel.getTag(OSMTagKey.ROUTE)) || rel.getTag("ferry") != null) {
+			return false; // ferries go both directions: build them with processTransportRelationV1
+		}
 		try {
 			if (Algorithms.isEmpty(version) || Integer.parseInt(version) < 2) {
 				for (RelationMember entry : rel.getMembers()) {
