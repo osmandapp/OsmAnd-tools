@@ -54,8 +54,7 @@ public class EmailTemplatesController {
 		}
 		EmailTemplatePreview.Draft draft = new EmailTemplatePreview().renderMarkup(templateId, html, texts, params, styles, headers, lang);
 		String filled = String.join("\n", draft.subject(), draft.html(), String.join("\n", draft.headers().values()));
-		return ResponseEntity.ok(Map.of("subject", draft.subject(), "html", draft.html(), "headers", draft.headers(),
-				"missing", EmailTemplatePreview.missingVariables(filled)));
+		return ResponseEntity.ok(Map.of("html", draft.html(), "missing", EmailTemplatePreview.missingVariables(filled)));
 	}
 
 	private static Map<String, Object> withMissing(String html) {
