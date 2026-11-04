@@ -236,7 +236,7 @@ public class SpatialSearchService {
 		}
 	}
 
-	public SpatialResponse searchSpatial(ClassicSearchService.SearchContext ctx, String timeZone, boolean autocomplete,
+	public SpatialResponse searchSpatial(ClassicSearchService.SearchContext ctx, boolean autocomplete,
 	                                     String userSessionKey, String maps) throws IOException {
 		long sTime = System.currentTimeMillis();
 		SpatialResponse response = new SpatialResponse();
@@ -271,7 +271,7 @@ public class SpatialSearchService {
 				sr.location = coord;
 				sr.objectType = ObjectType.LOCATION;
 				sr.localeName = ((float) coord.getLatitude()) + ", " + ((float) coord.getLongitude());
-				response.features.add(searchResultConverter.getFeature(sr, timeZone));
+				response.features.add(searchResultConverter.getFeature(sr));
 			}
 			SpatialPoiSearch poiTypeSearch = getSpatialPoiTypeSearch(ctx.locale(), new LatLon(ctx.lat(), ctx.lon()));
 			// In future multiple spatialTextSearch & multiple osmand regions
@@ -333,12 +333,11 @@ public class SpatialSearchService {
 						}
 					} else if (!objs.isEmpty()) {
 						LatLon l = r.getLatLon() == null ? new LatLon(ctx.lat(), ctx.lon()) : r.getLatLon();
-						f = getSpatialFeature(l, objs, ctx.locale(), timeZone, dominatedCity, r);
+						f = getSpatialFeature(l, objs, ctx.locale(), dominatedCity, r);
 					}
 					if (f != null) {
 						f.prop(SearchResultConverter.PoiTypeField.MATCHED_OBJECTS.getFieldName(),
-								matchedObjects(objs, ctx.locale(), timeZone, dominatedCity, r.getViewBBox31(),
-										amenityFeatureCache));
+								matchedObjects(objs, ctx.locale(), dominatedCity, r.getViewBBox31(), amenityFeatureCache));
 						f.prop(SearchResultConverter.PoiTypeField.VISIBLE_LEVEL.getFieldName(), r.visibleLevel());
 						f.prop(SearchResultConverter.PoiTypeField.COMPARE_KEY.getFieldName(), SpatialSearchResult.compareKeyString(r));
 						response.features.add(f);
@@ -456,9 +455,8 @@ public class SpatialSearchService {
 		return searchResultConverter.buildPoiSearchResult(amenity, locale, "");
 	}
 
-	private List<Map<String, Object>> matchedObjects(List<MapObject> objs, String locale, String timeZone,
-	                                                 String dominatedCity, int[] bbox31,
-	                                                 Map<MapObject, Feature> amenityFeatureCache) {
+	private List<Map<String, Object>> matchedObjects(List<MapObject> objs, String locale, String dominatedCity,
+	                                                 int[] bbox31, Map<MapObject, Feature> amenityFeatureCache) {
 		List<Map<String, Object>> matched = new ArrayList<>();
 		for (MapObject o : objs) {
 			if (o.getLocation() == null) {
@@ -471,7 +469,7 @@ public class SpatialSearchService {
 			m.put("lon", roundCoord(o.getLocation().getLongitude()));
 			if (o instanceof Amenity amenity) {
 				Feature feature = amenityFeatureCache.computeIfAbsent(amenity,
-						k -> searchResultConverter.getPoiFeature(searchResultConverter.buildPoiSearchResult((Amenity) k, locale, dominatedCity), timeZone));
+						k -> searchResultConverter.getPoiFeature(searchResultConverter.buildPoiSearchResult((Amenity) k, locale, dominatedCity)));
 				m.putAll(feature.properties);
 			} else if (o instanceof City city) {
 				m.put(SearchResultConverter.PoiTypeField.CITY_TYPE.getFieldName(), city.getType().name());
@@ -493,8 +491,8 @@ public class SpatialSearchService {
 		return Math.round(value * 1000000d) / 1000000d;
 	}
 
-	private Feature getSpatialFeature(LatLon loc, List<MapObject> objs, String locale, String timeZone,
-	                                  String dominatedCity, SpatialSearchResult ssr) {
+	private Feature getSpatialFeature(LatLon loc, List<MapObject> objs, String locale, String dominatedCity,
+	                                  SpatialSearchResult ssr) {
 		String extraNameMatch = ssr.getExtraNameMatch();
 
 		MapObject obj = objs.isEmpty() ? null : objs.get(0);
@@ -507,13 +505,13 @@ public class SpatialSearchService {
 			if (Algorithms.isNotEmpty(extraNameMatch)) {
 				result.localeName += " (" + extraNameMatch + ")"; // ref
 			}
-			return searchResultConverter.getFeature(result, timeZone);
+			return searchResultConverter.getFeature(result);
 		}
 		SearchResult result = new SearchResult();
 
 		if (spatialTextSearchAPI
 				.convertSpatialSearchResult(ssr, result, getSpatialPoiTypeSearch(), loc, locale, false) != null) {
-			return searchResultConverter.getFeature(result, timeZone); // non-Amenity objects
+			return searchResultConverter.getFeature(result); // non-Amenity objects
 		}
 
 		return null;

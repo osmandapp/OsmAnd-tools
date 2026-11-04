@@ -379,7 +379,7 @@ public class PoiSearchService {
 		return sscontext.getStats();
 	}
 
-	private Feature getPoi(String type, String name, LatLon loc, Long osmId, String timeZone) throws IOException {
+	private Feature getPoi(String type, String name, LatLon loc, Long osmId) throws IOException {
 		if (!osmAndMapsService.validateAndInitConfig()) {
 			return null;
 		}
@@ -409,7 +409,7 @@ public class PoiSearchService {
 						: osmId != null && ObfConstants.getOsmObjectId(a) == osmId;
 				if (match) {
 					Feature f = searchResultConverter.getPoiFeature(
-							searchResultConverter.buildPoiSearchResult(a, PoiTypesService.DEFAULT_SEARCH_LANG, ""), timeZone);
+							searchResultConverter.buildPoiSearchResult(a, PoiTypesService.DEFAULT_SEARCH_LANG, ""));
 					if (f != null) {
 						return f;
 					}
@@ -422,8 +422,8 @@ public class PoiSearchService {
 	}
 
 	public Feature getPoiResultByShareLink(String type, LatLon loc, String name, Long osmId, Long wikidataId,
-	                                       String timeZone, String lang) throws IOException {
-		Feature poiFeature = getPoi(type, name, loc, osmId, timeZone);
+	                                       String lang) throws IOException {
+		Feature poiFeature = getPoi(type, name, loc, osmId);
 
 		if (poiFeature != null && wikidataId == null) {
 			Object wikiIdFromOsm = poiFeature.properties.get("osm_tag_wikidata");
@@ -474,12 +474,12 @@ public class PoiSearchService {
 		return s != null && s.equalsIgnoreCase(t);
 	}
 
-	public Feature searchPoiByOsmId(LatLon loc, long osmid, String type, String timeZone) throws IOException {
+	public Feature searchPoiByOsmId(LatLon loc, long osmid, String type) throws IOException {
 		final String NODE_TYPE = "1";
-		return searchPoiByOsmId(loc, osmid, NODE_TYPE.equals(type) ? EntityType.NODE : EntityType.WAY, timeZone);
+		return searchPoiByOsmId(loc, osmid, NODE_TYPE.equals(type) ? EntityType.NODE : EntityType.WAY);
 	}
 
-	private Feature searchPoiByOsmId(LatLon loc, long osmid, EntityType type, String timeZone) throws IOException {
+	private Feature searchPoiByOsmId(LatLon loc, long osmid, EntityType type) throws IOException {
 		int radius = type == EntityType.NODE
 				? AmenitySearcher.AMENITY_SEARCH_RADIUS : AmenitySearcher.AMENITY_SEARCH_RADIUS_FOR_RELATION;
 		SearchResult res = searchSinglePoi(loc, radius, new ResultMatcher<>() {
@@ -493,11 +493,11 @@ public class PoiSearchService {
 				return false;
 			}
 		});
-		return res != null ? getMapObjectFeature(res, timeZone) : null;
+		return res != null ? getMapObjectFeature(res) : null;
 	}
 
-	private Feature getMapObjectFeature(SearchResult res, String timeZone) throws IOException {
-		Feature feature = searchResultConverter.getPoiFeature(res, timeZone);
+	private Feature getMapObjectFeature(SearchResult res) throws IOException {
+		Feature feature = searchResultConverter.getPoiFeature(res);
 		if (res.object instanceof Amenity amenity && TransportStopMatcher.isPublicTransportStop(amenity)) {
 			Long stopId = transportStopsService.findTransportStopId(amenity);
 			if (stopId != null) {
@@ -508,12 +508,12 @@ public class PoiSearchService {
 	}
 
 	// vector tile object: POI from the index by its osm id, else (no_indx types, buildings, ...) amenities from its tags as the map creator does
-	public List<Feature> getPoiByMapObject(long mapObjectId, LatLon loc, Map<String, String> tags, String timeZone) throws IOException {
+	public List<Feature> getPoiByMapObject(long mapObjectId, LatLon loc, Map<String, String> tags) throws IOException {
 		RenderedObject renderedObject = new RenderedObject();
 		renderedObject.setId(mapObjectId);
 		long osmId = ObfConstants.getOsmObjectId(renderedObject);
 		EntityType entityType = ObfConstants.getOsmEntityType(renderedObject);
-		Feature feature = searchPoiByOsmId(loc, osmId, entityType, timeZone);
+		Feature feature = searchPoiByOsmId(loc, osmId, entityType);
 		if (feature != null) {
 			return List.of(feature);
 		}
@@ -535,7 +535,7 @@ public class PoiSearchService {
 		List<Feature> features = new ArrayList<>();
 		for (Amenity amenity : amenities) {
 			Feature poiFeature = getMapObjectFeature(
-					searchResultConverter.buildPoiSearchResult(amenity, PoiTypesService.DEFAULT_SEARCH_LANG, ""), timeZone);
+					searchResultConverter.buildPoiSearchResult(amenity, PoiTypesService.DEFAULT_SEARCH_LANG, ""));
 			features.add(poiFeature.prop(SearchResultConverter.PoiTypeField.POI_FROM_TAGS.getFieldName(), true));
 		}
 		return features;
@@ -567,7 +567,7 @@ public class PoiSearchService {
 				return false;
 			}
 		});
-		return res != null ? searchResultConverter.getPoiFeature(res, null) : null;
+		return res != null ? searchResultConverter.getPoiFeature(res) : null;
 	}
 
 	private SearchResult searchSinglePoi(LatLon loc, int radiusMeters, ResultMatcher<Amenity> matcher)

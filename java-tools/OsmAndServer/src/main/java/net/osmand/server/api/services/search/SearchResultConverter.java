@@ -73,10 +73,10 @@ public class SearchResultConverter {
 		}
 	}
 
-	public Feature getFeature(SearchResult result, String timeZone) {
+	public Feature getFeature(SearchResult result) {
 		Feature feature;
 		if (result.objectType == ObjectType.POI) {
-			feature = getPoiFeature(result, timeZone);
+			feature = getPoiFeature(result);
 		} else {
 			Geometry geometry = Geometry.point(result.location != null ? result.location : new LatLon(0, 0));
 			feature = new Feature(geometry).prop(PoiTypeField.TYPE.getFieldName(), result.objectType)
@@ -101,7 +101,7 @@ public class SearchResultConverter {
 		return feature;
 	}
 
-	public Feature getPoiFeature(SearchResult result, String timeZone) {
+	public Feature getPoiFeature(SearchResult result) {
 		Amenity amenity = (Amenity) result.object;
 		Feature feature = null;
 
@@ -133,14 +133,6 @@ public class SearchResultConverter {
 			}
 			String value = unzipContent(entry.getValue());
 			feature.prop(entry.getKey(), value);
-		}
-		String openingHoursValue = tags.get(AMENITY_PREFIX + OPENING_HOURS);
-		OpeningHoursTime clientTime = getClientTime(timeZone);
-		if (clientTime != null && openingHoursValue != null) {
-			String openingHoursInfo = getOpeningHoursInfo(openingHoursValue, clientTime);
-			if (openingHoursInfo != null) {
-				feature.prop(AMENITY_PREFIX + OPENING_HOURS + OPENING_HOURS_INFO_SUFFIX, openingHoursInfo);
-			}
 		}
 		Map<String, String> names = amenity.getNamesMap(true);
 		for (Map.Entry<String, String> entry : names.entrySet()) {
@@ -242,9 +234,9 @@ public class SearchResultConverter {
 		return createAddressString(cityName, mainCity, dominatedCity, addr);
 	}
 
-	public void saveSearchResult(List<SearchResult> res, List<Feature> features, String timeZone) {
+	public void saveSearchResult(List<SearchResult> res, List<Feature> features) {
 		for (SearchResult result : res) {
-			features.add(getFeature(result, timeZone));
+			features.add(getFeature(result));
 		}
 	}
 
@@ -269,8 +261,20 @@ public class SearchResultConverter {
 			}
 			long osmId = amenity.getId();
 			if (!foundFeatures.containsKey(osmId)) {
-				foundFeatures.put(osmId, getPoiFeature(buildPoiSearchResult(amenity, locale, dominatedCity), timeZone));
+				Feature feature = getPoiFeature(buildPoiSearchResult(amenity, locale, dominatedCity));
+				addOpeningHoursInfo(feature, timeZone);
+				foundFeatures.put(osmId, feature);
 				remainingLimit--;
+			}
+		}
+	}
+
+	private void addOpeningHoursInfo(Feature feature, String timeZone) {
+		OpeningHoursTime clientTime = getClientTime(timeZone);
+		if (clientTime != null && feature.properties.get(AMENITY_PREFIX + OPENING_HOURS) instanceof String openingHoursValue) {
+			String openingHoursInfo = getOpeningHoursInfo(openingHoursValue, clientTime);
+			if (openingHoursInfo != null) {
+				feature.prop(AMENITY_PREFIX + OPENING_HOURS + OPENING_HOURS_INFO_SUFFIX, openingHoursInfo);
 			}
 		}
 	}
@@ -287,7 +291,8 @@ public class SearchResultConverter {
 		return merged;
 	}
 
-	private String getOpeningHoursInfo(String openingHoursValue, OpeningHoursTime time) {
+	@Nullable
+	public String getOpeningHoursInfo(String openingHoursValue, OpeningHoursTime time) {
 		OpeningHours openingHours = parseOpenedHours(openingHoursValue);
 		if (openingHours != null) {
 			List<OpeningHours.Info> openingHoursInfo = openingHours.getInfo(time);
@@ -368,7 +373,7 @@ public class SearchResultConverter {
 	}
 
 	@Nullable
-	private static OpeningHoursTime getClientTime(String timeZone) {
+	public static OpeningHoursTime getClientTime(String timeZone) {
 		if (Algorithms.isBlank(timeZone)) {
 			return null;
 		}
