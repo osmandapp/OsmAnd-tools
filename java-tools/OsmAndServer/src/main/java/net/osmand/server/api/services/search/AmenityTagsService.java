@@ -5,7 +5,6 @@ import net.osmand.shared.data.AdditionalInfoBundle;
 import net.osmand.shared.data.AmenityTagEntriesBuilder;
 import net.osmand.shared.data.AmenityTagEntriesBuilder.ValueLabel;
 import net.osmand.shared.data.AmenityTagEntry;
-import net.osmand.shared.osm.AbstractPoiType;
 import net.osmand.shared.osm.PoiCategory;
 import net.osmand.shared.osm.PoiType;
 import net.osmand.shared.util.OpeningHoursParser;
@@ -119,9 +118,8 @@ public class AmenityTagsService {
 		List<String> values = Algorithms.isEmpty(tagEntry.collapsableEntries) ? null : types.stream()
 				.map(type -> tagEntry.getCollapsableEntryValue(type.getKeyName()))
 				.collect(Collectors.toList());
-		AbstractPoiType parentType = types.get(0).getParentType();
-		String parentIcon = parentType != null ? parentType.getIconKeyName() : null;
-		return new VisibleTag(key, joinPoiTypeKeys(tagEntry), null, null, null, labels, values, parentIcon);
+		String icon = poiTypesService.getSharedPoiTypes().getPoiAdditionalCategoryIconName(tagEntry.key);
+		return new VisibleTag(key, joinPoiTypeKeys(tagEntry), null, null, null, labels, values, icon);
 	}
 
 	private VisibleTag toPlainTag(AmenityTagEntry tagEntry, Set<String> genericRowKeys) {
@@ -160,7 +158,7 @@ public class AmenityTagsService {
 	}
 
 	public record VisibleTag(String key, String value, String lang, List<LangValue> otherLangs, Boolean generic,
-	                         List<ValueLabel> labels, List<String> values, String parentIcon) {
+	                         List<ValueLabel> labels, List<String> values, String icon) {
 		public VisibleTag(String key, String value, String lang) {
 			this(key, value, lang, null, null, null, null, null);
 		}

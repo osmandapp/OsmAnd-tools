@@ -114,9 +114,9 @@ public class AmenityTagsServiceTest {
 	}
 
 	@Test
-	public void socketGroupHasIconOfParentType() {
-		assertEquals("charging_station", tag(Map.of("amenity_type", "transportation",
-				"amenity_subtype", "charging_station", "socket:type2", "4"), "collapsable_socket").parentIcon());
+	public void groupHasIconOfItsCategory() {
+		assertEquals("bus_yes", tag(Map.of("amenity_type", "transportation", "amenity_subtype", "charging_station",
+				"collapsable_access_bus", "bus_yes"), "collapsable_access_bus").icon());
 	}
 
 	// Lukas-Realschule (node 9422579452); as in Android a rule the parser cannot read is dropped,
