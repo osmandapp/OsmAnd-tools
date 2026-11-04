@@ -101,6 +101,24 @@ public class AmenityTagsServiceTest {
 		}
 	}
 
+	@Test
+	public void socketGroupHasValuesOfItsTypes() {
+		AmenityTagsService.VisibleTag socket = tag(Map.of("amenity_type", "transportation",
+				"amenity_subtype", "charging_station", "socket:type2", "4", "socket:type2:output", "22 kW",
+				"socket:chademo", "2"), "collapsable_socket");
+		assertEquals("osmand_socket_type2_yes;osmand_socket_chademo_yes", socket.value());
+		assertEquals(List.of("4 × 22 kW", "2"), socket.values());
+		assertNull(tag(Map.of("amenity_type", "service", "amenity_subtype", "boat_rental",
+				"collapsable_boat_rental_type", "boat_kayak_rental_yes;boat_canoe_rental_yes"),
+				"collapsable_boat_rental_type").values());
+	}
+
+	@Test
+	public void socketGroupHasIconOfParentType() {
+		assertEquals("charging_station", tag(Map.of("amenity_type", "transportation",
+				"amenity_subtype", "charging_station", "socket:type2", "4"), "collapsable_socket").parentIcon());
+	}
+
 	// Lukas-Realschule (node 9422579452); as in Android a rule the parser cannot read is dropped,
 	// a value without any rule it can read is shown as it is
 	@Test
@@ -115,8 +133,12 @@ public class AmenityTagsServiceTest {
 	}
 
 	private List<ValueLabel> labels(Map<String, String> tags, String key) {
+		return tag(tags, key).labels();
+	}
+
+	private AmenityTagsService.VisibleTag tag(Map<String, String> tags, String key) {
 		return service.convertToVisibleTags(tags, "en").stream().filter(tag -> tag.key().equals(key)).findFirst()
-				.orElseThrow().labels();
+				.orElseThrow();
 	}
 
 	private Set<String> visibleKeys(Map<String, String> tags) {

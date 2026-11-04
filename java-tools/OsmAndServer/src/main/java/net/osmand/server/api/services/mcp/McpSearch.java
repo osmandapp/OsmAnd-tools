@@ -535,10 +535,21 @@ public class McpSearch {
 		Map<String, String> tags = new LinkedHashMap<>();
 		for (AmenityTagsService.VisibleTag t : tagsService.convertToVisibleTags(raw, lang)) {
 			if (t.value() != null && !t.key().equals("name")) {
-				tags.put(t.key(), t.value());
+				tags.put(t.key(), t.values() != null ? joinGroupValues(t.value(), t.values()) : t.value());
 			}
 		}
 		return tags.isEmpty() ? null : tags;
+	}
+
+	// collapsable_socket: "osmand_socket_type2_yes: 4 × 22 kW;osmand_socket_chademo_yes"
+	private static String joinGroupValues(String types, List<String> values) {
+		String[] items = types.split(Amenity.SEPARATOR);
+		List<String> result = new ArrayList<>();
+		for (int i = 0; i < items.length; i++) {
+			String value = i < values.size() ? values.get(i) : null;
+			result.add(value != null ? items[i] + ": " + value : items[i]);
+		}
+		return String.join(Amenity.SEPARATOR, result);
 	}
 
 	// the web map's link to a POI (PoiManager.getPoiParams: /map/poi/?type&pin&osmId), opens it with its details

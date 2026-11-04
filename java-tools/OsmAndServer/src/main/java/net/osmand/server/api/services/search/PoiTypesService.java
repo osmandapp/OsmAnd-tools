@@ -42,6 +42,8 @@ public class PoiTypesService {
 		try (InputStream is = MapPoiTypes.class.getResourceAsStream("poi_types.xml")) {
 			net.osmand.shared.osm.MapPoiTypes types = new net.osmand.shared.osm.MapPoiTypes(null);
 			types.initFromString(new String(Objects.requireNonNull(is).readAllBytes(), StandardCharsets.UTF_8));
+			// filled lazily without a lock, while the requests read the types in parallel
+			types.initPoiTypesByTag();
 			net.osmand.shared.osm.MapPoiTypes.setDefault(types);
 			sharedPoiTypes = types;
 		} catch (IOException e) {
