@@ -29,6 +29,9 @@ import java.util.Set;
 import java.util.Map.Entry;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -181,6 +184,9 @@ public class OsmAndMapsService {
 	final List<RoutingCacheContext> routingCaches = new ArrayList<>();
 
 	NativeJavaRendering nativelib;
+
+	private final ExecutorService srtmUnzipExecutor = Executors.newSingleThreadExecutor();
+	private Future<?> srtmUnzip;
 
 	File tempDir;
 
@@ -571,12 +577,27 @@ public class OsmAndMapsService {
 
 	@Scheduled(fixedRate = INTERVAL_TO_MONITOR_ZIP)
 	public void checkZippedFiles() throws IOException {
-		if (tileConfig != null && !Algorithms.isEmpty(tileConfig.obfZipLocation) && !Algorithms.isEmpty(tileConfig.obfLocation)) {
-			LOGGER.info("Checking new files at " + tileConfig.obfZipLocation + " " + tileConfig.obfLocation);
-			File[] zipFiles = new File(tileConfig.obfZipLocation).listFiles();
+		if (tileConfig != null) {
+			unzipNewObfFiles(tileConfig.obfZipLocation, IndexConstants.BINARY_MAP_INDEX_EXT_ZIP);
+			if (srtmUnzip == null || srtmUnzip.isDone()) {
+				srtmUnzip = srtmUnzipExecutor.submit(() -> {
+					try {
+						unzipNewObfFiles(tileConfig.obfSrtmZipLocation, IndexConstants.BINARY_SRTM_MAP_INDEX_EXT_ZIP);
+					} catch (IOException e) {
+						LOGGER.error(e.getMessage(), e);
+					}
+				});
+			}
+		}
+	}
+
+	private void unzipNewObfFiles(String zipLocation, String zipExt) throws IOException {
+		if (!Algorithms.isEmpty(zipLocation) && !Algorithms.isEmpty(tileConfig.obfLocation)) {
+			LOGGER.info("Checking new files at " + zipLocation + " " + tileConfig.obfLocation);
+			File[] zipFiles = new File(zipLocation).listFiles();
 			List<File> zipWithoutJointMaps = zipFiles != null ? filterMap(Arrays.asList(zipFiles)) : new ArrayList<>();
 			for (File zipFile : zipWithoutJointMaps) {
-				if (zipFile.getName().endsWith(".obf.zip")) {
+				if (zipFile.getName().endsWith(zipExt)) {
 					String fn = zipFile.getName().substring(0, zipFile.getName().length() - ".zip".length());
 					File target = new File(tileConfig.obfLocation, fn);
 					File targetTemp = new File(tileConfig.obfLocation, fn + ".new");
@@ -673,10 +694,10 @@ public class OsmAndMapsService {
 		return image;
 	}
 
-	public byte[] renderMapboxVectorTile(int zoom, int x, int y, int shift) throws IOException {
+	public byte[] renderMapboxVectorTile(int zoom, int x, int y, int shift, boolean contourLinesOnly) throws IOException {
 		byte[] tile = null;
 		if (nativelib != null) {
-			tile = nativelib.getMapboxVectorTileFile(zoom, x, y, shift);
+			tile = nativelib.getMapboxVectorTileFile(zoom, x, y, shift, contourLinesOnly);
 		}
 		return tile;
 	}

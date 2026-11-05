@@ -634,10 +634,10 @@ public class NativeJavaRendering extends NativeLibrary {
 		}
 	}
 
-	public byte[] getMapboxVectorTileFile(int zoom, int x, int y, int shift) throws IOException {
+	public byte[] getMapboxVectorTileFile(int zoom, int x, int y, int shift, boolean contourLinesOnly) throws IOException {
         ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
         try (GZIPOutputStream gzipStream = new GZIPOutputStream(byteStream)) {
-            gzipStream.write(NativeLibrary.getMapboxVectorTileData(zoom, x, y, shift));
+            gzipStream.write(NativeLibrary.getMapboxVectorTileData(zoom, x, y, shift, contourLinesOnly));
         }
     	return byteStream.toByteArray();
 	}
