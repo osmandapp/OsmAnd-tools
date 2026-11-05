@@ -682,6 +682,11 @@ public class OsmAndMapsService {
 			}
 			String nativeLibraryPath = System.getenv("NATIVE_LIBRARY_PATH"); // use native library from file, optional
 			nativelib = NativeJavaRendering.getDefault(nativeLibraryPath, tileConfig.obfLocation, fontsFolder.getAbsolutePath());
+			if (nativelib != null && !Algorithms.isEmpty(tileConfig.obfSrtmLocation)) {
+				File srtmDir = new File(tileConfig.obfSrtmLocation);
+				Files.createDirectories(srtmDir.toPath());
+				nativelib.initFilesInDir(srtmDir);
+			}
 		}
 		return tileConfig.initErrorMessage == null;
 	}
@@ -1492,19 +1497,19 @@ public class OsmAndMapsService {
 
 
 	private synchronized void initNewObfFiles(File target, File targetTemp) throws IOException {
-		initObfReaders();
 		long val = System.currentTimeMillis();
-		BinaryMapIndexReaderReference ref = obfFiles.get(target.getAbsolutePath());
-		if (ref == null) {
-			ref = new BinaryMapIndexReaderReference();
-			ref.file = target;
-			obfFiles.put(target.getAbsolutePath(), ref);
-		}
-		if (ref.fileIndex != null) {
+		boolean srtm = target.getName().endsWith(IndexConstants.BINARY_SRTM_MAP_INDEX_EXT)
+				|| target.getName().endsWith(IndexConstants.BINARY_SRTM_FEET_MAP_INDEX_EXT);
+		if (!srtm) {
+			initObfReaders();
+			BinaryMapIndexReaderReference ref = obfFiles.get(target.getAbsolutePath());
+			if (ref == null) {
+				ref = new BinaryMapIndexReaderReference();
+				ref.file = target;
+				obfFiles.put(target.getAbsolutePath(), ref);
+			}
 			ref.fileIndex = null;
-		}
 
-		if (!ref.readers.isEmpty()) {
 			for (Entry<BinaryMapIndexReader, Boolean> r : ref.readers.entrySet()) {
 				r.getKey().close();
 			}
@@ -1514,11 +1519,14 @@ public class OsmAndMapsService {
 		}
 		target.delete();
 		targetTemp.renameTo(target);
-		RandomAccessFile raf = new RandomAccessFile(target, "r");
-		BinaryMapIndexReader reader = new BinaryMapIndexReader(raf, target);
-		ref.readers.put(reader, true);
-		ref.fileIndex = cacheFiles.addToCache(reader, target);
-		cacheFiles.writeToFile(new File(tileConfig.cacheLocation, CachedOsmandIndexes.INDEXES_DEFAULT_FILENAME));
+		if (!srtm) {
+			BinaryMapIndexReaderReference ref = obfFiles.get(target.getAbsolutePath());
+			RandomAccessFile raf = new RandomAccessFile(target, "r");
+			BinaryMapIndexReader reader = new BinaryMapIndexReader(raf, target);
+			ref.readers.put(reader, true);
+			ref.fileIndex = cacheFiles.addToCache(reader, target);
+			cacheFiles.writeToFile(new File(tileConfig.cacheLocation, CachedOsmandIndexes.INDEXES_DEFAULT_FILENAME));
+		}
 		if (nativelib != null) {
 			nativelib.initMapFile(target.getAbsolutePath(), false);
 		}
