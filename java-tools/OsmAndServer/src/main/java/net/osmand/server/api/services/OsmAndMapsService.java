@@ -126,6 +126,9 @@ public class OsmAndMapsService {
 	private static final long INTERVAL_TO_MONITOR_ZIP = 5 * 60 * 1000;
 	private static final long INTERVAL_TO_CLEANUP_ROUTING_CACHE = 10 * 60 * 1000;
 
+	private static final boolean UNZIP_SRTM_METERS = true;
+	private static final boolean UNZIP_SRTM_FEET = false; // currently unsupported
+
 	// counts only files open for Java (doesn't fit for rendering / routing)
 	private static final int MAX_SAME_FILE_OPEN = 15;
 	private static final long CACHE_MAX_ROUTING_CONTEXT_SEC = Integer.MAX_VALUE; //12 * 60 * 60; // 12h
@@ -578,11 +581,18 @@ public class OsmAndMapsService {
 	@Scheduled(fixedRate = INTERVAL_TO_MONITOR_ZIP)
 	public void checkZippedFiles() throws IOException {
 		if (tileConfig != null) {
-			unzipNewObfFiles(tileConfig.obfZipLocation, IndexConstants.BINARY_MAP_INDEX_EXT_ZIP);
+			unzipNewObfFiles(tileConfig.obfZipLocation, tileConfig.obfLocation, IndexConstants.BINARY_MAP_INDEX_EXT_ZIP, true);
 			if (srtmUnzip == null || srtmUnzip.isDone()) {
 				srtmUnzip = srtmUnzipExecutor.submit(() -> {
 					try {
-						unzipNewObfFiles(tileConfig.obfSrtmZipLocation, IndexConstants.BINARY_SRTM_MAP_INDEX_EXT_ZIP);
+						if (UNZIP_SRTM_METERS) {
+							unzipNewObfFiles(tileConfig.obfSrtmZipLocation, tileConfig.obfSrtmLocation,
+									IndexConstants.BINARY_SRTM_MAP_INDEX_EXT_ZIP, false);
+						}
+						if (UNZIP_SRTM_FEET) {
+							unzipNewObfFiles(tileConfig.obfSrtmZipLocation, tileConfig.obfSrtmLocation,
+									IndexConstants.BINARY_SRTM_FEET_MAP_INDEX_EXT_ZIP, false);
+						}
 					} catch (IOException e) {
 						LOGGER.error(e.getMessage(), e);
 					}
@@ -591,16 +601,18 @@ public class OsmAndMapsService {
 		}
 	}
 
-	private void unzipNewObfFiles(String zipLocation, String zipExt) throws IOException {
-		if (!Algorithms.isEmpty(zipLocation) && !Algorithms.isEmpty(tileConfig.obfLocation)) {
-			LOGGER.info("Checking new files at " + zipLocation + " " + tileConfig.obfLocation);
+	private void unzipNewObfFiles(String zipLocation, String obfLocation, String zipExt, boolean filterJointMaps) throws IOException {
+		if (!Algorithms.isEmpty(zipLocation) && !Algorithms.isEmpty(obfLocation)) {
+			File obfDir = new File(obfLocation);
+			Files.createDirectories(obfDir.toPath());
+			LOGGER.info("Checking new files at " + zipLocation + " " + obfDir);
 			File[] zipFiles = new File(zipLocation).listFiles();
-			List<File> zipWithoutJointMaps = zipFiles != null ? filterMap(Arrays.asList(zipFiles)) : new ArrayList<>();
-			for (File zipFile : zipWithoutJointMaps) {
+			List<File> files = zipFiles != null ? Arrays.asList(zipFiles) : List.of();
+			for (File zipFile : filterJointMaps ? filterMap(files) : files) {
 				if (zipFile.getName().endsWith(zipExt)) {
 					String fn = zipFile.getName().substring(0, zipFile.getName().length() - ".zip".length());
-					File target = new File(tileConfig.obfLocation, fn);
-					File targetTemp = new File(tileConfig.obfLocation, fn + ".new");
+					File target = new File(obfDir, fn);
+					File targetTemp = new File(obfDir, fn + ".new");
 					if (!target.exists() || target.lastModified() < zipFile.lastModified()
 							|| zipFile.length() > target.length()) {
 						long val = System.currentTimeMillis();
