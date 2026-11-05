@@ -29,6 +29,7 @@ public class MapboxVectorTileController {
 	protected static final Log LOGGER = LogFactory.getLog(MapboxVectorTileController .class);
 
 	private static final boolean DEBUG = true;
+	private static final int EMPTY_GZIP_TILE_SIZE = 20;
 
 	private static final long CLEANUP_CACHE_AFTER_ZOOM_7 = TimeUnit.DAYS.toMillis(10);
 	private static final long CLEANUP_CACHE_BEFORE_ZOOM_7 = TimeUnit.DAYS.toMillis(400);
@@ -95,7 +96,7 @@ public class MapboxVectorTileController {
 		}
 		HttpHeaders headers = new HttpHeaders();
 		headers.set(HttpHeaders.CONTENT_ENCODING, "gzip");
-		if (cache) {
+		if (cache && data.length > EMPTY_GZIP_TILE_SIZE) {
 			headers.setCacheControl("public, max-age=2592000"); // 30 days
 		} else {
 			headers.setCacheControl("no-cache, no-store, max-age=0, must-revalidate");
@@ -181,8 +182,8 @@ public class MapboxVectorTileController {
 					" (duration: " + duration + " ms)");
 		}
 
-		if (data == null) {
-			return null;
+		if (data == null || data.length <= EMPTY_GZIP_TILE_SIZE) {
+			return data;
 		}
 
 		return saveToCache(tile, data);
