@@ -1,6 +1,5 @@
 package net.osmand.server.controllers.pub;
 
-import java.awt.*;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -29,6 +28,7 @@ public class MapboxVectorTileController {
 	protected static final Log LOGGER = LogFactory.getLog(MapboxVectorTileController .class);
 
 	private static final boolean DEBUG = true;
+	private static final int EMPTY_GZIP_TILE_SIZE = 20;
 
 	private static final long CLEANUP_CACHE_AFTER_ZOOM_7 = TimeUnit.DAYS.toMillis(10);
 	private static final long CLEANUP_CACHE_BEFORE_ZOOM_7 = TimeUnit.DAYS.toMillis(400);
@@ -51,18 +51,25 @@ public class MapboxVectorTileController {
 	public ResponseEntity<?> getTile(@PathVariable int z, @PathVariable int x, @PathVariable int y,
 			@RequestParam(defaultValue = "true") boolean cache, @RequestParam(defaultValue = "0") int shift)
 			throws IOException {
-		return renderTileResponse(z, x, y, cache, shift, false);
+		return renderTileResponse(z, x, y, cache, shift, false, false);
 	}
 
 	@RequestMapping(path = "/contours/{z}/{x}/{y}.mvt", produces = MediaType.APPLICATION_PROTOBUF_VALUE)
 	public ResponseEntity<?> getContourLinesTile(@PathVariable int z, @PathVariable int x, @PathVariable int y,
 			@RequestParam(defaultValue = "true") boolean cache, @RequestParam(defaultValue = "0") int shift)
 			throws IOException {
-		return renderTileResponse(z, x, y, cache, shift, true);
+		return renderTileResponse(z, x, y, cache, shift, true, false);
 	}
 
-	private ResponseEntity<?> renderTileResponse(int z, int x, int y, boolean cache, int shift, boolean contourLinesOnly)
+	@RequestMapping(path = "/contours-feet/{z}/{x}/{y}.mvt", produces = MediaType.APPLICATION_PROTOBUF_VALUE)
+	public ResponseEntity<?> getContourLinesFeetTile(@PathVariable int z, @PathVariable int x, @PathVariable int y,
+			@RequestParam(defaultValue = "true") boolean cache, @RequestParam(defaultValue = "0") int shift)
 			throws IOException {
+		return renderTileResponse(z, x, y, cache, shift, true, true);
+	}
+
+	private ResponseEntity<?> renderTileResponse(int z, int x, int y, boolean cache, int shift,
+	                                             boolean contoursOnly, boolean feetContours) throws IOException {
 		if (shift < MapboxVectorTile.MIN_SHIFT || shift > MapboxVectorTile.MAX_SHIFT) {
 			return errorConfig("shift must be between " + MapboxVectorTile.MIN_SHIFT + " and " + MapboxVectorTile.MAX_SHIFT);
 		}
@@ -77,10 +84,8 @@ public class MapboxVectorTileController {
 		}
 
 		int effectiveShift = MapboxVectorTile.normalizeShift(z, shift);
-		String tileId = config.createTileId(MapboxVectorTile.getCacheNamespace(effectiveShift, contourLinesOnly), x, y, z, -1, -1);
-        MapboxVectorTile tile = tileMemoryCache.getTile(tileId, k -> new MapboxVectorTile(config, x, y, z, effectiveShift, contourLinesOnly));
-        // for testing
-        //MapboxVectorTile tile = new MapboxVectorTile(config, x, y, z, shift, contourLinesOnly);
+		String tileId = config.createTileId(MapboxVectorTile.getCacheNamespace(effectiveShift, contoursOnly, feetContours), x, y, z, -1, -1);
+        MapboxVectorTile tile = tileMemoryCache.getTile(tileId, k -> new MapboxVectorTile(config, x, y, z, effectiveShift, contoursOnly, feetContours));
         tileMemoryCache.conditionalCleanupCache();
 		byte[] data = cache ? tile.getCacheRuntimeTile() : null;
 		if (cache) {
@@ -95,7 +100,7 @@ public class MapboxVectorTileController {
 		}
 		HttpHeaders headers = new HttpHeaders();
 		headers.set(HttpHeaders.CONTENT_ENCODING, "gzip");
-		if (cache) {
+		if (cache && data.length > EMPTY_GZIP_TILE_SIZE) {
 			headers.setCacheControl("public, max-age=2592000"); // 30 days
 		} else {
 			headers.setCacheControl("no-cache, no-store, max-age=0, must-revalidate");
@@ -156,7 +161,7 @@ public class MapboxVectorTileController {
 		if (DEBUG) {
 			LOGGER.info("Start rendering tile [" + tile.getTileId() + "] on thread: " + Thread.currentThread().getId());
 		}
-        Future<byte[]> future = executor.submit(() -> osmAndMapsService.renderMapboxVectorTile(tile.z, tile.x, tile.y, tile.shift, tile.contourLinesOnly));
+        Future<byte[]> future = executor.submit(() -> osmAndMapsService.renderMapboxVectorTile(tile.z, tile.x, tile.y, tile.shift, tile.contoursOnly, tile.feetContours));
         byte[] data;
 		try {
             data = future.get(30, TimeUnit.SECONDS);
@@ -181,8 +186,8 @@ public class MapboxVectorTileController {
 					" (duration: " + duration + " ms)");
 		}
 
-		if (data == null) {
-			return null;
+		if (data == null || data.length <= EMPTY_GZIP_TILE_SIZE) {
+			return data;
 		}
 
 		return saveToCache(tile, data);
