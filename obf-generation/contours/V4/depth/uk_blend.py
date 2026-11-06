@@ -214,9 +214,15 @@ def blend_strip(raw_path, strip, source_infos, feather, out_path):
     open_source.cache_clear()
     index, row0, row1 = strip
     with rasterio.open(raw_path) as base:
+        # Blend needs a halo: a source boundary just outside a block must still feather into it,
+        # otherwise the block/strip edge becomes a hard step. Sources are therefore filtered with
+        # the same margin, and only the central part of each expanded block is written.
+        margin = max(feather, 20) // 2 + 2
         strip_window = Window(0, row0, base.width, row1 - row0)
         strip_bounds = window_bounds(strip_window, base.transform)
-        sources = [s for s in source_infos if not disjoint_bounds(s[1], strip_bounds)]
+        pad = margin * base.res[0]
+        wide_bounds = (strip_bounds[0], strip_bounds[1] - pad, strip_bounds[2], strip_bounds[3] + pad)
+        sources = [s for s in source_infos if not disjoint_bounds(s[1], wide_bounds)]
         profile = {
             "driver": "GTiff", "width": base.width, "height": row1 - row0,
             "count": 1, "dtype": "float32", "crs": base.crs, "nodata": np.nan,
@@ -231,13 +237,22 @@ def blend_strip(raw_path, strip, source_infos, feather, out_path):
                 height = min(512, row1 - row)
                 for col in range(0, base.width, 512):
                     width = min(512, base.width - col)
-                    window = Window(col, row, width, height)
-                    bounds = window_bounds(window, base.transform)
+                    erow0 = max(0, row - margin)
+                    erow1 = min(base.height, row + height + margin)
+                    ecol0 = max(0, col - margin)
+                    ecol1 = min(base.width, col + width + margin)
+                    expanded = Window(ecol0, erow0, ecol1 - ecol0, erow1 - erow0)
+                    bounds = window_bounds(expanded, base.transform)
                     candidates = [s for s in sources if not disjoint_bounds(s[1], bounds)]
-                    after, _, count, change = mosaic_window(base, window, candidates, feather)
-                    dst.write(after, 1, window=Window(col, row - row0, width, height))
-                    transition_cells += count
-                    total_change += change
+                    after, before, _, _ = mosaic_window(base, expanded, candidates, feather)
+                    ys = slice(row - erow0, row - erow0 + height)
+                    xs = slice(col - ecol0, col - ecol0 + width)
+                    out = after[ys, xs]
+                    dst.write(out, 1, window=Window(col, row - row0, width, height))
+                    diff = np.abs(out - before[ys, xs])
+                    changed = diff > 1e-5
+                    transition_cells += int(changed.sum())
+                    total_change += float(diff[changed].sum())
     print(f"Strip {index + 1}: {transition_cells} transition cells", flush=True)
     return index, transition_cells, total_change
 
