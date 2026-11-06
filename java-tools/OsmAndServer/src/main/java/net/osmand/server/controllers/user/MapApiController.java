@@ -775,15 +775,19 @@ public class MapApiController {
 			}
 			// check if new email is not registered
 			CloudUsersRepository.CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
-			if (pu != null) {
-				return ResponseEntity.badRequest().body("User was already registered with such email");
+			if (pu == null) {
+				// create temp user with new email
+				pu = new CloudUsersRepository.CloudUser();
+				pu.email = email;
+				pu.regTime = new Date();
+				pu.orderid = null;
+				usersRepository.saveAndFlush(pu);
+			} else {
+				ResponseEntity<String> accountError = userdataService.checkNewEmailAccount(pu);
+				if (accountError != null) {
+					return accountError;
+				}
 			}
-			// create temp user with new email
-			pu = new CloudUsersRepository.CloudUser();
-			pu.email = email;
-			pu.regTime = new Date();
-			pu.orderid = null;
-			usersRepository.saveAndFlush(pu);
 
 			// send code to new email
 			String oldEmail = currentAcc.email;
