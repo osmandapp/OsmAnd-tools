@@ -29,9 +29,10 @@ import net.osmand.server.api.services.UserdataService;
 import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
 
 /**
- * Two mailing lists of free-inactive users (had-pro / never-pro) for a support warning mail. State is kept across
- * runs: a user still inactive after the grace period (default 30 days) gets their files deleted instead of re-mailed;
- * a user active again before that is dropped. Free-inactive = free 2+ years, no device sync 2+ years, no file activity 1+ year.
+ * Mailing lists of free-inactive users (had-pro / never-pro) as comma-separated user ids. State is kept across runs:
+ * new users are registered only with registerNew, a user active again is dropped, a user still inactive after the
+ * grace period (default 30 days) is listed for deletion and deleted only with deleteFiles in a prod run.
+ * Free-inactive = free 2+ years, no device sync 2+ years, no file activity 1+ year.
  */
 @Component
 @AdminOperation(name = "notify-inactive-users")
@@ -42,8 +43,9 @@ public class NotifyInactiveUsersOperation extends AbstractFileFixOperation imple
 	private static final long DAY_MS = 86400000L;
 	private static final int DEFAULT_GRACE_DAYS = 30;
 
-	// graceDays: wait before deleting a still-inactive user (null = 30)
-	public record Extra(Integer graceDays, Boolean hadPro, Boolean neverPro) {
+	// graceDays: days after notification before a still-inactive user is eligible for deletion (null = 30)
+	// registerNew: store new users as notified (prod only); deleteFiles: delete files of eligible users (prod only)
+	public record Extra(Integer graceDays, Boolean hadPro, Boolean neverPro, Boolean registerNew, Boolean deleteFiles) {
 	}
 
 	private final UserBatchReader users;
@@ -75,19 +77,24 @@ public class NotifyInactiveUsersOperation extends AbstractFileFixOperation imple
 		Result result = new Result(isTest(params));
 		ctx.setResultSupplier(result::toResult);
 
-		Extra extra = ctx.getExtraParams() instanceof Extra e ? e : new Extra(null, null, null);
-		boolean includeHadPro = extra.hadPro() == null || extra.hadPro();
-		boolean includeNeverPro = extra.neverPro() == null || extra.neverPro();
-		long graceMs = (extra.graceDays() == null ? DEFAULT_GRACE_DAYS : Math.max(0, extra.graceDays())) * DAY_MS;
+		Extra extra = ctx.getExtraParams() instanceof Extra e ? e : new Extra(null, null, null, null, null);
+		boolean prod = !isTest(params);
+		Options options = new Options(prod,
+				extra.hadPro() == null || extra.hadPro(),
+				extra.neverPro() == null || extra.neverPro(),
+				(extra.graceDays() == null ? DEFAULT_GRACE_DAYS : Math.max(0, extra.graceDays())) * DAY_MS,
+				prod && Boolean.TRUE.equals(extra.registerNew()),
+				prod && Boolean.TRUE.equals(extra.deleteFiles()));
 
 		List<Integer> userIds = sampleUsers(params, ctx);
 		int total = userIds.size();
 		AtomicInteger done = new AtomicInteger();
 		forEach(clampThreads(params.threads()), userIds, ctx, userId -> {
-			processUser(userId, includeHadPro, includeNeverPro, graceMs, params, result);
+			processUser(userId, options, result);
 			int d = done.incrementAndGet();
-			ctx.setProgress(d, total, String.format("%d/%d users · %d to mail · %d deleted",
-					d, total, result.notifiedHadPro.size() + result.notifiedNeverPro.size(), result.deleted.size()));
+			ctx.setProgress(d, total, String.format("%d/%d users · %d new · %d still inactive · %d reactivated · %d deleted",
+					d, total, result.newUsers.size(), result.stillInactive.size(), result.reactivated.size(),
+					result.deleted.size()));
 		});
 
 		return result.toResult();
@@ -102,8 +109,11 @@ public class NotifyInactiveUsersOperation extends AbstractFileFixOperation imple
 		return users.sample(total, UserBatchReader.limit(total, params.usersPercent()), from, ctx);
 	}
 
-	private void processUser(int userId, boolean includeHadPro, boolean includeNeverPro, long graceMs,
-	                         Params params, Result result) {
+	private record Options(boolean prod, boolean includeHadPro, boolean includeNeverPro, long graceMs,
+	                       boolean registerNew, boolean deleteFiles) {
+	}
+
+	private void processUser(int userId, Options options, Result result) {
 		result.users.incrementAndGet();
 		CloudUser user = usersRepository.findById(userId);
 		if (user == null) {
@@ -123,16 +133,16 @@ public class NotifyInactiveUsersOperation extends AbstractFileFixOperation imple
 				return;
 			}
 			boolean hadPro = proExpiry > 0;
-			if (hadPro && !includeHadPro) {
+			if (hadPro && !options.includeHadPro()) {
 				return;
 			}
-			if (!hadPro && !includeNeverPro) {
+			if (!hadPro && !options.includeNeverPro()) {
 				return;
 			}
 			String category = hadPro ? InactiveUserNoticeRepository.CATEGORY_HAD_PRO
 					: InactiveUserNoticeRepository.CATEGORY_NEVER_PRO;
-			(hadPro ? result.notifiedHadPro : result.notifiedNeverPro).add(String.valueOf(userId));
-			if (!isTest(params)) {
+			result.newUsers.add(category, userId);
+			if (options.registerNew()) {
 				synchronized (dbLock) {
 					noticeRepository.insertNotified(userId, user.email, category);
 				}
@@ -142,8 +152,8 @@ public class NotifyInactiveUsersOperation extends AbstractFileFixOperation imple
 
 		Notice notice = existing.get();
 		if (!inactive) {
-			result.reactivated.incrementAndGet();
-			if (!isTest(params)) {
+			result.reactivated.add(notice.category(), userId);
+			if (options.prod()) {
 				synchronized (dbLock) {
 					noticeRepository.delete(userId);
 				}
@@ -155,31 +165,27 @@ public class NotifyInactiveUsersOperation extends AbstractFileFixOperation imple
 		}
 		long notifiedMs = notice.notifiedTime() == null ? 0
 				: notice.notifiedTime().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
-		if (System.currentTimeMillis() - notifiedMs < graceMs) {
-			result.pending.incrementAndGet();
+		if (System.currentTimeMillis() - notifiedMs < options.graceMs()) {
+			result.stillInactive.add(notice.category(), userId);
 			return;
 		}
-		// still inactive after grace period: delete files, do not mail again
-		Map<String, Object> entry = new LinkedHashMap<>();
-		entry.put("userid", userId);
-		entry.put("email", user.email);
-		entry.put("category", notice.category());
-		result.deleted.add(entry);
-		if (!isTest(params)) {
-			try {
-				for (UserFileNoData f : res.uniqueFiles) {
-					filesRepository.findById(f.id).ifPresent(this::deleteCompletely);
-				}
-				synchronized (dbLock) {
-					noticeRepository.markDeleted(userId);
-				}
-			} catch (Exception e) {
-				result.failed.incrementAndGet();
-				Map<String, Object> fail = new LinkedHashMap<>();
-				fail.put("userid", userId);
-				fail.put("error", String.valueOf(e.getMessage()));
-				result.failedUsers.add(fail);
+		result.eligibleForDelete.add(notice.category(), userId);
+		if (!options.deleteFiles()) {
+			return;
+		}
+		try {
+			for (UserFileNoData f : res.uniqueFiles) {
+				filesRepository.findById(f.id).ifPresent(this::deleteCompletely);
 			}
+			synchronized (dbLock) {
+				noticeRepository.markDeleted(userId);
+			}
+			result.deleted.add(notice.category(), userId);
+		} catch (Exception e) {
+			Map<String, Object> fail = new LinkedHashMap<>();
+			fail.put("userid", userId);
+			fail.put("error", String.valueOf(e.getMessage()));
+			result.failedUsers.add(fail);
 		}
 	}
 
@@ -220,16 +226,35 @@ public class NotifyInactiveUsersOperation extends AbstractFileFixOperation imple
 		throw new UnsupportedOperationException("notify-inactive-users scans in run()");
 	}
 
+	// user ids split by category, output as comma-separated lists ready for send-email
+	private static final class UserLists {
+		final List<String> hadPro = Collections.synchronizedList(new ArrayList<>());
+		final List<String> neverPro = Collections.synchronizedList(new ArrayList<>());
+
+		void add(String category, int userId) {
+			(InactiveUserNoticeRepository.CATEGORY_HAD_PRO.equals(category) ? hadPro : neverPro).add(String.valueOf(userId));
+		}
+
+		int size() {
+			return hadPro.size() + neverPro.size();
+		}
+
+		void putTo(Map<String, Object> r, String name) {
+			r.put(name + "Count", size());
+			r.put(name + "HadPro", String.join(",", new ArrayList<>(hadPro)));
+			r.put(name + "NeverPro", String.join(",", new ArrayList<>(neverPro)));
+		}
+	}
+
 	private static final class Result {
 		final boolean testRun;
-		final List<String> notifiedHadPro = Collections.synchronizedList(new ArrayList<>());
-		final List<String> notifiedNeverPro = Collections.synchronizedList(new ArrayList<>());
-		final List<Map<String, Object>> deleted = Collections.synchronizedList(new ArrayList<>());
+		final UserLists newUsers = new UserLists();
+		final UserLists stillInactive = new UserLists();
+		final UserLists reactivated = new UserLists();
+		final UserLists eligibleForDelete = new UserLists();
+		final UserLists deleted = new UserLists();
 		final List<Map<String, Object>> failedUsers = Collections.synchronizedList(new ArrayList<>());
 		final AtomicInteger users = new AtomicInteger();
-		final AtomicInteger reactivated = new AtomicInteger();
-		final AtomicInteger pending = new AtomicInteger();
-		final AtomicInteger failed = new AtomicInteger();
 
 		Result(boolean testRun) {
 			this.testRun = testRun;
@@ -237,18 +262,14 @@ public class NotifyInactiveUsersOperation extends AbstractFileFixOperation imple
 
 		Map<String, Object> toResult() {
 			Map<String, Object> r = new LinkedHashMap<>();
-			r.put("toMail", notifiedHadPro.size() + notifiedNeverPro.size());
-			r.put("deletedCount", deleted.size());
-			r.put("hadProCount", notifiedHadPro.size());
-			r.put("neverProCount", notifiedNeverPro.size());
-			r.put("reactivated", reactivated.get());
-			r.put("pending", pending.get());
-			r.put("failed", failed.get());
 			r.put("users", users.get());
 			r.put("testRun", testRun);
-			r.put("mailHadPro", String.join(",", new ArrayList<>(notifiedHadPro)));
-			r.put("mailNeverPro", String.join(",", new ArrayList<>(notifiedNeverPro)));
-			r.put("deleted", new ArrayList<>(deleted));
+			r.put("failed", failedUsers.size());
+			newUsers.putTo(r, "new");
+			stillInactive.putTo(r, "stillInactive");
+			reactivated.putTo(r, "reactivated");
+			eligibleForDelete.putTo(r, "eligibleForDelete");
+			deleted.putTo(r, "deleted");
 			r.put("failedUsers", new ArrayList<>(failedUsers));
 			return r;
 		}
