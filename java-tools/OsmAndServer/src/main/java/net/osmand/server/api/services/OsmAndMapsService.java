@@ -127,9 +127,6 @@ public class OsmAndMapsService {
 	private static final long INTERVAL_TO_MONITOR_ZIP = 5 * 60 * 1000;
 	private static final long INTERVAL_TO_CLEANUP_ROUTING_CACHE = 10 * 60 * 1000;
 
-	private static final boolean UNZIP_SRTM_METERS = true;
-	private static final boolean UNZIP_SRTM_FEET = false; // currently unsupported
-
 	// counts only files open for Java (doesn't fit for rendering / routing)
 	private static final int MAX_SAME_FILE_OPEN = 15;
 	private static final long CACHE_MAX_ROUTING_CONTEXT_SEC = Integer.MAX_VALUE; //12 * 60 * 60; // 12h
@@ -586,14 +583,10 @@ public class OsmAndMapsService {
 			if (srtmUnzip == null || srtmUnzip.isDone()) {
 				srtmUnzip = srtmUnzipExecutor.submit(() -> {
 					try {
-						if (UNZIP_SRTM_METERS) {
-							unzipNewObfFiles(tileConfig.obfSrtmZipLocation, tileConfig.obfSrtmLocation,
-									IndexConstants.BINARY_SRTM_MAP_INDEX_EXT_ZIP, true);
-						}
-						if (UNZIP_SRTM_FEET) {
-							unzipNewObfFiles(tileConfig.obfSrtmZipLocation, tileConfig.obfSrtmLocation,
-									IndexConstants.BINARY_SRTM_FEET_MAP_INDEX_EXT_ZIP, true);
-						}
+						unzipNewObfFiles(tileConfig.obfSrtmZipLocation, tileConfig.obfSrtmLocation,
+								IndexConstants.BINARY_SRTM_MAP_INDEX_EXT_ZIP, true);
+						unzipNewObfFiles(tileConfig.obfSrtmZipLocation, tileConfig.obfSrtmLocation,
+								IndexConstants.BINARY_SRTM_FEET_MAP_INDEX_EXT_ZIP, true);
 					} catch (IOException e) {
 						LOGGER.error(e.getMessage(), e);
 					}
@@ -714,10 +707,11 @@ public class OsmAndMapsService {
 		return image;
 	}
 
-	public byte[] renderMapboxVectorTile(int zoom, int x, int y, int shift, boolean contourLinesOnly) throws IOException {
+	public byte[] renderMapboxVectorTile(int zoom, int x, int y, int shift, boolean contourLinesOnly, boolean feet)
+			throws IOException {
 		byte[] tile = null;
 		if (nativelib != null) {
-			tile = nativelib.getMapboxVectorTileFile(zoom, x, y, shift, contourLinesOnly);
+			tile = nativelib.getMapboxVectorTileFile(zoom, x, y, shift, contourLinesOnly, feet);
 		}
 		return tile;
 	}

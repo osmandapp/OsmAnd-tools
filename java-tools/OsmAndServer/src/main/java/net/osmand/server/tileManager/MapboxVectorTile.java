@@ -22,15 +22,17 @@ public class MapboxVectorTile implements TileCacheProvider, Comparable<MapboxVec
 	public final int z;
 	public final int shift;
 	public final boolean contourLinesOnly;
+	public final boolean feet;
 	private static final long THREE_HOURS_IN_MILLIS = 3 * 60 * 60 * 1000L;
 
-	public MapboxVectorTile(TileServerConfig cfg, int x, int y, int z, int shift, boolean contourLinesOnly) {
+	public MapboxVectorTile(TileServerConfig cfg, int x, int y, int z, int shift, boolean contourLinesOnly, boolean feet) {
 		this.cfg = cfg;
 		this.x = x;
 		this.y = y;
 		this.z = z;
 		this.shift = normalizeShift(z, shift);
 		this.contourLinesOnly = contourLinesOnly;
+		this.feet = feet;
 		setTileId();
 		touch();
 	}
@@ -61,14 +63,14 @@ public class MapboxVectorTile implements TileCacheProvider, Comparable<MapboxVec
 		return dataZoom == Math.min(MAX_MVT_TILES_ZOOM, baseDataZoom) ? 0 : dataZoom - baseDataZoom;
 	}
 
-	// vector, vector-shift-1, vector-shift+1, vector-contours, vector-contours-shift+1, etc.
-	public static String getCacheNamespace(int shift, boolean contourLinesOnly) {
-		String namespace = contourLinesOnly ? "vector-contours" : "vector";
+	// vector, vector-shift-1, vector-shift+1, vector-contours, vector-contours-shift+1, vector-contours-feet, etc.
+	public static String getCacheNamespace(int shift, boolean contourLinesOnly, boolean feet) {
+		String namespace = contourLinesOnly ? (feet ? "vector-contours-feet" : "vector-contours") : "vector";
 		return shift == 0 ? namespace : namespace + "-shift" + (shift > 0 ? "+" : "") + shift;
 	}
 
 	public void setTileId() {
-		this.tileId = this.cfg.createTileId(getCacheNamespace(shift, contourLinesOnly), x, y, z, -1, -1);
+		this.tileId = this.cfg.createTileId(getCacheNamespace(shift, contourLinesOnly, feet), x, y, z, -1, -1);
 	}
 
 	public synchronized byte[] getCacheRuntimeTile() throws IOException {
@@ -88,7 +90,7 @@ public class MapboxVectorTile implements TileCacheProvider, Comparable<MapboxVec
 		return TileCacheProvider.super.getCacheFile(
 				cfg.mvtsLocation, ext, z, x, y,
 				-1, -1,
-				getCacheNamespace(shift, contourLinesOnly), null, MAX_ZOOM
+				getCacheNamespace(shift, contourLinesOnly, feet), null, MAX_ZOOM
 		);
 	}
 

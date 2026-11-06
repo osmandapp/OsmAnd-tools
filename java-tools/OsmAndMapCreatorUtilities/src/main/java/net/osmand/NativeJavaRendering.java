@@ -635,10 +635,11 @@ public class NativeJavaRendering extends NativeLibrary {
 		}
 	}
 
-	public byte[] getMapboxVectorTileFile(int zoom, int x, int y, int shift, boolean contourLinesOnly) throws IOException {
+	public byte[] getMapboxVectorTileFile(int zoom, int x, int y, int shift, boolean contourLinesOnly, boolean feet)
+			throws IOException {
         ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
         try (GZIPOutputStream gzipStream = new GZIPOutputStream(byteStream)) {
-            gzipStream.write(NativeLibrary.getMapboxVectorTileData(zoom, x, y, shift, contourLinesOnly));
+            gzipStream.write(NativeLibrary.getMapboxVectorTileData(zoom, x, y, shift, contourLinesOnly, feet));
         }
     	return byteStream.toByteArray();
 	}
