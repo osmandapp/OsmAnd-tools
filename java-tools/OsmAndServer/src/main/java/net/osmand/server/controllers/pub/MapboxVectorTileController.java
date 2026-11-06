@@ -1,6 +1,5 @@
 package net.osmand.server.controllers.pub;
 
-import java.awt.*;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -69,8 +68,8 @@ public class MapboxVectorTileController {
 		return renderTileResponse(z, x, y, cache, shift, true, true);
 	}
 
-	private ResponseEntity<?> renderTileResponse(int z, int x, int y, boolean cache, int shift, boolean contourLinesOnly,
-			boolean feet) throws IOException {
+	private ResponseEntity<?> renderTileResponse(int z, int x, int y, boolean cache, int shift,
+	                                             boolean contoursOnly, boolean feetContours) throws IOException {
 		if (shift < MapboxVectorTile.MIN_SHIFT || shift > MapboxVectorTile.MAX_SHIFT) {
 			return errorConfig("shift must be between " + MapboxVectorTile.MIN_SHIFT + " and " + MapboxVectorTile.MAX_SHIFT);
 		}
@@ -85,10 +84,8 @@ public class MapboxVectorTileController {
 		}
 
 		int effectiveShift = MapboxVectorTile.normalizeShift(z, shift);
-		String tileId = config.createTileId(MapboxVectorTile.getCacheNamespace(effectiveShift, contourLinesOnly, feet), x, y, z, -1, -1);
-        MapboxVectorTile tile = tileMemoryCache.getTile(tileId, k -> new MapboxVectorTile(config, x, y, z, effectiveShift, contourLinesOnly, feet));
-        // for testing
-        //MapboxVectorTile tile = new MapboxVectorTile(config, x, y, z, shift, contourLinesOnly);
+		String tileId = config.createTileId(MapboxVectorTile.getCacheNamespace(effectiveShift, contoursOnly, feetContours), x, y, z, -1, -1);
+        MapboxVectorTile tile = tileMemoryCache.getTile(tileId, k -> new MapboxVectorTile(config, x, y, z, effectiveShift, contoursOnly, feetContours));
         tileMemoryCache.conditionalCleanupCache();
 		byte[] data = cache ? tile.getCacheRuntimeTile() : null;
 		if (cache) {
@@ -164,7 +161,7 @@ public class MapboxVectorTileController {
 		if (DEBUG) {
 			LOGGER.info("Start rendering tile [" + tile.getTileId() + "] on thread: " + Thread.currentThread().getId());
 		}
-        Future<byte[]> future = executor.submit(() -> osmAndMapsService.renderMapboxVectorTile(tile.z, tile.x, tile.y, tile.shift, tile.contourLinesOnly, tile.feet));
+        Future<byte[]> future = executor.submit(() -> osmAndMapsService.renderMapboxVectorTile(tile.z, tile.x, tile.y, tile.shift, tile.contoursOnly, tile.feetContours));
         byte[] data;
 		try {
             data = future.get(30, TimeUnit.SECONDS);
