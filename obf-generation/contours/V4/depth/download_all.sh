@@ -265,7 +265,7 @@ if want uk; then
 	# 0.0002 degree GeoTIFF, so a 78 MB 2 m BAG turns into a 1.7 MB file. The surveys are then blended into uk.vrt
 	# over the EMODnet coastal underlay, with 10 px transitions between surveys and 20 px to the underlay.
 	UKHO_CONV_JOBS=${UKHO_CONV_JOBS:-$JOBS}
-	UK_FEATHER=${UK_FEATHER:-10}
+	UK_FEATHER=${UK_FEATHER:-5}
 	UK_COASTAL_FILL=${UK_COASTAL_FILL:-6000}
 	# OsmAnd-misc polygon of Ireland: Irish waters belong to Ireland_contours and are cut out of the UK grid
 	IRELAND_POLY=${IRELAND_POLY:-/home/xmd5a/git/OsmAnd-misc/osm-planet/polygons/europe/west-europe/ireland.poly}

@@ -180,7 +180,7 @@ def blend_boundaries(before, ids, arrays, width, underlay_width=None, underlay_i
     return after, transitions
 
 
-def mosaic_window(base, window, sources, feather, emodnet_feather=20):
+def mosaic_window(base, window, sources, feather, emodnet_feather=10):
     shape = (int(window.height), int(window.width))
     bounds = window_bounds(window, base.transform)
     if len(sources) <= 1:
@@ -215,14 +215,14 @@ def mosaic_window(base, window, sources, feather, emodnet_feather=20):
     return after, before, count, change
 
 
-def blend_strip(raw_path, strip, source_infos, feather, out_path):
+def blend_strip(raw_path, strip, source_infos, feather, out_path, emodnet_feather=10):
     open_source.cache_clear()
     index, row0, row1 = strip
     with rasterio.open(raw_path) as base:
         # Blend needs a halo: a source boundary just outside a block must still feather into it,
         # otherwise the block/strip edge becomes a hard step. Sources are therefore filtered with
         # the same margin, and only the central part of each expanded block is written.
-        margin = max(feather, 20) // 2 + 2
+        margin = max(feather, emodnet_feather) // 2 + 2
         strip_window = Window(0, row0, base.width, row1 - row0)
         strip_bounds = window_bounds(strip_window, base.transform)
         pad = margin * base.res[0]
@@ -249,7 +249,8 @@ def blend_strip(raw_path, strip, source_infos, feather, out_path):
                     expanded = Window(ecol0, erow0, ecol1 - ecol0, erow1 - erow0)
                     bounds = window_bounds(expanded, base.transform)
                     candidates = [s for s in sources if not disjoint_bounds(s[1], bounds)]
-                    after, before, _, _ = mosaic_window(base, expanded, candidates, feather)
+                    after, before, _, _ = mosaic_window(base, expanded, candidates, feather,
+                                                        emodnet_feather)
                     ys = slice(row - erow0, row - erow0 + height)
                     xs = slice(col - ecol0, col - ecol0 + width)
                     out = after[ys, xs]
@@ -278,7 +279,7 @@ def atomic_vrt(inputs, list_path, out_path, cell):
             os.remove(tmp)
 
 
-def build_full(uk, raw_path, feather=10, jobs=16):
+def build_full(uk, raw_path, feather=10, jobs=16, emodnet_feather=10):
     uk = os.path.abspath(uk)
     with open(os.path.join(uk, "uk_vrt_sources.txt")) as f:
         paths = [p.strip() for p in f if p.strip()]
@@ -302,7 +303,8 @@ def build_full(uk, raw_path, feather=10, jobs=16):
     with ProcessPoolExecutor(max_workers=jobs) as pool:
         for strip in strips:
             tmp = os.path.join(blend_dir, f"strip_{strip[0]:02d}.tmp.tif")
-            futures.append(pool.submit(blend_strip, raw_path, strip, source_infos, feather, tmp))
+            futures.append(pool.submit(blend_strip, raw_path, strip, source_infos, feather, tmp,
+                                       emodnet_feather))
         results = [f.result() for f in as_completed(futures)]
     finals = []
     for i in range(jobs):
@@ -314,7 +316,7 @@ def build_full(uk, raw_path, feather=10, jobs=16):
                os.path.join(uk, "uk.vrt"), cell)
     cells = sum(r[1] for r in results)
     change = sum(r[2] for r in results)
-    print(f"uk.vrt: {len(used)} sources, {jobs} strips, feather {feather} px (EMODnet 20 px), "
+    print(f"uk.vrt: {len(used)} sources, {jobs} strips, feather {feather} px (EMODnet {emodnet_feather} px), "
           f"{cells} transition cells, mean absolute change {change / cells:.3f} m", flush=True)
 
 
@@ -343,7 +345,7 @@ def blend(sources, before, bounds, widths):
     underlay_id = next((i for i, (path, _, _) in enumerate(kept)
                         if os.path.basename(path) == "emodnet_fill.vrt"), None)
     for width in widths:
-        after, changed = blend_boundaries(hard, ids, arrays, width, 20, underlay_id,
+        after, changed = blend_boundaries(hard, ids, arrays, width, 10, underlay_id,
                                           underlay_priority=1.0)
         results[width] = after
         transitions[width] = changed
