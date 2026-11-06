@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build src/uk/uk.vrt from grid/*.tif with newer and finer surveys taking priority.
 
-Surveys coarser than 120 m are excluded. Masked EMODnet is the lowest-priority source of the
+Surveys coarser than 80 m are excluded (--max-cell). Masked EMODnet is the lowest-priority source of the
 unblended uk_sources.vrt. Fully hidden older sources are omitted and the remaining overlaps are
 feathered by uk_blend.py; --feather 0 keeps the hard source boundaries.
 
@@ -101,7 +101,7 @@ def title_date(title):
     return m.group(1) if m else ""
 
 
-def survey_sources(uk, max_cell_m=120):
+def survey_sources(uk, max_cell_m=80):
     titles = zip_titles(uk)
     meta = survey_meta(uk)
     files = []
@@ -137,12 +137,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("uk")
     ap.add_argument("--feather", type=int, default=10)
+    ap.add_argument("--max-cell", type=float, default=80,
+                    help="exclude surveys whose native cell is coarser than this, in metres")
     ap.add_argument("-j", type=int, default=max(1, (os.cpu_count() or 2) // 2))
     args = ap.parse_args()
     if args.feather < 0:
         ap.error("--feather must not be negative")
     uk = os.path.abspath(args.uk)
-    paths, _ = survey_sources(uk)
+    paths, _ = survey_sources(uk, args.max_cell)
     underlay = os.path.join(uk, "emodnet_fill.vrt")
     if not os.path.exists(underlay):
         raise SystemExit(f"No {underlay}; run uk_emodnet_fill.py --build-vrt first")
