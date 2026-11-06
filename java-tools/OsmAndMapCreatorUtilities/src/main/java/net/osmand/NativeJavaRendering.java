@@ -428,6 +428,7 @@ public class NativeJavaRendering extends NativeLibrary {
 	public void initFilesInDir(File filesDir) throws IOException {
 		List<File> obfFiles = new ArrayList<>();
 		Map<String, FileIndex> mp = initIndexesCache(filesDir, obfFiles, false);
+		initCacheMapFile(new File(filesDir, INDEXES_CACHE).getAbsolutePath());
 		initFilesInDir(obfFiles, mp);
 	}
 
