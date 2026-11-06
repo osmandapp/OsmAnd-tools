@@ -8,8 +8,14 @@ Dirichlet boundaries land = 0 and the survey depths. Open sea without data stays
 mosaic is processed in tiles with an overlap margin; the result is a VRT over per-tile
 GeoTIFFs, so the input is not copied as one huge raster.
 
+The grid of the UK reaches into the waters of the neighbouring countries, and their land
+lies in it as well. With --foreign the land inside those polygons is not this map's coast:
+it stays NaN, it is no 0 m boundary of the fill, and the fill does not reach into their
+waters (the corridor is measured from the coast of this map only).
+
     uk_coastal_fill.py SRC OUT_DIR --land LAND [--exclude IRELAND.poly] [--exclude-raster ireland.vrt]
-                       [--land-mask land_mask.tif] [--limit 6000] [--tile 4096] [--margin 500] [-j N]
+                       [--land-mask land_mask.tif] [--foreign NEIGHBOUR.poly ...]
+                       [--limit 6000] [--tile 4096] [--margin 500] [-j N]
 """
 
 import argparse
@@ -134,31 +140,39 @@ def laplace_fill(land, data, fill):
     return values
 
 
-def fill_window(depth, land, transform, limit, exclude=None):
+def fill_window(depth, land, transform, limit, exclude=None, foreign=None):
     finite = np.isfinite(depth)
     data = finite & ~land
-    # a finite value, including a drying bank above 0 m, is kept as is; land without
-    # data is the only source of the 0 m boundary
-    values = np.where(finite, depth, np.where(land, 0.0, np.nan)).astype(np.float32)
+    # the land of a neighbouring country is not this map's coast: it is no 0 m boundary
+    # and it stays NaN in the output
+    uk_land = land if foreign is None else (land & ~foreign)
+    # a finite value, including a drying bank above 0 m, is kept as is; the land of this
+    # map without data is the only source of the 0 m boundary
+    values = np.where(finite, depth, np.nan).astype(np.float32)
+    values[uk_land] = 0.0
     gap = ~land & ~data
     # no land or no data means no fill corridor at all; no gap means nothing to solve
-    if not data.any() or not land.any() or not gap.any():
+    if not data.any() or not uk_land.any() or not gap.any():
         out = values.astype(np.float32)
+        out[land & ~uk_land] = np.nan
         if exclude is not None:
             out[exclude] = np.nan
-        return out, 0
+        return out, 0, np.zeros(depth.shape, dtype=bool)
     lat = transform.f + transform.e * depth.shape[0] / 2
     sy = abs(transform.e) * 111320.0
     sx = sy * math.cos(math.radians(lat))
-    dist_land = ndimage.distance_transform_edt(~land, sampling=(sy, sx))
+    # the corridor is measured from the coast of this map, so the fill does not creep
+    # into the waters of a neighbouring country
+    dist_land = ndimage.distance_transform_edt(~uk_land, sampling=(sy, sx))
     dist_data = ndimage.distance_transform_edt(~data, sampling=(sy, sx))
     fill = gap & ((dist_land + dist_data) <= limit)
-    filled = laplace_fill(land, values, fill)
+    filled = laplace_fill(uk_land, values, fill)
     out = filled.astype(np.float32)
     out[~land & ~data & ~fill] = np.nan
+    out[land & ~uk_land] = np.nan
     if exclude is not None:
         out[exclude] = np.nan
-    return out, int(fill.sum())
+    return out, int(fill.sum()), fill
 
 
 def tile_path(tile_dir, col, row):
@@ -167,7 +181,7 @@ def tile_path(tile_dir, col, row):
 
 def process_tiles(src, tile_dir, land, land_layer, width, height,
                   limit, tile_size, margin, tiles, force, exclude_shapes, exclude_raster,
-                  land_mask_path):
+                  land_mask_path, foreign_shapes=None):
     written = 0
     filled = 0
     with rasterio.open(src) as ds:
@@ -200,17 +214,28 @@ def process_tiles(src, tile_dir, land, land_layer, width, height,
                         arr = other.read(1, window=win, out_shape=depth.shape, boundless=True,
                                          fill_value=np.nan, resampling=Resampling.nearest)
                         exclude |= np.isfinite(arr)
-            out, count = fill_window(depth, mask, window_transform, limit, exclude if exclude.any() else None)
+            foreign = None
+            if foreign_shapes:
+                foreign = rasterize(foreign_shapes, out_shape=depth.shape, transform=window_transform,
+                                    fill=0, dtype="uint8", all_touched=True).astype(bool)
+                if exclude is not None and exclude.any():
+                    # the excluded waters (Ireland) are not this map's coast either
+                    foreign |= exclude
+            out, count, fill_mask = fill_window(depth, mask, window_transform, limit,
+                                                exclude if exclude.any() else None, foreign)
             central = out[y0 - ey0:y1 - ey0, x0 - ex0:x1 - ex0]
+            central_filled = fill_mask[y0 - ey0:y1 - ey0, x0 - ex0:x1 - ex0]
             central_transform = ds.window_transform(Window(x0, y0, x1 - x0, y1 - y0))
             profile = {
-                "driver": "GTiff", "width": x1 - x0, "height": y1 - y0, "count": 1,
+                "driver": "GTiff", "width": x1 - x0, "height": y1 - y0, "count": 2,
                 "dtype": "float32", "crs": ds.crs, "transform": central_transform,
                 "nodata": float("nan"), "compress": "deflate", "predictor": 3,
                 "tiled": True, "bigtiff": "IF_SAFER",
             }
             with rasterio.open(path + ".tmp", "w", **profile) as dst:
                 dst.write(central, 1)
+                # the second band marks the cells whose value is interpolated
+                dst.write(central_filled.astype(np.uint8), 2)
             os.replace(path + ".tmp", path)
             written += 1
             filled += count
@@ -233,6 +258,10 @@ def main():
     parser.add_argument("--name", default="uk_filled", help="name of the output VRT")
     parser.add_argument("--exclude", help="OsmAnd .poly to mask out (Ireland)")
     parser.add_argument("--exclude-raster", help="raster whose valid cells are masked out (INFOMAR)")
+    parser.add_argument("--foreign", action="append",
+                        help="OsmAnd .poly of a neighbouring country: the land inside it is not "
+                             "this map's coast, it stays NaN and the fill does not reach into its "
+                             "waters, can be given several times")
     parser.add_argument("--force", action="store_true", help="reprocess existing tiles")
     args = parser.parse_args()
 
@@ -261,6 +290,11 @@ def main():
     if args.land_mask and not os.path.exists(args.land_mask):
         create_land_mask(args.land_mask, land_path, land_layer, bounds, width, height)
     exclude_shapes = poly_shapes(args.exclude) if args.exclude else None
+    foreign_shapes = []
+    for path in args.foreign or []:
+        foreign_shapes.extend(poly_shapes(path))
+    if foreign_shapes:
+        print(f"foreign land: {len(args.foreign)} polygons", flush=True)
     tile_dir = os.path.join(args.out_dir, "fill_tiles")
     os.makedirs(tile_dir, exist_ok=True)
     ncols = math.ceil(width / args.tile)
@@ -276,7 +310,7 @@ def main():
         futures = [
             pool.submit(process_tiles, args.src, tile_dir, land_path, land_layer, width, height,
                         args.limit, args.tile, args.margin, chunk, args.force,
-                        exclude_shapes, args.exclude_raster, args.land_mask)
+                        exclude_shapes, args.exclude_raster, args.land_mask, foreign_shapes)
             for chunk in chunks if chunk
         ]
         for future in as_completed(futures):
@@ -295,11 +329,24 @@ def main():
         os.chmod(vrt, 0o644)
     cmd = [
         "gdalbuildvrt", "-q", "-overwrite", "-srcnodata", "nan", "-vrtnodata", "nan",
+        "-b", "1",
         "-te", repr(bounds.left), repr(bounds.bottom), repr(bounds.right), repr(bounds.top),
         "-tr", repr(res[0]), repr(res[1]), vrt,
     ] + tile_files
     subprocess.run(cmd, check=True)
     os.chmod(vrt, 0o444)
+    # the second band of the tiles marks the interpolated cells: no depth point is placed on them
+    interp = os.path.join(args.out_dir, f"{args.name}_interp.vrt")
+    if os.path.exists(interp):
+        os.chmod(interp, 0o644)
+    cmd = [
+        "gdalbuildvrt", "-q", "-overwrite", "-srcnodata", "nan", "-vrtnodata", "nan",
+        "-b", "2",
+        "-te", repr(bounds.left), repr(bounds.bottom), repr(bounds.right), repr(bounds.top),
+        "-tr", repr(res[0]), repr(res[1]), interp,
+    ] + tile_files
+    subprocess.run(cmd, check=True)
+    os.chmod(interp, 0o444)
     print(f"{vrt}: {written} tiles written, {filled} filled cells", flush=True)
 
 

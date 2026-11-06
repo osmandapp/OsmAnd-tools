@@ -220,7 +220,7 @@ if [ ${#FILES[@]} -eq 0 ]; then fail "uk: no surveys in src/uk/grid (downloaded 
 else
 	rasters_open uk "${FILES[@]}"
 	# uk.vrt is the blended mosaic written by uk_build_vrt.py, not a VRT of all the tifs: never rebuild it here
-	for v in "$SRC/uk/emodnet_fill.vrt" "$SRC/uk/uk.vrt" "$SRC/uk/uk_filled.vrt"; do
+	for v in "$SRC/uk/emodnet_fill.vrt" "$SRC/uk/uk.vrt" "$SRC/uk/uk_interp.vrt" "$SRC/uk/uk_filled.vrt" "$SRC/uk/uk_filled_interp.vrt"; do
 		if [ ! -f "$v" ]; then fail "uk: $(basename "$v") not found (run download_all.sh --only uk)"
 		elif gdalinfo "$v" >/dev/null 2>&1; then ok "uk: $(basename "$v") opens"
 		else fail "uk: $(basename "$v") does not open"; fi
@@ -265,6 +265,26 @@ EOF
 )
 	if [ $? -eq 0 ]; then ok "uk: drying bank at Tay (-3.112839 56.401750) stays a shallow bank"
 	else fail "uk: drying bank at Tay (-3.112839 56.401750) is too deep or changed"; fi
+	# the land of the neighbouring countries is not this map's coast: it stays empty, and the
+	# coastal fill does not reach into their waters
+	v=$(python3 - "$SRC/uk/uk_filled.vrt" <<'EOF' 2>/dev/null
+import sys
+import rasterio
+pts = [(1.85, 50.95, "Calais"), (2.37, 51.03, "Dunkirk"), (1.35, 51.13, "Dover")]
+with rasterio.open(sys.argv[1]) as ds:
+    for lon, lat, name in pts:
+        v = float(next(ds.sample([(lon, lat)]))[0])
+        if name == "Dover":
+            if v != 0:
+                print(f"{name} {v}")
+                sys.exit(1)
+        elif v == v:  # not NaN
+            print(f"{name} {v}")
+            sys.exit(1)
+EOF
+)
+	if [ $? -eq 0 ]; then ok "uk: the coast of France and Belgium stays out of the map"
+	else fail "uk: foreign land or water in the map: $v"; fi
 fi
 
 echo "== nz"

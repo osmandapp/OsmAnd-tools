@@ -269,6 +269,10 @@ if want uk; then
 	UK_COASTAL_FILL=${UK_COASTAL_FILL:-6000}
 	# OsmAnd-misc polygon of Ireland: Irish waters belong to Ireland_contours and are cut out of the UK grid
 	IRELAND_POLY=${IRELAND_POLY:-/home/xmd5a/git/OsmAnd-misc/osm-planet/polygons/europe/west-europe/ireland.poly}
+	# the neighbouring countries whose land lies in the UK grid: it is not the coast of this map,
+	# so it stays NaN and the coastal fill does not reach into their waters
+	POLY_DIR=${POLY_DIR:-/home/xmd5a/git/OsmAnd-misc/osm-planet/polygons/europe/west-europe}
+	UK_FOREIGN_POLYS=${UK_FOREIGN_POLYS:-"$POLY_DIR/france.poly $POLY_DIR/belgium.poly $POLY_DIR/netherlands.poly"}
 	if [ $DRY -eq 1 ]; then
 		echo "uk           UKHO Seabed Mapping Service surveys (BAG or CSV points), then the EMODnet underlay, uk.vrt and the coastal fill"
 	else
@@ -302,9 +306,15 @@ if want uk; then
 		"$HERE/uk_emodnet_fill.py" "$SRC/uk" "$emodnet" "$land" "$ireland" "$IRELAND_POLY" \
 			--output "$OUT/preview" --build-vrt
 		"$HERE/uk_build_vrt.py" "$SRC/uk" --feather "$UK_FEATHER" -j "$UKHO_CONV_JOBS"
-		# fill the gap between the coastline (0 m) and the surveys, so depth areas reach the coast
+		# fill the gap between the coastline (0 m) and the surveys, so depth areas reach the coast;
+		# the land of the neighbouring countries is not zeroed and their waters are not filled
+		foreign_args=()
+		for p in $UK_FOREIGN_POLYS; do
+			[ -e "$p" ] || { echo "FAILED uk: $p not found (the polygons of the neighbouring countries)" >&2; exit 1; }
+			foreign_args+=(--foreign "$p")
+		done
 		"$HERE/uk_coastal_fill.py" "$SRC/uk/uk.vrt" "$SRC/uk" --land "$land" \
-			--exclude "$IRELAND_POLY" --exclude-raster "$ireland" \
+			--exclude "$IRELAND_POLY" --exclude-raster "$ireland" "${foreign_args[@]}" \
 			--limit "$UK_COASTAL_FILL" -j "$UKHO_CONV_JOBS"
 	fi
 fi

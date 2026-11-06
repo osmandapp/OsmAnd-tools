@@ -43,12 +43,48 @@ def shifted_any(valid, r, axis, sign):
     return out
 
 
-def fill_one(path, half_width, closed_width, sigma, passes, write):
+def both_sides(valid, axis, radius):
+    """True where valid data lies within radius cells on both sides along axis."""
+    n = valid.shape[axis]
+    shape = [1] * valid.ndim
+    shape[axis] = n
+    pos = np.arange(n).reshape(shape)
+    before = np.maximum.accumulate(np.where(valid, pos, -1), axis=axis)
+    after = np.flip(np.minimum.accumulate(np.flip(np.where(valid, pos, n), axis=axis), axis=axis), axis=axis)
+    return (before >= 0) & (after < n) & ((pos - before) <= radius) & ((after - pos) <= radius)
+
+
+def grid_survey(a, sigma, valid, fill):
+    """Resample a survey over its own area with a Gaussian of sigma cells.
+
+    A systematic survey is run in parallel lines, and the strips between the lines were never
+    measured: the lines carry the crests of the sand waves and the strips the mean level, so
+    at the grid of the mosaic the survey shows its line pattern as a regular structure. A low
+    pass over the survey merges the lines into one surface. Only the cells of the survey (its
+    data and the strips between its lines) are written, so the neighbouring surveys are not
+    touched.
+    """
+    w = ndimage.gaussian_filter(valid.astype(np.float32), sigma)
+    v = ndimage.gaussian_filter(np.where(valid, a, 0).astype(np.float32), sigma)
+    est = np.divide(v, w, out=np.full(a.shape, np.nan, np.float32), where=w > 0)
+    out = a.copy()
+    cells = valid | fill
+    out[cells] = est[cells]
+    # the intertidal is measured: the drying heights and the shallow banks keep their value,
+    # the resampling would flatten them
+    keep = cells & (a > -1.0)
+    out[keep] = a[keep]
+    return out
+
+
+def fill_one(path, half_width, closed_width, sigma, passes, write, wide_width=40.0, grid_sigma=4.0):
     """Returns (path, filled pixels, NaN pixels before); filled is -1 when the tif has failed."""
     try:
         with rasterio.open(path) as d:
             a = d.read(1)
             prof = d.profile
+            # the cells that were interpolated in an earlier run keep their mark
+            previous = d.read(2) > 0.5 if d.count > 1 else None
         nan = ~np.isfinite(a)
         if not nan.any():
             return path, 0, 0
@@ -57,6 +93,7 @@ def fill_one(path, half_width, closed_width, sigma, passes, write):
         r = int(math.ceil(half_width))
         filled = 0
         a = a.copy()
+        mask = previous.copy() if previous is not None else np.zeros(a.shape, dtype=bool)
         # each pass closes the narrow holes of the current surface; a second pass is needed where
         # a diagonal chain of one-cell gaps leaves no data on both sides until its neighbours are
         # filled, and the count falls fast (3.2M, 1.3M, 0.23M on the UK set), so a few passes
@@ -71,8 +108,8 @@ def fill_one(path, half_width, closed_width, sigma, passes, write):
             valid = ~nan
             thin_x = shifted_any(valid, r, 1, -1) & shifted_any(valid, r, 1, 1)
             thin_y = shifted_any(valid, r, 0, -1) & shifted_any(valid, r, 0, 1)
-            mask = nan & (dist <= half_width) & (thin_x | thin_y)
-            n = int(mask.sum())
+            gap = nan & (dist <= half_width) & (thin_x | thin_y)
+            n = int(gap.sum())
             if not n:
                 break
             # a smooth estimate from the valid neighbours: the Gaussian sums of the values and of
@@ -80,10 +117,31 @@ def fill_one(path, half_width, closed_width, sigma, passes, write):
             w = ndimage.gaussian_filter(valid.astype(np.float32), sigma)
             v = ndimage.gaussian_filter(np.where(valid, a, 0).astype(np.float32), sigma)
             est = np.divide(v, w, out=np.zeros_like(v), where=w > 0)
-            ok = mask & np.isfinite(est)
+            ok = gap & np.isfinite(est)
             a[ok] = est[ok]
             nan[ok] = False
+            mask |= ok
             filled += int(ok.sum())
+        # A systematic survey is run in parallel swaths and the strips between them were never
+        # measured: the swaths carry the crests of the sand waves and the strips the mean
+        # level, so at the grid of the mosaic the survey shows its swath pattern as a regular
+        # structure. Such a survey is resampled over its own area (grid_survey), which merges
+        # the swaths into one surface, and every cell of it counts as interpolated: no depth
+        # point is placed on it. A survey with little missing data keeps its values: only its
+        # thin gaps are closed.
+        # the coverage is the measured cells against the area the survey reaches: a systematic
+        # survey covers a small part of it, an ordinary survey nearly all of it
+        dist = ndimage.distance_transform_edt(~valid0)
+        footprint = dist <= wide_width
+        coverage = valid0.sum() / max(1, footprint.sum())
+        wide = nan & (both_sides(valid0, 1, int(wide_width)) | both_sides(valid0, 0, int(wide_width)))
+        if coverage < 0.25 and wide.any():
+            # the whole area of the survey is resampled, the data and the closed strips alike,
+            # so that the swaths and the strips become one surface
+            a = grid_survey(a, grid_sigma, valid0, np.isfinite(a) | wide)
+            nan = ~np.isfinite(a)
+            mask = np.isfinite(a) | wide
+            filled += int(wide.sum())
         # a closed hole wider than the thin gaps (a gap between two swaths): filled by a Laplace
         # interpolation as long as it lies inside the footprint and is not wider than closed_width
         if closed_width > half_width and nan.any():
@@ -124,6 +182,7 @@ def fill_one(path, half_width, closed_width, sigma, passes, write):
                     est = np.divide(v, w, out=np.zeros_like(v), where=w > 0)
                     put = hole & np.isfinite(est)
                     sub[put] = est[put]
+                    mask[r0:r1, c0:c1] |= put
                     filled += int(put.sum())
                 if len(take):
                     nan = np.isnan(a)
@@ -132,10 +191,13 @@ def fill_one(path, half_width, closed_width, sigma, passes, write):
             print(f"FAILED {os.path.basename(path)}: {bad} valid cells would turn NaN, "
                   f"nothing written", flush=True)
             return path, -1, nan0
-        if filled and write:
+        if write:
             tmp = path + ".tmp.tif"
+            prof.update(count=2, dtype="float32", nodata=np.nan)
             with rasterio.open(tmp, "w", **prof) as dst:
                 dst.write(a, 1)
+                # the second band marks the cells whose value is interpolated
+                dst.write(mask.astype(np.float32), 2)
             os.replace(tmp, path)
     except Exception as e:
         print(f"FAILED {os.path.basename(path)}: {type(e).__name__} {e}", flush=True)
@@ -157,6 +219,12 @@ def main():
     ap.add_argument("--passes", type=int, default=3,
                     help="fill passes per tif: a diagonal chain needs its neighbours filled first "
                          "(default 3)")
+    ap.add_argument("--wide-width", type=float, default=40.0,
+                    help="the strips of a systematic survey are closed up to this width, cells "
+                         "(default 40)")
+    ap.add_argument("--grid-sigma", type=float, default=4.0,
+                    help="the systematic surveys are resampled over their own area with a "
+                         "Gaussian of this sigma, cells (default 4)")
     ap.add_argument("--report", action="store_true", help="count only, rewrite nothing")
     args = ap.parse_args()
     grid = os.path.join(args.uk, "grid")
@@ -171,7 +239,8 @@ def main():
     with ProcessPoolExecutor(max_workers=max(1, args.j)) as ex:
         it = ex.map(fill_one, files, itertools.repeat(args.half_width),
                     itertools.repeat(args.closed_width), itertools.repeat(args.sigma),
-                    itertools.repeat(args.passes), itertools.repeat(not args.report))
+                    itertools.repeat(args.passes), itertools.repeat(not args.report),
+                    itertools.repeat(args.wide_width), itertools.repeat(args.grid_sigma))
         for i, (path, filled, total) in enumerate(it, 1):
             if filled < 0:
                 failed += 1

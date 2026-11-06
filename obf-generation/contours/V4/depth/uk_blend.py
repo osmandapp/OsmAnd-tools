@@ -57,6 +57,36 @@ def read_source(path, bounds, shape):
     return out
 
 
+def read_source_with_mask(path, bounds, shape):
+    """The source and its mask of interpolated cells (the second band of the survey).
+
+    A survey that was closed by uk_fill_holes keeps the cells it filled in its second band:
+    their value is interpolated, and no depth point is placed on them.
+    """
+    src = open_source(path)
+    if src.count < 2:
+        return read_source(path, bounds, shape), None
+    window = from_bounds(*bounds, transform=src.transform)
+    col0 = max(0, int(math.floor(window.col_off)))
+    row0 = max(0, int(math.floor(window.row_off)))
+    col1 = min(src.width, int(math.ceil(window.col_off + window.width)))
+    row1 = min(src.height, int(math.ceil(window.row_off + window.height)))
+    shape2 = (shape[0], shape[1])
+    if col0 >= col1 or row0 >= row1:
+        return np.full(shape2, np.nan, dtype=np.float32), np.zeros(shape2, dtype=bool)
+    data = src.read([1, 2], window=Window(col0, row0, col1 - col0, row1 - row0))
+    x0 = max(0, int(round(col0 - window.col_off)))
+    y0 = max(0, int(round(row0 - window.row_off)))
+    h = min(data.shape[1], shape[0] - y0)
+    w = min(data.shape[2], shape[1] - x0)
+    values = np.full(shape2, np.nan, dtype=np.float32)
+    mask = np.zeros(shape2, dtype=bool)
+    if h > 0 and w > 0:
+        values[y0:y0 + h, x0:x0 + w] = data[0][:h, :w]
+        mask[y0:y0 + h, x0:x0 + w] = data[1][:h, :w] > 0.5
+    return values, mask
+
+
 def outer_window(source_bounds, base):
     w = from_bounds(*source_bounds, transform=base.transform)
     col0 = max(0, math.floor(w.col_off))
@@ -188,15 +218,17 @@ def mosaic_window(base, window, sources, feather, emodnet_feather=10):
             before = base.read(1, window=window).astype(np.float32)
             if np.isfinite(before).any():
                 raise RuntimeError(f"No source covers valid cells at {window}")
-            return before, before, 0, 0.0
-        a = read_source(sources[0][0], bounds, shape)
-        return a, a, 0, 0.0
+            return before, before, 0, 0.0, np.zeros(shape, dtype=bool)
+        a, mask = read_source_with_mask(sources[0][0], bounds, shape)
+        return a, a, 0, 0.0, mask if mask is not None else np.zeros(shape, dtype=bool)
     before = np.full(shape, np.nan, dtype=np.float32)
     ids = np.full(shape, -1, dtype=np.int32)
     arrays = []
+    masks = []
     for index, (path, _) in enumerate(sources):
-        a = read_source(path, bounds, shape)
+        a, mask = read_source_with_mask(path, bounds, shape)
         arrays.append(a)
+        masks.append(mask if mask is not None else np.zeros(shape, dtype=bool))
         valid = np.isfinite(a)
         if not valid.any():
             continue
@@ -210,9 +242,14 @@ def mosaic_window(base, window, sources, feather, emodnet_feather=10):
         raise RuntimeError(f"Blending changed coverage at {window}")
     if not np.allclose(after[~transitions], before[~transitions], equal_nan=True, rtol=0, atol=1e-5):
         raise RuntimeError(f"Blending changed cells outside transitions at {window}")
+    # the interpolated cells: the ones a survey closed when its holes were filled and the
+    # blended transitions. No depth point is placed on them
+    interpolated = transitions.copy()
+    for index, mask in enumerate(masks):
+        interpolated |= (ids == index) & mask
     count = int(transitions.sum())
     change = float(np.abs(after[transitions] - before[transitions]).sum()) if count else 0.0
-    return after, before, count, change
+    return after, before, count, change, interpolated
 
 
 def blend_strip(raw_path, strip, source_infos, feather, out_path, emodnet_feather=10):
@@ -221,8 +258,9 @@ def blend_strip(raw_path, strip, source_infos, feather, out_path, emodnet_feathe
     with rasterio.open(raw_path) as base:
         # Blend needs a halo: a source boundary just outside a block must still feather into it,
         # otherwise the block/strip edge becomes a hard step. Sources are therefore filtered with
-        # the same margin, and only the central part of each expanded block is written.
-        margin = max(feather, emodnet_feather) // 2 + 2
+        # the same margin, and only the central part of each expanded block is written. The halo
+        # also covers the gap closing, which needs the survey data on both sides of a gap.
+        margin = int(max(feather, emodnet_feather) // 2 + 2)
         strip_window = Window(0, row0, base.width, row1 - row0)
         strip_bounds = window_bounds(strip_window, base.transform)
         pad = margin * base.res[0]
@@ -230,7 +268,7 @@ def blend_strip(raw_path, strip, source_infos, feather, out_path, emodnet_feathe
         sources = [s for s in source_infos if not disjoint_bounds(s[1], wide_bounds)]
         profile = {
             "driver": "GTiff", "width": base.width, "height": row1 - row0,
-            "count": 1, "dtype": "float32", "crs": base.crs, "nodata": np.nan,
+            "count": 2, "dtype": "float32", "crs": base.crs, "nodata": np.nan,
             "transform": base.transform * Affine.translation(0, row0),
             "tiled": True, "blockxsize": 512, "blockysize": 512,
             "compress": "DEFLATE", "predictor": 3, "num_threads": 2,
@@ -249,12 +287,14 @@ def blend_strip(raw_path, strip, source_infos, feather, out_path, emodnet_feathe
                     expanded = Window(ecol0, erow0, ecol1 - ecol0, erow1 - erow0)
                     bounds = window_bounds(expanded, base.transform)
                     candidates = [s for s in sources if not disjoint_bounds(s[1], bounds)]
-                    after, before, _, _ = mosaic_window(base, expanded, candidates, feather,
-                                                        emodnet_feather)
+                    after, before, _, _, interpolated = mosaic_window(base, expanded, candidates, feather,
+                                                                        emodnet_feather)
                     ys = slice(row - erow0, row - erow0 + height)
                     xs = slice(col - ecol0, col - ecol0 + width)
                     out = after[ys, xs]
                     dst.write(out, 1, window=Window(col, row - row0, width, height))
+                    dst.write(interpolated[ys, xs].astype(np.uint8), 2,
+                              window=Window(col, row - row0, width, height))
                     diff = np.abs(out - before[ys, xs])
                     changed = diff > 1e-5
                     transition_cells += int(changed.sum())
@@ -263,15 +303,17 @@ def blend_strip(raw_path, strip, source_infos, feather, out_path, emodnet_feathe
     return index, transition_cells, total_change
 
 
-def atomic_vrt(inputs, list_path, out_path, cell):
+def atomic_vrt(inputs, list_path, out_path, cell, band=None):
     with open(list_path, "w") as f:
         f.write("\n".join(inputs) + "\n")
     tmp = out_path[:-4] + ".tmp.vrt"
     if os.path.exists(tmp):
         os.remove(tmp)
     try:
-        subprocess.run(["gdalbuildvrt", "-q", "-tr", str(cell), str(cell),
-                        "-input_file_list", list_path, tmp], check=True)
+        cmd = ["gdalbuildvrt", "-q", "-tr", str(cell), str(cell)]
+        if band:
+            cmd += ["-b", str(band)]
+        subprocess.run(cmd + ["-input_file_list", list_path, tmp], check=True)
         os.chmod(tmp, 0o444)
         os.replace(tmp, out_path)
     finally:
@@ -313,7 +355,11 @@ def build_full(uk, raw_path, feather=10, jobs=16, emodnet_feather=10):
         os.replace(tmp, final)
         finals.append(final)
     atomic_vrt(finals, os.path.join(uk, "uk_blend_sources.txt"),
-               os.path.join(uk, "uk.vrt"), cell)
+               os.path.join(uk, "uk.vrt"), cell, band=1)
+    # the cells whose value is interpolated: the gaps closed inside a survey and the
+    # blended transitions. No depth point is placed on them
+    atomic_vrt(finals, os.path.join(uk, "uk_blend_sources.txt"),
+               os.path.join(uk, "uk_interp.vrt"), cell, band=2)
     cells = sum(r[1] for r in results)
     change = sum(r[2] for r in results)
     print(f"uk.vrt: {len(used)} sources, {jobs} strips, feather {feather} px (EMODnet {emodnet_feather} px), "

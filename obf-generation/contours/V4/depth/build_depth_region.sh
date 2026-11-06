@@ -232,6 +232,13 @@ if [ -n "$DATA" ]; then
 			# tiles touching one of them are built
 			FR="$DATA/src/france/france.vrt"
 			: "${BBOX:=-5.5 43.3 2.6 51.2}"; : "${GRID:=$EMODNET,$FR}"; : "${FILL:=$FR}"; : "${TILE_WITH:=$FR}"
+			# the UK map holds the surveys of the Channel and of the Channel Islands: the French map leaves that
+			# water to it, so that the same ground is not charted twice
+			if [ -f "$DATA/src/uk/uk_filled.vrt" ]; then
+				coverage uk_filled "" "$DATA/src/uk/uk_filled.vrt"; : "${EXCLUDE:=$COVERAGE}"
+			elif [ -f "$DATA/src/uk/uk.vrt" ]; then
+				coverage uk "" "$DATA/src/uk/uk.vrt"; : "${EXCLUDE:=$COVERAGE}"
+			fi
 			: "${RESAMPLING:=auto}"; : "${CELL:=0.0002}"; : "${LEVELS:=2,5,10,15,20,25,30,35,40,45,50,100,200}"; : "${SMOOTH_FROM:=5}"
 			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1 ;;
 		Great_Britain_contours)
@@ -248,6 +255,12 @@ if [ -n "$DATA" ]; then
 			UK_TILES="$DATA/src/uk/uk.vrt"
 			[ -f "$UK_TILES" ] || UK_TILES="$UK"
 			: "${BBOX:=-8.7 49.8 2.0 60.9}"; : "${GRID:=$EMODNET,$UK}"; : "${FILL:=$UK}"; : "${TILE_WITH:=$UK_TILES}"
+			# the cells whose value is interpolated (the gaps closed inside a survey, the blended transitions
+			# and the coastal fill): no depth point is placed on them
+			: "${INTERP:=}"
+			for m in "$DATA/src/uk/uk_interp.vrt" "$DATA/src/uk/uk_filled_interp.vrt"; do
+				[ -f "$m" ] && INTERP="${INTERP:+$INTERP,}$m"
+			done
 			: "${RESAMPLING:=auto}"; : "${CELL:=0.0002}"; : "${LEVELS:=2,5,10,15,20,25,30,35,40,45,50,100,200}"; : "${SMOOTH_FROM:=5}"
 			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1 ;;
 		Denmark_contours)
@@ -419,7 +432,7 @@ if [ -n "$TILES" ]; then
 	step "$NAME: $(echo "$TILES" | wc -l | tr -d ' ') tiles of $TILE degrees, $JOBS at a time"
 	TILE_OUT="$TMP/tiles"; mkdir -p "$TILE_OUT"
 	export SELF="$0" GRID LAND LEVELS TIERS CELL UPSAMPLE SMOOTH SMOOTH_FROM RESAMPLING MIN_RING_CELLS OVERVIEW EXCLUDE \
-		EXCLUDE_LAYER FILL MAP_CREATOR TILE_OUT
+		EXCLUDE_LAYER FILL MAP_CREATOR TILE_OUT INTERP
 	echo "$TILES" | xargs -P "$JOBS" -L 1 bash -c '
 		name=$1; shift
 		args=(-n "$name" -b "$*" -i "$GRID" -m "$LAND" -o "$TILE_OUT" -l "${LEVELS:-none}" -p "$TIERS" -r "$CELL" \
@@ -697,6 +710,13 @@ if [ -n "$TIERS" ]; then
 	gdalwarp -q -overwrite -srcnodata "$LAND_NODATA" -dstnodata nan -co COMPRESS=DEFLATE -co TILED=YES \
 		"$TMP/grid.tif" "$TMP/water.tif"
 	exclude "$TMP/water.tif"
+	# a point is a sounding: it must not stand on an interpolated value
+	POINTS_RASTER="$TMP/water.tif"
+	if [ -n "$INTERP" ]; then
+		step "no depth point on the interpolated cells"
+		python3 "$HERE/depth_mask_raster.py" "$TMP/water.tif" "$TMP/water_points.tif" ${INTERP//,/ } 2>&1 | grep -v numpy
+		POINTS_RASTER="$TMP/water_points.tif"
+	fi
 	i=0
 	for tier in $TIERS; do
 		i=$((i + 1)); spacing=${tier%%:*}; zooms=${tier#*:}
@@ -704,7 +724,7 @@ if [ -n "$TIERS" ]; then
 		# per spacing cell the shoalest water cell at its own position and thinned where the bottom is even, as on
 		# charts (not a regular grid)
 		osm="$OUT/${NAME}_points$i.osm.gz"
-		python3 "$HERE/depth_points_osm.py" "$TMP/water.tif" "$osm" --bbox "$W" "$S" "$E" "$N" --shoalest "$spacing" --thin \
+		python3 "$HERE/depth_points_osm.py" "$POINTS_RASTER" "$osm" --bbox "$W" "$S" "$E" "$N" --shoalest "$spacing" --thin \
 			--first-id $((i * 100000000))
 		if [ "$(zcat < "$osm" | grep -c -m1 '<node')" = 0 ]; then
 			rm -f "$osm"; continue

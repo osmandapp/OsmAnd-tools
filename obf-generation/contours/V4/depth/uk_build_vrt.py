@@ -25,20 +25,25 @@ def warped_source(path, uk):
     gdalwarp with -tap and explicit NaN nodata prevents the nearest-neighbour edge
     stretch that gdalbuildvrt does when a source ends between grid cells. Coarse
     surveys are interpolated bilinearly; fine surveys keep nearest so their values
-    are not changed.
+    are not changed. The second band of the survey (the cells that were interpolated
+    when its holes were closed) is carried along.
     """
     with rasterio.open(path) as d:
         coarse = d.res[0] > CELL * 1.2
+        bands = min(2, d.count)
     warps = os.path.join(uk, "warps_grid")
     os.makedirs(warps, exist_ok=True)
     out = os.path.join(warps, os.path.basename(path)[:-4] + ".vrt")
     if not os.path.exists(out) or os.path.getmtime(out) < os.path.getmtime(path):
         if os.path.exists(out):
             os.remove(out)  # gdalwarp refuses to replace an existing VRT
-        subprocess.run(["gdalwarp", "-q", "-of", "VRT", "-t_srs", "EPSG:4326",
-                        "-tr", str(CELL), str(CELL), "-tap",
-                        "-r", "bilinear" if coarse else "near",
-                        "-srcnodata", "nan", "-dstnodata", "nan", path, out], check=True)
+        cmd = ["gdalwarp", "-q", "-of", "VRT", "-t_srs", "EPSG:4326",
+               "-tr", str(CELL), str(CELL), "-tap",
+               "-r", "bilinear" if coarse else "near",
+               "-srcnodata", "nan", "-dstnodata", "nan"]
+        if bands > 1:
+            cmd += ["-b", "1", "-b", "2"]
+        subprocess.run(cmd + [path, out], check=True)
     return out
 
 
@@ -150,7 +155,9 @@ def main():
         raise SystemExit(f"No {underlay}; run uk_emodnet_fill.py --build-vrt first")
     paths.insert(0, underlay)
     raw = os.path.join(uk, "uk_sources.vrt")
-    atomic_vrt(paths, os.path.join(uk, "uk_vrt_sources.txt"), raw, CELL)
+    # the raw mosaic takes the depth band only: the surveys carry a second band with their
+    # interpolated cells, and gdalbuildvrt cannot mix sources of different band counts
+    atomic_vrt(paths, os.path.join(uk, "uk_vrt_sources.txt"), raw, CELL, band=1)
     print(f"uk_sources.vrt: {len(paths)} sources", flush=True)
     if args.feather:
         build_full(uk, raw, args.feather, args.j)
