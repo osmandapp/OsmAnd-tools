@@ -1774,8 +1774,9 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					|| n.getTag("direction") != null || (n.getTag("highway") != null && !"speed_camera".equals(n.getTag("highway")))) {
 				continue;
 			}
-			Node a = i + 1 < nodes.size() ? n : nodes.get(i - 1);
-			Node b = i + 1 < nodes.size() ? nodes.get(i + 1) : n;
+			int segStart = i + 1 < nodes.size() ? i : i - 1;
+			Node a = nodes.get(segStart);
+			Node b = nodes.get(segStart + 1);
 			if (a == null || b == null) {
 				continue;
 			}
@@ -1784,8 +1785,20 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			for (LatLon t : speedCameraTargets.get(n.getId())) {
 				double diff = Math.abs(MapUtils.degreesDiff(wayBearing,
 						getBearing(n.getLatLon(), t)));
-				String d = diff < MAX_FORWARD_DEVIATION ? "forward" : diff > MIN_BACKWARD_DEVIATION ? "backward" : "";
-				direction = direction == null || direction.equals(d) ? d : "";
+				String d;
+				if (diff < MAX_FORWARD_DEVIATION) {
+					d = "forward";
+				} else if (diff > MIN_BACKWARD_DEVIATION) {
+					d = "backward";
+				} else {
+					direction = null; // direction is undefined
+					break;
+				}
+				if (direction != null && !direction.equals(d)) {
+					direction = null;
+					break;
+				}
+				direction = d;
 			}
 			if (!Algorithms.isEmpty(direction)) {
 				routeTypes.addPointType(pointTypes, n.getId(), "direction", direction);
