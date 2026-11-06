@@ -111,18 +111,25 @@ def visible_sources(raw_path, paths, jobs=1):
     return used, superseded
 
 
-def blend_boundaries(before, ids, width, underlay_width=None, underlay_id=None,
+def blend_boundaries(before, ids, arrays, width, underlay_width=None, underlay_id=None,
                      priority=0.5, underlay_priority=1.0):
     """Distance-weighted cross-fade across source boundaries.
 
-    Every source within the feather radius contributes its nearest visible value
-    with a distance-decaying weight; the cell's own source keeps at least half
-    the weight. Using only the single nearest boundary is not enough: in a strip
+    Every source within the feather radius contributes a value with a
+    distance-decaying weight; the cell's own source keeps at least half the
+    weight. Using only the single nearest boundary is not enough: in a strip
     narrower than the feather its two edges pull the cells in opposite directions
     and turn a moderate step into a cliff. Against the coarse EMODnet underlay a
     detailed survey keeps its value, while underlay cells are pulled towards the
     survey (a symmetric 50/50 there eats shallow features at the survey edge).
     For a two-source boundary this reduces to the previous 50/50 smoothstep ramp.
+
+    The contributed value is the source's own measurement at the cell when it has
+    one, and only otherwise its nearest valid value. Taking it from the source's
+    nearest *visible* cell instead would import depths from elsewhere and produce
+    a spurious dip at the junction. The weight distance is still measured on the
+    visible ownership map, so a source hidden under a newer one does not blend
+    over the newer source's interior.
     """
     shape = before.shape
     after = before.copy()
@@ -135,9 +142,15 @@ def blend_boundaries(before, ids, width, underlay_width=None, underlay_id=None,
     weight = np.zeros(shape, dtype=np.float32)
     value = np.zeros(shape, dtype=np.float32)
     for j in present:
-        # nearest cell of source j: its distance and value, extrapolated by nearest neighbour
-        distance, indices = ndimage.distance_transform_edt(ids != j, return_indices=True)
-        nearest = before[indices[0], indices[1]]
+        # weight distance: to the nearest cell where source j is on top of the mosaic
+        distance = ndimage.distance_transform_edt(ids != j)
+        # value: the source's own measurement here, else its nearest valid measurement
+        a = arrays[j]
+        valid = np.isfinite(a)
+        nearest = a
+        if not valid.all():
+            _, indices = ndimage.distance_transform_edt(~valid, return_indices=True)
+            nearest = a[indices[0], indices[1]]
         finite = np.isfinite(nearest)
         nearest = np.where(finite, nearest, 0.0)
         if has_underlay:
@@ -180,8 +193,10 @@ def mosaic_window(base, window, sources, feather, emodnet_feather=20):
         return a, a, 0, 0.0
     before = np.full(shape, np.nan, dtype=np.float32)
     ids = np.full(shape, -1, dtype=np.int32)
+    arrays = []
     for index, (path, _) in enumerate(sources):
         a = read_source(path, bounds, shape)
+        arrays.append(a)
         valid = np.isfinite(a)
         if not valid.any():
             continue
@@ -189,7 +204,7 @@ def mosaic_window(base, window, sources, feather, emodnet_feather=20):
         ids[valid] = index
     underlay_id = next((i for i, (path, _) in enumerate(sources)
                         if os.path.basename(path) == "emodnet_fill.vrt"), None)
-    after, transitions = blend_boundaries(before, ids, feather, emodnet_feather, underlay_id,
+    after, transitions = blend_boundaries(before, ids, arrays, feather, emodnet_feather, underlay_id,
                                           underlay_priority=1.0)
     if not np.array_equal(np.isfinite(after), np.isfinite(before)):
         raise RuntimeError(f"Blending changed coverage at {window}")
@@ -308,25 +323,27 @@ def blend(sources, before, bounds, widths):
     covered = np.zeros(shape, dtype=bool)
     kept, redundant = [], []
     for path in reversed(sources):
-        valid = np.isfinite(read_source(path, bounds, shape))
+        a = read_source(path, bounds, shape)
+        valid = np.isfinite(a)
         if valid.any() and not (valid & ~covered).any():
             redundant.append(path)
         else:
-            kept.append((path, valid))
+            kept.append((path, valid, a))
         covered |= valid
     kept.reverse()
     hard = np.full(shape, np.nan, dtype=np.float32)
     ids = np.full(shape, -1, dtype=np.int32)
-    for index, (path, _) in enumerate(kept):
-        a = read_source(path, bounds, shape)
+    arrays = []
+    for index, (path, _, a) in enumerate(kept):
         valid = np.isfinite(a)
         hard[valid] = a[valid]
         ids[valid] = index
+        arrays.append(a)
     results, transitions = {}, {}
-    underlay_id = next((i for i, (path, _) in enumerate(kept)
+    underlay_id = next((i for i, (path, _, _) in enumerate(kept)
                         if os.path.basename(path) == "emodnet_fill.vrt"), None)
     for width in widths:
-        after, changed = blend_boundaries(hard, ids, width, 20, underlay_id,
+        after, changed = blend_boundaries(hard, ids, arrays, width, 20, underlay_id,
                                           underlay_priority=1.0)
         results[width] = after
         transitions[width] = changed
