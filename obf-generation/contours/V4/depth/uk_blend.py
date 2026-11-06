@@ -113,66 +113,56 @@ def visible_sources(raw_path, paths, jobs=1):
 
 def blend_boundaries(before, ids, width, underlay_width=None, underlay_id=None,
                      priority=0.5, underlay_priority=1.0):
-    """Cross-fade across source boundaries.
+    """Distance-weighted cross-fade across source boundaries.
 
-    Between two detailed surveys the boundary value is the mean of the two
-    (priority 0.5), ramping to each source's own value over width/2 pixels on its
-    side. Against the coarse EMODnet underlay the detailed survey keeps its edge
-    value (priority 1.0) and the underlay is pulled towards it outside; a
-    symmetric 50/50 there eats shallow features at the survey edge and leaves a
-    step where three sources meet. The boundary mask marks both cells of every
-    pair, so the transition is continuous on both sides.
+    Every source within the feather radius contributes its nearest visible value
+    with a distance-decaying weight; the cell's own source keeps at least half
+    the weight. Using only the single nearest boundary is not enough: in a strip
+    narrower than the feather its two edges pull the cells in opposite directions
+    and turn a moderate step into a cliff. Against the coarse EMODnet underlay a
+    detailed survey keeps its value, while underlay cells are pulled towards the
+    survey (a symmetric 50/50 there eats shallow features at the survey edge).
+    For a two-source boundary this reduces to the previous 50/50 smoothstep ramp.
     """
     shape = before.shape
-    boundary = np.zeros(shape, dtype=bool)
-    b = (ids[:, 1:] != ids[:, :-1]) & (ids[:, 1:] >= 0) & (ids[:, :-1] >= 0)
-    boundary[:, 1:] |= b
-    boundary[:, :-1] |= b
-    b = (ids[1:, :] != ids[:-1, :]) & (ids[1:, :] >= 0) & (ids[:-1, :] >= 0)
-    boundary[1:, :] |= b
-    boundary[:-1, :] |= b
     after = before.copy()
-    if not boundary.any():
+    present = np.unique(ids[ids >= 0])
+    if len(present) <= 1:
         return after, np.zeros(shape, dtype=bool)
-    other_value = np.full(shape, np.nan, dtype=np.float32)
-    other_id = np.full(shape, -1, dtype=np.int32)
-    for dy, dx in ((0, 1), (0, -1), (1, 0), (-1, 0)):
-        shifted_ids = np.full(shape, -1, dtype=np.int32)
-        shifted_values = np.full(shape, np.nan, dtype=np.float32)
-        if dy == 0 and dx == 1:
-            shifted_ids[:, :-1] = ids[:, 1:]
-            shifted_values[:, :-1] = before[:, 1:]
-        elif dy == 0 and dx == -1:
-            shifted_ids[:, 1:] = ids[:, :-1]
-            shifted_values[:, 1:] = before[:, :-1]
-        elif dy == 1:
-            shifted_ids[:-1, :] = ids[1:, :]
-            shifted_values[:-1, :] = before[1:, :]
+    half = width / 2.0
+    underlay_half = (underlay_width if underlay_width is not None else width) / 2.0
+    has_underlay = underlay_id is not None and underlay_id >= 0
+    weight = np.zeros(shape, dtype=np.float32)
+    value = np.zeros(shape, dtype=np.float32)
+    for j in present:
+        # nearest cell of source j: its distance and value, extrapolated by nearest neighbour
+        distance, indices = ndimage.distance_transform_edt(ids != j, return_indices=True)
+        nearest = before[indices[0], indices[1]]
+        finite = np.isfinite(nearest)
+        nearest = np.where(finite, nearest, 0.0)
+        if has_underlay:
+            radius = np.where((ids == underlay_id) | (j == underlay_id),
+                              underlay_half, half).astype(np.float32)
+            # the underlay never pulls a detailed survey; underlay cells adopt the survey value
+            base = np.full(shape, 0.0 if j == underlay_id else priority, dtype=np.float32)
+            if j != underlay_id:
+                base = np.where(ids == underlay_id, underlay_priority, base).astype(np.float32)
         else:
-            shifted_ids[1:, :] = ids[:-1, :]
-            shifted_values[1:, :] = before[:-1, :]
-        take = boundary & (shifted_ids != ids) & (shifted_ids >= 0) & ~np.isfinite(other_value)
-        other_value[take] = shifted_values[take]
-        other_id[take] = shifted_ids[take]
-    distance, indices = ndimage.distance_transform_edt(~boundary, return_indices=True)
-    nearest_other = other_value[indices[0], indices[1]]
-    nearest_other_id = other_id[indices[0], indices[1]]
-    if underlay_width is not None and underlay_id is not None and underlay_id >= 0:
-        widths = np.where((ids == underlay_id) | (nearest_other_id == underlay_id),
-                          underlay_width, width).astype(np.float32)
-    else:
-        widths = np.full(shape, float(width), dtype=np.float32)
-    if underlay_id is not None and underlay_id >= 0:
-        boundary_priority = np.where((ids == underlay_id) | (nearest_other_id == underlay_id),
-                                     underlay_priority, priority).astype(np.float32)
-    else:
-        boundary_priority = np.full(shape, priority, dtype=np.float32)
-    own_boundary = np.where(ids > nearest_other_id,
-                            boundary_priority, 1.0 - boundary_priority).astype(np.float32)
-    t = np.clip(distance / (widths / 2.0), 0.0, 1.0)
-    own_weight = (own_boundary + (1.0 - own_boundary) * t * t * (3.0 - 2.0 * t)).astype(np.float32)
-    blend = (ids >= 0) & np.isfinite(before) & np.isfinite(nearest_other) & (distance < widths / 2.0)
-    after[blend] = before[blend] * own_weight[blend] + nearest_other[blend] * (1.0 - own_weight[blend])
+            radius = np.full(shape, half, dtype=np.float32)
+            base = np.full(shape, priority, dtype=np.float32)
+        t = np.clip(np.maximum(distance - 1.0, 0.0) / radius, 0.0, 1.0)
+        w = base * (1.0 - t * t * (3.0 - 2.0 * t))
+        w[(ids == j) | ~finite] = 0.0
+        weight += w
+        value += w * nearest
+    cap = np.full(shape, 0.5, dtype=np.float32)
+    if has_underlay:
+        cap = np.where(ids == underlay_id, 1.0, 0.5).astype(np.float32)
+    scale = np.minimum(1.0, cap / np.maximum(weight, 1e-9))
+    total = weight * scale
+    blended = value * scale
+    blend = (ids >= 0) & np.isfinite(before) & (weight > 0)
+    after[blend] = before[blend] * (1.0 - total[blend]) + blended[blend]
     transitions = blend & (np.abs(after - before) > 1e-5)
     return after, transitions
 
