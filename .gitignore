@@ -6,6 +6,7 @@ WikipediaConverter/target
 WikipediaConverter/gwtwiki/
 OsmAndMapCreator/regions.ocbf
 obf-generation/basemap/admin_levels/*.osm
+obf-generation/contours/V4/depth/AGENTS.md
 *.pyc
 **/.project
 **/.classpath

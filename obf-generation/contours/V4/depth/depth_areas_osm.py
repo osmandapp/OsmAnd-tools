@@ -11,7 +11,8 @@ With --field-max the band of the area (its shallowest and deepest depth) picks t
 chart drawn in feet does not paint a whole zone with the colour of its shallow edge: the US 30-60 ft zone
 (9.1-18.2 m) is deeper than 10 m for most of its range and is left out instead of being coloured 5-10 m. Polygons of one class are
 merged per CELL degree square (fewer vertices than the charted bands, which the classes join), OSM land is cut out
-(a dry band must not lie on the beach) and the result is written as closed ways or multipolygon relations tagged
+(a dry band must not lie on the beach) after the simplification, so the coast keeps the
+exact land boundary, and the result is written as closed ways or multipolygon relations tagged
 contourarea=depth, areatype=...
 
 --nested: every polygon is "shallower than" its class limit, as polygons of a grid above a level are, so a class
@@ -146,9 +147,11 @@ def main():
                         if shallower is not None:
                             area = area.Difference(shallower)
                         shallower = own if shallower is None else shallower.Union(own)
+                    # simplify before the land cut: the coast then stays exactly on the land
+                    # boundary, a simplify after the cut would move it and leave small gaps
+                    area = area.SimplifyPreserveTopology(args.simplify)
                     if dry is not None and area.Intersects(dry):
                         area = area.Difference(dry)
-                    area = area.SimplifyPreserveTopology(args.simplify)
                     for p in polygons(area):
                         outer = p.GetGeometryRef(0)
                         if outer.GetPointCount() < 4:

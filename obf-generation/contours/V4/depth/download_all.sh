@@ -16,10 +16,12 @@
 #   denmark      Danmarks Dybdemodel 50 m 2024, one GeoTIFF (depths positive, mean sea level) ~0.13 GB; not in the
 #                published regions: 50 m against EMODnet's 115 m is a small gain
 #   france       SHOM coastal DTMs 5-20 m, chart datum (PBMA), 11 zones as GeoTIFF         ~1.0 GB 7z
-#   uk           UKHO ADMIRALTY seabed surveys: with env UKHO_TOKEN (the Bearer token of a signed-in
-#                seabed.admiralty.co.uk session) the surveys of UKHO_SURVEYS (default ukho_surveys_clyde.txt) are
-#                downloaded; zips downloaded by hand can be put into DIR/src/uk/incoming. Every BAG becomes a 0.0002
-#                degree GeoTIFF
+#   uk           UKHO ADMIRALTY seabed surveys: BAG or CSV point delivery, whichever is finer per survey, becomes a
+#                0.0002 degree GeoTIFF; with env UKHO_TOKEN (the Bearer token of a signed-in seabed.admiralty.co.uk
+#                session) the surveys of the index are downloaded, zips put into DIR/src/uk/incoming by hand are
+#                converted as well. Then the EMODnet underlay and uk.vrt are built and the coastal gap is
+#                filled into uk_filled.vrt; needs DIR/src/emodnet/emodnet_2024.vrt, the land polygons in
+#                DIR/mask and DIR/src/ireland (run --only emodnet,mask,ireland first)
 #   nz           LINZ hydrographic chart vector data: depth contours, soundings, depth areas in 5 scale bands, WFS
 #                into one GeoPackage; needs env LINZ_API_KEY (free LINZ Data Service key)
 # --mask  OSM land polygons (osmdata.openstreetmap.de, coastline only) into DIR/mask/  ~0.9 GB zip
@@ -41,7 +43,7 @@ while [ $# -gt 0 ]; do
 		--only) ONLY=$2; DATA=1; shift 2 ;;
 		-j) JOBS=$2; shift 2 ;;
 		--dry-run) DRY=1; shift ;;
-		-h|--help) sed -n '2,31p' "$0"; exit 0 ;;
+		-h|--help) sed -n '2,33p' "$0"; exit 0 ;;
 		*) echo "Unknown option $1" >&2; exit 1 ;;
 	esac
 done
@@ -258,46 +260,53 @@ MNT_COTIER_GNB_PAPI_SM_20m_PACK_DL/MNT_COTIER_GOLFE_NORMAND_BRETON_PAPI_PBMA"
 fi
 if want uk; then
 	echo "== uk"
-	# the Seabed Mapping Service needs a login, so the zips of survey selections are put into src/uk/incoming by hand.
-	# Only the BAG grids are used (surveys that come as CSV points only are older); a BAG is averaged to 0.0002
-	# degree cells and deleted, which turns a 78 MB 2 m survey into a 1.7 MB GeoTIFF. Depths are negative, LAT.
-	mkdir -p "$SRC/uk/incoming" "$SRC/uk/grid" "$SRC/uk/downloaded"
-	if [ -n "${UKHO_TOKEN:-}" ] && [ $DRY -eq 0 ]; then
-		# the token of the site's sign-in lasts about an hour: a 401 stops here, a rerun with a new token resumes
-		grep -v '^#' "${UKHO_SURVEYS:-$HERE/ukho_surveys_clyde.txt}" | cut -f1 | while IFS= read -r id; do
-			[ -n "$id" ] && [ ! -f "$SRC/uk/downloaded/$id" ] || continue
-			code=$(curl -sL --retry 3 -X POST -o "$SRC/uk/incoming/$id.zip.part" -w '%{http_code}' \
-				-H "Authorization: Bearer $UKHO_TOKEN" -H 'Content-Type: application/json' \
-				-d "{\"featureIds\":[\"$id\"]}" https://seabedmappingservice-live.azurewebsites.net/api/features)
-			if [ "$code" = 401 ]; then echo "FAILED uk: token expired, get a new UKHO_TOKEN and rerun" >&2; exit 1; fi
-			if [ "$code" != 200 ] || ! unzip -tq "$SRC/uk/incoming/$id.zip.part" >/dev/null 2>&1; then
-				echo "FAILED uk: survey $id (HTTP $code)" >&2; rm -f "$SRC/uk/incoming/$id.zip.part"; continue
-			fi
-			mv "$SRC/uk/incoming/$id.zip.part" "$SRC/uk/incoming/$id.zip"; : > "$SRC/uk/downloaded/$id"
-			echo "ok survey $id"
-		done || exit 1
+	# UKHO ADMIRALTY seabed surveys. Both deliveries are used: the CSV point set when its spacing is at least as fine
+	# as the BAG, the BAG otherwise (uk_zip_to_tif.py picks per survey). Depths are negative, LAT; a survey becomes a
+	# 0.0002 degree GeoTIFF, so a 78 MB 2 m BAG turns into a 1.7 MB file. The surveys are then blended into uk.vrt
+	# over the EMODnet coastal underlay, with 10 px transitions between surveys and 20 px to the underlay.
+	UKHO_CONV_JOBS=${UKHO_CONV_JOBS:-$JOBS}
+	UK_FEATHER=${UK_FEATHER:-10}
+	UK_COASTAL_FILL=${UK_COASTAL_FILL:-6000}
+	# OsmAnd-misc polygon of Ireland: Irish waters belong to Ireland_contours and are cut out of the UK grid
+	IRELAND_POLY=${IRELAND_POLY:-/home/xmd5a/git/OsmAnd-misc/osm-planet/polygons/europe/west-europe/ireland.poly}
+	if [ $DRY -eq 1 ]; then
+		echo "uk           UKHO Seabed Mapping Service surveys (BAG or CSV points), then the EMODnet underlay, uk.vrt and the coastal fill"
+	else
+		mkdir -p "$SRC/uk/incoming" "$SRC/uk/grid" "$SRC/uk/downloaded"
+		uk_args=(-o "$SRC/uk" -j "$UKHO_CONV_JOBS")
+		# the zips downloaded earlier are an archive: take them from there and never delete them
+		[ ! -d "$SRC/uk/incoming_full" ] || uk_args+=(--zip-dir "$SRC/uk/incoming_full")
+		# download and convert; without UKHO_TOKEN only the zips already there are converted
+		"$HERE/download_ukho.py" "${uk_args[@]}"
+		# zips of surveys the index does not know (put there by hand) are converted here and then removed
+		for z in "$SRC"/uk/incoming/*.zip; do
+			[ -f "$z" ] || continue
+			out=$("$HERE/uk_zip_to_tif.py" "$z" "$SRC/uk")
+			printf '%s\n' "$out"
+			if printf '%s\n' "$out" | grep -q '^tif='; then rm -f "$z"
+			else echo "FAILED uk: $(basename "$z"), zip kept in incoming" >&2; fi
+		done
+		ireland="$SRC/ireland/ireland.vrt"
+		emodnet="$SRC/emodnet/emodnet_2024.vrt"
+		land="$OUT/mask/land_polygons.gpkg"
+		[ -f "$land" ] || land=$(find "$OUT/mask" -name 'land_polygons.shp' -print -quit 2>/dev/null)
+		for need in "$ireland" "$emodnet" "$IRELAND_POLY"; do
+			[ -e "$need" ] || { echo "FAILED uk: $need not found (run --only emodnet,mask,ireland first)" >&2; exit 1; }
+		done
+		[ -n "$land" ] || { echo "FAILED uk: no land polygons in $OUT/mask (run --mask first)" >&2; exit 1; }
+		# lattice holes and thin edge notches of the point surveys
+		"$HERE/uk_fill_holes.py" "$SRC/uk" -j "$UKHO_CONV_JOBS"
+		# Irish waters are INFOMAR, not UKHO: mask them and move empty surveys out of grid
+		"$HERE/uk_exclude_ireland.py" "$SRC/uk" "$ireland" "$IRELAND_POLY" -j "$UKHO_CONV_JOBS" --apply
+		# the EMODnet underlay of the coastal gaps, then the blended mosaic (uk.vrt)
+		"$HERE/uk_emodnet_fill.py" "$SRC/uk" "$emodnet" "$land" "$ireland" "$IRELAND_POLY" \
+			--output "$OUT/preview" --build-vrt
+		"$HERE/uk_build_vrt.py" "$SRC/uk" --feather "$UK_FEATHER" -j "$UKHO_CONV_JOBS"
+		# fill the gap between the coastline (0 m) and the surveys, so depth areas reach the coast
+		"$HERE/uk_coastal_fill.py" "$SRC/uk/uk.vrt" "$SRC/uk" --land "$land" \
+			--exclude "$IRELAND_POLY" --exclude-raster "$ireland" \
+			--limit "$UK_COASTAL_FILL" -j "$UKHO_CONV_JOBS"
 	fi
-	for z in "$SRC"/uk/incoming/*.zip; do
-		[ -f "$z" ] || continue
-		# a survey delivered as CSV points only has no BAG: nothing to take from its zip
-		unzip -oq "$z" '*.bag' -d "$SRC/uk/incoming" 2>/dev/null || echo "WARN uk: no BAG in $(basename "$z")"
-		rm -f "$z"
-	done
-	find "$SRC/uk/incoming" -name '*.bag' | while IFS= read -r bag; do
-		tif="$SRC/uk/grid/$(basename "$bag" .bag).tif"
-		# the compound CRS of a BAG (UTM + ALAT heights) is not parsed by PROJ: the horizontal one is given explicitly,
-		# a UTM zone or, for the BAGs in degrees, WGS 84
-		info=$(gdalinfo "$bag" 2>/dev/null || true)
-		zone=$(echo "$info" | grep -o 'UTM zone [0-9]*[NS]' | head -1 | awk '{print $3}' || true)
-		if [ -n "$zone" ]; then srs="EPSG:$(( ${zone%[NS]} + $([ "${zone: -1}" = N ] && echo 32600 || echo 32700) ))"
-		elif echo "$info" | grep -q 'GEOGCRS\["WGS 84"' && ! echo "$info" | grep -q PROJCRS; then srs=EPSG:4326
-		else echo "FAILED uk: unknown CRS in $(basename "$bag")" >&2; continue; fi
-		gdalwarp -q -overwrite -s_srs "$srs" -t_srs EPSG:4326 -tr 0.0002 0.0002 -r average -b 1 -ot Float32 \
-			-srcnodata 1000000 -dstnodata nan -co COMPRESS=DEFLATE -co TILED=YES "$bag" "$tif.tmp.tif" 2>/dev/null \
-			&& mv "$tif.tmp.tif" "$tif" && rm -f "$bag" && echo "ok $(basename "$tif")" \
-			|| echo "FAILED uk: $(basename "$bag")" >&2
-	done
-	find "$SRC/uk/incoming" -mindepth 1 -type d -empty -delete
 fi
 if want nz; then
 	echo "== nz"

@@ -6,7 +6,9 @@
 # For every source: file count against the expected one, every raster opens (gdalinfo), CRS is EPSG:4326 where
 # expected, a known sea point is below 0 m (depths are negative), and leftover archives or partial files.
 # Writes DIR/mask/land_polygons.gpkg (indexed copy of the land polygons) and DIR/src/gebco/gebco_2026.vrt, DIR/src/gebco_tid/gebco_2026_tid.vrt, DIR/src/emodnet/emodnet_2024.vrt,
-# DIR/src/cudem/cudem.vrt, DIR/src/ireland/ireland.vrt, DIR/src/denmark/denmark.vrt, DIR/src/france/france.vrt, DIR/src/uk/uk.vrt. Prints OK / WARN / FAIL lines and exits with 1 when anything failed.
+# DIR/src/cudem/cudem.vrt, DIR/src/ireland/ireland.vrt, DIR/src/denmark/denmark.vrt, DIR/src/france/france.vrt. Checks
+# DIR/src/uk/uk.vrt (the blended mosaic of download_all.sh) and its coastal fill uk_filled.vrt, without rebuilding
+# either. Prints OK / WARN / FAIL lines and exits with 1 when anything failed.
 set -uo pipefail
 
 OUT=""; JOBS=4
@@ -212,12 +214,57 @@ leftovers france "$SRC/france"
 
 echo "== uk"
 FILES=(); while IFS= read -r f; do FILES+=("$f"); done < <(find "$SRC/uk/grid" -name '*.tif' 2>/dev/null | sort)
-n=$(find "$SRC/uk/incoming" -name '*.bag' 2>/dev/null | wc -l | tr -d ' ')
-[ "$n" -eq 0 ] || warn "uk: $n BAG files in incoming not converted (rerun download_all.sh --only uk)"
+n=$(find "$SRC/uk/incoming" -mindepth 1 -maxdepth 1 \( -name '*.zip' -o -name '*.zip.part' \) 2>/dev/null | wc -l | tr -d ' ')
+[ "$n" -eq 0 ] || warn "uk: $n zips left in incoming (conversion did not finish; rerun download_all.sh --only uk)"
 if [ ${#FILES[@]} -eq 0 ]; then fail "uk: no surveys in src/uk/grid (downloaded by hand from seabed.admiralty.co.uk)"
 else
 	rasters_open uk "${FILES[@]}"
-	vrt uk "$SRC/uk/uk.vrt" "${FILES[@]}"
+	# uk.vrt is the blended mosaic written by uk_build_vrt.py, not a VRT of all the tifs: never rebuild it here
+	for v in "$SRC/uk/emodnet_fill.vrt" "$SRC/uk/uk.vrt" "$SRC/uk/uk_filled.vrt"; do
+		if [ ! -f "$v" ]; then fail "uk: $(basename "$v") not found (run download_all.sh --only uk)"
+		elif gdalinfo "$v" >/dev/null 2>&1; then ok "uk: $(basename "$v") opens"
+		else fail "uk: $(basename "$v") does not open"; fi
+	done
+	# the unblended list is what uk_build_vrt.py read; the blended VRT itself only needs the strips
+	missing=$(while IFS= read -r f; do [ -f "$f" ] || echo "$f"; done < "$SRC/uk/uk_vrt_sources.txt")
+	if [ -z "$missing" ]; then ok "uk: $(grep -c . "$SRC/uk/uk_vrt_sources.txt") sources of uk_vrt_sources.txt exist"
+	else fail "uk: $(echo "$missing" | wc -l | tr -d ' ') sources of uk_vrt_sources.txt are missing"
+		echo "$missing" | head -5 | sed 's/^/       /'; fi
+	sea uk "$SRC/uk/uk.vrt" 0.3703 52.988 "North Sea"
+	# the Dee gap was empty in uk.vrt; the coastal fill must have a shallow value there
+	v=$(python3 - "$SRC/uk/uk_filled.vrt" <<'EOF' 2>/dev/null
+import math, sys
+import rasterio
+with rasterio.open(sys.argv[1]) as ds:
+    v = float(next(ds.sample([(-3.20, 53.38)]))[0])
+print(f"{v:g}")
+sys.exit(0 if math.isfinite(v) and v <= 0 else 1)
+EOF
+)
+	if [ $? -eq 0 ]; then ok "uk: coastal fill at Dee gap (-3.20 53.38) is $v m"
+	else fail "uk: coastal fill at Dee gap (-3.20 53.38) is '$v', expected a depth <= 0"; fi
+	# the drying bank at the mouth of the Tay keeps its positive heights; they were clamped to 0 before
+	v=$(python3 - "$SRC/uk/uk.vrt" "$SRC/uk/uk_filled.vrt" <<'EOF' 2>/dev/null
+import sys
+import numpy as np
+import rasterio
+from rasterio.windows import Window
+lon, lat = -3.112839, 56.401750
+with rasterio.open(sys.argv[1]) as base, rasterio.open(sys.argv[2]) as fill:
+    x = int((lon - base.bounds.left) / base.res[0])
+    y = int((base.bounds.top - lat) / base.res[1])
+    w = Window(x - 4, y - 4, 9, 9)
+    a = base.read(1, window=w)
+    b = fill.read(1, window=w)
+    both = np.isfinite(a) & np.isfinite(b)
+    same = bool(np.all(a[both] == b[both]))
+    bank = bool(np.isfinite(a).any() and np.nanmax(a) > -1.0)
+print(f"bank={bank} same={same}")
+sys.exit(0 if bank and same else 1)
+EOF
+)
+	if [ $? -eq 0 ]; then ok "uk: drying bank at Tay (-3.112839 56.401750) stays a shallow bank"
+	else fail "uk: drying bank at Tay (-3.112839 56.401750) is too deep or changed"; fi
 fi
 
 echo "== nz"
