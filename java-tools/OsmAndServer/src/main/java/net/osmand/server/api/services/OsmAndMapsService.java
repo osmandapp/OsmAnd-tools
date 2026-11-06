@@ -68,6 +68,7 @@ import com.google.gson.JsonObject;
 import net.osmand.IndexConstants;
 import net.osmand.LocationsHolder;
 import net.osmand.NativeJavaRendering;
+import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.CachedOsmandIndexes;
 import net.osmand.binary.GeocodingUtilities;
@@ -581,17 +582,17 @@ public class OsmAndMapsService {
 	@Scheduled(fixedRate = INTERVAL_TO_MONITOR_ZIP)
 	public void checkZippedFiles() throws IOException {
 		if (tileConfig != null) {
-			unzipNewObfFiles(tileConfig.obfZipLocation, tileConfig.obfLocation, IndexConstants.BINARY_MAP_INDEX_EXT_ZIP, true);
+			unzipNewObfFiles(tileConfig.obfZipLocation, tileConfig.obfLocation, IndexConstants.BINARY_MAP_INDEX_EXT_ZIP, false);
 			if (srtmUnzip == null || srtmUnzip.isDone()) {
 				srtmUnzip = srtmUnzipExecutor.submit(() -> {
 					try {
 						if (UNZIP_SRTM_METERS) {
 							unzipNewObfFiles(tileConfig.obfSrtmZipLocation, tileConfig.obfSrtmLocation,
-									IndexConstants.BINARY_SRTM_MAP_INDEX_EXT_ZIP, false);
+									IndexConstants.BINARY_SRTM_MAP_INDEX_EXT_ZIP, true);
 						}
 						if (UNZIP_SRTM_FEET) {
 							unzipNewObfFiles(tileConfig.obfSrtmZipLocation, tileConfig.obfSrtmLocation,
-									IndexConstants.BINARY_SRTM_FEET_MAP_INDEX_EXT_ZIP, false);
+									IndexConstants.BINARY_SRTM_FEET_MAP_INDEX_EXT_ZIP, true);
 						}
 					} catch (IOException e) {
 						LOGGER.error(e.getMessage(), e);
@@ -601,14 +602,14 @@ public class OsmAndMapsService {
 		}
 	}
 
-	private void unzipNewObfFiles(String zipLocation, String obfLocation, String zipExt, boolean filterJointMaps) throws IOException {
+	private void unzipNewObfFiles(String zipLocation, String obfLocation, String zipExt, boolean srtm) throws IOException {
 		if (!Algorithms.isEmpty(zipLocation) && !Algorithms.isEmpty(obfLocation)) {
 			File obfDir = new File(obfLocation);
 			Files.createDirectories(obfDir.toPath());
 			LOGGER.info("Checking new files at " + zipLocation + " " + obfDir);
 			File[] zipFiles = new File(zipLocation).listFiles();
 			List<File> files = zipFiles != null ? Arrays.asList(zipFiles) : List.of();
-			for (File zipFile : filterJointMaps ? filterMap(files) : files) {
+			for (File zipFile : srtm ? filterCoveredBySubregions(files, zipExt) : filterMap(files)) {
 				if (zipFile.getName().endsWith(zipExt)) {
 					String fn = zipFile.getName().substring(0, zipFile.getName().length() - ".zip".length());
 					File target = new File(obfDir, fn);
@@ -1717,6 +1718,30 @@ public class OsmAndMapsService {
 			}
 		}
 		return res;
+	}
+
+	private List<File> filterCoveredBySubregions(List<File> files, String zipExt) throws IOException {
+		OsmandRegions regions = PlatformUtil.getOsmandRegions();
+		List<File> extFiles = files.stream().filter(f -> f.getName().endsWith(zipExt)).toList();
+		Set<String> downloadNames = extFiles.stream().map(f -> getDownloadNameByFileName(f.getName()))
+				.collect(Collectors.toSet());
+		return extFiles.stream().filter(f -> {
+			WorldRegion wr = regions.getRegionDataByDownloadName(getDownloadNameByFileName(f.getName()));
+			return wr == null || !isCoveredBySubregions(wr, downloadNames);
+		}).toList();
+	}
+
+	private boolean isCoveredBySubregions(WorldRegion region, Set<String> downloadNames) {
+		if (Algorithms.isEmpty(region.getSubregions())) {
+			return false;
+		}
+		for (WorldRegion subregion : region.getSubregions()) {
+			if (!downloadNames.contains(subregion.getRegionDownloadNameLC())
+					&& !isCoveredBySubregions(subregion, downloadNames)) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	private String getDownloadNameByFileName(String fileName) {
