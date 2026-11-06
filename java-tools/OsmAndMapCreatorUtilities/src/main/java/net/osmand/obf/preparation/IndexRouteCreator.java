@@ -79,8 +79,8 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	Map<MapRoutingTypes.MapRouteType, String> names = createTreeMap();
 
 	private TLongObjectHashMap<List<LatLon>> speedCameraTargets = new TLongObjectHashMap<>();
-	private final double MAX_FORWARD_DEVIATION = 45.0;
-	private final double MIN_BACKWARD_DEVIATION = 135.0;
+	private final double SPEED_CAMERA_FORWARD = 45.0;
+	private final double SPEED_CAMERA_BACKWARD = 135.0;
 
 
 
@@ -167,11 +167,11 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 						PropagateEntityTags pt = tagsTransformer
 								.getPropogateTagForEntity(new EntityId(EntityType.NODE, n.getId()));
 						pt.putThroughTags.put("highway", "speed_camera");
-						if (!target.isEmpty() && target.get(0) instanceof Node) {
+						if (!target.isEmpty() && target.get(0) instanceof Node targetNode) {
 							if (!speedCameraTargets.containsKey(n.getId())) {
 								speedCameraTargets.put(n.getId(), new ArrayList<>());
 							}
-							speedCameraTargets.get(n.getId()).add(((Node) target.get(0)).getLatLon());
+                            speedCameraTargets.get(n.getId()).add((targetNode).getLatLon());
 						}
 					}
 				}
@@ -1786,9 +1786,9 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				double diff = Math.abs(MapUtils.degreesDiff(wayBearing,
 						getBearing(n.getLatLon(), t)));
 				String d;
-				if (diff < MAX_FORWARD_DEVIATION) {
+				if (diff < SPEED_CAMERA_FORWARD) {
 					d = "forward";
-				} else if (diff > MIN_BACKWARD_DEVIATION) {
+				} else if (diff > SPEED_CAMERA_BACKWARD) {
 					d = "backward";
 				} else {
 					direction = null; // direction is undefined
@@ -1809,7 +1809,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	private static double getBearing(LatLon a, LatLon b) {
 		float[] res = new float[2];
 		Location.distanceBetween(a.getLatitude(), a.getLongitude(), b.getLatitude(), b.getLongitude(), res);
-		return res[1];
+		return res[1]; // initialBearing
 	}
 
 
