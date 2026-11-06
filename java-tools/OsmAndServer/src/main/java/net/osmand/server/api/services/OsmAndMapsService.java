@@ -605,7 +605,9 @@ public class OsmAndMapsService {
 	private void unzipNewObfFiles(String zipLocation, String obfLocation, String zipExt, boolean srtm) throws IOException {
 		if (!Algorithms.isEmpty(zipLocation) && !Algorithms.isEmpty(obfLocation)) {
 			File obfDir = new File(obfLocation);
-			Files.createDirectories(obfDir.toPath());
+			if (srtm) {
+				Files.createDirectories(obfDir.toPath());
+			}
 			LOGGER.info("Checking new files at " + zipLocation + " " + obfDir);
 			File[] zipFiles = new File(zipLocation).listFiles();
 			List<File> files = zipFiles != null ? Arrays.asList(zipFiles) : List.of();
