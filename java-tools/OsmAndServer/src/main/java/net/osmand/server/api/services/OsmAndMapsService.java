@@ -68,7 +68,6 @@ import com.google.gson.JsonObject;
 import net.osmand.IndexConstants;
 import net.osmand.LocationsHolder;
 import net.osmand.NativeJavaRendering;
-import net.osmand.PlatformUtil;
 import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.binary.CachedOsmandIndexes;
 import net.osmand.binary.GeocodingUtilities;
@@ -604,7 +603,7 @@ public class OsmAndMapsService {
 			LOGGER.info("Checking new files at " + zipLocation + " " + obfDir);
 			File[] zipFiles = new File(zipLocation).listFiles();
 			List<File> files = zipFiles != null ? Arrays.asList(zipFiles) : List.of();
-			for (File zipFile : srtm ? filterCoveredBySubregions(files, zipExt) : filterMap(files)) {
+			for (File zipFile : srtm ? filterCoveredByParents(files, zipExt) : filterMap(files)) {
 				if (zipFile.getName().endsWith(zipExt)) {
 					String fn = zipFile.getName().substring(0, zipFile.getName().length() - ".zip".length());
 					File target = new File(obfDir, fn);
@@ -1716,28 +1715,33 @@ public class OsmAndMapsService {
 		return res;
 	}
 
-	private List<File> filterCoveredBySubregions(List<File> files, String zipExt) throws IOException {
-		OsmandRegions regions = PlatformUtil.getOsmandRegions();
-		List<File> extFiles = files.stream().filter(f -> f.getName().endsWith(zipExt)).toList();
-		Set<String> downloadNames = extFiles.stream().map(f -> getDownloadNameByFileName(f.getName()))
-				.collect(Collectors.toSet());
-		return extFiles.stream().filter(f -> {
-			WorldRegion wr = regions.getRegionDataByDownloadName(getDownloadNameByFileName(f.getName()));
-			return wr == null || !isCoveredBySubregions(wr, downloadNames);
-		}).toList();
-	}
-
-	private boolean isCoveredBySubregions(WorldRegion region, Set<String> downloadNames) {
-		if (Algorithms.isEmpty(region.getSubregions())) {
-			return false;
+	private List<File> filterCoveredByParents(List<File> files, String zipExt) throws IOException {
+		if (osmandRegions == null) {
+			osmandRegions = new OsmandRegions(null);
 		}
-		for (WorldRegion subregion : region.getSubregions()) {
-			if (!downloadNames.contains(subregion.getRegionDownloadNameLC())
-					&& !isCoveredBySubregions(subregion, downloadNames)) {
-				return false;
+		List<File> res = new ArrayList<>();
+		Set<String> downloadNames = new HashSet<>();
+		for (File file : files) {
+			if (file.getName().endsWith(zipExt)) {
+				res.add(file);
+				downloadNames.add(getDownloadNameByFileName(file.getName()));
 			}
 		}
-		return true;
+		res.removeIf(file -> {
+			WorldRegion region = osmandRegions.getRegionDataByDownloadName(getDownloadNameByFileName(file.getName()));
+			if (region == null) {
+				return false;
+			}
+			WorldRegion parent = region.getSuperregion();
+			while (parent != null) {
+				if (downloadNames.contains(parent.getRegionDownloadNameLC())) {
+					return true; // meters 287 of 1387, feet 276 of 1375 filtered
+				}
+				parent = parent.getSuperregion();
+			}
+			return false;
+		});
+		return res;
 	}
 
 	private String getDownloadNameByFileName(String fileName) {
