@@ -76,6 +76,16 @@ public class DownloadIndexDocument {
 	
 	
 	public void setOutdatedMaps() {
+		addDeletedMap("Canada_nunavut_northamerica_2.obf.zip", DownloadType.MAP, "06.11.2026");
+		addDeletedMap("Norway_vestfold-og-telemark_europe_2.obf.zip", DownloadType.MAP, "06.11.2026");
+		addDeletedMap("Gb_england_channel-islands_europe_2.obf.zip", DownloadType.MAP, "06.11.2026");
+		addDeletedMap("Russia_central-federal-district_asia_2.obf.zip", DownloadType.MAP, "09.09.2026");
+		addDeletedMap("Us_texas_northamerica_2.obf.zip", DownloadType.MAP, "06.07.2026");
+		
+		addDeletedMap("Canada_nunavut_northamerica_2.road.obf.zip", DownloadType.ROAD_MAP, "06.11.2026");
+		addDeletedMap("Norway_vestfold-og-telemark_europe_2.road.obf.zip", DownloadType.ROAD_MAP, "06.11.2026");
+		addDeletedMap("Gb_england_channel-islands_europe_2.road.obf.zip", DownloadType.ROAD_MAP, "06.11.2026");
+
 		addDeletedMap("Canada_british-columbia_alberni-clayoquot_northamerica_2.obf.zip", DownloadType.MAP, "09.09.2026");
 		addDeletedMap("Canada_british-columbia_bulkley-nechako_northamerica_2.obf.zip", DownloadType.MAP, "09.09.2026");
 		addDeletedMap("Canada_british-columbia_capital-regional_northamerica_2.obf.zip", DownloadType.MAP, "09.09.2026");
