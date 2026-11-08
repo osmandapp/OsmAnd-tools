@@ -195,6 +195,12 @@ public class DownloadIndexesService  {
 			dwName = name.replace(' ', '_');
 		}
 
+		for (DownloadIndex di : doc.getDeletedMaps()) {
+			if (di.getName().equals(dwName) || di.getName().equals(dwName + ".zip")) {
+				// removed from the catalogue: the file is gone from the server, but it is still not a user file
+				return new ServerCommonFile((File) null, di);
+			}
+		}
 		for (DownloadIndex di : doc.getAllMaps()) {
 			if (di.getName().equals(dwName) || di.getName().equals(dwName + ".zip")) {
 				File file = new File(pathToDownloadFiles, dwName + ".zip");

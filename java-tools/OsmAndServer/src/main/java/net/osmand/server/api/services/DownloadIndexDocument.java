@@ -305,6 +305,10 @@ public class DownloadIndexDocument {
 		return maps;
 	}
 
+	public List<DownloadIndex> getDeletedMaps() {
+		return deletedMaps;
+	}
+
 	public List<DownloadIndex> getInapps() {
 		return inapps;
 	}
