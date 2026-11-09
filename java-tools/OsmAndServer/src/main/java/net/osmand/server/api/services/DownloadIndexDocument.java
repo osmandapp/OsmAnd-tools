@@ -1,5 +1,7 @@
 package net.osmand.server.api.services;
 
+import static net.osmand.IndexConstants.BINARY_MAP_INDEX_EXT;
+
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -73,6 +75,24 @@ public class DownloadIndexDocument {
 	
 	@XmlElement(name = "deleted_map")
 	private List<DownloadIndex> deletedMaps = new ArrayList<>(); 
+
+	public boolean isDeletedMap(String name) {
+		name = name.substring(name.lastIndexOf('/') + 1);
+		if (name.endsWith(UserdataService.INFO_EXT)) {
+			name = name.substring(0, name.length() - UserdataService.INFO_EXT.length());
+		}
+		if (!name.endsWith(BINARY_MAP_INDEX_EXT)) {
+			return false;
+		}
+		int ind = name.indexOf('.');
+		String dwName = name.substring(0, ind) + "_2" + name.substring(ind);
+		for (DownloadIndex di : deletedMaps) {
+			if (di.getName().equals(dwName + ".zip")) {
+				return true;
+			}
+		}
+		return false;
+	}
 	
 	
 	public void setOutdatedMaps() {

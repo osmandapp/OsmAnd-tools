@@ -371,7 +371,7 @@ public class UserdataController {
 	@GetMapping(value = "/check-file-on-server")
 	public ResponseEntity<String> checkFileOnServer(@RequestParam(name = "name", required = true) String name,
 			@RequestParam(name = "type", required = true) String type) throws IOException {
-		if (userdataService.checkThatObfFileisOnServer(name, type) != null) {
+		if (userdataService.isDeletedMapFile(name, type) || userdataService.checkThatObfFileisOnServer(name, type) != null) {
 			return ResponseEntity.ok(gson.toJson(Collections.singletonMap("status", "present")));
 		}
 		return ResponseEntity.ok(gson.toJson(Collections.singletonMap("status", "not-present")));
@@ -448,6 +448,7 @@ public class UserdataController {
 		}
 		Set<String> types = userdataService.parseFileTypes(type);
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, false, types);
+		userdataService.hideDeletedMaps(res);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 

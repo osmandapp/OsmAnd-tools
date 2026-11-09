@@ -1,5 +1,6 @@
 package net.osmand.server.api.services;
 
+import static net.osmand.IndexConstants.BINARY_MAP_INDEX_EXT;
 import static net.osmand.shared.IndexConstants.GPX_FILE_PREFIX;
 import static org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
 
@@ -172,6 +173,7 @@ public class UserdataService {
     private static final int MAX_NUMBER_OF_FILES_FREE_ACCOUNT = 10000;
     public static final long MAXIMUM_FREE_ACCOUNT_SIZE = 5 * MB;
     private static final long MAXIMUM_FREE_ACCOUNT_FILE_SIZE = 2 * MB;
+    private static final String FILE_TYPE = "FILE";
     public static final String FILE_TYPE_GLOBAL = "GLOBAL";
     public static final String FILE_TYPE_FAVOURITES = "FAVOURITES";
     public static final String FILE_TYPE_PROFILE = "PROFILE";
@@ -302,6 +304,21 @@ public class UserdataService {
 		return getUserFilesResults(allFiles, userId, allVersions);
 	}
 
+	public boolean isDeletedMapFile(String name, String type) throws IOException {
+		return FILE_TYPE.equalsIgnoreCase(type)
+				&& (name.endsWith(BINARY_MAP_INDEX_EXT) || name.endsWith(BINARY_MAP_INDEX_EXT + INFO_EXT))
+				&& downloadService.getIndexesDocument(false, false).isDeletedMap(name);
+	}
+
+	public void hideDeletedMaps(UserdataController.UserFilesResults files) throws IOException {
+		DownloadIndexDocument indexes = downloadService.getIndexesDocument(false, false);
+		// Keep stored bodies in quota totals, but exclude them from sync and restore.
+		files.uniqueFiles.removeIf(f -> FILE_TYPE.equalsIgnoreCase(f.type) && indexes.isDeletedMap(f.name));
+		if (files.allFiles != null) {
+			files.allFiles.removeIf(f -> FILE_TYPE.equalsIgnoreCase(f.type) && indexes.isDeletedMap(f.name));
+		}
+	}
+
 	public Set<String> parseFileTypes(String types) {
 		if (types == null || types.isEmpty()) {
 			return Collections.emptySet();
@@ -409,6 +426,11 @@ public class UserdataService {
 
 	public ResponseEntity<String> uploadMultipartFile(MultipartFile file, CloudUserDevicesRepository.CloudUserDevice dev,
 			String name, String type, Long clienttime, HttpSession session) throws IOException {
+		if (isDeletedMapFile(name, type)) {
+			// Acknowledge obsolete maps without storing their content or a cloud reference.
+			return ResponseEntity.ok(gson.toJson(Map.of(
+					"status", "ok", "updatetime", System.currentTimeMillis(), "filesize", 0)));
+		}
 		try (InternalZipFile zipfile = getUploadZipFile(file, name, type, session)) {
 			validateUserForUpload(dev, type, zipfile.getSize());
 			return uploadFile(zipfile, dev, name, type, clienttime);
@@ -1302,7 +1324,6 @@ public class UserdataService {
 
 
     private boolean isSelectedType(Set<String> filterTypes, CloudUserFilesRepository.UserFileNoData sf) {
-        final String FILE_TYPE = "FILE";
         final String FILE_TYPE_MAPS = "FILE_MAPS";
         final String FILE_TYPE_OTHER = "FILE_OTHER";
         String currentFileType = sf.type.toUpperCase();
