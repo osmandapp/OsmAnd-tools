@@ -161,7 +161,6 @@ public class UserdataController {
 	}
 
 	@PostMapping(value = "/user-update-orderid")
-	@Transactional
 	public ResponseEntity<String> userUpdateOrderid(@RequestParam String email,
 	                                                @RequestParam(name = "deviceid", required = false) String deviceId,
 	                                                @RequestParam(required = false) String orderid,
