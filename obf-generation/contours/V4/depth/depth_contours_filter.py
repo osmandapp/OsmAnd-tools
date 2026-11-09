@@ -7,7 +7,7 @@
 INPUT has line features (lon/lat) with an `elev` field (metres, negative below sea level) or a positive `depth` field
 (charted contours). OUTPUT (FlatGeobuf) keeps the lines below 0 m with a `depth` field (positive metres), drops closed
 rings shorter than N grid cells - single cells, and the bumps and hollows a multibeam survey leaves on a chart - and
-open pieces shorter than MIN_LINE_M, then simplifies every line by half a grid cell unless --simplify is given.
+open pieces shorter than MIN_LINE_M. Every vertex is kept unless --simplify gives a tolerance in degrees.
 """
 import argparse
 import math
@@ -37,8 +37,8 @@ def main():
                         help='cut the lines to this box before simplifying: the grid of a tile reaches past its box, '
                              'so the lines of two tiles meet exactly at their common edge')
     parser.add_argument('--min-line-m', type=float, default=0, help='drop open pieces shorter than this many metres')
-    parser.add_argument('--simplify', type=float, help='simplification tolerance in degrees; 0 keeps every vertex '
-                                                       '(default: half a grid cell)')
+    parser.add_argument('--simplify', type=float, default=0, help='simplification tolerance in degrees; 0 keeps every '
+                                                                 'vertex and is the default')
     parser.add_argument('--min-ring-cells', type=float, default=8,
                         help='closed rings shorter than this many cells are dropped')
     args = parser.parse_args()
@@ -57,7 +57,7 @@ def main():
         w, s, e, n = args.bbox
         box = ogr.CreateGeometryFromWkt('POLYGON((%r %r,%r %r,%r %r,%r %r,%r %r))' % (w, s, e, s, e, n, w, n, w, s))
     min_ring_m = args.min_ring_cells * args.cell * 111320
-    tolerance = args.cell / 2 if args.simplify is None else args.simplify
+    tolerance = args.simplify
     kept = dropped = 0
     fields = [layer.GetLayerDefn().GetFieldDefn(i).GetName() for i in range(layer.GetLayerDefn().GetFieldCount())]
     depth_field = 'elev' if 'elev' in fields else 'depth'

@@ -323,24 +323,25 @@ if want uk; then
 			[ -e "$need" ] || { echo "FAILED uk: $need not found (run --only emodnet,mask,ireland first)" >&2; exit 1; }
 		done
 		[ -n "$land" ] || { echo "FAILED uk: no land polygons in $OUT/mask (run --mask first)" >&2; exit 1; }
+		# the land of the neighbouring countries is not zeroed and their waters are not filled;
+		# the EMODnet underlay also stops at the midpoint between British and neighbouring land
+		foreign_args=()
+		for p in $UK_FOREIGN_POLYS; do
+			[ -e "$p" ] || { echo "FAILED uk: $p not found (the polygons of the neighbouring countries)" >&2; exit 1; }
+			foreign_args+=(--foreign "$p")
+		done
 		# lattice holes and thin edge notches of the point surveys
 		"$HERE/uk_fill_holes.py" "$SRC/uk" -j "$UKHO_CONV_JOBS"
 		# Irish waters are INFOMAR, not UKHO: mask them and move empty surveys out of grid
 		"$HERE/uk_exclude_ireland.py" "$SRC/uk" "$ireland" "$IRELAND_POLY" -j "$UKHO_CONV_JOBS" --apply
 		# the EMODnet underlay of the coastal gaps, then the blended mosaic (uk.vrt)
 		"$HERE/uk_emodnet_fill.py" "$SRC/uk" "$emodnet" "$land" "$ireland" "$IRELAND_POLY" \
-			--output "$OUT/preview" --build-vrt
+			--output "$OUT/preview" "${foreign_args[@]}" --build-vrt
 		"$HERE/uk_build_vrt.py" "$SRC/uk" --feather "$UK_FEATHER" -j "$UKHO_CONV_JOBS"
-		# fill the gap between the coastline (0 m) and the surveys, so depth areas reach the coast;
-		# the land of the neighbouring countries is not zeroed and their waters are not filled
-		foreign_args=()
-		for p in $UK_FOREIGN_POLYS; do
-			[ -e "$p" ] || { echo "FAILED uk: $p not found (the polygons of the neighbouring countries)" >&2; exit 1; }
-			foreign_args+=(--foreign "$p")
-		done
+		# fill the gap between the coastline (0 m) and the surveys, so depth areas reach the coast
 		"$HERE/uk_coastal_fill.py" "$SRC/uk/uk.vrt" "$SRC/uk" --land "$land" \
 			--exclude "$IRELAND_POLY" --exclude-raster "$ireland" "${foreign_args[@]}" \
-			--limit "$UK_COASTAL_FILL" -j "$UKHO_CONV_JOBS"
+			--limit "$UK_COASTAL_FILL" -j "$UKHO_CONV_JOBS" --force
 	fi
 fi
 if want nz; then

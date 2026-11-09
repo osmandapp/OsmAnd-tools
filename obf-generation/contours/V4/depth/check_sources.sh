@@ -298,7 +298,7 @@ if [ ${#FILES[@]} -eq 0 ]; then fail "uk: no surveys in src/uk/grid (downloaded 
 else
 	rasters_open uk "${FILES[@]}"
 	# uk.vrt is the blended mosaic written by uk_build_vrt.py, not a VRT of all the tifs: never rebuild it here
-	for v in "$SRC/uk/emodnet_fill.vrt" "$SRC/uk/uk.vrt" "$SRC/uk/uk_interp.vrt" "$SRC/uk/uk_filled.vrt" "$SRC/uk/uk_filled_interp.vrt"; do
+	for v in "$SRC/uk/emodnet_fill.vrt" "$SRC/uk/emodnet_home.vrt" "$SRC/uk/uk.vrt" "$SRC/uk/uk_interp.vrt" "$SRC/uk/uk_filled.vrt" "$SRC/uk/uk_filled_interp.vrt"; do
 		if [ ! -f "$v" ]; then fail "uk: $(basename "$v") not found (run download_all.sh --only uk)"
 		elif gdalinfo "$v" >/dev/null 2>&1; then ok "uk: $(basename "$v") opens"
 		else fail "uk: $(basename "$v") does not open"; fi
@@ -363,6 +363,34 @@ EOF
 )
 	if [ $? -eq 0 ]; then ok "uk: the coast of France and Belgium stays out of the map"
 	else fail "uk: foreign land or water in the map: $v"; fi
+	# The EMODnet base of the UK map ends at the midpoint to the neighbouring land: the French side of
+	# the Channel stays empty, the British side keeps its values.
+	v=$(python3 - "$SRC/uk/emodnet_home.vrt" "$SRC/emodnet/emodnet_2024.vrt" "$SRC/uk/uk_filled.vrt" <<'EOF' 2>/dev/null
+import math, sys
+import rasterio
+# French side of the Channel and of Normandy, British side of the Channel, the open sea and the North Sea.
+pts = [(1.80, 50.98, "Calais NW", False), (1.60, 50.91, "Cap Gris-Nez N", False),
+       (2.18, 51.08, "Dunkirk N", False), (-1.62, 49.75, "Cherbourg N", False),
+       (0.30, 50.20, "Channel off Normandy", False),
+       (1.32, 51.10, "Dover water", True), (-1.55, 50.60, "Lyme Bay", True),
+       (0.37, 52.99, "North Sea", True), (-3.20, 50.20, "Start Point", True)]
+with rasterio.open(sys.argv[1]) as home, rasterio.open(sys.argv[2]) as full, \
+     rasterio.open(sys.argv[3]) as filled:
+    for lon, lat, name, keep in pts:
+        h = float(next(home.sample([(lon, lat)]))[0])
+        f = float(next(full.sample([(lon, lat)]))[0])
+        u = float(next(filled.sample([(lon, lat)]))[0])
+        if keep and not (math.isfinite(h) and math.isfinite(f) and math.isfinite(u)):
+            print(f"{name}: home={h:g} full={f:g} filled={u:g}")
+            sys.exit(1)
+        if not keep and (math.isfinite(h) or math.isfinite(u)):
+            print(f"{name}: home={h:g} full={f:g} filled={u:g}")
+            sys.exit(1)
+print("ok")
+EOF
+)
+	if [ $? -eq 0 ]; then ok "uk: the EMODnet base stops at the midpoint to the French land"
+	else fail "uk: the EMODnet base crosses the midpoint to the French land: $v"; fi
 fi
 
 echo "== nz"

@@ -8,7 +8,7 @@ uk_sources.vrt.
 
 Usage:
   uk_emodnet_fill.py SRC_UK_DIR EMODNET_VRT LAND_GPKG IRELAND_VRT IRELAND_POLY --output DIR
-                   [--build-vrt] [--vrt-only]
+                   [--foreign NEIGHBOUR.poly ...] [--build-vrt] [--vrt-only]
 """
 
 import argparse, math, os, subprocess
@@ -32,6 +32,7 @@ gdal.UseExceptions()
 ogr.UseExceptions()
 gdal.PushErrorHandler("CPLQuietErrorHandler")
 CELL = 0.002
+UK_BOUNDS = (-8.7, 49.8, 2.0, 60.9)  # Great_Britain_contours in build_depth_region.sh
 
 
 def warp_array(sources, bounds, width, height, resample="average", output_type=gdal.GDT_Float32):
@@ -40,6 +41,8 @@ def warp_array(sources, bounds, width, height, resample="average", output_type=g
                    outputBounds=bounds, width=width, height=height,
                    resampleAlg=resample, outputType=output_type, dstNodata=float("nan"))
     a = ds.ReadAsArray()
+    if a.ndim == 3:
+        a = a[0]  # survey VRTs may carry the interpolation mask as band 2
     ds = None
     gdal.Unlink(path)
     return a
@@ -54,6 +57,42 @@ def rasterize_land(path, bounds, width, height):
     ds = None
     gdal.Unlink(out)
     return a.astype(bool)
+
+
+def home_water_only(mask, land, foreign_shapes, transform, sampling, home_path=None):
+    """Keep the side nearest to British land; the neighbouring countries get their own EMODnet map."""
+    if not foreign_shapes:
+        return mask
+    foreign = rasterize(foreign_shapes, out_shape=land.shape, transform=Affine.from_gdal(*transform),
+                        fill=0, all_touched=True, dtype="uint8").astype(bool)
+    foreign &= land
+    if not foreign.any():
+        return mask
+    home = land & ~foreign
+    home_distance = ndimage.distance_transform_edt(~home, sampling=sampling)
+    foreign_distance = ndimage.distance_transform_edt(~foreign, sampling=sampling)
+    home_mask = home_distance <= foreign_distance
+    clipped = mask & home_mask
+    if home_path:
+        write_coverage(home_path, home_mask, transform)
+    print(f"Home water: {int(home_mask.sum())} of {home_mask.size} cells; "
+          f"EMODnet cells beyond the midpoint to neighbouring land removed: "
+          f"{int(mask.sum() - clipped.sum())}", flush=True)
+    return clipped
+
+
+def build_home_coverage(uk, land_path, foreign_shapes):
+    """Midpoint coverage on the whole UK map bounds, not just on the current survey extents."""
+    left, bottom, right, top = UK_BOUNDS
+    width = math.ceil((right - left) / CELL)
+    height = math.ceil((top - bottom) / CELL)
+    bounds = (left, top - height * CELL, left + width * CELL, top)
+    transform = (left, CELL, 0, top, 0, -CELL)
+    land = rasterize_land(os.path.abspath(land_path), bounds, width, height)
+    midlat = (bounds[1] + bounds[3]) / 2
+    sampling = (CELL, CELL * math.cos(math.radians(midlat)))
+    home_water_only(np.zeros(land.shape, dtype=bool), land, foreign_shapes, transform, sampling,
+                    os.path.join(uk, "uk_home_water.gpkg"))
 
 
 def write_coverage(path, mask, transform):
@@ -105,7 +144,7 @@ def write_byte_raster(path, mask, transform, nodata=0):
     ds = None
 
 
-def smooth_coverage(path, out_path):
+def smooth_coverage(path, out_path, keep_path=None):
     source = ogr.Open(path)
     layer = source.GetLayer(0)
     feature = layer.GetNextFeature()
@@ -113,6 +152,14 @@ def smooth_coverage(path, out_path):
     smoothed = original.Buffer(CELL).Buffer(-CELL).SimplifyPreserveTopology(CELL / 10)
     if smoothed.IsEmpty():
         raise RuntimeError("Smoothed EMODnet coverage is empty")
+    if keep_path:
+        # The smoothing buffer must not bring the underlay back across the midpoint to foreign land.
+        keep_src = ogr.Open(keep_path)
+        keep_feature = keep_src.GetLayer(0).GetNextFeature()
+        smoothed = smoothed.Intersection(keep_feature.GetGeometryRef().Clone())
+        if smoothed.IsEmpty():
+            raise RuntimeError("EMODnet coverage outside the home water")
+        keep_src = None
     srs = layer.GetSpatialRef()
     if os.path.exists(out_path):
         os.remove(out_path)
@@ -137,7 +184,8 @@ def mask_nonnegative(path):
 
 def build_underlay(uk, emodnet, land):
     coverage = os.path.join(uk, "emodnet_fill_coverage_smooth.gpkg")
-    smooth_coverage(os.path.join(uk, "emodnet_fill_coverage.gpkg"), coverage)
+    smooth_coverage(os.path.join(uk, "emodnet_fill_coverage.gpkg"), coverage,
+                    os.path.join(uk, "uk_home_water.gpkg"))
     with rasterio.open(emodnet) as source:
         native_cell = source.res[0]
     tmp_dir = os.path.join(uk, "tmp")
@@ -177,6 +225,36 @@ def build_underlay(uk, emodnet, land):
     out = os.path.join(uk, "emodnet_fill.vrt")
     atomic_vrt([tif], os.path.join(uk, "emodnet_fill_source.txt"), out, 0.0002)
     print("EMODnet underlay written to", tif, "and", out, flush=True)
+    build_home_base(uk, emodnet)
+
+
+def build_home_base(uk, emodnet):
+    """The general EMODnet base of the UK map gets the same midpoint boundary as the coastal underlay."""
+    coverage = os.path.join(uk, "uk_home_water.gpkg")
+    if not os.path.exists(coverage):
+        raise RuntimeError("Missing the midpoint coverage; rebuild the EMODnet mask first")
+    with rasterio.open(emodnet) as source:
+        native_cell = source.res[0]
+    bounds = UK_BOUNDS
+    tif = os.path.join(uk, "emodnet_home.tif")
+    tmp = os.path.join(uk, "emodnet_home.tmp.tif")
+    if os.path.exists(tmp):
+        os.remove(tmp)
+    try:
+        gdal.Warp(tmp, os.path.abspath(emodnet), format="GTiff", dstSRS="EPSG:4326",
+                  outputBounds=bounds, xRes=native_cell, yRes=native_cell, targetAlignedPixels=True,
+                  resampleAlg="near", cutlineDSName=coverage, cutlineLayer="coverage",
+                  cropToCutline=False, dstNodata=float("nan"), outputType=gdal.GDT_Float32,
+                  multithread=True, warpOptions=["NUM_THREADS=16"],
+                  creationOptions=["COMPRESS=DEFLATE", "PREDICTOR=3", "TILED=YES",
+                                   "SPARSE_OK=TRUE", "BIGTIFF=IF_SAFER"])
+        os.replace(tmp, tif)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+    out = os.path.join(uk, "emodnet_home.vrt")
+    atomic_vrt([tif], os.path.join(uk, "emodnet_home_source.txt"), out, native_cell)
+    print("Midpoint-limited EMODnet base written to", tif, "and", out, flush=True)
 
 
 def save_preview(path, arrays, bounds, xlim=None, ylim=None, title="EMODnet fill preview"):
@@ -218,17 +296,27 @@ def main():
     ap.add_argument("--output", required=True)
     ap.add_argument("--radius", type=float, default=2000, help="closing radius in metres")
     ap.add_argument("--coast", type=float, default=2000, help="coastal selection distance in metres")
+    ap.add_argument("--foreign", action="append", required=True,
+                    help="neighbouring country .poly, repeatable; EMODnet stops at the midpoint to its land")
     ap.add_argument("--build-vrt", action="store_true", help="also build the EMODnet underlay VRT")
     ap.add_argument("--vrt-only", action="store_true", help="use the existing mask and only build its VRT")
     args = ap.parse_args()
     uk = os.path.abspath(args.uk)
+    os.makedirs(args.output, exist_ok=True)
+    # Only the neighbouring mainland takes part in the midpoint. Ireland is excluded separately
+    # (its poly and the INFOMAR grid), and counting it here would put the whole Celtic Sea on the
+    # foreign side of the line.
+    foreign_shapes = []
+    for path in args.foreign:
+        foreign_shapes.extend(poly_shapes(path))
     if args.vrt_only:
+        # Only the selected envelope is reused; the full-map midpoint coverage is cheap to rebuild and may be old.
+        build_home_coverage(uk, args.land, foreign_shapes)
         build_underlay(uk, args.emodnet, args.land)
         return
-    os.makedirs(args.output, exist_ok=True)
     accepted, excluded = survey_sources(uk)
     detail_path = os.path.join(uk, "uk_detail.vrt")
-    atomic_vrt(accepted, os.path.join(uk, "uk_detail_sources.txt"), detail_path, 0.0002)
+    atomic_vrt(accepted, os.path.join(uk, "uk_detail_sources.txt"), detail_path, 0.0002, band=1)
     with rasterio.open(detail_path) as detail:
         left, top = detail.bounds.left, detail.bounds.top
     width = math.ceil((detail.bounds.right - left) / CELL)
@@ -265,6 +353,8 @@ def main():
     poly = rasterize(poly_shapes(args.ireland_poly), out_shape=(height, width),
                      transform=Affine.from_gdal(*transform), fill=0, dtype="uint8").astype(bool)
     ireland_a = warp_array(os.path.abspath(args.ireland), bounds, width, height)
+    envelope = home_water_only(envelope, land, foreign_shapes, transform, sampling)
+    build_home_coverage(uk, args.land, foreign_shapes)
     envelope &= ~poly & ~np.isfinite(ireland_a)
     new = envelope & ~valid & emodnet_valid
     replacement_new = replacement & new
@@ -293,6 +383,8 @@ def main():
                  (0.15, 1.05), (52.90, 53.35), "Skegness: EMODnet underlay")
     save_preview(os.path.join(args.output, "uk_emodnet_fill_south.png"), arrays, bounds,
                  (-8.7, 2.0), (49.8, 53.6), "Southern UK: EMODnet underlay")
+    save_preview(os.path.join(args.output, "uk_emodnet_fill_channel.png"), arrays, bounds,
+                 (-2.0, 2.0), (49.8, 51.2), "Channel: EMODnet only on the British side")
     save_preview(os.path.join(args.output, "uk_emodnet_fill_north.png"), arrays, bounds,
                  (-8.7, 2.0), (56.4, 61.0), "Northern UK and offshore surveys")
     print("Preview written to", args.output, flush=True)

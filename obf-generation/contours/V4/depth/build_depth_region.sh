@@ -19,15 +19,15 @@
 #                SPACING degree cell, shown from ZOOMS; each tier is its own map section. Default none
 #   -r CELL      working cell in degrees, default the grid's own
 #   -u UPSAMPLE  cubic-spline upsampling factor before contouring, smooths the lines of a coarse grid (default 1)
-#   -s SMOOTH    low-pass for the deeper levels: average over SMOOTH x SMOOTH cells, then back (default 4, 1 = off);
-#                a flat bottom with sand waves near a level gives hundreds of tiny zigzags without it
-#   -d SMOOTH_FROM  levels from this depth down use the smoothed grid, shallower ones the full grid (default 20)
+#   -s SMOOTH    optional low-pass: average over SMOOTH x SMOOTH cells, then back (default 1 = off). When enabled,
+#                every level uses the same smoothed grid, so neighbouring contours cannot cross at a change of grid
+#   -d SMOOTH_FROM  deprecated compatibility option; smoothing applies to every level, not only deeper ones
 #   -a RESAMPLING   gdalwarp resampling of the cut (default average); bilinear avoids the steps of a coarse grid;
 #                   auto: every grid on its own, average when its cells are about the cell or finer, bilinear when coarser
 #                   (EMODnet under a 20 m survey), then laid over each other
 #                   (GEBCO) cut to a much finer cell
-#   -g MIN_RING_CELLS  drop closed rings shorter than this many cells (default 8)
-#   -S SIMPLIFY  simplification of grid contours and their depth areas in degrees (default half a cell; 0 is exact)
+#   -g MIN_RING_CELLS  drop closed rings shorter than this many cells (default 0: keep every ring)
+#   -S SIMPLIFY  simplification of grid contours and their depth areas in degrees (default 0: exact shared vertices)
 #   -w OVERVIEW  "CELL:ZOOMS", e.g. "0.02:5-8": the levels of 200 m and deeper again from the grid averaged to CELL
 #                degrees, as their own map section shown at ZOOMS - the main contours start at zoom 9. Default none
 #   -x EXCLUDE   polygons (OGR source, layer -X or the first) where another region has better data: no contours,
@@ -250,9 +250,6 @@ if [ -n "$DATA" ]; then
 				coverage uk "" "$DATA/src/uk/uk.vrt"; : "${EXCLUDE:=$COVERAGE}"
 			fi
 			: "${RESAMPLING:=auto}"; : "${CELL:=0.0002}"; : "${LEVELS:=2,5,10,15,20,25,30,35,40,45,50,100,200}"; : "${SMOOTH_FROM:=5}"
-			# Every level and fill band uses the same vertices: no smoothed copy may cross a shallower contour, and
-			# independent simplification must not move a line away from its area boundary.
-			: "${SMOOTH:=1}"; : "${SIMPLIFY:=0}"; : "${MIN_RING_CELLS:=0}"
 			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1 ;;
 		Great_Britain_contours)
 			# UKHO surveys downloaded by hand (download_all.sh uk): only the 1 degree tiles touching one of them.
@@ -267,7 +264,11 @@ if [ -n "$DATA" ]; then
 			# tile selection stays on the surveys: uk_filled.vrt covers the whole bbox with NaN
 			UK_TILES="$DATA/src/uk/uk.vrt"
 			[ -f "$UK_TILES" ] || UK_TILES="$UK"
-			: "${BBOX:=-8.7 49.8 2.0 60.9}"; : "${GRID:=$EMODNET,$UK}"; : "${FILL:=$UK}"; : "${TILE_WITH:=$UK_TILES}"
+			# The general EMODnet base, like the coastal underlay, ends at the midpoint to neighbouring land;
+			# detailed UKHO surveys are not clipped by that line.
+			UK_BASE="$DATA/src/uk/emodnet_home.vrt"
+			[ -f "$UK_BASE" ] || { echo "$NAME: no $UK_BASE (run download_all.sh --only uk with the midpoint mask)" >&2; exit 1; }
+			: "${BBOX:=-8.7 49.8 2.0 60.9}"; : "${GRID:=$UK_BASE,$UK}"; : "${FILL:=$UK}"; : "${TILE_WITH:=$UK_TILES}"
 			# the cells whose value is interpolated (the gaps closed inside a survey, the blended transitions
 			# and the coastal fill): no depth point is placed on them
 			: "${INTERP:=}"
@@ -329,7 +330,7 @@ if [ -n "$DATA" ]; then
 # the rasters with the interpolated cells of the region: no depth point is placed on them
 : "${INTERP:=}"
 fi
-: "${LEVELS:=2,5,10,20,30,50,100,200,500,$DEEP_LEVELS}"; : "${SMOOTH:=4}"; : "${SMOOTH_FROM:=20}"; : "${RESAMPLING:=average}"; : "${MIN_RING_CELLS:=8}"
+: "${LEVELS:=2,5,10,20,30,50,100,200,500,$DEEP_LEVELS}"; : "${SMOOTH:=1}"; : "${SMOOTH_FROM:=20}"; : "${RESAMPLING:=average}"; : "${MIN_RING_CELLS:=0}"; : "${SIMPLIFY:=0}"
 [ "$LEVELS" != none ] || LEVELS=""
 for v in NAME BBOX GRID LAND OUT; do
 	[ -n "${!v}" ] || { echo "Missing $v, see --help" >&2; exit 1; }
@@ -599,7 +600,7 @@ if [ -n "$LEVELS" ]; then
 			-co COMPRESS=DEFLATE -co TILED=YES "$TMP/grid.tif" "$TMP/contour_grid.tif"
 	fi
 	if [ "$SMOOTH" != 1 ]; then
-		step "smoothed copy for levels from $SMOOTH_FROM m: average over $SMOOTH cells"
+		step "common smoothed grid for every level: average over $SMOOTH cells"
 		COARSE=$(python3 -c "print(float('$FINE') * float('$SMOOTH'))")
 		# -tap: smoothing cells on multiples of COARSE everywhere, the same in neighbouring tiles
 		gdalwarp -q -overwrite -tap -tr "$COARSE" "$COARSE" -r average -multi -wo NUM_THREADS="$JOBS" \
@@ -613,23 +614,12 @@ if [ -n "$LEVELS" ]; then
 	done
 
 	# levels ascending as gdal_contour wants them: -11000 ... -2
-	levels() { echo "$LEVELS" | tr ',' '\n' | awk -v cmp="$1" -v from="$SMOOTH_FROM" \
-		'(cmp=="shallow" && $1<from) || (cmp=="deep" && $1>=from) || cmp=="all" {print $1}' | sort -rn | awk '{printf "%s ", -$1}'; }
+	levels() { echo "$LEVELS" | tr ',' '\n' | sort -rn | awk '{printf "%s ", -$1}'; }
 	step "contours at $LEVELS m"
-	if [ -f "$TMP/smooth.tif" ]; then
-		SHALLOW=$(levels shallow); DEEP=$(levels deep)
-		# shellcheck disable=SC2086
-		if [ -n "$SHALLOW" ]; then gdal_contour -q -a elev -fl $SHALLOW "$TMP/contour_grid.tif" "$TMP/contours.gpkg"; fi
-		# shellcheck disable=SC2086
-		if [ -n "$DEEP" ]; then gdal_contour -q -a elev -fl $DEEP "$TMP/smooth.tif" "$TMP/deep.gpkg"; fi
-		if [ -f "$TMP/deep.gpkg" ]; then
-			if [ -f "$TMP/contours.gpkg" ]; then ogr2ogr -q -append -nln contour "$TMP/contours.gpkg" "$TMP/deep.gpkg"
-			else mv "$TMP/deep.gpkg" "$TMP/contours.gpkg"; fi
-		fi
-	else
-		# shellcheck disable=SC2086
-		gdal_contour -q -a elev -fl $(levels all) "$TMP/contour_grid.tif" "$TMP/contours.gpkg"
-	fi
+	CONTOUR_RASTER="$TMP/contour_grid.tif"
+	[ ! -f "$TMP/smooth.tif" ] || CONTOUR_RASTER="$TMP/smooth.tif"
+	# shellcheck disable=SC2086
+	gdal_contour -q -a elev -fl $(levels) "$CONTOUR_RASTER" "$TMP/contours.gpkg"
 	step "filter and simplify"
 	python3 "$HERE/depth_contours_filter.py" "$TMP/contours.gpkg" "$TMP/depth.fgb" --cell "$FINE" --min-ring-cells "$MIN_RING_CELLS" \
 		--simplify "$CONTOUR_SIMPLIFY" --bbox "$W" "$S" "$E" "$N"
@@ -673,16 +663,15 @@ if [ -n "$OVERVIEW" ] && [ -n "$OVERVIEW_LEVELS" ]; then
 	rm -f "$TMP/overview.tif" "$TMP/overview.gpkg" "$TMP/overview.fgb"
 fi
 
-# fill: "shallower than L" for L = 0, 2, 5, 10 m, each from the raster its contour came from (the smoothed one from
-# SMOOTH_FROM), only where the fill grid has data (not from the rest of GRID); depth_areas_osm.py --nested makes bands
+# fill: "shallower than L" for L = 0, 2, 5, 10 m from the same raster as every contour, only where the fill grid
+# has data (not from the rest of GRID); depth_areas_osm.py --nested makes bands
 if [ -n "$FILL" ]; then
 	step "depth areas where $(basename "$fill_grid") has data"
 	fill_src=$fill_grid; [ -f "$TMP/fill_datum.tif" ] && fill_src="$TMP/fill_datum.tif"
 	# shallower than 0 m dries (class -1), than 2 m is 0-2 (0), than 5 m is 2-5 (2), than 10 m is 5-10 (5)
 	for level_class in 0:-1 2:0 5:2 10:5; do
 		level=${level_class%%:*}; class=${level_class#*:}
-		raster="$TMP/contour_grid.tif"
-		if [ -f "$TMP/smooth.tif" ] && [ "$level" -ge "$SMOOTH_FROM" ]; then raster="$TMP/smooth.tif"; fi
+		raster="${CONTOUR_RASTER:-$TMP/contour_grid.tif}"
 		if [ ! -f "$raster" ]; then
 			[ -f "$TMP/fill_cut.tif" ] || warp "$fill_src" average "$TMP/fill_cut.tif"
 			raster="$TMP/fill_cut.tif"

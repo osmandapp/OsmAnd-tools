@@ -3,7 +3,7 @@
 
     depth_areas_osm.py SOURCE OUTPUT.osm.gz --layer LAYER --field MIN_DEPTH_FIELD [--field-max MAX_DEPTH_FIELD]
                        --land LAND [--exclude COVERAGE ...] [--nested] [--bbox W S E N] [--cell 0.25]
-                       [--simplify 0.00002] [--first-id N]
+                       [--simplify 0] [--first-id N]
 
 Every polygon is classed by its shallowest depth like the style colours it: areatype=-1 dries (below 0 m), 0 for
 0-2 m, 2 for 2-5 m, 5 for 5-10 m; deeper ones are left out, the sea colour shows there.
@@ -88,7 +88,7 @@ def main():
     parser.add_argument('--exclude', action='append', help='polygons of another depth map, repeatable')
     parser.add_argument('--bbox', nargs=4, type=float, metavar=('W', 'S', 'E', 'N'))
     parser.add_argument('--cell', type=float, default=0.25)
-    parser.add_argument('--simplify', type=float, default=0.00002, help='degrees, about 2 m')
+    parser.add_argument('--simplify', type=float, default=0, help='tolerance in degrees; default 0 keeps every vertex')
     parser.add_argument('--first-id', type=int, default=700000000)
     parser.add_argument('--nested', action='store_true', help='a class holds the shallower ones: cut them out')
     args = parser.parse_args()

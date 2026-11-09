@@ -86,11 +86,14 @@ takes the charted contours (`dybdekurve`) of Kartverket "Sjøkart - Dybdedata" a
 (`dybdepunkt`) per zoom tier, keeping the shallowest one of every cell. `Europe_contours` and `Europe_points` leave
 the Kartverket coverage (`datakvalitet`, `-x`/`-X`) out, so the fjords do not get two sets of lines.
 
-- Contours: levels `-l` (2, 5, 10, 20, 30, 50, 100, 200, 500 m and every 1000 m by default; GEBCO from 10 m); levels
-  from 20 m down are traced on a smoothed grid (`-s`, `-d`), otherwise a flat bottom with sand waves gives hundreds
-  of zigzags; short closed rings are dropped. `-S` sets the simplification tolerance of grid contours and depth areas.
-  France uses one unsmoothed grid and unsimplified geometry for every level, so contours cannot cross at a change of
-  grid and the 2/5/10 m lines stay exactly on their fill boundaries. Long ways are split at the 2000-node OSM limit.
+- Contours: levels `-l` (2, 5, 10, 20, 30, 50, 100, 200, 500 m and every 1000 m by default; GEBCO from 10 m).
+  Every grid-built map uses one unsmoothed grid and unsimplified geometry for all levels by default, so contours cannot
+  cross at a change of grid and the 2/5/10 m lines stay exactly on their fill boundaries. `-s` optionally enables one
+  common smoothed grid for every level; `-S` sets a common simplification tolerance, and `-g` filters short rings.
+  Long ways are split at the 2000-node OSM limit. Vector chart contours and areas also keep every vertex by default.
+- The EMODnet base of a regional map stops at the midpoint between its land and the land of the neighbouring
+  countries (`uk_emodnet_fill.py --foreign`): the UK map must not cover the French coast with EMODnet, that ground
+  belongs to the French and the Europe maps.
 - Points `-p "SPACING:ZOOMS ..."`: the shallowest water depth of every SPACING degree cell, placed where it is (as
   on charts, not a regular grid); every tier is its own map section shown from its zooms (OsmAndMapCreator
   `--map-zooms`).

@@ -19,6 +19,7 @@ waters (the corridor is measured from the coast of this map only).
 """
 
 import argparse
+import hashlib
 import math
 import os
 import subprocess
@@ -242,6 +243,21 @@ def process_tiles(src, tile_dir, land, land_layer, width, height,
     return written, filled
 
 
+def input_signature(src, exclude, exclude_raster, land, foreign, limit, tile, margin, name):
+    """A hash of the inputs of the fill: the tiles of another run must not be reused."""
+    parts = [name, str(limit), str(tile), str(margin)]
+    for path in [src, exclude, exclude_raster, land] + list(foreign or []):
+        if not path:
+            parts.append("-")
+            continue
+        try:
+            st = os.stat(path)
+            parts.append(f"{path}:{st.st_size}:{int(st.st_mtime)}")
+        except OSError:
+            parts.append(f"{path}:missing")
+    return hashlib.md5("|".join(parts).encode()).hexdigest()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("src", help="blended depth mosaic, e.g. src/uk/uk.vrt")
@@ -303,13 +319,30 @@ def main():
     # long rows first, so the workers finish at about the same time
     chunks = [tiles[i::args.jobs] for i in range(args.jobs)]
 
+    # The tiles of an earlier run belong to the earlier inputs: a new mosaic or a new exclude
+    # raster must not keep them. The signature of the inputs is stored next to them.
+    signature = os.path.join(args.out_dir, f"{args.name}_fill_signature.txt")
+    current = input_signature(args.src, args.exclude, args.exclude_raster, args.land, args.foreign,
+                               args.limit, args.tile, args.margin, args.name)
+    previous = ""
+    if os.path.exists(signature):
+        with open(signature) as f:
+            previous = f.read().strip()
+    # No signature at all means the tiles come from an unknown run: they cannot be trusted either.
+    force = args.force or previous != current
+    if previous != current:
+        print(f"the inputs of the fill changed ({previous[:12] or 'none'} -> {current[:12]}), "
+              "reprocessing the tiles", flush=True)
+    with open(signature, "w") as f:
+        f.write(current + "\n")
+
     print(f"{args.src}: {width}x{height}, {len(tiles)} tiles of {args.tile}, "
           f"margin {args.margin}, limit {args.limit:.0f} m, {args.jobs} jobs", flush=True)
     written = filled = 0
     with ProcessPoolExecutor(max_workers=args.jobs) as pool:
         futures = [
             pool.submit(process_tiles, args.src, tile_dir, land_path, land_layer, width, height,
-                        args.limit, args.tile, args.margin, chunk, args.force,
+                        args.limit, args.tile, args.margin, chunk, force,
                         exclude_shapes, args.exclude_raster, args.land_mask, foreign_shapes)
             for chunk in chunks if chunk
         ]
