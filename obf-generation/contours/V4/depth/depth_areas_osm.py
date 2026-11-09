@@ -2,7 +2,8 @@
 """Depth areas (fill) as OSM multipolygons from charted depth area polygons, cut out of OSM land.
 
     depth_areas_osm.py SOURCE OUTPUT.osm.gz --layer LAYER --field MIN_DEPTH_FIELD [--field-max MAX_DEPTH_FIELD]
-                       --land LAND [--nested] [--bbox W S E N] [--cell 0.25] [--simplify 0.00002] [--first-id N]
+                       --land LAND [--exclude COVERAGE ...] [--nested] [--bbox W S E N] [--cell 0.25]
+                       [--simplify 0.00002] [--first-id N]
 
 Every polygon is classed by its shallowest depth like the style colours it: areatype=-1 dries (below 0 m), 0 for
 0-2 m, 2 for 2-5 m, 5 for 5-10 m; deeper ones are left out, the sea colour shows there.
@@ -23,6 +24,8 @@ import gzip
 import math
 
 from osgeo import gdal, ogr
+
+from depth_osm_exclude import Coverage
 
 ogr.UseExceptions()
 # IsValid() reports every self-intersection of the gdal_contour bands as a warning; MakeValid() fixes them
@@ -82,6 +85,7 @@ def main():
     parser.add_argument('--field', required=True, help='shallowest depth of the area, metres, negative dries')
     parser.add_argument('--field-max', help='deepest depth of the area, metres: the class is the one its band covers most')
     parser.add_argument('--land', required=True)
+    parser.add_argument('--exclude', action='append', help='polygons of another depth map, repeatable')
     parser.add_argument('--bbox', nargs=4, type=float, metavar=('W', 'S', 'E', 'N'))
     parser.add_argument('--cell', type=float, default=0.25)
     parser.add_argument('--simplify', type=float, default=0.00002, help='degrees, about 2 m')
@@ -93,6 +97,7 @@ def main():
     layer = src.GetLayer(args.layer)
     land_src = ogr.Open(args.land)
     land = land_src.GetLayer(0)
+    excluded = Coverage(args.exclude, args.cell) if args.exclude else None
     w, s, e, n = args.bbox if args.bbox else layer.GetExtent()[0:1] + layer.GetExtent()[2:3] + \
         layer.GetExtent()[1:2] + layer.GetExtent()[3:4]
     c = args.cell
@@ -133,6 +138,7 @@ def main():
                 # clipped to the cell first: a complete land polygon is a continent, its union alone takes seconds
                 dry = multipolygon(p for f in land for p in polygons(f.GetGeometryRef().Intersection(cell)))
                 dry = dry.UnionCascaded() if dry.GetGeometryCount() else None
+                exclude = excluded.near(x0, y0, x1, y1) if excluded is not None else None
                 shallower = None
                 for at, geoms in sorted(classes.items(), key=lambda c: int(c[0])):
                     # every part is made valid on its own: MakeValid() of the whole multipolygon treats the parts
@@ -151,6 +157,9 @@ def main():
                         # simplify before the land cut: the coast then stays exactly on the land
                         # boundary, a simplify after the cut would move it and leave small gaps
                         area = area.SimplifyPreserveTopology(args.simplify)
+                        # Cut another map after simplifying too: no sliver may move back across its boundary
+                        if exclude is not None and area.Intersects(exclude):
+                            area = area.Difference(exclude)
                         if dry is not None and area.Intersects(dry):
                             try:
                                 area = area.Difference(dry)

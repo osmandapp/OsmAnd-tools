@@ -7,8 +7,9 @@
 # expected, a known sea point is below 0 m (depths are negative), and leftover archives or partial files.
 # Writes DIR/mask/land_polygons.gpkg (indexed copy of the land polygons) and DIR/src/gebco/gebco_2026.vrt, DIR/src/gebco_tid/gebco_2026_tid.vrt, DIR/src/emodnet/emodnet_2024.vrt,
 # DIR/src/cudem/cudem.vrt, DIR/src/ireland/ireland.vrt, DIR/src/denmark/denmark.vrt, DIR/src/france/france.vrt. Checks
-# DIR/src/uk/uk.vrt (the blended mosaic of download_all.sh) and its coastal fill uk_filled.vrt, without rebuilding
-# either. Prints OK / WARN / FAIL lines and exits with 1 when anything failed.
+# DIR/src/uk/uk.vrt (the blended mosaic of download_all.sh) and its coastal fill uk_filled.vrt, and the masked EMODnet
+# mosaic and coastal fill in DIR/src/france/fill, without rebuilding them. Prints OK / WARN / FAIL lines and exits with 1
+# when anything failed.
 set -uo pipefail
 
 OUT=""; JOBS=4
@@ -211,6 +212,62 @@ if [ ${#FILES[@]} -gt 0 ]; then
 	else fail "france: gdalbuildvrt failed"; fi
 fi
 leftovers france "$SRC/france"
+FRFILL="$SRC/france/fill"
+for v in france_base.tif france_emodnet_fill.tif france_with_emodnet.vrt france_filled.vrt france_filled_interp.vrt; do
+	if [ ! -f "$FRFILL/$v" ]; then fail "france: fill/$v not found (run download_all.sh --only france)"
+	elif gdalinfo "$FRFILL/$v" >/dev/null 2>&1; then ok "france: fill/$v opens"
+	else fail "france: fill/$v does not open"; fi
+done
+if [ -f "$FRFILL/france_filled.vrt" ] && [ -f "$FRFILL/france_filled_interp.vrt" ]; then
+	# The reported point is on an OSM land cell; this is the nearest interpolated sea cell of the same gap.
+	v=$(python3 - "$FRFILL/france_with_emodnet.vrt" "$FRFILL/france_filled.vrt" "$FRFILL/france_filled_interp.vrt" <<'EOF' 2>/dev/null
+import math, sys
+import rasterio
+pt = (-2.3513, 48.6617)
+with rasterio.open(sys.argv[1]) as base, rasterio.open(sys.argv[2]) as fill, rasterio.open(sys.argv[3]) as interp:
+    before = float(next(base.sample([pt]))[0])
+    depth = float(next(fill.sample([pt]))[0])
+    marker = float(next(interp.sample([pt]))[0])
+print(f"before={before:g} depth={depth:g} interp={marker:g}")
+sys.exit(0 if math.isnan(before) and math.isfinite(depth) and depth < 0 and marker > 0 else 1)
+EOF
+)
+	if [ $? -eq 0 ]; then ok "france: Pleherel-Plage coastal gap is filled ($v)"
+	else fail "france: Pleherel-Plage coastal gap is not filled correctly: $v"; fi
+fi
+if [ -f "$FRFILL/france_with_emodnet.vrt" ]; then
+	v=$(python3 - "$SRC/emodnet/emodnet_2024.vrt" "$FRFILL/france_base.tif" "$FRFILL/france_with_emodnet.vrt" <<'EOF' 2>/dev/null
+import math, sys
+import rasterio
+open_sea = (-2.45, 48.75)
+shom = (-1.67, 43.40)
+with rasterio.open(sys.argv[1]) as emodnet, rasterio.open(sys.argv[2]) as base, rasterio.open(sys.argv[3]) as combined:
+    sea = float(next(emodnet.sample([open_sea]))[0])
+    cut = float(next(combined.sample([open_sea]))[0])
+    a = float(next(base.sample([shom]))[0])
+    b = float(next(combined.sample([shom]))[0])
+print(f"EMODnet open sea={sea:g}, selected={cut:g}; SHOM={a:g}, combined={b:g}")
+sys.exit(0 if math.isfinite(sea) and sea < 0 and math.isnan(cut)
+         and math.isfinite(a) and a == b else 1)
+EOF
+)
+	if [ $? -eq 0 ]; then ok "france: EMODnet stays out of open sea and does not replace SHOM ($v)"
+	else fail "france: invalid EMODnet extent or SHOM priority: $v"; fi
+fi
+if [ -f "$FRFILL/france_filled.vrt" ] && [ -f "$SRC/uk/uk_filled.vrt" ]; then
+	v=$(python3 - "$SRC/uk/uk_filled.vrt" "$FRFILL/france_filled.vrt" <<'EOF' 2>/dev/null
+import math, sys
+import rasterio
+pts = [(1.32, 51.13), (1.32, 51.10)]
+with rasterio.open(sys.argv[1]) as uk, rasterio.open(sys.argv[2]) as france:
+    values = [(float(next(uk.sample([pt]))[0]), float(next(france.sample([pt]))[0])) for pt in pts]
+print("; ".join(f"UK={a:g}, France={b:g}" for a, b in values))
+sys.exit(0 if all(math.isfinite(a) and math.isnan(b) for a, b in values) else 1)
+EOF
+)
+	if [ $? -eq 0 ]; then ok "france: UK land and water at Dover are masked out ($v)"
+	else fail "france: UK coverage is duplicated at Dover: $v"; fi
+fi
 
 echo "== uk"
 FILES=(); while IFS= read -r f; do FILES+=("$f"); done < <(find "$SRC/uk/grid" -name '*.tif' 2>/dev/null | sort)

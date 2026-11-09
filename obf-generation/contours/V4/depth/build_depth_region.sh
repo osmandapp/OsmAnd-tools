@@ -29,15 +29,15 @@
 #   -g MIN_RING_CELLS  drop closed rings shorter than this many cells (default 8)
 #   -w OVERVIEW  "CELL:ZOOMS", e.g. "0.02:5-8": the levels of 200 m and deeper again from the grid averaged to CELL
 #                degrees, as their own map section shown at ZOOMS - the main contours start at zoom 9. Default none
-#   -x EXCLUDE   polygons (OGR source, layer -X or the first) where another region has better data: no contours and
-#                no points there, the overview stays
+#   -x EXCLUDE   polygons (OGR source, layer -X or the first) where another region has better data: no contours,
+#                points or depth areas there, the overview stays
 #   -e ENC_DIR   S-57 ENC cells (NOAA ENC_ROOT): inside the approach and harbour cells (bands 4-6) the charted contours
 #                and soundings (depth_enc_osm.py) replace the grid; soundings thinned as ENC_TIERS, the charted levels
 #                with no contourtype (0.9, 3.6 m...) only from zoom 15, depth areas as the fill (depth_areas_osm.py)
 #   -F FILL      depth areas (fill), for grids in chart datum: "GRID[,PLUS,MINUS]", elevation = GRID + PLUS - MINUS
 #                brings a grid in a land datum to chart datum (NAP + NLGEO2018 - NLLAT2018 = LAT); the shifted grid
-#                replaces GRID in -i, so the contours are in chart datum too. Only where GRID has data (no EMODnet
-#                fill), the bands dries, 0-2, 2-5,
+#                replaces GRID in -i, so the contours are in chart datum too. Only where the FILL grid has data,
+#                the bands dries, 0-2, 2-5,
 #                5-10 m come from the same rasters as the contours of those levels (smoothed from SMOOTH_FROM), so
 #                their edges lie on the contours; depth_areas_osm.py --nested
 #   -t TILE      split a region larger than TILE degrees into tiles built in parallel (JOBS at a time); with -c the
@@ -64,8 +64,9 @@
 #                                     in LAT (NLLAT2018)
 #   Ireland_contours                  INFOMAR 10 m inshore over 25 m over EMODnet DTM 2024, LAT, as Netherlands_contours;
 #                                     fill from the INFOMAR grids
-#   France_contours                   SHOM coastal DTMs 5-20 m (11 zones) over EMODnet DTM 2024, chart datum, as
-#                                     Netherlands_contours, only the 1 degree tiles touching a zone; fill from SHOM
+#   France_contours                   SHOM coastal DTMs 5-20 m (11 zones), chart datum, only the 1 degree tiles touching
+#                                     a zone; with france_filled.vrt EMODnet closes only coastal/enclosed gaps and the
+#                                     remaining coastal strip is interpolated; without it SHOM lies over EMODnet, fill SHOM
 #   Great_Britain_contours            UKHO ADMIRALTY surveys (BAG, averaged to 0.0002 degrees) over EMODnet DTM 2024,
 #                                     LAT, as France_contours: only the 1 degree tiles touching a survey
 #   Denmark_contours                  (not published, small gain) Danmarks Dybdemodel 50 m 2024 over EMODnet DTM 2024,
@@ -229,9 +230,15 @@ if [ -n "$DATA" ]; then
 			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1 ;;
 		France_contours)
 			# SHOM coastal DTMs in chart datum (PBMA), scattered along the Channel and Atlantic coast: only the 1 degree
-			# tiles touching one of them are built
+			# tiles touching one of them are built. The filled grid adds EMODnet only in the coastal and enclosed gaps.
 			FR="$DATA/src/france/france.vrt"
-			: "${BBOX:=-5.5 43.3 2.6 51.2}"; : "${GRID:=$EMODNET,$FR}"; : "${FILL:=$FR}"; : "${TILE_WITH:=$FR}"
+			FR_DEPTH="$FR"
+			[ ! -f "$DATA/src/france/fill/france_filled.vrt" ] || FR_DEPTH="$DATA/src/france/fill/france_filled.vrt"
+			: "${BBOX:=-5.5 43.3 2.6 51.2}"; : "${FILL:=$FR_DEPTH}"; : "${TILE_WITH:=$FR}"
+			if [ "$FR_DEPTH" = "$FR" ]; then : "${GRID:=$EMODNET,$FR}"; else : "${GRID:=$FR_DEPTH}"; fi
+			if [ -f "$DATA/src/france/fill/france_filled_interp.vrt" ]; then
+				: "${INTERP:=$DATA/src/france/fill/france_filled_interp.vrt}"
+			fi
 			# the UK map holds the surveys of the Channel and of the Channel Islands: the French map leaves that
 			# water to it, so that the same ground is not charted twice
 			if [ -f "$DATA/src/uk/uk_filled.vrt" ]; then
@@ -658,7 +665,7 @@ if [ -n "$OVERVIEW" ] && [ -n "$OVERVIEW_LEVELS" ]; then
 fi
 
 # fill: "shallower than L" for L = 0, 2, 5, 10 m, each from the raster its contour came from (the smoothed one from
-# SMOOTH_FROM), only where the fill grid has data (not from EMODnet); depth_areas_osm.py --nested makes bands of them
+# SMOOTH_FROM), only where the fill grid has data (not from the rest of GRID); depth_areas_osm.py --nested makes bands
 if [ -n "$FILL" ]; then
 	step "depth areas where $(basename "$fill_grid") has data"
 	fill_src=$fill_grid; [ -f "$TMP/fill_datum.tif" ] && fill_src="$TMP/fill_datum.tif"
@@ -695,8 +702,9 @@ if [ -n "$FILL" ]; then
 	done
 	rm -f "$TMP"/coverage_*.tif "$TMP/fill_level.vrt" "$TMP/fill_cut.tif" "$TMP/band.gpkg"
 	if [ -f "$TMP/areas.gpkg" ]; then
+		area_exclude=(); [ -z "$EXCLUDE" ] || area_exclude=(--exclude "$EXCLUDE")
 		python3 "$HERE/depth_areas_osm.py" "$TMP/areas.gpkg" "$OUT/${NAME}_areas.osm.gz" --layer areas --field mindepth \
-			--nested --land "$TMP/land.gpkg" --bbox "$W" "$S" "$E" "$N" \
+			--nested --land "$TMP/land.gpkg" "${area_exclude[@]}" --bbox "$W" "$S" "$E" "$N" \
 			--simplify "$(python3 -c "print(float('$CELL') / 2)")" 2>&1 | grep -v numpy
 		if [ -n "$MAP_CREATOR" ] && [ "$(zcat < "$OUT/${NAME}_areas.osm.gz" | grep -c -m1 '<way')" != 0 ]; then
 			o=$(obf "$OUT/${NAME}_areas.osm.gz"); OBFS+=("$o")
