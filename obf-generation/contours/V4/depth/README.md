@@ -88,7 +88,9 @@ the Kartverket coverage (`datakvalitet`, `-x`/`-X`) out, so the fjords do not ge
 
 - Contours: levels `-l` (2, 5, 10, 20, 30, 50, 100, 200, 500 m and every 1000 m by default; GEBCO from 10 m); levels
   from 20 m down are traced on a smoothed grid (`-s`, `-d`), otherwise a flat bottom with sand waves gives hundreds
-  of zigzags; short closed rings are dropped.
+  of zigzags; short closed rings are dropped. `-S` sets the simplification tolerance of grid contours and depth areas.
+  France uses one unsmoothed grid and unsimplified geometry for every level, so contours cannot cross at a change of
+  grid and the 2/5/10 m lines stay exactly on their fill boundaries. Long ways are split at the 2000-node OSM limit.
 - Points `-p "SPACING:ZOOMS ..."`: the shallowest water depth of every SPACING degree cell, placed where it is (as
   on charts, not a regular grid); every tier is its own map section shown from its zooms (OsmAndMapCreator
   `--map-zooms`).

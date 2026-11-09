@@ -3,7 +3,7 @@
 #
 #   build_depth_region.sh -D DATA_DIR -n REGION [-c MAP_CREATOR_DIR] [-k] [-j JOBS]
 #   build_depth_region.sh -n NAME -b "W S E N" -i GRID -m LAND -o OUT_DIR [-l LEVELS] [-p TIERS] [-r CELL]
-#                         [-u UPSAMPLE] [-s SMOOTH] [-d SMOOTH_FROM] [-a RESAMPLING] [-g MIN_RING_CELLS] [-t TILE]
+#                         [-u UPSAMPLE] [-s SMOOTH] [-d SMOOTH_FROM] [-a RESAMPLING] [-g MIN_RING_CELLS] [-S SIMPLIFY] [-t TILE]
 #                         [-w OVERVIEW] [-x EXCLUDE [-X LAYER]] [-e ENC_DIR] [-F FILL] [-N NO_DETAILED]
 #                         [-c MAP_CREATOR_DIR] [-k] [-j JOBS]
 #
@@ -27,6 +27,7 @@
 #                   (EMODnet under a 20 m survey), then laid over each other
 #                   (GEBCO) cut to a much finer cell
 #   -g MIN_RING_CELLS  drop closed rings shorter than this many cells (default 8)
+#   -S SIMPLIFY  simplification of grid contours and their depth areas in degrees (default half a cell; 0 is exact)
 #   -w OVERVIEW  "CELL:ZOOMS", e.g. "0.02:5-8": the levels of 200 m and deeper again from the grid averaged to CELL
 #                degrees, as their own map section shown at ZOOMS - the main contours start at zoom 9. Default none
 #   -x EXCLUDE   polygons (OGR source, layer -X or the first) where another region has better data: no contours,
@@ -66,7 +67,8 @@
 #                                     fill from the INFOMAR grids
 #   France_contours                   SHOM coastal DTMs 5-20 m (11 zones), chart datum, only the 1 degree tiles touching
 #                                     a zone; with france_filled.vrt EMODnet closes only holes enclosed by SHOM and the
-#                                     coastal strip is interpolated; without it SHOM lies over EMODnet, fill SHOM
+#                                     coastal strip is interpolated; without it SHOM lies over EMODnet, fill SHOM;
+#                                     all levels and fill bands share exact, unsmoothed geometry
 #   Great_Britain_contours            UKHO ADMIRALTY surveys (BAG, averaged to 0.0002 degrees) over EMODnet DTM 2024,
 #                                     LAT, as France_contours: only the 1 degree tiles touching a survey
 #   Denmark_contours                  (not published, small gain) Danmarks Dybdemodel 50 m 2024 over EMODnet DTM 2024,
@@ -104,8 +106,8 @@ set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 V4=$(cd "$HERE/.." && pwd)
-NAME=""; BBOX="${BBOX:-}"; GRID=""; LAND=""; OUT=""; CELL=""; UPSAMPLE=1; JOBS=4; SMOOTH=4; SMOOTH_FROM=""; MAP_CREATOR=""
-DATA=""; TILE=0; TILE_WITH="${TILE_WITH:-}"; KEEP=0; LEVELS=""; TIERS=""; RESAMPLING=""; MIN_RING_CELLS=""; OVERVIEW=""
+NAME=""; BBOX="${BBOX:-}"; GRID=""; LAND=""; OUT=""; CELL=""; UPSAMPLE=1; JOBS=4; SMOOTH=""; SMOOTH_FROM=""; MAP_CREATOR=""
+DATA=""; TILE=0; TILE_WITH="${TILE_WITH:-}"; KEEP=0; LEVELS=""; TIERS=""; RESAMPLING=""; MIN_RING_CELLS=""; SIMPLIFY=""; OVERVIEW=""
 NO_DETAILED=""; FULL_NAME=""; EXCLUDE=""; EXCLUDE_LAYER=""; ENC=""; ENC_AREAS=""; FILL=""; ENC_TIERS="0.02:10-11 0.008:12 0.003:13-14 0.001:15-"
 # steps FROM:TO:STEP... : comma-separated levels
 steps() { local s a b c out=""; for s; do IFS=: read -r a b c <<< "$s"; out+=$(seq "$a" "$c" "$b" | paste -sd, -),; done
@@ -129,6 +131,7 @@ while [ $# -gt 0 ]; do
 		-d) SMOOTH_FROM=$2; shift 2 ;;
 		-a) RESAMPLING=$2; shift 2 ;;
 		-g) MIN_RING_CELLS=$2; shift 2 ;;
+		-S) SIMPLIFY=$2; shift 2 ;;
 		-c) MAP_CREATOR=$2; shift 2 ;;
 		-D) DATA=$2; shift 2 ;;
 		-t) TILE=$2; shift 2 ;;
@@ -247,6 +250,9 @@ if [ -n "$DATA" ]; then
 				coverage uk "" "$DATA/src/uk/uk.vrt"; : "${EXCLUDE:=$COVERAGE}"
 			fi
 			: "${RESAMPLING:=auto}"; : "${CELL:=0.0002}"; : "${LEVELS:=2,5,10,15,20,25,30,35,40,45,50,100,200}"; : "${SMOOTH_FROM:=5}"
+			# Every level and fill band uses the same vertices: no smoothed copy may cross a shallower contour, and
+			# independent simplification must not move a line away from its area boundary.
+			: "${SMOOTH:=1}"; : "${SIMPLIFY:=0}"; : "${MIN_RING_CELLS:=0}"
 			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1 ;;
 		Great_Britain_contours)
 			# UKHO surveys downloaded by hand (download_all.sh uk): only the 1 degree tiles touching one of them.
@@ -323,7 +329,7 @@ if [ -n "$DATA" ]; then
 # the rasters with the interpolated cells of the region: no depth point is placed on them
 : "${INTERP:=}"
 fi
-: "${LEVELS:=2,5,10,20,30,50,100,200,500,$DEEP_LEVELS}"; : "${SMOOTH_FROM:=20}"; : "${RESAMPLING:=average}"; : "${MIN_RING_CELLS:=8}"
+: "${LEVELS:=2,5,10,20,30,50,100,200,500,$DEEP_LEVELS}"; : "${SMOOTH:=4}"; : "${SMOOTH_FROM:=20}"; : "${RESAMPLING:=average}"; : "${MIN_RING_CELLS:=8}"
 [ "$LEVELS" != none ] || LEVELS=""
 for v in NAME BBOX GRID LAND OUT; do
 	[ -n "${!v}" ] || { echo "Missing $v, see --help" >&2; exit 1; }
@@ -414,6 +420,8 @@ if [ -z "$CELL" ]; then
 	fi
 fi
 FINE=$(python3 -c "print(float('$CELL') / float('$UPSAMPLE'))")
+CONTOUR_SIMPLIFY=${SIMPLIFY:-$(python3 -c "print(float('$FINE') / 2)")}
+AREA_SIMPLIFY=${SIMPLIFY:-$(python3 -c "print(float('$CELL') / 2)")}
 
 TILES=$(python3 -c "
 import math
@@ -440,12 +448,12 @@ for i in range(math.ceil((e - w) / t)):
 if [ -n "$TILES" ]; then
 	step "$NAME: $(echo "$TILES" | wc -l | tr -d ' ') tiles of $TILE degrees, $JOBS at a time"
 	TILE_OUT="$TMP/tiles"; mkdir -p "$TILE_OUT"
-	export SELF="$0" GRID LAND LEVELS TIERS CELL UPSAMPLE SMOOTH SMOOTH_FROM RESAMPLING MIN_RING_CELLS OVERVIEW EXCLUDE \
+	export SELF="$0" GRID LAND LEVELS TIERS CELL UPSAMPLE SMOOTH SMOOTH_FROM RESAMPLING MIN_RING_CELLS SIMPLIFY OVERVIEW EXCLUDE \
 		EXCLUDE_LAYER FILL MAP_CREATOR TILE_OUT INTERP
 	echo "$TILES" | xargs -P "$JOBS" -L 1 bash -c '
 		name=$1; shift
 		args=(-n "$name" -b "$*" -i "$GRID" -m "$LAND" -o "$TILE_OUT" -l "${LEVELS:-none}" -p "$TIERS" -r "$CELL" \
-			-u "$UPSAMPLE" -s "$SMOOTH" -d "$SMOOTH_FROM" -a "$RESAMPLING" -g "$MIN_RING_CELLS" -w "$OVERVIEW" \
+			-u "$UPSAMPLE" -s "$SMOOTH" -d "$SMOOTH_FROM" -a "$RESAMPLING" -g "$MIN_RING_CELLS" -S "$SIMPLIFY" -w "$OVERVIEW" \
 			-x "$EXCLUDE" -X "$EXCLUDE_LAYER" -F "$FILL" -j 1)
 		JAVA_OPTS="${JAVA_OPTS:--Xmx2g}" bash "$SELF" "${args[@]}" > "$TILE_OUT/$name.log" 2>&1 \
 			|| { echo "FAILED tile $name:"; tail -20 "$TILE_OUT/$name.log"; exit 255; }
@@ -624,7 +632,7 @@ if [ -n "$LEVELS" ]; then
 	fi
 	step "filter and simplify"
 	python3 "$HERE/depth_contours_filter.py" "$TMP/contours.gpkg" "$TMP/depth.fgb" --cell "$FINE" --min-ring-cells "$MIN_RING_CELLS" \
-		--bbox "$W" "$S" "$E" "$N"
+		--simplify "$CONTOUR_SIMPLIFY" --bbox "$W" "$S" "$E" "$N"
 	if [ "$(ogrinfo -so -al "$TMP/depth.fgb" | awk -F': ' '/Feature Count/{print $2}')" = 0 ]; then
 		step "no contours in $NAME"
 	else
@@ -650,8 +658,9 @@ if [ -n "$OVERVIEW" ] && [ -n "$OVERVIEW_LEVELS" ]; then
 	gdal_rasterize -q -burn 0 -l "$LAND_LAYER" "$TMP/land.gpkg" "$TMP/overview.tif"
 	# shellcheck disable=SC2086
 	gdal_contour -q -a elev -fl $OVERVIEW_LEVELS "$TMP/overview.tif" "$TMP/overview.gpkg"
+	overview_simplify=${SIMPLIFY:-$(python3 -c "print(float('$ov_cell') / 2)")}
 	python3 "$HERE/depth_contours_filter.py" "$TMP/overview.gpkg" "$TMP/overview.fgb" --cell "$ov_cell" \
-		--min-ring-cells "$MIN_RING_CELLS"
+		--min-ring-cells "$MIN_RING_CELLS" --simplify "$overview_simplify"
 	if [ "$(ogrinfo -so -al "$TMP/overview.fgb" | awk -F': ' '/Feature Count/{print $2}')" != 0 ]; then
 		python3 "$V4/ogr2osm.py" -f -t "$V4/translations/contours_depth.py" -o "$TMP/${NAME}_overview.osm" \
 			"$TMP/overview.fgb" >/dev/null
@@ -705,7 +714,7 @@ if [ -n "$FILL" ]; then
 		area_exclude=(); [ -z "$EXCLUDE" ] || area_exclude=(--exclude "$EXCLUDE")
 		python3 "$HERE/depth_areas_osm.py" "$TMP/areas.gpkg" "$OUT/${NAME}_areas.osm.gz" --layer areas --field mindepth \
 			--nested --land "$TMP/land.gpkg" "${area_exclude[@]}" --bbox "$W" "$S" "$E" "$N" \
-			--simplify "$(python3 -c "print(float('$CELL') / 2)")" 2>&1 | grep -v numpy
+			--simplify "$AREA_SIMPLIFY" 2>&1 | grep -v numpy
 		if [ -n "$MAP_CREATOR" ] && [ "$(zcat < "$OUT/${NAME}_areas.osm.gz" | grep -c -m1 '<way')" != 0 ]; then
 			o=$(obf "$OUT/${NAME}_areas.osm.gz"); OBFS+=("$o")
 		fi

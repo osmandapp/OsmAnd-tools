@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Clean depth contours made by gdal_contour before they go to OSM.
 
-    depth_contours_filter.py INPUT OUTPUT --cell DEGREES [--min-ring-cells N] [--bbox W S E N] [--min-line-m M]
+    depth_contours_filter.py INPUT OUTPUT --cell DEGREES [--min-ring-cells N] [--bbox W S E N]
+                             [--min-line-m M] [--simplify DEGREES]
 
 INPUT has line features (lon/lat) with an `elev` field (metres, negative below sea level) or a positive `depth` field
 (charted contours). OUTPUT (FlatGeobuf) keeps the lines below 0 m with a `depth` field (positive metres), drops closed
 rings shorter than N grid cells - single cells, and the bumps and hollows a multibeam survey leaves on a chart - and
-open pieces shorter than MIN_LINE_M, then simplifies every line by half a grid cell.
+open pieces shorter than MIN_LINE_M, then simplifies every line by half a grid cell unless --simplify is given.
 """
 import argparse
 import math
@@ -36,6 +37,8 @@ def main():
                         help='cut the lines to this box before simplifying: the grid of a tile reaches past its box, '
                              'so the lines of two tiles meet exactly at their common edge')
     parser.add_argument('--min-line-m', type=float, default=0, help='drop open pieces shorter than this many metres')
+    parser.add_argument('--simplify', type=float, help='simplification tolerance in degrees; 0 keeps every vertex '
+                                                       '(default: half a grid cell)')
     parser.add_argument('--min-ring-cells', type=float, default=8,
                         help='closed rings shorter than this many cells are dropped')
     args = parser.parse_args()
@@ -54,6 +57,7 @@ def main():
         w, s, e, n = args.bbox
         box = ogr.CreateGeometryFromWkt('POLYGON((%r %r,%r %r,%r %r,%r %r,%r %r))' % (w, s, e, s, e, n, w, n, w, s))
     min_ring_m = args.min_ring_cells * args.cell * 111320
+    tolerance = args.cell / 2 if args.simplify is None else args.simplify
     kept = dropped = 0
     fields = [layer.GetLayerDefn().GetFieldDefn(i).GetName() for i in range(layer.GetLayerDefn().GetFieldCount())]
     depth_field = 'elev' if 'elev' in fields else 'depth'
@@ -79,15 +83,23 @@ def main():
             if not closed and length_m(part) < args.min_line_m:
                 dropped += 1
                 continue
-            simple = part.SimplifyPreserveTopology(args.cell / 2)
+            simple = part if tolerance == 0 else part.SimplifyPreserveTopology(tolerance)
             if simple is None or simple.IsEmpty() or simple.GetPointCount() < 2:
                 dropped += 1
                 continue
-            f = ogr.Feature(out_layer.GetLayerDefn())
-            f.SetField('depth', int(round(-elev)))
-            f.SetGeometry(simple)
-            out_layer.CreateFeature(f)
-            kept += 1
+            # OSM ways have a 2000-node limit. Adjacent pieces share their end vertex, so splitting does not
+            # change the line; a long closed ring becomes several open ways with the same depth.
+            for start in range(0, simple.GetPointCount() - 1, 1999):
+                end = min(start + 1999, simple.GetPointCount() - 1)
+                piece = ogr.Geometry(ogr.wkbLineString)
+                for i in range(start, end + 1):
+                    x, y = simple.GetX(i), simple.GetY(i)
+                    piece.AddPoint_2D(x, y)
+                f = ogr.Feature(out_layer.GetLayerDefn())
+                f.SetField('depth', int(round(-elev)))
+                f.SetGeometry(piece)
+                out_layer.CreateFeature(f)
+                kept += 1
     out = None
     print('contours kept %d, dropped %d (rings shorter than %.0f m or degenerate)' % (kept, dropped, min_ring_m))
 

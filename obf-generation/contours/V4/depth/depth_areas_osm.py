@@ -106,16 +106,29 @@ def main():
     with gzip.open(args.output, 'wt', compresslevel=5) as out:
         out.write("<?xml version='1.0' encoding='UTF-8'?>\n<osm version='0.6' upload='false' generator='depth_areas_osm'>\n")
 
-        def ring(r):
+        def ring(r, tags=''):
+            """Write one closed way, or connected open ways for a multipolygon when the OSM node limit requires it."""
             nonlocal nid
             refs = []
             for i in range(r.GetPointCount() - 1):
                 nid += 1
                 out.write('<node id="-%d" visible="true" lat="%.7f" lon="%.7f"/>\n' % (nid, r.GetY(i), r.GetX(i)))
                 refs.append(nid)
-            nid += 1
-            out.write('<way id="-%d" visible="true">%s' % (nid, ''.join('<nd ref="-%d"/>' % x for x in refs + refs[:1])))
-            return nid
+            # The closing node is repeated in a single way. Split rings share the end vertex of adjacent ways;
+            # only the relation is tagged then, as for any other multipolygon with several outer ways.
+            sequence = refs + refs[:1]
+            ways = []
+            start = 0
+            while start < len(sequence) - 1:
+                end = min(start + 1999, len(sequence) - 1)
+                part = sequence[start:end + 1]
+                nid += 1
+                way_tags = tags if len(sequence) <= 2000 else ''
+                out.write('<way id="-%d" visible="true">%s%s</way>\n' % (
+                    nid, ''.join('<nd ref="-%d"/>' % x for x in part), way_tags))
+                ways.append(nid)
+                start = end
+            return ways
 
         for i in range(math.floor(w / c), math.ceil(e / c)):
             for j in range(math.floor(s / c), math.ceil(n / c)):
@@ -178,19 +191,16 @@ def main():
                         tags = '<tag k="contourarea" v="depth"/><tag k="areatype" v="%s"/>' % at
                         inners = [p.GetGeometryRef(k) for k in range(1, p.GetGeometryCount())
                                   if p.GetGeometryRef(k).GetPointCount() >= 4]
-                        ow = ring(outer)
-                        if not inners:
-                            out.write(tags + '</way>\n')
-                        else:
-                            out.write('</way>\n')
-                            iw = []
-                            for r in inners:
-                                iw.append(ring(r))
-                                out.write('</way>\n')
+                        ow = ring(outer, tags if not inners else '')
+                        iw = []
+                        for r in inners:
+                            iw += ring(r)
+                        if inners or len(ow) > 1:
                             nid += 1
-                            out.write('<relation id="-%d" visible="true"><member type="way" ref="-%d" role="outer"/>%s'
-                                      '<tag k="type" v="multipolygon"/>%s</relation>\n' % (
-                                          nid, ow, ''.join('<member type="way" ref="-%d" role="inner"/>' % x for x in iw), tags))
+                            members = ''.join('<member type="way" ref="-%d" role="outer"/>' % x for x in ow)
+                            members += ''.join('<member type="way" ref="-%d" role="inner"/>' % x for x in iw)
+                            out.write('<relation id="-%d" visible="true">%s'
+                                      '<tag k="type" v="multipolygon"/>%s</relation>\n' % (nid, members, tags))
                         written += 1
         out.write('</osm>\n')
     print('depth areas written: %d' % written)
