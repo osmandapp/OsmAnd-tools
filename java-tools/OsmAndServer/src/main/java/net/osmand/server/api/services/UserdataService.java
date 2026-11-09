@@ -1763,9 +1763,9 @@ public class UserdataService {
     }
 
 
-    public ResponseEntity<String> changeEmail(String username, String token, CloudUserDevicesRepository.CloudUserDevice dev, HttpServletRequest request) throws ServletException {
+    public ResponseEntity<String> changeEmail(String newEmail, String token, CloudUserDevicesRepository.CloudUserDevice dev, HttpServletRequest request) throws ServletException {
         // validate new email
-        CloudUsersRepository.CloudUser tempUser = usersRepository.findByEmailIgnoreCase(username);
+        CloudUsersRepository.CloudUser tempUser = usersRepository.findByEmailIgnoreCase(newEmail);
         if (tempUser == null) {
             return ResponseEntity.badRequest().body("Something went wrong with your new email");
         }
@@ -1774,7 +1774,7 @@ public class UserdataService {
             return accountError;
         }
         // validate token
-        ResponseEntity<String> response = confirmCode(username, token);
+        ResponseEntity<String> response = confirmCode(newEmail, token);
         if (!response.getStatusCode().is2xxSuccessful()) {
             return response;
         }
@@ -1788,9 +1788,9 @@ public class UserdataService {
         emailTokenRequests.invalidate(tempUser.email.trim().toLowerCase(Locale.ROOT));
         usersRepository.delete(tempUser);
         String oldEmail = currentUser.email;
-        currentUser.email = username;
+        currentUser.email = newEmail;
         usersRepository.saveAndFlush(currentUser);
-	    LOG.info("User email changed (/auth/change-email) from " + oldEmail + " to " + currentUser.email);
+	    LOG.info("User email changed (/auth/change-email) from " + EmailSenderService.shortenEmail(oldEmail) + " to " + EmailSenderService.shortenEmail(currentUser.email));
 
 	    userSubService.verifyAndRefreshProOrderId(currentUser);
 
