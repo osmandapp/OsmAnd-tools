@@ -313,6 +313,8 @@ if [ -n "$DATA" ]; then
 		*) echo "Unknown region '$NAME', see --help" >&2; exit 1 ;;
 	esac
 	: "${LAND:=$DATA/mask/land_polygons.gpkg}"; : "${OUT:=$DATA/build}"
+# the rasters with the interpolated cells of the region: no depth point is placed on them
+: "${INTERP:=}"
 fi
 : "${LEVELS:=2,5,10,20,30,50,100,200,500,$DEEP_LEVELS}"; : "${SMOOTH_FROM:=20}"; : "${RESAMPLING:=average}"; : "${MIN_RING_CELLS:=8}"
 [ "$LEVELS" != none ] || LEVELS=""

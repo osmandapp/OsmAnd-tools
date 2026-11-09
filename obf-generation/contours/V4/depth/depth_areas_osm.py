@@ -18,7 +18,7 @@ contourarea=depth, areatype=...
 --nested: every polygon is "shallower than" its class limit, as polygons of a grid above a level are, so a class
 contains the shallower ones. Classes are cut one by one from the shallowest, each minus all shallower classes.
 """
-import argparse
+import argparse, sys
 import gzip
 import math
 
@@ -137,21 +137,31 @@ def main():
                 for at, geoms in sorted(classes.items(), key=lambda c: int(c[0])):
                     # every part is made valid on its own: MakeValid() of the whole multipolygon treats the parts
                     # that touch or overlap (the bands of a chart do) as an error and cuts holes where they meet
-                    mp = multipolygon(p for g in geoms for p in polygons(g if g.IsValid() else g.MakeValid()))
-                    area = mp.UnionCascaded()
-                    if area is None or area.IsEmpty() or not area.IsValid():
-                        area = mp.Buffer(0)  # the same union, the slow way, for a GEOS that gave up
-                    area = area.Intersection(cell)
-                    if args.nested:
-                        own = area
-                        if shallower is not None:
-                            area = area.Difference(shallower)
-                        shallower = own if shallower is None else shallower.Union(own)
-                    # simplify before the land cut: the coast then stays exactly on the land
-                    # boundary, a simplify after the cut would move it and leave small gaps
-                    area = area.SimplifyPreserveTopology(args.simplify)
-                    if dry is not None and area.Intersects(dry):
-                        area = area.Difference(dry)
+                    try:
+                        mp = multipolygon(p for g in geoms for p in polygons(g if g.IsValid() else g.MakeValid()))
+                        area = mp.UnionCascaded()
+                        if area is None or area.IsEmpty() or not area.IsValid():
+                            area = mp.Buffer(0)  # the same union, the slow way, for a GEOS that gave up
+                        area = area.Intersection(cell)
+                        if args.nested:
+                            own = area
+                            if shallower is not None:
+                                area = area.Difference(shallower)
+                            shallower = own if shallower is None else shallower.Union(own)
+                        # simplify before the land cut: the coast then stays exactly on the land
+                        # boundary, a simplify after the cut would move it and leave small gaps
+                        area = area.SimplifyPreserveTopology(args.simplify)
+                        if dry is not None and area.Intersects(dry):
+                            try:
+                                area = area.Difference(dry)
+                            except Exception:
+                                # a GEOS that cannot assign the free holes of the result: the same cut
+                                # on repaired geometries
+                                area = area.Buffer(0).Difference(dry.Buffer(0))
+                    except Exception as e:
+                        # one broken band must not stop the tile
+                        print('skipped the area %s at %.4f,%.4f: %s' % (at, x0, y0, e), file=sys.stderr)
+                        continue
                     for p in polygons(area):
                         outer = p.GetGeometryRef(0)
                         if outer.GetPointCount() < 4:

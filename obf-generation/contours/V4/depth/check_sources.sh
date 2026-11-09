@@ -270,7 +270,7 @@ EOF
 	v=$(python3 - "$SRC/uk/uk_filled.vrt" <<'EOF' 2>/dev/null
 import sys
 import rasterio
-pts = [(1.85, 50.95, "Calais"), (2.37, 51.03, "Dunkirk"), (1.35, 51.13, "Dover")]
+pts = [(1.85, 50.95, "Calais"), (2.37, 51.03, "Dunkirk"), (1.32, 51.13, "Dover")]
 with rasterio.open(sys.argv[1]) as ds:
     for lon, lat, name in pts:
         v = float(next(ds.sample([(lon, lat)]))[0])
