@@ -170,9 +170,7 @@ public class UserdataController {
 		if (pu == null) {
 			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
 		}
-		pu.orderid = orderid;
-
-		usersRepository.saveAndFlush(pu);
+		userSubService.updateOrderId(pu, orderid);
 
 		if (orderid != null) {
 			discardPreviousAccountOrderId(pu.id, orderid, email, request);

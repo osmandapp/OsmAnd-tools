@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.*;
 import java.util.Map.Entry;
 
+import jakarta.persistence.EntityManager;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import net.osmand.purchases.*;
@@ -83,6 +84,9 @@ public class UserSubscriptionService {
 
 	@Autowired
 	protected CloudUsersRepository usersRepository;
+
+	@Autowired
+	private EntityManager entityManager;
 
 	@Autowired
 	protected PurchasesDataLoader purchasesDataLoader;
@@ -405,6 +409,13 @@ public class UserSubscriptionService {
 		}
 	}
 
+	public void updateOrderId(CloudUsersRepository.CloudUser pu, String orderId) {
+		// Detach before changing orderid so Hibernate cannot flush stale login tokens.
+		entityManager.detach(pu);
+		usersRepository.updateOrderId(pu.id, orderId);
+		pu.orderid = orderId;
+	}
+
 	public boolean updateOrderId(CloudUsersRepository.CloudUser pu) {
 		// get the latest subscription
 		String subOrderId = null;
@@ -437,9 +448,8 @@ public class UserSubscriptionService {
 			}
 		}
 		if (subOrderId != null) {
-			pu.orderid = subOrderId;
+			updateOrderId(pu, subOrderId);
 			LOG.info("Updated orderId for user " + EmailSenderService.shortenEmail(pu.email) + " " + pu.orderid);
-			usersRepository.saveAndFlush(pu);
 			return true;
 		}
 		LOG.info("Empty update orderId for user " + EmailSenderService.shortenEmail(pu.email));

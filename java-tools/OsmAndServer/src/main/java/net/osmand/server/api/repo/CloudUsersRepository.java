@@ -17,7 +17,10 @@ import jakarta.persistence.TemporalType;
 import org.springframework.data.domain.Pageable;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import net.osmand.server.api.repo.CloudUsersRepository.CloudUser;
 
@@ -40,6 +43,11 @@ public interface CloudUsersRepository extends JpaRepository<CloudUser, Long> {
     CloudUser findFirstByOrderidAndEmailNotIgnoreCaseOrderByIdAsc(String orderid, String email);
 	
 	CloudUser findById(int id);
+
+	@Transactional
+	@Modifying
+	@Query(value = "UPDATE user_accounts SET orderid = :orderId WHERE id = :id", nativeQuery = true)
+	void updateOrderId(int id, String orderId);
 	
     @Entity
     @Table(name = "user_accounts")
