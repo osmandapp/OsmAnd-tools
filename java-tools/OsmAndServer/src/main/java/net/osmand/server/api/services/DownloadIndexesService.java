@@ -160,17 +160,29 @@ public class DownloadIndexesService  {
 		public final File file;
 		public final URL url;
 		public final DownloadIndex di;
+		public final boolean isDeletedMapFile;
 
 		public ServerCommonFile(File file, DownloadIndex di) {
 			this.file = file;
 			this.di = di;
 			this.url = null;
+			this.isDeletedMapFile = false;
 		}
 		
 		public ServerCommonFile(URL url, DownloadIndex di) {
 			this.url = url;
 			this.file = null;
 			this.di = di;
+			this.isDeletedMapFile = false;
+		}
+
+		// deleted map (deleted_map in indexes.xml): removed from the catalogue, no file on the server,
+		// but still a standard map, not a user file
+		public ServerCommonFile(DownloadIndex di) {
+			this.url = null;
+			this.file = null;
+			this.di = di;
+			this.isDeletedMapFile = true;
 		}
 		
 		
@@ -197,8 +209,7 @@ public class DownloadIndexesService  {
 
 		for (DownloadIndex di : doc.getDeletedMaps()) {
 			if (di.getName().equals(dwName) || di.getName().equals(dwName + ".zip")) {
-				// removed from the catalogue: the file is gone from the server, but it is still not a user file
-				return new ServerCommonFile((File) null, di);
+				return new ServerCommonFile(di);
 			}
 		}
 		for (DownloadIndex di : doc.getAllMaps()) {

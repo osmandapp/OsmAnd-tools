@@ -3,6 +3,7 @@ package net.osmand.server.api.services;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.spy;
 
@@ -40,8 +41,7 @@ public class DownloadIndexesServiceDeletedMapsTest {
 	private void assertDeletedMap(String deviceFileName) throws IOException {
 		ServerCommonFile scf = service.getServerGlobalFile(deviceFileName);
 		assertNotNull(deviceFileName + " must not be stored in the cloud as a user file", scf);
+		assertTrue(scf.isDeletedMapFile);
 		assertEquals(DownloadType.DELETED_MAP, scf.di.getDownloadType());
-		assertNull(scf.file);
-		assertNull(scf.url);
 	}
 }
