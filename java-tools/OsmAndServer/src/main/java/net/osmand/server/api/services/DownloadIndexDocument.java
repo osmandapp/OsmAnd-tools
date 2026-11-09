@@ -9,6 +9,7 @@ import java.util.List;
 import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
+import javax.xml.bind.annotation.XmlTransient;
 
 import net.osmand.server.api.services.DownloadIndexesService.DownloadType;
 
@@ -298,6 +299,11 @@ public class DownloadIndexDocument {
 		indx.addAll(weather);
 		indx.addAll(starmap);
 		return indx;
+	}
+
+	@XmlTransient
+	public List<DownloadIndex> getDeletedMaps() {
+		return deletedMaps;
 	}
 
 	public void sortMaps(List<DownloadIndex> l) {

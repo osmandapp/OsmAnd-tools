@@ -81,6 +81,9 @@ public class UserdataController {
 	@Autowired
 	UserdataService userdataService;
 
+	@Autowired
+	DeletedMapsService deletedMapsService;
+
     @Autowired
     DeviceInAppPurchasesRepository iapsRepository;
 
@@ -330,10 +333,13 @@ public class UserdataController {
 	                                         @RequestParam(name = "type", required = true) String type,
 	                                         @RequestParam(name = "updatetime", required = true) Long updatetime,
 	                                         @RequestParam(name = "deviceid", required = true) int deviceId,
-	                                         @RequestParam(name = "accessToken", required = true) String accessToken) {
+	                                         @RequestParam(name = "accessToken", required = true) String accessToken) throws IOException {
 		CloudUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
 			return userdataService.tokenNotValidError();
+		} else if (deletedMapsService.isDeletionMarker(name, type, updatetime)) {
+			// Acknowledge version cleanup without deleting the synthetic marker.
+			return userdataService.ok();
 		} else {
 			return userdataService.deleteFileVersion(updatetime, dev.userid, name, type, null);
 		}
@@ -371,7 +377,7 @@ public class UserdataController {
 	@GetMapping(value = "/check-file-on-server")
 	public ResponseEntity<String> checkFileOnServer(@RequestParam(name = "name", required = true) String name,
 			@RequestParam(name = "type", required = true) String type) throws IOException {
-		if (userdataService.checkThatObfFileisOnServer(name, type) != null) {
+		if (deletedMapsService.isDeletedMapFile(name, type) || userdataService.checkThatObfFileisOnServer(name, type) != null) {
 			return ResponseEntity.ok(gson.toJson(Collections.singletonMap("status", "present")));
 		}
 		return ResponseEntity.ok(gson.toJson(Collections.singletonMap("status", "not-present")));
@@ -448,6 +454,7 @@ public class UserdataController {
 		}
 		Set<String> types = userdataService.parseFileTypes(type);
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, false, types);
+		deletedMapsService.markDeletedMaps(res);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 

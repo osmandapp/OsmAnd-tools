@@ -85,6 +85,9 @@ public class UserdataService {
     protected DownloadIndexesService downloadService;
 
     @Autowired
+    protected DeletedMapsService deletedMapsService;
+
+    @Autowired
     protected CloudUserFilesRepository filesRepository;
 
 	@Lazy
@@ -173,6 +176,7 @@ public class UserdataService {
     public static final long MAXIMUM_FREE_ACCOUNT_SIZE = 5 * MB;
     private static final long MAXIMUM_FREE_ACCOUNT_FILE_SIZE = 2 * MB;
     public static final String FILE_TYPE_GLOBAL = "GLOBAL";
+    static final String FILE_TYPE = "FILE";
     public static final String FILE_TYPE_FAVOURITES = "FAVOURITES";
     public static final String FILE_TYPE_PROFILE = "PROFILE";
     public static final String FILE_TYPE_GPX = "GPX";
@@ -409,6 +413,9 @@ public class UserdataService {
 
 	public ResponseEntity<String> uploadMultipartFile(MultipartFile file, CloudUserDevicesRepository.CloudUserDevice dev,
 			String name, String type, Long clienttime, HttpSession session) throws IOException {
+		if (deletedMapsService.isDeletedMapFile(name, type)) {
+			return deletedMapsService.handleDeletedMapUpload(name, type, clienttime, dev);
+		}
 		try (InternalZipFile zipfile = getUploadZipFile(file, name, type, session)) {
 			validateUserForUpload(dev, type, zipfile.getSize());
 			return uploadFile(zipfile, dev, name, type, clienttime);
@@ -748,6 +755,7 @@ public class UserdataService {
 
     public void getFile(CloudUserFilesRepository.UserFile userFile, HttpServletResponse response, HttpServletRequest request, String name, String type,
                         CloudUserDevicesRepository.CloudUserDevice dev, boolean simplified) throws IOException {
+        deletedMapsService.validateDownload(name, type);
         InputStream bin = null;
         File fileToDelete = null;
         try {
@@ -1302,7 +1310,6 @@ public class UserdataService {
 
 
     private boolean isSelectedType(Set<String> filterTypes, CloudUserFilesRepository.UserFileNoData sf) {
-        final String FILE_TYPE = "FILE";
         final String FILE_TYPE_MAPS = "FILE_MAPS";
         final String FILE_TYPE_OTHER = "FILE_OTHER";
         String currentFileType = sf.type.toUpperCase();

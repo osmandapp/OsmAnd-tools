@@ -181,19 +181,7 @@ public class DownloadIndexesService  {
 	
 	public ServerCommonFile getServerGlobalFile(String name) throws IOException {
 		DownloadIndexDocument doc = getIndexesDocument(false, false);
-		// ignore folders for srtm / hillshade / slope
-		if (name.lastIndexOf('/') != -1) {
-			name = name.substring(name.lastIndexOf('/') + 1);
-		}
-		String dwName;
-		if (name.endsWith("obf")) {
-			// add _2 for obf files 
-			int ind = name.indexOf('.');
-			dwName = name.substring(0, ind) + "_2" + name.substring(ind);
-		} else {
-			// replace ' ' as it could be done on device 
-			dwName = name.replace(' ', '_');
-		}
+		String dwName = toIndexFileName(name);
 
 		for (DownloadIndex di : doc.getAllMaps()) {
 			if (di.getName().equals(dwName) || di.getName().equals(dwName + ".zip")) {
@@ -241,6 +229,24 @@ public class DownloadIndexesService  {
 		return null;
 	}
 	
+	// Converts a local filename to an index name, e.g. roads/Region.road.obf -> Region_2.road.obf
+	public static String toIndexFileName(String name) {
+		// ignore folders for srtm / hillshade / slope
+		if (name.lastIndexOf('/') != -1) {
+			name = name.substring(name.lastIndexOf('/') + 1);
+		}
+		String dwName;
+		if (name.endsWith("obf")) {
+			// add _2 for obf files
+			int ind = name.indexOf('.');
+			dwName = name.substring(0, ind) + "_2" + name.substring(ind);
+		} else {
+			// replace ' ' as it could be done on device
+			dwName = name.replace(' ', '_');
+		}
+		return dwName;
+	}
+
 	public File getIndexesXml(boolean upd, boolean gzip) {
 		File target = getStandardFilePath(gzip);
 		if (!target.exists() || upd) {
