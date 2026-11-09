@@ -65,8 +65,8 @@
 #   Ireland_contours                  INFOMAR 10 m inshore over 25 m over EMODnet DTM 2024, LAT, as Netherlands_contours;
 #                                     fill from the INFOMAR grids
 #   France_contours                   SHOM coastal DTMs 5-20 m (11 zones), chart datum, only the 1 degree tiles touching
-#                                     a zone; with france_filled.vrt EMODnet closes only coastal/enclosed gaps and the
-#                                     remaining coastal strip is interpolated; without it SHOM lies over EMODnet, fill SHOM
+#                                     a zone; with france_filled.vrt EMODnet closes only holes enclosed by SHOM and the
+#                                     coastal strip is interpolated; without it SHOM lies over EMODnet, fill SHOM
 #   Great_Britain_contours            UKHO ADMIRALTY surveys (BAG, averaged to 0.0002 degrees) over EMODnet DTM 2024,
 #                                     LAT, as France_contours: only the 1 degree tiles touching a survey
 #   Denmark_contours                  (not published, small gain) Danmarks Dybdemodel 50 m 2024 over EMODnet DTM 2024,
@@ -230,7 +230,7 @@ if [ -n "$DATA" ]; then
 			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1 ;;
 		France_contours)
 			# SHOM coastal DTMs in chart datum (PBMA), scattered along the Channel and Atlantic coast: only the 1 degree
-			# tiles touching one of them are built. The filled grid adds EMODnet only in the coastal and enclosed gaps.
+			# tiles touching one of them are built. The filled grid adds EMODnet only in holes enclosed by SHOM.
 			FR="$DATA/src/france/france.vrt"
 			FR_DEPTH="$FR"
 			[ ! -f "$DATA/src/france/fill/france_filled.vrt" ] || FR_DEPTH="$DATA/src/france/fill/france_filled.vrt"

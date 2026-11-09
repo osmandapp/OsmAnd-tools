@@ -213,17 +213,38 @@ if [ ${#FILES[@]} -gt 0 ]; then
 fi
 leftovers france "$SRC/france"
 FRFILL="$SRC/france/fill"
-for v in france_base.tif france_emodnet_fill.tif france_with_emodnet.vrt france_filled.vrt france_filled_interp.vrt; do
+for v in france_base.tif france_with_emodnet.vrt france_filled.vrt france_filled_interp.vrt; do
 	if [ ! -f "$FRFILL/$v" ]; then fail "france: fill/$v not found (run download_all.sh --only france)"
 	elif gdalinfo "$FRFILL/$v" >/dev/null 2>&1; then ok "france: fill/$v opens"
 	else fail "france: fill/$v does not open"; fi
 done
-if [ -f "$FRFILL/france_filled.vrt" ] && [ -f "$FRFILL/france_filled_interp.vrt" ]; then
-	# The reported point is on an OSM land cell; this is the nearest interpolated sea cell of the same gap.
+# This file exists only when the SHOM grids really have an enclosed hole to fill with EMODnet.
+if [ -f "$FRFILL/france_emodnet_fill.tif" ]; then
+	if gdalinfo "$FRFILL/france_emodnet_fill.tif" >/dev/null 2>&1; then ok "france: fill/france_emodnet_fill.tif opens"
+	else fail "france: fill/france_emodnet_fill.tif does not open"; fi
+fi
+if [ -f "$FRFILL/france_filled.vrt" ]; then
+	# There is no SHOM zone at Pleherel: the separate EMODnet map covers it, the French map must not.
+	v=$(python3 - "$SRC/emodnet/emodnet_2024.vrt" "$FRFILL/france_with_emodnet.vrt" "$FRFILL/france_filled.vrt" <<'EOF' 2>/dev/null
+import math, sys
+import rasterio
+pts = [(-2.40, 48.66), (-2.3513, 48.6617)]
+with rasterio.open(sys.argv[1]) as emodnet, rasterio.open(sys.argv[2]) as base, rasterio.open(sys.argv[3]) as fill:
+    source = float(next(emodnet.sample([pts[0]]))[0])
+    values = [(float(next(base.sample([pt]))[0]), float(next(fill.sample([pt]))[0])) for pt in pts]
+print(f"EMODnet={source:g}; " + "; ".join(f"combined={a:g}, filled={b:g}" for a, b in values))
+sys.exit(0 if math.isfinite(source) and source < 0
+         and all(math.isnan(a) and math.isnan(b) for a, b in values) else 1)
+EOF
+)
+	if [ $? -eq 0 ]; then ok "france: no EMODnet coastal band at Pleherel-Plage ($v)"
+	else fail "france: EMODnet coastal band is present at Pleherel-Plage: $v"; fi
+fi
+if [ -f "$FRFILL/france_filled_interp.vrt" ]; then
 	v=$(python3 - "$FRFILL/france_with_emodnet.vrt" "$FRFILL/france_filled.vrt" "$FRFILL/france_filled_interp.vrt" <<'EOF' 2>/dev/null
 import math, sys
 import rasterio
-pt = (-2.3513, 48.6617)
+pt = (-2.0251, 48.6159)
 with rasterio.open(sys.argv[1]) as base, rasterio.open(sys.argv[2]) as fill, rasterio.open(sys.argv[3]) as interp:
     before = float(next(base.sample([pt]))[0])
     depth = float(next(fill.sample([pt]))[0])
@@ -232,8 +253,8 @@ print(f"before={before:g} depth={depth:g} interp={marker:g}")
 sys.exit(0 if math.isnan(before) and math.isfinite(depth) and depth < 0 and marker > 0 else 1)
 EOF
 )
-	if [ $? -eq 0 ]; then ok "france: Pleherel-Plage coastal gap is filled ($v)"
-	else fail "france: Pleherel-Plage coastal gap is not filled correctly: $v"; fi
+	if [ $? -eq 0 ]; then ok "france: SHOM coastal gap at Saint-Malo is interpolated ($v)"
+	else fail "france: SHOM coastal gap at Saint-Malo is not interpolated: $v"; fi
 fi
 if [ -f "$FRFILL/france_with_emodnet.vrt" ]; then
 	v=$(python3 - "$SRC/emodnet/emodnet_2024.vrt" "$FRFILL/france_base.tif" "$FRFILL/france_with_emodnet.vrt" <<'EOF' 2>/dev/null

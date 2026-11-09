@@ -15,8 +15,8 @@
 #   ireland      INFOMAR bathymetry 25 m (Irish waters) and 10 m (inshore), LAT, from the GSI ImageServer
 #   denmark      Danmarks Dybdemodel 50 m 2024, one GeoTIFF (depths positive, mean sea level) ~0.13 GB; not in the
 #                published regions: 50 m against EMODnet's 115 m is a small gain
-#   france       SHOM coastal DTMs 5-20 m, chart datum (PBMA), 11 zones as GeoTIFF; then EMODnet only in coastal
-#                and enclosed data gaps and a Laplace fill to the coast in src/france/fill; needs emodnet and mask
+#   france       SHOM coastal DTMs 5-20 m, chart datum (PBMA), 11 zones as GeoTIFF; then EMODnet only in holes
+#                enclosed by SHOM and a Laplace fill to the coast in src/france/fill; needs emodnet and mask
 #   uk           UKHO ADMIRALTY seabed surveys: BAG or CSV point delivery, whichever is finer per survey, becomes a
 #                0.0002 degree GeoTIFF; with env UKHO_TOKEN (the Bearer token of a signed-in seabed.admiralty.co.uk
 #                session) the surveys of the index are downloaded, zips put into DIR/src/uk/incoming by hand are
@@ -258,7 +258,7 @@ MNT_COTIER_GNB_PAPI_SM_20m_PACK_DL/MNT_COTIER_GOLFE_NORMAND_BRETON_PAPI_PBMA"
 				&& mv "$tif.tmp.tif" "$tif" && rm -rf "$SRC/france/$pkg.x" "$SRC/france/$pkg.7z" && echo "ok $pkg.tif"
 		done
 		gdalbuildvrt -q -overwrite -resolution highest "$SRC/france/france.vrt" "$SRC"/france/*.tif
-		# EMODnet is used only in coastal and enclosed data gaps, then the remaining coastal strip is interpolated
+		# EMODnet closes only holes enclosed by SHOM; the coastal strip is interpolated without an EMODnet band
 		FRANCE_COASTAL_FILL=${FRANCE_COASTAL_FILL:-6000}
 		POLY_DIR=${POLY_DIR:-/home/xmd5a/git/OsmAnd-misc/osm-planet/polygons/europe}
 		FRANCE_FOREIGN_POLYS=${FRANCE_FOREIGN_POLYS:-"$POLY_DIR/west-europe/belgium.poly $POLY_DIR/west-europe/netherlands.poly $POLY_DIR/south-europe/spain.poly"}
@@ -277,7 +277,7 @@ MNT_COTIER_GNB_PAPI_SM_20m_PACK_DL/MNT_COTIER_GOLFE_NORMAND_BRETON_PAPI_PBMA"
 		if [ -f "$SRC/uk/uk_filled.vrt" ]; then exclude_args=(--exclude-raster "$SRC/uk/uk_filled.vrt")
 		elif [ -f "$SRC/uk/uk.vrt" ]; then exclude_args=(--exclude-raster "$SRC/uk/uk.vrt"); fi
 		"$HERE/france_emodnet_fill.py" "$SRC/france/france.vrt" "$emodnet" "$SRC/france/fill" \
-			--land "$land" --coast "$FRANCE_COASTAL_FILL" "${foreign_args[@]}" -j "$JOBS"
+			--land "$land" "${foreign_args[@]}" -j "$JOBS"
 		"$HERE/uk_coastal_fill.py" "$SRC/france/fill/france_with_emodnet.vrt" "$SRC/france/fill" \
 			--land "$land" --land-clip "$SRC/france/fill/land_clip.gpkg" "${foreign_args[@]}" "${exclude_args[@]}" \
 			--limit "$FRANCE_COASTAL_FILL" --name france_filled -j "$JOBS"

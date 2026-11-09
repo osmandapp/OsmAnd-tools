@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Add EMODnet to the SHOM mosaic only in coastal and enclosed data gaps.
+"""Add EMODnet to the SHOM mosaic only in holes enclosed by detailed data.
 
 The SHOM zones are averaged to the 0.0002 degree grid used by France_contours. On a
-coarser selection grid, EMODnet is admitted only into the corridor between the coast
-and nearby SHOM/EMODnet data and into empty components enclosed by detailed data and
-land. SHOM always has priority. The resulting france_with_emodnet.vrt is the input of
-the coastal Laplace fill in uk_coastal_fill.py; open water remains empty.
+coarser selection grid, EMODnet is admitted only into empty components fully enclosed
+by detailed data, never into the coastal gap or open water. SHOM always has priority.
+The resulting france_with_emodnet.vrt is the input of the coastal Laplace fill in
+uk_coastal_fill.py; that fill uses no additional EMODnet along the coast.
 
     france_emodnet_fill.py FRANCE.vrt EMODNET.vrt OUT_DIR --land LAND_GPKG
                            [--foreign NEIGHBOUR.poly ...] [--force]
@@ -86,8 +86,8 @@ def coarse_land(source, bounds, width, height):
     return values
 
 
-def build_gap_mask(base, emodnet, land, mask_path, coverage_path, bounds, mask_cell,
-                   radius, coast, foreign_paths):
+def build_gap_mask(base, land, mask_path, coverage_path, bounds, mask_cell,
+                   radius, foreign_paths):
     left, bottom, right, top = bounds
     width = math.ceil((right - left) / mask_cell)
     height = math.ceil((top - bottom) / mask_cell)
@@ -95,33 +95,18 @@ def build_gap_mask(base, emodnet, land, mask_path, coverage_path, bounds, mask_c
     transform = (left, mask_cell, 0, top, 0, -mask_cell)
     print(f"Gap selection grid: {width}x{height}", flush=True)
     detail = np.isfinite(coarse_values(base, mask_bounds, width, height))
-    emodnet_values = coarse_values(emodnet, mask_bounds, width, height)
-    emodnet_valid = np.isfinite(emodnet_values) & (emodnet_values < 0)
-    del emodnet_values
     land_mask = coarse_land(land, mask_bounds, width, height)
     midlat = (mask_bounds[1] + mask_bounds[3]) / 2
     sampling = (mask_cell, mask_cell * math.cos(math.radians(midlat)))
     radius_deg = radius / 111320.0
 
-    # Close narrow cracks first, then accept only holes with a detailed-data boundary.
+    # Close narrow cracks first. Land is deliberately not a boundary here: a bay enclosed
+    # by data and the shore is a coastal gap for the Laplace stage, not an EMODnet hole.
     dilated = ndimage.distance_transform_edt(~detail, sampling=sampling) <= radius_deg
     closed = ndimage.distance_transform_edt(dilated, sampling=sampling) > radius_deg
     del dilated
-    with_land = closed | land_mask
-    holes = ndimage.binary_fill_holes(with_land) & ~with_land & ~land_mask
-    hole_labels, hole_count = ndimage.label(holes)
-    touching = ndimage.binary_dilation(closed, structure=np.ones((3, 3)))
-    keep_holes = np.unique(hole_labels[touching & (hole_labels > 0)])
-    enclosed = np.isin(hole_labels, keep_holes)
-    del holes, hole_labels, touching, with_land
-
-    # The same corridor as the Laplace fill, but EMODnet itself can be the nearby data:
-    # parts of the French coast, including Pleherel-Plage, have no SHOM zone at all.
-    known = detail | emodnet_valid
-    land_distance = ndimage.distance_transform_edt(~land_mask, sampling=sampling)
-    data_distance = ndimage.distance_transform_edt(~known, sampling=sampling)
-    coastal = (land_distance + data_distance) <= coast / 111320.0
-    envelope = (coastal | enclosed) & ~land_mask
+    envelope = ndimage.binary_fill_holes(closed) & ~closed & ~land_mask
+    _, hole_count = ndimage.label(envelope)
     if foreign_paths:
         shapes = []
         for path in foreign_paths:
@@ -132,8 +117,7 @@ def build_gap_mask(base, emodnet, land, mask_path, coverage_path, bounds, mask_c
         envelope &= ~foreign
     write_byte_raster(mask_path, envelope, transform)
     area = write_coverage(coverage_path, envelope, transform)
-    print(f"Enclosed holes kept: {len(keep_holes)} of {hole_count}", flush=True)
-    print(f"EMODnet candidate cells: {int((envelope & ~detail & emodnet_valid).sum())}; "
+    print(f"Enclosed EMODnet holes: {hole_count}; {int(envelope.sum())} coarse cells; "
           f"envelope {area:.4f} square degrees", flush=True)
 
 
@@ -191,8 +175,6 @@ def main():
     ap.add_argument("--cell", type=float, default=0.0002, help="working grid in degrees")
     ap.add_argument("--mask-cell", type=float, default=0.002, help="gap selection grid in degrees")
     ap.add_argument("--radius", type=float, default=2000, help="crack closing radius in metres")
-    ap.add_argument("--coast", type=float, default=6000,
-                    help="coastal corridor: distance to land + distance to data, in metres")
     ap.add_argument("-j", "--jobs", type=int, default=16)
     ap.add_argument("--force", action="store_true", help="rebuild the intermediate rasters")
     args = ap.parse_args()
@@ -216,12 +198,14 @@ def main():
     if args.force or not os.path.exists(base):
         build_base(args.source, base, bounds, args.cell, args.jobs)
     if args.force or not os.path.exists(mask) or not os.path.exists(coverage):
-        build_gap_mask(base, args.emodnet, land, mask, coverage, bounds, args.mask_cell,
-                       args.radius, args.coast, args.foreign)
+        build_gap_mask(base, land, mask, coverage, bounds, args.mask_cell,
+                       args.radius, args.foreign)
     with rasterio.open(mask) as selected:
         has_envelope = bool(selected.read(1).any())
     if has_envelope and (args.force or not os.path.exists(underlay)):
         build_underlay(args.emodnet, land, coverage, underlay, bounds, args.cell, args.jobs)
+    elif not has_envelope and os.path.exists(underlay):
+        os.remove(underlay)
     build_composite(base, underlay if has_envelope else None, composite, bounds, args.cell)
     print(composite, flush=True)
 
