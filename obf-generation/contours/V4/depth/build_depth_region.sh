@@ -221,9 +221,15 @@ if [ -n "$DATA" ]; then
 			# The Rijkswaterstaat grids in chart datum with the coastal gap closed by the Laplace fill
 			# (netherlands_filled.vrt); without it, use the raw grids and the NSGI datum shift.
 			NL_FILL="$NL/fill/netherlands_filled.vrt"
+			# the EMODnet base limited to the contour of the detailed data
+			NL_BASE="$NL/fill/netherlands_emodnet_base.vrt"
 			: "${BBOX:=1.7 51.1 7.3 55.7}"
 			if [ -f "$NL_FILL" ]; then
-				: "${GRID:=$EMODNET,$NL_FILL}"; : "${FILL:=$NL_FILL}"
+				if [ -f "$NL_BASE" ]; then
+					: "${GRID:=$NL_BASE,$NL_FILL}"; : "${FILL:=$NL_FILL}"
+				else
+					: "${GRID:=$EMODNET,$NL_FILL}"; : "${FILL:=$NL_FILL}"
+				fi
 				if [ -f "$NL/fill/netherlands_filled_interp.vrt" ]; then
 					: "${INTERP:=$NL/fill/netherlands_filled_interp.vrt}"
 				fi
@@ -235,7 +241,11 @@ if [ -n "$DATA" ]; then
 			fi
 			# the UK map has the priority: the Dutch map gives way to its whole coverage, the Thames
 			# estuary and the North Sea off East Anglia
-			if [ -f "$DATA/src/uk/emodnet_home.vrt" ] && [ -f "$DATA/src/uk/uk_filled.vrt" ]; then
+			if [ -f "$DATA/src/uk/emodnet_base.vrt" ] && [ -f "$DATA/src/uk/uk_filled.vrt" ]; then
+				coverage uk_netherlands "--bbox 1.7 51.1 7.3 55.7 --cell 0.001 --shrink -1" \
+					"$DATA/src/uk/emodnet_base.vrt" "$DATA/src/uk/uk_filled.vrt"
+				: "${EXCLUDE:=$COVERAGE}"
+			elif [ -f "$DATA/src/uk/emodnet_home.vrt" ] && [ -f "$DATA/src/uk/uk_filled.vrt" ]; then
 				coverage uk_netherlands "--bbox 1.7 51.1 7.3 55.7 --cell 0.001 --shrink -1" \
 					"$DATA/src/uk/emodnet_home.vrt" "$DATA/src/uk/uk_filled.vrt"
 				: "${EXCLUDE:=$COVERAGE}"
@@ -248,9 +258,16 @@ if [ -n "$DATA" ]; then
 			# the Laplace fill (ireland_filled.vrt); without it, use the raw INFOMAR over EMODnet.
 			IE="$DATA/src/ireland/ireland.vrt"
 			IE_FILL="$DATA/src/ireland/fill/ireland_filled.vrt"
+			# the EMODnet base limited to the contour of the detailed data
+			IE_BASE="$DATA/src/ireland/fill/ireland_emodnet_base.vrt"
 			: "${BBOX:=-11.8 51.2 -5.3 55.6}"
 			if [ -f "$IE_FILL" ]; then
-				: "${GRID:=$EMODNET,$IE_FILL}"; : "${FILL:=$IE_FILL}"; : "${TILE_WITH:=$IE}"
+				if [ -f "$IE_BASE" ]; then
+					: "${GRID:=$IE_BASE,$IE_FILL}"
+				else
+					: "${GRID:=$EMODNET,$IE_FILL}"
+				fi
+				: "${FILL:=$IE_FILL}"; : "${TILE_WITH:=$IE}"
 				if [ -f "$DATA/src/ireland/fill/ireland_filled_interp.vrt" ]; then
 					: "${INTERP:=$DATA/src/ireland/fill/ireland_filled_interp.vrt}"
 				fi
@@ -260,7 +277,11 @@ if [ -n "$DATA" ]; then
 			# The UK map has the priority: the Irish map gives way to its whole coverage, the EMODnet base
 			# on the British side of the midline and the UKHO surveys that reach into the Irish side. The
 			# coverage is expanded by a cell, so that the two maps do not overlap even along the cell edges.
-			if [ -f "$DATA/src/uk/emodnet_home.vrt" ] && [ -f "$DATA/src/uk/uk_filled.vrt" ]; then
+			if [ -f "$DATA/src/uk/emodnet_base.vrt" ] && [ -f "$DATA/src/uk/uk_filled.vrt" ]; then
+				coverage uk_ireland "--bbox -11.8 51.2 -5.3 55.6 --cell 0.001 --shrink -1" \
+					"$DATA/src/uk/emodnet_base.vrt" "$DATA/src/uk/uk_filled.vrt"
+				: "${EXCLUDE:=$COVERAGE}"
+			elif [ -f "$DATA/src/uk/emodnet_home.vrt" ] && [ -f "$DATA/src/uk/uk_filled.vrt" ]; then
 				coverage uk_ireland "--bbox -11.8 51.2 -5.3 55.6 --cell 0.001 --shrink -1" \
 					"$DATA/src/uk/emodnet_home.vrt" "$DATA/src/uk/uk_filled.vrt"
 				: "${EXCLUDE:=$COVERAGE}"
@@ -301,8 +322,11 @@ if [ -n "$DATA" ]; then
 			UK_TILES="$DATA/src/uk/uk.vrt"
 			[ -f "$UK_TILES" ] || UK_TILES="$UK"
 			# The general EMODnet base, like the coastal underlay, ends at the midpoint to neighbouring land;
-			# detailed UKHO surveys are not clipped by that line.
-			UK_BASE="$DATA/src/uk/emodnet_home.vrt"
+			# detailed UKHO surveys are not clipped by that line. The base is also limited to the contour
+			# of the detailed data (emodnet_base.vrt, depth_emodnet_base.py); emodnet_home.vrt is the older
+			# base with the midpoint only.
+			UK_BASE="$DATA/src/uk/emodnet_base.vrt"
+			[ -f "$UK_BASE" ] || UK_BASE="$DATA/src/uk/emodnet_home.vrt"
 			[ -f "$UK_BASE" ] || { echo "$NAME: no $UK_BASE (run download_all.sh --only uk with the midpoint mask)" >&2; exit 1; }
 			: "${BBOX:=-8.7 49.8 2.0 60.9}"; : "${GRID:=$UK_BASE,$UK}"; : "${FILL:=$UK}"; : "${TILE_WITH:=$UK_TILES}"
 			# the cells whose value is interpolated (the gaps closed inside a survey, the blended transitions

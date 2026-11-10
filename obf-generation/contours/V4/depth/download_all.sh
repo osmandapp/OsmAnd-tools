@@ -245,6 +245,12 @@ if want netherlands; then
 				--foreign "$POLY_DIR/belgium.poly" --foreign "$POLY_DIR/germany.poly" \
 				--foreign "$POLY_DIR/france.poly" --foreign "$POLY_DIR/great-britain.poly" \
 				--limit "$NETHERLANDS_COASTAL_FILL" --name netherlands_filled -j "$JOBS" --force
+			# the EMODnet base of the map: only inside the contour of the detailed data
+			"$HERE/depth_emodnet_base.py" --name netherlands \
+				--detail "$NL/bathymetrie_ncp_juni_2019.tif" "$NL/bodemhoogte_20mtr_2024.tif" \
+				--emodnet "$SRC/emodnet/emodnet_2024.vrt" --bbox 1.7 51.1 7.3 55.7 \
+				--out "$NL_FILL/netherlands_emodnet_base.tif" \
+				--region "$SRC/netherlands/netherlands_emodnet_region.gpkg"
 		else
 			echo "netherlands: coastal fill skipped (no land polygons or neighbour polygons; run --mask first)" >&2
 		fi
@@ -280,6 +286,11 @@ if want ireland; then
 				"$HERE/uk_coastal_fill.py" "$IE_FILL/ireland_base.tif" "$IE_FILL" --land "$land" \
 					--foreign "$POLY_DIR/great-britain.poly" --limit "$IRELAND_COASTAL_FILL" \
 					--name ireland_filled -j "$JOBS" --force
+				# the EMODnet base of the map: only inside the contour of the detailed data
+				"$HERE/depth_emodnet_base.py" --name ireland --detail "$SRC/ireland/ireland.vrt" \
+					--emodnet "$SRC/emodnet/emodnet_2024.vrt" --bbox -11.8 51.2 -5.3 55.6 \
+					--out "$IE_FILL/ireland_emodnet_base.tif" \
+					--region "$SRC/ireland/ireland_emodnet_region.gpkg"
 			else
 				echo "ireland: coastal fill skipped (no land polygons or great-britain.poly; run --mask first)" >&2
 			fi
@@ -410,6 +421,12 @@ if want uk; then
 		"$HERE/uk_coastal_fill.py" "$SRC/uk/uk.vrt" "$SRC/uk" --land "$land" \
 			--exclude "$IRELAND_POLY" --exclude-raster "$ireland" "${foreign_args[@]}" \
 			--limit "$UK_COASTAL_FILL" -j "$UKHO_CONV_JOBS" --force
+		# the EMODnet base of the map: only inside the contour of the detailed data, and only
+		# up to the midpoint to the neighbouring land
+		"$HERE/depth_emodnet_base.py" --name uk --detail "$SRC/uk/uk_detail.vrt" \
+			--emodnet "$emodnet" --bbox -8.7 49.8 2.0 60.9 \
+			--allowed "$SRC/uk/uk_home_water.gpkg" \
+			--out "$SRC/uk/emodnet_base.tif" --region "$SRC/uk/uk_emodnet_region.gpkg"
 	fi
 fi
 if want nz; then

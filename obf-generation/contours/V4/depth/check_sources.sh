@@ -214,6 +214,34 @@ EOF
 else
 	warn "netherlands: no coastal fill (src/netherlands/fill/netherlands_filled.vrt)"
 fi
+# the EMODnet base of the map is limited to the contour of the detailed data: the sea far from the
+# grids has no base, the sea around them keeps it
+if [ -f "$SRC/netherlands/fill/netherlands_emodnet_base.vrt" ]; then
+	v=$(python3 - "$SRC/netherlands/fill/netherlands_emodnet_base.vrt" <<'EOF' 2>/dev/null
+import math, sys
+import rasterio
+inside = [(3.40, 53.30, "sea west of the coast"), (2.60, 52.00, "Strait of Dover"),
+          (5.00, 54.50, "north of the mainland")]
+outside = [(2.20, 53.00, "open sea NW"), (1.80, 51.50, "Thames")]
+with rasterio.open(sys.argv[1]) as base:
+    for lon, lat, name in inside:
+        b = float(next(base.sample([(lon, lat)]))[0])
+        if not math.isfinite(b) or b >= 0:
+            print(f"{name}: base={b:g}")
+            sys.exit(1)
+    for lon, lat, name in outside:
+        b = float(next(base.sample([(lon, lat)]))[0])
+        if math.isfinite(b):
+            print(f"{name}: base={b:g}")
+            sys.exit(1)
+print("ok")
+EOF
+)
+	if [ $? -eq 0 ]; then ok "netherlands: the EMODnet base stays inside the contour of the grids"
+	else fail "netherlands: the EMODnet base leaves the contour of the grids: $v"; fi
+else
+	warn "netherlands: no EMODnet base limited to the contour (src/netherlands/fill/netherlands_emodnet_base.vrt)"
+fi
 
 echo "== ireland"
 # INFOMAR tiles without data were left as .empty; the 10 m inshore grid goes on top of the 25 m one
@@ -260,6 +288,32 @@ EOF
 	else fail "ireland: coastal fill: $v"; fi
 else
 	warn "ireland: no coastal fill (src/ireland/fill/ireland_filled.vrt)"
+fi
+# the EMODnet base of the map is limited to the contour of the detailed data
+if [ -f "$SRC/ireland/fill/ireland_emodnet_base.vrt" ]; then
+	v=$(python3 - "$SRC/ireland/fill/ireland_emodnet_base.vrt" <<'EOF' 2>/dev/null
+import math, sys
+import rasterio
+inside = [(-6.05, 53.50, "Rush"), (-10.50, 52.00, "Celtic Sea west"), (-7.60, 51.30, "Celtic Sea")]
+outside = [(-5.40, 54.60, "North Channel"), (-5.60, 52.00, "Irish Sea east")]
+with rasterio.open(sys.argv[1]) as base:
+    for lon, lat, name in inside:
+        b = float(next(base.sample([(lon, lat)]))[0])
+        if not math.isfinite(b) or b >= 0:
+            print(f"{name}: base={b:g}")
+            sys.exit(1)
+    for lon, lat, name in outside:
+        b = float(next(base.sample([(lon, lat)]))[0])
+        if math.isfinite(b):
+            print(f"{name}: base={b:g}")
+            sys.exit(1)
+print("ok")
+EOF
+)
+	if [ $? -eq 0 ]; then ok "ireland: the EMODnet base stays inside the contour of INFOMAR"
+	else fail "ireland: the EMODnet base leaves the contour of INFOMAR: $v"; fi
+else
+	warn "ireland: no EMODnet base limited to the contour (src/ireland/fill/ireland_emodnet_base.vrt)"
 fi
 # the UK map has the priority: the neighbouring maps give way to its whole coverage, the EMODnet base on
 # the British side of the midline and the UKHO surveys that reach into the Irish side
@@ -490,6 +544,35 @@ EOF
 )
 	if [ $? -eq 0 ]; then ok "uk: the EMODnet base stops at the midpoint to the neighbouring land"
 	else fail "uk: the EMODnet base crosses the midpoint to the neighbouring land: $v"; fi
+	# The base of the map is limited to the contour of the detailed data: the sea far from the
+	# surveys has no base any more, the sea around them keeps it.
+	if [ -f "$SRC/uk/emodnet_base.vrt" ]; then
+		v=$(python3 - "$SRC/uk/emodnet_base.vrt" <<'EOF' 2>/dev/null
+import math, sys
+import rasterio
+inside = [(0.3703, 52.988, "North Sea"), (-6.68, 51.27, "Celtic Sea"), (-3.20, 50.20, "Start Point"),
+          (-1.00, 58.00, "sea north of Scotland")]
+outside = [(-8.30, 55.60, "Atlantic west of Scotland"), (-8.00, 52.00, "Atlantic west of Ireland"),
+           (1.80, 50.98, "Calais NW"), (-6.05, 53.50, "Rush")]
+with rasterio.open(sys.argv[1]) as base:
+    for lon, lat, name in inside:
+        b = float(next(base.sample([(lon, lat)]))[0])
+        if not math.isfinite(b) or b >= 0:
+            print(f"{name}: base={b:g}")
+            sys.exit(1)
+    for lon, lat, name in outside:
+        b = float(next(base.sample([(lon, lat)]))[0])
+        if math.isfinite(b):
+            print(f"{name}: base={b:g}")
+            sys.exit(1)
+print("ok")
+EOF
+)
+		if [ $? -eq 0 ]; then ok "uk: the EMODnet base stays inside the contour of the surveys"
+		else fail "uk: the EMODnet base leaves the contour of the surveys: $v"; fi
+	else
+		warn "uk: no EMODnet base limited to the contour (src/uk/emodnet_base.vrt)"
+	fi
 fi
 
 echo "== nz"

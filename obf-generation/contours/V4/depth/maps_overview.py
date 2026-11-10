@@ -45,15 +45,15 @@ STYLES = os.path.expanduser("~/git/OsmAnd-resources/rendering_styles")
 REGIONS = {
     "Great_Britain_contours": dict(
         color="#e6194b", bbox=(-8.7, 49.8, 2.0, 60.9),
-        sources=["src/uk/emodnet_home.vrt", "src/uk/uk_filled.vrt"],
+        sources=["src/uk/emodnet_base.vrt", "src/uk/uk_filled.vrt"],
         exclude=[], label=(-2.4, 54.3), hatch="///"),
     "Ireland_contours": dict(
         color="#3cb44b", bbox=(-11.8, 51.2, -5.3, 55.6),
-        sources=["src/emodnet/emodnet_2024.vrt", "src/ireland/fill/ireland_filled.vrt"],
+        sources=["src/ireland/fill/ireland_emodnet_base.vrt", "src/ireland/fill/ireland_filled.vrt"],
         exclude=["uk_ireland.gpkg"], label=(-8.6, 53.2), hatch="..."),
     "Netherlands_contours": dict(
         color="#4363d8", bbox=(1.7, 51.1, 7.3, 55.7),
-        sources=["src/emodnet/emodnet_2024.vrt", "src/netherlands/fill/netherlands_filled.vrt"],
+        sources=["src/netherlands/fill/netherlands_emodnet_base.vrt", "src/netherlands/fill/netherlands_filled.vrt"],
         exclude=["uk_netherlands.gpkg"], label=(4.6, 52.6), hatch="xxx"),
     "France_contours": dict(
         color="#911eb4", bbox=(-5.5, 43.3, 2.6, 51.2),
