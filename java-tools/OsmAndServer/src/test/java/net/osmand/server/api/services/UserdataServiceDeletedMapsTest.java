@@ -63,7 +63,7 @@ public class UserdataServiceDeletedMapsTest {
 	@Before
 	public void setUp() throws IOException {
 		DownloadIndexDocument indexes = new DownloadIndexDocument();
-		indexes.setOutdatedMaps();
+		DeletedMapsService.setOutdatedMaps(indexes.getDeletedMaps());
 		DownloadIndex active = new DownloadIndex();
 		active.setName("Germany_berlin_europe_2.obf.zip");
 		active.setType(DownloadType.MAP);
