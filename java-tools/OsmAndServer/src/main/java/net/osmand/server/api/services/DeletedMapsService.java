@@ -5,16 +5,14 @@ import static net.osmand.server.api.services.UserdataService.ERROR_MESSAGE_FILE_
 import static net.osmand.server.api.services.UserdataService.FILE_TYPE;
 import static net.osmand.server.api.services.UserdataService.INFO_EXT;
 
-import java.io.IOException;
 import java.text.ParseException;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
-import jakarta.annotation.Nullable;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -36,14 +34,12 @@ import net.osmand.server.utils.exception.OsmAndPublicApiException;
 public class DeletedMapsService {
 
 	@Autowired
-	private DownloadIndexesService downloadService;
-
-	@Autowired
 	private CloudUserFilesRepository filesRepository;
 
 	private final Gson gson = new Gson();
+	private final Set<String> deletedMapNames = createDeletedMapNames();
 
-	public static void setOutdatedMaps(List<DownloadIndex> deletedMaps) {
+	public static void setDeletedMaps(List<DownloadIndex> deletedMaps) {
 		addDeletedMap(deletedMaps, "Canada_nunavut_northamerica_2.obf.zip", DownloadType.MAP, "06.11.2026");
 		addDeletedMap(deletedMaps, "Norway_vestfold-og-telemark_europe_2.obf.zip", DownloadType.MAP, "06.11.2026");
 		addDeletedMap(deletedMaps, "Gb_england_channel-islands_europe_2.obf.zip", DownloadType.MAP, "06.11.2026");
@@ -218,15 +214,23 @@ public class DeletedMapsService {
 		addDeletedMap(deletedMaps, "Spain_europe_2.road.obf.zip", DownloadType.ROAD_MAP, "03.09.2025");
 	}
 
-	public boolean isDeletedMapFile(String name, String type) throws IOException {
-		return isDeletedMapFile(name, type, null);
+	public boolean isDeletedMapFile(String name, String type) {
+		if (!FILE_TYPE.equalsIgnoreCase(type)) {
+			return false;
+		}
+		if (name.endsWith(INFO_EXT)) {
+			name = name.substring(0, name.length() - INFO_EXT.length());
+		}
+		if (!name.endsWith(IndexConstants.BINARY_MAP_INDEX_EXT)) {
+			return false;
+		}
+		return deletedMapNames.contains(DownloadIndexesService.toIndexFileName(name));
 	}
 
-	public void markDeletedMaps(UserFilesResults result, boolean removeFromList) throws IOException {
-		Set<String> deletedMaps = getDeletedMapNames();
+	public void markDeletedMaps(UserFilesResults result, boolean removeFromList) {
 		for (Iterator<UserFileNoData> iterator = result.uniqueFiles.iterator(); iterator.hasNext();) {
 			UserFileNoData file = iterator.next();
-			if (isDeletedMapFile(file.name, file.type, deletedMaps)) {
+			if (isDeletedMapFile(file.name, file.type)) {
 				iterator.remove();
 			}
 		}
@@ -236,7 +240,7 @@ public class DeletedMapsService {
 		Set<String> marked = new HashSet<>();
 		for (Iterator<UserFileNoData> iterator = result.allFiles.iterator(); iterator.hasNext();) {
 			UserFileNoData file = iterator.next();
-			if (isDeletedMapFile(file.name, file.type, deletedMaps)) {
+			if (isDeletedMapFile(file.name, file.type)) {
 				if (removeFromList || file.name.endsWith(INFO_EXT) || !marked.add(file.type + "/" + file.name)) {
 					iterator.remove();
 				} else {
@@ -271,40 +275,26 @@ public class DeletedMapsService {
 		return ResponseEntity.ok(gson.toJson(Map.of("status", "ok", "updatetime", uploadTime, "filesize", 0)));
 	}
 
-	public void validateDownload(String name, String type) throws IOException {
+	public void validateDownload(String name, String type) {
 		if (isDeletedMapFile(name, type)) {
 			throw new OsmAndPublicApiException(ERROR_CODE_FILE_NOT_AVAILABLE, ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
 		}
 	}
 
-	public boolean isDeletionMarker(String name, String type, long updatetime) throws IOException {
+	public boolean isDeletionMarker(String name, String type, long updatetime) {
 		// Version cleanup must keep the synthetic deletion marker.
 		return updatetime == 0 && isDeletedMapFile(name, type);
 	}
 
-	private Set<String> getDeletedMapNames() throws IOException {
+	private static Set<String> createDeletedMapNames() {
+		List<DownloadIndex> deletedMaps = new ArrayList<>();
+		setDeletedMaps(deletedMaps);
 		Set<String> names = new HashSet<>();
-		for (DownloadIndex index : downloadService.getIndexesDocument(false, false).getDeletedMaps()) {
+		for (DownloadIndex index : deletedMaps) {
 			String name = index.getName();
 			names.add(name.endsWith(".zip") ? name.substring(0, name.length() - ".zip".length()) : name);
 		}
 		return names;
-	}
-
-	private boolean isDeletedMapFile(String name, String type, @Nullable Set<String> deletedMaps) throws IOException {
-		if (!FILE_TYPE.equalsIgnoreCase(type)) {
-			return false;
-		}
-		if (name.endsWith(INFO_EXT)) {
-			name = name.substring(0, name.length() - INFO_EXT.length());
-		}
-		if (!name.endsWith(IndexConstants.BINARY_MAP_INDEX_EXT)) {
-			return false;
-		}
-		if (deletedMaps == null) {
-			deletedMaps = getDeletedMapNames();
-		}
-		return deletedMaps.contains(DownloadIndexesService.toIndexFileName(name));
 	}
 
 	private static void addDeletedMap(List<DownloadIndex> deletedMaps, String name,
