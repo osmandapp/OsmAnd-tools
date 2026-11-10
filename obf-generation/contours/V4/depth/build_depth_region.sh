@@ -218,17 +218,38 @@ if [ -n "$DATA" ]; then
 			# the merged bands (about 0.3 GB) are only an intermediate
 			rm -f "$OUT/$NAME.bands.gpkg"; exit 0 ;;
 		Netherlands_contours)
-			: "${BBOX:=1.7 51.1 7.3 55.7}"; : "${GRID:=$EMODNET,$NL/bathymetrie_ncp_juni_2019.tif,$NL/bodemhoogte_20mtr_2024.tif}"
+			# The Rijkswaterstaat grids in chart datum with the coastal gap closed by the Laplace fill
+			# (netherlands_filled.vrt); without it, use the raw grids and the NSGI datum shift.
+			NL_FILL="$NL/fill/netherlands_filled.vrt"
+			: "${BBOX:=1.7 51.1 7.3 55.7}"
+			if [ -f "$NL_FILL" ]; then
+				: "${GRID:=$EMODNET,$NL_FILL}"; : "${FILL:=$NL_FILL}"
+				if [ -f "$NL/fill/netherlands_filled_interp.vrt" ]; then
+					: "${INTERP:=$NL/fill/netherlands_filled_interp.vrt}"
+				fi
+			else
+				: "${GRID:=$EMODNET,$NL/bathymetrie_ncp_juni_2019.tif,$NL/bodemhoogte_20mtr_2024.tif}"
+				if [ -f "$NL/nl_nsgi_nllat2018.tif" ]; then
+					: "${FILL:=$NL/bodemhoogte_20mtr_2024.tif,$NL/nl_nsgi_nlgeo2018.tif,$NL/nl_nsgi_nllat2018.tif}"
+				fi
+			fi
 			: "${RESAMPLING:=auto}"; : "${CELL:=0.0002}"; : "${LEVELS:=2,5,10,15,20,25,30,35,40,45,50,100,200}"
 			: "${SMOOTH_FROM:=5}"
-			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1
-			if [ -f "$NL/nl_nsgi_nllat2018.tif" ]; then
-				: "${FILL:=$NL/bodemhoogte_20mtr_2024.tif,$NL/nl_nsgi_nlgeo2018.tif,$NL/nl_nsgi_nllat2018.tif}"
-			fi ;;
+			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1 ;;
 		Ireland_contours)
-			# INFOMAR grids are LAT already: the fill needs no datum shift
+			# INFOMAR grids are LAT already: the fill needs no datum shift. The coastal gap is closed by
+			# the Laplace fill (ireland_filled.vrt); without it, use the raw INFOMAR over EMODnet.
 			IE="$DATA/src/ireland/ireland.vrt"
-			: "${BBOX:=-11.8 51.2 -5.3 55.6}"; : "${GRID:=$EMODNET,$IE}"; : "${FILL:=$IE}"
+			IE_FILL="$DATA/src/ireland/fill/ireland_filled.vrt"
+			: "${BBOX:=-11.8 51.2 -5.3 55.6}"
+			if [ -f "$IE_FILL" ]; then
+				: "${GRID:=$EMODNET,$IE_FILL}"; : "${FILL:=$IE_FILL}"; : "${TILE_WITH:=$IE}"
+				if [ -f "$DATA/src/ireland/fill/ireland_filled_interp.vrt" ]; then
+					: "${INTERP:=$DATA/src/ireland/fill/ireland_filled_interp.vrt}"
+				fi
+			else
+				: "${GRID:=$EMODNET,$IE}"; : "${FILL:=$IE}"
+			fi
 			: "${RESAMPLING:=auto}"; : "${CELL:=0.0002}"; : "${LEVELS:=2,5,10,15,20,25,30,35,40,45,50,100,200}"; : "${SMOOTH_FROM:=5}"
 			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1 ;;
 		France_contours)

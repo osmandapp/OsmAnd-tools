@@ -12,7 +12,9 @@
 #   (cudem_ninth NOAA CUDEM 1/9" topobathy, 930 tiles, ~187 GB: disabled until there is disk space)
 #   norway       Kartverket "Sjøkart - Dybdedata", whole country, FGDB       ~2.3 GB zip
 #   netherlands  Rijkswaterstaat bottom grids 20 m 2024, Zeeland, NCP 2019   ~0.3 GB
+#                then a Laplace coastal fill into src/netherlands/fill; needs mask and neighbour polygons
 #   ireland      INFOMAR bathymetry 25 m (Irish waters) and 10 m (inshore), LAT, from the GSI ImageServer
+#                then a Laplace coastal fill into src/ireland/fill; needs mask and great-britain.poly
 #   denmark      Danmarks Dybdemodel 50 m 2024, one GeoTIFF (depths positive, mean sea level) ~0.13 GB; not in the
 #                published regions: 50 m against EMODnet's 115 m is a small gain
 #   france       SHOM coastal DTMs 5-20 m, chart datum (PBMA), 11 zones as GeoTIFF; then EMODnet only in holes
@@ -204,7 +206,49 @@ if want netherlands; then
 	# NSGI hydroid (LAT) and NAP geoid of PROJ: their difference is how far chart datum lies below NAP
 	NL="$NL https://cdn.proj.org/nl_nsgi_nllat2018.tif https://cdn.proj.org/nl_nsgi_nlgeo2018.tif"
 	if [ $DRY -eq 1 ]; then printf "%s\n" $NL | report netherlands
-	else for u in $NL; do fetch "$u" "$SRC/netherlands/$(basename "$u")"; done; fi
+	else
+		for u in $NL; do fetch "$u" "$SRC/netherlands/$(basename "$u")"; done
+		# The coastal gap between the Rijkswaterstaat grids and the shore is filled by Laplace, like UK and
+		# France. The working grid is 0.0002 degrees in chart datum: the NCP 2019 is LAT already, the
+		# bodemhoogte 2024 is NAP, so the NSGI geoids bring it to LAT (depth + nlgeo2018 - nllat2018).
+		land="$OUT/mask/land_polygons.gpkg"
+		[ -f "$land" ] || land=$(find "$OUT/mask" -name 'land_polygons.shp' -print -quit 2>/dev/null)
+		POLY_DIR=${POLY_DIR:-/home/xmd5a/git/OsmAnd-misc/osm-planet/polygons/europe/west-europe}
+		if [ -n "$land" ] && [ -e "$POLY_DIR/belgium.poly" ] && [ -e "$POLY_DIR/germany.poly" ]; then
+			NL_FILL="$SRC/netherlands/fill"; mkdir -p "$NL_FILL"
+			for spec in "bathymetrie_ncp_juni_2019.tif:ncp_lat.tif:bilinear" \
+			            "bodemhoogte_20mtr_2024.tif:bodem_nap.tif:average" \
+			            "nl_nsgi_nlgeo2018.tif:nl_nsgi_nlgeo2018.tif:bilinear" \
+			            "nl_nsgi_nllat2018.tif:nl_nsgi_nllat2018.tif:bilinear"; do
+				src=${spec%%:*}; rest=${spec#*:}; dst=${rest%%:*}; res=${rest#*:}
+				gdalwarp -q -overwrite -t_srs EPSG:4326 -te 1.7 51.1 7.3 55.7 -tr 0.0002 0.0002 \
+					-r "$res" -ot Float32 -dstnodata nan -multi -wo NUM_THREADS="$JOBS" \
+					-co COMPRESS=DEFLATE -co PREDICTOR=3 -co TILED=YES -co BIGTIFF=IF_SAFER \
+					"$SRC/netherlands/$src" "$NL_FILL/$dst"
+			done
+			read -r NW NH <<< "$(gdalinfo -json "$NL_FILL/bodem_nap.tif" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(*d["size"])')"
+			GT=$(gdalinfo -json "$NL_FILL/bodem_nap.tif" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(",".join(map(repr, d["geoTransform"])))')
+			cat > "$NL_FILL/bodem_lat.vrt" <<-VRT
+			<VRTDataset rasterXSize="$NW" rasterYSize="$NH"><SRS>EPSG:4326</SRS><GeoTransform>$GT</GeoTransform>
+			<VRTRasterBand dataType="Float32" band="1" subClass="VRTDerivedRasterBand"><NoDataValue>nan</NoDataValue>
+			<PixelFunctionType>sum</PixelFunctionType><PixelFunctionArguments propagateNoData="true"/>
+			<SimpleSource><SourceFilename relativeToVRT="1">bodem_nap.tif</SourceFilename><SourceBand>1</SourceBand></SimpleSource>
+			<SimpleSource><SourceFilename relativeToVRT="1">nl_nsgi_nlgeo2018.tif</SourceFilename><SourceBand>1</SourceBand></SimpleSource>
+			<ComplexSource><SourceFilename relativeToVRT="1">nl_nsgi_nllat2018.tif</SourceFilename><SourceBand>1</SourceBand><ScaleRatio>-1</ScaleRatio></ComplexSource>
+			</VRTRasterBand></VRTDataset>
+			VRT
+			gdalbuildvrt -q -overwrite -resolution user -tr 0.0002 0.0002 -te 1.7 51.1 7.3 55.7 \
+				-srcnodata nan -vrtnodata nan "$NL_FILL/netherlands_base.vrt" \
+				"$NL_FILL/ncp_lat.tif" "$NL_FILL/bodem_lat.vrt"
+			NETHERLANDS_COASTAL_FILL=${NETHERLANDS_COASTAL_FILL:-6000}
+			"$HERE/uk_coastal_fill.py" "$NL_FILL/netherlands_base.vrt" "$NL_FILL" --land "$land" \
+				--foreign "$POLY_DIR/belgium.poly" --foreign "$POLY_DIR/germany.poly" \
+				--foreign "$POLY_DIR/france.poly" --foreign "$POLY_DIR/great-britain.poly" \
+				--limit "$NETHERLANDS_COASTAL_FILL" --name netherlands_filled -j "$JOBS" --force
+		else
+			echo "netherlands: coastal fill skipped (no land polygons or neighbour polygons; run --mask first)" >&2
+		fi
+	fi
 fi
 if want ireland; then
 	echo "== ireland"
@@ -216,6 +260,30 @@ if want ireland; then
 		# tiles downloaded before the 3.4e38 fix
 		find "$SRC/ireland/25m" "$SRC/ireland/10m" -name '*.tif' ! -name '*.tmp.tif' -print0 \
 			| xargs -0 -P "$JOBS" -n 1 bash -c 'arcgis_nodata "$0"'
+		# INFOMAR tiles: 25 m first, the 10 m inshore grid on top (later files win in a VRT)
+		IE_FILES=()
+		while IFS= read -r f; do IE_FILES+=("$f"); done < <(find "$SRC/ireland/25m" -name '*.tif' 2>/dev/null | sort; find "$SRC/ireland/10m" -name '*.tif' 2>/dev/null | sort)
+		if [ ${#IE_FILES[@]} -gt 0 ]; then
+			gdalbuildvrt -q -overwrite -resolution highest "$SRC/ireland/ireland.vrt" "${IE_FILES[@]}"
+			# the coastal gap between INFOMAR and the shore is filled by Laplace, like UK and France;
+			# the working grid is the 0.0002 degree grid of Ireland_contours
+			land="$OUT/mask/land_polygons.gpkg"
+			[ -f "$land" ] || land=$(find "$OUT/mask" -name 'land_polygons.shp' -print -quit 2>/dev/null)
+			POLY_DIR=${POLY_DIR:-/home/xmd5a/git/OsmAnd-misc/osm-planet/polygons/europe/west-europe}
+			if [ -n "$land" ] && [ -e "$POLY_DIR/great-britain.poly" ]; then
+				IE_FILL="$SRC/ireland/fill"; mkdir -p "$IE_FILL"
+				gdalwarp -q -overwrite -t_srs EPSG:4326 -te -11.8 51.2 -5.3 55.6 -tr 0.0002 0.0002 \
+					-r average -ot Float32 -dstnodata nan -multi -wo NUM_THREADS="$JOBS" \
+					-co COMPRESS=DEFLATE -co PREDICTOR=3 -co TILED=YES -co BIGTIFF=IF_SAFER \
+					"$SRC/ireland/ireland.vrt" "$IE_FILL/ireland_base.tif"
+				IRELAND_COASTAL_FILL=${IRELAND_COASTAL_FILL:-6000}
+				"$HERE/uk_coastal_fill.py" "$IE_FILL/ireland_base.tif" "$IE_FILL" --land "$land" \
+					--foreign "$POLY_DIR/great-britain.poly" --limit "$IRELAND_COASTAL_FILL" \
+					--name ireland_filled -j "$JOBS" --force
+			else
+				echo "ireland: coastal fill skipped (no land polygons or great-britain.poly; run --mask first)" >&2
+			fi
+		fi
 	fi
 fi
 if want denmark; then

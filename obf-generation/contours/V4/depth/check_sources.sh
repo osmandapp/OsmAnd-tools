@@ -182,6 +182,38 @@ if [ ${#FILES[@]} -gt 0 ]; then
 		echo "     $(basename "$f"): $(crs "$f")"
 	done
 fi
+# the coastal gap between the Rijkswaterstaat grids and the shore is closed by the Laplace fill
+if [ -f "$SRC/netherlands/fill/netherlands_filled.vrt" ]; then
+	v=$(python3 - "$SRC/netherlands/fill/netherlands_base.vrt" "$SRC/netherlands/fill/netherlands_filled.vrt" \
+		"$SRC/netherlands/fill/netherlands_filled_interp.vrt" <<'EOF' 2>/dev/null
+import math, sys
+import rasterio
+# gaps of the Wadden Sea and of the Texel: the base has no data there, the fill closes them
+gaps = [(6.2245, 53.5507, "Wadden Sea"), (6.6415, 53.5877, "Texel"), (6.4873, 53.5569, "Ameland")]
+# the waters of the neighbours stay out of the map
+out = [(2.00, 51.70, "UK North Sea"), (3.00, 51.50, "Scheldt"), (7.00, 54.00, "German Bight")]
+with rasterio.open(sys.argv[1]) as base, rasterio.open(sys.argv[2]) as filled, \
+     rasterio.open(sys.argv[3]) as interp:
+    for lon, lat, name in gaps:
+        b = float(next(base.sample([(lon, lat)]))[0])
+        f = float(next(filled.sample([(lon, lat)]))[0])
+        i = float(next(interp.sample([(lon, lat)]))[0])
+        if math.isfinite(b) or not math.isfinite(f) or f >= 0 or i != 1:
+            print(f"{name}: base={b:g} filled={f:g} interp={i:g}")
+            sys.exit(1)
+    for lon, lat, name in out:
+        f = float(next(filled.sample([(lon, lat)]))[0])
+        if math.isfinite(f):
+            print(f"{name}: filled={f:g}")
+            sys.exit(1)
+print("ok")
+EOF
+)
+	if [ $? -eq 0 ]; then ok "netherlands: the coastal gap is filled and the foreign waters stay out"
+	else fail "netherlands: coastal fill: $v"; fi
+else
+	warn "netherlands: no coastal fill (src/netherlands/fill/netherlands_filled.vrt)"
+fi
 
 echo "== ireland"
 # INFOMAR tiles without data were left as .empty; the 10 m inshore grid goes on top of the 25 m one
@@ -196,6 +228,38 @@ else
 		ok "ireland: ireland.vrt of ${#FILES[@]} files"
 		sea ireland "$SRC/ireland/ireland.vrt" -6.05 53.33 "Dublin Bay"
 	else fail "ireland: gdalbuildvrt failed"; fi
+fi
+# the coastal gap between INFOMAR and the shore is closed by the Laplace fill
+if [ -f "$SRC/ireland/fill/ireland_filled.vrt" ]; then
+	v=$(python3 - "$SRC/ireland/fill/ireland_base.tif" "$SRC/ireland/fill/ireland_filled.vrt" \
+		"$SRC/ireland/fill/ireland_filled_interp.vrt" <<'EOF' 2>/dev/null
+import math, sys
+import rasterio
+# gaps of the Shannon estuary and off Donegal: the base has no data there, the fill closes them
+gaps = [(-9.0230, 52.6730, "Shannon"), (-8.6820, 54.7640, "Donegal"), (-9.9320, 52.1270, "Shannon mouth")]
+# the British side of the Irish Sea stays out of the Irish map
+out = [(-5.00, 53.50, "Irish Sea UK"), (-5.75, 54.70, "North Antrim")]
+with rasterio.open(sys.argv[1]) as base, rasterio.open(sys.argv[2]) as filled, \
+     rasterio.open(sys.argv[3]) as interp:
+    for lon, lat, name in gaps:
+        b = float(next(base.sample([(lon, lat)]))[0])
+        f = float(next(filled.sample([(lon, lat)]))[0])
+        i = float(next(interp.sample([(lon, lat)]))[0])
+        if math.isfinite(b) or not math.isfinite(f) or f >= 0 or i != 1:
+            print(f"{name}: base={b:g} filled={f:g} interp={i:g}")
+            sys.exit(1)
+    for lon, lat, name in out:
+        f = float(next(filled.sample([(lon, lat)]))[0])
+        if math.isfinite(f):
+            print(f"{name}: filled={f:g}")
+            sys.exit(1)
+print("ok")
+EOF
+)
+	if [ $? -eq 0 ]; then ok "ireland: the coastal gap is filled and the British waters stay out"
+	else fail "ireland: coastal fill: $v"; fi
+else
+	warn "ireland: no coastal fill (src/ireland/fill/ireland_filled.vrt)"
 fi
 leftovers ireland "$SRC/ireland"
 
