@@ -8,7 +8,6 @@ import java.util.List;
 import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
-import javax.xml.bind.annotation.XmlTransient;
 
 @XmlRootElement(name = "osmand_regions")
 public class DownloadIndexDocument {
@@ -108,7 +107,6 @@ public class DownloadIndexDocument {
 		return indx;
 	}
 
-	@XmlTransient
 	public List<DownloadIndex> getDeletedMaps() {
 		return deletedMaps;
 	}
