@@ -81,7 +81,7 @@ public class MapApiController {
 	UserdataService userdataService;
 
 	@Autowired
-	DeletedMapsService deletedMapsService;
+	CloudMapFilesService cloudMapFilesService;
 
 	@Autowired
 	TrackAnalyzerService trackAnalyzerService;
@@ -398,7 +398,7 @@ public class MapApiController {
 		}
 		Set<String> types = userdataService.parseFileTypes(type);
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, true, types);
-		deletedMapsService.markDeletedMaps(res, true);
+		cloudMapFilesService.prepareFileListForDeletedMaps(res, true);
 		Map<String, Set<String>> sharedFilesMap = shareFileService.getFilesByOwner(dev.userid);
 
 		res.uniqueFiles.forEach(nd -> {

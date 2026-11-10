@@ -85,7 +85,7 @@ public class UserdataService {
     protected DownloadIndexesService downloadService;
 
     @Autowired
-    protected DeletedMapsService deletedMapsService;
+    protected CloudMapFilesService cloudMapFilesService;
 
     @Autowired
     protected CloudUserFilesRepository filesRepository;
@@ -413,8 +413,8 @@ public class UserdataService {
 
 	public ResponseEntity<String> uploadMultipartFile(MultipartFile file, CloudUserDevicesRepository.CloudUserDevice dev,
 			String name, String type, Long clienttime, HttpSession session) throws IOException {
-		if (deletedMapsService.isDeletedMapFile(name, type)) {
-			return deletedMapsService.handleDeletedMapUpload(name, type, clienttime, dev);
+		if (cloudMapFilesService.isDeletedMapFile(name, type)) {
+			return cloudMapFilesService.handleDeletedMapUpload(name, type, clienttime, dev);
 		}
 		try (InternalZipFile zipfile = getUploadZipFile(file, name, type, session)) {
 			validateUserForUpload(dev, type, zipfile.getSize());
@@ -755,7 +755,7 @@ public class UserdataService {
 
     public void getFile(CloudUserFilesRepository.UserFile userFile, HttpServletResponse response, HttpServletRequest request, String name, String type,
                         CloudUserDevicesRepository.CloudUserDevice dev, boolean simplified) throws IOException {
-        deletedMapsService.validateDownload(name, type);
+        cloudMapFilesService.validateDownload(name, type);
         InputStream bin = null;
         File fileToDelete = null;
         try {

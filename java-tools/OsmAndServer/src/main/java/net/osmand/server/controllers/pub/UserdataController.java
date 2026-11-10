@@ -82,7 +82,7 @@ public class UserdataController {
 	UserdataService userdataService;
 
 	@Autowired
-	DeletedMapsService deletedMapsService;
+	CloudMapFilesService cloudMapFilesService;
 
     @Autowired
     DeviceInAppPurchasesRepository iapsRepository;
@@ -337,7 +337,7 @@ public class UserdataController {
 		CloudUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
 			return userdataService.tokenNotValidError();
-		} else if (deletedMapsService.isDeletionMarker(name, type, updatetime)) {
+		} else if (cloudMapFilesService.isDeletedMapMarker(name, type, updatetime)) {
 			// Acknowledge version cleanup without deleting the synthetic marker.
 			return userdataService.ok();
 		} else {
@@ -377,7 +377,7 @@ public class UserdataController {
 	@GetMapping(value = "/check-file-on-server")
 	public ResponseEntity<String> checkFileOnServer(@RequestParam(name = "name", required = true) String name,
 			@RequestParam(name = "type", required = true) String type) throws IOException {
-		if (deletedMapsService.isDeletedMapFile(name, type) || userdataService.checkThatObfFileisOnServer(name, type) != null) {
+		if (cloudMapFilesService.isDeletedMapFile(name, type) || userdataService.checkThatObfFileisOnServer(name, type) != null) {
 			return ResponseEntity.ok(gson.toJson(Collections.singletonMap("status", "present")));
 		}
 		return ResponseEntity.ok(gson.toJson(Collections.singletonMap("status", "not-present")));
@@ -454,7 +454,7 @@ public class UserdataController {
 		}
 		Set<String> types = userdataService.parseFileTypes(type);
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, false, types);
-		deletedMapsService.markDeletedMaps(res, false);
+		cloudMapFilesService.prepareFileListForDeletedMaps(res, false);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 

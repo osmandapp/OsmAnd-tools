@@ -36,7 +36,7 @@ import net.osmand.server.utils.exception.OsmAndPublicApiException;
 
 /** Keeps obsolete standard maps out of Cloud transfers. */
 @Service
-public class DeletedMapsService {
+public class CloudMapFilesService {
 
 	private static final String OUTDATED_DELETED_MAPS_XML = "/countries-info/outdated-deleted-maps.xml";
 
@@ -46,9 +46,9 @@ public class DeletedMapsService {
 	private final Gson gson = new Gson();
 	private final Set<String> deletedMapNames = createDeletedMapNames();
 
-	public static void setDeletedMaps(List<DownloadIndex> deletedMaps) {
+	public static void loadDeletedMaps(List<DownloadIndex> deletedMaps) {
 		try (InputStream input = Objects.requireNonNull(
-				DeletedMapsService.class.getResourceAsStream(OUTDATED_DELETED_MAPS_XML), OUTDATED_DELETED_MAPS_XML)) {
+				CloudMapFilesService.class.getResourceAsStream(OUTDATED_DELETED_MAPS_XML), OUTDATED_DELETED_MAPS_XML)) {
 			DownloadIndexDocument document = JAXB.unmarshal(input, DownloadIndexDocument.class);
 			for (DownloadIndex map : document.getDeletedMaps()) {
 				map.setDateByString(map.getDate());
@@ -73,7 +73,7 @@ public class DeletedMapsService {
 		return deletedMapNames.contains(DownloadIndexesService.toIndexFileName(name));
 	}
 
-	public void markDeletedMaps(UserFilesResults result, boolean removeFromList) {
+	public void prepareFileListForDeletedMaps(UserFilesResults result, boolean removeFromList) {
 		for (Iterator<UserFileNoData> iterator = result.uniqueFiles.iterator(); iterator.hasNext();) {
 			UserFileNoData file = iterator.next();
 			if (isDeletedMapFile(file.name, file.type)) {
@@ -127,14 +127,14 @@ public class DeletedMapsService {
 		}
 	}
 
-	public boolean isDeletionMarker(String name, String type, long updatetime) {
+	public boolean isDeletedMapMarker(String name, String type, long updatetime) {
 		// Version cleanup must keep the synthetic deletion marker.
 		return updatetime == 0 && isDeletedMapFile(name, type);
 	}
 
 	private static Set<String> createDeletedMapNames() {
 		List<DownloadIndex> deletedMaps = new ArrayList<>();
-		setDeletedMaps(deletedMaps);
+		loadDeletedMaps(deletedMaps);
 		Set<String> names = new HashSet<>();
 		for (DownloadIndex index : deletedMaps) {
 			String name = index.getName();
