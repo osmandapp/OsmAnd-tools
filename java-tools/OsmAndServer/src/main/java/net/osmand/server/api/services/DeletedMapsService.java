@@ -292,7 +292,8 @@ public class DeletedMapsService {
 		Set<String> names = new HashSet<>();
 		for (DownloadIndex index : deletedMaps) {
 			String name = index.getName();
-			names.add(name.endsWith(".zip") ? name.substring(0, name.length() - ".zip".length()) : name);
+			names.add(name.endsWith(IndexConstants.ZIP_EXT)
+					? name.substring(0, name.length() - IndexConstants.ZIP_EXT.length()) : name);
 		}
 		return names;
 	}
