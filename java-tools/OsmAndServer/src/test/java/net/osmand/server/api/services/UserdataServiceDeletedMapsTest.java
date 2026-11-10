@@ -75,7 +75,9 @@ public class UserdataServiceDeletedMapsTest {
 		service.downloadService = downloads;
 		service.storageService = mock(StorageService.class);
 		service.filesRepository = mock(CloudUserFilesRepository.class);
-		service.deletedMapsService = new DeletedMapsService(downloads, service.filesRepository);
+		service.deletedMapsService = new DeletedMapsService();
+		ReflectionTestUtils.setField(service.deletedMapsService, "downloadService", downloads);
+		ReflectionTestUtils.setField(service.deletedMapsService, "filesRepository", service.filesRepository);
 		service.usersRepository = mock(CloudUsersRepository.class);
 
 		device.id = 10;

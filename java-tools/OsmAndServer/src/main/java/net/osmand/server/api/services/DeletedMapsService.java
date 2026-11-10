@@ -16,6 +16,7 @@ import java.util.Set;
 
 import jakarta.annotation.Nullable;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
@@ -34,8 +35,12 @@ import net.osmand.server.utils.exception.OsmAndPublicApiException;
 @Service
 public class DeletedMapsService {
 
-	private final DownloadIndexesService downloadService;
-	private final CloudUserFilesRepository filesRepository;
+	@Autowired
+	private DownloadIndexesService downloadService;
+
+	@Autowired
+	private CloudUserFilesRepository filesRepository;
+
 	private final Gson gson = new Gson();
 
 	public static void setOutdatedMaps(List<DownloadIndex> deletedMaps) {
@@ -211,11 +216,6 @@ public class DeletedMapsService {
 
 		addDeletedMap(deletedMaps, "India_asia_2.road.obf.zip", DownloadType.ROAD_MAP, "03.09.2025");
 		addDeletedMap(deletedMaps, "Spain_europe_2.road.obf.zip", DownloadType.ROAD_MAP, "03.09.2025");
-	}
-
-	public DeletedMapsService(DownloadIndexesService downloadService, CloudUserFilesRepository filesRepository) {
-		this.downloadService = downloadService;
-		this.filesRepository = filesRepository;
 	}
 
 	public boolean isDeletedMapFile(String name, String type) throws IOException {
