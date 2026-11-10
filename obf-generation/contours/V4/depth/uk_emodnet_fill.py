@@ -303,9 +303,9 @@ def main():
     args = ap.parse_args()
     uk = os.path.abspath(args.uk)
     os.makedirs(args.output, exist_ok=True)
-    # Only the neighbouring mainland takes part in the midpoint. Ireland is excluded separately
-    # (its poly and the INFOMAR grid), and counting it here would put the whole Celtic Sea on the
-    # foreign side of the line.
+    # Every neighbouring country takes part in the midpoint, Ireland included: the Irish Sea and
+    # the waters around Ireland belong to the Irish map. The Celtic Sea stays on the British side
+    # of the line, because it is closer to British land than to Irish land.
     foreign_shapes = []
     for path in args.foreign:
         foreign_shapes.extend(poly_shapes(path))

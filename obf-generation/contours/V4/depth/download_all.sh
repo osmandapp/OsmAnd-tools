@@ -297,7 +297,7 @@ if want uk; then
 	# the neighbouring countries whose land lies in the UK grid: it is not the coast of this map,
 	# so it stays NaN and the coastal fill does not reach into their waters
 	POLY_DIR=${POLY_DIR:-/home/xmd5a/git/OsmAnd-misc/osm-planet/polygons/europe/west-europe}
-	UK_FOREIGN_POLYS=${UK_FOREIGN_POLYS:-"$POLY_DIR/france.poly $POLY_DIR/belgium.poly $POLY_DIR/netherlands.poly"}
+	UK_FOREIGN_POLYS=${UK_FOREIGN_POLYS:-"$POLY_DIR/france.poly $POLY_DIR/belgium.poly $POLY_DIR/netherlands.poly $POLY_DIR/ireland.poly"}
 	if [ $DRY -eq 1 ]; then
 		echo "uk           UKHO Seabed Mapping Service surveys (BAG or CSV points), then the EMODnet underlay, uk.vrt and the coastal fill"
 	else
