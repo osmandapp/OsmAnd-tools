@@ -43,7 +43,7 @@ import net.osmand.server.api.services.DownloadIndexesService.DownloadType;
 import net.osmand.server.controllers.pub.UserdataController;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
 
-public class UserdataServiceDeletedMapsTest {
+public class CloudMapFilesServiceTest {
 
 	private static final String MAP = "Germany_nordrhein-westfalen_europe.obf";
 	private static final String ROAD_MAP = "roads/Canada_nunavut_northamerica.road.obf";
@@ -63,7 +63,7 @@ public class UserdataServiceDeletedMapsTest {
 	@Before
 	public void setUp() throws IOException {
 		DownloadIndexDocument indexes = new DownloadIndexDocument();
-		DeletedMapsService.setOutdatedMaps(indexes.getDeletedMaps());
+		CloudMapFilesService.loadDeletedMaps(indexes.getDeletedMaps());
 		DownloadIndex active = new DownloadIndex();
 		active.setName("Germany_berlin_europe_2.obf.zip");
 		active.setType(DownloadType.MAP);
@@ -75,9 +75,8 @@ public class UserdataServiceDeletedMapsTest {
 		service.downloadService = downloads;
 		service.storageService = mock(StorageService.class);
 		service.filesRepository = mock(CloudUserFilesRepository.class);
-		service.deletedMapsService = new DeletedMapsService();
-		ReflectionTestUtils.setField(service.deletedMapsService, "downloadService", downloads);
-		ReflectionTestUtils.setField(service.deletedMapsService, "filesRepository", service.filesRepository);
+		service.cloudMapFilesService = new CloudMapFilesService();
+		ReflectionTestUtils.setField(service.cloudMapFilesService, "filesRepository", service.filesRepository);
 		service.usersRepository = mock(CloudUsersRepository.class);
 
 		device.id = 10;
@@ -115,7 +114,7 @@ public class UserdataServiceDeletedMapsTest {
 		when(devices.findById(device.id)).thenReturn(device);
 		ReflectionTestUtils.setField(controller, "devicesRepository", devices);
 		ReflectionTestUtils.setField(controller, "userdataService", service);
-		ReflectionTestUtils.setField(controller, "deletedMapsService", service.deletedMapsService);
+		ReflectionTestUtils.setField(controller, "cloudMapFilesService", service.cloudMapFilesService);
 	}
 
 	@Test
@@ -127,9 +126,9 @@ public class UserdataServiceDeletedMapsTest {
 				.unmarshal(new StringReader(xml.toString()));
 		doReturn(restored).when(downloads).getIndexesDocument(false, false);
 		assertFalse(restored.getDeletedMaps().isEmpty());
-		assertTrue(service.deletedMapsService.isDeletedMapFile(MAP, TYPE));
-		assertTrue(service.deletedMapsService.isDeletedMapFile(ROAD_MAP, TYPE));
-		assertFalse(service.deletedMapsService.isDeletedMapFile(ACTIVE_MAP, TYPE));
+		assertTrue(service.cloudMapFilesService.isDeletedMapFile(MAP, TYPE));
+		assertTrue(service.cloudMapFilesService.isDeletedMapFile(ROAD_MAP, TYPE));
+		assertFalse(service.cloudMapFilesService.isDeletedMapFile(ACTIVE_MAP, TYPE));
 	}
 
 	@Test
