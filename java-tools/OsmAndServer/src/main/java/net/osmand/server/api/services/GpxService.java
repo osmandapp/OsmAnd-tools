@@ -89,8 +89,8 @@ public class GpxService {
     private void addAnalysisToTrackData(WebGpxParser.TrackData gpxData, GpxTrackAnalysis gpxAnalysis) {
         if (gpxAnalysis != null) {
             gpxData.analysis = webGpxParser.getTrackAnalysis(gpxAnalysis, null);
-            if (!Algorithms.isEmpty(gpxData.tracks) && (!gpxAnalysis.getPointAttributes().isEmpty() || (gpxAnalysis.getAvgSpeed() != 0.0 && !gpxAnalysis.hasSpeedInTrack()))) {
-                boolean addSpeed = gpxAnalysis.getAvgSpeed() != 0.0 && !gpxAnalysis.hasSpeedInTrack();
+            boolean addSpeed = gpxAnalysis.getAvgSpeed() != 0.0 && !gpxAnalysis.hasSpeedInTrack();
+            if (!Algorithms.isEmpty(gpxData.tracks) && (!gpxAnalysis.getPointAttributes().isEmpty() || addSpeed)) {
                 webGpxParser.addAdditionalInfo(gpxData.tracks, gpxAnalysis, addSpeed);
             }
         }
@@ -109,9 +109,7 @@ public class GpxService {
             analysis.put("avgElevationSrtm", srtmAnalysis.getAvgElevation());
             analysis.put("maxElevationSrtm", srtmAnalysis.getMaxElevation());
             webGpxParser.addSrtmEle(trackData.tracks, srtmAnalysis);
-            if (analysis.get("elevationData") == null) {
-                webGpxParser.addAdditionalInfo(trackData.tracks, srtmAnalysis, false);
-            }
+            webGpxParser.addAdditionalInfo(trackData.tracks, srtmAnalysis, false);
         }
         return trackData;
     }
