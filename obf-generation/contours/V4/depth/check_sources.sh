@@ -261,6 +261,37 @@ EOF
 else
 	warn "ireland: no coastal fill (src/ireland/fill/ireland_filled.vrt)"
 fi
+# the UK map has the priority: the neighbouring maps give way to its whole coverage, the EMODnet base on
+# the British side of the midline and the UKHO surveys that reach into the Irish side
+for c in uk_ireland uk_netherlands; do
+	if [ -f "$SRC/coverage/$c.gpkg" ]; then
+		case $c in
+			uk_ireland) inside="-5.50,54.60 -6.68,51.27"; outside="-7.60,51.30 -6.00,53.30" ;;
+			uk_netherlands) inside="1.80,51.50 2.00,52.50"; outside="4.80,53.00 3.50,51.50" ;;
+		esac
+		v=$(python3 - "$SRC/coverage/$c.gpkg" "$inside" "$outside" <<'EOF' 2>/dev/null
+import sys
+from osgeo import ogr
+ogr.UseExceptions()
+ds = ogr.Open(sys.argv[1])
+feature = ds.GetLayer(0).GetNextFeature()
+geom = feature.GetGeometryRef().Clone()
+# the British side of the midline and the survey pockets of the UK are in the UK coverage,
+# the Irish and the Dutch waters are not
+for group, expected in ((sys.argv[2], True), (sys.argv[3], False)):
+    for pair in group.split():
+        lon, lat = (float(v) for v in pair.split(","))
+        point = ogr.CreateGeometryFromWkt(f"POINT({lon} {lat})")
+        if geom.Contains(point) != expected:
+            print(f"{lon} {lat}: inside={geom.Contains(point)}")
+            sys.exit(1)
+print("ok")
+EOF
+)
+		if [ $? -eq 0 ]; then ok "$c: the UK coverage is the border of the neighbouring maps"
+		else fail "$c: the UK coverage is wrong: $v"; fi
+	fi
+done
 leftovers ireland "$SRC/ireland"
 
 echo "== france"

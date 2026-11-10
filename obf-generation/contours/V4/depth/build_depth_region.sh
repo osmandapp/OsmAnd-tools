@@ -233,6 +233,13 @@ if [ -n "$DATA" ]; then
 					: "${FILL:=$NL/bodemhoogte_20mtr_2024.tif,$NL/nl_nsgi_nlgeo2018.tif,$NL/nl_nsgi_nllat2018.tif}"
 				fi
 			fi
+			# the UK map has the priority: the Dutch map gives way to its whole coverage, the Thames
+			# estuary and the North Sea off East Anglia
+			if [ -f "$DATA/src/uk/emodnet_home.vrt" ] && [ -f "$DATA/src/uk/uk_filled.vrt" ]; then
+				coverage uk_netherlands "--bbox 1.7 51.1 7.3 55.7 --cell 0.001 --shrink -1" \
+					"$DATA/src/uk/emodnet_home.vrt" "$DATA/src/uk/uk_filled.vrt"
+				: "${EXCLUDE:=$COVERAGE}"
+			fi
 			: "${RESAMPLING:=auto}"; : "${CELL:=0.0002}"; : "${LEVELS:=2,5,10,15,20,25,30,35,40,45,50,100,200}"
 			: "${SMOOTH_FROM:=5}"
 			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1 ;;
@@ -249,6 +256,14 @@ if [ -n "$DATA" ]; then
 				fi
 			else
 				: "${GRID:=$EMODNET,$IE}"; : "${FILL:=$IE}"
+			fi
+			# The UK map has the priority: the Irish map gives way to its whole coverage, the EMODnet base
+			# on the British side of the midline and the UKHO surveys that reach into the Irish side. The
+			# coverage is expanded by a cell, so that the two maps do not overlap even along the cell edges.
+			if [ -f "$DATA/src/uk/emodnet_home.vrt" ] && [ -f "$DATA/src/uk/uk_filled.vrt" ]; then
+				coverage uk_ireland "--bbox -11.8 51.2 -5.3 55.6 --cell 0.001 --shrink -1" \
+					"$DATA/src/uk/emodnet_home.vrt" "$DATA/src/uk/uk_filled.vrt"
+				: "${EXCLUDE:=$COVERAGE}"
 			fi
 			: "${RESAMPLING:=auto}"; : "${CELL:=0.0002}"; : "${LEVELS:=2,5,10,15,20,25,30,35,40,45,50,100,200}"; : "${SMOOTH_FROM:=5}"
 			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1 ;;
