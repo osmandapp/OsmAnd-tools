@@ -398,7 +398,7 @@ public class MapApiController {
 		}
 		Set<String> types = userdataService.parseFileTypes(type);
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, true, types);
-		deletedMapsService.markDeletedMaps(res);
+		deletedMapsService.markDeletedMaps(res, true);
 		Map<String, Set<String>> sharedFilesMap = shareFileService.getFilesByOwner(dev.userid);
 
 		res.uniqueFiles.forEach(nd -> {

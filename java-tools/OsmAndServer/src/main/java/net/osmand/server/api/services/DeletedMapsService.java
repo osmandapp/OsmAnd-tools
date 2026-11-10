@@ -44,7 +44,7 @@ public class DeletedMapsService {
 		return isDeletedMapFile(name, type, null);
 	}
 
-	public void markDeletedMaps(UserFilesResults result) throws IOException {
+	public void markDeletedMaps(UserFilesResults result, boolean removeFromList) throws IOException {
 		Set<String> deletedMaps = getDeletedMapNames();
 		for (Iterator<UserFileNoData> iterator = result.uniqueFiles.iterator(); iterator.hasNext();) {
 			UserFileNoData file = iterator.next();
@@ -59,7 +59,7 @@ public class DeletedMapsService {
 		for (Iterator<UserFileNoData> iterator = result.allFiles.iterator(); iterator.hasNext();) {
 			UserFileNoData file = iterator.next();
 			if (isDeletedMapFile(file.name, file.type, deletedMaps)) {
-				if (file.name.endsWith(INFO_EXT) || !marked.add(file.type + "/" + file.name)) {
+				if (removeFromList || file.name.endsWith(INFO_EXT) || !marked.add(file.type + "/" + file.name)) {
 					iterator.remove();
 				} else {
 					// Negative size prevents downloads; zero update time prevents local deletion.
@@ -77,7 +77,7 @@ public class DeletedMapsService {
 		long uploadTime = Math.max(System.currentTimeMillis(), clienttime == null ? 0 : clienttime);
 		if (!name.endsWith(INFO_EXT)) {
 			UserFile previous = filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(dev.userid, name, type);
-			if (previous == null || previous.filesize >= 0) {
+			if (previous == null || previous.filesize == null || previous.filesize >= 0) {
 				UserFile marker = new UserFile();
 				marker.userid = dev.userid;
 				marker.deviceid = dev.id;

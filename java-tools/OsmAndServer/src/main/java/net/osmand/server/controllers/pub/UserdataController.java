@@ -454,7 +454,7 @@ public class UserdataController {
 		}
 		Set<String> types = userdataService.parseFileTypes(type);
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, false, types);
-		deletedMapsService.markDeletedMaps(res);
+		deletedMapsService.markDeletedMaps(res, false);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 
