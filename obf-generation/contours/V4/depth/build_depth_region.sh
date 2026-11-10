@@ -240,9 +240,11 @@ if [ -n "$DATA" ]; then
 				fi
 			fi
 			# the UK map has the priority: the Dutch map gives way to its whole coverage, the Thames
-			# estuary and the North Sea off East Anglia
+			# estuary and the North Sea off East Anglia. The coverage is on the working grid and is not
+			# expanded: the Dutch data then reaches the edge of the UK data and no seam is left between
+			# the two maps.
 			if [ -f "$DATA/src/uk/emodnet_base.vrt" ] && [ -f "$DATA/src/uk/uk_filled.vrt" ]; then
-				coverage uk_netherlands "--bbox 1.7 51.1 7.3 55.7 --cell 0.001 --shrink -1" \
+				coverage uk_netherlands "--bbox 1.7 51.1 2.05 55.7 --cell 0.0002 --shrink 0" \
 					"$DATA/src/uk/emodnet_base.vrt" "$DATA/src/uk/uk_filled.vrt"
 				: "${EXCLUDE:=$COVERAGE}"
 			elif [ -f "$DATA/src/uk/emodnet_home.vrt" ] && [ -f "$DATA/src/uk/uk_filled.vrt" ]; then
@@ -276,9 +278,10 @@ if [ -n "$DATA" ]; then
 			fi
 			# The UK map has the priority: the Irish map gives way to its whole coverage, the EMODnet base
 			# on the British side of the midline and the UKHO surveys that reach into the Irish side. The
-			# coverage is expanded by a cell, so that the two maps do not overlap even along the cell edges.
+			# coverage is on the working grid and is not expanded, so that the Irish data reaches the edge
+			# of the UK data and no seam is left between the two maps.
 			if [ -f "$DATA/src/uk/emodnet_base.vrt" ] && [ -f "$DATA/src/uk/uk_filled.vrt" ]; then
-				coverage uk_ireland "--bbox -11.8 51.2 -5.3 55.6 --cell 0.001 --shrink -1" \
+				coverage uk_ireland "--bbox -8.7 51.2 -5.3 55.6 --cell 0.0002 --shrink 0" \
 					"$DATA/src/uk/emodnet_base.vrt" "$DATA/src/uk/uk_filled.vrt"
 				: "${EXCLUDE:=$COVERAGE}"
 			elif [ -f "$DATA/src/uk/emodnet_home.vrt" ] && [ -f "$DATA/src/uk/uk_filled.vrt" ]; then
@@ -300,9 +303,11 @@ if [ -n "$DATA" ]; then
 				: "${INTERP:=$DATA/src/france/fill/france_filled_interp.vrt}"
 			fi
 			# the UK map holds the surveys of the Channel and of the Channel Islands: the French map leaves that
-			# water to it, so that the same ground is not charted twice
+			# water to it, so that the same ground is not charted twice. The coverage is on the working grid
+			# and is not expanded, so that the French data reaches the edge of the UK data.
 			if [ -f "$DATA/src/uk/uk_filled.vrt" ]; then
-				coverage uk_filled "" "$DATA/src/uk/uk_filled.vrt"; : "${EXCLUDE:=$COVERAGE}"
+				coverage uk_filled "--bbox -5.5 49.8 2.05 51.2 --cell 0.0002 --shrink 0" \
+					"$DATA/src/uk/uk_filled.vrt"; : "${EXCLUDE:=$COVERAGE}"
 			elif [ -f "$DATA/src/uk/uk.vrt" ]; then
 				coverage uk "" "$DATA/src/uk/uk.vrt"; : "${EXCLUDE:=$COVERAGE}"
 			fi
