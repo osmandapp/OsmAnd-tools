@@ -26,7 +26,6 @@ import net.osmand.server.api.repo.CloudUsersRepository;
 import net.osmand.server.api.services.StorageService;
 import net.osmand.server.api.services.StorageService.InternalZipFile;
 import net.osmand.server.api.services.UserdataService;
-import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
 
 public abstract class AbstractFileFixOperation extends AbstractParallelOperation<AbstractFileFixOperation.Params> {
 
@@ -129,8 +128,7 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 				: params.updatedAfter().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
 		Long beforeMs = params.updatedBefore() == null ? null
 				: params.updatedBefore().plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli();
-		UserFilesResults res = userdataService.generateFiles(userId, null, false, false, typesOf(params));
-		for (UserFileNoData fileNoData : res.uniqueFiles) {
+		for (UserFileNoData fileNoData : listFiles(userId, params)) {
 			if (afterMs != null && fileNoData.updatetimems < afterMs) {
 				continue;
 			}
@@ -151,6 +149,10 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 		if (userFound) {
 			stats.usersFound.incrementAndGet();
 		}
+	}
+
+	protected List<UserFileNoData> listFiles(int userId, Params params) {
+		return userdataService.generateFiles(userId, null, false, false, typesOf(params)).uniqueFiles;
 	}
 
 	private boolean processFileById(long id, Params params, Stats stats) {
@@ -229,7 +231,7 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 		}
 		AtomicInteger sum = new AtomicInteger();
 		forEach(clampThreads(params.threads()), userIds, ctx, userId ->
-				sum.addAndGet(userdataService.generateFiles(userId, null, false, false, typesOf(params)).uniqueFiles.size()));
+				sum.addAndGet(listFiles(userId, params).size()));
 		return UserBatchReader.limit(sum.get(), params.filesPercent());
 	}
 
