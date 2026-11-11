@@ -176,7 +176,7 @@ public class UserdataService {
     public static final long MAXIMUM_FREE_ACCOUNT_SIZE = 5 * MB;
     private static final long MAXIMUM_FREE_ACCOUNT_FILE_SIZE = 2 * MB;
     public static final String FILE_TYPE_GLOBAL = "GLOBAL";
-    static final String FILE_TYPE = "FILE";
+    public static final String FILE_TYPE = "FILE";
     public static final String FILE_TYPE_FAVOURITES = "FAVOURITES";
     public static final String FILE_TYPE_PROFILE = "PROFILE";
     public static final String FILE_TYPE_GPX = "GPX";
