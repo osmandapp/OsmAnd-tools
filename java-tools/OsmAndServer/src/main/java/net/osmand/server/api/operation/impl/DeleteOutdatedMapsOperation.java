@@ -16,13 +16,12 @@ import net.osmand.server.api.services.CloudMapFilesService;
 import net.osmand.server.api.services.StorageService;
 import net.osmand.server.api.services.UserdataService;
 
-/** Deletes uploaded copies of maps removed from the catalog. */
+/** Deletes stored versions of maps removed from the catalog. */
 @Component
 @AdminOperation(name = "delete-outdated-maps")
 public class DeleteOutdatedMapsOperation extends AbstractFileFixOperation {
 
 	private static final Logger LOG = LoggerFactory.getLogger(DeleteOutdatedMapsOperation.class);
-	private static final long MAX_LINK_ZIP_SIZE = 1000;
 
 	private final CloudMapFilesService cloudMapFilesService;
 
@@ -50,7 +49,7 @@ public class DeleteOutdatedMapsOperation extends AbstractFileFixOperation {
 
 	@Override
 	protected boolean fix(UserFile file, Params params) {
-		if (!hasUploadedContent(file)) {
+		if (file.filesize == null || file.filesize <= 0) {
 			return false;
 		}
 		if (!isTest(params)) {
@@ -58,10 +57,5 @@ public class DeleteOutdatedMapsOperation extends AbstractFileFixOperation {
 			userdataService.deleteFileVersion(null, file.userid, file.name, file.type, file);
 		}
 		return true;
-	}
-
-	private static boolean hasUploadedContent(UserFile file) {
-		return file.filesize != null && file.filesize > 0
-				&& file.zipfilesize != null && file.zipfilesize > MAX_LINK_ZIP_SIZE;
 	}
 }
