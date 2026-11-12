@@ -262,8 +262,7 @@ public class PoiSearchService {
 				for (SpatialSearchResult r : results.mainResults) {
 					SpatialPoiType type = r.getPoiCategory(poiTypeSearch);
 					if (type != null) {
-						Map<String, String> fields = spatialSearchService.getSpatialPoiTypeFields(type, locale);
-						res.put(fields.get(SearchResultConverter.PoiTypeField.NAME.getFieldName()), fields);
+						res.put(type.getKey(), spatialSearchService.getSpatialPoiTypeFields(type, locale));
 					}
 				}
 			}
