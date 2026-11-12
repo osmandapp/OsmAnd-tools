@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
-# Depth contours and soundings of Norway from Kartverket "Sjøkart - Dybdedata" (FGDB, vector) as .osm.gz and OBF.
+# Depth contours, soundings and depth areas of vector chart data as .osm.gz and OBF.
 #
-#   build_depth_kartverket.sh -D DATA_DIR [-n NAME] [-b "W S E N"] [-t TILE] [-j JOBS] [-c MAP_CREATOR_DIR] [-k]
-#   build_depth_kartverket.sh -i FGDB -m LAND -o OUT_DIR [-n NAME] [-b "W S E N"] [-p TIERS] [-t TILE] [-j JOBS]
-#                             [-c MAP_CREATOR_DIR] [-k]
+# The source is Kartverket "Sjøkart - Dybdedata" for Norway, or LINZ hydrographic data merged into the same layers by
+# depth_bands_merge.py for New Zealand: any OGR source with the layers dybdekurve, dybdepunkt and dybdeareal works.
+#
+#   build_depth_charts.sh -D DATA_DIR [-n NAME] [-b "W S E N"] [-t TILE] [-j JOBS] [-c MAP_CREATOR_DIR] [-k]
+#   build_depth_charts.sh -i FGDB -m LAND -o OUT_DIR [-n NAME] [-b "W S E N"] [-p TIERS] [-t TILE] [-j JOBS]
+#                         [-c MAP_CREATOR_DIR] [-k]
 #
 #   -D DATA_DIR  folder of download_all.sh: the FGDB is DATA_DIR/src/norway/*.gdb, the land
 #                DATA_DIR/mask/land_polygons.gpkg, the output DATA_DIR/build
 #   -n NAME      default Norway_contours
 #   -b BBOX      only this box (lon/lat), default all of the data
-#   -i FGDB      the Dybdedata file geodatabase (or any OGR source with its dybdekurve and dybdepunkt layers). The
+#   -i FGDB      the chart source (Kartverket FGDB or any OGR source with its dybdekurve and dybdepunkt layers). The
 #                map keeps 2 m and every 5 m as its contours and leaves the 1 m steps of a harbour survey out;
 #                env MINOR_ZOOMS="15-" keeps the metre levels down to 10 m as a map section of those zooms
 #   -m LAND      land polygons; soundings on land are dropped, contours are kept as they are

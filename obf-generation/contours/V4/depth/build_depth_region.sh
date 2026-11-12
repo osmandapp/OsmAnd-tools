@@ -81,7 +81,7 @@
 #                                     Britain surveys, the Netherlands and Norway (with FULL_COVERAGE=1 also
 #                                     Europe_full_coverage_contours, all of EMODnet)
 #   Europe_points                     EMODnet DTM 2024, points, 10 degree tiles
-#   Norway_contours                   Kartverket Sjøkart - Dybdedata (vector), see build_depth_kartverket.sh
+#   Norway_contours                   Kartverket Sjøkart - Dybdedata (vector), see build_depth_charts.sh
 #   New-zealand_contours              LINZ chart vector data, 5 scale bands merged by depth_bands_merge.py (the largest
 #                                     scale wins), then as Norway_contours; main islands only (165..180 E)
 #   World_contours                    GEBCO_2026 (15"), contours every 10 m to 300 m, 50 m to 1000 m, then as the
@@ -201,7 +201,7 @@ if [ -n "$DATA" ]; then
 	}
 	case "$NAME" in
 		Norway_contours)
-			exec "$HERE/build_depth_kartverket.sh" -D "$DATA" -n "$NAME" -j "$JOBS" ${MAP_CREATOR:+-c "$MAP_CREATOR"} \
+			exec "$HERE/build_depth_charts.sh" -D "$DATA" -n "$NAME" -j "$JOBS" ${MAP_CREATOR:+-c "$MAP_CREATOR"} \
 				$([ $KEEP -eq 1 ] && echo -k) ;;
 		New-zealand_contours)
 			# LINZ chart vector data: the scale bands merged (the largest scale wins), then built as Norway
@@ -213,7 +213,7 @@ if [ -n "$DATA" ]; then
 			mkdir -p "$OUT"
 			python3 "$HERE/depth_bands_merge.py" "$DATA/src/nz/linz_hydro.gpkg" "$OUT/$NAME.bands.gpkg" \
 				--bbox ${BBOX:-165 -48 180 -33.5} 2>&1 | grep -v numpy
-			"$HERE/build_depth_kartverket.sh" -n "$NAME" -i "$OUT/$NAME.bands.gpkg" -m "$DATA/mask/land_polygons.gpkg" \
+			"$HERE/build_depth_charts.sh" -n "$NAME" -i "$OUT/$NAME.bands.gpkg" -m "$DATA/mask/land_polygons.gpkg" \
 				-o "$OUT" -j "$JOBS" ${MAP_CREATOR:+-c "$MAP_CREATOR"}
 			# the merged bands (about 0.3 GB) are only an intermediate
 			rm -f "$OUT/$NAME.bands.gpkg"; exit 0 ;;

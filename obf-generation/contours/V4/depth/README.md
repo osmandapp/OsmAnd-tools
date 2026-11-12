@@ -81,8 +81,9 @@ Regions (bounds of the published OBFs, grid, levels, point tiers, tile size) are
 `Gulf_of_Mexico_north-west_contours` (NOAA CUDEM 1/3" near the coast over GEBCO_2026; `-i` takes several grids,
 comma-separated, a later one wins where it has data).
 
-`Norway_contours` is built from vectors, not a grid: `build_depth_kartverket.sh` (also called for that region name)
-takes the charted contours (`dybdekurve`) of Kartverket "Sjøkart - Dybdedata" as they are and thins its soundings
+`Norway_contours` and `New-zealand_contours` are built from vectors, not a grid: `build_depth_charts.sh` (also called
+for `Norway_contours`) takes the charted contours (`dybdekurve`) of Kartverket "Sjøkart - Dybdedata", or of LINZ
+hydrographic data merged into the same layers by `depth_bands_merge.py`, as they are and thins its soundings
 (`dybdepunkt`) per zoom tier, keeping the shallowest one of every cell. `Europe_contours` and `Europe_points` leave
 the Kartverket coverage (`datakvalitet`, `-x`/`-X`) out, so the fjords do not get two sets of lines.
 
