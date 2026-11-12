@@ -29,6 +29,10 @@ public class TransportTags {
 		}
 	}
 
+	public void addTagValue(long routeId, String tag, String value) {
+		tags.computeIfAbsent(routeId, k -> new ArrayList<>()).add(new TransportTagValue(tag, value));
+	}
+
 	public void registerTagValues(Relation rel, long routeId) {
 		Map<String, String> relTags = rel.getTags();
 		registerTagValues(routeId, relTags);
