@@ -307,7 +307,7 @@ public class DownloadOsmGPX {
 		utility.commitAllStatements();
 	}
 
-	private void ensureActivitySchema() throws SQLException {
+	static void ensureActivitySchema(Connection dbConn) throws SQLException {
 		try (Statement statement = dbConn.createStatement()) {
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS activity text");
 
@@ -330,6 +330,8 @@ public class DownloadOsmGPX {
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS manual_review jsonb");
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_reviewed ON " + GPX_METADATA_TABLE_NAME
 					+ " (id) WHERE manual_review IS NOT NULL");
+			statement.executeUpdate("DROP INDEX CONCURRENTLY IF EXISTS osm_gpx_data_manual_review_id");
+			statement.executeUpdate("DROP INDEX CONCURRENTLY IF EXISTS osm_gpx_data_reviewed_idx");
 			// ids of the tracks parse_tracks still has to parse: a restarted run starts at once instead of reading
 			// the parsed rows; built once per TRACK_STATS_VERSION, a parsed track leaves it
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_parse_v" + TRACK_STATS_VERSION
@@ -352,6 +354,7 @@ public class DownloadOsmGPX {
 					+ " GENERATED ALWAYS AS (ST_MakeEnvelope(minlon, minlat, maxlon, maxlat, " + SRID_WGS84 + ")) STORED");
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_bbox_geom ON " + GPX_METADATA_TABLE_NAME
 					+ " USING GIST (bbox)");
+			statement.executeUpdate("DROP INDEX CONCURRENTLY IF EXISTS idx_osm_gpx_bbox_gist");
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_date ON " + GPX_METADATA_TABLE_NAME + " (date)");
 			statement.executeUpdate("DROP INDEX IF EXISTS idx_osm_gpx_year");
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_ranges_optimized ON " + GPX_METADATA_TABLE_NAME
@@ -468,7 +471,7 @@ public class DownloadOsmGPX {
 
 	protected void parseTracks(String rootPath, TrackSelection selection, JobOptions options)
 			throws SQLException, InterruptedException {
-		ensureActivitySchema();
+		ensureActivitySchema(dbConn);
 		Map<String, List<String>> activitiesMap = createActivitiesMap(rootPath);
 		if (activitiesMap.isEmpty()) {
 			LOG.info("Activities map is empty. Skipping.");
@@ -574,7 +577,7 @@ public class DownloadOsmGPX {
 	}
 
 	protected void classifyTracks(String rootPath, JobOptions options) throws SQLException {
-		ensureActivitySchema();
+		ensureActivitySchema(dbConn);
 		Map<String, List<String>> activitiesMap = createActivitiesMap(rootPath);
 		if (activitiesMap.isEmpty()) {
 			LOG.info("Activities map is empty. Skipping.");
@@ -1748,27 +1751,30 @@ public class DownloadOsmGPX {
 		}
 	}
 
-	private void initDBConnection() throws SQLException {
-		if (dbConn == null) {
-			dbConn = DriverManager.getConnection(System.getenv("DB_CONN"),
-					isEmpty(System.getenv("DB_USER")) ? "test" : System.getenv("DB_USER"),
-					isEmpty(System.getenv("DB_PWD")) ? "test" : System.getenv("DB_PWD"));
-//			executeSQL("DROP TABLE " + TABLE_NAME);
-			ResultSet rs = dbConn.getMetaData().getTables(null, null, GPX_METADATA_TABLE_NAME, null);
-			if (!rs.next()) {
-				executeSQL("CREATE TABLE " + GPX_FILES_TABLE_NAME + " (id bigint primary key, data bytea)");
-				executeSQL("CREATE TABLE " + GPX_METADATA_TABLE_NAME
-						+ "(id bigint primary key, \"user\" text, \"date\" timestamp, name text, lat float, lon float, "
-						+ " minlat float, minlon float, maxlat float, maxlon float, "
-						+ "pending boolean, tags text[], description text, visibility text)");
+	static Connection openDatabase() throws SQLException {
+		Connection connection = DriverManager.getConnection(System.getenv("DB_CONN"),
+				isEmpty(System.getenv("DB_USER")) ? "test" : System.getenv("DB_USER"),
+				isEmpty(System.getenv("DB_PWD")) ? "test" : System.getenv("DB_PWD"));
+		try (ResultSet tables = connection.getMetaData().getTables(null, null, GPX_METADATA_TABLE_NAME, null);
+			 Statement statement = connection.createStatement()) {
+			if (!tables.next()) {
+				statement.execute("CREATE TABLE IF NOT EXISTS " + GPX_FILES_TABLE_NAME + " (id bigint PRIMARY KEY, data bytea)");
+				statement.execute("CREATE TABLE " + GPX_METADATA_TABLE_NAME + " (id bigint PRIMARY KEY, \"user\" text, \"date\" timestamp,"
+						+ " name text, lat float, lon float, minlat float, minlon float, maxlat float, maxlon float,"
+						+ " pending boolean, tags text[], description text, visibility text)");
+				ensureActivitySchema(connection);
 			}
+		} catch (SQLException e) {
+			connection.close();
+			throw e;
 		}
+		return connection;
 	}
 
-	private void executeSQL(String sql) throws SQLException {
-		Statement statement = dbConn.createStatement();
-		statement.execute(sql);
-		statement.close();
+	private void initDBConnection() throws SQLException {
+		if (dbConn == null) {
+			dbConn = openDatabase();
+		}
 	}
 
 	private Object executeSQLQuery(String sql) throws SQLException {
