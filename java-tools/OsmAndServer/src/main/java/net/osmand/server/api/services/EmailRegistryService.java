@@ -73,8 +73,10 @@ public class EmailRegistryService {
 		re.category = category;
 		re.categoryId = categoryId;
 		jdbcTemplate.query("select count(distinct A." + mailCol + "), U.channel from " + table + " A "
-				+ " left join email_unsubscribed U on A." + mailCol + " = U.email " + " where A." + mailCol
-				+ " not in (select email from email_blocked ) group by U.channel", new RowCallbackHandler() {
+				+ " left join email_unsubscribed U on A." + mailCol + " = U.email"
+				+ " where A." + mailCol + " is not null"
+				+ " and not exists (select 1 from email_blocked B where B.email = A." + mailCol + ")"
+				+ " group by U.channel", new RowCallbackHandler() {
 
 					@Override
 					public void processRow(ResultSet rs) throws SQLException {
