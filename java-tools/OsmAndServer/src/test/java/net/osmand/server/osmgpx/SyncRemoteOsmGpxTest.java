@@ -19,7 +19,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.SingleConnectionDataSource;
-import org.springframework.web.server.ResponseStatusException;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
@@ -139,16 +138,21 @@ public class SyncRemoteOsmGpxTest {
 	}
 
 	@Test
-	public void doesNotSkipAnUnfinishedSourcePair() throws Exception {
+	public void skipsMissingFilesAndLimitsJoinedRows() throws Exception {
 		saveBatch(source, new Track[] {track(ID), track(ID + 1), new Track(track(ID + 2).metadata(), null)}, -1);
 		execute(source, "DELETE FROM osm_gpx_files WHERE id = " + (ID + 1));
-		assertEquals(1, controller.batch("secret", -1, 100).size());
-		assertEquals(503, assertThrows(ResponseStatusException.class, () -> controller.batch("secret", ID, 100)).getStatusCode().value());
-		execute(source, "INSERT INTO osm_gpx_files VALUES (" + (ID + 1) + ", NULL)");
-		List<Track> batch = controller.batch("secret", ID, 100);
+		List<Track> batch = controller.batch("secret", -1, 2);
 		assertEquals(2, batch.size());
-		assertEquals(ID + 1, batch.get(0).metadata().get("id").longValue());
-		assertNull(batch.get(0).gpx());
+		assertEquals(ID, batch.get(0).metadata().get("id").longValue());
+		assertEquals(ID + 2, batch.get(1).metadata().get("id").longValue());
+		assertNull(batch.get(1).gpx());
+		assertEquals(ID + 2, saveBatch(target, batch.toArray(Track[]::new), -1));
+		assertEquals(2, count(target, "osm_gpx_data"));
+		assertEquals(2, count(target, "osm_gpx_files"));
+		List<Track> next = controller.batch("secret", ID, 1);
+		assertEquals(1, next.size());
+		assertEquals(ID + 2, next.get(0).metadata().get("id").longValue());
+		assertTrue(controller.batch("secret", ID + 2, 1).isEmpty());
 	}
 
 	@Test

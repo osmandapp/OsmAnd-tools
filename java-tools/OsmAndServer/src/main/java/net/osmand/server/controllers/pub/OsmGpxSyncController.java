@@ -68,19 +68,12 @@ public class OsmGpxSyncController {
 			throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "OsmGpx datasource is not initialized");
 		}
 		String metadataColumnsSql = jdbcTemplate.execute(SyncRemoteOsmGpx::getMetadataColumns).sql();
-		return jdbcTemplate.query("SELECT row_to_json(m)::text AS metadata, f.id AS file_id, f.data FROM"
+		return jdbcTemplate.query("SELECT row_to_json(m)::text AS metadata, f.data FROM"
 				+ " (SELECT " + metadataColumnsSql + " FROM " + GPX_METADATA_TABLE_NAME
-				+ " WHERE id > ? ORDER BY id LIMIT ?) m"
-				+ " LEFT JOIN " + GPX_FILES_TABLE_NAME + " f ON f.id = m.id ORDER BY m.id", (ResultSetExtractor<List<Track>>) rs -> {
+				+ " WHERE id > ?) m"
+				+ " INNER JOIN " + GPX_FILES_TABLE_NAME + " f ON f.id = m.id ORDER BY m.id LIMIT ?", (ResultSetExtractor<List<Track>>) rs -> {
 			List<Track> tracks = new ArrayList<>();
 			while (rs.next()) {
-				// Download writes metadata and files separately. Never advance past an unfinished pair.
-				if (rs.getObject("file_id") == null) {
-					if (tracks.isEmpty()) {
-						throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Next GPX file is not available yet");
-					}
-					break;
-				}
 				try {
 					tracks.add(new Track(json.readTree(rs.getString("metadata")), rs.getBytes("data")));
 				} catch (IOException e) {
