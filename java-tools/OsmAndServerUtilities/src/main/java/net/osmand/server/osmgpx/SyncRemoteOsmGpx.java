@@ -117,7 +117,6 @@ public class SyncRemoteOsmGpx {
 
 	static long saveBatch(Connection connection, MetadataColumns metadataColumns, Track[] tracks, long afterId) throws SQLException {
 		connection.setAutoCommit(false);
-		boolean committed = false;
 		try (PreparedStatement metadata = connection.prepareStatement("INSERT INTO " + GPX_METADATA_TABLE_NAME + " (" + metadataColumns.sql() + ")"
 				+ " SELECT " + metadataColumns.sql() + " FROM json_populate_record(NULL::" + GPX_METADATA_TABLE_NAME + ", ?::json)"
 				+ " ON CONFLICT (id) DO NOTHING");
@@ -144,13 +143,16 @@ public class SyncRemoteOsmGpx {
 			metadata.executeBatch();
 			files.executeBatch();
 			connection.commit();
-			committed = true;
-			return afterId;
-		} finally {
-			if (!committed) {
+		} catch (SQLException | RuntimeException | Error error) {
+			try {
 				connection.rollback();
+				connection.setAutoCommit(true);
+			} catch (SQLException | RuntimeException | Error cleanupError) {
+				error.addSuppressed(cleanupError);
 			}
-			connection.setAutoCommit(true);
+			throw error;
 		}
+		connection.setAutoCommit(true);
+		return afterId;
 	}
 }

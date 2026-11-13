@@ -194,10 +194,38 @@ public class SyncRemoteOsmGpxTest {
 	public void failedRollbackDoesNotEnableAutocommit() throws Exception {
 		execute(target, "ALTER TABLE osm_gpx_files ADD CONSTRAINT reject_file CHECK (id <> " + ID + ")");
 		Connection failing = mock(Connection.class, delegatesTo(target));
-		SQLException error = new SQLException("Simulated rollback failure");
-		doThrow(error).when(failing).rollback();
-		assertSame(error, assertThrows(SQLException.class, () -> saveBatch(failing, new Track[] {track(ID)}, -1)));
+		SQLException rollbackError = new SQLException("Simulated rollback failure");
+		doThrow(rollbackError).when(failing).rollback();
+		SQLException error = assertThrows(SQLException.class, () -> saveBatch(failing, new Track[] {track(ID)}, -1));
+		assertEquals("23514", error.getSQLState()); // Original CHECK constraint violation.
+		assertArrayEquals(new Throwable[] {rollbackError}, error.getSuppressed());
 		verify(failing, never()).setAutoCommit(true);
+		assertFalse(target.getAutoCommit());
+	}
+
+	@Test
+	public void failedRollbackPreservesOutOfMemoryError() throws Exception {
+		Connection failing = mock(Connection.class, delegatesTo(target));
+		OutOfMemoryError error = new OutOfMemoryError("Simulated OOM preparing metadata insert");
+		SQLException rollbackError = new SQLException("Simulated rollback failure");
+		doThrow(error).when(failing).prepareStatement(startsWith("INSERT INTO osm_gpx_data"));
+		doThrow(rollbackError).when(failing).rollback();
+		assertSame(error, assertThrows(OutOfMemoryError.class, () -> saveBatch(failing, new Track[] {track(ID)}, -1)));
+		assertArrayEquals(new Throwable[] {rollbackError}, error.getSuppressed());
+		verify(failing, never()).setAutoCommit(true);
+		assertFalse(target.getAutoCommit());
+	}
+
+	@Test
+	public void failedAutocommitRestorePreservesOriginalError() throws Exception {
+		Connection failing = mock(Connection.class, delegatesTo(target));
+		SQLException error = new SQLException("Simulated metadata insert failure");
+		SQLException restoreError = new SQLException("Simulated autocommit restore failure");
+		doThrow(error).when(failing).prepareStatement(startsWith("INSERT INTO osm_gpx_data"));
+		doThrow(restoreError).when(failing).setAutoCommit(true);
+		assertSame(error, assertThrows(SQLException.class, () -> saveBatch(failing, new Track[] {track(ID)}, -1)));
+		assertArrayEquals(new Throwable[] {restoreError}, error.getSuppressed());
+		verify(failing).rollback();
 		assertFalse(target.getAutoCommit());
 	}
 
