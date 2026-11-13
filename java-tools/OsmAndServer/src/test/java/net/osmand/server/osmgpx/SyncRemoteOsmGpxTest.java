@@ -74,17 +74,17 @@ public class SyncRemoteOsmGpxTest {
 	@Test
 	public void copiesAllStoredMetadataAndExcludesGeneratedColumns() throws Exception {
 		Track original = track(ID);
-		saveBatch(source, new Track[] {original}, -1);
+		saveBatch(source, new Track[] {original}, 0);
 		execute(source, "UPDATE osm_gpx_data SET activity = 'cycling', speed = 12.5, distance = 1234.5, points = 100,"
 				+ " max_speed = 20, max_dist_between_points = 30, time_minutes = 10, waypoints = 2,"
 				+ " simplified_geometry = decode('00ff01', 'hex'), speed_matches_activity = true, file_activity = 'cycling',"
 				+ " activity_source = 'file', track_stats = '{\"v\":1}', manual_review = '{\"admin\":{}}'");
-		List<Track> batch = readBatch(-1, 100);
+		List<Track> batch = readBatch(0, 100);
 		assertEquals(1, batch.size());
 		assertEquals("cycling", batch.get(0).metadata().get("activity").textValue());
 		assertTrue(batch.get(0).metadata().has("manual_review"));
 		assertFalse(batch.get(0).metadata().has("bbox"));
-		assertEquals(ID, saveBatch(target, JSON.readValue(JSON.writeValueAsBytes(batch), Track[].class), -1));
+		assertEquals(ID, saveBatch(target, JSON.readValue(JSON.writeValueAsBytes(batch), Track[].class), 0));
 		try (Statement statement = target.createStatement(); ResultSet rs = statement.executeQuery(
 				"SELECT m.*, f.data FROM osm_gpx_data m JOIN osm_gpx_files f USING (id)")) {
 			assertTrue(rs.next());
@@ -103,21 +103,21 @@ public class SyncRemoteOsmGpxTest {
 			assertTrue(rs.next());
 			assertEquals(batch.get(0).metadata(), JSON.readTree(rs.getString(1)));
 		}
-		assertTrue(controller.batch("secret", ID, 100).isEmpty());
+		assertTrue(controller.batch("secret", ID + 1, 100, 0).isEmpty());
 	}
 
 	@Test
 	public void refreshesColumnsBetweenRequestsAndQuotesTheirNames() throws Exception {
-		saveBatch(source, new Track[] {track(ID)}, -1);
-		assertEquals(1, controller.batch("secret", -1, 100).size());
+		saveBatch(source, new Track[] {track(ID)}, 0);
+		assertEquals(1, controller.batch("secret", 0, 100, 0).size());
 		for (Connection connection : new Connection[] {source, target}) {
 			execute(connection, "ALTER TABLE osm_gpx_data ADD COLUMN \"future field\" text, ADD COLUMN obsolete text");
 			execute(connection, "ALTER TABLE osm_gpx_data DROP COLUMN obsolete");
 		}
 		execute(source, "UPDATE osm_gpx_data SET \"future field\" = 'new metadata'");
-		List<Track> batch = readBatch(-1, 100);
+		List<Track> batch = readBatch(0, 100);
 		assertEquals("new metadata", batch.get(0).metadata().get("future field").textValue());
-		saveBatch(target, batch.toArray(Track[]::new), -1);
+		saveBatch(target, batch.toArray(Track[]::new), 0);
 		try (Statement statement = target.createStatement();
 			 ResultSet rs = statement.executeQuery("SELECT \"future field\" FROM osm_gpx_data")) {
 			assertTrue(rs.next());
@@ -128,10 +128,10 @@ public class SyncRemoteOsmGpxTest {
 	@Test
 	public void rejectsSourceColumnsMissingOnTheTargetWithoutLosingData() throws Exception {
 		execute(source, "ALTER TABLE osm_gpx_data ADD COLUMN source_only text");
-		saveBatch(source, new Track[] {track(ID)}, -1);
+		saveBatch(source, new Track[] {track(ID)}, 0);
 		execute(source, "UPDATE osm_gpx_data SET source_only = 'must not be lost'");
-		Track[] tracks = readBatch(-1, 100).toArray(Track[]::new);
-		assertThrows(IllegalArgumentException.class, () -> saveBatch(target, tracks, -1));
+		Track[] tracks = readBatch(0, 100).toArray(Track[]::new);
+		assertThrows(IllegalArgumentException.class, () -> saveBatch(target, tracks, 0));
 		assertEquals(0, count(target, "osm_gpx_data"));
 		assertEquals(0, count(target, "osm_gpx_files"));
 		assertTrue(target.getAutoCommit());
@@ -139,31 +139,31 @@ public class SyncRemoteOsmGpxTest {
 
 	@Test
 	public void skipsMissingFilesAndLimitsJoinedRows() throws Exception {
-		saveBatch(source, new Track[] {track(ID), track(ID + 1), new Track(track(ID + 2).metadata(), null)}, -1);
+		saveBatch(source, new Track[] {track(ID), track(ID + 1), new Track(track(ID + 2).metadata(), null)}, 0);
 		execute(source, "DELETE FROM osm_gpx_files WHERE id = " + (ID + 1));
-		List<Track> batch = readBatch(-1, 2);
+		List<Track> batch = readBatch(0, 2);
 		assertEquals(2, batch.size());
 		assertEquals(ID, batch.get(0).metadata().get("id").longValue());
 		assertEquals(ID + 2, batch.get(1).metadata().get("id").longValue());
 		assertNull(batch.get(1).gpx());
-		assertEquals(ID + 2, saveBatch(target, batch.toArray(Track[]::new), -1));
+		assertEquals(ID + 2, saveBatch(target, batch.toArray(Track[]::new), 0));
 		assertEquals(2, count(target, "osm_gpx_data"));
 		assertEquals(2, count(target, "osm_gpx_files"));
-		List<Track> next = readBatch(ID, 1);
+		List<Track> next = readBatch(ID + 1, 1);
 		assertEquals(1, next.size());
 		assertEquals(ID + 2, next.get(0).metadata().get("id").longValue());
-		assertTrue(controller.batch("secret", ID + 2, 1).isEmpty());
+		assertTrue(controller.batch("secret", ID + 3, 1, 0).isEmpty());
 	}
 
 	@Test
 	public void failedFileInsertRollsBackMetadataAndAllowsRetry() throws Exception {
 		execute(target, "ALTER TABLE osm_gpx_files ADD CONSTRAINT reject_file CHECK (id <> " + ID + ")");
-		assertThrows(SQLException.class, () -> saveBatch(target, new Track[] {track(ID)}, -1));
+		assertThrows(SQLException.class, () -> saveBatch(target, new Track[] {track(ID)}, 0));
 		assertEquals(0, count(target, "osm_gpx_data"));
 		assertEquals(0, count(target, "osm_gpx_files"));
 		assertTrue(target.getAutoCommit());
 		execute(target, "ALTER TABLE osm_gpx_files DROP CONSTRAINT reject_file");
-		saveBatch(target, new Track[] {track(ID)}, -1);
+		saveBatch(target, new Track[] {track(ID)}, 0);
 		assertEquals(1, count(target, "osm_gpx_files"));
 	}
 
@@ -181,11 +181,11 @@ public class SyncRemoteOsmGpxTest {
 			return batch;
 		}).when(failing).prepareStatement(startsWith("INSERT INTO osm_gpx_data"));
 		Track[] tracks = {track(ID), track(ID + 1)};
-		assertSame(error, assertThrows(OutOfMemoryError.class, () -> saveBatch(failing, tracks, -1)));
+		assertSame(error, assertThrows(OutOfMemoryError.class, () -> saveBatch(failing, tracks, 0)));
 		assertEquals(0, count(target, "osm_gpx_data"));
 		assertEquals(0, count(target, "osm_gpx_files"));
 		assertTrue(target.getAutoCommit());
-		assertEquals(ID + 1, saveBatch(target, tracks, -1));
+		assertEquals(ID + 1, saveBatch(target, tracks, 0));
 		assertEquals(2, count(target, "osm_gpx_data"));
 		assertEquals(2, count(target, "osm_gpx_files"));
 	}
@@ -196,7 +196,7 @@ public class SyncRemoteOsmGpxTest {
 		Connection failing = mock(Connection.class, delegatesTo(target));
 		SQLException rollbackError = new SQLException("Simulated rollback failure");
 		doThrow(rollbackError).when(failing).rollback();
-		SQLException error = assertThrows(SQLException.class, () -> saveBatch(failing, new Track[] {track(ID)}, -1));
+		SQLException error = assertThrows(SQLException.class, () -> saveBatch(failing, new Track[] {track(ID)}, 0));
 		assertEquals("23514", error.getSQLState()); // Original CHECK constraint violation.
 		assertArrayEquals(new Throwable[] {rollbackError}, error.getSuppressed());
 		verify(failing, never()).setAutoCommit(true);
@@ -210,7 +210,7 @@ public class SyncRemoteOsmGpxTest {
 		SQLException rollbackError = new SQLException("Simulated rollback failure");
 		doThrow(error).when(failing).prepareStatement(startsWith("INSERT INTO osm_gpx_data"));
 		doThrow(rollbackError).when(failing).rollback();
-		assertSame(error, assertThrows(OutOfMemoryError.class, () -> saveBatch(failing, new Track[] {track(ID)}, -1)));
+		assertSame(error, assertThrows(OutOfMemoryError.class, () -> saveBatch(failing, new Track[] {track(ID)}, 0)));
 		assertArrayEquals(new Throwable[] {rollbackError}, error.getSuppressed());
 		verify(failing, never()).setAutoCommit(true);
 		assertFalse(target.getAutoCommit());
@@ -223,7 +223,7 @@ public class SyncRemoteOsmGpxTest {
 		SQLException restoreError = new SQLException("Simulated autocommit restore failure");
 		doThrow(error).when(failing).prepareStatement(startsWith("INSERT INTO osm_gpx_data"));
 		doThrow(restoreError).when(failing).setAutoCommit(true);
-		assertSame(error, assertThrows(SQLException.class, () -> saveBatch(failing, new Track[] {track(ID)}, -1)));
+		assertSame(error, assertThrows(SQLException.class, () -> saveBatch(failing, new Track[] {track(ID)}, 0)));
 		assertArrayEquals(new Throwable[] {restoreError}, error.getSuppressed());
 		verify(failing).rollback();
 		assertFalse(target.getAutoCommit());
@@ -231,7 +231,7 @@ public class SyncRemoteOsmGpxTest {
 
 	@Test
 	public void exportsGeometryLargerThanDefaultJsonStringLimit() throws Exception {
-		saveBatch(source, new Track[] {track(ID)}, -1);
+		saveBatch(source, new Track[] {track(ID)}, 0);
 		// Hex in JSON exceeds Jackson 2.15's default 5,000,000-character string limit.
 		byte[] geometry = new byte[3_000_000];
 		Arrays.fill(geometry, (byte) 0xab);
@@ -240,7 +240,7 @@ public class SyncRemoteOsmGpxTest {
 			update.setLong(2, ID);
 			update.executeUpdate();
 		}
-		String response = JSON.writeValueAsString(controller.batch("secret", -1, 1));
+		String response = JSON.writeValueAsString(controller.batch("secret", 0, 1, 0));
 		try (Statement statement = source.createStatement();
 			 ResultSet rs = statement.executeQuery("SELECT row_to_json(m)::text FROM (SELECT "
 					 + SyncRemoteOsmGpx.getMetadataColumns(source).sql() + " FROM osm_gpx_data) m")) {
@@ -252,38 +252,21 @@ public class SyncRemoteOsmGpxTest {
 
 	@Test
 	public void resumesAfterHttpFailureAndBatchLimitAndPreservesLocalChanges() throws Exception {
-		saveBatch(source, new Track[] {track(ID), track(ID + 1), track(ID + 2)}, -1);
+		saveBatch(source, new Track[] {track(ID), track(ID + 1), track(ID + 2)}, 0);
 		AtomicBoolean fail = new AtomicBoolean(true);
 		AtomicInteger requests = new AtomicInteger();
-		server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-		server.createContext(SyncRemoteOsmGpx.API_PATH, exchange -> {
-			requests.incrementAndGet();
-			String[] params = exchange.getRequestURI().getQuery().split("&");
-			long after = Long.parseLong(params[0].split("=")[1]);
-			int limit = Integer.parseInt(params[1].split("=")[1]);
-			try (exchange) {
-				if (after == ID && fail.getAndSet(false)) {
-					exchange.sendResponseHeaders(503, -1);
-					return;
-				}
-				byte[] body = JSON.writeValueAsBytes(controller.batch(exchange.getRequestHeaders().getFirst(SyncRemoteOsmGpx.API_KEY_HEADER), after, limit));
-				exchange.sendResponseHeaders(200, body.length);
-				exchange.getResponseBody().write(body);
-			}
-		});
-		server.start();
-		String url = "http://127.0.0.1:" + server.getAddress().getPort() + SyncRemoteOsmGpx.API_PATH;
+		String url = startServer(fail, requests);
 		HttpClient client = HttpClient.newHttpClient();
-		assertThrows(IOException.class, () -> SyncRemoteOsmGpx.downloadAndInsertBatches(target, client, url, "secret", 1, 0));
+		assertThrows(IOException.class, () -> SyncRemoteOsmGpx.downloadAndInsertBatches(target, client, url, "secret", 1, 0, 0, 0));
 		assertEquals(1, count(target, "osm_gpx_data"));
 		execute(target, "UPDATE osm_gpx_data SET activity = 'walking', name = 'local'");
-		SyncRemoteOsmGpx.downloadAndInsertBatches(target, client, url, "secret", 1, 1);
+		SyncRemoteOsmGpx.downloadAndInsertBatches(target, client, url, "secret", 1, 1, 0, 0);
 		assertEquals(2, count(target, "osm_gpx_data"));
 		assertEquals(2, count(target, "osm_gpx_files"));
 		assertEquals(3, requests.get()); // No extra request after reaching the batch limit.
-		SyncRemoteOsmGpx.downloadAndInsertBatches(target, client, url, "secret", 1, 0);
+		SyncRemoteOsmGpx.downloadAndInsertBatches(target, client, url, "secret", 1, 0, 0, 0);
 		assertEquals(3, count(target, "osm_gpx_data"));
-		saveBatch(target, new Track[] {track(ID)}, -1);
+		saveBatch(target, new Track[] {track(ID)}, 0);
 		try (Statement statement = target.createStatement();
 			 ResultSet rs = statement.executeQuery("SELECT name, activity FROM osm_gpx_data WHERE id = " + ID)) {
 			assertTrue(rs.next());
@@ -292,12 +275,165 @@ public class SyncRemoteOsmGpxTest {
 		}
 	}
 
-	private static long saveBatch(Connection connection, Track[] tracks, long afterId) throws SQLException {
-		return SyncRemoteOsmGpx.saveBatch(connection, SyncRemoteOsmGpx.getMetadataColumns(connection), tracks, afterId);
+	@Test
+	public void startsWithZeroAndAdvancesToTheNextId() throws Exception {
+		saveBatch(source, new Track[] {track(0), track(1)}, 0);
+		String url = startServer(new AtomicBoolean(false), new AtomicInteger());
+		SyncRemoteOsmGpx.downloadAndInsertBatches(target, HttpClient.newHttpClient(), url, "secret", 1, 0, 0, 0);
+		assertEquals(2, count(target, "osm_gpx_data"));
+		assertEquals(2, count(target, "osm_gpx_files"));
+		assertEquals(0, readBatch(0, 1).get(0).metadata().get("id").longValue());
+		assertEquals(1, readBatch(1, 1).get(0).metadata().get("id").longValue());
+		assertTrue(readBatch(2, 1).isEmpty());
 	}
 
-	private List<Track> readBatch(long afterId, int limit) throws IOException {
-		return Arrays.asList(JSON.readValue(JSON.writeValueAsBytes(controller.batch("secret", afterId, limit)), Track[].class));
+	@Test
+	public void resynchronizesInclusiveRangeAndRepairsMissingRows() throws Exception {
+		for (Connection connection : new Connection[] {source, target}) {
+			execute(connection, "ALTER TABLE osm_gpx_data ADD COLUMN \"future \"\"field\" text");
+		}
+		saveBatch(source, new Track[] {track(ID - 1), track(ID), track(ID + 2), track(ID + 3)}, 0);
+		saveBatch(target, new Track[] {track(ID - 1), track(ID), track(ID + 1), track(ID + 2), track(ID + 3)}, 0);
+		execute(source, "UPDATE osm_gpx_data SET name = 'remote', activity = 'cycling', \"future \"\"field\" = 'remote'");
+		execute(source, "UPDATE osm_gpx_files SET data = decode('010203', 'hex')");
+		execute(target, "UPDATE osm_gpx_data SET name = 'local', activity = 'walking', \"future \"\"field\" = 'local'");
+		execute(target, "DELETE FROM osm_gpx_files WHERE id = " + ID);
+		execute(target, "DELETE FROM osm_gpx_data WHERE id = " + (ID + 2));
+		String url = startServer(new AtomicBoolean(false), new AtomicInteger());
+		SyncRemoteOsmGpx.downloadAndInsertBatches(target, HttpClient.newHttpClient(), url, "secret", 1, 0, ID, ID + 2);
+		assertEquals(5, count(target, "osm_gpx_data"));
+		assertEquals(5, count(target, "osm_gpx_files"));
+		try (Statement statement = target.createStatement(); ResultSet rs = statement.executeQuery(
+				"SELECT m.id, name, activity, bbox, \"future \"\"field\", f.data FROM osm_gpx_data m JOIN osm_gpx_files f USING (id)")) {
+			while (rs.next()) {
+				boolean resynced = rs.getLong("id") == ID || rs.getLong("id") == ID + 2;
+				assertEquals(resynced ? "remote" : "local", rs.getString("name"));
+				assertEquals(resynced ? "cycling" : "walking", rs.getString("activity"));
+				assertEquals(resynced ? "remote:bbox" : "local:bbox", rs.getString("bbox"));
+				assertEquals(resynced ? "remote" : "local", rs.getString("future \"field"));
+				assertArrayEquals(resynced ? new byte[] {1, 2, 3} : track(ID).gpx(), rs.getBytes("data"));
+			}
+		}
+	}
+
+	@Test
+	public void resynchronizesOpenBoundariesAndHonorsBatchLimit() throws Exception {
+		Track[] tracks = {track(ID), track(ID + 1), track(ID + 2)};
+		saveBatch(source, tracks, 0);
+		saveBatch(target, tracks, 0);
+		execute(source, "UPDATE osm_gpx_data SET name = 'remote'");
+		execute(target, "UPDATE osm_gpx_data SET name = 'local'");
+		AtomicInteger requests = new AtomicInteger();
+		String url = startServer(new AtomicBoolean(false), requests);
+		HttpClient client = HttpClient.newHttpClient();
+		SyncRemoteOsmGpx.downloadAndInsertBatches(target, client, url, "secret", 1, 1, 0, ID);
+		assertEquals(1, requests.get());
+		SyncRemoteOsmGpx.downloadAndInsertBatches(target, client, url, "secret", 1, 1, ID + 1, 0);
+		assertEquals(2, requests.get());
+		try (Statement statement = target.createStatement();
+			 ResultSet rs = statement.executeQuery("SELECT name FROM osm_gpx_data ORDER BY id")) {
+			assertTrue(rs.next());
+			assertEquals("remote", rs.getString(1));
+			assertTrue(rs.next());
+			assertEquals("remote", rs.getString(1));
+			assertTrue(rs.next());
+			assertEquals("local", rs.getString(1));
+		}
+		SyncRemoteOsmGpx.downloadAndInsertBatches(target, client, url, "secret", 1, 0, ID + 1, 0);
+		try (Statement statement = target.createStatement();
+			 ResultSet rs = statement.executeQuery("SELECT count(*) FROM osm_gpx_data WHERE name = 'remote'")) {
+			assertTrue(rs.next());
+			assertEquals(3, rs.getInt(1));
+		}
+	}
+
+	@Test
+	public void resynchronizesSingleIdAtBigintLimit() throws Exception {
+		saveBatch(source, new Track[] {track(Long.MAX_VALUE)}, 0);
+		saveBatch(target, new Track[] {track(Long.MAX_VALUE)}, 0);
+		execute(source, "UPDATE osm_gpx_data SET name = 'remote'");
+		AtomicInteger requests = new AtomicInteger();
+		String url = startServer(new AtomicBoolean(false), requests);
+		SyncRemoteOsmGpx.downloadAndInsertBatches(target, HttpClient.newHttpClient(), url, "secret", 100, 0,
+				Long.MAX_VALUE, Long.MAX_VALUE);
+		assertEquals(1, requests.get());
+		SyncRemoteOsmGpx.downloadAndInsertBatches(target, HttpClient.newHttpClient(), url, "secret", 100, 0, 0, 0);
+		assertEquals(1, requests.get());
+		try (Statement statement = target.createStatement(); ResultSet rs = statement.executeQuery("SELECT id, name FROM osm_gpx_data")) {
+			assertTrue(rs.next());
+			assertEquals(Long.MAX_VALUE, rs.getLong(1));
+			assertEquals("remote", rs.getString(2));
+			assertFalse(rs.next());
+		}
+	}
+
+	@Test
+	public void failedResyncRollsBackMetadataUpdates() throws Exception {
+		Track original = track(ID);
+		saveBatch(target, new Track[] {original}, 0);
+		execute(target, "ALTER TABLE osm_gpx_files ADD CONSTRAINT reject_data CHECK (data <> decode('010203', 'hex'))");
+		Track replacement = new Track(JSON.createObjectNode().put("id", ID).put("name", "remote"), new byte[] {1, 2, 3});
+		assertThrows(SQLException.class, () -> SyncRemoteOsmGpx.updateBatch(target, SyncRemoteOsmGpx.getMetadataColumns(target),
+				new Track[] {replacement}, ID));
+		try (Statement statement = target.createStatement(); ResultSet rs = statement.executeQuery(
+				"SELECT name, data FROM osm_gpx_data JOIN osm_gpx_files USING (id)")) {
+			assertTrue(rs.next());
+			assertEquals(original.metadata().get("name").textValue(), rs.getString(1));
+			assertArrayEquals(original.gpx(), rs.getBytes(2));
+		}
+		assertTrue(target.getAutoCommit());
+	}
+
+	@Test
+	public void rejectsTracksOutsideRequestedRange() throws Exception {
+		controller = spy(controller);
+		doReturn(List.of(track(ID), track(ID + 1))).when(controller).batch("secret", ID, 100, ID);
+		String url = startServer(new AtomicBoolean(false), new AtomicInteger());
+		IOException error = assertThrows(IOException.class, () -> SyncRemoteOsmGpx.downloadAndInsertBatches(
+				target, HttpClient.newHttpClient(), url, "secret", 100, 0, ID, ID));
+		assertEquals("OsmGpx batch exceeds requested id range", error.getMessage());
+		assertEquals(0, count(target, "osm_gpx_data"));
+		assertEquals(0, count(target, "osm_gpx_files"));
+		assertTrue(target.getAutoCommit());
+	}
+
+	@Test
+	public void rejectsInvalidIdRangeOptionsBeforeOpeningDatabase() {
+		for (String[] range : new String[][] {{"-1", "0"}, {"0", "-1"}, {"101", "100"}}) {
+			IllegalArgumentException error = assertThrows(IllegalArgumentException.class, () -> SyncRemoteOsmGpx.main(
+					new String[] {"https://builder.osmand.net", "--from-id=" + range[0], "--to-id=" + range[1]}));
+			assertEquals("IDs must be >= 0, with from-id <= to-id when to-id is set", error.getMessage());
+		}
+	}
+
+	private String startServer(AtomicBoolean fail, AtomicInteger requests) throws IOException {
+		server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+		server.createContext(SyncRemoteOsmGpx.API_PATH, exchange -> {
+			requests.incrementAndGet();
+			String[] params = exchange.getRequestURI().getQuery().split("&");
+			long fromId = Long.parseLong(params[0].split("=")[1]);
+			int limit = Integer.parseInt(params[1].split("=")[1]);
+			long toId = Long.parseLong(params[2].split("=")[1]);
+			try (exchange) {
+				if (fromId == ID + 1 && fail.getAndSet(false)) {
+					exchange.sendResponseHeaders(503, 0);
+					return;
+				}
+				byte[] body = JSON.writeValueAsBytes(controller.batch(exchange.getRequestHeaders().getFirst(SyncRemoteOsmGpx.API_KEY_HEADER), fromId, limit, toId));
+				exchange.sendResponseHeaders(200, body.length);
+				exchange.getResponseBody().write(body);
+			}
+		});
+		server.start();
+		return "http://127.0.0.1:" + server.getAddress().getPort() + SyncRemoteOsmGpx.API_PATH;
+	}
+
+	private static long saveBatch(Connection connection, Track[] tracks, long fromId) throws SQLException {
+		return SyncRemoteOsmGpx.insertBatch(connection, SyncRemoteOsmGpx.getMetadataColumns(connection), tracks, fromId);
+	}
+
+	private List<Track> readBatch(long fromId, int limit) throws IOException {
+		return Arrays.asList(JSON.readValue(JSON.writeValueAsBytes(controller.batch("secret", fromId, limit, 0)), Track[].class));
 	}
 
 	private static Track track(long id) throws IOException {

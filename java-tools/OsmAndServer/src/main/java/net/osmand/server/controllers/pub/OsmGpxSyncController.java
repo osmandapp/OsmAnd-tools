@@ -45,13 +45,14 @@ public class OsmGpxSyncController {
 
 	@GetMapping(path = SyncRemoteOsmGpx.API_PATH, produces = MediaType.APPLICATION_JSON_VALUE)
 	public List<Track> batch(@RequestHeader(value = SyncRemoteOsmGpx.API_KEY_HEADER, required = false) String key,
-	                         @RequestParam(name = "afterId", defaultValue = "-1") long afterId,
-	                         @RequestParam(name = "limit", defaultValue = "" + SyncRemoteOsmGpx.DEFAULT_BATCH_SIZE) int limit) {
+	                         @RequestParam(name = "fromId", defaultValue = "0") long fromId,
+	                         @RequestParam(name = "limit", defaultValue = "" + SyncRemoteOsmGpx.DEFAULT_BATCH_SIZE) int limit,
+	                         @RequestParam(name = "toId", defaultValue = "0") long toId) {
 		if (apiKey.isBlank() || key == null || !MessageDigest.isEqual(apiKey.getBytes(StandardCharsets.UTF_8),
 				key.getBytes(StandardCharsets.UTF_8))) {
 			throw new ResponseStatusException(HttpStatus.FORBIDDEN);
 		}
-		if (afterId < -1 || limit < 1 || limit > SyncRemoteOsmGpx.MAX_BATCH_SIZE) {
+		if (fromId < 0 || toId < 0 || limit < 1 || limit > SyncRemoteOsmGpx.MAX_BATCH_SIZE) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid cursor or batch size");
 		}
 		if (!config.osmgpxInitialized()) {
@@ -60,7 +61,7 @@ public class OsmGpxSyncController {
 		String metadataColumnsSql = jdbcTemplate.execute(SyncRemoteOsmGpx::getMetadataColumns).sql();
 		return jdbcTemplate.query("SELECT row_to_json(m)::text AS metadata, f.data FROM"
 				+ " (SELECT " + metadataColumnsSql + " FROM " + GPX_METADATA_TABLE_NAME
-				+ " WHERE id > ?) m"
+				+ " WHERE id >= ? AND id <= ?) m"
 				+ " INNER JOIN " + GPX_FILES_TABLE_NAME + " f ON f.id = m.id ORDER BY m.id LIMIT ?", (ResultSetExtractor<List<Track>>) rs -> {
 			List<Track> tracks = new ArrayList<>();
 			while (rs.next()) {
@@ -68,6 +69,6 @@ public class OsmGpxSyncController {
 						rs.getBytes("data")));
 			}
 			return tracks;
-		}, afterId, limit);
+		}, fromId, toId == 0 ? Long.MAX_VALUE : toId, limit);
 	}
 }
