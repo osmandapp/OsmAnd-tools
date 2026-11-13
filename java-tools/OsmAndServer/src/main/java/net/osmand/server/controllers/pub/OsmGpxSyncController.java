@@ -26,6 +26,9 @@ import net.osmand.server.DatasourceConfiguration;
 import net.osmand.server.osmgpx.SyncRemoteOsmGpx;
 import net.osmand.server.osmgpx.SyncRemoteOsmGpx.Track;
 
+import static net.osmand.server.controllers.pub.OsmGpxController.GPX_FILES_TABLE_NAME;
+import static net.osmand.server.controllers.pub.OsmGpxController.GPX_METADATA_TABLE_NAME;
+
 @RestController
 public class OsmGpxSyncController {
 
@@ -66,8 +69,9 @@ public class OsmGpxSyncController {
 		}
 		String metadataColumnsSql = jdbcTemplate.execute(SyncRemoteOsmGpx::getMetadataColumns).sql();
 		return jdbcTemplate.query("SELECT row_to_json(m)::text AS metadata, f.id AS file_id, f.data FROM"
-				+ " (SELECT " + metadataColumnsSql + " FROM osm_gpx_data WHERE id > ? ORDER BY id LIMIT ?) m"
-				+ " LEFT JOIN osm_gpx_files f ON f.id = m.id ORDER BY m.id", (ResultSetExtractor<List<Track>>) rs -> {
+				+ " (SELECT " + metadataColumnsSql + " FROM " + GPX_METADATA_TABLE_NAME
+				+ " WHERE id > ? ORDER BY id LIMIT ?) m"
+				+ " LEFT JOIN " + GPX_FILES_TABLE_NAME + " f ON f.id = m.id ORDER BY m.id", (ResultSetExtractor<List<Track>>) rs -> {
 			List<Track> tracks = new ArrayList<>();
 			while (rs.next()) {
 				// Download writes metadata and files separately. Never advance past an unfinished pair.

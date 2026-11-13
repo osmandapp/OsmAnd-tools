@@ -82,8 +82,8 @@ public class OsmGpxController {
 	private static final int MAX_TAGS_PER_BBOX = 1000;
 	private final AtomicInteger cacheTouch = new AtomicInteger(0);
 
-	private static final String GPX_METADATA_TABLE_NAME = "osm_gpx_data";
-	private static final String GPX_FILES_TABLE_NAME = "osm_gpx_files";
+	static final String GPX_METADATA_TABLE_NAME = "osm_gpx_data";
+	static final String GPX_FILES_TABLE_NAME = "osm_gpx_files";
 	private static final String ROUTE_COLUMNS = "m.id, m.name, m.description, m.user, m.date, m.activity, m.lat, m.lon, " +
 			"m.speed, m.distance, m.points, m.max_speed, m.max_dist_between_points, m.time_minutes, m.waypoints, m.tags";
 	private static final int SRID_WGS84 = 4326;
