@@ -330,8 +330,6 @@ public class DownloadOsmGPX {
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS manual_review jsonb");
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_reviewed ON " + GPX_METADATA_TABLE_NAME
 					+ " (id) WHERE manual_review IS NOT NULL");
-			statement.executeUpdate("DROP INDEX CONCURRENTLY IF EXISTS osm_gpx_data_manual_review_id");
-			statement.executeUpdate("DROP INDEX CONCURRENTLY IF EXISTS osm_gpx_data_reviewed_idx");
 			// ids of the tracks parse_tracks still has to parse: a restarted run starts at once instead of reading
 			// the parsed rows; built once per TRACK_STATS_VERSION, a parsed track leaves it
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_parse_v" + TRACK_STATS_VERSION
@@ -354,7 +352,6 @@ public class DownloadOsmGPX {
 					+ " GENERATED ALWAYS AS (ST_MakeEnvelope(minlon, minlat, maxlon, maxlat, " + SRID_WGS84 + ")) STORED");
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_bbox_geom ON " + GPX_METADATA_TABLE_NAME
 					+ " USING GIST (bbox)");
-			statement.executeUpdate("DROP INDEX CONCURRENTLY IF EXISTS idx_osm_gpx_bbox_gist");
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_date ON " + GPX_METADATA_TABLE_NAME + " (date)");
 			statement.executeUpdate("DROP INDEX IF EXISTS idx_osm_gpx_year");
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_ranges_optimized ON " + GPX_METADATA_TABLE_NAME
