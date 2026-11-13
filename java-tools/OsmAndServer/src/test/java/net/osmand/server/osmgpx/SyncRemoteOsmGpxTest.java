@@ -79,7 +79,7 @@ public class SyncRemoteOsmGpxTest {
 				+ " max_speed = 20, max_dist_between_points = 30, time_minutes = 10, waypoints = 2,"
 				+ " simplified_geometry = decode('00ff01', 'hex'), speed_matches_activity = true, file_activity = 'cycling',"
 				+ " activity_source = 'file', track_stats = '{\"v\":1}', manual_review = '{\"admin\":{}}'");
-		List<Track> batch = controller.batch("secret", -1, 100);
+		List<Track> batch = readBatch(-1, 100);
 		assertEquals(1, batch.size());
 		assertEquals("cycling", batch.get(0).metadata().get("activity").textValue());
 		assertTrue(batch.get(0).metadata().has("manual_review"));
@@ -115,7 +115,7 @@ public class SyncRemoteOsmGpxTest {
 			execute(connection, "ALTER TABLE osm_gpx_data DROP COLUMN obsolete");
 		}
 		execute(source, "UPDATE osm_gpx_data SET \"future field\" = 'new metadata'");
-		List<Track> batch = controller.batch("secret", -1, 100);
+		List<Track> batch = readBatch(-1, 100);
 		assertEquals("new metadata", batch.get(0).metadata().get("future field").textValue());
 		saveBatch(target, batch.toArray(Track[]::new), -1);
 		try (Statement statement = target.createStatement();
@@ -130,7 +130,7 @@ public class SyncRemoteOsmGpxTest {
 		execute(source, "ALTER TABLE osm_gpx_data ADD COLUMN source_only text");
 		saveBatch(source, new Track[] {track(ID)}, -1);
 		execute(source, "UPDATE osm_gpx_data SET source_only = 'must not be lost'");
-		Track[] tracks = controller.batch("secret", -1, 100).toArray(Track[]::new);
+		Track[] tracks = readBatch(-1, 100).toArray(Track[]::new);
 		assertThrows(IllegalArgumentException.class, () -> saveBatch(target, tracks, -1));
 		assertEquals(0, count(target, "osm_gpx_data"));
 		assertEquals(0, count(target, "osm_gpx_files"));
@@ -141,7 +141,7 @@ public class SyncRemoteOsmGpxTest {
 	public void skipsMissingFilesAndLimitsJoinedRows() throws Exception {
 		saveBatch(source, new Track[] {track(ID), track(ID + 1), new Track(track(ID + 2).metadata(), null)}, -1);
 		execute(source, "DELETE FROM osm_gpx_files WHERE id = " + (ID + 1));
-		List<Track> batch = controller.batch("secret", -1, 2);
+		List<Track> batch = readBatch(-1, 2);
 		assertEquals(2, batch.size());
 		assertEquals(ID, batch.get(0).metadata().get("id").longValue());
 		assertEquals(ID + 2, batch.get(1).metadata().get("id").longValue());
@@ -149,7 +149,7 @@ public class SyncRemoteOsmGpxTest {
 		assertEquals(ID + 2, saveBatch(target, batch.toArray(Track[]::new), -1));
 		assertEquals(2, count(target, "osm_gpx_data"));
 		assertEquals(2, count(target, "osm_gpx_files"));
-		List<Track> next = controller.batch("secret", ID, 1);
+		List<Track> next = readBatch(ID, 1);
 		assertEquals(1, next.size());
 		assertEquals(ID + 2, next.get(0).metadata().get("id").longValue());
 		assertTrue(controller.batch("secret", ID + 2, 1).isEmpty());
@@ -212,13 +212,14 @@ public class SyncRemoteOsmGpxTest {
 			update.setLong(2, ID);
 			update.executeUpdate();
 		}
-		Track[] batch = controller.batch("secret", -1, 1).toArray(Track[]::new);
-		saveBatch(target, batch, -1);
-		try (Statement statement = target.createStatement();
-			 ResultSet rs = statement.executeQuery("SELECT simplified_geometry FROM osm_gpx_data WHERE id = " + ID)) {
+		String response = JSON.writeValueAsString(controller.batch("secret", -1, 1));
+		try (Statement statement = source.createStatement();
+			 ResultSet rs = statement.executeQuery("SELECT row_to_json(m)::text FROM (SELECT "
+					 + SyncRemoteOsmGpx.getMetadataColumns(source).sql() + " FROM osm_gpx_data) m")) {
 			assertTrue(rs.next());
-			assertArrayEquals(geometry, rs.getBytes(1));
+			assertTrue(response.contains("\"metadata\":" + rs.getString(1)));
 		}
+		assertTrue(response.contains("\"gpx\":" + JSON.writeValueAsString(track(ID).gpx())));
 	}
 
 	@Test
@@ -265,6 +266,10 @@ public class SyncRemoteOsmGpxTest {
 
 	private static long saveBatch(Connection connection, Track[] tracks, long afterId) throws SQLException {
 		return SyncRemoteOsmGpx.saveBatch(connection, SyncRemoteOsmGpx.getMetadataColumns(connection), tracks, afterId);
+	}
+
+	private List<Track> readBatch(long afterId, int limit) throws IOException {
+		return Arrays.asList(JSON.readValue(JSON.writeValueAsBytes(controller.batch("secret", afterId, limit)), Track[].class));
 	}
 
 	private static Track track(long id) throws IOException {

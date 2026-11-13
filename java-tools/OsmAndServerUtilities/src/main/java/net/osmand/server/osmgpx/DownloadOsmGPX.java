@@ -112,8 +112,8 @@ public class DownloadOsmGPX {
 
 	// preindex before 76787 with maxlat/minlat
 	private static final long INITIAL_ID = 1000; // start with 1000
-	private static final String GPX_METADATA_TABLE_NAME = "osm_gpx_data";
-	private static final String GPX_FILES_TABLE_NAME = "osm_gpx_files";
+	static final String GPX_METADATA_TABLE_NAME = "osm_gpx_data";
+	static final String GPX_FILES_TABLE_NAME = "osm_gpx_files";
 	private static final long FETCH_INTERVAL_SLEEP = 10000;
 
 	private static final int HTTP_TIMEOUT = 5000;
@@ -130,7 +130,7 @@ public class DownloadOsmGPX {
 	// tracks parse_tracks still has to parse; also the idx_osm_gpx_parse_v* predicate, the query must use the same text
 	private static final String OUTDATED_STATS_CONDITION =
 			"track_stats IS NULL OR COALESCE((track_stats->>'v')::int, 0) < " + TRACK_STATS_VERSION;
-	private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
+	static final ObjectMapper JSON_MAPPER = new ObjectMapper();
 	private static final int PARSE_BATCH_LIMIT = 1000;
 	private static final int LARGE_GPX_BYTES = 5 << 20; // compressed; larger files are parsed one at a time
 	private static final int CLASSIFY_BATCH_LIMIT = 10000;
