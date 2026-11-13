@@ -108,12 +108,13 @@ public class SyncRemoteOsmGpxTest {
 	}
 
 	@Test
-	public void includesNewColumnsAndQuotesTheirNames() throws Exception {
+	public void refreshesColumnsBetweenRequestsAndQuotesTheirNames() throws Exception {
+		saveBatch(source, new Track[] {track(ID)}, -1);
+		assertEquals(1, controller.batch("secret", -1, 100).size());
 		for (Connection connection : new Connection[] {source, target}) {
 			execute(connection, "ALTER TABLE osm_gpx_data ADD COLUMN \"future field\" text, ADD COLUMN obsolete text");
 			execute(connection, "ALTER TABLE osm_gpx_data DROP COLUMN obsolete");
 		}
-		saveBatch(source, new Track[] {track(ID)}, -1);
 		execute(source, "UPDATE osm_gpx_data SET \"future field\" = 'new metadata'");
 		List<Track> batch = controller.batch("secret", -1, 100);
 		assertEquals("new metadata", batch.get(0).metadata().get("future field").textValue());
