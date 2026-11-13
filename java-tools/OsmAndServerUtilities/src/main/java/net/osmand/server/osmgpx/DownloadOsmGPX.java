@@ -112,8 +112,8 @@ public class DownloadOsmGPX {
 
 	// preindex before 76787 with maxlat/minlat
 	private static final long INITIAL_ID = 1000; // start with 1000
-	private static final String GPX_METADATA_TABLE_NAME = "osm_gpx_data";
-	private static final String GPX_FILES_TABLE_NAME = "osm_gpx_files";
+	static final String GPX_METADATA_TABLE_NAME = "osm_gpx_data";
+	static final String GPX_FILES_TABLE_NAME = "osm_gpx_files";
 	private static final long FETCH_INTERVAL_SLEEP = 10000;
 
 	private static final int HTTP_TIMEOUT = 5000;
@@ -130,7 +130,7 @@ public class DownloadOsmGPX {
 	// tracks parse_tracks still has to parse; also the idx_osm_gpx_parse_v* predicate, the query must use the same text
 	private static final String OUTDATED_STATS_CONDITION =
 			"track_stats IS NULL OR COALESCE((track_stats->>'v')::int, 0) < " + TRACK_STATS_VERSION;
-	private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
+	static final ObjectMapper JSON_MAPPER = new ObjectMapper();
 	private static final int PARSE_BATCH_LIMIT = 1000;
 	private static final int LARGE_GPX_BYTES = 5 << 20; // compressed; larger files are parsed one at a time
 	private static final int CLASSIFY_BATCH_LIMIT = 10000;
@@ -179,7 +179,6 @@ public class DownloadOsmGPX {
 	public static void main(String[] args) throws Exception {
 		String main = args.length > 0 ? args[0] : "";
 		DownloadOsmGPX utility = new DownloadOsmGPX();
-		//createActivitiesMap("../../");
 		if ("test_download".equals(main)) {
 			String gpx = utility.downloadGpx(57905, "");
 			Source src = new Buffer().write(gpx.getBytes());
@@ -269,21 +268,21 @@ public class DownloadOsmGPX {
 			utility.recalculateMinMaxLatLon(true);
 		} else if ("add_activity".equals(main)) {
 			// kept for existing jobs: parses tracks without activity
-			utility.addActivityColumnAndPopulate(args[1]);
+			utility.addActivityColumnAndPopulate();
 		} else if ("update_activity".equals(main)) {
-			// kept for existing jobs: update_activity <rootPath> foot,cycling,garbage parses those tracks again
+			// kept for existing jobs: update_activity <ignored-path> foot,cycling,garbage parses those tracks again
 			String categories = args.length > 2 ? args[2] : null;
-			utility.updateActivity(args[1], categories);
+			utility.updateActivity(categories);
 		} else if ("parse_tracks".equals(main)) {
-			// parse_tracks <rootPath> [--threads=N] [--categories=foot,garbage] [--where=<SQL condition>] [--force]
+			// parse_tracks [--threads=N] [--categories=foot,garbage] [--where=<SQL condition>] [--force]
 			// parses tracks without track_stats or with an older TRACK_STATS_VERSION (every track with --force),
 			// so a stopped run continues where it stopped
-			JobOptions options = JobOptions.parse(args, 2);
-			utility.parseTracks(args[1], options.force ? TrackSelection.ALL : TrackSelection.OUTDATED_STATS, options);
+			JobOptions options = JobOptions.parse(args);
+			utility.parseTracks(options.force ? TrackSelection.ALL : TrackSelection.OUTDATED_STATS, options);
 		} else if ("classify_tracks".equals(main)) {
-			// classify_tracks <rootPath> [--categories=foot,garbage] [--where=<SQL condition>]
+			// classify_tracks [--categories=foot,garbage] [--where=<SQL condition>]
 			// sets activity again from stored columns and track_stats, without reading GPX
-			utility.classifyTracks(args[1], JobOptions.parse(args, 2));
+			utility.classifyTracks(JobOptions.parse(args));
 		} else {
 			System.out.println("Arguments " + Arrays.toString(args));
 			for (int i = 0; i < args.length; i++) {
@@ -307,7 +306,7 @@ public class DownloadOsmGPX {
 		utility.commitAllStatements();
 	}
 
-	private void ensureActivitySchema() throws SQLException {
+	static void ensureActivitySchema(Connection dbConn) throws SQLException {
 		try (Statement statement = dbConn.createStatement()) {
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS activity text");
 
@@ -366,14 +365,14 @@ public class DownloadOsmGPX {
 		LOG.info("Activity schema (columns and indexes) ensured.");
 	}
 
-	protected void addActivityColumnAndPopulate(String rootPath) throws SQLException, InterruptedException {
-		parseTracks(rootPath, TrackSelection.WITHOUT_ACTIVITY, new JobOptions());
+	protected void addActivityColumnAndPopulate() throws SQLException, InterruptedException {
+		parseTracks(TrackSelection.WITHOUT_ACTIVITY, new JobOptions());
 	}
 
-	protected void updateActivity(String rootPath, String categories) throws SQLException, InterruptedException {
+	protected void updateActivity(String categories) throws SQLException, InterruptedException {
 		JobOptions options = new JobOptions();
 		options.categories = categories;
-		parseTracks(rootPath, TrackSelection.ALL, options);
+		parseTracks(TrackSelection.ALL, options);
 	}
 
 	private enum TrackSelection {
@@ -389,8 +388,10 @@ public class DownloadOsmGPX {
 		String where; // e.g. "id % 1000 = 0" for a sample, "(track_stats->>'speed_p95')::float > 40" for a subgroup
 		boolean force;
 
-		static JobOptions parse(String[] args, int from) {
+		static JobOptions parse(String[] args) {
 			JobOptions options = new JobOptions();
+			// Ignore the optional directory argument used by older jobs.
+			int from = args.length > 1 && !args[1].startsWith("--") ? 2 : 1;
 			for (int i = from; i < args.length; i++) {
 				String arg = args[i];
 				String value = arg.substring(arg.indexOf('=') + 1).trim();
@@ -466,14 +467,10 @@ public class DownloadOsmGPX {
 		return condition.toString();
 	}
 
-	protected void parseTracks(String rootPath, TrackSelection selection, JobOptions options)
+	protected void parseTracks(TrackSelection selection, JobOptions options)
 			throws SQLException, InterruptedException {
-		ensureActivitySchema();
-		Map<String, List<String>> activitiesMap = createActivitiesMap(rootPath);
-		if (activitiesMap.isEmpty()) {
-			LOG.info("Activities map is empty. Skipping.");
-			return;
-		}
+		ensureActivitySchema(dbConn);
+		Map<String, List<String>> activitiesMap = createActivitiesMap();
 		String condition = trackCondition(activitiesMap, options);
 		if (condition == null) {
 			return;
@@ -573,13 +570,9 @@ public class DownloadOsmGPX {
 		}
 	}
 
-	protected void classifyTracks(String rootPath, JobOptions options) throws SQLException {
-		ensureActivitySchema();
-		Map<String, List<String>> activitiesMap = createActivitiesMap(rootPath);
-		if (activitiesMap.isEmpty()) {
-			LOG.info("Activities map is empty. Skipping.");
-			return;
-		}
+	protected void classifyTracks(JobOptions options) throws SQLException {
+		ensureActivitySchema(dbConn);
+		Map<String, List<String>> activitiesMap = createActivitiesMap();
 		String condition = trackCondition(activitiesMap, options);
 		if (condition == null) {
 			return;
@@ -1259,17 +1252,18 @@ public class DownloadOsmGPX {
 		boolean teleport;
 	}
 
-	private static Map<String, List<String>> createActivitiesMap(String rootPath) {
-		File activityFile = new File(rootPath, "resources/poi/activities.json");
-		if (!activityFile.exists()) {
-			return Collections.emptyMap();
-		}
-
-		ObjectMapper mapper = new ObjectMapper();
+	private static Map<String, List<String>> createActivitiesMap() {
+		String resource = "/resources/activities.json";
 		Map<String, List<String>> activitiesMap = new LinkedHashMap<>();
 
-		try {
-			JsonNode rootNode = mapper.readTree(activityFile);
+		try (InputStream stream = DownloadOsmGPX.class.getResourceAsStream(resource)) {
+			if (stream == null) {
+				throw new IllegalStateException("Missing JAR resource: " + resource);
+			}
+			JsonNode rootNode = JSON_MAPPER.readTree(stream);
+			if (rootNode == null || !rootNode.path("groups").isArray()) {
+				throw new IllegalStateException("Invalid JAR resource: " + resource);
+			}
 
 			JsonNode groups = rootNode.path("groups");
 			for (JsonNode group : groups) {
@@ -1297,9 +1291,12 @@ public class DownloadOsmGPX {
 				}
 			}
 		} catch (IOException e) {
-			return Collections.emptyMap();
+			throw new IllegalStateException("Cannot read JAR resource: " + resource, e);
 		}
 
+		if (activitiesMap.isEmpty()) {
+			throw new IllegalStateException("No activities in JAR resource: " + resource);
+		}
 		return activitiesMap;
 	}
 
@@ -1748,27 +1745,30 @@ public class DownloadOsmGPX {
 		}
 	}
 
-	private void initDBConnection() throws SQLException {
-		if (dbConn == null) {
-			dbConn = DriverManager.getConnection(System.getenv("DB_CONN"),
-					isEmpty(System.getenv("DB_USER")) ? "test" : System.getenv("DB_USER"),
-					isEmpty(System.getenv("DB_PWD")) ? "test" : System.getenv("DB_PWD"));
-//			executeSQL("DROP TABLE " + TABLE_NAME);
-			ResultSet rs = dbConn.getMetaData().getTables(null, null, GPX_METADATA_TABLE_NAME, null);
-			if (!rs.next()) {
-				executeSQL("CREATE TABLE " + GPX_FILES_TABLE_NAME + " (id bigint primary key, data bytea)");
-				executeSQL("CREATE TABLE " + GPX_METADATA_TABLE_NAME
-						+ "(id bigint primary key, \"user\" text, \"date\" timestamp, name text, lat float, lon float, "
-						+ " minlat float, minlon float, maxlat float, maxlon float, "
-						+ "pending boolean, tags text[], description text, visibility text)");
+	static Connection openDatabase() throws SQLException {
+		Connection connection = DriverManager.getConnection(System.getenv("DB_CONN"),
+				isEmpty(System.getenv("DB_USER")) ? "test" : System.getenv("DB_USER"),
+				isEmpty(System.getenv("DB_PWD")) ? "test" : System.getenv("DB_PWD"));
+		try (ResultSet tables = connection.getMetaData().getTables(null, null, GPX_METADATA_TABLE_NAME, null);
+			 Statement statement = connection.createStatement()) {
+			if (!tables.next()) {
+				statement.execute("CREATE TABLE IF NOT EXISTS " + GPX_FILES_TABLE_NAME + " (id bigint PRIMARY KEY, data bytea)");
+				statement.execute("CREATE TABLE " + GPX_METADATA_TABLE_NAME + " (id bigint PRIMARY KEY, \"user\" text, \"date\" timestamp,"
+						+ " name text, lat float, lon float, minlat float, minlon float, maxlat float, maxlon float,"
+						+ " pending boolean, tags text[], description text, visibility text)");
+				ensureActivitySchema(connection);
 			}
+		} catch (SQLException e) {
+			connection.close();
+			throw e;
 		}
+		return connection;
 	}
 
-	private void executeSQL(String sql) throws SQLException {
-		Statement statement = dbConn.createStatement();
-		statement.execute(sql);
-		statement.close();
+	private void initDBConnection() throws SQLException {
+		if (dbConn == null) {
+			dbConn = openDatabase();
+		}
 	}
 
 	private Object executeSQLQuery(String sql) throws SQLException {
