@@ -366,15 +366,24 @@ if [ -n "$DATA" ]; then
 		World_contours)
 			: "${BBOX:=-180 -79 180 85}"; : "${GRID:=$GEBCO}"; : "${LEVELS:=$(steps 10:300:10 350:950:50),$DEEP_LEVELS}"
 			: "${OVERVIEW:=$OVERVIEW_Z5_8}"
+			# one unsmoothed section of the 15" grid is 3.1 GB, over the 2 GB limit of a map index: keep the
+			# published smoothing of the world map (4x4 cells, rings under 8 cells dropped)
+			: "${SMOOTH:=4}"; : "${MIN_RING_CELLS:=8}"
 			if [ -z "$NO_DETAILED" ]; then
 				detailed_europe
-				coverage emodnet "--cell 0.02" "$EMODNET"; emodnet=$COVERAGE
+				# Europe_contours is published only within its bbox (-31.3 25.4 36 71.2), so the world leaves
+				# out exactly that part of EMODnet; the rest of its coverage (Cape Verde, the Atlantic west
+				# of 31 W) has no other map and must stay in the world on GEBCO
+				coverage emodnet_europe "--cell 0.02 --bbox -31.3 25.4 36.0 71.2" "$EMODNET"; emodnet_europe=$COVERAGE
 				# the box of New-zealand_contours: LINZ also has the Pacific islands and the Ross Sea
 				coverage new-zealand "--bbox 165 -48 180 -33.5 --layer area_1 --layer area_2 --layer area_3 --layer area_4 --layer area_5" \
 					"$DATA/src/nz/linz_hydro.gpkg"; nz=$COVERAGE
 				coverage gulf-cudem "--bbox $GULF_BBOX" "$DATA/src/cudem/cudem.vrt"; gulf=$COVERAGE
-				NO_DETAILED="World_contours:$emodnet,$DETAILED_EUROPE,$nz,$gulf:$emodnet"
+				NO_DETAILED="World_contours:$emodnet_europe,$DETAILED_EUROPE,$nz,$gulf:$emodnet_europe"
 			fi
+			# four map sections, built two at a time and merged: every part stays well below the 2 GB limit,
+			# and the memory of the build stays moderate (two JVMs of 6 GB instead of one of 16 GB)
+			: "${CONTOUR_PARTS:=4}"; : "${SECTION_HEAP:=-Xmx6g}"
 			: "${FULL_NAME:=World_full_coverage_contours}"
 			[ "$TILE" != 0 ] || TILE=15 ;;
 		World_Northern_hemisphere_points)
@@ -437,7 +446,7 @@ obf() {
 single() {
 	local output=$1; shift
 	local dir; dir=$(mktemp -d "$TMP/single.XXXX")
-	(cd "$dir" && JAVA_OPTS="${JAVA_OPTS:--Xmx16g}" bash "$MAP_CREATOR/utilities.sh" generate-single-map "$output" \
+	(cd "$dir" && JAVA_OPTS="${JAVA_OPTS:-${SECTION_HEAP:--Xmx16g}}" bash "$MAP_CREATOR/utilities.sh" generate-single-map "$output" \
 		--name="$NAME" "$@" ${RENDERING_TYPES:+--rendering-types=$RENDERING_TYPES} > single.log 2>&1) || { tail -20 "$dir/single.log" >&2; return 1; }
 	# an old OsmAndMapCreator prints its usage for an unknown command and exits with 0
 	[ -f "$output" ] || { tail -20 "$dir/single.log" >&2; return 1; }
@@ -528,11 +537,40 @@ if [ -n "$TILES" ]; then
 		# sections DIR OUTPUT : the map sections of the tiles in DIR, built in parallel (each in its own JVM), merged
 		sections() {
 			local dir=$1 output=$2 pre; pre="$TMP/$(basename "$1")_"
+			local f col g cols i j split; local -a files pids
 			OBFS=(); PIDS=()
 			contours=("$dir"/*_[0-9][0-9]_[0-9][0-9].osm.gz)
 			if [ -f "${contours[0]}" ]; then
 				step "contours obf of ${#contours[@]} tiles"
-				single "${pre}contours.obf" "${contours[@]}" & PIDS+=($!); OBFS+=("${pre}contours.obf")
+				if [ "${CONTOUR_PARTS:-1}" -gt 1 ]; then
+					# Split the tiles by their column: every part is a contiguous set of columns, so no part
+					# approaches the 2 GB limit and the parts meet exactly at tile edges. Parts are built two at
+					# a time, one Java each, to keep the load and the memory of the build moderate.
+					cols=0
+					for f in "${contours[@]}"; do
+						col=$(basename "$f" | sed -E 's/.*_([0-9]{2})_[0-9]{2}\.osm\.gz/\1/')
+						[ "$((10#$col))" -gt "$cols" ] && cols=$((10#$col))
+					done
+					split="$TMP/split"; rm -rf "$split"; mkdir -p "$split"
+					for f in "${contours[@]}"; do
+						col=$(basename "$f" | sed -E 's/.*_([0-9]{2})_[0-9]{2}\.osm\.gz/\1/')
+						g=$(( (10#$col) * CONTOUR_PARTS / (cols + 1) ))
+						[ "$g" -ge "$CONTOUR_PARTS" ] && g=$((CONTOUR_PARTS - 1))
+						mkdir -p "$split/$g"; ln -sf "$f" "$split/$g/"
+					done
+					for ((i = 0; i < CONTOUR_PARTS; i += 2)); do
+						pids=()
+						for ((j = i; j < i + 2 && j < CONTOUR_PARTS; j++)); do
+							files=("$split/$j"/*.osm.gz)
+							[ -f "${files[0]}" ] || continue
+							step "contours obf of ${#files[@]} tiles, part $((j + 1)) of $CONTOUR_PARTS"
+							single "${pre}contours$j.obf" "${files[@]}" & pids+=($!); OBFS+=("${pre}contours$j.obf")
+						done
+						for pid in "${pids[@]}"; do wait "$pid" || exit 1; done
+					done
+				else
+					single "${pre}contours.obf" "${contours[@]}" & PIDS+=($!); OBFS+=("${pre}contours.obf")
+				fi
 			fi
 			overview=("$dir"/*_overview.osm.gz)
 			if [ -n "$OVERVIEW" ] && [ -f "${overview[0]}" ]; then

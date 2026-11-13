@@ -89,7 +89,9 @@ the Kartverket coverage (`datakvalitet`, `-x`/`-X`) out, so the fjords do not ge
 
 - Contours: levels `-l` (2, 5, 10, 20, 30, 50, 100, 200, 500 m and every 1000 m by default; GEBCO from 10 m).
   Every grid-built map uses one unsmoothed grid and unsimplified geometry for all levels by default, so contours cannot
-  cross at a change of grid and the 2/5/10 m lines stay exactly on their fill boundaries. `-s` optionally enables one
+  cross at a change of grid and the 2/5/10 m lines stay exactly on their fill boundaries. `World_contours` is the
+  exception: it keeps 4x4 smoothing and drops rings under 8 cells, because an unsmoothed 15" world section is 3.1 GB,
+  over the 2 GB limit of one map index. `-s` optionally enables one
   common smoothed grid for every level; `-S` sets a common simplification tolerance, and `-g` filters short rings.
   Long ways are split at the 2000-node OSM limit. Vector chart contours and areas also keep every vertex by default.
 - The EMODnet base of a regional map stops at the midpoint between its land and the land of the neighbouring
@@ -100,6 +102,10 @@ the Kartverket coverage (`datakvalitet`, `-x`/`-X`) out, so the fjords do not ge
   `--map-zooms`).
 - A region larger than `-t` degrees is split into tiles built `-j` at a time (each tile's Java takes up to 2 GB);
   the OBFs of contours, point tiers and tiles are merged with `merge-index`.
+- `World_contours` is too large for one map section even with the smoothing: its contour tiles are split into
+  `CONTOUR_PARTS=4` groups of columns, each group becomes a map section of its own. The parts are built two at a
+  time (`SECTION_HEAP=-Xmx6g` each, so at most 12 GB of heap), which keeps the machine from saturating, and are
+  merged with `merge-index` at the end.
 - Overview `-w CELL:ZOOMS` (World, Europe, Gulf: `0.02:5-8`): the contours start at zoom 9, so the levels of 200 m
   and deeper are traced again on the grid averaged to CELL degrees as a map section of their own for the lower zooms.
 - `-k` skips a region whose `NAME.depth.obf` exists.
@@ -134,5 +140,7 @@ coverage of the detailed regions cut out of the tiles' OSM (`-N`). The map of th
 - `depth_exclude_check.py BEFORE_DIR AFTER_DIR --exclude ...`: nothing left inside, nothing lost outside.
 
 `Europe_contours` leaves out Ireland, France, the Great Britain surveys, the Netherlands grids and Kartverket.
-`World_contours` leaves out EMODnet (its overview too, Europe has its own), the same regions, New Zealand
-(165..180 E) and the CUDEM of the Gulf box.
+`World_contours` leaves out the EMODnet coverage only within the `Europe_contours` bbox (`emodnet_europe`,
+-31.3 25.4 36 71.2; its overview too, Europe has its own), the same regions, New Zealand
+(165..180 E) and the CUDEM of the Gulf box. The rest of the EMODnet coverage (Cape Verde, the Atlantic
+west of 31 W) is not covered by any other map, so it stays in the world on GEBCO instead of becoming a hole.
