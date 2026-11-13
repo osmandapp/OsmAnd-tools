@@ -252,10 +252,11 @@ public class GarminConnectService {
 		try {
 			tmp = File.createTempFile("garmin-folder-", ".gpx");
 			String folderMarker = GPX_FOLDER_GARMIN + "/" + EMPTY_FILE_NAME;
-			StorageService.InternalZipFile zip = StorageService.InternalZipFile.buildFromFileAndDelete(tmp);
-			tmp = null;
-			userdataService.validateUserForUpload(dev, FILE_TYPE_GPX, zip.getSize());
-			userdataService.uploadFile(zip, dev, folderMarker, FILE_TYPE_GPX, System.currentTimeMillis());
+			try (StorageService.InternalZipFile zip = StorageService.InternalZipFile.buildFromFileAndDelete(tmp)) {
+				tmp = null;
+				userdataService.validateUserForUpload(dev, FILE_TYPE_GPX, zip.getSize());
+				userdataService.uploadFile(zip, dev, folderMarker, FILE_TYPE_GPX, System.currentTimeMillis());
+			}
 			LOG.info("Garmin: created empty folder marker '" + folderMarker + "' for userid=" + userid);
 		} catch (OsmAndPublicApiException e) {
 			LOG.warn("Garmin: skipped empty folder marker creation for userid=" + userid + " due to upload validation failure: " + e.getMessage());
@@ -580,10 +581,11 @@ public class GarminConnectService {
 			if (clientTimeMs <= 0L) {
 				clientTimeMs = System.currentTimeMillis();
 			}
-			StorageService.InternalZipFile zip = StorageService.InternalZipFile.buildFromFileAndDelete(tmp);
-			tmp = null;
-			userdataService.validateUserForUpload(dev, FILE_TYPE_GPX, zip.getSize());
-			userdataService.uploadFile(zip, dev, cloudName, FILE_TYPE_GPX, clientTimeMs);
+			try (StorageService.InternalZipFile zip = StorageService.InternalZipFile.buildFromFileAndDelete(tmp)) {
+				tmp = null;
+				userdataService.validateUserForUpload(dev, FILE_TYPE_GPX, zip.getSize());
+				userdataService.uploadFile(zip, dev, cloudName, FILE_TYPE_GPX, clientTimeMs);
+			}
 			conn.lastGarminImportAt = System.currentTimeMillis();
 			garminUserConnectionRepository.save(conn);
 			LOG.info("Garmin activityFiles: stored " + fileType + " as GPX " + cloudName + " userid=" + conn.userid);

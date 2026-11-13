@@ -13,6 +13,7 @@ import org.apache.commons.logging.Log;
 
 import net.osmand.PlatformUtil;
 import net.osmand.util.Algorithms;
+import rtree.RTree;
 import rtree.RTreeException;
 
 public class ObfDiffMerger {
@@ -82,6 +83,7 @@ public class ObfDiffMerger {
 						System.out.println("Processed " + region + " " + date + " .");
 					}
 				}
+				RTree.clearCache();
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -259,6 +261,7 @@ public class ObfDiffMerger {
 						System.out.println("Processed " + flToMerge + " with " + s);
 					}
 				}
+				RTree.clearCache();
 			}
 		} catch (Exception e) {
 			e.printStackTrace();

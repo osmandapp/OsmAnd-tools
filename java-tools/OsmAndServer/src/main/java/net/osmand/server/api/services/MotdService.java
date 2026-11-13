@@ -403,8 +403,8 @@ public class MotdService {
 			int length = Math.max(parts1.length, parts2.length);
 			for (int i = 0; i < length; i++) {
 				// Get the numeric value for each part, defaulting to 0 if a part doesn't exist.
-				int num1 = (i < parts1.length) ? Integer.parseInt(parts1[i]) : 0;
-				int num2 = (i < parts2.length) ? Integer.parseInt(parts2[i]) : 0;
+				int num1 = (i < parts1.length) ? Algorithms.parseIntSilently(parts1[i], 0) : 0;
+				int num2 = (i < parts2.length) ? Algorithms.parseIntSilently(parts2[i], 0) : 0;
 
 				// If num1 is greater, version1 is greater.
 				if (num1 > num2) {

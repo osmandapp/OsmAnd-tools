@@ -10,6 +10,7 @@ import okio.Buffer;
 import static net.osmand.IndexConstants.*;
 import static net.osmand.server.api.services.WebUserdataService.*;
 import static net.osmand.server.api.services.UserdataService.*;
+import static net.osmand.server.api.services.EmailSenderService.CloudAccountAction;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 import java.io.IOException;
@@ -80,6 +81,9 @@ public class MapApiController {
 	UserdataService userdataService;
 
 	@Autowired
+	CloudMapFilesService cloudMapFilesService;
+
+	@Autowired
 	TrackAnalyzerService trackAnalyzerService;
 
 	@Autowired
@@ -129,7 +133,7 @@ public class MapApiController {
 	}
 
 	@GetMapping(path = { "/auth/info" }, produces = "application/json")
-	public String userInfo(java.security.Principal user) {
+	public String userInfo(java.security.Principal user, HttpServletRequest request) throws ServletException {
 		if (user == null) {
 			return gson.toJson(user);
 		}
@@ -137,6 +141,10 @@ public class MapApiController {
 			Object obj = ((Authentication) user).getPrincipal();
 			if (obj instanceof OsmAndProUser) {
 				OsmAndProUser pu = (OsmAndProUser) ((Authentication) user).getPrincipal();
+				if (usersRepository.findById(pu.getUserDevice().userid) == null) {
+					request.logout();
+					return gson.toJson(null);
+				}
 				List<String> roles = pu.getAuthorities().stream()
 						.map(GrantedAuthority::getAuthority)
 						.toList();
@@ -383,13 +391,14 @@ public class MapApiController {
 	public ResponseEntity<String> listFiles(@RequestParam(required = false) String name,
 	                                        @RequestParam(required = false) String type,
 	                                        @RequestParam(required = false, defaultValue = "false") boolean addDevices,
-	                                        @RequestParam(required = false, defaultValue = "false") boolean allVersions) {
+	                                        @RequestParam(required = false, defaultValue = "false") boolean allVersions) throws IOException {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
 		Set<String> types = userdataService.parseFileTypes(type);
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, true, types);
+		cloudMapFilesService.prepareFileListForDeletedMaps(res, true);
 		Map<String, Set<String>> sharedFilesMap = shareFileService.getFilesByOwner(dev.userid);
 
 		res.uniqueFiles.forEach(nd -> {
@@ -745,11 +754,15 @@ public class MapApiController {
 		if (pu == null) {
 			return ResponseEntity.badRequest().body("User not found");
 		}
-		return userdataService.sendCode(action, lang, pu);
+		return userdataService.sendCode(CloudAccountAction.fromCodeRequest(action, false), lang, pu);
 	}
 
 	@PostMapping(path = {"/auth/send-code-to-new-email"})
 	public ResponseEntity<String> sendCodeToNewEmail(@RequestParam String action, @RequestParam String lang, @RequestParam String email, @RequestParam String code) {
+		CloudAccountAction emailAction = CloudAccountAction.fromCodeRequest(action, true);
+		if (emailAction != CloudAccountAction.EMAIL_CHANGE) {
+			return ResponseEntity.badRequest().body("Unsupported action");
+		}
 		if (emailSender.isEmail(email)) {
 			CloudUserDevice dev = osmAndMapsService.checkUser();
 			if (dev == null) {
@@ -766,18 +779,24 @@ public class MapApiController {
 			}
 			// check if new email is not registered
 			CloudUsersRepository.CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
-			if (pu != null) {
-				return ResponseEntity.badRequest().body("User was already registered with such email");
+			if (pu == null) {
+				// create temp user with new email
+				pu = new CloudUsersRepository.CloudUser();
+				pu.email = email;
+				pu.regTime = new Date();
+				pu.orderid = null;
+				usersRepository.saveAndFlush(pu);
+			} else {
+				ResponseEntity<String> accountError = userdataService.checkNewEmailAccount(pu);
+				if (accountError != null) {
+					return accountError;
+				}
 			}
-			// create temp user with new email
-			pu = new CloudUsersRepository.CloudUser();
-			pu.email = email;
-			pu.regTime = new Date();
-			pu.orderid = null;
-			usersRepository.saveAndFlush(pu);
 
 			// send code to new email
-			return userdataService.sendCode(action, lang, pu);
+			String oldEmail = currentAcc.email;
+			return userdataService.sendCode(emailAction, lang, pu, () -> emailSender.sendOsmAndCloudAccountEmail(
+					oldEmail, null, lang, CloudAccountAction.EMAIL_CHANGED, EmailSenderService.maskEmail(email)));
 		}
 		return ResponseEntity.badRequest().body("Please enter valid email");
 	}

@@ -74,9 +74,10 @@ public class FavoriteService {
     }
 
     public void uploadFavoriteFile(File tmpFile, CloudUserDevicesRepository.CloudUserDevice dev, String name, Long updatetime, Date clienttime) throws IOException {
-        StorageService.InternalZipFile fl = StorageService.InternalZipFile.buildFromFileAndDelete(tmpFile);
-        userdataService.validateUserForUpload(dev, FILE_TYPE_FAVOURITES, fl.getSize());
-        userdataService.uploadFile(fl, dev, name, FILE_TYPE_FAVOURITES, clienttime != null ? clienttime.getTime() : System.currentTimeMillis());
+        try (StorageService.InternalZipFile fl = StorageService.InternalZipFile.buildFromFileAndDelete(tmpFile)) {
+            userdataService.validateUserForUpload(dev, FILE_TYPE_FAVOURITES, fl.getSize());
+            userdataService.uploadFile(fl, dev, name, FILE_TYPE_FAVOURITES, clienttime != null ? clienttime.getTime() : System.currentTimeMillis());
+        }
         if (updatetime != null) {
             boolean isWebDevice = UserdataService.TOKEN_DEVICE_WEB.equals(dev.deviceid);
             boolean isRecentWebEdit = System.currentTimeMillis() - updatetime < WEB_VERSION_INTERVAL_MS;

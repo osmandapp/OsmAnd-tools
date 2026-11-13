@@ -250,6 +250,7 @@ public class WebSecurityConfiguration {
 						.requestMatchers("/admin/search-test/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
 						.requestMatchers("/admin/turn-lanes/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
 						.requestMatchers("/admin/order-mgmt/**").hasAnyAuthority(ROLE_ADMIN, ROLE_SUPPORT)
+						.requestMatchers("/admin/email-templates/**").hasAuthority(ROLE_ADMIN)
 						.requestMatchers("/admin/operations/**").hasAuthority(ROLE_ADMIN)
 						.requestMatchers("/admin/**").hasAuthority(ROLE_ADMIN)
 						.requestMatchers("/actuator/**").hasAuthority(ROLE_ADMIN)
@@ -317,9 +318,8 @@ public class WebSecurityConfiguration {
 		source.registerCorsConfiguration("/vector/**", vectorTilesConfiguration);
 
 		CorsConfiguration configuration = new CorsConfiguration();
-		configuration.setAllowedOrigins(Arrays.asList("https://maptile.osmand.net",
-				"https://docs.osmand.net", "https://osmand.net", "https://www.osmand.net",
-				"https://test.osmand.net", "https://osmbtc.org", "http://localhost:3000", "https://builder.osmand.net"));
+		configuration.setAllowedOrigins(Arrays.asList("https://osmand.net", "http://localhost:3000"));
+		configuration.addAllowedOriginPattern("https://*.osmand.net");
 		configuration.setAllowCredentials(true);
 		configuration.setAllowedMethods(Arrays.asList(CorsConfiguration.ALL));
 		configuration.setAllowedHeaders(Arrays.asList("Content-Type"));

@@ -44,6 +44,9 @@ public class ShareFileService {
 	@Autowired
 	UserdataService userdataService;
 
+	@Autowired
+	EmailSenderService emailSender;
+
 	protected static final Log LOGGER = LogFactory.getLog(ShareFileService.class);
 
 	Gson gson = new Gson();
@@ -221,6 +224,7 @@ public class ShareFileService {
 		shareFile.addAccessRecord(access);
 
 		shareFileRepository.saveAndFlush(shareFile);
+		emailSender.sendAfterCommit(() -> emailSender.sendShareFileRequestEmail(access));
 	}
 
 	public CloudUserFilesRepository.UserFile getUserFile(ShareFileRepository.ShareFile file) {
@@ -262,10 +266,16 @@ public class ShareFileService {
 			if (access != null) {
 				access.access = (accessType);
 				shareFileRepository.saveAndFlush(access);
+				if (PermissionType.READ.name().equals(accessType)) {
+					emailSender.sendAfterCommit(() -> emailSender.sendShareFileAccessEmail(access, true));
+				} else if (PermissionType.BLOCKED.name().equals(accessType)) {
+					emailSender.sendAfterCommit(() -> emailSender.sendShareFileAccessEmail(access, false));
+				}
 			}
 		}
 		return true;
 	}
+
 
 	public UserdataController.UserFilesResults getSharedWithMe(int userid, String type) {
 		List<ShareFileRepository.ShareFilesAccess> list = shareFileRepository.findShareFilesAccessListByUserId(userid);
@@ -327,16 +337,17 @@ public class ShareFileService {
 			if (file.filepath.equals(name) && file.type.equals(type)) {
 				CloudUserFilesRepository.UserFile userFile = getUserFile(file);
 				if (userFile != null) {
-					StorageService.InternalZipFile zipFile = userdataService.getZipFile(userFile, newName);
-					if (zipFile != null) {
-						try {
-							userdataService.validateUserForUpload(dev, type, zipFile.getSize());
-						} catch (OsmAndPublicApiException e) {
-							return ResponseEntity.badRequest().body(e.getMessage());
+					try (StorageService.InternalZipFile zipFile = userdataService.getZipFile(userFile, newName)) {
+						if (zipFile != null) {
+							try {
+								userdataService.validateUserForUpload(dev, type, zipFile.getSize());
+							} catch (OsmAndPublicApiException e) {
+								return ResponseEntity.badRequest().body(e.getMessage());
+							}
+							return userdataService.uploadFile(zipFile, dev, newName, type, System.currentTimeMillis());
+						} else {
+							return ResponseEntity.badRequest().body("Zip file not found");
 						}
-						return userdataService.uploadFile(zipFile, dev, newName, type, System.currentTimeMillis());
-					} else {
-						return ResponseEntity.badRequest().body("Zip file not found");
 					}
 				}
 				return ResponseEntity.badRequest().body("Original file not found");

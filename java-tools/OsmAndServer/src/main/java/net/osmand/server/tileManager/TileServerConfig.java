@@ -25,6 +25,12 @@ public class TileServerConfig {
 	@Value("${tile-server.obf.ziplocation}")
 	public String obfZipLocation;
 
+	@Value("${tile-server.obf.srtm.location}")
+	public String obfSrtmLocation;
+
+	@Value("${tile-server.obf.srtm.ziplocation}")
+	public String obfSrtmZipLocation;
+
 	@Value("${tile-server.cache.location}")
 	public String cacheLocation;
 

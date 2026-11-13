@@ -3,6 +3,7 @@ package net.osmand.server.controllers.pub;
 import static net.osmand.server.api.repo.DeviceInAppPurchasesRepository.*;
 import static net.osmand.server.api.repo.DeviceSubscriptionsRepository.*;
 import static net.osmand.server.api.repo.SupportersRepository.*;
+import static net.osmand.server.api.services.EmailSenderService.CloudAccountAction;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 import java.io.IOException;
@@ -79,6 +80,9 @@ public class UserdataController {
 
 	@Autowired
 	UserdataService userdataService;
+
+	@Autowired
+	CloudMapFilesService cloudMapFilesService;
 
     @Autowired
     DeviceInAppPurchasesRepository iapsRepository;
@@ -194,10 +198,11 @@ public class UserdataController {
                                                HttpServletRequest request) {
 		// allow to register only with small case
 		email = email.toLowerCase().trim();
-		CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
-		if (!email.contains("@")) {
+		if (!emailSender.isEmail(email)) {
 			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
 		}
+		CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
+		boolean registered = pu != null && !devicesRepository.findByUserid(pu.id).isEmpty();
 		if (pu != null) {
 			if (!Boolean.TRUE.equals(login)) {
 				logErrorWithThrow(request, ERROR_CODE_USER_IS_ALREADY_REGISTERED, "user was already registered with such email");
@@ -215,7 +220,10 @@ public class UserdataController {
 		}
 		pu.tokendevice = deviceId;
 		userdataService.updateSecureEmailToken(pu);
-		emailSender.sendOsmAndCloudRegistrationEmail(pu.email, pu.token, lang, true);
+		String regEmail = pu.email;
+		String regToken = pu.token;
+		CloudAccountAction action = registered ? CloudAccountAction.LOGIN : CloudAccountAction.SETUP;
+		emailSender.sendAfterCommit(() -> emailSender.sendOsmAndCloudAccountEmail(regEmail, regToken, lang, action));
 		CloudUser saved = usersRepository.saveAndFlush(pu);
 	    if (orderid != null) {
 		    discardPreviousAccountOrderId(saved.id, orderid, email, request);
@@ -267,7 +275,7 @@ public class UserdataController {
                 LOG.warn("Supporter not found during cloud registration for supporterId: " + userId);
             }
         } else {
-            LOG.info("No supporter context provided during cloud registration for email: " + EmailSenderService.shorten(email));
+            LOG.info("No supporter context provided during cloud registration for email: " + EmailSenderService.shortenEmail(email));
         }
         // --- End Linking Logic ---
 
@@ -325,10 +333,13 @@ public class UserdataController {
 	                                         @RequestParam(name = "type", required = true) String type,
 	                                         @RequestParam(name = "updatetime", required = true) Long updatetime,
 	                                         @RequestParam(name = "deviceid", required = true) int deviceId,
-	                                         @RequestParam(name = "accessToken", required = true) String accessToken) {
+	                                         @RequestParam(name = "accessToken", required = true) String accessToken) throws IOException {
 		CloudUserDevice dev = checkToken(deviceId, accessToken);
 		if (dev == null) {
 			return userdataService.tokenNotValidError();
+		} else if (cloudMapFilesService.isDeletedMapMarker(name, type, updatetime)) {
+			// Acknowledge version cleanup without deleting the synthetic marker.
+			return userdataService.ok();
 		} else {
 			return userdataService.deleteFileVersion(updatetime, dev.userid, name, type, null);
 		}
@@ -366,7 +377,7 @@ public class UserdataController {
 	@GetMapping(value = "/check-file-on-server")
 	public ResponseEntity<String> checkFileOnServer(@RequestParam(name = "name", required = true) String name,
 			@RequestParam(name = "type", required = true) String type) throws IOException {
-		if (userdataService.checkThatObfFileisOnServer(name, type) != null) {
+		if (cloudMapFilesService.isDeletedMapFile(name, type) || userdataService.checkThatObfFileisOnServer(name, type) != null) {
 			return ResponseEntity.ok(gson.toJson(Collections.singletonMap("status", "present")));
 		}
 		return ResponseEntity.ok(gson.toJson(Collections.singletonMap("status", "not-present")));
@@ -443,6 +454,7 @@ public class UserdataController {
 		}
 		Set<String> types = userdataService.parseFileTypes(type);
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, false, types);
+		cloudMapFilesService.prepareFileListForDeletedMaps(res, false);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 
@@ -471,7 +483,7 @@ public class UserdataController {
 		if (pu == null) {
 			return ResponseEntity.badRequest().body("User not found");
 		}
-		return userdataService.sendCode(data.action, data.lang, pu);
+		return userdataService.sendCode(CloudAccountAction.fromCodeRequest(data.action, false), data.lang, pu);
 	}
 
 	public static class UserFilesResults {
@@ -493,8 +505,10 @@ public class UserdataController {
 		String m = "";
 		for (Map.Entry<String, String[]> e : params.entrySet()) {
 			String v = e.getValue().length > 0 ? e.getValue()[0] : "EMPTY";
-			if (e.getKey().toLowerCase().contains("email") || emailSender.isEmail(v)) {
-				v = EmailSenderService.shorten(v); // hide full email from logs
+			if (e.getKey().toLowerCase().contains("token")) {
+				v = "***";
+			} else if (e.getKey().toLowerCase().contains("email") || emailSender.isEmail(v)) {
+				v = EmailSenderService.shortenEmail(v); // hide full email from logs
 			}
 			m += ", " + e.getKey() + ":" + v;
 		}

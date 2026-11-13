@@ -2,6 +2,7 @@ package net.osmand.server.api.repo;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 
@@ -13,6 +14,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Temporal;
 import jakarta.persistence.TemporalType;
+import org.hibernate.annotations.DynamicUpdate;
 import org.springframework.data.domain.Pageable;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -30,6 +32,8 @@ public interface CloudUsersRepository extends JpaRepository<CloudUser, Long> {
 	
 	CloudUser findByOrderid(String orderid);
 
+	List<CloudUser> findByOrderidIn(Collection<String> orderids);
+
     List<CloudUser> findByEmailStartingWith(String prefix, Pageable pageable);
     
     List<CloudUser> findUsersByOrderidAndTokendevice(String orderid, String tokendevice);
@@ -40,6 +44,7 @@ public interface CloudUsersRepository extends JpaRepository<CloudUser, Long> {
 	
     @Entity
     @Table(name = "user_accounts")
+    @DynamicUpdate
     class CloudUser implements Serializable {
         @Serial
         private static final long serialVersionUID = 1L;

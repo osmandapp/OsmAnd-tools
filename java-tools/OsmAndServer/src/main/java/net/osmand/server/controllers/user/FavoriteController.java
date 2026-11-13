@@ -1,6 +1,7 @@
 package net.osmand.server.controllers.user;
 
 import com.google.gson.Gson;
+import net.osmand.data.Amenity;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository;
 import net.osmand.server.api.services.FavoriteService;
@@ -32,7 +33,9 @@ import static net.osmand.shared.gpx.GpxUtilities.HIDDEN_EXTENSION;
 @Controller
 @RequestMapping("/mapapi/fav")
 public class FavoriteController {
-    
+
+    private static final String SHORT_DESCRIPTION_TAG = GpxUtilities.OSM_PREFIX + Amenity.SHORT_DESCRIPTION;
+
     @Autowired
     UserdataService userdataService;
     
@@ -55,11 +58,12 @@ public class FavoriteController {
     public ResponseEntity<String> deleteFav(@RequestBody String data,
                                             @RequestParam String fileName,
                                             @RequestParam Long updatetime,
+                                            @RequestParam int ind,
 											HttpSession session) throws IOException {
         CloudUserDevicesRepository.CloudUserDevice dev = favoriteService.getUserId();
         GpxFile file = favoriteService.createGpxFile(fileName, dev, updatetime, session);
         if (file != null) {
-            file.deleteWptPt(webGpxParser.convertToWptPt(gson.fromJson(data, WebGpxParser.Wpt.class)));
+            deleteWptPtAtIndex(file, gson.fromJson(data, WebGpxParser.Wpt.class).name, ind);
         } else
             throw new OsmAndPublicApiException(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE,
                     UserdataService.ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
@@ -146,20 +150,33 @@ public class FavoriteController {
                                             @RequestParam int ind,
                                             HttpSession session) throws IOException {
         CloudUserDevicesRepository.CloudUserDevice dev = favoriteService.getUserId();
-        WptPt wptPt = webGpxParser.convertToWptPt(gson.fromJson(data, WebGpxParser.Wpt.class));
+        WebGpxParser.Wpt wpt = gson.fromJson(data, WebGpxParser.Wpt.class);
+        WptPt wptPt = webGpxParser.convertToWptPt(wpt);
+        boolean changeGroup = !oldGroupName.equals(newGroupName);
         GpxFile newGpxFile = favoriteService.createGpxFile(newGroupName, dev, newGroupUpdatetime, session);
         if (newGpxFile != null) {
-            newGpxFile.updateWptPt(wptName, ind, wptPt, true);
+            if (changeGroup) {
+                newGpxFile.addPoint(wptPt);
+            } else {
+                WptPt currentWpt = findWptPt(newGpxFile, wptName, ind);
+                if (currentWpt != null) {
+                    newGpxFile.updateWptPt(currentWpt, wptPt, true);
+                    if (wpt.ext != null) {
+                        replaceShortDescriptions(currentWpt, wptPt);
+                    }
+                } else {
+                    newGpxFile.addPoint(wptPt);
+                }
+            }
         } else
             throw new OsmAndPublicApiException(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE,
                     UserdataService.ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
         
-        boolean changeGroup = !oldGroupName.equals(newGroupName);
         GpxFile oldGpxFile = null;
         if (changeGroup) {
             oldGpxFile = favoriteService.createGpxFile(oldGroupName, dev, oldGroupUpdatetime, session);
             if (oldGpxFile != null) {
-                oldGpxFile.deleteWptPt(wptName, ind);
+                deleteWptPtAtIndex(oldGpxFile, wptName, ind);
             } else
                 throw new OsmAndPublicApiException(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE,
                         UserdataService.ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
@@ -224,10 +241,47 @@ public class FavoriteController {
             
             File tmpGpx = gpxService.createTmpFileByGpxFile(gpxFile, fullNewName);
             sessionResources.addGpxTempFilesToSession(session, tmpGpx);
-            InternalZipFile fl = InternalZipFile.buildFromFileAndDelete(tmpGpx);
-            
-            return favoriteService.renameFavFolder(fullOldName, fullNewName, fl, dev);
+            try (InternalZipFile fl = InternalZipFile.buildFromFileAndDelete(tmpGpx)) {
+                return favoriteService.renameFavFolder(fullOldName, fullNewName, fl, dev);
+            }
         }
         return ResponseEntity.badRequest().body(FavoriteService.ERROR_READING_GPX_MSG);
+    }
+
+    private static WptPt findWptPt(GpxFile file, String wptName, int index) {
+        List<WptPt> points = file.getPointsList();
+        if (index < 0 || index >= points.size() || !Objects.equals(points.get(index).getName(), wptName)) {
+            return null;
+        }
+        return points.get(index);
+    }
+
+    private static void replaceShortDescriptions(WptPt point, WptPt newPoint) {
+        Map<String, String> extensions = point.getExtensionsToWrite();
+        extensions.keySet().removeIf(FavoriteController::isShortDescriptionTag);
+        newPoint.getExtensionsToRead().forEach((key, value) -> {
+            if (isShortDescriptionTag(key)) {
+                extensions.put(key, value);
+            }
+        });
+    }
+
+    private static boolean isShortDescriptionTag(String key) {
+        return key.equals(SHORT_DESCRIPTION_TAG) || key.startsWith(SHORT_DESCRIPTION_TAG + ":");
+    }
+
+    private static void deleteWptPtAtIndex(GpxFile file, String wptName, int index) {
+        if (findWptPt(file, wptName, index) == null) {
+            throw new OsmAndPublicApiException(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE,
+                    FavoriteService.ERROR_FILE_WAS_CHANGED_MSG);
+        }
+        WptPt point = file.getPointsList().remove(index);
+        GpxUtilities.PointsGroup group = file.getPointsGroups().get(point.getCategory());
+        if (group != null) {
+            group.getPoints().removeIf(p -> p == point);
+        }
+        long time = System.currentTimeMillis();
+        file.setModifiedTime(time);
+        file.setPointsModifiedTime(time);
     }
 }

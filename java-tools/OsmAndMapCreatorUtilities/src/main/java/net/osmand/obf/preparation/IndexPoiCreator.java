@@ -53,6 +53,7 @@ import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
 import net.osmand.router.RoutingContext;
+import net.osmand.search.rules.SearchModLocaleRules.PoiService;
 import net.osmand.search.rules.SearchModRules;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
@@ -104,6 +105,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 
     // Actual list of brands is constantly regenerated from BrandAnalyzer utlitity
 	private static final String ENV_POI_TOP_INDEXES_URL = "POI_TOP_INDEXES_URL";
+	// poi_additional of poi_types.xml with top_index="true", set from <poi><service> of the search rules
+	public static final String POI_SERVICE_TAG = "service_abbreviation";
 	public static final int DEFAULT_TOP_INDEX_MIN_COUNT = PoiType.DEFAULT_MIN_COUNT; 
 	public static final int DEFAULT_TOP_INDEX_MAX_PER_MAP = PoiType.DEFAULT_MAX_PER_MAP;
 	public static final int DEFAULT_TOP_INDEX_LIMIT_PER_MAP = 1000;
@@ -247,6 +250,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
                         continue;
                     }
     				EntityParser.parseMapObject(a, e, tags, false);
+					addPoiService(a, tags, icc);
     				if (relationCenters.size() > 1) {
     					a.setAdditionalInfo(Amenity.ROUTE_ID, "R" + e.getId());
                         long cenId = id + ((long) i * 2);
@@ -370,6 +374,16 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		Algorithms.removeAllFiles(poiIndexFile);
 	}
 
+
+	// a place of a national service of the search rules (DMV, ЦНАП) gets its word as a top_index tag
+	private static void addPoiService(Amenity a, Map<String, String> tags, IndexCreationContext icc) {
+		for (PoiService service : icc.poiServices()) {
+			if (service.matches(tags, a.getName())) {
+				a.setAdditionalInfo(POI_SERVICE_TAG, service.word());
+				return;
+			}
+		}
+	}
 
 	public void insertAmenityIntoPoi(Amenity amenity) throws SQLException {
 		assert IndexConstants.POI_TABLE != null : "use constants here to show table usage "; //$NON-NLS-1$
@@ -926,7 +940,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			int maxPerMap = entry.getValue().getMaxPerMap();
 			minCount =  minCount > 0 ? minCount : DEFAULT_TOP_INDEX_MIN_COUNT;
 			maxPerMap = maxPerMap > 0 ? maxPerMap : DEFAULT_TOP_INDEX_MAX_PER_MAP;
-			if (providedTopIndexes != null) {
+			String key = entry.getKey().substring(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX.length());
+			// the global list (brands.lst) governs every top index tag but the services of the search rules
+			boolean provided = providedTopIndexes != null && !POI_SERVICE_TAG.equals(key);
+			if (provided) {
 				minCount = 0;
 				maxPerMap = DEFAULT_TOP_INDEX_LIMIT_PER_MAP;
 			}
@@ -940,9 +957,8 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 				if (Algorithms.isEmpty(originalValue)) {
 					continue;
 				}
-				if (providedTopIndexes != null) {
+				if (provided) {
                     String normalizedValue = TopTagValuesAnalyzer.normalizeTagValue(originalValue);
-					String key = entry.getKey().substring(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX.length());
 					if (providedTopIndexes.containsKey(key) && providedTopIndexes.get(key).contains(normalizedValue)
 							&& maxPerMap-- > 0) {
 						set.add(originalValue);

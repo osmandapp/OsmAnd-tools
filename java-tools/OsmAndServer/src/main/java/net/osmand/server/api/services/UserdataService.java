@@ -19,13 +19,13 @@ import java.security.SecureRandom;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
+import jakarta.annotation.Nullable;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -83,6 +83,9 @@ public class UserdataService {
 
     @Autowired
     protected DownloadIndexesService downloadService;
+
+    @Autowired
+    protected CloudMapFilesService cloudMapFilesService;
 
     @Autowired
     protected CloudUserFilesRepository filesRepository;
@@ -148,7 +151,7 @@ public class UserdataService {
     public static final String MODEL_DEVICE_WEB = "Web";
     public static final String TOKEN_DEVICE_WEB = "web";
     public static final int ERROR_CODE_PRO_USERS = 100;
-    private static final long MB = 1024 * 1024;
+    static final long MB = 1024 * 1024;
     public static final int BUFFER_SIZE = 1024 * 512;
     public static final long MAXIMUM_ACCOUNT_SIZE = 3000 * MB; // 3 (5 GB - std, 50 GB - ext, 1000 GB - pro)
     private static final String USER_FOLDER_PREFIX = "user-";
@@ -173,6 +176,7 @@ public class UserdataService {
     public static final long MAXIMUM_FREE_ACCOUNT_SIZE = 5 * MB;
     private static final long MAXIMUM_FREE_ACCOUNT_FILE_SIZE = 2 * MB;
     public static final String FILE_TYPE_GLOBAL = "GLOBAL";
+    public static final String FILE_TYPE = "FILE";
     public static final String FILE_TYPE_FAVOURITES = "FAVOURITES";
     public static final String FILE_TYPE_PROFILE = "PROFILE";
     public static final String FILE_TYPE_GPX = "GPX";
@@ -195,7 +199,9 @@ public class UserdataService {
     private static final int EMAIL_TOKEN_MIN_DIGITS = 6;
     private static final int EMAIL_TOKEN_MAX_DIGITS = 12;
 
-    private static final int EMAIL_TOKEN_EXPIRATION_HOURS = 24;
+    public static final int EMAIL_TOKEN_EXPIRATION_HOURS = 24;
+    public static final long CODE_EXPIRATION_TIME_MS = TimeUnit.HOURS.toMillis(EMAIL_TOKEN_EXPIRATION_HOURS);
+    private static final String CODE_TTL_TEXT = "(" + EMAIL_TOKEN_EXPIRATION_HOURS + " h)";
     private static final int EMAIL_TOKEN_MIN_DELAY_MINUTES = 10;
     private static final int EMAIL_TOKEN_MAX_DELAY_MINUTES = 60;
 
@@ -407,15 +413,16 @@ public class UserdataService {
 
 	public ResponseEntity<String> uploadMultipartFile(MultipartFile file, CloudUserDevicesRepository.CloudUserDevice dev,
 			String name, String type, Long clienttime, HttpSession session) throws IOException {
-		InternalZipFile zipfile;
-		try {
-			zipfile = getUploadZipFile(file, name, type, session);
+		if (cloudMapFilesService.isDeletedMapFile(name, type)) {
+			return cloudMapFilesService.handleDeletedMapUpload(name, type, clienttime, dev);
+		}
+		try (InternalZipFile zipfile = getUploadZipFile(file, name, type, session)) {
 			validateUserForUpload(dev, type, zipfile.getSize());
+			return uploadFile(zipfile, dev, name, type, clienttime);
 		} catch (OsmAndPublicApiException e) {
 			LOG.warn(String.format("Upload rejected for user %d, file %s/%s: %s", dev.userid, type, name, e.getMessage()));
 			throw e;
 		}
-		return uploadFile(zipfile, dev, name, type, clienttime);
 	}
 
 	private InternalZipFile getUploadZipFile(MultipartFile file, String name, String type, HttpSession session) throws IOException {
@@ -521,7 +528,7 @@ public class UserdataService {
 		return storageFileName(type, shortName, updatetime);
 	}
 
-	private static String shortBasename(String base) {
+	static String shortBasename(String base) {
 		byte[] b = base.getBytes(StandardCharsets.UTF_8);
 		if (b.length <= SHORT_FILENAME) {
 			return base;
@@ -531,6 +538,11 @@ public class UserdataService {
 			end--;
 		}
 		return new String(b, 0, end, StandardCharsets.UTF_8);
+	}
+
+	// temp and .gz file names are built from it, so a long basename is shortened to fit the 255-byte limit
+	static String tmpFilePrefix(String name) {
+		return GPX_FILE_PREFIX + shortBasename(name.substring(name.lastIndexOf('/') + 1));
 	}
 
     // remap an existing file's S3 object to the bounded key and persist storagename; no-op if not needed
@@ -590,10 +602,10 @@ public class UserdataService {
             return ResponseEntity.badRequest().body("Email is not valid.");
 		}
         CloudUsersRepository.CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
+        boolean registered = pu != null && !devicesRepository.findByUserid(pu.id).isEmpty();
         if (isNew) {
             if (pu != null) {
-                List<CloudUserDevicesRepository.CloudUserDevice> devices = devicesRepository.findByUserid(pu.id);
-                if (devices != null && !devices.isEmpty()) {
+                if (registered) {
 	                userSubService.verifyAndRefreshProOrderId(pu);
                     return ResponseEntity.badRequest().body("An account is already registered with this email address.");
                 }
@@ -607,7 +619,9 @@ public class UserdataService {
             pu.tokendevice = TOKEN_DEVICE_WEB;
             updateSecureEmailToken(pu);
             usersRepository.saveAndFlush(pu);
-            emailSender.sendOsmAndCloudWebEmail(pu.email, pu.token, "@ACTION_SETUP@", lang);
+            emailSender.sendOsmAndCloudAccountEmail(pu.email, pu.token, lang,
+                    registered ? EmailSenderService.CloudAccountAction.PASSWORD
+                               : EmailSenderService.CloudAccountAction.SETUP);
 		} else {
             return ResponseEntity.badRequest().body("error_email");
         }
@@ -620,12 +634,11 @@ public class UserdataService {
         if (pu == null) {
             return ResponseEntity.badRequest().body("error_email");
         }
-        if (pu.token == null || !pu.token.equals(token) || pu.tokenTime == null || System.currentTimeMillis()
-                - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(EMAIL_TOKEN_EXPIRATION_HOURS, TimeUnit.HOURS)) {
+        if (!isCodeValid(pu, token)) {
             if (isWebLinkValid(pu, token)) {
                 return ok();
             }
-            wearOutToken(pu);
+            wearOutToken(pu, token);
             return ResponseEntity.badRequest().body("error_token");
         }
         return ok();
@@ -666,27 +679,27 @@ public class UserdataService {
     public ResponseEntity<String> registerNewDevice(String email, String token, String deviceId, String accessToken,
                                                     String lang, String brand, String model) {
 		if (Algorithms.isEmpty(email)) {
-			LOG.error("device-register: email is empty (" + email + ")");
+			LOG.error("device-register: email is empty (" + EmailSenderService.shortenEmail(email) + ")");
 			throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_NOT_REGISTERED, "empty email");
 		}
         email = email.toLowerCase().trim();
         CloudUsersRepository.CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
         if (pu == null) {
-            LOG.error("device-register: email is not found (" + EmailSenderService.shorten(email) + ")");
+            LOG.error("device-register: email is not found (" + EmailSenderService.shortenEmail(email) + ")");
             throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_NOT_REGISTERED, "user with that email is not registered");
         }
-        boolean tokenIsActive = pu.token != null && pu.tokenTime != null &&
-                (System.currentTimeMillis() - pu.tokenTime.getTime()) <
-                        TimeUnit.MILLISECONDS.convert(EMAIL_TOKEN_EXPIRATION_HOURS, TimeUnit.HOURS);
+        boolean tokenIsActive = isCodeActive(pu);
         boolean webLink = TOKEN_DEVICE_WEB.equals(deviceId) && isWebLinkValid(pu, token);
         if (webLink) {
             pu.webLinkToken = null;
             pu.webLinkTime = null;
-        } else if ( ! (tokenIsActive && pu.token.equals(token))) {
-            wearOutToken(pu); // cut down on tries (even for web password)
+        } else if (!isCodeValid(pu, token)) {
+            wearOutToken(pu, token); // cut down on tries (even for web password)
             if ( ! (tokenIsActive && validateWithWebPassword(pu.id, token))) {
-                LOG.error("device-register: invalid token (" + email + ") [" + token + "]");
-                throw new OsmAndPublicApiException(ERROR_CODE_TOKEN_IS_NOT_VALID_OR_EXPIRED, "token is not valid or expired (24h)");
+                if (!Algorithms.isEmpty(token)) {
+                    LOG.error("device-register: invalid token (" + EmailSenderService.shortenEmail(email) + ")");
+                }
+                throw new OsmAndPublicApiException(ERROR_CODE_TOKEN_IS_NOT_VALID_OR_EXPIRED, "token is not valid or expired " + CODE_TTL_TEXT);
             }
         }
         pu.token = null;
@@ -694,14 +707,14 @@ public class UserdataService {
         emailTokenRequests.invalidate(pu.email.trim().toLowerCase(Locale.ROOT));
         CloudUserDevicesRepository.CloudUserDevice device = new CloudUserDevicesRepository.CloudUserDevice();
 	    if (Algorithms.isEmpty(deviceId) || Algorithms.isEmpty(model)) {
-		    LOG.error("device-register: avoid delete-anonymous-same-device (" + email + ")");
+		    LOG.error("device-register: avoid delete-anonymous-same-device (" + EmailSenderService.shortenEmail(email) + ")");
 	    } else {
 		    CloudUserDevicesRepository.CloudUserDevice sameDevice;
 		    while ((sameDevice = devicesRepository
 				    .findTopByUseridAndDeviceidAndModelOrderByUdpatetimeDesc(pu.id, deviceId, model)) != null) {
 				LOG.error(String.format(
 						"device-register: delete-same-device (%s) id (%d) brand (%s) model (%s) deviceId (%s)",
-						email, sameDevice.id, brand, model, deviceId));
+						EmailSenderService.shortenEmail(email), sameDevice.id, brand, model, deviceId));
 			    devicesRepository.delete(sameDevice);
 		    }
 	    }
@@ -717,7 +730,7 @@ public class UserdataService {
 	    userSubService.verifyAndRefreshProOrderId(pu);
 
         devicesRepository.saveAndFlush(device);
-        LOG.info("device-register: success (" + EmailSenderService.shorten(email) + ")");
+        LOG.info("device-register: success (" + EmailSenderService.shortenEmail(email) + ")");
         return ResponseEntity.ok(gson.toJson(device));
     }
 
@@ -742,6 +755,7 @@ public class UserdataService {
 
     public void getFile(CloudUserFilesRepository.UserFile userFile, HttpServletResponse response, HttpServletRequest request, String name, String type,
                         CloudUserDevicesRepository.CloudUserDevice dev, boolean simplified) throws IOException {
+        cloudMapFilesService.validateDownload(name, type);
         InputStream bin = null;
         File fileToDelete = null;
         try {
@@ -844,30 +858,31 @@ public class UserdataService {
             return ResponseEntity.badRequest().body("Previous version of file not found");
         }
         CloudUserFilesRepository.UserFile usf = new CloudUserFilesRepository.UserFile();
-        InternalZipFile zipFile = getZipFile(prevFile, prevFile.name);
-        if (zipFile == null) {
-            return ResponseEntity.badRequest().body("Error restore file");
+        try (InternalZipFile zipFile = getZipFile(prevFile, prevFile.name)) {
+            if (zipFile == null) {
+                return ResponseEntity.badRequest().body("Error restore file");
+            }
+            try {
+                validateUserForUpload(dev, type, zipFile.getSize());
+            } catch (OsmAndPublicApiException e) {
+                return ResponseEntity.badRequest().body(e.getMessage());
+            }
+            usf.name = prevFile.name;
+            usf.type = type;
+            usf.updatetime = new Date();
+            usf.clienttime = prevFile.clienttime;
+            usf.userid = dev.userid;
+            usf.deviceid = dev.id;
+            usf.filesize = zipFile.getContentSize();
+            usf.zipfilesize = zipFile.getSize();
+            usf.storagename = computeStorageName(usf.type, usf.name, usf.updatetime);
+            usf.storage = storageService.save(userFolder(usf), storageFileName(usf), zipFile);
+            if (storageService.storeLocally()) {
+                usf.data = zipFile.getBytes();
+            }
+            filesRepository.saveAndFlush(usf);
+            return ResponseEntity.ok(gson.toJson(new UserFileNoData(usf)));
         }
-        try {
-            validateUserForUpload(dev, type, zipFile.getSize());
-        } catch (OsmAndPublicApiException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
-        usf.name = prevFile.name;
-        usf.type = type;
-        usf.updatetime = new Date();
-        usf.clienttime = prevFile.clienttime;
-        usf.userid = dev.userid;
-        usf.deviceid = dev.id;
-        usf.filesize = zipFile.getContentSize();
-        usf.zipfilesize = zipFile.getSize();
-        usf.storagename = computeStorageName(usf.type, usf.name, usf.updatetime);
-        usf.storage = storageService.save(userFolder(usf), storageFileName(usf), zipFile);
-        if (storageService.storeLocally()) {
-            usf.data = zipFile.getBytes();
-        }
-        filesRepository.saveAndFlush(usf);
-        return ResponseEntity.ok(gson.toJson(new UserFileNoData(usf)));
     }
     
     public boolean checkIfRestoredVersionExists(String name, String type, Long updatetime, CloudUserDevicesRepository.CloudUserDevice dev) {
@@ -1205,25 +1220,26 @@ public class UserdataService {
     public ResponseEntity<String> renameFile(String oldName, String newName, String type, CloudUserDevicesRepository.CloudUserDevice dev, boolean saveCopy) throws IOException {
         CloudUserFilesRepository.UserFile file = getLastFileVersion(dev.userid, oldName, type);
         if (file != null) {
-            InternalZipFile zipFile = getZipFile(file, newName);
-            if (zipFile != null) {
-                try {
-                    validateUserForUpload(dev, type, zipFile.getSize());
-                } catch (OsmAndPublicApiException e) {
-                    return ResponseEntity.badRequest().body(e.getMessage());
-                }
-                //create file with new name
-                ResponseEntity<String> res = uploadFile(zipFile, dev, newName, type, System.currentTimeMillis());
-                if (res.getStatusCode().is2xxSuccessful()) {
-                    if (!saveCopy) {
-                        //delete file with old name
-                        deleteFile(oldName, type, null, null, dev);
+            try (InternalZipFile zipFile = getZipFile(file, newName)) {
+                if (zipFile != null) {
+                    try {
+                        validateUserForUpload(dev, type, zipFile.getSize());
+                    } catch (OsmAndPublicApiException e) {
+                        return ResponseEntity.badRequest().body(e.getMessage());
                     }
+                    //create file with new name
+                    ResponseEntity<String> res = uploadFile(zipFile, dev, newName, type, System.currentTimeMillis());
+                    if (res.getStatusCode().is2xxSuccessful()) {
+                        if (!saveCopy) {
+                            //delete file with old name
+                            deleteFile(oldName, type, null, null, dev);
+                        }
+                        return ok();
+                    }
+                } else {
+                    // skip deleted files
                     return ok();
                 }
-            } else {
-                // skip deleted files
-                return ok();
             }
         }
         return ResponseEntity.badRequest().body(saveCopy ? "Error create duplicate file!" : "Error rename file!");
@@ -1235,7 +1251,7 @@ public class UserdataService {
 
     public InternalZipFile getZipFile(CloudUserFilesRepository.UserFile file, String newName, HttpSession session) throws IOException {
         InternalZipFile zipFile = null;
-        File tmpGpx = File.createTempFile(GPX_FILE_PREFIX + newName.replace("/../", "/"), ".gpx");
+        File tmpGpx = File.createTempFile(tmpFilePrefix(newName), ".gpx");
         if (file.filesize == 0 && file.name.endsWith(EMPTY_FILE_NAME)) {
             sessionResources.addGpxTempFilesToSession(session, tmpGpx);
             zipFile = InternalZipFile.buildFromFileAndDelete(tmpGpx);
@@ -1294,7 +1310,6 @@ public class UserdataService {
 
 
     private boolean isSelectedType(Set<String> filterTypes, CloudUserFilesRepository.UserFileNoData sf) {
-        final String FILE_TYPE = "FILE";
         final String FILE_TYPE_MAPS = "FILE_MAPS";
         final String FILE_TYPE_OTHER = "FILE_OTHER";
         String currentFileType = sf.type.toUpperCase();
@@ -1491,9 +1506,8 @@ public class UserdataService {
     public ResponseEntity<String> deleteAccount(String token, CloudUserDevicesRepository.CloudUserDevice dev, HttpServletRequest request) throws ServletException {
         CloudUsersRepository.CloudUser pu = usersRepository.findById(dev.userid);
         if (pu != null && pu.id == dev.userid) {
-            boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(EMAIL_TOKEN_EXPIRATION_HOURS, TimeUnit.HOURS);
-            boolean validToken = pu.token.equals(token) && !tokenExpired;
-            wearOutToken(pu);
+            boolean validToken = isCodeValid(pu, token);
+            wearOutToken(pu, token);
             if (validToken) {
                 if (deleteAllFiles(dev)) {
                     int numOfUsersDelete = usersRepository.deleteByEmailIgnoreCase(pu.email);
@@ -1517,7 +1531,7 @@ public class UserdataService {
                     return ResponseEntity.badRequest().body(String.format("Unable to delete user files (%s)", pu.email));
                 }
             }
-            return ResponseEntity.badRequest().body("Token is not valid or expired (24h), or password is not valid");
+            return ResponseEntity.badRequest().body("Token is not valid or expired " + CODE_TTL_TEXT);
         }
         return ResponseEntity.badRequest().body("Email doesn't match login username");
     }
@@ -1586,17 +1600,31 @@ public class UserdataService {
     }
 
     @Transactional
-    public ResponseEntity<String> sendCode(String action, String lang, CloudUsersRepository.CloudUser pu) {
-        if (!("setup".equals(action) || "change".equals(action) || "delete".equals(action))) {
-            return ok();
+    public ResponseEntity<String> sendCode(EmailSenderService.CloudAccountAction action, String lang,
+            CloudUsersRepository.CloudUser pu) {
+        return sendCode(action, lang, pu, null);
+    }
+
+    @Transactional
+    public ResponseEntity<String> sendCode(EmailSenderService.CloudAccountAction action, String lang,
+            CloudUsersRepository.CloudUser pu, Runnable onSent) {
+        if (action == null) {
+            return ResponseEntity.badRequest().body("Unknown action");
         }
         if (pu == null) {
             return ResponseEntity.badRequest().body("Email is not registered");
         }
         updateSecureEmailToken(pu);
         String token = pu.token;
-        emailSender.sendOsmAndCloudWebEmail(pu.email, token, action, lang);
         usersRepository.saveAndFlush(pu);
+        String email = pu.email;
+        emailSender.sendAfterCommit(() -> {
+            boolean sent = emailSender.sendOsmAndCloudAccountEmail(email, token, lang, action,
+                    action == EmailSenderService.CloudAccountAction.EMAIL_CHANGE ? email : null);
+            if (sent && onSent != null) {
+                onSent.run();
+            }
+        });
 
 	    userSubService.verifyAndRefreshProOrderId(pu);
 
@@ -1608,12 +1636,12 @@ public class UserdataService {
         if (pu == null) {
             return ResponseEntity.badRequest().body("User is not registered");
         }
-        boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(EMAIL_TOKEN_EXPIRATION_HOURS, TimeUnit.HOURS);
-        wearOutToken(pu);
-        if (pu.token.equals(code) && !tokenExpired) {
+        boolean validToken = isCodeValid(pu, code);
+        wearOutToken(pu, code);
+        if (validToken) {
             return ok();
         } else {
-            return ResponseEntity.badRequest().body("Token is not valid or expired (24h)");
+            return ResponseEntity.badRequest().body("Token is not valid or expired " + CODE_TTL_TEXT);
         }
     }
 
@@ -1625,29 +1653,48 @@ public class UserdataService {
         if (pu == null) {
             return ResponseEntity.badRequest().body("User is not registered");
         }
-        boolean tokenExpired = System.currentTimeMillis() - pu.tokenTime.getTime() > TimeUnit.MILLISECONDS.convert(EMAIL_TOKEN_EXPIRATION_HOURS, TimeUnit.HOURS);
-        wearOutToken(pu);
-        if (pu.token.equals(token) && !tokenExpired) {
+        boolean validToken = isCodeValid(pu, token);
+        wearOutToken(pu, token);
+        if (validToken) {
             return ok();
         } else {
-            return ResponseEntity.badRequest().body("Token is not valid or expired (24h)");
+            return ResponseEntity.badRequest().body("Token is not valid or expired " + CODE_TTL_TEXT);
         }
+    }
+
+    private boolean isCodeActive(CloudUsersRepository.CloudUser pu) {
+        return pu.token != null && pu.tokenTime != null
+                && System.currentTimeMillis() - pu.tokenTime.getTime() < CODE_EXPIRATION_TIME_MS;
+    }
+
+    private boolean isCodeValid(CloudUsersRepository.CloudUser pu, String code) {
+        return isCodeActive(pu) && pu.token.equals(Algorithms.trimIfNotNull(code));
     }
 
     // Support creates the link, the owner gets an email that lets them cancel it.
     // The link works only after a delay, so whoever created it can't use it before the owner can react.
-    public static final long WEB_LINK_VALID_FROM = TimeUnit.HOURS.toMillis(6);
-    public static final long WEB_LINK_VALID_TO = TimeUnit.HOURS.toMillis(72);
+    public static final int WEB_LINK_VALID_FROM_HOURS = 6;
+    public static final int WEB_LINK_VALID_TO_HOURS = 72;
+    public static final long WEB_LINK_VALID_FROM = TimeUnit.HOURS.toMillis(WEB_LINK_VALID_FROM_HOURS);
+    public static final long WEB_LINK_VALID_TO = TimeUnit.HOURS.toMillis(WEB_LINK_VALID_TO_HOURS);
     public static final String WEB_LINK_URL = "https://osmand.net/map/account/";
 
+    // stored only after the owner email went out
+    @Nullable
     public Date createWebLoginLink(CloudUsersRepository.CloudUser pu) {
         byte[] bytes = new byte[24];
         new SecureRandom().nextBytes(bytes);
-        pu.webLinkToken = HexFormat.of().formatHex(bytes);
+        String token = HexFormat.of().formatHex(bytes);
+        boolean sent = emailSender.sendOsmAndCloudWebLinkEmail(pu.email, emailSender.getLatestUserLang(pu.id),
+                getWebLinkCancelUrl(pu.email, token));
+        if (!sent) {
+            LOG.error("web-link: owner email not sent, link not created for " + EmailSenderService.shortenEmail(pu.email));
+            return null;
+        }
+        pu.webLinkToken = token;
         pu.webLinkTime = new Date();
         usersRepository.saveAndFlush(pu);
-        emailSender.sendOsmAndCloudWebLinkEmail(pu.email, getWebLinkCancelUrl(pu));
-        LOG.info("web-link: created for " + EmailSenderService.shorten(pu.email));
+        LOG.info("web-link: created for " + EmailSenderService.shortenEmail(pu.email));
         return new Date(pu.webLinkTime.getTime() + WEB_LINK_VALID_FROM);
     }
 
@@ -1655,15 +1702,15 @@ public class UserdataService {
         return WEB_LINK_URL + "?email=" + URLEncoder.encode(pu.email, StandardCharsets.UTF_8) + "&link=" + pu.webLinkToken;
     }
 
-    private String getWebLinkCancelUrl(CloudUsersRepository.CloudUser pu) {
-        return WEB_LINK_URL + "?email=" + URLEncoder.encode(pu.email, StandardCharsets.UTF_8) + "&cancel-link="
-                + getWebLinkCancelCode(pu);
+    private String getWebLinkCancelUrl(String email, String token) {
+        return WEB_LINK_URL + "?email=" + URLEncoder.encode(email, StandardCharsets.UTF_8) + "&cancel-link="
+                + getWebLinkCancelCode(token);
     }
 
     // the cancel code can't be turned back into the link token
-    private String getWebLinkCancelCode(CloudUsersRepository.CloudUser pu) {
+    private String getWebLinkCancelCode(String token) {
         try {
-            byte[] hash = MessageDigest.getInstance("SHA-256").digest(pu.webLinkToken.getBytes(StandardCharsets.UTF_8));
+            byte[] hash = MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hash, 0, 16);
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
@@ -1681,52 +1728,60 @@ public class UserdataService {
 
     public ResponseEntity<String> cancelWebLoginLink(String email, String cancelCode) {
         CloudUsersRepository.CloudUser pu = email == null ? null : usersRepository.findByEmailIgnoreCase(email.trim());
-        if (pu == null || pu.webLinkToken == null || cancelCode == null || !getWebLinkCancelCode(pu).equals(cancelCode)) {
+        if (pu == null || pu.webLinkToken == null || cancelCode == null || !getWebLinkCancelCode(pu.webLinkToken).equals(cancelCode)) {
             return ResponseEntity.badRequest().body("Link is not valid or already cancelled");
         }
         pu.webLinkToken = null;
         pu.webLinkTime = null;
         usersRepository.saveAndFlush(pu);
-        LOG.info("web-link: cancelled by owner " + EmailSenderService.shorten(pu.email));
+        LOG.info("web-link: cancelled by owner " + EmailSenderService.shortenEmail(pu.email));
         return ok();
     }
 
-    public void wearOutToken(CloudUsersRepository.CloudUser pu) {
-        if (pu == null || pu.tokenTime == null) {
+    public void wearOutToken(CloudUsersRepository.CloudUser pu, String token) {
+        if (pu == null || pu.tokenTime == null || Algorithms.isEmpty(token)) {
             return;
         }
         Calendar cal = Calendar.getInstance();
         cal.setTime(pu.tokenTime);
-        cal.add(Calendar.HOUR_OF_DAY, -7);
+        cal.add(Calendar.HOUR_OF_DAY, -2);
         pu.tokenTime = cal.getTime();
 
         usersRepository.saveAndFlush(pu);
     }
 
-
-    public ResponseEntity<String> changeEmail(String username, String token, CloudUserDevicesRepository.CloudUserDevice dev, HttpServletRequest request) throws ServletException {
-        // validate new email
-        CloudUsersRepository.CloudUser tempUser = usersRepository.findByEmailIgnoreCase(username);
-        if (tempUser == null) {
-            return ResponseEntity.badRequest().body("Something went wrong with your new email");
-        }
-        if (tempUser.orderid != null) {
-            String errorMsg = userSubService.checkOrderIdPro(tempUser.orderid);
-            if (errorMsg != null) {
-                return ResponseEntity.badRequest().body("You can't change email, because you have subscription on new email");
-            }
-        } else {
-            List<CloudUserFilesRepository.UserFileNoData> allFiles = filesRepository.listFilesByUserid(tempUser.id, null, null);
-            if (!allFiles.isEmpty()) {
-                return ResponseEntity.badRequest().body("You can't change email, because you have files in account on new email");
-            }
-        }
+    @Nullable
+    public ResponseEntity<String> checkNewEmailAccount(CloudUsersRepository.CloudUser tempUser) {
         List<CloudUserDevicesRepository.CloudUserDevice> devices = devicesRepository.findByUserid(tempUser.id);
         if (!devices.isEmpty()) {
             return ResponseEntity.badRequest().body("You can't change email, because you have devices in account on new email");
         }
+        if (!Algorithms.isEmpty(tempUser.orderid) && userSubService.checkOrderIdPro(tempUser.orderid) == null) {
+            return ResponseEntity.badRequest().body("You can't change email, because you have subscription on new email");
+        }
+        if (!subscriptionsRepo.findAllByUserId(tempUser.id).isEmpty() || !inAppPurchasesRepo.findByUserId(tempUser.id).isEmpty()) {
+            return ResponseEntity.badRequest().body("You can't change email, because you have purchases in account on new email");
+        }
+        List<CloudUserFilesRepository.UserFileNoData> allFiles = filesRepository.listFilesByUserid(tempUser.id, null, null);
+        if (!allFiles.isEmpty()) {
+            return ResponseEntity.badRequest().body("You can't change email, because you have files in account on new email");
+        }
+        return null;
+    }
+
+
+    public ResponseEntity<String> changeEmail(String newEmail, String token, CloudUserDevicesRepository.CloudUserDevice dev, HttpServletRequest request) throws ServletException {
+        // validate new email
+        CloudUsersRepository.CloudUser tempUser = usersRepository.findByEmailIgnoreCase(newEmail);
+        if (tempUser == null) {
+            return ResponseEntity.badRequest().body("Something went wrong with your new email");
+        }
+        ResponseEntity<String> accountError = checkNewEmailAccount(tempUser);
+        if (accountError != null) {
+            return accountError;
+        }
         // validate token
-        ResponseEntity<String> response = confirmCode(username, token);
+        ResponseEntity<String> response = confirmCode(newEmail, token);
         if (!response.getStatusCode().is2xxSuccessful()) {
             return response;
         }
@@ -1739,9 +1794,10 @@ public class UserdataService {
         emailTokenRequests.invalidate(currentUser.email.trim().toLowerCase(Locale.ROOT));
         emailTokenRequests.invalidate(tempUser.email.trim().toLowerCase(Locale.ROOT));
         usersRepository.delete(tempUser);
-        currentUser.email = username;
+        String oldEmail = currentUser.email;
+        currentUser.email = newEmail;
         usersRepository.saveAndFlush(currentUser);
-	    LOG.info("User email changed (/auth/change-email) from " + tempUser.email + " to " + currentUser.email);
+	    LOG.info("User email changed (/auth/change-email) from " + EmailSenderService.shortenEmail(oldEmail) + " to " + EmailSenderService.shortenEmail(currentUser.email));
 
 	    userSubService.verifyAndRefreshProOrderId(currentUser);
 

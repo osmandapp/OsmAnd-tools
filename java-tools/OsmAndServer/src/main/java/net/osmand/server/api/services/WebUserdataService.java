@@ -36,7 +36,6 @@ import java.util.zip.GZIPInputStream;
 
 import static net.osmand.server.api.services.UserdataService.FILE_TYPE_GPX;
 import static net.osmand.shared.IndexConstants.GPX_FILE_EXT;
-import static net.osmand.shared.IndexConstants.GPX_FILE_PREFIX;
 
 @Service
 public class WebUserdataService {
@@ -619,21 +618,25 @@ public class WebUserdataService {
 			}
 			if (zipFile != null) {
 				try {
-					userdataService.validateUserForUpload(dev, type, zipFile.getSize());
-				} catch (OsmAndPublicApiException e) {
-					return ResponseEntity.badRequest().body(e.getMessage());
-				}
-				ResponseEntity<String> res = userdataService.uploadFile(zipFile, dev, newName, type, System.currentTimeMillis());
-				if (res.getStatusCode().is2xxSuccessful()) {
-					boolean renamed = renameInfoFile(oldName, newName, dev, saveCopy, session);
-					if (!renamed) {
-						return ResponseEntity.badRequest().body("Error rename info file!");
+					try {
+						userdataService.validateUserForUpload(dev, type, zipFile.getSize());
+					} catch (OsmAndPublicApiException e) {
+						return ResponseEntity.badRequest().body(e.getMessage());
 					}
-					if (!saveCopy) {
-						//delete file with old name
-						userdataService.deleteFile(oldName, type, null, null, dev);
+					ResponseEntity<String> res = userdataService.uploadFile(zipFile, dev, newName, type, System.currentTimeMillis());
+					if (res.getStatusCode().is2xxSuccessful()) {
+						boolean renamed = renameInfoFile(oldName, newName, dev, saveCopy, session);
+						if (!renamed) {
+							return ResponseEntity.badRequest().body("Error rename info file!");
+						}
+						if (!saveCopy) {
+							//delete file with old name
+							userdataService.deleteFile(oldName, type, null, null, dev);
+						}
+						return userdataService.ok();
 					}
-					return userdataService.ok();
+				} finally {
+					zipFile.close();
 				}
 			} else {
 				// skip deleted files
@@ -693,7 +696,7 @@ public class WebUserdataService {
 			}
 			if (gpxFile != null) {
 				gpxFile.updateTrackName(preparedName);
-				File tmpGpx = File.createTempFile(GPX_FILE_PREFIX + preparedName.replace("/../", "/"), ".gpx");
+				File tmpGpx = File.createTempFile(UserdataService.tmpFilePrefix(preparedName), ".gpx");
 				Exception exception = GpxUtilities.INSTANCE.writeGpxFile(new KFile(tmpGpx.getAbsolutePath()), gpxFile);
 				if (exception != null) {
 					String isError = String.format(
@@ -750,14 +753,16 @@ public class WebUserdataService {
 					.replace("/", "\\/");
 			byte[] updated = jsonStr.getBytes(StandardCharsets.UTF_8);
 			// create new file
-			File tmpInfo = File.createTempFile(GPX_FILE_PREFIX + newName.replace("/../", "/") + INFO_FILE_EXT, INFO_FILE_EXT);
+			File tmpInfo = File.createTempFile(UserdataService.tmpFilePrefix(newName + INFO_FILE_EXT), INFO_FILE_EXT);
 			try (FileOutputStream fos = new FileOutputStream(tmpInfo)) {
 				fos.write(updated);
 			}
 			// upload new file
 			sessionResources.addGpxTempFilesToSession(session, tmpInfo);
-			StorageService.InternalZipFile zipFile = StorageService.InternalZipFile.buildFromFileAndDelete(tmpInfo);
-			ResponseEntity<String> res = userdataService.uploadFile(zipFile, dev, newName + INFO_FILE_EXT, FILE_TYPE_GPX, System.currentTimeMillis());
+			ResponseEntity<String> res;
+			try (StorageService.InternalZipFile zipFile = StorageService.InternalZipFile.buildFromFileAndDelete(tmpInfo)) {
+				res = userdataService.uploadFile(zipFile, dev, newName + INFO_FILE_EXT, FILE_TYPE_GPX, System.currentTimeMillis());
+			}
 			if (res.getStatusCode().is2xxSuccessful()) {
 				if (!saveCopy) {
 					userdataService.deleteFile(oldName + INFO_FILE_EXT, FILE_TYPE_GPX, null, null, dev);

@@ -7,15 +7,13 @@ import static net.osmand.search.SearchUICore.createAddressString;
 import static net.osmand.search.SearchUICore.getDominatedCity;
 import static net.osmand.search.SearchUICore.getMainCityName;
 import static net.osmand.shared.gpx.GpxUtilities.OSM_PREFIX;
-import static net.osmand.util.OpeningHoursParser.parseOpenedHours;
+import static net.osmand.shared.util.OpeningHoursParser.parseOpenedHours;
 
-import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.StringJoiner;
-import java.util.TimeZone;
 import java.util.TreeMap;
 
 import org.jetbrains.annotations.Nullable;
@@ -37,8 +35,9 @@ import net.osmand.search.core.SearchResult;
 import net.osmand.search.core.TopIndexFilter;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import net.osmand.server.controllers.pub.GeojsonClasses.Geometry;
+import net.osmand.shared.util.OpeningHoursParser.OpeningHours;
+import net.osmand.shared.util.OpeningHoursTime;
 import net.osmand.util.Algorithms;
-import net.osmand.util.OpeningHoursParser.OpeningHours;
 
 @Service
 public class SearchResultConverter {
@@ -59,7 +58,9 @@ public class SearchResultConverter {
 		MATCHED_OBJECTS("web_matched_objects"), VISIBLE_LEVEL("web_visible_level"),
 		COMPARE_KEY("web_compare_key"), BBOX_LAT_LON("web_bbox_lat_lon"),
 		WIKIDATA_ID("web_wikidata_id"), CITY_TYPE("web_city_type"), ELO("web_poi_elo"),
-		TRANSPORT_STOP_ID("web_transport_stop_id"), POI_FROM_TAGS("web_poi_from_tags");
+		TRANSPORT_STOP_ID("web_transport_stop_id"), POI_FROM_TAGS("web_poi_from_tags"),
+		// the category name the query matched, shown in brackets after the translation: "Школа (Schule)"
+		ALT_NAME("web_alt_name");
 
 		private final String fieldName;
 
@@ -72,10 +73,10 @@ public class SearchResultConverter {
 		}
 	}
 
-	public Feature getFeature(SearchResult result, String timeZone) {
+	public Feature getFeature(SearchResult result) {
 		Feature feature;
 		if (result.objectType == ObjectType.POI) {
-			feature = getPoiFeature(result, timeZone);
+			feature = getPoiFeature(result);
 		} else {
 			Geometry geometry = Geometry.point(result.location != null ? result.location : new LatLon(0, 0));
 			feature = new Feature(geometry).prop(PoiTypeField.TYPE.getFieldName(), result.objectType)
@@ -100,7 +101,7 @@ public class SearchResultConverter {
 		return feature;
 	}
 
-	public Feature getPoiFeature(SearchResult result, String timeZone) {
+	public Feature getPoiFeature(SearchResult result) {
 		Amenity amenity = (Amenity) result.object;
 		Feature feature = null;
 
@@ -132,14 +133,6 @@ public class SearchResultConverter {
 			}
 			String value = unzipContent(entry.getValue());
 			feature.prop(entry.getKey(), value);
-		}
-		String openingHoursValue = tags.get(AMENITY_PREFIX + OPENING_HOURS);
-		Calendar clientTime = getClientTime(timeZone);
-		if (clientTime != null && openingHoursValue != null) {
-			String openingHoursInfo = getOpeningHoursInfo(openingHoursValue, clientTime);
-			if (openingHoursInfo != null) {
-				feature.prop(AMENITY_PREFIX + OPENING_HOURS + OPENING_HOURS_INFO_SUFFIX, openingHoursInfo);
-			}
 		}
 		Map<String, String> names = amenity.getNamesMap(true);
 		for (Map.Entry<String, String> entry : names.entrySet()) {
@@ -241,9 +234,9 @@ public class SearchResultConverter {
 		return createAddressString(cityName, mainCity, dominatedCity, addr);
 	}
 
-	public void saveSearchResult(List<SearchResult> res, List<Feature> features, String timeZone) {
+	public void saveSearchResult(List<SearchResult> res, List<Feature> features) {
 		for (SearchResult result : res) {
-			features.add(getFeature(result, timeZone));
+			features.add(getFeature(result));
 		}
 	}
 
@@ -268,8 +261,20 @@ public class SearchResultConverter {
 			}
 			long osmId = amenity.getId();
 			if (!foundFeatures.containsKey(osmId)) {
-				foundFeatures.put(osmId, getPoiFeature(buildPoiSearchResult(amenity, locale, dominatedCity), timeZone));
+				Feature feature = getPoiFeature(buildPoiSearchResult(amenity, locale, dominatedCity));
+				addOpeningHoursInfo(feature, timeZone);
+				foundFeatures.put(osmId, feature);
 				remainingLimit--;
+			}
+		}
+	}
+
+	private void addOpeningHoursInfo(Feature feature, String timeZone) {
+		OpeningHoursTime clientTime = getClientTime(timeZone);
+		if (clientTime != null && feature.properties.get(AMENITY_PREFIX + OPENING_HOURS) instanceof String openingHoursValue) {
+			String openingHoursInfo = getOpeningHoursInfo(openingHoursValue, clientTime);
+			if (openingHoursInfo != null) {
+				feature.prop(AMENITY_PREFIX + OPENING_HOURS + OPENING_HOURS_INFO_SUFFIX, openingHoursInfo);
 			}
 		}
 	}
@@ -286,10 +291,11 @@ public class SearchResultConverter {
 		return merged;
 	}
 
-	private String getOpeningHoursInfo(String openingHoursValue, Calendar calendar) {
+	@Nullable
+	public String getOpeningHoursInfo(String openingHoursValue, OpeningHoursTime time) {
 		OpeningHours openingHours = parseOpenedHours(openingHoursValue);
 		if (openingHours != null) {
-			List<OpeningHours.Info> openingHoursInfo = openingHours.getInfo(calendar);
+			List<OpeningHours.Info> openingHoursInfo = openingHours.getInfo(time);
 			if (!Algorithms.isEmpty(openingHoursInfo)) {
 				StringJoiner openHoursInfos = new StringJoiner(";");
 				for (OpeningHours.Info info : openingHoursInfo) {
@@ -367,12 +373,10 @@ public class SearchResultConverter {
 	}
 
 	@Nullable
-	private static Calendar getClientTime(String timeZone) {
+	public static OpeningHoursTime getClientTime(String timeZone) {
 		if (Algorithms.isBlank(timeZone)) {
 			return null;
 		}
-		Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone(timeZone));
-		calendar.setTimeInMillis(System.currentTimeMillis());
-		return calendar;
+		return OpeningHoursTime.ofEpochMillis(System.currentTimeMillis(), timeZone);
 	}
 }

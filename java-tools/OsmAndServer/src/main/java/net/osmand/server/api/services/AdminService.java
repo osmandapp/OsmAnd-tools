@@ -172,6 +172,7 @@ public class AdminService {
 		public String platform;
 		public Date purchaseTime;
 		public Boolean osmandCloud;
+		public boolean canLinkUser;
 		public CloudUserInfo cloudUserInfo;
 	}
 

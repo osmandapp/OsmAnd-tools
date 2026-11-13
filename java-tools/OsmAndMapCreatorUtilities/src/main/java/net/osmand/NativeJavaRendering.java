@@ -428,6 +428,7 @@ public class NativeJavaRendering extends NativeLibrary {
 	public void initFilesInDir(File filesDir) throws IOException {
 		List<File> obfFiles = new ArrayList<>();
 		Map<String, FileIndex> mp = initIndexesCache(filesDir, obfFiles, false);
+		initCacheMapFile(new File(filesDir, INDEXES_CACHE).getAbsolutePath());
 		initFilesInDir(obfFiles, mp);
 	}
 
@@ -634,10 +635,11 @@ public class NativeJavaRendering extends NativeLibrary {
 		}
 	}
 
-	public byte[] getMapboxVectorTileFile(int zoom, int x, int y, int shift) throws IOException {
+	public byte[] getMapboxVectorTileFile(int zoom, int x, int y, int shift, boolean contoursOnly, boolean feetContours)
+			throws IOException {
         ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
         try (GZIPOutputStream gzipStream = new GZIPOutputStream(byteStream)) {
-            gzipStream.write(NativeLibrary.getMapboxVectorTileData(zoom, x, y, shift));
+            gzipStream.write(NativeLibrary.getMapboxVectorTileData(zoom, x, y, shift, contoursOnly, feetContours));
         }
     	return byteStream.toByteArray();
 	}

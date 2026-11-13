@@ -32,6 +32,7 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.*;
+import java.nio.file.Files;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -49,6 +50,7 @@ public class GpxService {
     public static final int MAX_SIZE_FILES = 10;
     public static final int MAX_SIZE_FILES_AUTH = 100;
     public static final String ERROR_WRITING_GPX_MSG = "Error writing gpx!";
+    private static final long MAX_UNZIPPED_FILE_SIZE = 100 * UserdataService.MB;
     
     @Autowired
     WebGpxParser webGpxParser;
@@ -87,8 +89,8 @@ public class GpxService {
     private void addAnalysisToTrackData(WebGpxParser.TrackData gpxData, GpxTrackAnalysis gpxAnalysis) {
         if (gpxAnalysis != null) {
             gpxData.analysis = webGpxParser.getTrackAnalysis(gpxAnalysis, null);
-            if (!gpxData.tracks.isEmpty() && (!gpxAnalysis.getPointAttributes().isEmpty() || (gpxAnalysis.getAvgSpeed() != 0.0 && !gpxAnalysis.hasSpeedInTrack()))) {
-                boolean addSpeed = gpxAnalysis.getAvgSpeed() != 0.0 && !gpxAnalysis.hasSpeedInTrack();
+            boolean addSpeed = gpxAnalysis.getAvgSpeed() != 0.0 && !gpxAnalysis.hasSpeedInTrack();
+            if (!Algorithms.isEmpty(gpxData.tracks) && (!gpxAnalysis.getPointAttributes().isEmpty() || addSpeed)) {
                 webGpxParser.addAdditionalInfo(gpxData.tracks, gpxAnalysis, addSpeed);
             }
         }
@@ -107,23 +109,14 @@ public class GpxService {
             analysis.put("avgElevationSrtm", srtmAnalysis.getAvgElevation());
             analysis.put("maxElevationSrtm", srtmAnalysis.getMaxElevation());
             webGpxParser.addSrtmEle(trackData.tracks, srtmAnalysis);
-            if (analysis.get("elevationData") == null) {
-                webGpxParser.addAdditionalInfo(trackData.tracks, srtmAnalysis, false);
-            }
+            webGpxParser.addAdditionalInfo(trackData.tracks, srtmAnalysis, false);
         }
         return trackData;
     }
     
     public WebGpxParser.TrackData addAnalysisData(WebGpxParser.TrackData trackData) throws IOException {
         GpxFile gpxFile = webGpxParser.createGpxFileFromTrackData(trackData);
-        GpxTrackAnalysis gpxTrackAnalysis = getAnalysis(gpxFile, false);
-        if (gpxTrackAnalysis != null) {
-        	trackData.analysis = webGpxParser.getTrackAnalysis(gpxTrackAnalysis, null);
-            boolean addSpeed = trackData.analysis.get("avgSpeed") != null && trackData.analysis.get("hasSpeedInTrack") == "false";
-            if (addSpeed || trackData.analysis.get("elevationData") != null) {
-                webGpxParser.addAdditionalInfo(trackData.tracks, gpxTrackAnalysis, addSpeed);
-            }
-        }
+        addAnalysisToTrackData(trackData, getAnalysis(gpxFile, false));
         return trackData;
     }
     
@@ -138,7 +131,7 @@ public class GpxService {
             }
         }
         if (analysis != null) {
-            cleanupFromNan(analysis);
+            cleanupSummaryFromNan(analysis);
         }
         return analysis;
     }
@@ -224,7 +217,7 @@ public class GpxService {
     }
 
     
-    public void cleanupFromNan(GpxTrackAnalysis analysis) {
+    private void cleanupSummaryFromNan(GpxTrackAnalysis analysis) {
         // process analysis
         if (Double.isNaN(analysis.getMinHdop())) {
             analysis.setMinHdop(-1);
@@ -239,6 +232,10 @@ public class GpxService {
         }
         cleanupFromNan(analysis.getLocationStart());
         cleanupFromNan(analysis.getLocationEnd());
+    }
+
+    public void cleanupFromNan(GpxTrackAnalysis analysis) {
+        cleanupSummaryFromNan(analysis);
 
         Iterator<PointAttributes> iterator = analysis.getPointAttributes().iterator();
         float sumDist = 0;
@@ -301,17 +298,27 @@ public class GpxService {
 
     public File saveMultipartFileToTemp(MultipartFile file, String httpSessionId) throws IOException {
         File tmpFile = File.createTempFile(GPX_FILE_PREFIX + httpSessionId, GPX_FILE_EXT);
-        InputStream is = file.getInputStream();
-        FileOutputStream fous = new FileOutputStream(tmpFile);
-        Algorithms.streamCopy(is, fous);
-        is.close();
-        fous.close();
+        try (InputStream is = new BufferedInputStream(file.getInputStream());
+             FileOutputStream fous = new FileOutputStream(tmpFile)) {
+            if (isGzipStream(is)) {
+                try (InputStream unzipped = new GZIPInputStream(is)) {
+                    if (!Algorithms.streamCopy(unzipped, fous, MAX_UNZIPPED_FILE_SIZE)) {
+                        throw new OsmAndPublicApiException(HttpStatus.PAYLOAD_TOO_LARGE.value(),
+                                "The unzipped file is larger than " + MAX_UNZIPPED_FILE_SIZE / UserdataService.MB + " MB");
+                    }
+                }
+            } else {
+                Algorithms.streamCopy(is, fous);
+            }
+        } catch (IOException | RuntimeException e) {
+            Files.deleteIfExists(tmpFile.toPath());
+            throw e;
+        }
         return tmpFile;
     }
     
     public File createTmpFileByGpxFile(GpxFile gpxFile, String fileName) throws IOException {
-        String sanitizedPrefix = fileName.replace("/../", "/");
-        File tmpGpx = File.createTempFile(GPX_FILE_PREFIX + sanitizedPrefix, GPX_FILE_EXT);
+        File tmpGpx = File.createTempFile(UserdataService.tmpFilePrefix(fileName), GPX_FILE_EXT);
         Exception exception = GpxUtilities.INSTANCE.writeGpxFile(new KFile(tmpGpx.getAbsolutePath()), gpxFile);
         if (exception != null) {
             throw new OsmAndPublicApiException(HttpStatus.BAD_REQUEST.value(), ERROR_WRITING_GPX_MSG);

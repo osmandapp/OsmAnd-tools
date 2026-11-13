@@ -1,4 +1,5 @@
 import os
+import random
 import threading
 import time
 import traceback
@@ -32,6 +33,23 @@ print(
     f"LLM: {MODEL}, SELECTED: {SELECTED_PLACE_IDS}/{SELECTED_MEDIA_IDS}, ENV: {SAVE_SCORE_ENV}, PHOTOS_PER_REQUEST: {MAX_PHOTOS_PER_REQUEST}, QUAD={QUAD}, \
     PHOTOS_PER_PLACE={PHOTOS_PER_PLACE}, PLACES_PER_QUAD={MAX_PLACES_PER_QUAD}, MIN_ELO={MIN_ELO}, MIN_ELO_SUBTYPE={MIN_ELO_SUBTYPE}",
     flush=True)
+
+RATE_LIMIT_RETRIES = int(os.getenv('RATE_LIMIT_RETRIES', '5'))
+RATE_LIMIT_MAX_DELAY = float(os.getenv('RATE_LIMIT_MAX_DELAY', '60'))
+
+
+def call_llm_with_backoff(prompt, batch_images):
+    # 429 from a shared upstream pool is transient: wait and retry instead of stopping the whole run.
+    for attempt in range(RATE_LIMIT_RETRIES + 1):
+        try:
+            return call_llm(prompt, batch_images)
+        except openai.RateLimitError as e:
+            if attempt == RATE_LIMIT_RETRIES:
+                raise
+            delay = min(RATE_LIMIT_MAX_DELAY, 5 * 2 ** attempt) * random.uniform(0.5, 1.5)
+            print(f"#{current_thread().name}. 429 rate limit, retry {attempt + 1}/{RATE_LIMIT_RETRIES} in {delay:.1f}s", flush=True)
+            time.sleep(delay)
+
 
 stop_immediately = False
 total_place_count = 0
@@ -208,7 +226,7 @@ def process_place(run_id, place_info, is_selected, media_ids):
             place_run['scored_photo_ids'] = []
 
             try:
-                res = call_llm(prompt, batch_images)
+                res = call_llm_with_backoff(prompt, batch_images)
                 if res:
                     place_run['duration'] = res['duration']
                     place_run['prompt_tokens'] = res['prompt_tokens']
@@ -216,7 +234,7 @@ def process_place(run_id, place_info, is_selected, media_ids):
             except (
                     openai.PermissionDeniedError,
                     openai.AuthenticationError,
-                    openai.RateLimitError,
+                    openai.RateLimitError,  # only after RATE_LIMIT_RETRIES are exhausted
                     openai.NotFoundError,
             ) as e:
                 print(f"#{current_thread().name}. STOPPED place {place_id}! Error: {e}")

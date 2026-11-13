@@ -391,7 +391,9 @@ public class TopTagValuesAnalyzer {
 	}
 
 	private Map<String, TagValueRegion> parseTagValueFile(File fl) throws FileNotFoundException, IOException {
-		BufferedReader r = new BufferedReader(new FileReader(fl));
+		// all_brands.csv or all_brands.csv.gz from collect-tag-values
+		BufferedReader r = fl.getName().endsWith(".gz") ? TagValuesCollector.reader(fl)
+				: new BufferedReader(new FileReader(fl));
 		Map<String, TagValueRegion> regions = new TreeMap<>();
 		String line = r.readLine(); // skip first line
 		while ((line = r.readLine()) != null) {

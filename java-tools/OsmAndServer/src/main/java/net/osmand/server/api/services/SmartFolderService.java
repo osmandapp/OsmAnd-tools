@@ -127,8 +127,9 @@ public class SmartFolderService {
 		File tmp = File.createTempFile(GENERAL_SETTINGS_PREFIX, JSON_FILE_EXT);
 		sessionResources.addGpxTempFilesToSession(session, tmp);
 		Files.writeString(tmp.toPath(), settingsJson.toString(2), StandardCharsets.UTF_8);
-		InternalZipFile zipFile = InternalZipFile.buildFromFileAndDelete(tmp);
-		return userDataService.uploadFile(zipFile, dev, GENERAL_SETTINGS_JSON_FILE, FILE_TYPE_GLOBAL, System.currentTimeMillis());
+		try (InternalZipFile zipFile = InternalZipFile.buildFromFileAndDelete(tmp)) {
+			return userDataService.uploadFile(zipFile, dev, GENERAL_SETTINGS_JSON_FILE, FILE_TYPE_GLOBAL, System.currentTimeMillis());
+		}
 	}
 
 	private String getFileDir(String name) {

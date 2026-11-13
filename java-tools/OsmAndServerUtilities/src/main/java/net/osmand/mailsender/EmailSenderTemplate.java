@@ -7,13 +7,12 @@ import org.apache.commons.mail.EmailException;
 import org.apache.commons.mail.HtmlEmail;
 
 import javax.annotation.Nullable;
-import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Year;
+import java.time.ZoneOffset;
 import java.util.*;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /*
@@ -35,29 +34,21 @@ Environment:
 
 Template files structure:
 
-	Check load() to see which common templates may be included.
-	Check findTemplateFile() to see how files are loaded from EMAIL_TEMPLATES directory.
+	See templates/email/README.md in web-server-config.
 
 Special variables:
 
 	@TO@, @TO_BASE64@ - automatically set with To-address before sending each email
 
-	@HTML_NEWLINE_TO_BR@ - user-defined option to convert \n to <br>\n (text-like templates)
-		This option is disabled by default and never applied to "already-html" templates.
-		If it is enabled in defaults.html, particular template might disable it with:
-			<!--Set HTML_NEWLINE_TO_BR=false--> OR <!--Unset HTML_NEWLINE_TO_BR-->
-
 Template variables:
 
-	The template engine supports 1st and 2nd level variables (e.g. FIRST=1 SECOND=@FIRST@ THIRD=@SECOND@)
+	Variables may reference other variables at any depth (e.g. FIRST=1 SECOND=@FIRST@ THIRD=@SECOND@)
 
 Public methods:
 
 	load() - load template from file (+lang)
-	template() - use string(s) as template (not file)
 
 	set() - set template variable (@TOKEN@ etc)
-	unset() - unset template variable
 
 	from() / name() - set From: email / name (optional)
 	subject() - set Subject: (optional)
@@ -74,15 +65,17 @@ Return values:
 
 Examples:
 
-	new EmailSenderTemplate().template("Subject: test\nHi!").to("test@email").to("other@email").send().isSuccess();
-	new EmailSenderTemplate().load("cloud/web", "en").to("osmand@t-online.de").set("TOKEN", "777").send().isSuccess();
+	new EmailSenderTemplate().load("cloud/account/login", "de").to("test@email").set("TOKEN", "777").send().isSuccess();
 
 */
 
 public class EmailSenderTemplate {
 	private static final Log LOG = LogFactory.getLog(EmailSenderTemplate.class);
+	static final String TEMPLATES_ENV = "EMAIL_TEMPLATES";
+	static final String TEMPLATES_HINT = TEMPLATES_ENV + "=/path/to/templates/email (environment)";
+	static final Pattern VARIABLE = Pattern.compile("@([A-Z0-9_]+)@");
 
-	public String defaultTemplatesDirectory = "./templates";
+	public String defaultTemplatesDirectory = templatesDirectory();
 
 	private final SmtpSendGridSender sender;
 	private int totalEmails, sentEmails;
@@ -97,16 +90,6 @@ public class EmailSenderTemplate {
 	private final String sendGridDomains = System.getenv("SENDGRID_DOMAINS");
 	private final String smtpDomains = System.getenv("SMTP_DOMAINS");
 
-	public static void test(String[] args) {
-		EmailSenderTemplate sender = new EmailSenderTemplate()
-				.load("cloud/web", "en")
-				.to("dmarc-reports@osmand.net")
-				.set("ACTION", "REGISTER")
-				.set("TOKEN", "777")
-				.send();
-		System.err.printf("SUCCESS (%b)\n", sender.isSuccess());
-	}
-
 	public String toString() {
 		return String.format("From: %s (%s)\nSubject: %s\n\n%s\n",
 				fill(fromEmail), fill(fromName), fill(subject), fill(body));
@@ -118,18 +101,21 @@ public class EmailSenderTemplate {
 
 	// configure by environment
 	public EmailSenderTemplate() {
-		final String templates = System.getenv("EMAIL_TEMPLATES");
-		if (templates != null) {
-			this.defaultTemplatesDirectory = templates;
-			// LOG.info("Using env EMAIL_TEMPLATES: " + templates);
-		}
-
 		final String smtpServer = System.getenv("SMTP_SERVER");
 		final String apiKey = System.getenv("SENDGRID_KEY");
 
 		testEmailCopy = System.getenv("TEST_EMAIL_COPY");
 
 		this.sender = new SmtpSendGridSender(smtpServer, apiKey);
+	}
+
+	static String templatesDirectory() {
+		final String templates = System.getenv(TEMPLATES_ENV);
+		if (templates == null) {
+			return "./templates";
+		}
+		// LOG.info("Using env EMAIL_TEMPLATES: " + templates);
+		return templates;
 	}
 
 	public EmailSenderTemplate send() {
@@ -145,7 +131,7 @@ public class EmailSenderTemplate {
 		}
 
 		for (String to : toList) {
-			setVarsByTo(to);
+			String html = fillBody(to);
 
 			// build SendGrid-compatible objects
 
@@ -154,7 +140,7 @@ public class EmailSenderTemplate {
 			Email fromObject = new Email(fill(fromEmail));
 			fromObject.setName(fill(fromName));
 
-			Content contentObject = new Content("text/html", fill(body));
+			Content contentObject = new Content("text/html", html);
 
 			Mail mailObject = new Mail(fromObject, fill(subject), toObject, contentObject);
 			mailObject.from = fromObject;
@@ -172,28 +158,37 @@ public class EmailSenderTemplate {
 		return this;
 	}
 
-	public EmailSenderTemplate load(String template, @Nullable String langNullable) {
-		String lang = langNullable == null ? "en" : langNullable;
-		include("defaults", lang, false); // settings (email-headers, vars, etc)
-		include("header", lang, false); // optional
-		include(template, lang, true); // template required
-		include("footer", lang, false); // optional
-		include("unsubscribe", lang, false); // optional
+	// lang comes from request parameters (e.g. the public /mapapi/auth/register) and becomes part of a translations
+	// file path (translations/<lang>.properties), so only locale-shaped values are accepted - anything else, such as
+	// "../../some/file", falls back to English instead of loading an arbitrary file into the email.
+	private static final Pattern LANG_PATTERN = Pattern.compile("[a-zA-Z]{2,3}([-_][a-zA-Z0-9]{2,4})?");
+
+	public static String safeLang(@Nullable String lang) {
+		return lang != null && LANG_PATTERN.matcher(lang).matches() ? lang : EmailTemplate.DEFAULT_LANG;
+	}
+
+	public EmailSenderTemplate load(String template, @Nullable String lang) {
+		return load(EmailTemplate.fromFile(defaultTemplatesDirectory, template, safeLang(lang)));
+	}
+
+	EmailSenderTemplate loadMarkup(String template, String markup, Map<String, Map<String, String>> addedLines,
+	                               @Nullable String lang) {
+		return load(EmailTemplate.fromMarkup(defaultTemplatesDirectory, template, markup, addedLines, safeLang(lang)));
+	}
+
+	private EmailSenderTemplate load(EmailTemplate emailTemplate) {
+		vars.putAll(emailTemplate.vars);
+		headers.putAll(emailTemplate.headers);
+		set("YEAR", String.valueOf(Year.now(ZoneOffset.UTC).getValue()));
+		fromEmail = emailTemplate.from;
+		fromName = emailTemplate.fromName;
+		subject = emailTemplate.subject;
+		body = emailTemplate.body;
 		return this;
 	}
 
 	public EmailSenderTemplate load(String template) {
-		return load(template, "en");
-	}
-
-	public EmailSenderTemplate template(String templateAsString) {
-		parse(Arrays.asList(templateAsString.split("\n")));
-		return this;
-	}
-
-	public EmailSenderTemplate template(List<String> templateAsList) {
-		parse(templateAsList);
-		return this;
+		return load(template, EmailTemplate.DEFAULT_LANG);
 	}
 
 	public EmailSenderTemplate from(String from) {
@@ -238,13 +233,8 @@ public class EmailSenderTemplate {
 		return this;
 	}
 
-	public EmailSenderTemplate set(HashMap<String, String> keyval) {
+	public EmailSenderTemplate set(Map<String, String> keyval) {
 		vars.putAll(keyval);
-		return this;
-	}
-
-	public EmailSenderTemplate unset(String key) {
-		vars.remove(key);
 		return this;
 	}
 
@@ -253,17 +243,27 @@ public class EmailSenderTemplate {
 	}
 
 	private String fill(String in) {
+		String filled = replaceVariables(in);
+		if (filled != null && VARIABLE.matcher(filled).find()) {
+			throw new IllegalStateException(filled + ": error - please fill all tokens @A-Z0-9_@");
+		}
+		return filled;
+	}
+
+	private String replaceVariables(String in) {
 		String filled = in;
 		if (filled != null) {
-			final int PASSES = 2; // enough
-			for (int i = 0; i < PASSES; i++) {
+			String previous;
+			int passes = 0;
+			do {
+				if (passes++ > vars.size()) {
+					throw new IllegalStateException("Template variables reference each other in a cycle");
+				}
+				previous = filled;
 				for (String key : vars.keySet()) {
 					filled = filled.replace("@" + key + "@", vars.get(key));
 				}
-			}
-			if (filled.matches("(?s)^.*@[A-Z_]+@.*$")) {
-				throw new IllegalStateException(filled + ": error - please fill all tokens @A-Z@");
-			}
+			} while (!filled.equals(previous));
 		}
 		return filled;
 	}
@@ -279,143 +279,39 @@ public class EmailSenderTemplate {
 		set("TO_BASE64", to64); // @TO_BASE64@
 	}
 
+	String fillBody(String to) {
+		setVarsByTo(to);
+		return fill(body);
+	}
+
+	String fillBodyKeepingMissing(String to) {
+		setVarsByTo(to);
+		return replaceVariables(body);
+	}
+
+	String subjectKeepingMissing() {
+		return replaceVariables(subject);
+	}
+
+	Map<String, String> headersKeepingMissing() {
+		Map<String, String> filled = new TreeMap<>();
+		headers.forEach((key, value) -> filled.put(key, replaceVariables(value)));
+		return filled;
+	}
+
 	private void validateLoadedTemplates() {
 		if (fromEmail == null || fromEmail.isEmpty()) {
-			throw new IllegalStateException("Fatal: fromEmail is not found (try <!--From: from@email-->)");
+			throw new IllegalStateException("Fatal: fromEmail is not found (try FROM=from@email in params.properties)");
 		}
 		if (fromName == null || fromName.isEmpty()) {
-			throw new IllegalStateException("Fatal: fromName is not found (try <!--Name: CompanyName-->)");
+			throw new IllegalStateException("Fatal: fromName is not found (try FROM_NAME=CompanyName in params.properties)");
 		}
 		if (subject == null || subject.isEmpty()) {
-			throw new IllegalStateException("Fatal: subject is not found (try <!--Subject: hello-->)");
+			throw new IllegalStateException("Fatal: subject is not found (try <NAME>_SUBJECT=hello in translations/en.properties)");
 		}
 		if (body == null || body.isEmpty()) {
 			throw new IllegalStateException("Fatal: body is not found (please fill template in)");
 		}
-	}
-
-	private final String HTML_COMMENT_MATCH = "(?s).*<!--.*?-->*.";
-	private final String HTML_COMMENT_REPLACE = "(?s)<!--.*?-->"; // (?s) Pattern.DOTALL (multiline)
-	private final String HTML_NEWLINE_TO_BR = "HTML_NEWLINE_TO_BR"; // user-defined var from templates
-
-	private void parseCommandArgumentsFromComment(String line) {
-		// <!--  Name  OsmAnd and co    -->
-		// <!--From: @NOREPLY_MAIL_FROM@-->
-		// <!--Set: HTML_NEWLINE_TO_BR=true-->
-		// <!-- Set DEFAULT_MAIL_FROM = noreply@domain -->
-		if (!line.matches(HTML_COMMENT_MATCH)) {
-			return;
-		}
-		Matcher matcher = Pattern.compile("<!--.*?([A-Za-z-]+)[:\\s]+(.*?)\\s*-->").matcher(line);
-		if (matcher.find()) {
-			String command = matcher.group(1);
-			String argument = matcher.group(2);
-			if ("Set".equalsIgnoreCase(command)) {
-				Matcher keyval = Pattern.compile("^(.*?)\\s*=\\s*(.*?)$").matcher(argument);
-				if (keyval.find()) {
-					set(keyval.group(1), keyval.group(2));
-				}
-			} else if ("Unset".equalsIgnoreCase(command)) {
-				unset(argument);
-			} else if ("From".equalsIgnoreCase(command)) {
-				fromEmail = argument;
-			} else if ("Name".equalsIgnoreCase(command)) {
-				fromName = argument;
-			} else if ("Subject".equalsIgnoreCase(command)) {
-				subject = argument;
-			} else {
-				// optional headers, eg:
-				// <!--List-Unsubscribe: <URL>-->
-				// <!--List-Unsubscribe-Post: List-Unsubscribe=One-Click-->
-				if (!argument.isEmpty()) {
-					headers.put(command, argument);
-				}
-			}
-		}
-	}
-
-	private File findTemplateFile(String template, String lang) {
-		List<String> search = Arrays.asList(
-				defaultTemplatesDirectory + "/" + template + "/" + lang + ".html", // dir/template/name/lang.html
-				defaultTemplatesDirectory + "/" + template + "/" + "en" + ".html", // dir/template/name/en.html
-				defaultTemplatesDirectory + "/" + template + "/" + "index" + ".html", // dir/template/name/index.html
-				defaultTemplatesDirectory + "/" + template + ".html" // dir/template/name.html
-		);
-
-		for (String path : search) {
-			String cleaned = path
-					.replaceAll("\\\\+", "/") // replace \ to /
-					.replaceAll("/+", "/") // replace // to /
-					.replace("(../)+", ""); // remove ../
-			File foundFile = new File(cleaned);
-			if (foundFile.isFile()) {
-				return foundFile;
-			}
-		}
-
-		return null;
-	}
-
-	private void include(String template, String lang, boolean required) {
-		File foundFile = findTemplateFile(template, lang);
-
-		if (foundFile == null) {
-			if (required) {
-				throw new IllegalStateException(template + ": template not found in " + defaultTemplatesDirectory +
-						" - fetch web-server-config and set EMAIL_TEMPLATES=/path/to/templates/email (environment)");
-			}
-			return; // silent
-		}
-
-		List<String> templateLines = new ArrayList<>();
-		Scanner reader;
-		try {
-			reader = new Scanner(foundFile);
-		} catch (FileNotFoundException e) {
-			throw new RuntimeException(e);
-		}
-		while (reader.hasNextLine()) {
-			templateLines.add(reader.nextLine());
-		}
-		reader.close();
-
-		parse(templateLines);
-	}
-
-	private void parse(List<String> lines) {
-		List<String> bodyLines = new ArrayList<>();
-		boolean htmlTagFound = false;
-
-		for (String line : lines) {
-			parseCommandArgumentsFromComment(line);
-
-			String cleaned = line.replaceAll(HTML_COMMENT_REPLACE, "");
-
-			// allow to specify Subject-line at the beginning of the template
-			if (bodyLines.isEmpty() && cleaned.trim().startsWith("Subject:")) {
-				subject = cleaned.replaceFirst(".*?:", "").trim();
-				continue;
-			}
-
-			// blank lines are allowed after non-blank
-			if (bodyLines.isEmpty() && cleaned.isEmpty()) {
-				continue;
-			}
-
-			// add <br> at end of line if options is enabled and <br> is not already added
-			String lowercase = cleaned.toLowerCase();
-			if (lowercase.contains("<html") || lowercase.contains("html>")) {
-				htmlTagFound = true;
-			}
-			if (!htmlTagFound && "true".equals(vars.get(HTML_NEWLINE_TO_BR)) && !lowercase.endsWith("<br>")) {
-				bodyLines.add(cleaned + "<br>" + "\n");
-			} else {
-				bodyLines.add(cleaned + "\n");
-			}
-		}
-
-		String joined = String.join("", bodyLines).replaceAll(HTML_COMMENT_REPLACE, "");
-		body = body == null ? joined : body + joined; // concat bodies from all included templates
 	}
 
 	public String concealEmail(String email) {
@@ -447,7 +343,6 @@ public class EmailSenderTemplate {
 						return error();
 					}
 				};
-				LOG.error("SendGrid sender is not configured");
 			}
 		}
 

@@ -6,6 +6,7 @@ import static net.osmand.util.Algorithms.colorToString;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiConsumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -13,11 +14,13 @@ import kotlin.Pair;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import net.osmand.shared.gpx.GpxUtilities;
+import net.osmand.shared.gpx.PointAttributes;
 import net.osmand.shared.gpx.primitives.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.stereotype.Component;
 
+import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 @Component
@@ -195,7 +198,8 @@ public class WebGpxParser {
     public class WebTrack {
         private List<Point> points;
 
-        private List<List<Point>> segments = new ArrayList<>();
+        // the same points as in points, not sent to the web
+        private transient List<List<Point>> segments = new ArrayList<>();
         private Track ext;
         
         public WebTrack(Track track, List<GpxUtilities.RouteType> routeTypes) {
@@ -426,17 +430,16 @@ public class WebGpxParser {
     
     public int addTrkptToRoutePoint(int currTrkPointInd, int prevTrkPointInd, Point routePoint, List<Point> trackPoints, List<Point> routePoints) {
         if (currTrkPointInd != 0) {
-            for (Point pt : trackPoints) {
-                int pointInd = trackPoints.indexOf(pt);
-                if (pointInd > prevTrkPointInd && pointInd <= currTrkPointInd) {
-                    if (routePoint.geometry == null) {
-                        routePoint.geometry = new ArrayList<>();
-                    }
-                    if (Objects.equals(pt.profile, GAP_PROFILE_TYPE)) {
-                        routePoint.profile = GAP_PROFILE_TYPE;
-                    }
-                    routePoint.geometry.add(pt);
+            int lastInd = Math.min(currTrkPointInd, trackPoints.size() - 1);
+            for (int pointInd = Math.max(prevTrkPointInd + 1, 0); pointInd <= lastInd; pointInd++) {
+                Point pt = trackPoints.get(pointInd);
+                if (routePoint.geometry == null) {
+                    routePoint.geometry = new ArrayList<>();
                 }
+                if (Objects.equals(pt.profile, GAP_PROFILE_TYPE)) {
+                    routePoint.profile = GAP_PROFILE_TYPE;
+                }
+                routePoint.geometry.add(pt);
             }
         }
         routePoints.add(routePoint);
@@ -445,58 +448,41 @@ public class WebGpxParser {
     
     public void addSrtmEle(List<WebTrack> tracks, GpxTrackAnalysis srtmAnalysis) {
         if (srtmAnalysis != null && tracks != null) {
-            int globalIndex = 0;
-            for (WebTrack track : tracks) {
-                for (Point point : track.points) {
-                    if (point.geometry != null) {
-                        for (Point p : point.geometry) {
-                            if (globalIndex < srtmAnalysis.getPointAttributes().size()) {
-                                p.srtmEle = srtmAnalysis.getPointAttributes().get(globalIndex).getElevation();
-                            }
-                            globalIndex++;
-                        }
-                    } else {
-                        if (globalIndex < srtmAnalysis.getPointAttributes().size()) {
-                            point.srtmEle = srtmAnalysis.getPointAttributes().get(globalIndex).getElevation();
-                        }
-                        globalIndex++;
-                    }
-                }
-            }
+            forEachAnalysedPoint(tracks, srtmAnalysis.getPointAttributes(), (point, attributes) -> point.srtmEle = attributes.getElevation());
         }
     }
     
     public void addAdditionalInfo(List<WebTrack> tracks, GpxTrackAnalysis analysis, boolean addSpeed) {
-        tracks.forEach(track -> {
-            int pointsSize = 0;
-            if (track.points == null || track.points.isEmpty() || analysis == null || analysis.getPointAttributes().isEmpty()) {
-                return;
+        if (analysis != null && tracks != null) {
+            forEachAnalysedPoint(tracks, analysis.getPointAttributes(), (point, attributes) -> {
+                point.distance = attributes.getDistance();
+                if (addSpeed) {
+                    point.speed = attributes.getSpeed();
+                }
+            });
+        }
+    }
+
+    private void forEachAnalysedPoint(List<WebTrack> tracks, List<PointAttributes> attributes, BiConsumer<Point, PointAttributes> action) {
+        int globalIndex = 0;
+        for (WebTrack track : tracks) {
+            if (Algorithms.isEmpty(track.points)) {
+                continue;
             }
+            boolean routed = track.points.get(0).geometry != null;
             for (Point point : track.points) {
-                if (point.geometry != null) {
-                    for (Point p : point.geometry) {
-                        int ind = point.geometry.indexOf(p);
-                        if (ind + pointsSize < analysis.getPointAttributes().size()) {
-                            p.distance = analysis.getPointAttributes().get(ind + pointsSize).getDistance();
-                            if (addSpeed) {
-                                p.speed = analysis.getPointAttributes().get(ind + pointsSize).getSpeed();
-                            }
-                        }
-                    }
-                } else {
-                    int ind = track.points.indexOf(point);
-                    if (ind < analysis.getPointAttributes().size()) {
-                        point.distance = analysis.getPointAttributes().get(ind).getDistance();
-                        if (addSpeed) {
-                            point.speed = analysis.getPointAttributes().get(ind).getSpeed();
-                        }
-                    }
+                List<Point> analysedPoints = routed ? point.geometry : Collections.singletonList(point);
+                if (analysedPoints == null) {
+                    continue;
                 }
-                if (point.geometry != null) {
-                    pointsSize += point.geometry.size();
+                for (Point p : analysedPoints) {
+                    if (globalIndex < attributes.size()) {
+                        action.accept(p, attributes.get(globalIndex));
+                    }
+                    globalIndex++;
                 }
             }
-        });
+        }
     }
     
     public Map<String, Object> getTrackAnalysis(GpxTrackAnalysis analysis, GpxTrackAnalysis srtmAnalysis) {
