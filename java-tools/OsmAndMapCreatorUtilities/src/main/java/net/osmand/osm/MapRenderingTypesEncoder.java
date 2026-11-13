@@ -680,12 +680,23 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		return tags;
 	}
 
+	// turn:lanes:both_ways lanes are added to each direction: left lanes go first, right lanes go last
+	// (left, left|left -> prepended; right, right|right -> appended; mixed values are left as is)
 	private void addBothWayValue(Map<String, String> tags, String tag, String bothWayValue) {
-		if (bothWayValue.equals("left")) {
+		if (allLanesEqual(bothWayValue, "left")) {
 			tags.put(tag, bothWayValue + "|" + tags.get(tag));
-		} else if (bothWayValue.equals("right")) {
+		} else if (allLanesEqual(bothWayValue, "right")) {
 			tags.put(tag, tags.get(tag) + "|" + bothWayValue);
 		}
+	}
+
+	private static boolean allLanesEqual(String lanes, String value) {
+		for (String lane : lanes.split("\\|", -1)) {
+			if (!lane.equals(value)) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	private Map<String, String> transformStepsRampTags(Map<String, String> tags) {
