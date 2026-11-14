@@ -111,6 +111,10 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	public static final int DEFAULT_TOP_INDEX_MAX_PER_MAP = PoiType.DEFAULT_MAX_PER_MAP;
 	public static final int DEFAULT_TOP_INDEX_LIMIT_PER_MAP = 1000;
 	public static final int DEFAULT_NAME_INDEX_POI_TYPES = 1000;
+	// an alternative name of a top index value (name:xx of its POIs named by the value) is a name of the whole brand
+	// only if enough of those POIs carry it
+	public static final int ALT_NAME_MIN_POIS = 3;
+	public static final double ALT_NAME_MIN_SHARE = 0.1;
 
 	// some multipolygons have > 38K islands (tongass)
 	private static final int MAX_POI_OUTER_MULTIPOLYGON_SIZE = 256;
@@ -430,36 +434,37 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		}
 		String wd = a.getAdditionalInfo(tag + "_wikidata");
 		if (wd != null && wd.length() > 0) {
-			rulType.setWikidataId(wd);
-			addAltNames(mainValue, rulType, mainValue);
-			// add all names as alternative "tag" name (alternative brand names)
+			rulType.addWikidataId(wd);
+			// add all names as alternative "tag" name (alternative brand names), counted once per POI
 			if (mainValue.equalsIgnoreCase(tempNames.get("name"))) {
 				int mainValueParts = SearchAlgorithms.split(mainValue).size();
+				Set<String> poiAltNames = PoiAdditionalType.newNameSet();
 				for (String k : tempNames.keySet()) {
 					if (k.startsWith("name:")) {
 						String v = tempNames.get(k);
 						if (SearchAlgorithms.split(v).size() == mainValueParts) {
-							addAltNamesMix(mainValue, rulType, v);
+							addAltNamesMix(mainValue, poiAltNames, v);
 						}
 					}
 				}
+				rulType.addNamedPoi(poiAltNames);
 			}
 			
 		}
 		return null;
 	}
 
-	private void addAltNamesMix(String mainValue, PoiAdditionalType rulType, String val) {
-		addAltNames(mainValue, rulType, val);
+	private void addAltNamesMix(String mainValue, Set<String> altNames, String val) {
+		addAltNames(mainValue, altNames, val);
 		if (val.indexOf('.') != -1) {
-			addAltNames(mainValue, rulType, val.replace(".", " "));
-			addAltNames(mainValue, rulType, val.replace(".", ""));
+			addAltNames(mainValue, altNames, val.replace(".", " "));
+			addAltNames(mainValue, altNames, val.replace(".", ""));
 		}
 	}
 	
-	private void addAltNames(String mainValue, PoiAdditionalType rulType, String val) {
+	private void addAltNames(String mainValue, Set<String> altNames, String val) {
 		if (!val.equalsIgnoreCase(mainValue)) {
-			rulType.getAltNames().add(val);
+			altNames.add(val);
 		}
 	}
 
@@ -1416,14 +1421,14 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		private String value;
 		private boolean text;
 		private String wikidataId;
-		private Set<String> altNames = new TreeSet<String>(new Comparator<String>() {
-
-			@Override
-			public int compare(String o1, String o2) {
-				// no collator ! (mix with .)
-				return o1.toLowerCase().compareTo(o2.toLowerCase());
-			}
-		});
+		// wikidata id -> number of POIs of the value tagged with it
+		private Map<String, Integer> wikidataIdPois = new LinkedHashMap<String, Integer>();
+		// no collator ! (mix with .)
+		private static final Comparator<String> NAME_COMPARATOR = Comparator.comparing(String::toLowerCase);
+		// alternative name -> number of POIs named by the value that carry it
+		private final Map<String, Integer> poiAltNames = new TreeMap<>(NAME_COMPARATOR);
+		// POIs named by the value (name == value)
+		private int namedPois;
 		private int usage;
 		private int targetId;
 		private int id;
@@ -1443,7 +1448,27 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			return text;
 		}
 		
+		static Set<String> newNameSet() {
+			return new TreeSet<String>(NAME_COMPARATOR);
+		}
+
+		public void addNamedPoi(Set<String> poiAltNames) {
+			namedPois++;
+			for (String altName : poiAltNames) {
+				Integer cnt = this.poiAltNames.get(altName);
+				this.poiAltNames.put(altName, cnt == null ? 1 : cnt + 1);
+			}
+		}
+
+		// the alternative names carried by enough POIs named by the value to be names of the whole brand
 		public Set<String> getAltNames() {
+			Set<String> altNames = newNameSet();
+			for (Map.Entry<String, Integer> e : poiAltNames.entrySet()) {
+				int cnt = e.getValue();
+				if (cnt >= ALT_NAME_MIN_POIS && cnt >= ALT_NAME_MIN_SHARE * namedPois) {
+					altNames.add(e.getKey());
+				}
+			}
 			return altNames;
 		}
 
@@ -1467,10 +1492,17 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			return value;
 		}
 		
-		public void setWikidataId(String wikidataId) {
-			this.wikidataId = wikidataId;
+		// a value can be tagged with the wikidata ids of several brands (brand:th=คาลเท็กซ์ of one PT station among
+		// the Caltex ones): the value takes the id of most of its POIs, the first seen on a tie, not the last one
+		public void addWikidataId(String wikidataId) {
+			Integer cnt = wikidataIdPois.get(wikidataId);
+			cnt = cnt == null ? 1 : cnt + 1;
+			wikidataIdPois.put(wikidataId, cnt);
+			if (this.wikidataId == null || cnt > wikidataIdPois.get(this.wikidataId)) {
+				this.wikidataId = wikidataId;
+			}
 		}
-		
+
 		public String getWikidataId() {
 			return wikidataId;
 		}
