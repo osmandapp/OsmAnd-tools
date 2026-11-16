@@ -71,7 +71,6 @@ public class FixNfcNamesOperation extends AbstractFileFixOperation {
 	}
 
 	private boolean renameToNfc(UserFile file, String newName) {
-		userdataService.lockFileNames(file.userid);
 		List<UserFile> versions = getVersions(file, file.name);
 		List<UserFile> nfcVersions = getVersions(file, newName);
 		List<UserFile> staleDeletions = getStaleDeletions(versions, nfcVersions);

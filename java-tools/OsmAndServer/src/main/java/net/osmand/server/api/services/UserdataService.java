@@ -162,8 +162,6 @@ public class UserdataService {
     private static final String CR_SANITIZE = "$0D"; // \r
     private static final String LF_SANITIZE = "$0A"; // \n
 
-    private static final int FILE_NAMES_LOCK = 1;
-
     private static final int ERROR_CODE_EMAIL_IS_INVALID = 1 + ERROR_CODE_PRO_USERS;
     private static final int ERROR_CODE_NO_VALID_SUBSCRIPTION = 2 + ERROR_CODE_PRO_USERS;
     public static final int ERROR_CODE_USER_IS_NOT_REGISTERED = 3 + ERROR_CODE_PRO_USERS;
@@ -489,7 +487,7 @@ public class UserdataService {
 		if (storageService.storeLocally()) {
 			usf.data = zipfile.getBytes();
 		}
-		saveUserFile(usf, name);
+		filesRepository.saveAndFlush(usf);
 		return ResponseEntity.ok(gson.toJson(new ResponseFileStatus(usf)));
 	}
 
@@ -576,33 +574,6 @@ public class UserdataService {
             return nfcName;
         }
         return name;
-    }
-
-    public void lockFileNames(int userid) {
-        filesRepository.lockFileNames(FILE_NAMES_LOCK, userid);
-    }
-
-    private String getLockedStoredFileName(int userid, String name, String type) {
-        if (!KUnicode.INSTANCE.normalizeNFC(name).equals(name)) {
-            lockFileNames(userid);
-        }
-        return getStoredFileName(userid, name, type);
-    }
-
-    private void saveUserFile(UserFile usf, String requestedName) {
-        if (KUnicode.INSTANCE.normalizeNFC(requestedName).equals(requestedName)) {
-            filesRepository.saveAndFlush(usf);
-            return;
-        }
-        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
-            lockFileNames(usf.userid);
-            String storedName = getStoredFileName(usf.userid, requestedName, usf.type);
-            if (storedName.equals(usf.name)) {
-                filesRepository.saveAndFlush(usf);
-            } else {
-                renameFileVersion(usf, storedName);
-            }
-        });
     }
 
     public static boolean hasContent(UserFile file) {
@@ -934,7 +905,7 @@ public class UserdataService {
             if (storageService.storeLocally()) {
                 usf.data = zipFile.getBytes();
             }
-            saveUserFile(usf, prevFile.name);
+            filesRepository.saveAndFlush(usf);
             return ResponseEntity.ok(gson.toJson(new UserFileNoData(usf)));
         }
     }
@@ -1069,7 +1040,7 @@ public class UserdataService {
 	@Transactional
     public void deleteFile(String name, String type, Integer deviceId, Long clienttime, CloudUserDevicesRepository.CloudUserDevice dev) {
         CloudUserFilesRepository.UserFile usf = new CloudUserFilesRepository.UserFile();
-        usf.name = getLockedStoredFileName(dev.userid, name, type);
+        usf.name = getStoredFileName(dev.userid, name, type);
         usf.type = type;
         usf.updatetime = new Date();
         usf.userid = dev.userid;

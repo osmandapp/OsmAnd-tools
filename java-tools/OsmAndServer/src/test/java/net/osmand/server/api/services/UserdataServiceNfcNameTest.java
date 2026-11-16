@@ -17,7 +17,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.transaction.PlatformTransactionManager;
 
 import net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
 import net.osmand.server.api.repo.CloudUserFilesRepository;
@@ -44,7 +43,6 @@ public class UserdataServiceNfcNameTest {
 		ReflectionTestUtils.setField(service, "filesRepository", filesRepository);
 		ReflectionTestUtils.setField(service, "storageService", storageService);
 		ReflectionTestUtils.setField(service, "shareFileService", shareFileService);
-		ReflectionTestUtils.setField(service, "transactionManager", mock(PlatformTransactionManager.class));
 	}
 
 	@Test
