@@ -35,7 +35,7 @@ public class FixStorageNamesOperation extends AbstractFileFixOperation {
 	}
 
 	private boolean needsMigration(UserFile v) {
-		return Algorithms.isEmpty(v.storagename) && v.filesize != null && v.filesize >= 0
+		return Algorithms.isEmpty(v.storagename) && UserdataService.hasContent(v)
 				&& userdataService.computeStorageName(v.type, v.name, v.updatetime) != null;
 	}
 }

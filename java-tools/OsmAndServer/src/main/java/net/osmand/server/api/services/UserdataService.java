@@ -36,6 +36,7 @@ import net.osmand.server.api.repo.*;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.shared.io.KFile;
+import net.osmand.shared.util.KUnicode;
 import okio.GzipSource;
 import okio.Okio;
 import org.apache.commons.collections4.IterableUtils;
@@ -160,6 +161,8 @@ public class UserdataService {
     private static final int SHORT_FILENAME = 200; // bytes a too-long basename is shortened to
     private static final String CR_SANITIZE = "$0D"; // \r
     private static final String LF_SANITIZE = "$0A"; // \n
+
+    private static final int FILE_NAMES_LOCK = 1;
 
     private static final int ERROR_CODE_EMAIL_IS_INVALID = 1 + ERROR_CODE_PRO_USERS;
     private static final int ERROR_CODE_NO_VALID_SUBSCRIPTION = 2 + ERROR_CODE_PRO_USERS;
@@ -349,8 +352,7 @@ public class UserdataService {
         res.userid = userId;
         Set<String> fileIds = new TreeSet<>();
         for (UserFileNoData sf : files) {
-            String fileId = sf.type + "____" + sf.name;
-	        boolean isNewestFile = fileIds.add(fileId);
+	        boolean isNewestFile = fileIds.add(getFileId(sf));
 
 	        if (sf.filesize >= 0) {
 		        res.totalFileVersions++;
@@ -413,14 +415,15 @@ public class UserdataService {
 
 	public ResponseEntity<String> uploadMultipartFile(MultipartFile file, CloudUserDevicesRepository.CloudUserDevice dev,
 			String name, String type, Long clienttime, HttpSession session) throws IOException {
-		if (cloudMapFilesService.isDeletedMapFile(name, type)) {
-			return cloudMapFilesService.handleDeletedMapUpload(name, type, clienttime, dev);
+		String fileName = getStoredFileName(dev.userid, name, type);
+		if (cloudMapFilesService.isDeletedMapFile(fileName, type)) {
+			return cloudMapFilesService.handleDeletedMapUpload(fileName, type, clienttime, dev);
 		}
-		try (InternalZipFile zipfile = getUploadZipFile(file, name, type, session)) {
+		try (InternalZipFile zipfile = getUploadZipFile(file, fileName, type, session)) {
 			validateUserForUpload(dev, type, zipfile.getSize());
-			return uploadFile(zipfile, dev, name, type, clienttime);
+			return uploadFile(zipfile, dev, fileName, type, clienttime);
 		} catch (OsmAndPublicApiException e) {
-			LOG.warn(String.format("Upload rejected for user %d, file %s/%s: %s", dev.userid, type, name, e.getMessage()));
+			LOG.warn(String.format("Upload rejected for user %d, file %s/%s: %s", dev.userid, type, fileName, e.getMessage()));
 			throw e;
 		}
 	}
@@ -471,7 +474,7 @@ public class UserdataService {
 	public ResponseEntity<String> uploadFile(InternalZipFile zipfile, CloudUserDevicesRepository.CloudUserDevice dev,
 			String name, String type, Long clienttime) throws IOException {
 		CloudUserFilesRepository.UserFile usf = new CloudUserFilesRepository.UserFile();
-		usf.name = name;
+		usf.name = getStoredFileName(dev.userid, name, type);
 		usf.type = type;
 		usf.updatetime = new Date();
 		if (clienttime != null) {
@@ -486,7 +489,7 @@ public class UserdataService {
 		if (storageService.storeLocally()) {
 			usf.data = zipfile.getBytes();
 		}
-		filesRepository.saveAndFlush(usf);
+		saveUserFile(usf, name);
 		return ResponseEntity.ok(gson.toJson(new ResponseFileStatus(usf)));
 	}
 
@@ -557,6 +560,57 @@ public class UserdataService {
         }
         fl.storagename = bounded;
         filesRepository.save(fl);
+    }
+
+    public void renameFileVersion(UserFile fl, String newName) {
+        if (hasContent(fl) && Algorithms.isEmpty(fl.storagename)) {
+            fl.storagename = storageFileName(fl);
+        }
+        fl.name = newName;
+        filesRepository.save(fl);
+    }
+
+    public String getStoredFileName(int userid, String name, String type) {
+        String nfcName = KUnicode.INSTANCE.normalizeNFC(name);
+        if (nfcName.equals(name) || !filesRepository.existsByUseridAndNameAndType(userid, name, type)) {
+            return nfcName;
+        }
+        return name;
+    }
+
+    public void lockFileNames(int userid) {
+        filesRepository.lockFileNames(FILE_NAMES_LOCK, userid);
+    }
+
+    private String getLockedStoredFileName(int userid, String name, String type) {
+        if (!KUnicode.INSTANCE.normalizeNFC(name).equals(name)) {
+            lockFileNames(userid);
+        }
+        return getStoredFileName(userid, name, type);
+    }
+
+    private void saveUserFile(UserFile usf, String requestedName) {
+        if (KUnicode.INSTANCE.normalizeNFC(requestedName).equals(requestedName)) {
+            filesRepository.saveAndFlush(usf);
+            return;
+        }
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            lockFileNames(usf.userid);
+            String storedName = getStoredFileName(usf.userid, requestedName, usf.type);
+            if (storedName.equals(usf.name)) {
+                filesRepository.saveAndFlush(usf);
+            } else {
+                renameFileVersion(usf, storedName);
+            }
+        });
+    }
+
+    public static boolean hasContent(UserFile file) {
+        return file.filesize != null && file.filesize >= 0;
+    }
+
+    public static String getFileId(UserFileNoData file) {
+        return file.type + "____" + file.name;
     }
 
     public synchronized void updateSecureEmailToken(CloudUser user) {
@@ -880,13 +934,14 @@ public class UserdataService {
             if (storageService.storeLocally()) {
                 usf.data = zipFile.getBytes();
             }
-            filesRepository.saveAndFlush(usf);
+            saveUserFile(usf, prevFile.name);
             return ResponseEntity.ok(gson.toJson(new UserFileNoData(usf)));
         }
     }
     
     public boolean checkIfRestoredVersionExists(String name, String type, Long updatetime, CloudUserDevicesRepository.CloudUserDevice dev) {
-        UserFile file = filesRepository.findTopByUseridAndNameAndTypeAndUpdatetimeGreaterThanOrderByUpdatetimeDesc(dev.userid, name, type, new Date(updatetime));
+        UserFile file = filesRepository.findTopByUseridAndNameAndTypeAndUpdatetimeGreaterThanOrderByUpdatetimeDesc(dev.userid,
+                getStoredFileName(dev.userid, name, type), type, new Date(updatetime));
         return file != null;
     }
     
@@ -971,7 +1026,7 @@ public class UserdataService {
 		if (name.contains("/../")) {
 			return null; // just ../ or /.. is valid
 		}
-        name = sanitizeDecode(name);
+        name = getStoredFileName(dev.userid, sanitizeDecode(name), type);
         if (updatetime != null) {
             return filesRepository.findTopByUseridAndNameAndTypeAndUpdatetime(dev.userid, name, type,
                     new Date(updatetime));
@@ -984,8 +1039,8 @@ public class UserdataService {
         if (dev == null) {
             return null;
         }
-        return filesRepository.findTopByUseridAndNameAndTypeAndUpdatetimeLessThanOrderByUpdatetimeDesc(dev.userid, name, type,
-                new Date(updatetime));
+        return filesRepository.findTopByUseridAndNameAndTypeAndUpdatetimeLessThanOrderByUpdatetimeDesc(dev.userid,
+                getStoredFileName(dev.userid, name, type), type, new Date(updatetime));
     }
     
     public InputStream getInputStream(CloudUserFilesRepository.UserFile userFile) {
@@ -1014,7 +1069,7 @@ public class UserdataService {
 	@Transactional
     public void deleteFile(String name, String type, Integer deviceId, Long clienttime, CloudUserDevicesRepository.CloudUserDevice dev) {
         CloudUserFilesRepository.UserFile usf = new CloudUserFilesRepository.UserFile();
-        usf.name = name;
+        usf.name = getLockedStoredFileName(dev.userid, name, type);
         usf.type = type;
         usf.updatetime = new Date();
         usf.userid = dev.userid;
@@ -1026,15 +1081,15 @@ public class UserdataService {
             usf.clienttime = new Date(clienttime);
         }
         filesRepository.saveAndFlush(usf);
-		shareFileService.deleteShareFile(name, dev.userid);
+		shareFileService.deleteShareFile(usf.name, dev.userid);
     }
 
     //delete entry from database!
     public ResponseEntity<String> deleteFileVersion(Long updatetime, int userid, String fileName, String fileType, UserFile file) {
         UserFile userFile = file;
         if (updatetime != null && userFile == null) {
-            userFile = filesRepository.findTopByUseridAndNameAndTypeAndUpdatetime(userid, fileName, fileType,
-                    new Date(updatetime));
+            userFile = filesRepository.findTopByUseridAndNameAndTypeAndUpdatetime(userid,
+                    getStoredFileName(userid, fileName, fileType), fileType, new Date(updatetime));
         }
         if (userFile == null) {
             throw new OsmAndPublicApiException(UserdataService.ERROR_CODE_FILE_NOT_AVAILABLE, ERROR_MESSAGE_FILE_IS_NOT_AVAILABLE);
@@ -1078,8 +1133,9 @@ public class UserdataService {
 	}
 
 	private FileVersionsForDeletion prepareVersionsForDeletion(int userid, String fileName, String fileType) {
+		String storedName = getStoredFileName(userid, fileName, fileType);
 		List<UserFile> primaryVersions = filesRepository.findAllByUseridAndNameAndTypeOrderByUpdatetimeDesc(
-				userid, fileName, fileType);
+				userid, storedName, fileType);
 		Map<Long, UserFile> allVersions = new LinkedHashMap<>();
 		for (UserFile file : primaryVersions) {
 			allVersions.put(file.id, file);
@@ -1087,7 +1143,7 @@ public class UserdataService {
 		// GPX analysis is stored as a separate companion file and must not survive the source GPX.
 		if (FILE_TYPE_GPX.equals(fileType) && !fileName.endsWith(INFO_EXT)) {
 			List<UserFile> infoVersions = filesRepository.findAllByUseridAndNameAndTypeOrderByUpdatetimeDesc(
-					userid, fileName + INFO_EXT, fileType);
+					userid, storedName + INFO_EXT, fileType);
 			for (UserFile file : infoVersions) {
 				allVersions.put(file.id, file);
 			}
@@ -1289,7 +1345,7 @@ public class UserdataService {
     }
 
     public UserFile getLastFileVersion(int id, String fileName, String fileType) {
-        return filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(id, fileName, fileType);
+        return filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(id, getStoredFileName(id, fileName, fileType), fileType);
     }
 
 	public void updateFileSize(UserFileNoData ufnd) {
@@ -1377,7 +1433,7 @@ public class UserdataService {
             JSONArray itemsJson = new JSONArray();
 			zs = new ZipOutputStream(new FileOutputStream(tmpFile));
 			for (CloudUserFilesRepository.UserFileNoData sf : files) {
-				String fileId = sf.type + "____" + sf.name;
+				String fileId = getFileId(sf);
                 if (shouldSkipFile(filterTypes, sf, null)) {
                     continue;
                 }

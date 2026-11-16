@@ -38,6 +38,9 @@ public interface CloudUserFilesRepository extends JpaRepository<UserFile, Long> 
 
 	boolean existsByUseridAndNameAndType(int userid, String name, String type);
 
+	@Query(value = "SELECT 1 FROM (SELECT pg_advisory_xact_lock(?1, ?2)) l", nativeQuery = true)
+	Integer lockFileNames(int lockClass, int userid);
+
 	Iterable<UserFile> findAllByUserid(int userid);
 
     @Query("SELECT uf FROM UserFile uf "

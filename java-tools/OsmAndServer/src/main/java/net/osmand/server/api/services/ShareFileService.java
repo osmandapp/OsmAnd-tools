@@ -158,6 +158,19 @@ public class ShareFileService {
 		return false;
 	}
 
+	public void renameShareFile(String name, String newName, int userid) {
+		ShareFileRepository.ShareFile shareFile = shareFileRepository.findByOwneridAndFilepath(userid, name);
+		if (shareFile == null) {
+			return;
+		}
+		if (shareFileRepository.findByOwneridAndFilepath(userid, newName) != null) {
+			shareFileRepository.delete(shareFile);
+		} else {
+			shareFile.filepath = newName;
+			shareFileRepository.saveAndFlush(shareFile);
+		}
+	}
+
 	public void deleteAllShareFiles(int userid) {
 		shareFileRepository.deleteAll(shareFileRepository.findByOwnerid(userid));
 	}
