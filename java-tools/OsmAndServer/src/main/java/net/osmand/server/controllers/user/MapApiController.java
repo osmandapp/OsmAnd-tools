@@ -175,11 +175,13 @@ public class MapApiController {
 		String username = credentials.username;
 		String password = credentials.password;
 		if (username == null || password == null) {
+			LOG.info(String.format("XXX Username or password is null for user '%s'", username));
 			return ResponseEntity.badRequest().body("Username and password are required");
 		}
 		
 		ResponseEntity<String> response = userdataService.checkUserEmail(username);
 		if (response.getStatusCodeValue() != 200) {
+			LOG.info(String.format("XXX User '%s' does not exist", username));
 			return ResponseEntity.badRequest().body(EMAIL_ERROR);
 		}
 		
@@ -187,6 +189,7 @@ public class MapApiController {
 		try {
 			authManager.authenticate(pwt);
 		} catch (AuthenticationException e) {
+			LOG.info(String.format("XXX User '%s' incorrect pw '%s' ", username, password));
 			return ResponseEntity.badRequest().body(PASSWORD_ERROR);
 		}
 		request.login(username, password);
