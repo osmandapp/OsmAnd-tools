@@ -111,10 +111,16 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	public static final int DEFAULT_TOP_INDEX_MAX_PER_MAP = PoiType.DEFAULT_MAX_PER_MAP;
 	public static final int DEFAULT_TOP_INDEX_LIMIT_PER_MAP = 1000;
 	public static final int DEFAULT_NAME_INDEX_POI_TYPES = 1000;
-	// an alternative name of a top index value (name:xx of its POIs named by the value) is a name of the whole brand
-	// only if enough of those POIs carry it
+	// an alternative name of a top index value (name:xx of its POIs named by the value, same number of words) is kept
+	// unless there is evidence against it (PoiAdditionalType.getAltNames). A name of ALT_NAME_MIN_POIS POIs is kept,
+	// a weaker one is cut if it is a name of a brand with another wikidata id (Shell on a PT station) or a minority
+	// of its language: less than ALT_NAME_MAX_MINORITY_SHARE of at least ALT_NAME_MIN_LANG_POIS POIs with a name:xx
+	// of the same number of words (the value included) and unlike the value and the strong names
+	// (ALT_NAME_MIN_SIMILARITY): Банкомат of 2 of 499 name:ru of Беларусбанк is cut, the only name:en Omsin stays
 	public static final int ALT_NAME_MIN_POIS = 3;
-	public static final double ALT_NAME_MIN_SHARE = 0.1;
+	public static final double ALT_NAME_MAX_MINORITY_SHARE = 0.3;
+	public static final int ALT_NAME_MIN_LANG_POIS = 2;
+	public static final double ALT_NAME_MIN_SIMILARITY = 0.4;
 
 	// some multipolygons have > 38K islands (tongass)
 	private static final int MAX_POI_OUTER_MULTIPOLYGON_SIZE = 256;
@@ -436,35 +442,39 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		if (wd != null && wd.length() > 0) {
 			rulType.addWikidataId(wd);
 			// add all names as alternative "tag" name (alternative brand names), counted once per POI
+			// with the languages carrying them and the languages having a name of the same number of words
 			if (mainValue.equalsIgnoreCase(tempNames.get("name"))) {
 				int mainValueParts = SearchAlgorithms.split(mainValue).size();
-				Set<String> poiAltNames = PoiAdditionalType.newNameSet();
+				Map<String, Set<String>> poiAltNames = PoiAdditionalType.newNameMap();
+				Set<String> poiLangs = new HashSet<>();
 				for (String k : tempNames.keySet()) {
 					if (k.startsWith("name:")) {
 						String v = tempNames.get(k);
 						if (SearchAlgorithms.split(v).size() == mainValueParts) {
-							addAltNamesMix(mainValue, poiAltNames, v);
+							String lang = k.substring("name:".length());
+							poiLangs.add(lang);
+							addAltNamesMix(mainValue, poiAltNames, lang, v);
 						}
 					}
 				}
-				rulType.addNamedPoi(poiAltNames);
+				rulType.addNamedPoi(poiAltNames, poiLangs);
 			}
 			
 		}
 		return null;
 	}
 
-	private void addAltNamesMix(String mainValue, Set<String> altNames, String val) {
-		addAltNames(mainValue, altNames, val);
+	private void addAltNamesMix(String mainValue, Map<String, Set<String>> altNames, String lang, String val) {
+		addAltNames(mainValue, altNames, lang, val);
 		if (val.indexOf('.') != -1) {
-			addAltNames(mainValue, altNames, val.replace(".", " "));
-			addAltNames(mainValue, altNames, val.replace(".", ""));
+			addAltNames(mainValue, altNames, lang, val.replace(".", " "));
+			addAltNames(mainValue, altNames, lang, val.replace(".", ""));
 		}
 	}
-	
-	private void addAltNames(String mainValue, Set<String> altNames, String val) {
+
+	private void addAltNames(String mainValue, Map<String, Set<String>> altNames, String lang, String val) {
 		if (!val.equalsIgnoreCase(mainValue)) {
-			altNames.add(val);
+			altNames.computeIfAbsent(val, k -> new HashSet<>()).add(lang);
 		}
 	}
 
@@ -810,6 +820,7 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		// 2. write categories table
 		PoiCreatorCategories globalCategories = rootZoomsTree.node.categories;
 		writer.writePoiCategoriesTable(globalCategories);
+		markOtherBrandNames(globalCategories);
 		writer.writePoiSubtypesTable(globalCategories, topIndexAdditional);
 		
 		// 2.5 write names table
@@ -908,6 +919,30 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		prepareStatement.close();
 
 		writer.endWritePoiIndex();
+	}
+
+	/**
+	 * A weak alternative name of a written top index value that is the value or a strong alternative name of a value
+	 * with another wikidata id is the name of another brand (Shell, Caltex, Bangchak among the names of PT stations).
+	 * Weak only: one brand can have several wikidata ids (Shell, เชลล์), and its strong names stay.
+	 */
+	private void markOtherBrandNames(PoiCreatorCategories categories) {
+		List<PoiAdditionalType> brands = new ArrayList<>();
+		Map<String, Set<String>> brandNameIds = new HashMap<>();
+		for (PoiAdditionalType rt : categories.additionalAttributes) {
+			Set<String> written = rt.isText() ? null : topIndexAdditional.get(rt.getTag());
+			if (written == null || !written.contains(rt.getValue()) || rt.getWikidataId() == null) {
+				continue;
+			}
+			brands.add(rt);
+			brandNameIds.computeIfAbsent(rt.getValue().toLowerCase(), k -> new HashSet<>()).add(rt.getWikidataId());
+			for (String altName : rt.getStrongAltNames()) {
+				brandNameIds.computeIfAbsent(altName.toLowerCase(), k -> new HashSet<>()).add(rt.getWikidataId());
+			}
+		}
+		for (PoiAdditionalType rt : brands) {
+			rt.markOtherBrandNames(brandNameIds);
+		}
 	}
 
 	private void collectTopIndexMap() throws SQLException, IOException {
@@ -1427,8 +1462,12 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		private static final Comparator<String> NAME_COMPARATOR = Comparator.comparing(String::toLowerCase);
 		// alternative name -> number of POIs named by the value that carry it
 		private final Map<String, Integer> poiAltNames = new TreeMap<>(NAME_COMPARATOR);
-		// POIs named by the value (name == value)
-		private int namedPois;
+		// alternative name -> language -> POIs carrying it in that name:xx
+		private final Map<String, Map<String, Integer>> altNameLangPois = new TreeMap<>(NAME_COMPARATOR);
+		// language -> POIs named by the value with a name:xx of the same number of words (the value itself included)
+		private final Map<String, Integer> langPois = new HashMap<>();
+		// weak alternative names that are names of a brand with another wikidata id
+		private final Set<String> otherBrandNames = new TreeSet<>(NAME_COMPARATOR);
 		private int usage;
 		private int targetId;
 		private int id;
@@ -1452,24 +1491,125 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			return new TreeSet<String>(NAME_COMPARATOR);
 		}
 
-		public void addNamedPoi(Set<String> poiAltNames) {
-			namedPois++;
-			for (String altName : poiAltNames) {
-				Integer cnt = this.poiAltNames.get(altName);
-				this.poiAltNames.put(altName, cnt == null ? 1 : cnt + 1);
+		static Map<String, Set<String>> newNameMap() {
+			return new TreeMap<>(NAME_COMPARATOR);
+		}
+
+		/**
+		 * @param poiAltNames alternative names of one POI named by the value -> languages carrying them
+		 * @param poiLangs languages of the POI with a name:xx of the same number of words as the value
+		 */
+		public void addNamedPoi(Map<String, Set<String>> poiAltNames, Set<String> poiLangs) {
+			for (String lang : poiLangs) {
+				langPois.merge(lang, 1, Integer::sum);
+			}
+			for (Map.Entry<String, Set<String>> e : poiAltNames.entrySet()) {
+				this.poiAltNames.merge(e.getKey(), 1, Integer::sum);
+				Map<String, Integer> langs = altNameLangPois.computeIfAbsent(e.getKey(), k -> new HashMap<>());
+				for (String lang : e.getValue()) {
+					langs.merge(lang, 1, Integer::sum);
+				}
 			}
 		}
 
-		// the alternative names carried by enough POIs named by the value to be names of the whole brand
-		public Set<String> getAltNames() {
-			Set<String> altNames = newNameSet();
+		// the alternative names carried by enough POIs to be names of the brand whatever the other names are
+		Set<String> getStrongAltNames() {
+			Set<String> strong = newNameSet();
 			for (Map.Entry<String, Integer> e : poiAltNames.entrySet()) {
-				int cnt = e.getValue();
-				if (cnt >= ALT_NAME_MIN_POIS && cnt >= ALT_NAME_MIN_SHARE * namedPois) {
-					altNames.add(e.getKey());
+				if (e.getValue() >= ALT_NAME_MIN_POIS) {
+					strong.add(e.getKey());
+				}
+			}
+			return strong;
+		}
+
+		// brandNameIds: lower case values and strong alternative names of the written top index values -> wikidata ids
+		void markOtherBrandNames(Map<String, Set<String>> brandNameIds) {
+			for (Map.Entry<String, Integer> e : poiAltNames.entrySet()) {
+				Set<String> ids = e.getValue() >= ALT_NAME_MIN_POIS ? null : brandNameIds.get(e.getKey().toLowerCase());
+				if (ids != null && (ids.size() > 1 || !ids.contains(wikidataId))) {
+					otherBrandNames.add(e.getKey());
+				}
+			}
+		}
+
+		// the alternative names that are names of the whole brand: all but those with evidence against them
+		public Set<String> getAltNames() {
+			Set<String> altNames = getStrongAltNames();
+			List<String> strong = null;
+			for (String altName : poiAltNames.keySet()) {
+				if (altNames.contains(altName) || otherBrandNames.contains(altName)) {
+					continue;
+				}
+				if (strong == null) {
+					strong = new ArrayList<>();
+					strong.add(normalizeForSimilarity(value));
+					for (String s : altNames) {
+						strong.add(normalizeForSimilarity(s));
+					}
+				}
+				if (!isLanguageMinority(altName, strong)) {
+					altNames.add(altName);
 				}
 			}
 			return altNames;
+		}
+
+		// a minority of the language where the name is the most used, and unlike the value and the strong names
+		private boolean isLanguageMinority(String altName, List<String> strong) {
+			String lang = null;
+			int langCnt = 0;
+			for (Map.Entry<String, Integer> l : altNameLangPois.get(altName).entrySet()) {
+				if (l.getValue() > langCnt) {
+					lang = l.getKey();
+					langCnt = l.getValue();
+				}
+			}
+			Integer competitors = langPois.get(lang);
+			if (competitors == null || competitors < ALT_NAME_MIN_LANG_POIS
+					|| langCnt >= ALT_NAME_MAX_MINORITY_SHARE * competitors) {
+				return false;
+			}
+			String norm = normalizeForSimilarity(altName);
+			for (String s : strong) {
+				if (similarity(norm, s) >= ALT_NAME_MIN_SIMILARITY) {
+					return false;
+				}
+			}
+			return true;
+		}
+
+		private static String normalizeForSimilarity(String name) {
+			return Junidecode.unidecode(name).toLowerCase().replaceAll("[^\\p{L}\\p{N}]", "");
+		}
+
+		// 1 if one contains the other, else the Dice coefficient of the character bigrams
+		private static double similarity(String a, String b) {
+			if (a.isEmpty() || b.isEmpty()) {
+				return 0;
+			}
+			if (a.contains(b) || b.contains(a)) {
+				return 1;
+			}
+			Set<String> ga = bigrams(a), gb = bigrams(b);
+			int common = 0;
+			for (String g : ga) {
+				if (gb.contains(g)) {
+					common++;
+				}
+			}
+			return 2.0 * common / (ga.size() + gb.size());
+		}
+
+		private static Set<String> bigrams(String s) {
+			Set<String> g = new HashSet<>();
+			for (int i = 0; i + 2 <= s.length(); i++) {
+				g.add(s.substring(i, i + 2));
+			}
+			if (s.length() == 1) {
+				g.add(s);
+			}
+			return g;
 		}
 
 		public void increment() {
