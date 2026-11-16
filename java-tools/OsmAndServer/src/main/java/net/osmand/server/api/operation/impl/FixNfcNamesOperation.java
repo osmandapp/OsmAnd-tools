@@ -21,7 +21,7 @@ import net.osmand.server.api.services.StorageService;
 import net.osmand.server.api.services.UserdataService;
 import net.osmand.shared.util.KUnicode;
 
-/** Renames files whose name is not in NFC, all versions at once; when both forms exist, drops deletions newer than the last live version (test run only lists them). */
+/** Renames Cloud file names to NFC. */
 @Component
 @AdminOperation(name = "fix-nfc-names")
 public class FixNfcNamesOperation extends AbstractFileFixOperation {

@@ -60,6 +60,9 @@ public class ShareFileService {
 	public static final String PRIVATE_SHARE_TYPE = "private";
 	public static final String PUBLIC_SHARE_TYPE = "public";
 
+	private static final List<String> ACCESS_PRIORITY = List.of(PermissionType.PENDING.name(),
+			PermissionType.READ.name(), PermissionType.BLOCKED.name());
+
 	@Transactional
 	public UUID generateSharedCode(CloudUserFilesRepository.UserFile userFile, boolean publicAccess) {
 		UUID uniqueCode = generateUniqueCode();
@@ -163,11 +166,37 @@ public class ShareFileService {
 		if (shareFile == null) {
 			return;
 		}
-		if (shareFileRepository.findByOwneridAndFilepath(userid, newName) != null) {
+		ShareFileRepository.ShareFile newShareFile = shareFileRepository.findByOwneridAndFilepath(userid, newName);
+		if (newShareFile != null) {
+			copyAccessRecords(shareFile, newShareFile);
 			shareFileRepository.delete(shareFile);
 		} else {
 			shareFile.filepath = newName;
 			shareFileRepository.saveAndFlush(shareFile);
+		}
+	}
+
+	private void copyAccessRecords(ShareFileRepository.ShareFile from, ShareFileRepository.ShareFile to) {
+		boolean changed = false;
+		for (ShareFileRepository.ShareFilesAccess access : from.accessRecords) {
+			ShareFileRepository.ShareFilesAccess existing = to.accessRecords.stream()
+					.filter(a -> a.user.id == access.user.id)
+					.findFirst()
+					.orElse(null);
+			if (existing == null) {
+				ShareFileRepository.ShareFilesAccess copy = new ShareFileRepository.ShareFilesAccess();
+				copy.user = access.user;
+				copy.access = access.access;
+				copy.requestDate = access.requestDate;
+				to.addAccessRecord(copy);
+				changed = true;
+			} else if (ACCESS_PRIORITY.indexOf(access.access) > ACCESS_PRIORITY.indexOf(existing.access)) {
+				existing.access = access.access;
+				changed = true;
+			}
+		}
+		if (changed) {
+			shareFileRepository.saveAndFlush(to);
 		}
 	}
 
