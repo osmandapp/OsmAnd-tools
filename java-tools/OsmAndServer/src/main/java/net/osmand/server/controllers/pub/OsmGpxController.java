@@ -76,8 +76,8 @@ public class OsmGpxController {
 	private static final int MAX_RUNTIME_CACHE_SIZE = 5000;
 	private static final int MAX_ROUTES_SUMMARY = 100000;
 	private static final int MAX_ROUTES_FULL_MODE_THRESHOLD = 5000;
-	private static final int MAX_NEAR_RADIUS_M = 500_000;
-	private static final int MAX_NEAR_ROUTES = 500;
+	private static final int MAX_NEAR_RADIUS_M = 50_000;
+	private static final int MAX_NEAR_ROUTES = 1000;
 	private static final int MAX_NEAR_CANDIDATES = 5000;
 	private static final int MAX_TAGS_PER_BBOX = 1000;
 	private final AtomicInteger cacheTouch = new AtomicInteger(0);
