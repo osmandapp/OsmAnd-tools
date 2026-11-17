@@ -306,8 +306,8 @@ public class DownloadOsmGPX {
 		utility.commitAllStatements();
 	}
 
-	static void ensureActivitySchema(Connection dbConn) throws SQLException {
-		try (Statement statement = dbConn.createStatement()) {
+	static void ensureActivitySchema(Connection connection) throws SQLException {
+		try (Statement statement = connection.createStatement()) {
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS activity text");
 
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS speed float");

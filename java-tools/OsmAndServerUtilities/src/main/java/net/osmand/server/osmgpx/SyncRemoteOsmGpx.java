@@ -34,21 +34,19 @@ public class SyncRemoteOsmGpx {
 	public static final int MAX_BATCH_SIZE = 5000;
 
 	// JSON preserves nullable coordinates and timestamp precision without manual conversions.
-	public record Track(JsonNode metadata, byte[] gpx) {
+	public record OsmGpxTrack(JsonNode metadata, byte[] gpx) {
 	}
 
-	public record MetadataColumns(String sql, Set<String> names, String updateSql) {
+	public record MetadataColumns(String sql, Set<String> names) {
 	}
 
 	public static MetadataColumns getMetadataColumns(Connection connection) throws SQLException {
 		try (Statement statement = connection.createStatement();
-			 ResultSet rs = statement.executeQuery("SELECT string_agg(quote_ident(attname), ', ' ORDER BY attnum), array_agg(attname::text),"
-					 + " string_agg(quote_ident(attname) || ' = EXCLUDED.' || quote_ident(attname), ', ' ORDER BY attnum)"
-					 + " FILTER (WHERE attname <> 'id')"
+			 ResultSet rs = statement.executeQuery("SELECT string_agg(quote_ident(attname), ', ' ORDER BY attnum), array_agg(attname::text)"
 					 + " FROM pg_attribute WHERE attrelid = '" + GPX_METADATA_TABLE_NAME + "'::regclass"
 					 + " AND attnum > 0 AND NOT attisdropped AND attgenerated = ''")) {
 			rs.next();
-			return new MetadataColumns(rs.getString(1), Set.of((String[]) rs.getArray(2).getArray()), rs.getString(3));
+			return new MetadataColumns(rs.getString(1), Set.of((String[]) rs.getArray(2).getArray()));
 		}
 	}
 
@@ -127,12 +125,12 @@ public class SyncRemoteOsmGpx {
 					+ (fromId == null ? "" : "&fromId=" + fromId) + (toId == null ? "" : "&toId=" + toId)))
 					.header(API_KEY_HEADER, apiKey).timeout(Duration.ofMinutes(5)).GET().build();
 			HttpResponse<InputStream> response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
-			Track[] tracks;
+			OsmGpxTrack[] tracks;
 			try (InputStream body = response.body()) {
 				if (response.statusCode() != 200) {
 					throw new IOException("OsmGpx batch request failed: HTTP " + response.statusCode());
 				}
-				tracks = JSON_MAPPER.readValue(body, Track[].class);
+				tracks = JSON_MAPPER.readValue(body, OsmGpxTrack[].class);
 			}
 			if (tracks == null || tracks.length > batchSize) {
 				throw new IOException("Invalid OsmGpx batch");
@@ -144,12 +142,7 @@ public class SyncRemoteOsmGpx {
 			if (toId != null && tracks[tracks.length - 1].metadata().path("id").asInt() > toId) {
 				throw new IOException("OsmGpx batch exceeds requested id range");
 			}
-			int lastId;
-			if (resync) {
-				lastId = updateBatch(connection, metadataColumns, tracks, fromId);
-			} else {
-				lastId = insertBatch(connection, metadataColumns, tracks, fromId);
-			}
+			int lastId = saveBatch(connection, metadataColumns, tracks, fromId, resync);
 			totalTracks += tracks.length;
 			double tracksPerHour = totalTracks * (double) Duration.ofHours(1).toNanos()
 					/ Math.max(1, System.nanoTime() - startedNanos);
@@ -164,25 +157,24 @@ public class SyncRemoteOsmGpx {
 		System.out.println("OsmGpx batch limit reached, total " + totalTracks + " tracks, next id " + fromId);
 	}
 
-	static int insertBatch(Connection connection, MetadataColumns metadataColumns, Track[] tracks, Integer fromId) throws SQLException {
-		return saveBatch(connection, metadataColumns, tracks, fromId, "DO NOTHING", "DO NOTHING");
-	}
-
-	static int updateBatch(Connection connection, MetadataColumns metadataColumns, Track[] tracks, Integer fromId) throws SQLException {
-		return saveBatch(connection, metadataColumns, tracks, fromId,
-				"DO UPDATE SET " + metadataColumns.updateSql(), "DO UPDATE SET data = EXCLUDED.data");
-	}
-
-	private static int saveBatch(Connection connection, MetadataColumns metadataColumns, Track[] tracks, Integer fromId,
-	                              String metadataConflict, String filesConflict) throws SQLException {
+	static int saveBatch(Connection connection, MetadataColumns metadataColumns, OsmGpxTrack[] tracks, Integer fromId,
+	                     boolean doUpdate) throws SQLException {
+		// Missing JSON fields keep their current values during resync.
+		String metadataConflict = doUpdate
+				? "DO UPDATE SET (" + metadataColumns.sql() + ") = (SELECT " + metadataColumns.sql()
+						+ " FROM json_populate_record(" + GPX_METADATA_TABLE_NAME + ", (SELECT metadata FROM incoming)))"
+				: "DO NOTHING";
+		String filesConflict = doUpdate ? "DO UPDATE SET data = EXCLUDED.data" : "DO NOTHING";
 		int lastId = fromId == null ? -1 : fromId - 1;
 		connection.setAutoCommit(false);
-		try (PreparedStatement metadata = connection.prepareStatement("INSERT INTO " + GPX_METADATA_TABLE_NAME + " (" + metadataColumns.sql() + ")"
-				+ " SELECT " + metadataColumns.sql() + " FROM json_populate_record(NULL::" + GPX_METADATA_TABLE_NAME + ", ?::json)"
+		try (PreparedStatement metadata = connection.prepareStatement("WITH incoming AS (SELECT ?::json AS metadata)"
+				+ " INSERT INTO " + GPX_METADATA_TABLE_NAME + " (" + metadataColumns.sql() + ")"
+				+ " SELECT " + metadataColumns.sql() + " FROM json_populate_record(NULL::" + GPX_METADATA_TABLE_NAME
+				+ ", (SELECT metadata FROM incoming))"
 				+ " ON CONFLICT (id) " + metadataConflict);
 			 PreparedStatement files = connection.prepareStatement("INSERT INTO " + GPX_FILES_TABLE_NAME + " (id, data) VALUES (?, ?)"
 					 + " ON CONFLICT (id) " + filesConflict)) {
-			for (Track track : tracks) {
+			for (OsmGpxTrack track : tracks) {
 				JsonNode id = track == null || track.metadata() == null ? null : track.metadata().get("id");
 				if (id == null || !id.isIntegralNumber() || !id.canConvertToInt() || id.intValue() <= lastId) {
 					throw new IllegalArgumentException("OsmGpx batch ids must be increasing int values");
