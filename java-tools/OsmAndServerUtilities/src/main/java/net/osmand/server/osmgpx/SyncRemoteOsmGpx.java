@@ -93,7 +93,7 @@ public class SyncRemoteOsmGpx {
 
 	@Nullable
 	private static Integer parseId(String value) {
-		if (value == null) {
+		if (Algorithms.isEmpty(value)) {
 			return null;
 		}
 		int id = Algorithms.parseIntSilently(value, -1);
