@@ -300,7 +300,7 @@ public class MainUtilities {
 				if (a.startsWith("--")) {
 					if (a.contains("=")) {
 						String[] keyval = a.split("=");
-						setOpt(keyval[0], keyval[1]); // --opt=value
+						setOpt(keyval[0], keyval.length > 1 ? keyval[1] : ""); // --opt=[value]
 					} else {
 						setOpt(a, "true"); // --opt
 					}
