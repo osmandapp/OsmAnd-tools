@@ -15,6 +15,8 @@ import java.time.Duration;
 import java.util.Iterator;
 import java.util.Set;
 
+import javax.annotation.Nullable;
+
 import com.fasterxml.jackson.databind.JsonNode;
 
 import net.osmand.MainUtilities.CommandLineOpts;
@@ -78,7 +80,7 @@ public class SyncRemoteOsmGpx {
 			throw new IllegalArgumentException("from-id must be <= to-id");
 		}
 		String apiKey = System.getenv(API_KEY_ENV);
-		if (apiKey == null || apiKey.isBlank()) {
+		if (Algorithms.isBlank(apiKey)) {
 			throw new IllegalArgumentException(API_KEY_ENV + " is required");
 		}
 		String url = opts.getStrings().get(0).replaceAll("/+$", "") + API_PATH;
@@ -89,6 +91,7 @@ public class SyncRemoteOsmGpx {
 		}
 	}
 
+	@Nullable
 	private static Integer parseId(String value) {
 		if (value == null) {
 			return null;
