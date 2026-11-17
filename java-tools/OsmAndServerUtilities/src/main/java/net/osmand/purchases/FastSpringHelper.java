@@ -2,9 +2,11 @@ package net.osmand.purchases;
 
 import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
 import com.google.gson.Gson;
+import com.google.gson.JsonParseException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -61,6 +63,8 @@ public class FastSpringHelper {
 	// values for the "kind" column, same convention as UpdateSubscription.deleteSubscription (expired/invalid/gone)
 	public static final String KIND_REFUND = "refund";
 	public static final String KIND_CHARGEBACK = "chargeback";
+
+	private static final String ORDER_NOT_FOUND_ERROR = "Not found";
 
 	private static final String API_BASE = "https://api.fastspring.com";
 	private static final int CONNECT_TIMEOUT_MILLIS = 30 * 1000;
@@ -205,22 +209,41 @@ public class FastSpringHelper {
 		}
 	}
 
+	@Nullable
 	private static FastSpringOrder getOrder(String orderId) throws IOException {
 		HttpURLConnection connection = openConnection("/orders/" + orderId);
+		int code = connection.getResponseCode();
+		if (code == HttpURLConnection.HTTP_BAD_REQUEST && isOrderNotFound(connection)) {
+			LOG.warn("FastSpring order not found: " + orderId);
+			return null;
+		}
 		try (InputStream is = connection.getInputStream();
 		     InputStreamReader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
-			if (connection.getResponseCode() != 200) {
-				LOG.warn("Failed to get FastSpring order: " +
-						connection.getResponseCode() + " " + connection.getResponseMessage());
+			if (code != HttpURLConnection.HTTP_OK) {
+				LOG.warn("Failed to get FastSpring order: " + code + " " + connection.getResponseMessage());
 				return null;
 			}
 			FastSpringOrder order = GSON.fromJson(reader, FastSpringOrder.class);
 			if (order == null) {
-				LOG.warn("Failed to get FastSpring order: " + connection.getResponseCode() + " " + connection.getResponseMessage());
+				LOG.warn("Empty FastSpring order response: " + orderId);
 				return null;
 			}
 
 			return order;
+		}
+	}
+
+	private static boolean isOrderNotFound(HttpURLConnection connection) throws IOException {
+		InputStream errorStream = connection.getErrorStream();
+		if (errorStream == null) {
+			return false;
+		}
+		try (InputStreamReader reader = new InputStreamReader(errorStream, StandardCharsets.UTF_8)) {
+			FastSpringOrderErrorResponse response = GSON.fromJson(reader, FastSpringOrderErrorResponse.class);
+			return response != null && response.orders != null && response.orders.stream()
+					.anyMatch(r -> r.error != null && ORDER_NOT_FOUND_ERROR.equals(r.error.order));
+		} catch (JsonParseException e) {
+			return false;
 		}
 	}
 
@@ -292,6 +315,18 @@ public class FastSpringHelper {
 			public String sku;
 			public Double subtotal;
 			public String subscription; //subscriptionId
+		}
+	}
+
+	private static class FastSpringOrderErrorResponse {
+		public List<OrderResult> orders;
+
+		private static class OrderResult {
+			public OrderError error;
+		}
+
+		private static class OrderError {
+			public String order;
 		}
 	}
 
