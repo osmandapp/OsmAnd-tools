@@ -19,6 +19,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.SingleConnectionDataSource;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
@@ -55,7 +56,10 @@ public class SyncRemoteOsmGpxTest {
 				return true;
 			}
 		};
-		controller = new OsmGpxSyncController(new JdbcTemplate(new SingleConnectionDataSource(source, true)), config, "secret");
+		controller = new OsmGpxSyncController();
+		ReflectionTestUtils.setField(controller, "jdbcTemplate", new JdbcTemplate(new SingleConnectionDataSource(source, true)));
+		ReflectionTestUtils.setField(controller, "config", config);
+		ReflectionTestUtils.setField(controller, "apiKey", "secret");
 	}
 
 	@After

@@ -1,6 +1,7 @@
 package net.osmand.server.controllers.pub;
 
 import org.junit.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -13,7 +14,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 public class OsmGpxSyncControllerTest {
 
 	private MockMvc mvc(String key) {
-		return MockMvcBuilders.standaloneSetup(new OsmGpxSyncController(null, new DatasourceConfiguration(), key)).build();
+		OsmGpxSyncController controller = new OsmGpxSyncController();
+		ReflectionTestUtils.setField(controller, "config", new DatasourceConfiguration());
+		ReflectionTestUtils.setField(controller, "apiKey", key);
+		return MockMvcBuilders.standaloneSetup(controller).build();
 	}
 
 	@Test

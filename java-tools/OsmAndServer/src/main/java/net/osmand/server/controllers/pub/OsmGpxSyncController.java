@@ -31,17 +31,15 @@ import static net.osmand.server.controllers.pub.OsmGpxController.GPX_METADATA_TA
 @RestController
 public class OsmGpxSyncController {
 
-	private final JdbcTemplate jdbcTemplate;
-	private final DatasourceConfiguration config;
-	private final String apiKey;
+	@Autowired
+	@Qualifier("osmgpxJdbcTemplate")
+	private JdbcTemplate jdbcTemplate;
 
 	@Autowired
-	public OsmGpxSyncController(@Qualifier("osmgpxJdbcTemplate") JdbcTemplate jdbcTemplate, DatasourceConfiguration config,
-			@Value("${" + SyncRemoteOsmGpx.API_KEY_ENV + ":}") String apiKey) {
-		this.jdbcTemplate = jdbcTemplate;
-		this.config = config;
-		this.apiKey = apiKey;
-	}
+	private DatasourceConfiguration config;
+
+	@Value("${" + SyncRemoteOsmGpx.API_KEY_ENV + ":}")
+	private String apiKey;
 
 	@GetMapping(path = SyncRemoteOsmGpx.API_PATH, produces = MediaType.APPLICATION_JSON_VALUE)
 	public List<Track> batch(@RequestHeader(value = SyncRemoteOsmGpx.API_KEY_HEADER, required = false) String key,
