@@ -35,12 +35,14 @@ public class OsmGpxSyncControllerTest {
 			mvc.perform(get(SyncRemoteOsmGpx.API_PATH).header(SyncRemoteOsmGpx.API_KEY_HEADER, "secret").param("limit", limit))
 					.andExpect(status().isBadRequest());
 		}
-		mvc.perform(get(SyncRemoteOsmGpx.API_PATH).header(SyncRemoteOsmGpx.API_KEY_HEADER, "secret").param("fromId", "-1"))
-				.andExpect(status().isBadRequest());
-		for (String toId : new String[] {"-1", "invalid"}) {
-			mvc.perform(get(SyncRemoteOsmGpx.API_PATH).header(SyncRemoteOsmGpx.API_KEY_HEADER, "secret").param("toId", toId))
-					.andExpect(status().isBadRequest());
+		for (String name : new String[] {"fromId", "toId"}) {
+			for (String value : new String[] {"-1", "invalid", "2147483648"}) {
+				mvc.perform(get(SyncRemoteOsmGpx.API_PATH).header(SyncRemoteOsmGpx.API_KEY_HEADER, "secret").param(name, value))
+						.andExpect(status().isBadRequest());
+			}
 		}
+		mvc.perform(get(SyncRemoteOsmGpx.API_PATH).header(SyncRemoteOsmGpx.API_KEY_HEADER, "secret")
+				.param("fromId", "101").param("toId", "100")).andExpect(status().isBadRequest());
 	}
 
 	@Test

@@ -43,14 +43,16 @@ public class OsmGpxSyncController {
 
 	@GetMapping(path = SyncRemoteOsmGpx.API_PATH, produces = MediaType.APPLICATION_JSON_VALUE)
 	public List<Track> batch(@RequestHeader(value = SyncRemoteOsmGpx.API_KEY_HEADER, required = false) String key,
-	                         @RequestParam(name = "fromId", defaultValue = "0") long fromId,
+	                         @RequestParam(name = "fromId", required = false) Integer fromId,
 	                         @RequestParam(name = "limit", defaultValue = "" + SyncRemoteOsmGpx.DEFAULT_BATCH_SIZE) int limit,
-	                         @RequestParam(name = "toId", defaultValue = "0") long toId) {
+	                         @RequestParam(name = "toId", required = false) Integer toId) {
 		if (apiKey.isBlank() || key == null || !MessageDigest.isEqual(apiKey.getBytes(StandardCharsets.UTF_8),
 				key.getBytes(StandardCharsets.UTF_8))) {
 			throw new ResponseStatusException(HttpStatus.FORBIDDEN);
 		}
-		if (fromId < 0 || toId < 0 || limit < 1 || limit > SyncRemoteOsmGpx.MAX_BATCH_SIZE) {
+		if ((fromId != null && fromId < 0) || (toId != null && toId < 0)
+				|| (fromId != null && toId != null && fromId > toId)
+				|| limit < 1 || limit > SyncRemoteOsmGpx.MAX_BATCH_SIZE) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid cursor or batch size");
 		}
 		if (!config.osmgpxInitialized()) {
@@ -58,8 +60,7 @@ public class OsmGpxSyncController {
 		}
 		String metadataColumnsSql = jdbcTemplate.execute(SyncRemoteOsmGpx::getMetadataColumns).sql();
 		return jdbcTemplate.query("SELECT row_to_json(m)::text AS metadata, f.data FROM"
-				+ " (SELECT " + metadataColumnsSql + " FROM " + GPX_METADATA_TABLE_NAME
-				+ " WHERE id >= ? AND id <= ?) m"
+				+ " (SELECT " + metadataColumnsSql + " FROM " + GPX_METADATA_TABLE_NAME + " WHERE id BETWEEN ? AND ?) m"
 				+ " INNER JOIN " + GPX_FILES_TABLE_NAME + " f ON f.id = m.id ORDER BY m.id LIMIT ?", (ResultSetExtractor<List<Track>>) rs -> {
 			List<Track> tracks = new ArrayList<>();
 			while (rs.next()) {
@@ -67,6 +68,6 @@ public class OsmGpxSyncController {
 						rs.getBytes("data")));
 			}
 			return tracks;
-		}, fromId, toId == 0 ? Long.MAX_VALUE : toId, limit);
+		}, fromId == null ? 0 : fromId, toId == null ? Integer.MAX_VALUE : toId, limit);
 	}
 }

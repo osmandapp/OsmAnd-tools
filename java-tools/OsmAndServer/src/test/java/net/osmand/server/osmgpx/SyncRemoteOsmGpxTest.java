@@ -20,6 +20,8 @@ import org.junit.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
@@ -38,7 +40,7 @@ import static org.mockito.Mockito.*;
 public class SyncRemoteOsmGpxTest {
 
 	private static final ObjectMapper JSON = new ObjectMapper();
-	private static final long ID = 9007199254740993L; // must not lose bigint precision in JSON
+	private static final int ID = 12_504_745;
 	private Connection source;
 	private Connection target;
 	private OsmGpxSyncController controller;
@@ -107,13 +109,13 @@ public class SyncRemoteOsmGpxTest {
 			assertTrue(rs.next());
 			assertEquals(batch.get(0).metadata(), JSON.readTree(rs.getString(1)));
 		}
-		assertTrue(controller.batch("secret", ID + 1, 100, 0).isEmpty());
+		assertTrue(controller.batch("secret", ID + 1, 100, null).isEmpty());
 	}
 
 	@Test
 	public void refreshesColumnsBetweenRequestsAndQuotesTheirNames() throws Exception {
 		saveBatch(source, new Track[] {track(ID)}, 0);
-		assertEquals(1, controller.batch("secret", 0, 100, 0).size());
+		assertEquals(1, controller.batch("secret", null, 100, null).size());
 		for (Connection connection : new Connection[] {source, target}) {
 			execute(connection, "ALTER TABLE osm_gpx_data ADD COLUMN \"future field\" text, ADD COLUMN obsolete text");
 			execute(connection, "ALTER TABLE osm_gpx_data DROP COLUMN obsolete");
@@ -156,7 +158,7 @@ public class SyncRemoteOsmGpxTest {
 		List<Track> next = readBatch(ID + 1, 1);
 		assertEquals(1, next.size());
 		assertEquals(ID + 2, next.get(0).metadata().get("id").longValue());
-		assertTrue(controller.batch("secret", ID + 3, 1, 0).isEmpty());
+		assertTrue(controller.batch("secret", ID + 3, 1, null).isEmpty());
 	}
 
 	@Test
@@ -241,10 +243,10 @@ public class SyncRemoteOsmGpxTest {
 		Arrays.fill(geometry, (byte) 0xab);
 		try (PreparedStatement update = source.prepareStatement("UPDATE osm_gpx_data SET simplified_geometry = ? WHERE id = ?")) {
 			update.setBytes(1, geometry);
-			update.setLong(2, ID);
+			update.setInt(2, ID);
 			update.executeUpdate();
 		}
-		String response = JSON.writeValueAsString(controller.batch("secret", 0, 1, 0));
+		String response = JSON.writeValueAsString(controller.batch("secret", null, 1, null));
 		try (Statement statement = source.createStatement();
 			 ResultSet rs = statement.executeQuery("SELECT row_to_json(m)::text FROM (SELECT "
 					 + SyncRemoteOsmGpx.getMetadataColumns(source).sql() + " FROM osm_gpx_data) m")) {
@@ -261,14 +263,14 @@ public class SyncRemoteOsmGpxTest {
 		AtomicInteger requests = new AtomicInteger();
 		String url = startServer(fail, requests);
 		HttpClient client = HttpClient.newHttpClient();
-		assertThrows(IOException.class, () -> SyncRemoteOsmGpx.downloadAndInsertBatches(target, client, url, "secret", 1, 0, 0, 0));
+		assertThrows(IOException.class, () -> SyncRemoteOsmGpx.downloadAndInsertBatches(target, client, url, "secret", 1, 0, null, null));
 		assertEquals(1, count(target, "osm_gpx_data"));
 		execute(target, "UPDATE osm_gpx_data SET activity = 'walking', name = 'local'");
-		SyncRemoteOsmGpx.downloadAndInsertBatches(target, client, url, "secret", 1, 1, 0, 0);
+		SyncRemoteOsmGpx.downloadAndInsertBatches(target, client, url, "secret", 1, 1, null, null);
 		assertEquals(2, count(target, "osm_gpx_data"));
 		assertEquals(2, count(target, "osm_gpx_files"));
 		assertEquals(3, requests.get()); // No extra request after reaching the batch limit.
-		SyncRemoteOsmGpx.downloadAndInsertBatches(target, client, url, "secret", 1, 0, 0, 0);
+		SyncRemoteOsmGpx.downloadAndInsertBatches(target, client, url, "secret", 1, 0, null, null);
 		assertEquals(3, count(target, "osm_gpx_data"));
 		saveBatch(target, new Track[] {track(ID)}, 0);
 		try (Statement statement = target.createStatement();
@@ -283,12 +285,34 @@ public class SyncRemoteOsmGpxTest {
 	public void startsWithZeroAndAdvancesToTheNextId() throws Exception {
 		saveBatch(source, new Track[] {track(0), track(1)}, 0);
 		String url = startServer(new AtomicBoolean(false), new AtomicInteger());
-		SyncRemoteOsmGpx.downloadAndInsertBatches(target, HttpClient.newHttpClient(), url, "secret", 1, 0, 0, 0);
+		SyncRemoteOsmGpx.downloadAndInsertBatches(target, HttpClient.newHttpClient(), url, "secret", 1, 0, null, null);
 		assertEquals(2, count(target, "osm_gpx_data"));
 		assertEquals(2, count(target, "osm_gpx_files"));
 		assertEquals(0, readBatch(0, 1).get(0).metadata().get("id").longValue());
 		assertEquals(1, readBatch(1, 1).get(0).metadata().get("id").longValue());
 		assertTrue(readBatch(2, 1).isEmpty());
+	}
+
+	@Test
+	public void distinguishesOmittedBoundsFromZero() throws Exception {
+		Track[] tracks = {track(0), track(1)};
+		saveBatch(source, tracks, 0);
+		saveBatch(target, tracks, 0);
+		assertEquals(2, controller.batch("secret", null, 100, null).size());
+		assertEquals(1, controller.batch("secret", null, 100, 0).size());
+		assertEquals(1, controller.batch("secret", 0, 100, 0).size());
+		assertEquals(1, controller.batch("secret", 1, 100, null).size());
+		execute(source, "UPDATE osm_gpx_data SET name = 'remote'");
+		AtomicInteger requests = new AtomicInteger();
+		String url = startServer(new AtomicBoolean(false), requests);
+		SyncRemoteOsmGpx.downloadAndInsertBatches(target, HttpClient.newHttpClient(), url, "secret", 100, 0, 0, 0);
+		assertEquals(1, requests.get());
+		try (Statement statement = target.createStatement(); ResultSet rs = statement.executeQuery(
+				"SELECT id FROM osm_gpx_data WHERE name = 'remote'")) {
+			assertTrue(rs.next());
+			assertEquals(0, rs.getInt(1));
+			assertFalse(rs.next());
+		}
 	}
 
 	@Test
@@ -330,9 +354,9 @@ public class SyncRemoteOsmGpxTest {
 		AtomicInteger requests = new AtomicInteger();
 		String url = startServer(new AtomicBoolean(false), requests);
 		HttpClient client = HttpClient.newHttpClient();
-		SyncRemoteOsmGpx.downloadAndInsertBatches(target, client, url, "secret", 1, 1, 0, ID);
+		SyncRemoteOsmGpx.downloadAndInsertBatches(target, client, url, "secret", 1, 1, null, ID);
 		assertEquals(1, requests.get());
-		SyncRemoteOsmGpx.downloadAndInsertBatches(target, client, url, "secret", 1, 1, ID + 1, 0);
+		SyncRemoteOsmGpx.downloadAndInsertBatches(target, client, url, "secret", 1, 1, ID + 1, null);
 		assertEquals(2, requests.get());
 		try (Statement statement = target.createStatement();
 			 ResultSet rs = statement.executeQuery("SELECT name FROM osm_gpx_data ORDER BY id")) {
@@ -343,7 +367,7 @@ public class SyncRemoteOsmGpxTest {
 			assertTrue(rs.next());
 			assertEquals("local", rs.getString(1));
 		}
-		SyncRemoteOsmGpx.downloadAndInsertBatches(target, client, url, "secret", 1, 0, ID + 1, 0);
+		SyncRemoteOsmGpx.downloadAndInsertBatches(target, client, url, "secret", 1, 0, ID + 1, null);
 		try (Statement statement = target.createStatement();
 			 ResultSet rs = statement.executeQuery("SELECT count(*) FROM osm_gpx_data WHERE name = 'remote'")) {
 			assertTrue(rs.next());
@@ -352,20 +376,20 @@ public class SyncRemoteOsmGpxTest {
 	}
 
 	@Test
-	public void resynchronizesSingleIdAtBigintLimit() throws Exception {
-		saveBatch(source, new Track[] {track(Long.MAX_VALUE)}, 0);
-		saveBatch(target, new Track[] {track(Long.MAX_VALUE)}, 0);
+	public void resynchronizesSingleIdAtIntLimit() throws Exception {
+		saveBatch(source, new Track[] {track(Integer.MAX_VALUE)}, 0);
+		saveBatch(target, new Track[] {track(Integer.MAX_VALUE)}, 0);
 		execute(source, "UPDATE osm_gpx_data SET name = 'remote'");
 		AtomicInteger requests = new AtomicInteger();
 		String url = startServer(new AtomicBoolean(false), requests);
 		SyncRemoteOsmGpx.downloadAndInsertBatches(target, HttpClient.newHttpClient(), url, "secret", 100, 0,
-				Long.MAX_VALUE, Long.MAX_VALUE);
+				Integer.MAX_VALUE, Integer.MAX_VALUE);
 		assertEquals(1, requests.get());
-		SyncRemoteOsmGpx.downloadAndInsertBatches(target, HttpClient.newHttpClient(), url, "secret", 100, 0, 0, 0);
+		SyncRemoteOsmGpx.downloadAndInsertBatches(target, HttpClient.newHttpClient(), url, "secret", 100, 0, null, null);
 		assertEquals(1, requests.get());
 		try (Statement statement = target.createStatement(); ResultSet rs = statement.executeQuery("SELECT id, name FROM osm_gpx_data")) {
 			assertTrue(rs.next());
-			assertEquals(Long.MAX_VALUE, rs.getLong(1));
+			assertEquals(Integer.MAX_VALUE, rs.getInt(1));
 			assertEquals("remote", rs.getString(2));
 			assertFalse(rs.next());
 		}
@@ -404,9 +428,14 @@ public class SyncRemoteOsmGpxTest {
 	@Test
 	public void rejectsInvalidIdRangeOptionsBeforeOpeningDatabase() {
 		for (String[] range : new String[][] {{"-1", "0"}, {"0", "-1"}, {"101", "100"}}) {
-			IllegalArgumentException error = assertThrows(IllegalArgumentException.class, () -> SyncRemoteOsmGpx.main(
+			assertThrows(IllegalArgumentException.class, () -> SyncRemoteOsmGpx.main(
 					new String[] {"https://builder.osmand.net", "--from-id=" + range[0], "--to-id=" + range[1]}));
-			assertEquals("IDs must be >= 0, with from-id <= to-id when to-id is set", error.getMessage());
+		}
+		for (String option : new String[] {"--from-id", "--to-id"}) {
+			for (String value : new String[] {"-2", "invalid", "2147483648"}) {
+				assertThrows(IllegalArgumentException.class, () -> SyncRemoteOsmGpx.main(
+						new String[] {"https://builder.osmand.net", option + "=" + value}));
+			}
 		}
 	}
 
@@ -414,12 +443,12 @@ public class SyncRemoteOsmGpxTest {
 		server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
 		server.createContext(SyncRemoteOsmGpx.API_PATH, exchange -> {
 			requests.incrementAndGet();
-			String[] params = exchange.getRequestURI().getQuery().split("&");
-			long fromId = Long.parseLong(params[0].split("=")[1]);
-			int limit = Integer.parseInt(params[1].split("=")[1]);
-			long toId = Long.parseLong(params[2].split("=")[1]);
+			MultiValueMap<String, String> params = UriComponentsBuilder.fromUri(exchange.getRequestURI()).build().getQueryParams();
+			Integer fromId = params.containsKey("fromId") ? Integer.valueOf(params.getFirst("fromId")) : null;
+			int limit = Integer.parseInt(params.getFirst("limit"));
+			Integer toId = params.containsKey("toId") ? Integer.valueOf(params.getFirst("toId")) : null;
 			try (exchange) {
-				if (fromId == ID + 1 && fail.getAndSet(false)) {
+				if (fromId != null && fromId == ID + 1 && fail.getAndSet(false)) {
 					exchange.sendResponseHeaders(503, 0);
 					return;
 				}
@@ -432,15 +461,15 @@ public class SyncRemoteOsmGpxTest {
 		return "http://127.0.0.1:" + server.getAddress().getPort() + SyncRemoteOsmGpx.API_PATH;
 	}
 
-	private static long saveBatch(Connection connection, Track[] tracks, long fromId) throws SQLException {
+	private static int saveBatch(Connection connection, Track[] tracks, int fromId) throws SQLException {
 		return SyncRemoteOsmGpx.insertBatch(connection, SyncRemoteOsmGpx.getMetadataColumns(connection), tracks, fromId);
 	}
 
-	private List<Track> readBatch(long fromId, int limit) throws IOException {
-		return Arrays.asList(JSON.readValue(JSON.writeValueAsBytes(controller.batch("secret", fromId, limit, 0)), Track[].class));
+	private List<Track> readBatch(Integer fromId, int limit) throws IOException {
+		return Arrays.asList(JSON.readValue(JSON.writeValueAsBytes(controller.batch("secret", fromId, limit, null)), Track[].class));
 	}
 
-	private static Track track(long id) throws IOException {
+	private static Track track(int id) throws IOException {
 		return new Track(JSON.readTree("{\"id\":" + id + ",\"user\":\"author\",\"name\":\"O'Brien — трек\","
 				+ "\"date\":\"2026-11-12T01:02:03.123456\",\"minlat\":null,\"maxlat\":\"NaN\",\"tags\":[\"hiking\",\"тест\"]}"),
 				new byte[] {31, -117, 0, -1});
