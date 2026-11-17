@@ -26,6 +26,7 @@ import net.osmand.server.utils.WebGpxParser;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
 import net.osmand.shared.gpx.primitives.WptPt;
+import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 /**
@@ -38,6 +39,7 @@ public class McpRoutes {
 	static final String GAP = "gap";
 	public static final int MAX_POINTS = 50;
 	private static final int MAX_GEOMETRY = 300;
+	private static final double MAX_ROUTE_END_GAP_M = 1000;
 
 	private final RoutingService routingService;
 	private final OsmAndMapsService mapsService;
@@ -61,6 +63,16 @@ public class McpRoutes {
 	}
 
 	public record Built(List<WebGpxParser.Point> points, List<Leg> legs) {
+
+		public List<String> notRoutedLegs() {
+			List<String> res = new ArrayList<>();
+			for (int i = 0; i < legs.size(); i++) {
+				if (!legs.get(i).routed) {
+					res.add(String.valueOf(i));
+				}
+			}
+			return res;
+		}
 	}
 
 	public McpRoutes(RoutingService routingService, OsmAndMapsService mapsService, WebGpxParser webGpxParser,
@@ -193,8 +205,11 @@ public class McpRoutes {
 					p.geometry = straight(prev, p);
 				} else {
 					LatLon a = new LatLon(prev.lat, prev.lng), b = new LatLon(p.lat, p.lng);
-					p.geometry = routeLeg(a, b, prev.profile, MapUtils.getDistance(a, b) > hhOnlyLimitM);
-					routed = p.geometry.size() > 2;
+					RoutingService.RouteResult route = routeLeg(a, b, prev.profile,
+							MapUtils.getDistance(a, b) > hhOnlyLimitM);
+					routed = !Algorithms.isEmpty(route.routeTypes) && reaches(route.points.get(0), a)
+							&& reaches(route.points.get(route.points.size() - 1), b);
+					p.geometry = routed ? route.points : straight(prev, p);
 				}
 				for (int k = 1; k < p.geometry.size(); k++) {
 					WebGpxParser.Point g0 = p.geometry.get(k - 1), g1 = p.geometry.get(k);
@@ -210,10 +225,10 @@ public class McpRoutes {
 		return new Built(res, legs);
 	}
 
-	private List<WebGpxParser.Point> routeLeg(LatLon a, LatLon b, String mode, boolean hhOnly) throws RouteException {
+	private RoutingService.RouteResult routeLeg(LatLon a, LatLon b, String mode, boolean hhOnly) throws RouteException {
 		try {
 			if (serverApi.isEmpty()) {
-				return routingService.updateRouteBetweenPoints(a, b, mode, false, hhOnly, null).points;
+				return routingService.updateRouteBetweenPoints(a, b, mode, false, hhOnly, null);
 			}
 			// the same call the web map makes to its routing server
 			String form = "start=" + enc(gson.toJson(a)) + "&end=" + enc(gson.toJson(b)) + "&routeMode=" + enc(mode)
@@ -226,7 +241,9 @@ public class McpRoutes {
 				throw new RouteException("Routing server error " + resp.statusCode());
 			}
 			JsonObject o = new JsonParser().parse(resp.body()).getAsJsonObject();
-			return gson.fromJson(o.get("points"), new TypeToken<List<WebGpxParser.Point>>() {}.getType());
+			return new RoutingService.RouteResult(
+					gson.fromJson(o.get("points"), new TypeToken<List<WebGpxParser.Point>>() {}.getType()),
+					gson.fromJson(o.get("routeTypes"), new TypeToken<List<GpxUtilities.RouteType>>() {}.getType()));
 		} catch (IOException e) {
 			throw new RouteException("Routing server is not available: " + e.getMessage());
 		} catch (InterruptedException e) {
@@ -243,7 +260,6 @@ public class McpRoutes {
 		Map<String, Object> res = new LinkedHashMap<>();
 		double total = 0;
 		List<Map<String, Object>> legs = new ArrayList<>();
-		List<String> notRouted = new ArrayList<>();
 		for (int i = 0; i < b.legs.size(); i++) {
 			Leg l = b.legs.get(i);
 			total += l.distanceM;
@@ -254,12 +270,12 @@ public class McpRoutes {
 			m.put("distanceKm", McpTracks.round(l.distanceM / 1000, 3));
 			if (!l.routed) {
 				m.put("routed", false);
-				notRouted.add(String.valueOf(i));
 			}
 			legs.add(m);
 		}
 		res.put("distanceKm", McpTracks.round(total / 1000, 3));
 		res.put("legs", legs);
+		List<String> notRouted = b.notRoutedLegs();
 		if (!notRouted.isEmpty()) {
 			res.put("warning", "No route found for legs " + String.join(", ", notRouted)
 					+ ": a straight line is used (no map data there or the points are not reachable with this profile)");
@@ -328,6 +344,10 @@ public class McpRoutes {
 			l.add(c);
 		}
 		return l;
+	}
+
+	private static boolean reaches(WebGpxParser.Point routeEnd, LatLon point) {
+		return MapUtils.getDistance(point, routeEnd.lat, routeEnd.lng) <= MAX_ROUTE_END_GAP_M;
 	}
 
 	private static String str(JsonObject o, String key) {
