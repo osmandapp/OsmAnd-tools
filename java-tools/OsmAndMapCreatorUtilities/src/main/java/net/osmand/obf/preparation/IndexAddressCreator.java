@@ -89,6 +89,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 	private boolean DEBUG_FULL_NAMES = false; //true to see attached cityPart and boundaries to the street names
 
+	private final Set<String> unitSecondAddresses = new HashSet<>();
+
 	private TreeSet<String> langAttributes = new TreeSet<String>();
 	{
 		langAttributes.add(MapObject.NAME_ADMIN_LEVEL_ATTR);
@@ -1037,7 +1039,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 							building2.setName(secondHno + additionalHname);
 							Set<Long> ids2OfStreet = getStreetInCity(0, e.getIsInNames(), street2, false, null, l, icc);
 							ids2OfStreet.removeAll(idsOfStreet); // remove duplicated entries!
-							if (!ids2OfStreet.isEmpty()) {
+							boolean unit = !Algorithms.isEmpty(e.getTag(OSMTagKey.ADDR_UNIT));
+							if (!ids2OfStreet.isEmpty() && (!unit || unitSecondAddresses.add(new TreeSet<>(ids2OfStreet) + " " + secondHno))) {
 								streetDAO.writeBuilding(ids2OfStreet, building2);
 								building.setName(firstNo);
 							}
