@@ -176,8 +176,9 @@ public class McpController {
 
 	private static final Map<String, Object> WAYPOINTS_ARG = Map.of("type", "array", "description",
 			"Track waypoints, up to " + McpSearch.MAX_WAYPOINTS + ": pass a search / search_popular_places result as "
-					+ "it is (plus group). With osm the server stores the POI as OsmAnd does (origin and all its tags: "
-					+ "opening hours, website, wiki...), so the app shows its details; name and icon come from the POI unless given. "
+					+ "it is (plus group and color, a different color for each group). With osm the server stores the POI "
+					+ "as OsmAnd does (origin and all its tags: opening hours, website, wiki...), so the app shows its details; "
+					+ "name and icon come from the POI unless given. "
 					+ "icon: an OsmAnd icon name from a result (default " + McpSearch.DEFAULT_ICON + ").",
 			"items", Map.of("type", "object", "properties", Map.ofEntries(
 					Map.entry("lat", Map.of("type", "number")), Map.entry("lon", Map.of("type", "number")),
@@ -715,11 +716,18 @@ public class McpController {
 		}
 		checkFileAccess(grant, "GPX", name, Access.WRITE);
 		McpRoutes.Built b = buildRoute(args);
+		List<String> notRouted = b.notRoutedLegs();
+		if (!notRouted.isEmpty()) {
+			throw new ToolException("No route found for legs " + String.join(", ", notRouted)
+					+ ", the track is not saved: move those points, take another profile or give those legs "
+					+ "profile line to save them as straight lines");
+		}
 		String title = str(args, "title");
 		if (title == null) {
 			title = name.substring(name.lastIndexOf('/') + 1, name.length() - 4);
 		}
 		List<WptPt> wpts = new ArrayList<>();
+		List<String> waypointWarnings = new ArrayList<>();
 		if (args.get("waypoints") instanceof List<?> l) {
 			if (l.size() > McpSearch.MAX_WAYPOINTS) {
 				throw new ToolException("At most " + McpSearch.MAX_WAYPOINTS + " waypoints");
@@ -729,7 +737,7 @@ public class McpController {
 					throw new ToolException("waypoint " + i + " must be an object");
 				}
 				try {
-					wpts.add(search().waypoint(w, str(args, "locale")));
+					wpts.add(search().waypoint(w, str(args, "locale"), waypointWarnings));
 				} catch (McpSearch.SearchException e) {
 					throw new ToolException("waypoint " + i + ": " + e.getMessage());
 				}
@@ -737,6 +745,9 @@ public class McpController {
 		}
 		String gpx = routes().toGpx(b, title, str(args, "description"), wpts);
 		Map<String, Object> res = routes().summary(b, false);
+		if (!waypointWarnings.isEmpty()) {
+			res.put("waypointWarnings", waypointWarnings);
+		}
 		res.put("saved", writeFile(grant, "GPX", name, gpx));
 		res.put("name", name);
 		return res;
