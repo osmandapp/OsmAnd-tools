@@ -394,7 +394,11 @@ public class NameIndexCreator<T> {
 	}
 	
 	public static void addPoiCategories(NameIndexCreator<PoiNameObject> th, PoiNameObject obj, MapPoiTypes poiTypes) {
-		addPoiCategory(th, obj, obj.subtype, poiTypes);
+		for (String subtype : obj.subtype.split(",|;")) {
+			if (!subtype.trim().isEmpty()) {
+				addPoiCategory(th, obj, subtype.trim(), poiTypes);
+			}
+		}
 		if (obj.additionalTags != null) {
 			for (PoiAdditionalType o : obj.additionalTags) {
 				String key = o.getTag();
