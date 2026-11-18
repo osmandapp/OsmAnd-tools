@@ -114,6 +114,7 @@ public class DownloadOsmGPX {
 	private static final long INITIAL_ID = 1000; // start with 1000
 	static final String GPX_METADATA_TABLE_NAME = "osm_gpx_data";
 	static final String GPX_FILES_TABLE_NAME = "osm_gpx_files";
+	public static final String GPX_REVIEWS_TABLE_NAME = "osm_gpx_reviews";
 	private static final long FETCH_INTERVAL_SLEEP = 10000;
 
 	private static final int HTTP_TIMEOUT = 5000;
@@ -306,8 +307,14 @@ public class DownloadOsmGPX {
 		utility.commitAllStatements();
 	}
 
-	static void ensureActivitySchema(Connection connection) throws SQLException {
+	static void ensureOsmGpxSchema(Connection connection) throws SQLException {
 		try (Statement statement = connection.createStatement()) {
+			statement.executeUpdate("CREATE TABLE IF NOT EXISTS " + GPX_FILES_TABLE_NAME + " (id bigint PRIMARY KEY, data bytea)");
+			statement.executeUpdate("CREATE TABLE IF NOT EXISTS " + GPX_METADATA_TABLE_NAME + " (id bigint PRIMARY KEY, \"user\" text, \"date\" timestamp,"
+					+ " name text, lat float, lon float, minlat float, minlon float, maxlat float, maxlon float,"
+					+ " pending boolean, tags text[], description text, visibility text)");
+			statement.executeUpdate("CREATE TABLE IF NOT EXISTS " + GPX_REVIEWS_TABLE_NAME + " (id bigint PRIMARY KEY, manual_review jsonb)");
+
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS activity text");
 
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS speed float");
@@ -325,10 +332,7 @@ public class DownloadOsmGPX {
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS activity_source text");
 			// facts from one GPX parse, so classification rules can change without parsing again (see computeTrackStats)
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS track_stats json");
-			// reviews people give tracks on the heatmap (PubTracksController); parsing and classifying never write it
-			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS manual_review jsonb");
-			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_reviewed ON " + GPX_METADATA_TABLE_NAME
-					+ " (id) WHERE manual_review IS NOT NULL");
+			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " DROP COLUMN IF EXISTS manual_review");
 			// ids of the tracks parse_tracks still has to parse: a restarted run starts at once instead of reading
 			// the parsed rows; built once per TRACK_STATS_VERSION, a parsed track leaves it
 			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_parse_v" + TRACK_STATS_VERSION
@@ -362,7 +366,7 @@ public class DownloadOsmGPX {
 					+ " WHERE (distance > 0::double precision OR speed > 0::double precision)"
 					+ " AND activity NOT LIKE 'garbage%' AND activity <> 'error'::text");
 		}
-		LOG.info("Activity schema (columns and indexes) ensured.");
+		LOG.info("OsmGpx schema ensured.");
 	}
 
 	protected void addActivityColumnAndPopulate() throws SQLException, InterruptedException {
@@ -469,7 +473,7 @@ public class DownloadOsmGPX {
 
 	protected void parseTracks(TrackSelection selection, JobOptions options)
 			throws SQLException, InterruptedException {
-		ensureActivitySchema(dbConn);
+		ensureOsmGpxSchema(dbConn);
 		Map<String, List<String>> activitiesMap = createActivitiesMap();
 		String condition = trackCondition(activitiesMap, options);
 		if (condition == null) {
@@ -571,7 +575,7 @@ public class DownloadOsmGPX {
 	}
 
 	protected void classifyTracks(JobOptions options) throws SQLException {
-		ensureActivitySchema(dbConn);
+		ensureOsmGpxSchema(dbConn);
 		Map<String, List<String>> activitiesMap = createActivitiesMap();
 		String condition = trackCondition(activitiesMap, options);
 		if (condition == null) {
@@ -1749,14 +1753,9 @@ public class DownloadOsmGPX {
 		Connection connection = DriverManager.getConnection(System.getenv("DB_CONN"),
 				isEmpty(System.getenv("DB_USER")) ? "test" : System.getenv("DB_USER"),
 				isEmpty(System.getenv("DB_PWD")) ? "test" : System.getenv("DB_PWD"));
-		try (ResultSet tables = connection.getMetaData().getTables(null, null, GPX_METADATA_TABLE_NAME, null);
-			 Statement statement = connection.createStatement()) {
+		try (ResultSet tables = connection.getMetaData().getTables(null, null, GPX_REVIEWS_TABLE_NAME, null)) {
 			if (!tables.next()) {
-				statement.execute("CREATE TABLE IF NOT EXISTS " + GPX_FILES_TABLE_NAME + " (id bigint PRIMARY KEY, data bytea)");
-				statement.execute("CREATE TABLE " + GPX_METADATA_TABLE_NAME + " (id bigint PRIMARY KEY, \"user\" text, \"date\" timestamp,"
-						+ " name text, lat float, lon float, minlat float, minlon float, maxlat float, maxlon float,"
-						+ " pending boolean, tags text[], description text, visibility text)");
-				ensureActivitySchema(connection);
+				ensureOsmGpxSchema(connection);
 			}
 		} catch (SQLException e) {
 			connection.close();

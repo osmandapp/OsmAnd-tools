@@ -86,7 +86,7 @@ public class SyncRemoteOsmGpx {
 		String url = opts.getStrings().get(0).replaceAll("/+$", "") + API_PATH;
 		HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(30)).build();
 		try (Connection connection = DownloadOsmGPX.openDatabase()) {
-			DownloadOsmGPX.ensureActivitySchema(connection);
+			DownloadOsmGPX.ensureOsmGpxSchema(connection);
 			downloadAndInsertBatches(connection, client, url, apiKey, batchSize, maxBatches, fromId, toId);
 		}
 	}
