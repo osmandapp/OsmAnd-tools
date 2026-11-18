@@ -39,6 +39,7 @@ import net.osmand.data.TransportSchedule;
 import net.osmand.data.TransportStop;
 import net.osmand.data.TransportStopExit;
 import net.osmand.osm.MapRenderingTypesEncoder;
+import net.osmand.binary.ObfConstants;
 import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Entity.EntityId;
 import net.osmand.osm.edit.EntityParser;
@@ -829,7 +830,7 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 			List<TransportStop> forwardStops = directRoute.getForwardStops();
 			for (int i = 0; i < forwardStops.size(); i++) {
 				TransportStop ts = forwardStops.get(i);
-				if (ts.getId() == insertNode.getId()) {
+				if (ts.getId() == getTransportStopId(insertNode)) {
 					int insertInd = before ? i  : i + 1;
 					boolean alreadyExistMissing = false;
 					if(before && i > 0 && forwardStops.get(i - 1).isMissingStop()) {
@@ -848,6 +849,11 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 	}
 
 	
+	// same id as EntityParser.parseMapObject gives to the TransportStop of this entity
+	private static long getTransportStopId(Entity e) {
+		return e.getId() > 0 ? ObfConstants.createMapObjectIdFromOsmAndEntity(e) : e.getId();
+	}
+
 	private void addIncompleteRoute(long routeId, TransportRoute t) {
 		incompleteRoutesMap.put(routeId, t);
 	}
@@ -872,12 +878,14 @@ public class IndexTransportCreator extends AbstractIndexPartCreator {
 		for (RelationMember rm : rel.getMembers()) {
 //			boolean node = rm.getEntityId().getType() == EntityType.NODE;
 			boolean validNode = ("stop".equals(rm.getRole()) || "platform".equals(rm.getRole()));
-			if (rm.getEntity() == null && validNode) {
+			// a stop outside of the extract: node is not loaded, way is loaded without nodes
+			boolean missing = rm.getEntity() == null || rm.getEntity().getLatLon() == null;
+			if (missing && validNode) {
 				if (!missingPrevious) {
 					missingStopsAfterStop.add(previousStop);
 				}
 				missingPrevious = true;
-			} else if (stopPlatformIds.contains(rm.getEntityId().getId())) {
+			} else if (!missing && stopPlatformIds.contains(getTransportStopId(rm.getEntity()))) {
 				previousStop = rm.getEntity();
 				if (missingPrevious) {
 					missingStopsAfterStop.add(previousStop);
