@@ -25,6 +25,7 @@ import java.util.Objects;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.GZIPInputStream;
 
 import static net.osmand.wiki.commonswiki.parser.ParserUtils.FILE_PREFIX;
@@ -42,6 +43,7 @@ public class CommonsWikimediaPreparation {
 	private static final AtomicLong totalPagesCount = new AtomicLong(0);
 	private static final AtomicLong otherErrorsCount = new AtomicLong(0);
 	private static final AtomicLong changedLicenseCount = new AtomicLong(0);
+	private static final AtomicReference<Exception> writerError = new AtomicReference<>();
 
 	public static final String RESULT_SQLITE = "meta_commonswiki.sqlite";
 	public static final String FILE_NAMESPACE = "6";
@@ -104,7 +106,7 @@ public class CommonsWikimediaPreparation {
 		--result_db=/path/to/result_db/meta_commonswiki.sqlite
 		--recreate_db recreate meta_commonswiki.sqlite
 		--keep_files keep downloaded files instead of deleting them
-		--threads=8 number of parsing threads (downloads always run in a single thread)
+		--threads=8 number of parsing threads (downloads always run in a single thread, daily dumps are parsed one at a time in date order)
 		--show_log show license update log
 		
 		--mode=parse-img-meta
@@ -128,7 +130,7 @@ public class CommonsWikimediaPreparation {
 		long start = System.currentTimeMillis();
 		String commonsWikiDBPath = commonsWikiDB.getAbsolutePath();
 		initDatabase(commonsWikiDBPath, recreateDb);
-		ExecutorService executor = Executors.newFixedThreadPool(threads);
+		ExecutorService executor = Executors.newFixedThreadPool(dailyUpdate ? 1 : threads);
 		Thread writerThread = new Thread(() -> writeToDatabase(commonsWikiDBPath));
 		writerThread.start();
 		log.info("Updating wikidata...");
@@ -168,7 +170,12 @@ public class CommonsWikimediaPreparation {
 		}
 		QUEUE.put(END_SIGNAL);
 		writerThread.join();
+		Exception writeError = writerError.get();
+		if (writeError != null) {
+			throw new RuntimeException("Error during writing to " + commonsWikiDBPath, writeError);
+		}
 		createIndex(commonsWikiDBPath);
+		wfd.saveUpdateTimestamp();
 		log.info("========= All tasks done in %.0fs ========="
 				.formatted((System.currentTimeMillis() - start) / 1000.0));
 		log.info("========= Statistics =========");
@@ -208,6 +215,7 @@ public class CommonsWikimediaPreparation {
 
 	private static void writeToDatabase(String sqliteFileName) {
 		System.out.println("Writer started...");
+		boolean endReceived = false;
 		try (Connection conn = DBDialect.SQLITE.getDatabaseConnection(sqliteFileName, log)) {
 			conn.setAutoCommit(false);
 			try (PreparedStatement insertStatement = conn.prepareStatement("""
@@ -230,7 +238,10 @@ public class CommonsWikimediaPreparation {
 				}
 				while (true) {
 					Article a = QUEUE.take();
-					if (a == END_SIGNAL) break;
+					if (a == END_SIGNAL) {
+						endReceived = true;
+						break;
+					}
 					if (showLog) {
 						selectStatement.setLong(1, a.id);
 						try (ResultSet rs = selectStatement.executeQuery()) {
@@ -269,9 +280,22 @@ public class CommonsWikimediaPreparation {
 				}
 			}
 		} catch (Exception e) {
-			e.printStackTrace();
+			log.error("Writer failed: " + e.getMessage());
+			writerError.set(e);
+			if (!endReceived && !(e instanceof InterruptedException)) {
+				skipQueueUntilEnd();
+			}
 		}
 		System.out.println("Writer finished (queue empty).");
+	}
+
+	private static void skipQueueUntilEnd() {
+		try {
+			while (QUEUE.take() != END_SIGNAL) {
+			}
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		}
 	}
 
 	public void createIndex(String sqliteFileName) {
