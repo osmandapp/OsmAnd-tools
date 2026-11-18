@@ -1259,6 +1259,7 @@ public class WikiDatabasePreparation {
 			log.info("Create wikidata...");
 			processWikidata(wikidataDB, wikidataFile, osmCoordinates, 0, -1, false);
 			createOSMWikidataTable(wikidataDB, osmCoordinates);
+			AbstractWikiFilesDownloader.removeTimestampFile(wikidataDB.getParent());
 			break;
 		case "create-osm-wikidata":
 			wikidataDB = new File(wikidataSqliteName);
@@ -1313,6 +1314,7 @@ public class WikiDatabasePreparation {
 		}
 		wfd.removeDownloadedPages();
 		createOSMWikidataTable(wikidataDB, osmCoordinates);
+		wfd.saveUpdateTimestamp();
 	}
 
 	protected static void processWikidataRegions(final String sqliteFileName) throws SQLException, IOException {
