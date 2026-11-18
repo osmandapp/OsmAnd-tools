@@ -172,6 +172,13 @@ public abstract class AbstractWikiFilesDownloader {
 				while ((n = bzIn.read(buffer)) != -1) {
 					gzOut.write(buffer, 0, n);
 				}
+			} catch (IOException e) {
+				try {
+					Files.deleteIfExists(partFile.toPath());
+				} catch (IOException deleteError) {
+					e.addSuppressed(deleteError);
+				}
+				throw e;
 			}
 			Files.move(partFile.toPath(), gz.toPath(), StandardCopyOption.REPLACE_EXISTING);
 			System.out.println(gzFile + " downloading is finished");
