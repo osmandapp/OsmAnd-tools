@@ -6,6 +6,7 @@ import java.io.UncheckedIOException;
 import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.sql.Array;
+import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
@@ -46,14 +47,16 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletResponse;
 import net.osmand.server.DatasourceConfiguration;
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
+import net.osmand.server.osmgpx.OsmGpxSchema;
 
-import static net.osmand.server.controllers.pub.OsmGpxController.GPX_FILES_TABLE_NAME;
-import static net.osmand.server.controllers.pub.OsmGpxController.GPX_METADATA_TABLE_NAME;
-import static net.osmand.server.osmgpx.DownloadOsmGPX.GPX_REVIEWS_TABLE_NAME;
+import static net.osmand.server.osmgpx.OsmGpxSchema.GPX_FILES_TABLE_NAME;
+import static net.osmand.server.osmgpx.OsmGpxSchema.GPX_METADATA_TABLE_NAME;
+import static net.osmand.server.osmgpx.OsmGpxSchema.GPX_REVIEWS_TABLE_NAME;
 
 /**
  * Anyone reads reviews; signed-in OsmAnd users and admins write them.
@@ -93,6 +96,16 @@ public class PubTracksController {
 	private final Gson gson = new Gson();
 
 	public record ReviewRequest(Long id, String verdict, String activity, String comment) {
+	}
+
+	@PostConstruct
+	void initOsmGpxSchema() {
+		if (config.osmgpxInitialized()) {
+			jdbcTemplate.execute((Connection connection) -> {
+				OsmGpxSchema.initializeSchema(connection);
+				return null;
+			});
+		}
 	}
 
 	/** whether the caller may send reviews; no ids */

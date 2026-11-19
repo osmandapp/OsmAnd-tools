@@ -23,8 +23,8 @@ import net.osmand.server.DatasourceConfiguration;
 import net.osmand.server.osmgpx.SyncRemoteOsmGpx;
 import net.osmand.server.osmgpx.SyncRemoteOsmGpx.OsmGpxTrack;
 
-import static net.osmand.server.controllers.pub.OsmGpxController.GPX_FILES_TABLE_NAME;
-import static net.osmand.server.controllers.pub.OsmGpxController.GPX_METADATA_TABLE_NAME;
+import static net.osmand.server.osmgpx.OsmGpxSchema.GPX_FILES_TABLE_NAME;
+import static net.osmand.server.osmgpx.OsmGpxSchema.GPX_METADATA_TABLE_NAME;
 
 @RestController
 public class OsmGpxSyncController {
