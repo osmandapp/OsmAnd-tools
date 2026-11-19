@@ -171,6 +171,9 @@ public class PubTracksController {
 			jdbcTemplate.update("UPDATE " + GPX_REVIEWS_TABLE_NAME + " SET manual_review = NULLIF(CASE WHEN " + left + "->'users' = '{}'::jsonb THEN "
 					+ left + " - 'users' ELSE " + left + " END, '{}'::jsonb) WHERE id = ?", mine, mine, mine, req.id());
 		}
+		if (review == null) {
+			jdbcTemplate.update("DELETE FROM " + GPX_REVIEWS_TABLE_NAME + " WHERE id = ? AND manual_review IS NULL", req.id());
+		}
 		String stored = jdbcTemplate.query("SELECT manual_review::text FROM " + GPX_REVIEWS_TABLE_NAME + " WHERE id = ?",
 				(ResultSetExtractor<String>) rs -> rs.next() ? rs.getString(1) : null, req.id());
 		return ResponseEntity.ok(gson.toJson(publicView(stored, mine)));
