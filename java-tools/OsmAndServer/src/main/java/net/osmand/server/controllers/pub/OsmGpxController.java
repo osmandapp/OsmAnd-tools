@@ -48,6 +48,8 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.zip.GZIPInputStream;
 
 import static net.osmand.server.api.services.UserdataService.BUFFER_SIZE;
+import static net.osmand.server.osmgpx.OsmGpxSchema.GPX_FILES_TABLE_NAME;
+import static net.osmand.server.osmgpx.OsmGpxSchema.GPX_METADATA_TABLE_NAME;
 
 @RestController
 @RequestMapping("/osmgpx")
@@ -82,8 +84,6 @@ public class OsmGpxController {
 	private static final int MAX_TAGS_PER_BBOX = 1000;
 	private final AtomicInteger cacheTouch = new AtomicInteger(0);
 
-	static final String GPX_METADATA_TABLE_NAME = "osm_gpx_data";
-	static final String GPX_FILES_TABLE_NAME = "osm_gpx_files";
 	private static final String ROUTE_COLUMNS = "m.id, m.name, m.description, m.user, m.date, m.activity, m.lat, m.lon, " +
 			"m.speed, m.distance, m.points, m.max_speed, m.max_dist_between_points, m.time_minutes, m.waypoints, m.tags";
 	private static final int SRID_WGS84 = 4326;

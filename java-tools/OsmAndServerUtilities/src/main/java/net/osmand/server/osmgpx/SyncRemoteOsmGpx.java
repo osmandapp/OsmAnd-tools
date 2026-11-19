@@ -22,8 +22,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import net.osmand.MainUtilities.CommandLineOpts;
 import net.osmand.util.Algorithms;
 
-import static net.osmand.server.osmgpx.DownloadOsmGPX.GPX_FILES_TABLE_NAME;
-import static net.osmand.server.osmgpx.DownloadOsmGPX.GPX_METADATA_TABLE_NAME;
+import static net.osmand.server.osmgpx.OsmGpxSchema.GPX_FILES_TABLE_NAME;
+import static net.osmand.server.osmgpx.OsmGpxSchema.GPX_METADATA_TABLE_NAME;
 import static net.osmand.server.osmgpx.DownloadOsmGPX.JSON_MAPPER;
 
 /** Copies new GPX and metadata; explicit inclusive id ranges also replace existing rows. */
@@ -86,7 +86,7 @@ public class SyncRemoteOsmGpx {
 		String url = opts.getStrings().get(0).replaceAll("/+$", "") + API_PATH;
 		HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(30)).build();
 		try (Connection connection = DownloadOsmGPX.openDatabase()) {
-			DownloadOsmGPX.ensureActivitySchema(connection);
+			OsmGpxSchema.actualizeSchema(connection);
 			downloadAndInsertBatches(connection, client, url, apiKey, batchSize, maxBatches, fromId, toId);
 		}
 	}
