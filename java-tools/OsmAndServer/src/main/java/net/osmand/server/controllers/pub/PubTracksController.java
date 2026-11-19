@@ -51,17 +51,22 @@ import net.osmand.server.DatasourceConfiguration;
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
 
+import static net.osmand.server.controllers.pub.OsmGpxController.GPX_FILES_TABLE_NAME;
+import static net.osmand.server.controllers.pub.OsmGpxController.GPX_METADATA_TABLE_NAME;
+import static net.osmand.server.osmgpx.DownloadOsmGPX.GPX_REVIEWS_TABLE_NAME;
+
 /**
- * Reviews of OsmGpx tracks from the heatmap page. Anyone reads them and downloads the reviewed tracks; signed-in OsmAnd
- * users and admins write. Stored in osm_gpx_data.manual_review as {"admin": review, "users": {"cloud user id": review}};
- * what leaves the server has no admin e-mail and no user ids.
+ * Anyone reads reviews; signed-in OsmAnd users and admins write them.
+ * Stored in osm_gpx_reviews.manual_review as:
+ * {"admin": review, "users": {"cloud user id": review}}.
+ * Public responses contain neither admin emails nor user IDs.
  */
 @RestController
 @RequestMapping("/api/pubtracks")
 public class PubTracksController {
 
 	private static final Log LOG = LogFactory.getLog(PubTracksController.class);
-	private static final String TABLE = "osm_gpx_data";
+	private static final String REVIEWED_TRACKS = " FROM " + GPX_REVIEWS_TABLE_NAME + " r JOIN " + GPX_METADATA_TABLE_NAME + " m ON m.id = r.id";
 	// the quick actions of the heatmap page
 	private static final Set<String> VERDICTS = Set.of("ok", "wrong_activity", "bad_quality", "bad_line", "simulated", "garbage");
 	private static final int MAX_COMMENT = 2000;
@@ -69,10 +74,10 @@ public class PubTracksController {
 	private static final int EXPORT_BATCH = 500;
 	private static final Pattern NUMBER = Pattern.compile("[-+]?\\d+(\\.\\d+)?([eE][-+]?\\d+)?"); // negative coordinates are not formulas
 	// any review of the track (admin or a user) was saved at or after the $s instant; review times are ISO-8601 strings, so they compare as text
-	private static final String REVIEWED_SINCE = "jsonb_path_exists(m.manual_review, '$.**.time ? (@ >= $s)', jsonb_build_object('s', ?::text))";
-	private static final String REVIEWED_BEFORE = "jsonb_path_exists(m.manual_review, '$.**.time ? (@ < $s)', jsonb_build_object('s', ?::text))";
-	private static final String REVIEWED_AS = "jsonb_path_exists(m.manual_review, '$.**.verdict ? (@ == $v)', jsonb_build_object('v', ?::text))";
-	private static final String LAST_REVIEW = "(SELECT max(x #>> '{}') FROM jsonb_path_query(m.manual_review, '$.**.time') x)";
+	private static final String REVIEWED_SINCE = "jsonb_path_exists(r.manual_review, '$.**.time ? (@ >= $s)', jsonb_build_object('s', ?::text))";
+	private static final String REVIEWED_BEFORE = "jsonb_path_exists(r.manual_review, '$.**.time ? (@ < $s)', jsonb_build_object('s', ?::text))";
+	private static final String REVIEWED_AS = "jsonb_path_exists(r.manual_review, '$.**.verdict ? (@ == $v)', jsonb_build_object('v', ?::text))";
+	private static final String LAST_REVIEW = "(SELECT max(x #>> '{}') FROM jsonb_path_query(r.manual_review, '$.**.time') x)";
 	private static final int LIST_LIMIT = 500;
 	private static final String[] EXPORT_COLUMNS = {"id", "user", "date", "name", "description", "tags", "lat", "lon", "activity",
 			"activity_source", "file_activity", "speed_matches_activity", "speed", "max_speed", "distance", "points", "time_minutes",
@@ -128,29 +133,32 @@ public class PubTracksController {
 			}
 			review.addProperty("time", Instant.now().toString());
 		}
-		boolean admin = isAdmin(auth);
-		String mine = admin ? "admin" : String.valueOf(user.getUserDevice().userid);
-		int updated;
-		if (admin && review != null) {
-			review.addProperty("author", user.getUsername()); // kept in the database, never sent out
-			updated = jdbcTemplate.update("UPDATE " + TABLE + " SET manual_review = COALESCE(manual_review, '{}'::jsonb)"
-					+ " || jsonb_build_object('admin', ?::jsonb) WHERE id = ?", gson.toJson(review), req.id());
-		} else if (admin) {
-			updated = jdbcTemplate.update("UPDATE " + TABLE + " SET manual_review = NULLIF(COALESCE(manual_review, '{}'::jsonb) - 'admin',"
-					+ " '{}'::jsonb) WHERE id = ?", req.id());
-		} else if (review != null) {
-			updated = jdbcTemplate.update("UPDATE " + TABLE + " SET manual_review = COALESCE(manual_review, '{}'::jsonb)"
-					+ " || jsonb_build_object('users', COALESCE(manual_review->'users', '{}'::jsonb) || jsonb_build_object(?::text, ?::jsonb))"
-					+ " WHERE id = ?", mine, gson.toJson(review), req.id());
-		} else {
-			String left = "(COALESCE(manual_review, '{}'::jsonb) #- ARRAY['users', ?::text])";
-			updated = jdbcTemplate.update("UPDATE " + TABLE + " SET manual_review = NULLIF(CASE WHEN " + left + "->'users' = '{}'::jsonb THEN "
-					+ left + " - 'users' ELSE " + left + " END, '{}'::jsonb) WHERE id = ?", mine, mine, mine, req.id());
-		}
-		if (updated == 0) {
+		if (!jdbcTemplate.queryForObject("SELECT EXISTS (SELECT 1 FROM " + GPX_METADATA_TABLE_NAME + " WHERE id = ?)",
+				Boolean.class, req.id())) {
 			return ResponseEntity.notFound().build();
 		}
-		String stored = jdbcTemplate.query("SELECT manual_review::text FROM " + TABLE + " WHERE id = ?",
+		boolean admin = isAdmin(auth);
+		String mine = admin ? "admin" : String.valueOf(user.getUserDevice().userid);
+		if (admin && review != null) {
+			review.addProperty("author", user.getUsername()); // kept in the database, never sent out
+			jdbcTemplate.update("INSERT INTO " + GPX_REVIEWS_TABLE_NAME + " AS r (id, manual_review) VALUES (?, jsonb_build_object('admin', ?::jsonb))"
+					+ " ON CONFLICT (id) DO UPDATE SET manual_review = COALESCE(r.manual_review, '{}'::jsonb) || EXCLUDED.manual_review",
+					req.id(), gson.toJson(review));
+		} else if (admin) {
+			jdbcTemplate.update("UPDATE " + GPX_REVIEWS_TABLE_NAME + " SET manual_review = NULLIF(COALESCE(manual_review, '{}'::jsonb) - 'admin',"
+					+ " '{}'::jsonb) WHERE id = ?", req.id());
+		} else if (review != null) {
+			jdbcTemplate.update("INSERT INTO " + GPX_REVIEWS_TABLE_NAME + " AS r (id, manual_review)"
+					+ " VALUES (?, jsonb_build_object('users', jsonb_build_object(?::text, ?::jsonb)))"
+					+ " ON CONFLICT (id) DO UPDATE SET manual_review = COALESCE(r.manual_review, '{}'::jsonb)"
+					+ " || jsonb_build_object('users', COALESCE(r.manual_review->'users', '{}'::jsonb) || (EXCLUDED.manual_review->'users'))",
+					req.id(), mine, gson.toJson(review));
+		} else {
+			String left = "(COALESCE(manual_review, '{}'::jsonb) #- ARRAY['users', ?::text])";
+			jdbcTemplate.update("UPDATE " + GPX_REVIEWS_TABLE_NAME + " SET manual_review = NULLIF(CASE WHEN " + left + "->'users' = '{}'::jsonb THEN "
+					+ left + " - 'users' ELSE " + left + " END, '{}'::jsonb) WHERE id = ?", mine, mine, mine, req.id());
+		}
+		String stored = jdbcTemplate.query("SELECT manual_review::text FROM " + GPX_REVIEWS_TABLE_NAME + " WHERE id = ?",
 				(ResultSetExtractor<String>) rs -> rs.next() ? rs.getString(1) : null, req.id());
 		return ResponseEntity.ok(gson.toJson(publicView(stored, mine)));
 	}
@@ -168,7 +176,7 @@ public class PubTracksController {
 		String mine = user == null ? null : isAdmin(auth) ? "admin" : String.valueOf(user.getUserDevice().userid);
 		Map<Long, JsonObject> res = new LinkedHashMap<>();
 		String in = String.join(",", Collections.nCopies(ids.size(), "?"));
-		jdbcTemplate.query("SELECT id, manual_review::text FROM " + TABLE + " WHERE manual_review IS NOT NULL AND id IN (" + in + ")",
+		jdbcTemplate.query("SELECT id, manual_review::text FROM " + GPX_REVIEWS_TABLE_NAME + " WHERE manual_review IS NOT NULL AND id IN (" + in + ")",
 				(RowCallbackHandler) rs -> res.put(rs.getLong(1), publicView(rs.getString(2), mine)), ids.toArray());
 		return ResponseEntity.ok(gson.toJson(res));
 	}
@@ -187,7 +195,7 @@ public class PubTracksController {
 		if (!isBlank(verdict) && !VERDICTS.contains(verdict)) {
 			return ResponseEntity.badRequest().body("verdict must be one of " + VERDICTS);
 		}
-		StringBuilder where = new StringBuilder(" WHERE m.manual_review IS NOT NULL");
+		StringBuilder where = new StringBuilder(" WHERE r.manual_review IS NOT NULL");
 		List<Object> args = new ArrayList<>();
 		Instant from = parseSince(since);
 		if (from != null) {
@@ -204,9 +212,9 @@ public class PubTracksController {
 			args.add(verdict);
 		}
 		if ("admin".equals(who)) {
-			where.append(" AND m.manual_review->'admin' IS NOT NULL");
+			where.append(" AND r.manual_review->'admin' IS NOT NULL");
 		} else if ("users".equals(who)) {
-			where.append(" AND m.manual_review->'users' IS NOT NULL");
+			where.append(" AND r.manual_review->'users' IS NOT NULL");
 		}
 		if (!isBlank(q)) {
 			if (q.trim().matches("\\d{1,18}")) {
@@ -218,12 +226,12 @@ public class PubTracksController {
 			}
 		}
 		JsonObject res = new JsonObject();
-		res.addProperty("total", jdbcTemplate.queryForObject("SELECT count(*) FROM " + TABLE + " m" + where, Long.class, args.toArray()));
+		res.addProperty("total", jdbcTemplate.queryForObject("SELECT count(*)" + REVIEWED_TRACKS + where, Long.class, args.toArray()));
 		args.add(Math.max(1, Math.min(limit, LIST_LIMIT)));
 		args.add(Math.max(0, offset));
 		JsonArray rows = new JsonArray();
 		jdbcTemplate.query("SELECT m.id, m.\"user\", m.date, m.name, m.activity, m.file_activity, m.speed, m.distance, m.points, m.time_minutes,"
-						+ " m.manual_review::text AS manual_review FROM " + TABLE + " m" + where + " ORDER BY " + LAST_REVIEW + " DESC LIMIT ? OFFSET ?",
+						+ " r.manual_review::text AS manual_review" + REVIEWED_TRACKS + where + " ORDER BY " + LAST_REVIEW + " DESC LIMIT ? OFFSET ?",
 				(RowCallbackHandler) rs -> {
 					JsonObject row = new JsonObject();
 					row.addProperty("id", rs.getLong("id"));
@@ -264,9 +272,10 @@ public class PubTracksController {
 		response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"osmgpx-reviews.csv.gz\"");
 		String select = "SELECT m.id, m.\"user\", m.date, m.name, m.description, m.tags, m.lat, m.lon, m.activity, m.activity_source, "
 				+ "m.file_activity, m.speed_matches_activity, m.speed, m.max_speed, m.distance, m.points, m.time_minutes, "
-				+ "m.manual_review::text AS manual_review, m.track_stats::text AS track_stats, m.simplified_geometry"
-				+ (gpx ? ", f.data AS gpx FROM " + TABLE + " m LEFT JOIN osm_gpx_files f ON f.id = m.id" : " FROM " + TABLE + " m")
-				+ " WHERE m.manual_review IS NOT NULL AND m.id > ?" + (from == null ? "" : " AND " + REVIEWED_SINCE)
+				+ "r.manual_review::text AS manual_review, m.track_stats::text AS track_stats, m.simplified_geometry"
+				+ (gpx ? ", f.data AS gpx" : "") + REVIEWED_TRACKS
+				+ (gpx ? " LEFT JOIN " + GPX_FILES_TABLE_NAME + " f ON f.id = m.id" : "")
+				+ " WHERE r.manual_review IS NOT NULL AND m.id > ?" + (from == null ? "" : " AND " + REVIEWED_SINCE)
 				+ (to == null ? "" : " AND " + REVIEWED_BEFORE) + " ORDER BY m.id LIMIT " + EXPORT_BATCH;
 		int batches = 0;
 		try (Writer w = new OutputStreamWriter(new GZIPOutputStream(response.getOutputStream(), 1 << 16), StandardCharsets.UTF_8)) {
