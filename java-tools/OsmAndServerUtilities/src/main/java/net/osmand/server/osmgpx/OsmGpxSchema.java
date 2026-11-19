@@ -97,6 +97,7 @@ public class OsmGpxSchema {
 							AND activity NOT LIKE 'garbage%%' AND activity <> 'error'::text;
 					""".formatted(GPX_METADATA_TABLE_NAME, TRACK_STATS_VERSION, OUTDATED_STATS_CONDITION));
 		}
+		actualizeSchema(connection);
 		LOG.info("OsmGpx schema initialized.");
 	}
 
