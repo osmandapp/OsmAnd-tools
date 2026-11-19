@@ -249,7 +249,7 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 		return null;
 	}
 
-	private Set<String> typesOf(Params params) {
+	protected Set<String> typesOf(Params params) {
 		Set<String> supported = supportedTypes();
 		Set<String> chosen = params.fileTypes() == null ? Set.of() : params.fileTypes();
 		if (supported == null) {

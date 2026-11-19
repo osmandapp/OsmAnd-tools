@@ -538,7 +538,7 @@ public class GarminConnectService {
 			LOG.warn("Garmin activityFiles: missing or invalid summaryId / file base name");
 			return;
 		}
-		String cloudName = GPX_FOLDER_GARMIN + "/" + baseFileName + ".gpx";
+		String cloudName = userdataService.getStoredFileName(conn.userid, GPX_FOLDER_GARMIN + "/" + baseFileName + ".gpx", FILE_TYPE_GPX);
 		UserFile latestCloud = cloudUserFilesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(
 				conn.userid, cloudName, FILE_TYPE_GPX);
 		if (isNonDeletedCloudFile(latestCloud)) {
