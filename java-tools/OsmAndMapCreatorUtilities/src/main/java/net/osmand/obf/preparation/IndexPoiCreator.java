@@ -431,36 +431,27 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		String wd = a.getAdditionalInfo(tag + "_wikidata");
 		if (wd != null && wd.length() > 0) {
 			rulType.setWikidataId(wd);
-			addAltNames(mainValue, rulType, mainValue);
-			// add all names as alternative "tag" name (alternative brand names)
+			// name:xx of the POIs named by the value are candidates for alternative "tag" names (brand names)
 			if (mainValue.equalsIgnoreCase(tempNames.get("name"))) {
 				int mainValueParts = SearchAlgorithms.split(mainValue).size();
+				Set<String> poiAltNames = new TreeSet<>(PoiAdditionalType.NAME_COMPARATOR);
 				for (String k : tempNames.keySet()) {
 					if (k.startsWith("name:")) {
 						String v = tempNames.get(k);
 						if (SearchAlgorithms.split(v).size() == mainValueParts) {
-							addAltNamesMix(mainValue, rulType, v);
+							rulType.addLangName(k.substring("name:".length()), v);
+							if (!v.equalsIgnoreCase(mainValue)) {
+								poiAltNames.add(v);
+							}
 						}
 					}
 				}
+				for (String v : poiAltNames) {
+					rulType.addAltNamePoi(v);
+				}
 			}
-			
 		}
 		return null;
-	}
-
-	private void addAltNamesMix(String mainValue, PoiAdditionalType rulType, String val) {
-		addAltNames(mainValue, rulType, val);
-		if (val.indexOf('.') != -1) {
-			addAltNames(mainValue, rulType, val.replace(".", " "));
-			addAltNames(mainValue, rulType, val.replace(".", ""));
-		}
-	}
-	
-	private void addAltNames(String mainValue, PoiAdditionalType rulType, String val) {
-		if (!val.equalsIgnoreCase(mainValue)) {
-			rulType.getAltNames().add(val);
-		}
 	}
 
 
@@ -1416,14 +1407,18 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 		private String value;
 		private boolean text;
 		private String wikidataId;
-		private Set<String> altNames = new TreeSet<String>(new Comparator<String>() {
-
-			@Override
-			public int compare(String o1, String o2) {
-				// no collator ! (mix with .)
-				return o1.toLowerCase().compareTo(o2.toLowerCase());
-			}
-		});
+		// no collator ! (mix with .)
+		static final Comparator<String> NAME_COMPARATOR = Comparator.comparing(String::toLowerCase);
+		// a name of fewer POIs is cut when it is a minority of its language and unlike the value and the most used name
+		// of that language: Банкомат on 2 of 521 POIs of Беларусбанк with a name:ru, Почта on 1 of 174 of Белпошта
+		private static final int ALT_NAME_MIN_POIS = 3;
+		private static final int ALT_NAME_MIN_LANG_POIS = 2;
+		private static final double ALT_NAME_MAX_MINORITY_SHARE = 0.3;
+		private static final double ALT_NAME_MIN_SIMILARITY = 0.4;
+		// alternative name -> POIs named by the value that carry it
+		private final Map<String, Integer> altNamePois = new TreeMap<>(NAME_COMPARATOR);
+		// language -> name:xx of the POIs named by the value, the value itself included -> POIs
+		private final Map<String, Map<String, Integer>> langNames = new HashMap<>();
 		private int usage;
 		private int targetId;
 		private int id;
@@ -1443,8 +1438,97 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 			return text;
 		}
 		
+		void addAltNamePoi(String name) {
+			altNamePois.merge(name, 1, Integer::sum);
+		}
+
+		void addLangName(String lang, String name) {
+			langNames.computeIfAbsent(lang, k -> new TreeMap<>(NAME_COMPARATOR)).merge(name, 1, Integer::sum);
+		}
+
 		public Set<String> getAltNames() {
+			Set<String> altNames = new TreeSet<>(NAME_COMPARATOR);
+			if (!langNames.isEmpty()) {
+				addAltName(altNames, value);
+			}
+			for (Map.Entry<String, Integer> e : altNamePois.entrySet()) {
+				if (e.getValue() >= ALT_NAME_MIN_POIS || !isLanguageMinority(e.getKey())) {
+					addAltName(altNames, e.getKey());
+				}
+			}
 			return altNames;
+		}
+
+		private void addAltName(Set<String> altNames, String name) {
+			if (!name.equalsIgnoreCase(value)) {
+				altNames.add(name);
+			}
+			if (name.indexOf('.') != -1) {
+				for (String n : new String[] { name.replace(".", " "), name.replace(".", "") }) {
+					if (!n.equalsIgnoreCase(value)) {
+						altNames.add(n);
+					}
+				}
+			}
+		}
+
+		private boolean isLanguageMinority(String name) {
+			Map<String, Integer> names = null;
+			int cnt = 0;
+			for (Map<String, Integer> l : langNames.values()) {
+				Integer c = l.get(name);
+				if (c != null && c > cnt) {
+					names = l;
+					cnt = c;
+				}
+			}
+			if (names == null) {
+				return false;
+			}
+			int total = 0;
+			String mostUsed = null;
+			for (Map.Entry<String, Integer> e : names.entrySet()) {
+				total += e.getValue();
+				if (mostUsed == null || e.getValue() > names.get(mostUsed)) {
+					mostUsed = e.getKey();
+				}
+			}
+			if (total < ALT_NAME_MIN_LANG_POIS || cnt >= ALT_NAME_MAX_MINORITY_SHARE * total) {
+				return false;
+			}
+			String n = normalizeForSimilarity(name);
+			return similarity(n, normalizeForSimilarity(value)) < ALT_NAME_MIN_SIMILARITY
+					&& similarity(n, normalizeForSimilarity(mostUsed)) < ALT_NAME_MIN_SIMILARITY;
+		}
+
+		private static String normalizeForSimilarity(String name) {
+			return Junidecode.unidecode(name).toLowerCase().replaceAll("[^\\p{L}\\p{N}]", "");
+		}
+
+		// Dice coefficient of character bigrams; a much shorter name is a part of the other one (Почта of Белпошта)
+		static double similarity(String name, String other) {
+			if (name.isEmpty() || other.isEmpty() || name.length() < 0.75 * other.length()) {
+				return 0;
+			}
+			Set<String> a = bigrams(name), b = bigrams(other);
+			int common = 0;
+			for (String g : a) {
+				if (b.contains(g)) {
+					common++;
+				}
+			}
+			return 2.0 * common / (a.size() + b.size());
+		}
+
+		private static Set<String> bigrams(String s) {
+			Set<String> g = new HashSet<>();
+			for (int i = 0; i + 2 <= s.length(); i++) {
+				g.add(s.substring(i, i + 2));
+			}
+			if (s.length() == 1) {
+				g.add(s);
+			}
+			return g;
 		}
 
 		public void increment() {
