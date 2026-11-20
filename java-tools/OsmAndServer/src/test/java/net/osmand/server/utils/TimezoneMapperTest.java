@@ -31,7 +31,7 @@ import org.junit.Test;
 // A city fails when the mapper gives it a different local time on one of four days of the year (a zone
 // with another name but the same clock, Europe/Kiev for Europe/Kyiv, is fine). The list (3.4 MB zip) is kept in
 // build/geonames and downloaded again when older than a week; with no copy and no network the test is skipped.
-// Cities where GeoNames is wrong or the zone is disputed are in ACCEPTED and DISPUTED.
+// Cities where GeoNames is wrong are in GEONAMES_FIXES, disputed ones in ACCEPTED and DISPUTED.
 // The full list of wrong cities is in build/timezone-mismatches.txt.
 public class TimezoneMapperTest {
 
@@ -42,8 +42,8 @@ public class TimezoneMapperTest {
 	private static final Path REPORT = Path.of("build", "timezone-mismatches.txt");
 	private static final int SHOWN = 25;
 
-	// cities where GeoNames is wrong or the zone is disputed: geonameid -> the zone that is accepted as well
-	private static final Map<Long, String> ACCEPTED = Map.ofEntries(
+	// GeoNames gives these cities a wrong zone, the mapper gives the tzdb one: geonameid -> the right zone
+	private static final Map<Long, String> GEONAMES_FIXES = Map.ofEntries(
 			// US-border municipalities of Coahuila and Tamaulipas follow US DST since 2022 (tzdb America/Matamoros)
 			Map.entry(3520271L, "America/Matamoros"), // Ciudad Río Bravo
 			Map.entry(3514868L, "America/Matamoros"), // Valle Hermoso
@@ -58,7 +58,10 @@ public class TimezoneMapperTest {
 			Map.entry(4266307L, "America/Indiana/Vincennes"), // Vincennes
 			// tzdb puts Govi-Altai and Zavkhan at UTC+8, Asia/Hovd is Bayan-Ölgii, Hovd and Uvs only
 			Map.entry(1516393L, "Asia/Ulaanbaatar"), // Altai
-			Map.entry(1515007L, "Asia/Ulaanbaatar"), // Uliastay
+			Map.entry(1515007L, "Asia/Ulaanbaatar")); // Uliastay
+
+	// no right answer, the zone of the mapper is accepted as well: geonameid -> the mapper zone
+	private static final Map<Long, String> ACCEPTED = Map.ofEntries(
 			// a Liberland claim on the unclaimed Danube bank, population 63
 			Map.entry(13405691L, "Etc/GMT-1"), // Liberpolis
 			// on the China-Vietnam border river, the point is within the simplified border (not checked in OSM)
@@ -124,9 +127,11 @@ public class TimezoneMapperTest {
 	}
 
 	private static boolean accepted(City city, String mapped, Instant[] days) {
-		String zone = ACCEPTED.get(city.id);
-		if (zone != null && sameClock(zone, mapped, days)) {
-			return true;
+		for (Map<Long, String> exceptions : List.of(GEONAMES_FIXES, ACCEPTED)) {
+			String zone = exceptions.get(city.id);
+			if (zone != null && sameClock(zone, mapped, days)) {
+				return true;
+			}
 		}
 		Set<String> disputed = DISPUTED.get(city.country);
 		return disputed != null && disputed.contains(city.timeZone)
