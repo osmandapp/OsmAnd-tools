@@ -394,12 +394,15 @@ public class SpatialSearchService {
 	                                         String locale) {
 		Feature feature = new Feature(Geometry.point(new LatLon(0, 0)))
 				.prop(SearchResultConverter.PoiTypeField.TYPE.getFieldName(), ObjectType.POI_TYPE);
-		Map<String, String> tags = getSpatialPoiTypeFields(type, locale);
+		Map<String, String> tags = getSpatialPoiTypeFields(type.getLocalType(poiTypeSearch), locale);
 		for (Map.Entry<String, String> entry : tags.entrySet()) {
 			feature.prop(entry.getKey(), entry.getValue());
 		}
 		String name = tags.get(SearchResultConverter.PoiTypeField.NAME.getFieldName());
-		String altName = r.getPoiCategoryMatchedName(poiTypeSearch);
+		String altName = type.getAltName(poiTypeSearch, locale);
+		if (altName == null) {
+			altName = r.getPoiCategoryMatchedName(poiTypeSearch);
+		}
 		if (altName != null && !altName.equalsIgnoreCase(name)) {
 			feature.prop(SearchResultConverter.PoiTypeField.ALT_NAME.getFieldName(), altName);
 		}
