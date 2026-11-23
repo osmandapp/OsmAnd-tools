@@ -8,7 +8,7 @@ valdco), sounding_b (depth) and area_b (drval1): LINZ hydrographic data as downl
 of a band are its coverage. Per CELL degree square, band by band from the largest scale, a band keeps what lies
 outside the coverage of the larger scale bands; its own coverage is then added. Curves are linearized.
 
-OUTPUT gets the layers and fields of Kartverket's "Sjøkart - Dybdedata", so build_depth_kartverket.sh builds it:
+OUTPUT gets the layers and fields of Kartverket's "Sjøkart - Dybdedata", so build_depth_charts.sh builds it:
 dybdekurve (dybde), dybdepunkt (dybde), dybdeareal (minimumsdybde), geometry column SHAPE, EPSG:4326.
 """
 import argparse
@@ -61,18 +61,22 @@ def main():
     srs.ImportFromEPSG(4326)
     srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
     out = {}
-    for name, geom_type, field in (('dybdekurve', ogr.wkbMultiLineString, 'dybde'),
-                                   ('dybdepunkt', ogr.wkbPoint, 'dybde'),
-                                   ('dybdeareal', ogr.wkbMultiPolygon, 'minimumsdybde')):
+    for name, geom_type, field, field_max in (('dybdekurve', ogr.wkbMultiLineString, 'dybde', None),
+                                              ('dybdepunkt', ogr.wkbPoint, 'dybde', None),
+                                              ('dybdeareal', ogr.wkbMultiPolygon, 'minimumsdybde', 'maksimumsdybde')):
         layer = dst.CreateLayer(name, srs, geom_type, options=['GEOMETRY_NAME=SHAPE', 'SPATIAL_INDEX=YES'])
         layer.CreateField(ogr.FieldDefn(field, ogr.OFTReal))
-        out[name] = (layer, field)
+        if field_max:
+            layer.CreateField(ogr.FieldDefn(field_max, ogr.OFTReal))
+        out[name] = (layer, field, field_max)
     counts = {name: 0 for name in out}
 
-    def write(name, geom, value):
-        layer, field = out[name]
+    def write(name, geom, value, value_max=None):
+        layer, field, field_max = out[name]
         f = ogr.Feature(layer.GetLayerDefn())
         f.SetField(field, value)
+        if field_max and value_max is not None:
+            f.SetField(field_max, value_max)
         f.SetGeometry(geom)
         layer.CreateFeature(f)
         counts[name] += 1
@@ -99,7 +103,8 @@ def main():
                     for p in parts(g.Intersection(cell), ogr.wkbPolygon):
                         rest = p if taken is None else p.Difference(taken)
                         for q in parts(rest, ogr.wkbPolygon):
-                            write('dybdeareal', multi([q], ogr.wkbMultiPolygon), f.GetField('drval1'))
+                            write('dybdeareal', multi([q], ogr.wkbMultiPolygon), f.GetField('drval1'),
+                                  f.GetField('drval2'))
                         own.append(p)
                 coverage = multi(own, ogr.wkbMultiPolygon).UnionCascaded() if own else None
 

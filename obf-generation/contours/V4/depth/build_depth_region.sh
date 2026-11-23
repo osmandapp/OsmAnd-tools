@@ -3,7 +3,7 @@
 #
 #   build_depth_region.sh -D DATA_DIR -n REGION [-c MAP_CREATOR_DIR] [-k] [-j JOBS]
 #   build_depth_region.sh -n NAME -b "W S E N" -i GRID -m LAND -o OUT_DIR [-l LEVELS] [-p TIERS] [-r CELL]
-#                         [-u UPSAMPLE] [-s SMOOTH] [-d SMOOTH_FROM] [-a RESAMPLING] [-g MIN_RING_CELLS] [-t TILE]
+#                         [-u UPSAMPLE] [-s SMOOTH] [-d SMOOTH_FROM] [-a RESAMPLING] [-g MIN_RING_CELLS] [-S SIMPLIFY] [-t TILE]
 #                         [-w OVERVIEW] [-x EXCLUDE [-X LAYER]] [-e ENC_DIR] [-F FILL] [-N NO_DETAILED]
 #                         [-c MAP_CREATOR_DIR] [-k] [-j JOBS]
 #
@@ -19,25 +19,26 @@
 #                SPACING degree cell, shown from ZOOMS; each tier is its own map section. Default none
 #   -r CELL      working cell in degrees, default the grid's own
 #   -u UPSAMPLE  cubic-spline upsampling factor before contouring, smooths the lines of a coarse grid (default 1)
-#   -s SMOOTH    low-pass for the deeper levels: average over SMOOTH x SMOOTH cells, then back (default 4, 1 = off);
-#                a flat bottom with sand waves near a level gives hundreds of tiny zigzags without it
-#   -d SMOOTH_FROM  levels from this depth down use the smoothed grid, shallower ones the full grid (default 20)
+#   -s SMOOTH    optional low-pass: average over SMOOTH x SMOOTH cells, then back (default 1 = off). When enabled,
+#                every level uses the same smoothed grid, so neighbouring contours cannot cross at a change of grid
+#   -d SMOOTH_FROM  deprecated compatibility option; smoothing applies to every level, not only deeper ones
 #   -a RESAMPLING   gdalwarp resampling of the cut (default average); bilinear avoids the steps of a coarse grid;
 #                   auto: every grid on its own, average when its cells are about the cell or finer, bilinear when coarser
 #                   (EMODnet under a 20 m survey), then laid over each other
 #                   (GEBCO) cut to a much finer cell
-#   -g MIN_RING_CELLS  drop closed rings shorter than this many cells (default 8)
+#   -g MIN_RING_CELLS  drop closed rings shorter than this many cells (default 0: keep every ring)
+#   -S SIMPLIFY  simplification of grid contours and their depth areas in degrees (default 0: exact shared vertices)
 #   -w OVERVIEW  "CELL:ZOOMS", e.g. "0.02:5-8": the levels of 200 m and deeper again from the grid averaged to CELL
 #                degrees, as their own map section shown at ZOOMS - the main contours start at zoom 9. Default none
-#   -x EXCLUDE   polygons (OGR source, layer -X or the first) where another region has better data: no contours and
-#                no points there, the overview stays
+#   -x EXCLUDE   polygons (OGR source, layer -X or the first) where another region has better data: no contours,
+#                points or depth areas there, the overview stays
 #   -e ENC_DIR   S-57 ENC cells (NOAA ENC_ROOT): inside the approach and harbour cells (bands 4-6) the charted contours
 #                and soundings (depth_enc_osm.py) replace the grid; soundings thinned as ENC_TIERS, the charted levels
 #                with no contourtype (0.9, 3.6 m...) only from zoom 15, depth areas as the fill (depth_areas_osm.py)
 #   -F FILL      depth areas (fill), for grids in chart datum: "GRID[,PLUS,MINUS]", elevation = GRID + PLUS - MINUS
 #                brings a grid in a land datum to chart datum (NAP + NLGEO2018 - NLLAT2018 = LAT); the shifted grid
-#                replaces GRID in -i, so the contours are in chart datum too. Only where GRID has data (no EMODnet
-#                fill), the bands dries, 0-2, 2-5,
+#                replaces GRID in -i, so the contours are in chart datum too. Only where the FILL grid has data,
+#                the bands dries, 0-2, 2-5,
 #                5-10 m come from the same rasters as the contours of those levels (smoothed from SMOOTH_FROM), so
 #                their edges lie on the contours; depth_areas_osm.py --nested
 #   -t TILE      split a region larger than TILE degrees into tiles built in parallel (JOBS at a time); with -c the
@@ -64,8 +65,10 @@
 #                                     in LAT (NLLAT2018)
 #   Ireland_contours                  INFOMAR 10 m inshore over 25 m over EMODnet DTM 2024, LAT, as Netherlands_contours;
 #                                     fill from the INFOMAR grids
-#   France_contours                   SHOM coastal DTMs 5-20 m (11 zones) over EMODnet DTM 2024, chart datum, as
-#                                     Netherlands_contours, only the 1 degree tiles touching a zone; fill from SHOM
+#   France_contours                   SHOM coastal DTMs 5-20 m (11 zones), chart datum, only the 1 degree tiles touching
+#                                     a zone; with france_filled.vrt EMODnet closes only holes enclosed by SHOM and the
+#                                     coastal strip is interpolated; without it SHOM lies over EMODnet, fill SHOM;
+#                                     all levels and fill bands share exact, unsmoothed geometry
 #   Great_Britain_contours            UKHO ADMIRALTY surveys (BAG, averaged to 0.0002 degrees) over EMODnet DTM 2024,
 #                                     LAT, as France_contours: only the 1 degree tiles touching a survey
 #   Denmark_contours                  (not published, small gain) Danmarks Dybdemodel 50 m 2024 over EMODnet DTM 2024,
@@ -78,7 +81,7 @@
 #                                     Britain surveys, the Netherlands and Norway (with FULL_COVERAGE=1 also
 #                                     Europe_full_coverage_contours, all of EMODnet)
 #   Europe_points                     EMODnet DTM 2024, points, 10 degree tiles
-#   Norway_contours                   Kartverket Sjøkart - Dybdedata (vector), see build_depth_kartverket.sh
+#   Norway_contours                   Kartverket Sjøkart - Dybdedata (vector), see build_depth_charts.sh
 #   New-zealand_contours              LINZ chart vector data, 5 scale bands merged by depth_bands_merge.py (the largest
 #                                     scale wins), then as Norway_contours; main islands only (165..180 E)
 #   World_contours                    GEBCO_2026 (15"), contours every 10 m to 300 m, 50 m to 1000 m, then as the
@@ -103,8 +106,8 @@ set -euo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 V4=$(cd "$HERE/.." && pwd)
-NAME=""; BBOX="${BBOX:-}"; GRID=""; LAND=""; OUT=""; CELL=""; UPSAMPLE=1; JOBS=4; SMOOTH=4; SMOOTH_FROM=""; MAP_CREATOR=""
-DATA=""; TILE=0; TILE_WITH="${TILE_WITH:-}"; KEEP=0; LEVELS=""; TIERS=""; RESAMPLING=""; MIN_RING_CELLS=""; OVERVIEW=""
+NAME=""; BBOX="${BBOX:-}"; GRID=""; LAND=""; OUT=""; CELL=""; UPSAMPLE=1; JOBS=4; SMOOTH=""; SMOOTH_FROM=""; MAP_CREATOR=""
+DATA=""; TILE=0; TILE_WITH="${TILE_WITH:-}"; KEEP=0; LEVELS=""; TIERS=""; RESAMPLING=""; MIN_RING_CELLS=""; SIMPLIFY=""; OVERVIEW=""
 NO_DETAILED=""; FULL_NAME=""; EXCLUDE=""; EXCLUDE_LAYER=""; ENC=""; ENC_AREAS=""; FILL=""; ENC_TIERS="0.02:10-11 0.008:12 0.003:13-14 0.001:15-"
 # steps FROM:TO:STEP... : comma-separated levels
 steps() { local s a b c out=""; for s; do IFS=: read -r a b c <<< "$s"; out+=$(seq "$a" "$c" "$b" | paste -sd, -),; done
@@ -128,6 +131,7 @@ while [ $# -gt 0 ]; do
 		-d) SMOOTH_FROM=$2; shift 2 ;;
 		-a) RESAMPLING=$2; shift 2 ;;
 		-g) MIN_RING_CELLS=$2; shift 2 ;;
+		-S) SIMPLIFY=$2; shift 2 ;;
 		-c) MAP_CREATOR=$2; shift 2 ;;
 		-D) DATA=$2; shift 2 ;;
 		-t) TILE=$2; shift 2 ;;
@@ -197,7 +201,7 @@ if [ -n "$DATA" ]; then
 	}
 	case "$NAME" in
 		Norway_contours)
-			exec "$HERE/build_depth_kartverket.sh" -D "$DATA" -n "$NAME" -j "$JOBS" ${MAP_CREATOR:+-c "$MAP_CREATOR"} \
+			exec "$HERE/build_depth_charts.sh" -D "$DATA" -n "$NAME" -j "$JOBS" ${MAP_CREATOR:+-c "$MAP_CREATOR"} \
 				$([ $KEEP -eq 1 ] && echo -k) ;;
 		New-zealand_contours)
 			# LINZ chart vector data: the scale bands merged (the largest scale wins), then built as Norway
@@ -209,39 +213,133 @@ if [ -n "$DATA" ]; then
 			mkdir -p "$OUT"
 			python3 "$HERE/depth_bands_merge.py" "$DATA/src/nz/linz_hydro.gpkg" "$OUT/$NAME.bands.gpkg" \
 				--bbox ${BBOX:-165 -48 180 -33.5} 2>&1 | grep -v numpy
-			"$HERE/build_depth_kartverket.sh" -n "$NAME" -i "$OUT/$NAME.bands.gpkg" -m "$DATA/mask/land_polygons.gpkg" \
+			"$HERE/build_depth_charts.sh" -n "$NAME" -i "$OUT/$NAME.bands.gpkg" -m "$DATA/mask/land_polygons.gpkg" \
 				-o "$OUT" -j "$JOBS" ${MAP_CREATOR:+-c "$MAP_CREATOR"}
 			# the merged bands (about 0.3 GB) are only an intermediate
 			rm -f "$OUT/$NAME.bands.gpkg"; exit 0 ;;
 		Netherlands_contours)
-			: "${BBOX:=1.7 51.1 7.3 55.7}"; : "${GRID:=$EMODNET,$NL/bathymetrie_ncp_juni_2019.tif,$NL/bodemhoogte_20mtr_2024.tif}"
+			# The Rijkswaterstaat grids in chart datum with the coastal gap closed by the Laplace fill
+			# (netherlands_filled.vrt); without it, use the raw grids and the NSGI datum shift.
+			NL_FILL="$NL/fill/netherlands_filled.vrt"
+			# the EMODnet base limited to the contour of the detailed data
+			NL_BASE="$NL/fill/netherlands_emodnet_base.vrt"
+			: "${BBOX:=1.7 51.1 7.3 55.7}"
+			if [ -f "$NL_FILL" ]; then
+				if [ -f "$NL_BASE" ]; then
+					: "${GRID:=$NL_BASE,$NL_FILL}"; : "${FILL:=$NL_FILL}"
+				else
+					: "${GRID:=$EMODNET,$NL_FILL}"; : "${FILL:=$NL_FILL}"
+				fi
+				if [ -f "$NL/fill/netherlands_filled_interp.vrt" ]; then
+					: "${INTERP:=$NL/fill/netherlands_filled_interp.vrt}"
+				fi
+			else
+				: "${GRID:=$EMODNET,$NL/bathymetrie_ncp_juni_2019.tif,$NL/bodemhoogte_20mtr_2024.tif}"
+				if [ -f "$NL/nl_nsgi_nllat2018.tif" ]; then
+					: "${FILL:=$NL/bodemhoogte_20mtr_2024.tif,$NL/nl_nsgi_nlgeo2018.tif,$NL/nl_nsgi_nllat2018.tif}"
+				fi
+			fi
+			# the UK map has the priority: the Dutch map gives way to its whole coverage, the Thames
+			# estuary and the North Sea off East Anglia. The coverage is on the working grid and is not
+			# expanded: the Dutch data then reaches the edge of the UK data and no seam is left between
+			# the two maps.
+			if [ -f "$DATA/src/uk/emodnet_base.vrt" ] && [ -f "$DATA/src/uk/uk_filled.vrt" ]; then
+				coverage uk_netherlands "--bbox 1.7 51.1 2.05 55.7 --cell 0.0002 --shrink 0" \
+					"$DATA/src/uk/emodnet_base.vrt" "$DATA/src/uk/uk_filled.vrt"
+				: "${EXCLUDE:=$COVERAGE}"
+			elif [ -f "$DATA/src/uk/emodnet_home.vrt" ] && [ -f "$DATA/src/uk/uk_filled.vrt" ]; then
+				coverage uk_netherlands "--bbox 1.7 51.1 7.3 55.7 --cell 0.001 --shrink -1" \
+					"$DATA/src/uk/emodnet_home.vrt" "$DATA/src/uk/uk_filled.vrt"
+				: "${EXCLUDE:=$COVERAGE}"
+			fi
 			: "${RESAMPLING:=auto}"; : "${CELL:=0.0002}"; : "${LEVELS:=2,5,10,15,20,25,30,35,40,45,50,100,200}"
 			: "${SMOOTH_FROM:=5}"
-			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1
-			if [ -f "$NL/nl_nsgi_nllat2018.tif" ]; then
-				: "${FILL:=$NL/bodemhoogte_20mtr_2024.tif,$NL/nl_nsgi_nlgeo2018.tif,$NL/nl_nsgi_nllat2018.tif}"
-			fi ;;
+			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1 ;;
 		Ireland_contours)
-			# INFOMAR grids are LAT already: the fill needs no datum shift
+			# INFOMAR grids are LAT already: the fill needs no datum shift. The coastal gap is closed by
+			# the Laplace fill (ireland_filled.vrt); without it, use the raw INFOMAR over EMODnet.
 			IE="$DATA/src/ireland/ireland.vrt"
-			: "${BBOX:=-11.8 51.2 -5.3 55.6}"; : "${GRID:=$EMODNET,$IE}"; : "${FILL:=$IE}"
+			IE_FILL="$DATA/src/ireland/fill/ireland_filled.vrt"
+			# the EMODnet base limited to the contour of the detailed data
+			IE_BASE="$DATA/src/ireland/fill/ireland_emodnet_base.vrt"
+			: "${BBOX:=-11.8 51.2 -5.3 55.6}"
+			if [ -f "$IE_FILL" ]; then
+				if [ -f "$IE_BASE" ]; then
+					: "${GRID:=$IE_BASE,$IE_FILL}"
+				else
+					: "${GRID:=$EMODNET,$IE_FILL}"
+				fi
+				: "${FILL:=$IE_FILL}"; : "${TILE_WITH:=$IE}"
+				if [ -f "$DATA/src/ireland/fill/ireland_filled_interp.vrt" ]; then
+					: "${INTERP:=$DATA/src/ireland/fill/ireland_filled_interp.vrt}"
+				fi
+			else
+				: "${GRID:=$EMODNET,$IE}"; : "${FILL:=$IE}"
+			fi
+			# The UK map has the priority: the Irish map gives way to its whole coverage, the EMODnet base
+			# on the British side of the midline and the UKHO surveys that reach into the Irish side. The
+			# coverage is on the working grid and is not expanded, so that the Irish data reaches the edge
+			# of the UK data and no seam is left between the two maps.
+			if [ -f "$DATA/src/uk/emodnet_base.vrt" ] && [ -f "$DATA/src/uk/uk_filled.vrt" ]; then
+				coverage uk_ireland "--bbox -8.7 51.2 -5.3 55.6 --cell 0.0002 --shrink 0" \
+					"$DATA/src/uk/emodnet_base.vrt" "$DATA/src/uk/uk_filled.vrt"
+				: "${EXCLUDE:=$COVERAGE}"
+			elif [ -f "$DATA/src/uk/emodnet_home.vrt" ] && [ -f "$DATA/src/uk/uk_filled.vrt" ]; then
+				coverage uk_ireland "--bbox -11.8 51.2 -5.3 55.6 --cell 0.001 --shrink -1" \
+					"$DATA/src/uk/emodnet_home.vrt" "$DATA/src/uk/uk_filled.vrt"
+				: "${EXCLUDE:=$COVERAGE}"
+			fi
 			: "${RESAMPLING:=auto}"; : "${CELL:=0.0002}"; : "${LEVELS:=2,5,10,15,20,25,30,35,40,45,50,100,200}"; : "${SMOOTH_FROM:=5}"
 			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1 ;;
 		France_contours)
 			# SHOM coastal DTMs in chart datum (PBMA), scattered along the Channel and Atlantic coast: only the 1 degree
-			# tiles touching one of them are built
+			# tiles touching one of them are built. The filled grid adds EMODnet only in holes enclosed by SHOM.
 			FR="$DATA/src/france/france.vrt"
-			: "${BBOX:=-5.5 43.3 2.6 51.2}"; : "${GRID:=$EMODNET,$FR}"; : "${FILL:=$FR}"; : "${TILE_WITH:=$FR}"
+			FR_DEPTH="$FR"
+			[ ! -f "$DATA/src/france/fill/france_filled.vrt" ] || FR_DEPTH="$DATA/src/france/fill/france_filled.vrt"
+			: "${BBOX:=-5.5 43.3 2.6 51.2}"; : "${FILL:=$FR_DEPTH}"; : "${TILE_WITH:=$FR}"
+			if [ "$FR_DEPTH" = "$FR" ]; then : "${GRID:=$EMODNET,$FR}"; else : "${GRID:=$FR_DEPTH}"; fi
+			if [ -f "$DATA/src/france/fill/france_filled_interp.vrt" ]; then
+				: "${INTERP:=$DATA/src/france/fill/france_filled_interp.vrt}"
+			fi
+			# the UK map holds the surveys of the Channel and of the Channel Islands: the French map leaves that
+			# water to it, so that the same ground is not charted twice. The coverage is on the working grid
+			# and is not expanded, so that the French data reaches the edge of the UK data.
+			if [ -f "$DATA/src/uk/uk_filled.vrt" ]; then
+				coverage uk_filled "--bbox -5.5 49.8 2.05 51.2 --cell 0.0002 --shrink 0" \
+					"$DATA/src/uk/uk_filled.vrt"; : "${EXCLUDE:=$COVERAGE}"
+			elif [ -f "$DATA/src/uk/uk.vrt" ]; then
+				coverage uk "" "$DATA/src/uk/uk.vrt"; : "${EXCLUDE:=$COVERAGE}"
+			fi
 			: "${RESAMPLING:=auto}"; : "${CELL:=0.0002}"; : "${LEVELS:=2,5,10,15,20,25,30,35,40,45,50,100,200}"; : "${SMOOTH_FROM:=5}"
 			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1 ;;
 		Great_Britain_contours)
-			# UKHO surveys downloaded by hand (download_all.sh uk): only the 1 degree tiles touching one of them
-			UK="$DATA/src/uk/uk.vrt"
+			# UKHO surveys downloaded by hand (download_all.sh uk): only the 1 degree tiles touching one of them.
+			# uk_filled.vrt is uk.vrt with the coastal gap interpolated up to the coastline (uk_coastal_fill.py);
+			# fall back to uk.vrt when the fill has not been built yet.
+			UK="$DATA/src/uk/uk_filled.vrt"
+			[ -f "$UK" ] || UK="$DATA/src/uk/uk.vrt"
 			if [ ! -f "$UK" ]; then
-				echo "$NAME: no src/uk/uk.vrt (surveys into src/uk/incoming, download_all.sh --only uk, check_sources.sh)" >&2
+				echo "$NAME: no src/uk/uk.vrt or uk_filled.vrt (surveys into src/uk/incoming, download_all.sh --only uk, check_sources.sh)" >&2
 				exit 1
 			fi
-			: "${BBOX:=-8.7 49.8 2.0 60.9}"; : "${GRID:=$EMODNET,$UK}"; : "${FILL:=$UK}"; : "${TILE_WITH:=$UK}"
+			# tile selection stays on the surveys: uk_filled.vrt covers the whole bbox with NaN
+			UK_TILES="$DATA/src/uk/uk.vrt"
+			[ -f "$UK_TILES" ] || UK_TILES="$UK"
+			# The general EMODnet base, like the coastal underlay, ends at the midpoint to neighbouring land;
+			# detailed UKHO surveys are not clipped by that line. The base is also limited to the contour
+			# of the detailed data (emodnet_base.vrt, depth_emodnet_base.py); emodnet_home.vrt is the older
+			# base with the midpoint only.
+			UK_BASE="$DATA/src/uk/emodnet_base.vrt"
+			[ -f "$UK_BASE" ] || UK_BASE="$DATA/src/uk/emodnet_home.vrt"
+			[ -f "$UK_BASE" ] || { echo "$NAME: no $UK_BASE (run download_all.sh --only uk with the midpoint mask)" >&2; exit 1; }
+			: "${BBOX:=-8.7 49.8 2.0 60.9}"; : "${GRID:=$UK_BASE,$UK}"; : "${FILL:=$UK}"; : "${TILE_WITH:=$UK_TILES}"
+			# the cells whose value is interpolated (the gaps closed inside a survey, the blended transitions
+			# and the coastal fill): no depth point is placed on them
+			: "${INTERP:=}"
+			for m in "$DATA/src/uk/uk_interp.vrt" "$DATA/src/uk/uk_filled_interp.vrt"; do
+				[ -f "$m" ] && INTERP="${INTERP:+$INTERP,}$m"
+			done
 			: "${RESAMPLING:=auto}"; : "${CELL:=0.0002}"; : "${LEVELS:=2,5,10,15,20,25,30,35,40,45,50,100,200}"; : "${SMOOTH_FROM:=5}"
 			: "${TIERS:=0.01:11-12 0.005:13 0.0025:14-}"; [ "$TILE" != 0 ] || TILE=1 ;;
 		Denmark_contours)
@@ -268,15 +366,24 @@ if [ -n "$DATA" ]; then
 		World_contours)
 			: "${BBOX:=-180 -79 180 85}"; : "${GRID:=$GEBCO}"; : "${LEVELS:=$(steps 10:300:10 350:950:50),$DEEP_LEVELS}"
 			: "${OVERVIEW:=$OVERVIEW_Z5_8}"
+			# one unsmoothed section of the 15" grid is 3.1 GB, over the 2 GB limit of a map index: keep the
+			# published smoothing of the world map (4x4 cells, rings under 8 cells dropped)
+			: "${SMOOTH:=4}"; : "${MIN_RING_CELLS:=8}"
 			if [ -z "$NO_DETAILED" ]; then
 				detailed_europe
-				coverage emodnet "--cell 0.02" "$EMODNET"; emodnet=$COVERAGE
+				# Europe_contours is published only within its bbox (-31.3 25.4 36 71.2), so the world leaves
+				# out exactly that part of EMODnet; the rest of its coverage (Cape Verde, the Atlantic west
+				# of 31 W) has no other map and must stay in the world on GEBCO
+				coverage emodnet_europe "--cell 0.02 --bbox -31.3 25.4 36.0 71.2" "$EMODNET"; emodnet_europe=$COVERAGE
 				# the box of New-zealand_contours: LINZ also has the Pacific islands and the Ross Sea
 				coverage new-zealand "--bbox 165 -48 180 -33.5 --layer area_1 --layer area_2 --layer area_3 --layer area_4 --layer area_5" \
 					"$DATA/src/nz/linz_hydro.gpkg"; nz=$COVERAGE
 				coverage gulf-cudem "--bbox $GULF_BBOX" "$DATA/src/cudem/cudem.vrt"; gulf=$COVERAGE
-				NO_DETAILED="World_contours:$emodnet,$DETAILED_EUROPE,$nz,$gulf:$emodnet"
+				NO_DETAILED="World_contours:$emodnet_europe,$DETAILED_EUROPE,$nz,$gulf:$emodnet_europe"
 			fi
+			# four map sections, built two at a time and merged: every part stays well below the 2 GB limit,
+			# and the memory of the build stays moderate (two JVMs of 6 GB instead of one of 16 GB)
+			: "${CONTOUR_PARTS:=4}"; : "${SECTION_HEAP:=-Xmx6g}"
 			: "${FULL_NAME:=World_full_coverage_contours}"
 			[ "$TILE" != 0 ] || TILE=15 ;;
 		World_Northern_hemisphere_points)
@@ -294,8 +401,10 @@ if [ -n "$DATA" ]; then
 		*) echo "Unknown region '$NAME', see --help" >&2; exit 1 ;;
 	esac
 	: "${LAND:=$DATA/mask/land_polygons.gpkg}"; : "${OUT:=$DATA/build}"
+# the rasters with the interpolated cells of the region: no depth point is placed on them
+: "${INTERP:=}"
 fi
-: "${LEVELS:=2,5,10,20,30,50,100,200,500,$DEEP_LEVELS}"; : "${SMOOTH_FROM:=20}"; : "${RESAMPLING:=average}"; : "${MIN_RING_CELLS:=8}"
+: "${LEVELS:=2,5,10,20,30,50,100,200,500,$DEEP_LEVELS}"; : "${SMOOTH:=1}"; : "${SMOOTH_FROM:=20}"; : "${RESAMPLING:=average}"; : "${MIN_RING_CELLS:=0}"; : "${SIMPLIFY:=0}"
 [ "$LEVELS" != none ] || LEVELS=""
 for v in NAME BBOX GRID LAND OUT; do
 	[ -n "${!v}" ] || { echo "Missing $v, see --help" >&2; exit 1; }
@@ -337,7 +446,7 @@ obf() {
 single() {
 	local output=$1; shift
 	local dir; dir=$(mktemp -d "$TMP/single.XXXX")
-	(cd "$dir" && JAVA_OPTS="${JAVA_OPTS:--Xmx16g}" bash "$MAP_CREATOR/utilities.sh" generate-single-map "$output" \
+	(cd "$dir" && JAVA_OPTS="${JAVA_OPTS:-${SECTION_HEAP:--Xmx16g}}" bash "$MAP_CREATOR/utilities.sh" generate-single-map "$output" \
 		--name="$NAME" "$@" ${RENDERING_TYPES:+--rendering-types=$RENDERING_TYPES} > single.log 2>&1) || { tail -20 "$dir/single.log" >&2; return 1; }
 	# an old OsmAndMapCreator prints its usage for an unknown command and exits with 0
 	[ -f "$output" ] || { tail -20 "$dir/single.log" >&2; return 1; }
@@ -386,6 +495,8 @@ if [ -z "$CELL" ]; then
 	fi
 fi
 FINE=$(python3 -c "print(float('$CELL') / float('$UPSAMPLE'))")
+CONTOUR_SIMPLIFY=${SIMPLIFY:-$(python3 -c "print(float('$FINE') / 2)")}
+AREA_SIMPLIFY=${SIMPLIFY:-$(python3 -c "print(float('$CELL') / 2)")}
 
 TILES=$(python3 -c "
 import math
@@ -412,12 +523,12 @@ for i in range(math.ceil((e - w) / t)):
 if [ -n "$TILES" ]; then
 	step "$NAME: $(echo "$TILES" | wc -l | tr -d ' ') tiles of $TILE degrees, $JOBS at a time"
 	TILE_OUT="$TMP/tiles"; mkdir -p "$TILE_OUT"
-	export SELF="$0" GRID LAND LEVELS TIERS CELL UPSAMPLE SMOOTH SMOOTH_FROM RESAMPLING MIN_RING_CELLS OVERVIEW EXCLUDE \
-		EXCLUDE_LAYER FILL MAP_CREATOR TILE_OUT
+	export SELF="$0" GRID LAND LEVELS TIERS CELL UPSAMPLE SMOOTH SMOOTH_FROM RESAMPLING MIN_RING_CELLS SIMPLIFY OVERVIEW EXCLUDE \
+		EXCLUDE_LAYER FILL MAP_CREATOR TILE_OUT INTERP
 	echo "$TILES" | xargs -P "$JOBS" -L 1 bash -c '
 		name=$1; shift
 		args=(-n "$name" -b "$*" -i "$GRID" -m "$LAND" -o "$TILE_OUT" -l "${LEVELS:-none}" -p "$TIERS" -r "$CELL" \
-			-u "$UPSAMPLE" -s "$SMOOTH" -d "$SMOOTH_FROM" -a "$RESAMPLING" -g "$MIN_RING_CELLS" -w "$OVERVIEW" \
+			-u "$UPSAMPLE" -s "$SMOOTH" -d "$SMOOTH_FROM" -a "$RESAMPLING" -g "$MIN_RING_CELLS" -S "$SIMPLIFY" -w "$OVERVIEW" \
 			-x "$EXCLUDE" -X "$EXCLUDE_LAYER" -F "$FILL" -j 1)
 		JAVA_OPTS="${JAVA_OPTS:--Xmx2g}" bash "$SELF" "${args[@]}" > "$TILE_OUT/$name.log" 2>&1 \
 			|| { echo "FAILED tile $name:"; tail -20 "$TILE_OUT/$name.log"; exit 255; }
@@ -426,11 +537,40 @@ if [ -n "$TILES" ]; then
 		# sections DIR OUTPUT : the map sections of the tiles in DIR, built in parallel (each in its own JVM), merged
 		sections() {
 			local dir=$1 output=$2 pre; pre="$TMP/$(basename "$1")_"
+			local f col g cols i j split; local -a files pids
 			OBFS=(); PIDS=()
 			contours=("$dir"/*_[0-9][0-9]_[0-9][0-9].osm.gz)
 			if [ -f "${contours[0]}" ]; then
 				step "contours obf of ${#contours[@]} tiles"
-				single "${pre}contours.obf" "${contours[@]}" & PIDS+=($!); OBFS+=("${pre}contours.obf")
+				if [ "${CONTOUR_PARTS:-1}" -gt 1 ]; then
+					# Split the tiles by their column: every part is a contiguous set of columns, so no part
+					# approaches the 2 GB limit and the parts meet exactly at tile edges. Parts are built two at
+					# a time, one Java each, to keep the load and the memory of the build moderate.
+					cols=0
+					for f in "${contours[@]}"; do
+						col=$(basename "$f" | sed -E 's/.*_([0-9]{2})_[0-9]{2}\.osm\.gz/\1/')
+						[ "$((10#$col))" -gt "$cols" ] && cols=$((10#$col))
+					done
+					split="$TMP/split"; rm -rf "$split"; mkdir -p "$split"
+					for f in "${contours[@]}"; do
+						col=$(basename "$f" | sed -E 's/.*_([0-9]{2})_[0-9]{2}\.osm\.gz/\1/')
+						g=$(( (10#$col) * CONTOUR_PARTS / (cols + 1) ))
+						[ "$g" -ge "$CONTOUR_PARTS" ] && g=$((CONTOUR_PARTS - 1))
+						mkdir -p "$split/$g"; ln -sf "$f" "$split/$g/"
+					done
+					for ((i = 0; i < CONTOUR_PARTS; i += 2)); do
+						pids=()
+						for ((j = i; j < i + 2 && j < CONTOUR_PARTS; j++)); do
+							files=("$split/$j"/*.osm.gz)
+							[ -f "${files[0]}" ] || continue
+							step "contours obf of ${#files[@]} tiles, part $((j + 1)) of $CONTOUR_PARTS"
+							single "${pre}contours$j.obf" "${files[@]}" & pids+=($!); OBFS+=("${pre}contours$j.obf")
+						done
+						for pid in "${pids[@]}"; do wait "$pid" || exit 1; done
+					done
+				else
+					single "${pre}contours.obf" "${contours[@]}" & PIDS+=($!); OBFS+=("${pre}contours.obf")
+				fi
 			fi
 			overview=("$dir"/*_overview.osm.gz)
 			if [ -n "$OVERVIEW" ] && [ -f "${overview[0]}" ]; then
@@ -563,7 +703,7 @@ if [ -n "$LEVELS" ]; then
 			-co COMPRESS=DEFLATE -co TILED=YES "$TMP/grid.tif" "$TMP/contour_grid.tif"
 	fi
 	if [ "$SMOOTH" != 1 ]; then
-		step "smoothed copy for levels from $SMOOTH_FROM m: average over $SMOOTH cells"
+		step "common smoothed grid for every level: average over $SMOOTH cells"
 		COARSE=$(python3 -c "print(float('$FINE') * float('$SMOOTH'))")
 		# -tap: smoothing cells on multiples of COARSE everywhere, the same in neighbouring tiles
 		gdalwarp -q -overwrite -tap -tr "$COARSE" "$COARSE" -r average -multi -wo NUM_THREADS="$JOBS" \
@@ -577,26 +717,15 @@ if [ -n "$LEVELS" ]; then
 	done
 
 	# levels ascending as gdal_contour wants them: -11000 ... -2
-	levels() { echo "$LEVELS" | tr ',' '\n' | awk -v cmp="$1" -v from="$SMOOTH_FROM" \
-		'(cmp=="shallow" && $1<from) || (cmp=="deep" && $1>=from) || cmp=="all" {print $1}' | sort -rn | awk '{printf "%s ", -$1}'; }
+	levels() { echo "$LEVELS" | tr ',' '\n' | sort -rn | awk '{printf "%s ", -$1}'; }
 	step "contours at $LEVELS m"
-	if [ -f "$TMP/smooth.tif" ]; then
-		SHALLOW=$(levels shallow); DEEP=$(levels deep)
-		# shellcheck disable=SC2086
-		if [ -n "$SHALLOW" ]; then gdal_contour -q -a elev -fl $SHALLOW "$TMP/contour_grid.tif" "$TMP/contours.gpkg"; fi
-		# shellcheck disable=SC2086
-		if [ -n "$DEEP" ]; then gdal_contour -q -a elev -fl $DEEP "$TMP/smooth.tif" "$TMP/deep.gpkg"; fi
-		if [ -f "$TMP/deep.gpkg" ]; then
-			if [ -f "$TMP/contours.gpkg" ]; then ogr2ogr -q -append -nln contour "$TMP/contours.gpkg" "$TMP/deep.gpkg"
-			else mv "$TMP/deep.gpkg" "$TMP/contours.gpkg"; fi
-		fi
-	else
-		# shellcheck disable=SC2086
-		gdal_contour -q -a elev -fl $(levels all) "$TMP/contour_grid.tif" "$TMP/contours.gpkg"
-	fi
+	CONTOUR_RASTER="$TMP/contour_grid.tif"
+	[ ! -f "$TMP/smooth.tif" ] || CONTOUR_RASTER="$TMP/smooth.tif"
+	# shellcheck disable=SC2086
+	gdal_contour -q -a elev -fl $(levels) "$CONTOUR_RASTER" "$TMP/contours.gpkg"
 	step "filter and simplify"
 	python3 "$HERE/depth_contours_filter.py" "$TMP/contours.gpkg" "$TMP/depth.fgb" --cell "$FINE" --min-ring-cells "$MIN_RING_CELLS" \
-		--bbox "$W" "$S" "$E" "$N"
+		--simplify "$CONTOUR_SIMPLIFY" --bbox "$W" "$S" "$E" "$N"
 	if [ "$(ogrinfo -so -al "$TMP/depth.fgb" | awk -F': ' '/Feature Count/{print $2}')" = 0 ]; then
 		step "no contours in $NAME"
 	else
@@ -622,8 +751,9 @@ if [ -n "$OVERVIEW" ] && [ -n "$OVERVIEW_LEVELS" ]; then
 	gdal_rasterize -q -burn 0 -l "$LAND_LAYER" "$TMP/land.gpkg" "$TMP/overview.tif"
 	# shellcheck disable=SC2086
 	gdal_contour -q -a elev -fl $OVERVIEW_LEVELS "$TMP/overview.tif" "$TMP/overview.gpkg"
+	overview_simplify=${SIMPLIFY:-$(python3 -c "print(float('$ov_cell') / 2)")}
 	python3 "$HERE/depth_contours_filter.py" "$TMP/overview.gpkg" "$TMP/overview.fgb" --cell "$ov_cell" \
-		--min-ring-cells "$MIN_RING_CELLS"
+		--min-ring-cells "$MIN_RING_CELLS" --simplify "$overview_simplify"
 	if [ "$(ogrinfo -so -al "$TMP/overview.fgb" | awk -F': ' '/Feature Count/{print $2}')" != 0 ]; then
 		python3 "$V4/ogr2osm.py" -f -t "$V4/translations/contours_depth.py" -o "$TMP/${NAME}_overview.osm" \
 			"$TMP/overview.fgb" >/dev/null
@@ -636,16 +766,15 @@ if [ -n "$OVERVIEW" ] && [ -n "$OVERVIEW_LEVELS" ]; then
 	rm -f "$TMP/overview.tif" "$TMP/overview.gpkg" "$TMP/overview.fgb"
 fi
 
-# fill: "shallower than L" for L = 0, 2, 5, 10 m, each from the raster its contour came from (the smoothed one from
-# SMOOTH_FROM), only where the fill grid has data (not from EMODnet); depth_areas_osm.py --nested makes bands of them
+# fill: "shallower than L" for L = 0, 2, 5, 10 m from the same raster as every contour, only where the fill grid
+# has data (not from the rest of GRID); depth_areas_osm.py --nested makes bands
 if [ -n "$FILL" ]; then
 	step "depth areas where $(basename "$fill_grid") has data"
 	fill_src=$fill_grid; [ -f "$TMP/fill_datum.tif" ] && fill_src="$TMP/fill_datum.tif"
 	# shallower than 0 m dries (class -1), than 2 m is 0-2 (0), than 5 m is 2-5 (2), than 10 m is 5-10 (5)
 	for level_class in 0:-1 2:0 5:2 10:5; do
 		level=${level_class%%:*}; class=${level_class#*:}
-		raster="$TMP/contour_grid.tif"
-		if [ -f "$TMP/smooth.tif" ] && [ "$level" -ge "$SMOOTH_FROM" ]; then raster="$TMP/smooth.tif"; fi
+		raster="${CONTOUR_RASTER:-$TMP/contour_grid.tif}"
 		if [ ! -f "$raster" ]; then
 			[ -f "$TMP/fill_cut.tif" ] || warp "$fill_src" average "$TMP/fill_cut.tif"
 			raster="$TMP/fill_cut.tif"
@@ -674,9 +803,10 @@ if [ -n "$FILL" ]; then
 	done
 	rm -f "$TMP"/coverage_*.tif "$TMP/fill_level.vrt" "$TMP/fill_cut.tif" "$TMP/band.gpkg"
 	if [ -f "$TMP/areas.gpkg" ]; then
+		area_exclude=(); [ -z "$EXCLUDE" ] || area_exclude=(--exclude "$EXCLUDE")
 		python3 "$HERE/depth_areas_osm.py" "$TMP/areas.gpkg" "$OUT/${NAME}_areas.osm.gz" --layer areas --field mindepth \
-			--nested --land "$TMP/land.gpkg" --bbox "$W" "$S" "$E" "$N" \
-			--simplify "$(python3 -c "print(float('$CELL') / 2)")" 2>&1 | grep -v numpy
+			--nested --land "$TMP/land.gpkg" "${area_exclude[@]}" --bbox "$W" "$S" "$E" "$N" \
+			--simplify "$AREA_SIMPLIFY" 2>&1 | grep -v numpy
 		if [ -n "$MAP_CREATOR" ] && [ "$(zcat < "$OUT/${NAME}_areas.osm.gz" | grep -c -m1 '<way')" != 0 ]; then
 			o=$(obf "$OUT/${NAME}_areas.osm.gz"); OBFS+=("$o")
 		fi
@@ -691,6 +821,13 @@ if [ -n "$TIERS" ]; then
 	gdalwarp -q -overwrite -srcnodata "$LAND_NODATA" -dstnodata nan -co COMPRESS=DEFLATE -co TILED=YES \
 		"$TMP/grid.tif" "$TMP/water.tif"
 	exclude "$TMP/water.tif"
+	# a point is a sounding: it must not stand on an interpolated value
+	POINTS_RASTER="$TMP/water.tif"
+	if [ -n "$INTERP" ]; then
+		step "no depth point on the interpolated cells"
+		python3 "$HERE/depth_mask_raster.py" "$TMP/water.tif" "$TMP/water_points.tif" ${INTERP//,/ } 2>&1 | grep -v numpy
+		POINTS_RASTER="$TMP/water_points.tif"
+	fi
 	i=0
 	for tier in $TIERS; do
 		i=$((i + 1)); spacing=${tier%%:*}; zooms=${tier#*:}
@@ -698,7 +835,7 @@ if [ -n "$TIERS" ]; then
 		# per spacing cell the shoalest water cell at its own position and thinned where the bottom is even, as on
 		# charts (not a regular grid)
 		osm="$OUT/${NAME}_points$i.osm.gz"
-		python3 "$HERE/depth_points_osm.py" "$TMP/water.tif" "$osm" --bbox "$W" "$S" "$E" "$N" --shoalest "$spacing" --thin \
+		python3 "$HERE/depth_points_osm.py" "$POINTS_RASTER" "$osm" --bbox "$W" "$S" "$E" "$N" --shoalest "$spacing" --thin \
 			--first-id $((i * 100000000))
 		if [ "$(zcat < "$osm" | grep -c -m1 '<node')" = 0 ]; then
 			rm -f "$osm"; continue

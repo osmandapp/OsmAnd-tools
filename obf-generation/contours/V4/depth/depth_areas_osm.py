@@ -2,7 +2,8 @@
 """Depth areas (fill) as OSM multipolygons from charted depth area polygons, cut out of OSM land.
 
     depth_areas_osm.py SOURCE OUTPUT.osm.gz --layer LAYER --field MIN_DEPTH_FIELD [--field-max MAX_DEPTH_FIELD]
-                       --land LAND [--nested] [--bbox W S E N] [--cell 0.25] [--simplify 0.00002] [--first-id N]
+                       --land LAND [--exclude COVERAGE ...] [--nested] [--bbox W S E N] [--cell 0.25]
+                       [--simplify 0] [--first-id N]
 
 Every polygon is classed by its shallowest depth like the style colours it: areatype=-1 dries (below 0 m), 0 for
 0-2 m, 2 for 2-5 m, 5 for 5-10 m; deeper ones are left out, the sea colour shows there.
@@ -11,17 +12,20 @@ With --field-max the band of the area (its shallowest and deepest depth) picks t
 chart drawn in feet does not paint a whole zone with the colour of its shallow edge: the US 30-60 ft zone
 (9.1-18.2 m) is deeper than 10 m for most of its range and is left out instead of being coloured 5-10 m. Polygons of one class are
 merged per CELL degree square (fewer vertices than the charted bands, which the classes join), OSM land is cut out
-(a dry band must not lie on the beach) and the result is written as closed ways or multipolygon relations tagged
+(a dry band must not lie on the beach) after the simplification, so the coast keeps the
+exact land boundary, and the result is written as closed ways or multipolygon relations tagged
 contourarea=depth, areatype=...
 
 --nested: every polygon is "shallower than" its class limit, as polygons of a grid above a level are, so a class
 contains the shallower ones. Classes are cut one by one from the shallowest, each minus all shallower classes.
 """
-import argparse
+import argparse, sys
 import gzip
 import math
 
 from osgeo import gdal, ogr
+
+from depth_osm_exclude import Coverage
 
 ogr.UseExceptions()
 # IsValid() reports every self-intersection of the gdal_contour bands as a warning; MakeValid() fixes them
@@ -81,9 +85,10 @@ def main():
     parser.add_argument('--field', required=True, help='shallowest depth of the area, metres, negative dries')
     parser.add_argument('--field-max', help='deepest depth of the area, metres: the class is the one its band covers most')
     parser.add_argument('--land', required=True)
+    parser.add_argument('--exclude', action='append', help='polygons of another depth map, repeatable')
     parser.add_argument('--bbox', nargs=4, type=float, metavar=('W', 'S', 'E', 'N'))
     parser.add_argument('--cell', type=float, default=0.25)
-    parser.add_argument('--simplify', type=float, default=0.00002, help='degrees, about 2 m')
+    parser.add_argument('--simplify', type=float, default=0, help='tolerance in degrees; default 0 keeps every vertex')
     parser.add_argument('--first-id', type=int, default=700000000)
     parser.add_argument('--nested', action='store_true', help='a class holds the shallower ones: cut them out')
     args = parser.parse_args()
@@ -92,6 +97,7 @@ def main():
     layer = src.GetLayer(args.layer)
     land_src = ogr.Open(args.land)
     land = land_src.GetLayer(0)
+    excluded = Coverage(args.exclude, args.cell) if args.exclude else None
     w, s, e, n = args.bbox if args.bbox else layer.GetExtent()[0:1] + layer.GetExtent()[2:3] + \
         layer.GetExtent()[1:2] + layer.GetExtent()[3:4]
     c = args.cell
@@ -100,16 +106,29 @@ def main():
     with gzip.open(args.output, 'wt', compresslevel=5) as out:
         out.write("<?xml version='1.0' encoding='UTF-8'?>\n<osm version='0.6' upload='false' generator='depth_areas_osm'>\n")
 
-        def ring(r):
+        def ring(r, tags=''):
+            """Write one closed way, or connected open ways for a multipolygon when the OSM node limit requires it."""
             nonlocal nid
             refs = []
             for i in range(r.GetPointCount() - 1):
                 nid += 1
                 out.write('<node id="-%d" visible="true" lat="%.7f" lon="%.7f"/>\n' % (nid, r.GetY(i), r.GetX(i)))
                 refs.append(nid)
-            nid += 1
-            out.write('<way id="-%d" visible="true">%s' % (nid, ''.join('<nd ref="-%d"/>' % x for x in refs + refs[:1])))
-            return nid
+            # The closing node is repeated in a single way. Split rings share the end vertex of adjacent ways;
+            # only the relation is tagged then, as for any other multipolygon with several outer ways.
+            sequence = refs + refs[:1]
+            ways = []
+            start = 0
+            while start < len(sequence) - 1:
+                end = min(start + 1999, len(sequence) - 1)
+                part = sequence[start:end + 1]
+                nid += 1
+                way_tags = tags if len(sequence) <= 2000 else ''
+                out.write('<way id="-%d" visible="true">%s%s</way>\n' % (
+                    nid, ''.join('<nd ref="-%d"/>' % x for x in part), way_tags))
+                ways.append(nid)
+                start = end
+            return ways
 
         for i in range(math.floor(w / c), math.ceil(e / c)):
             for j in range(math.floor(s / c), math.ceil(n / c)):
@@ -132,23 +151,39 @@ def main():
                 # clipped to the cell first: a complete land polygon is a continent, its union alone takes seconds
                 dry = multipolygon(p for f in land for p in polygons(f.GetGeometryRef().Intersection(cell)))
                 dry = dry.UnionCascaded() if dry.GetGeometryCount() else None
+                exclude = excluded.near(x0, y0, x1, y1) if excluded is not None else None
                 shallower = None
                 for at, geoms in sorted(classes.items(), key=lambda c: int(c[0])):
                     # every part is made valid on its own: MakeValid() of the whole multipolygon treats the parts
                     # that touch or overlap (the bands of a chart do) as an error and cuts holes where they meet
-                    mp = multipolygon(p for g in geoms for p in polygons(g if g.IsValid() else g.MakeValid()))
-                    area = mp.UnionCascaded()
-                    if area is None or area.IsEmpty() or not area.IsValid():
-                        area = mp.Buffer(0)  # the same union, the slow way, for a GEOS that gave up
-                    area = area.Intersection(cell)
-                    if args.nested:
-                        own = area
-                        if shallower is not None:
-                            area = area.Difference(shallower)
-                        shallower = own if shallower is None else shallower.Union(own)
-                    if dry is not None and area.Intersects(dry):
-                        area = area.Difference(dry)
-                    area = area.SimplifyPreserveTopology(args.simplify)
+                    try:
+                        mp = multipolygon(p for g in geoms for p in polygons(g if g.IsValid() else g.MakeValid()))
+                        area = mp.UnionCascaded()
+                        if area is None or area.IsEmpty() or not area.IsValid():
+                            area = mp.Buffer(0)  # the same union, the slow way, for a GEOS that gave up
+                        area = area.Intersection(cell)
+                        if args.nested:
+                            own = area
+                            if shallower is not None:
+                                area = area.Difference(shallower)
+                            shallower = own if shallower is None else shallower.Union(own)
+                        # simplify before the land cut: the coast then stays exactly on the land
+                        # boundary, a simplify after the cut would move it and leave small gaps
+                        area = area.SimplifyPreserveTopology(args.simplify)
+                        # Cut another map after simplifying too: no sliver may move back across its boundary
+                        if exclude is not None and area.Intersects(exclude):
+                            area = area.Difference(exclude)
+                        if dry is not None and area.Intersects(dry):
+                            try:
+                                area = area.Difference(dry)
+                            except Exception:
+                                # a GEOS that cannot assign the free holes of the result: the same cut
+                                # on repaired geometries
+                                area = area.Buffer(0).Difference(dry.Buffer(0))
+                    except Exception as e:
+                        # one broken band must not stop the tile
+                        print('skipped the area %s at %.4f,%.4f: %s' % (at, x0, y0, e), file=sys.stderr)
+                        continue
                     for p in polygons(area):
                         outer = p.GetGeometryRef(0)
                         if outer.GetPointCount() < 4:
@@ -156,19 +191,16 @@ def main():
                         tags = '<tag k="contourarea" v="depth"/><tag k="areatype" v="%s"/>' % at
                         inners = [p.GetGeometryRef(k) for k in range(1, p.GetGeometryCount())
                                   if p.GetGeometryRef(k).GetPointCount() >= 4]
-                        ow = ring(outer)
-                        if not inners:
-                            out.write(tags + '</way>\n')
-                        else:
-                            out.write('</way>\n')
-                            iw = []
-                            for r in inners:
-                                iw.append(ring(r))
-                                out.write('</way>\n')
+                        ow = ring(outer, tags if not inners else '')
+                        iw = []
+                        for r in inners:
+                            iw += ring(r)
+                        if inners or len(ow) > 1:
                             nid += 1
-                            out.write('<relation id="-%d" visible="true"><member type="way" ref="-%d" role="outer"/>%s'
-                                      '<tag k="type" v="multipolygon"/>%s</relation>\n' % (
-                                          nid, ow, ''.join('<member type="way" ref="-%d" role="inner"/>' % x for x in iw), tags))
+                            members = ''.join('<member type="way" ref="-%d" role="outer"/>' % x for x in ow)
+                            members += ''.join('<member type="way" ref="-%d" role="inner"/>' % x for x in iw)
+                            out.write('<relation id="-%d" visible="true">%s'
+                                      '<tag k="type" v="multipolygon"/>%s</relation>\n' % (nid, members, tags))
                         written += 1
         out.write('</osm>\n')
     print('depth areas written: %d' % written)
