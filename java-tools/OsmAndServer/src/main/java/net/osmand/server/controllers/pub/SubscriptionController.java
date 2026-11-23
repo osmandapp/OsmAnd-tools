@@ -6,12 +6,12 @@ import jakarta.transaction.Transactional;
 import net.osmand.purchases.PurchaseHelper;
 import net.osmand.purchases.ReceiptValidationHelper;
 import net.osmand.purchases.ReceiptValidationHelper.InAppReceipt;
+import net.osmand.mailsender.EmailSenderTemplate;
 import net.osmand.server.PurchasesDataLoader;
 import net.osmand.server.api.repo.*;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscriptionPrimaryKey;
 import net.osmand.server.api.repo.SupportersRepository.Supporter;
-import net.osmand.server.api.services.EmailSenderService;
 import net.osmand.server.api.services.LotteryPlayService;
 import net.osmand.server.api.services.PromoService;
 import net.osmand.server.api.services.ReceiptValidationService;
@@ -194,7 +194,7 @@ public class SubscriptionController {
     public ResponseEntity<String> register(HttpServletRequest request) {
         String email = request.getParameter("email");
         if (email != null) {
-            email = EmailSenderService.normalizeEmail(email);
+            email = EmailSenderTemplate.cleanEmail(email);
         }
         String visibleName = request.getParameter("visibleName");
         String preferredCountry = request.getParameter("preferredCountry");

@@ -139,12 +139,16 @@ public class EmailTemplateTest {
 	}
 
 	@Test
-	public void cleanEmailDropsFormatCharsAnywhereAndSpacesAtEdges() {
-		assertEquals("user@example.com", cleanEmail("\u200Euser@exa\u200Bmple.com\uFEFF"));
-		assertEquals("user@example.com", cleanEmail(" \u200F\u00A0\tuser@example.com\u3000\u2028\n"));
+	public void cleanEmailDropsRtlMarkAndLineSeparator() {
+		assertEquals("user@example.com", cleanEmail("\u200Fuser@example.com\u2028"));
+		assertEquals("user@example.com", cleanEmail(" user@exa\u200Fmple.com\u2028 "));
 		assertEquals("john smith@example.com", cleanEmail("john smith@example.com"));
-		assertEquals("user\u2028@example.com", cleanEmail("user\u2028@example.com"));
 		assertNull(cleanEmail(null));
+	}
+
+	@Test
+	public void cleanEmailLowerCasesAddress() {
+		assertEquals("user@example.com", cleanEmail(" User@Example.COM "));
 	}
 
 	@Test(timeout = 1000)

@@ -1,6 +1,7 @@
 package net.osmand.server.controllers.user;
 
 import jakarta.servlet.http.HttpServletRequest;
+import net.osmand.mailsender.EmailSenderTemplate;
 import net.osmand.server.PurchasesDataLoader;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.OrderInfoRepository;
@@ -127,7 +128,7 @@ public class OrderManagementController {
 			@RequestParam String purchaseToken,
 			@RequestParam boolean isSubscription) {
 
-		email = EmailSenderService.normalizeEmail(email);
+		email = EmailSenderTemplate.cleanEmail(email);
 		if (usersRepository.findByEmailIgnoreCase(email) == null) {
 			return ResponseEntity
 					.status(HttpStatus.BAD_REQUEST)
@@ -212,7 +213,7 @@ public class OrderManagementController {
 	@PreAuthorize("hasAnyAuthority(T(net.osmand.server.WebSecurityConfiguration).ROLE_ADMIN, T(net.osmand.server.WebSecurityConfiguration).ROLE_SUPPORT)")
 	@ResponseBody
 	public ResponseEntity<?> createWebLoginLink(Authentication auth, @RequestParam String email) {
-		CloudUsersRepository.CloudUser pu = usersRepository.findByEmailIgnoreCase(EmailSenderService.normalizeEmail(email));
+		CloudUsersRepository.CloudUser pu = usersRepository.findByEmailIgnoreCase(EmailSenderTemplate.cleanEmail(email));
 		if (pu == null) {
 			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("OsmAnd Cloud account not found");
 		}

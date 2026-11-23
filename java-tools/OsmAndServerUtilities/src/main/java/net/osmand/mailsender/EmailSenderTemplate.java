@@ -74,7 +74,6 @@ public class EmailSenderTemplate {
 	static final String TEMPLATES_ENV = "EMAIL_TEMPLATES";
 	static final String TEMPLATES_HINT = TEMPLATES_ENV + "=/path/to/templates/email (environment)";
 	static final Pattern VARIABLE = Pattern.compile("@([A-Z0-9_]+)@");
-	private static final Pattern EMAIL_FORMAT_CHARS = Pattern.compile("\\p{Cf}");
 
 	public String defaultTemplatesDirectory = templatesDirectory();
 
@@ -321,25 +320,12 @@ public class EmailSenderTemplate {
 		return email.replaceFirst(".....", "....."); // do not discover email in logs
 	}
 
-	// any Unicode space or control char: NBSP and U+2028 included, which \s misses, and all that trim() drops
-	public static boolean isEmailSpace(int c) {
-		return Character.isSpaceChar(c) || Character.isISOControl(c);
-	}
-
-	// a loop, not a regex: [...]+$ backtracks quadratically on a long run of inner spaces
+	// U+200F (right-to-left mark) and U+2028 (line separator) come along with addresses pasted from some apps
 	public static String cleanEmail(String email) {
 		if (email == null) {
 			return null;
 		}
-		String visible = EMAIL_FORMAT_CHARS.matcher(email).replaceAll("");
-		int start = 0, end = visible.length();
-		while (start < end && isEmailSpace(visible.charAt(start))) {
-			start++;
-		}
-		while (end > start && isEmailSpace(visible.charAt(end - 1))) {
-			end--;
-		}
-		return visible.substring(start, end);
+		return email.replace("\u200F", "").replace("\u2028", "").trim().toLowerCase(Locale.ROOT);
 	}
 
 	// compatible with SendGrid

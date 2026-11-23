@@ -3,6 +3,7 @@ package net.osmand.server.controllers.user;
 import java.io.*;
 
 import jakarta.servlet.http.HttpSession;
+import net.osmand.mailsender.EmailSenderTemplate;
 import net.osmand.server.api.repo.*;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import okio.Buffer;
@@ -172,7 +173,7 @@ public class MapApiController {
 		if (user != null) {
 			request.logout();
 		}
-		String username = EmailSenderService.normalizeEmail(credentials.username);
+		String username = EmailSenderTemplate.cleanEmail(credentials.username);
 		String password = credentials.password;
 		if (username == null || password == null) {
 			return ResponseEntity.badRequest().body("Username and password are required");
@@ -209,7 +210,7 @@ public class MapApiController {
 
 	@PostMapping(path = { "/auth/activate" }, consumes = "application/json", produces = "application/json")
 	public ResponseEntity<String> activateMapUser(@RequestBody UserPasswordPost credentials) {
-		String username = EmailSenderService.normalizeEmail(credentials.username);
+		String username = EmailSenderTemplate.cleanEmail(credentials.username);
 		String password = credentials.password;
 		String token = credentials.token;
 		if (username == null || password == null) {
@@ -230,7 +231,7 @@ public class MapApiController {
 
 	@PostMapping(path = { "/auth/cancel-link" }, consumes = "application/json", produces = "application/json")
 	public ResponseEntity<String> cancelWebLoginLink(@RequestBody UserPasswordPost credentials) {
-		return userdataService.cancelWebLoginLink(EmailSenderService.normalizeEmail(credentials.username), credentials.token);
+		return userdataService.cancelWebLoginLink(EmailSenderTemplate.cleanEmail(credentials.username), credentials.token);
 	}
 
 	@PostMapping(path = { "/auth/logout" }, consumes = "application/json", produces = "application/json")
@@ -244,7 +245,7 @@ public class MapApiController {
 	                                              @RequestParam String lang,
 	                                              @RequestParam boolean isNew,
 	                                              HttpServletRequest request) {
-		String username = EmailSenderService.normalizeEmail(credentials.username);
+		String username = EmailSenderTemplate.cleanEmail(credentials.username);
 		if (username == null) {
 			return ResponseEntity.badRequest().body("Username is required");
 		}
@@ -253,7 +254,7 @@ public class MapApiController {
 	
 	@PostMapping(path = {"/auth/validate-token"}, consumes = "application/json", produces = "application/json")
 	public ResponseEntity<String> registerMapUser(@RequestBody UserPasswordPost credentials) {
-		String username = EmailSenderService.normalizeEmail(credentials.username);
+		String username = EmailSenderTemplate.cleanEmail(credentials.username);
 		String token = credentials.token;
 		if (username == null) {
 			return ResponseEntity.badRequest().body("Username and token are required");
@@ -763,7 +764,7 @@ public class MapApiController {
 		if (emailAction != CloudAccountAction.EMAIL_CHANGE) {
 			return ResponseEntity.badRequest().body("Unsupported action");
 		}
-		String newEmail = EmailSenderService.normalizeEmail(email);
+		String newEmail = EmailSenderTemplate.cleanEmail(email);
 		if (emailSender.isEmail(newEmail)) {
 			CloudUserDevice dev = osmAndMapsService.checkUser();
 			if (dev == null) {
@@ -803,7 +804,7 @@ public class MapApiController {
 
 	@PostMapping(path = {"/auth/change-email"})
 	public ResponseEntity<String> changeEmail(@RequestBody UserPasswordPost credentials, HttpServletRequest request) throws ServletException {
-		String username = EmailSenderService.normalizeEmail(credentials.username);
+		String username = EmailSenderTemplate.cleanEmail(credentials.username);
 		String token = credentials.token;
 		if (username == null || token == null) {
 			return ResponseEntity.badRequest().body("Username and token are required");

@@ -24,6 +24,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import net.osmand.purchases.PurchaseHelper;
+import net.osmand.mailsender.EmailSenderTemplate;
 import net.osmand.server.PurchasesDataLoader;
 import net.osmand.server.api.repo.*;
 import net.osmand.server.api.services.*;
@@ -725,7 +726,7 @@ public class ApiController {
 	public ResponseEntity<String> addUser(@RequestParam String promoKey,
 	                                      @RequestParam String userEmail) {
 		synchronized (this) {
-			return promoService.addUser(promoKey, EmailSenderService.normalizeEmail(userEmail));
+			return promoService.addUser(promoKey, EmailSenderTemplate.cleanEmail(userEmail));
 		}
 	}
 
