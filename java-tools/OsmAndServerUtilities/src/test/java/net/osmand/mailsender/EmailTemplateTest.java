@@ -139,9 +139,10 @@ public class EmailTemplateTest {
 	}
 
 	@Test
-	public void cleanEmailDropsRtlMarkAndLineSeparator() {
+	public void trimLowerCaseEmailDropsInvisibleCharactersAndLowerCases() {
 		assertEquals("user@example.com", trimLowerCaseEmail("\u200Fuser@example.com\u2028"));
 		assertEquals("user@example.com", trimLowerCaseEmail(" user@exa\u200Fmp\u200Fle.com\u2028 "));
+		assertEquals("user@example.com", trimLowerCaseEmail("\u200FUser@Example.COM"));
 		assertEquals("john smith@example.com", trimLowerCaseEmail("john smith@example.com"));
 		assertNull(trimLowerCaseEmail(null));
 	}
