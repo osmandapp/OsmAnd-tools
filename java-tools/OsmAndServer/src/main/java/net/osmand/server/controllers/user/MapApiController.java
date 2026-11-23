@@ -781,18 +781,19 @@ public class MapApiController {
 			}
 			// check if new email is not registered
 			CloudUsersRepository.CloudUser pu = usersRepository.findByEmailIgnoreCase(newEmail);
-			if (pu != null) {
+			if (pu == null) {
+				// create temp user with new email
+				pu = new CloudUsersRepository.CloudUser();
+				pu.email = newEmail;
+				pu.regTime = new Date();
+				pu.orderid = null;
+				usersRepository.saveAndFlush(pu);
+			} else {
 				ResponseEntity<String> accountError = userdataService.checkNewEmailAccount(pu);
 				if (accountError != null) {
 					return accountError;
 				}
 			}
-			// create temp user with new email
-			pu = new CloudUsersRepository.CloudUser();
-			pu.email = newEmail;
-			pu.regTime = new Date();
-			pu.orderid = null;
-			usersRepository.saveAndFlush(pu);
 
 			// send code to new email
 			String oldEmail = currentAcc.email;

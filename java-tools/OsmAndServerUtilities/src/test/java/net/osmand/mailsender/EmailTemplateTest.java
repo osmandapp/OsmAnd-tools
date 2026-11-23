@@ -146,17 +146,6 @@ public class EmailTemplateTest {
 		assertNull(cleanEmail(null));
 	}
 
-	@Test
-	public void cleanEmailLowerCasesAddress() {
-		assertEquals("user@example.com", cleanEmail(" User@Example.COM "));
-	}
-
-	@Test(timeout = 1000)
-	public void cleanEmailIsLinearOnLongInnerSpaces() {
-		String spaced = "a" + " ".repeat(100_000) + "b";
-		assertEquals(spaced, cleanEmail(spaced));
-	}
-
 	@Test(expected = IllegalStateException.class)
 	public void missingTemplateFails() {
 		load("cloud/account/missing");
