@@ -24,6 +24,7 @@
 #   -c MAP_CREATOR_DIR  unzipped OsmAndMapCreator: writes OUT_DIR/NAME.depth.obf
 #   -k           keep: do nothing when OUT_DIR/NAME.depth.obf already exists
 #   env RENDERING_TYPES  rendering_types.xml for OsmAndMapCreator instead of its own (new tags before a nightly)
+#   env MAX_SEGMENT  the longest contour segment in kilometres, default 50 (see ogr2osm.py --max-segment)
 #
 # The contours are the charted ones (dybdekurve, 0 m = chart datum): only the SRS is dropped so that ogr2osm does not
 # swap lat/lon (a line clipped at a tile edge is a multiline, ogr2osm writes its parts as ways), then
@@ -102,6 +103,29 @@ merge() {
 	[ -f "$OUT/$NAME.depth.obf" ] || { tail -20 "$TMP/merge.log" >&2; exit 1; }
 }
 
+# a map section is built from at most MAX_FILES tiles: the index of OsmAndMapCreator fails above 2048 files
+MAX_FILES="${MAX_FILES:-2000}"
+
+# map_sections OUTPUT ZOOMS OSM_GZ... : one map section per MAX_FILES files, built in parallel.
+# The files of a section are the tiles of one kind, so a section that has to be split is split by the tile order.
+map_sections() {
+	local output=$1 zooms=$2; shift 2
+	local -a chunk=()
+	local part=0 f
+	for f in "$@"; do
+		chunk+=("$f")
+		if [ ${#chunk[@]} -ge "$MAX_FILES" ]; then
+			single "${output%.obf}_$part.obf" $zooms "${chunk[@]}" & PIDS+=($!)
+			OBFS+=("${output%.obf}_$part.obf")
+			part=$((part + 1)); chunk=()
+		fi
+	done
+	if [ ${#chunk[@]} -gt 0 ]; then
+		single "${output%.obf}_$part.obf" $zooms "${chunk[@]}" & PIDS+=($!)
+		OBFS+=("${output%.obf}_$part.obf")
+	fi
+}
+
 if [ -z "$BBOX" ] && [ "$TILE" != 0 ]; then
 	# tiles of whole TILE degrees over the data, only those with any contour, sounding or area
 	TILES=$(python3 - "$FGDB" "$TILE" "$NAME" <<-'PY' 2>&1 | grep -v numpy
@@ -133,27 +157,37 @@ if [ -z "$BBOX" ] && [ "$TILE" != 0 ]; then
 		echo "tile $name: $(tail -1 "$TILE_OUT/$name.log")"' _
 	if [ -n "$MAP_CREATOR" ]; then
 		OBFS=(); PIDS=()
-		contours=("$TILE_OUT"/*_[0-9][0-9]_[0-9][0-9].osm.gz)  # *_minor.osm.gz does not match
+		# A tile is NAME_i_j.osm.gz; i and j grow past 99 when the data starts far from the 180th meridian
+		# (New Zealand: i is the longitude column counted from -180), so the names cannot be matched by a
+		# fixed number of digits. Take every .osm.gz that is not a minor, an area or a point file.
+		contours=()
+		for f in "$TILE_OUT"/*.osm.gz; do
+			[ -f "$f" ] || continue
+			case "${f##*/}" in
+				*_minor.osm.gz|*_areas.osm.gz|*_points*.osm.gz) continue ;;
+			esac
+			contours+=("$f")
+		done
 		if [ -f "${contours[0]}" ]; then
 			step "contours obf of ${#contours[@]} tiles"
-			single "$TMP/contours.obf" "${contours[@]}" & PIDS+=($!); OBFS+=("$TMP/contours.obf")
+			map_sections "$TMP/contours.obf" "" "${contours[@]}"
 		fi
 		minor=("$TILE_OUT"/*_minor.osm.gz)
 		if [ -f "${minor[0]}" ]; then
 			step "minor contours obf of ${#minor[@]} tiles"
-			single "$TMP/minor.obf" --map-zooms="$MINOR_ZOOMS" "${minor[@]}" & PIDS+=($!); OBFS+=("$TMP/minor.obf")
+			map_sections "$TMP/minor.obf" "--map-zooms=$MINOR_ZOOMS" "${minor[@]}"
 		fi
 		areas=("$TILE_OUT"/*_areas.osm.gz)
 		if [ -f "${areas[0]}" ]; then
 			step "depth areas obf of ${#areas[@]} tiles"
-			single "$TMP/areas.obf" "${areas[@]}" & PIDS+=($!); OBFS+=("$TMP/areas.obf")
+			map_sections "$TMP/areas.obf" "" "${areas[@]}"
 		fi
 		i=0
 		for tier in $TIERS; do
 			i=$((i + 1)); points=("$TILE_OUT"/*_points$i.osm.gz)
 			[ -f "${points[0]}" ] || continue
 			step "points $i obf of ${#points[@]} tiles"
-			single "$TMP/points$i.obf" --map-zooms="${tier#*:}" "${points[@]}" & PIDS+=($!); OBFS+=("$TMP/points$i.obf")
+			map_sections "$TMP/points$i.obf" "--map-zooms=${tier#*:}" "${points[@]}"
 		done
 		[ ${#OBFS[@]} -gt 0 ] || { echo "no tile has depth data" >&2; exit 1; }
 		for pid in "${PIDS[@]}"; do wait "$pid" || exit 1; done
@@ -179,6 +213,13 @@ rm -f "$OUT/$NAME.osm.gz" "$OUT/${NAME}_minor.osm.gz"
 MINOR_ZOOMS="${MINOR_ZOOMS-}"  # env MINOR_ZOOMS="15-" to keep the metre levels as a section of those zooms
 # a ring of 16 cells of 0.00005 degrees is about 80 m, a chart's smallest closed contour
 MIN_RING_CELLS="${MIN_RING_CELLS:-16}"; MIN_LINE_M="${MIN_LINE_M:-30}"
+# Tiles are named NAME_i_j (see TILES above): every tile writes its own OSM with ids from 1, and
+# generate-single-map merges the tiles by id, so the objects of one tile would replace those of another.
+# A range of its own per tile keeps them all; 1e7 is above the soundings of a 0.001 degree tier of a 1 degree tile.
+ID_BASE=0
+if [[ "$NAME" =~ _([0-9]+)_([0-9]+)$ ]]; then
+	ID_BASE=$(( (10#${BASH_REMATCH[1]} * 1000 + 10#${BASH_REMATCH[2]}) * 10000000 ))
+fi
 for part in main ${MINOR_ZOOMS:+minor}; do
 	if [ "$part" = main ]; then where="dybde = 2 OR dybde % 5 = 0"; out="$OUT/$NAME.osm.gz"
 	else where="dybde <= 10 AND dybde <> 2 AND dybde % 5 <> 0"; out="$OUT/${NAME}_minor.osm.gz"; fi
@@ -194,7 +235,7 @@ for part in main ${MINOR_ZOOMS:+minor}; do
 		python3 "$HERE/depth_contours_filter.py" "$TMP/depth.fgb" "$TMP/clean.fgb" --cell 0.00005 \
 			--min-ring-cells "$MIN_RING_CELLS" --min-line-m "$MIN_LINE_M" 2>&1 | grep -v numpy
 		mv "$TMP/clean.fgb" "$TMP/depth.fgb"
-		python3 "$V4/ogr2osm.py" -f -t "$V4/translations/contours_depth.py" -o "$TMP/$NAME.osm" "$TMP/depth.fgb" >/dev/null
+		python3 "$V4/ogr2osm.py" -f --max-segment="${MAX_SEGMENT:-50}" --id "-$ID_BASE" -t "$V4/translations/contours_depth.py" -o "$TMP/$NAME.osm" "$TMP/depth.fgb" >/dev/null
 		gzip -f "$TMP/$NAME.osm"; mv "$TMP/$NAME.osm.gz" "$out"
 	fi
 	rm -f "$TMP/depth.fgb"
@@ -207,15 +248,15 @@ if [ -n "$BBOX" ]; then
 fi
 spacings=""; for tier in $TIERS; do spacings+="${tier%%:*} "; done
 python3 "$HERE/depth_soundings_osm.py" "$FGDB" "$OUT/${NAME}_points" --tiers "$spacings" --land "$LAND_CUT" \
-	--land-cell "$LAND_CELL" ${BBOX:+--bbox $BBOX} --first-id 100000000 2>&1 | grep -v numpy
+	--land-cell "$LAND_CELL" ${BBOX:+--bbox $BBOX} --first-id $((100000000 + ID_BASE)) 2>&1 | grep -v numpy
 for f in "$OUT/${NAME}"_points*.osm.gz; do
 	[ "$(zcat < "$f" | grep -c -m1 '<node')" != 0 ] || rm -f "$f"
 done
 
 step "depth areas"
 python3 "$HERE/depth_areas_osm.py" "$FGDB" "$OUT/${NAME}_areas.osm.gz" --layer dybdeareal --field minimumsdybde \
-	--field-max maksimumsdybde \
-	--land "$LAND_CUT" ${BBOX:+--bbox $BBOX} 2>&1 | grep -v numpy
+	--field-max maksimumsdybde --first-id $((700000000 + ID_BASE)) \
+	--land "$LAND_CUT" ${BBOX:+--bbox $BBOX} --max-segment "${MAX_SEGMENT:-50}" 2>&1 | grep -v numpy
 [ "$(zcat < "$OUT/${NAME}_areas.osm.gz" | grep -c -m1 '<way')" != 0 ] || rm -f "$OUT/${NAME}_areas.osm.gz"
 
 if [ -n "$MAP_CREATOR" ]; then

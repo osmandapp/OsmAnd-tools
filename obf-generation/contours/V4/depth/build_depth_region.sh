@@ -58,6 +58,9 @@
 #   -c MAP_CREATOR_DIR  unzipped OsmAndMapCreator: writes OUT_DIR/NAME.depth.obf (points need its --map-zooms)
 #   -k           keep: do nothing when OUT_DIR/NAME.depth.obf already exists
 #   env RENDERING_TYPES  rendering_types.xml for OsmAndMapCreator instead of its own (new tags before a nightly)
+#   env MAX_SEGMENT  the longest contour segment in kilometres, default 50: a longer one is split with points on the
+#                segment, so that the line keeps its shape but the renderer does not walk one segment over many
+#                tiles (a long segment of the world contours made the map slow to draw)
 #
 # Regions (-D DATA_DIR -n REGION), bounds of the published OBFs; options given on the command line win:
 #   Netherlands_contours              Rijkswaterstaat 20 m 2024 over NCP 2019 over EMODnet DTM 2024, contours every 5 m
@@ -108,7 +111,12 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 V4=$(cd "$HERE/.." && pwd)
 NAME=""; BBOX="${BBOX:-}"; GRID=""; LAND=""; OUT=""; CELL=""; UPSAMPLE=1; JOBS=4; SMOOTH=""; SMOOTH_FROM=""; MAP_CREATOR=""
 DATA=""; TILE=0; TILE_WITH="${TILE_WITH:-}"; KEEP=0; LEVELS=""; TIERS=""; RESAMPLING=""; MIN_RING_CELLS=""; SIMPLIFY=""; OVERVIEW=""
-NO_DETAILED=""; FULL_NAME=""; EXCLUDE=""; EXCLUDE_LAYER=""; ENC=""; ENC_AREAS=""; FILL=""; ENC_TIERS="0.02:10-11 0.008:12 0.003:13-14 0.001:15-"
+NO_DETAILED=""; FULL_NAME=""; EXCLUDE=""; EXCLUDE_LAYER=""; ENC=""; ENC_AREAS=""; FILL=""
+LAND_EXTRA="${LAND_EXTRA:-}"
+# a contour segment longer than this many kilometres is split with intermediate points: a long segment made the
+# renderer walk one segment over many tiles, which was slow (OsmAnd-core); see ogr2osm.py --max-segment
+MAX_SEGMENT="${MAX_SEGMENT:-50}"
+ENC_TIERS="0.05:9 0.02:10-11 0.008:12 0.003:13-14 0.001:15-"
 # steps FROM:TO:STEP... : comma-separated levels
 steps() { local s a b c out=""; for s; do IFS=: read -r a b c <<< "$s"; out+=$(seq "$a" "$c" "$b" | paste -sd, -),; done
 	echo "${out%,}"; }
@@ -191,32 +199,130 @@ if [ -n "$DATA" ]; then
 		rm -rf "$COVERAGE.lock"
 	}
 	detailed_europe() {
-		local c=""
-		coverage ireland "" "$DATA/src/ireland/ireland.vrt"; c+=",$COVERAGE"
-		coverage france "" "$DATA/src/france/france.vrt"; c+=",$COVERAGE"
-		coverage uk "" "$DATA/src/uk/uk.vrt"; c+=",$COVERAGE"
-		coverage netherlands "" "$NL/bathymetrie_ncp_juni_2019.tif" "$NL/bodemhoogte_20mtr_2024.tif"; c+=",$COVERAGE"
+		local c="" ie="$DATA/src/ireland" fr="$DATA/src/france" uk="$DATA/src/uk" nl="$DATA/src/netherlands"
+		# the coverage of a detailed map is the area of its own data, not the footprint of the source: the
+		# source may reach further than the map publishes (the INFOMAR grids go far west of Ireland, where
+		# the map has no data), and the gap is filled by the wider map (EMODnet, GEBCO)
+		if [ -f "$ie/fill/ireland_emodnet_base.vrt" ] && [ -f "$ie/fill/ireland_filled.vrt" ]; then
+			coverage ireland "" "$ie/fill/ireland_emodnet_base.vrt" "$ie/fill/ireland_filled.vrt"
+		else
+			coverage ireland "" "$ie/ireland.vrt"
+		fi
+		c+=",$COVERAGE"
+		if [ -f "$fr/fill/france_filled.vrt" ]; then
+			coverage france "" "$fr/fill/france_filled.vrt"
+		else
+			coverage france "" "$fr/france.vrt"
+		fi
+		c+=",$COVERAGE"
+		if [ -f "$uk/emodnet_base.vrt" ] && [ -f "$uk/uk_filled.vrt" ]; then
+			coverage uk "" "$uk/emodnet_base.vrt" "$uk/uk_filled.vrt"
+		else
+			coverage uk "" "$uk/uk.vrt"
+		fi
+		c+=",$COVERAGE"
+		if [ -f "$nl/fill/netherlands_emodnet_base.vrt" ] && [ -f "$nl/fill/netherlands_filled.vrt" ]; then
+			coverage netherlands "" "$nl/fill/netherlands_emodnet_base.vrt" "$nl/fill/netherlands_filled.vrt"
+		else
+			coverage netherlands "" "$NL/bathymetrie_ncp_juni_2019.tif" "$NL/bodemhoogte_20mtr_2024.tif"
+		fi
+		c+=",$COVERAGE"
 		coverage norway "--layer datakvalitet" "${KARTVERKET:-$DATA/src/norway/Dybdedata.gdb}"; c+=",$COVERAGE"
 		DETAILED_EUROPE=${c#,}
+	}
+	# the areas that the world map leaves to the other maps: the EMODnet coverage of Europe_contours, the
+	# detailed maps of Europe, the Pacific map of LINZ and the Gulf
+	world_exclusions() {
+		detailed_europe
+		# Europe_contours is published only within its bbox (-31.3 25.4 36 71.2), so the world leaves
+		# out exactly that part of EMODnet; the rest of its coverage (Cape Verde, the Atlantic west
+		# of 31 W) has no other map and must stay in the world on GEBCO
+		coverage emodnet_europe "--cell 0.02 --bbox -31.3 25.4 36.0 71.2 --below 0" "$EMODNET"; emodnet_europe=$COVERAGE
+		# the Pacific map of LINZ: its box crosses the antimeridian, so the coverage is built in a continuous
+		# longitude space. The areas are the vector data itself, so the cell only sets the tolerance of the
+		# simplification. The contours and the soundings are data too: they reach 0.005° into the coverage, so that
+		# the world leaves them out as well (the deep contours of the Ross Sea have no depth area around them, and a
+		# sounding outside of every area would be drawn twice). The coverage is the convex hull of every connected
+		# component of that data, as the base of the detailed maps of Europe is cut (depth_emodnet_base.py): the
+		# gaps inside the chart data are closed, and the islands do not drag the empty water between them.
+		local nz_layers="--layer area_1 --layer area_2 --layer area_3 --layer area_4 --layer area_5"
+		nz_layers+=" --layer contour_1 --layer contour_2 --layer contour_3 --layer contour_4 --layer contour_5"
+		nz_layers+=" --layer sounding_1 --layer sounding_2 --layer sounding_3 --layer sounding_4 --layer sounding_5"
+		coverage new-zealand "--cell 0.001 --shrink 0 --radius 0.005 --hull 0.02 --bbox 145 -78.5 -143.8 -7 --max-extent 20 $nz_layers" \
+			"$DATA/src/nz/linz_hydro.gpkg"; nz=$COVERAGE
+		# the Gulf map covers its whole box (GEBCO with the CUDEM on top), so the world leaves the box out
+		coverage gulf "--bbox $GULF_BBOX --cell 0.01 --below 0" "$GEBCO" "$DATA/src/cudem/cudem.vrt"; gulf=$COVERAGE
+		WORLD_EXCLUDE="$emodnet_europe,$DETAILED_EUROPE,$nz,$gulf"
 	}
 	case "$NAME" in
 		Norway_contours)
 			exec "$HERE/build_depth_charts.sh" -D "$DATA" -n "$NAME" -j "$JOBS" ${MAP_CREATOR:+-c "$MAP_CREATOR"} \
 				$([ $KEEP -eq 1 ] && echo -k) ;;
 		New-zealand_contours)
-			# LINZ chart vector data: the scale bands merged (the largest scale wins), then built as Norway
+			# LINZ chart vector data: the scale bands merged (the largest scale wins), then built as Norway.
+			# The data covers the whole Pacific (New Zealand, the Chatham and the Kermadec islands, the Ross
+			# Sea, Samoa, Tonga, Fiji, the Cook islands), so the box crosses the antimeridian and the merge
+			# and the mask walk over both halves of it.
 			: "${OUT:=$DATA/build}"
 			if [ ! -f "$DATA/src/nz/linz_hydro.gpkg" ]; then
 				echo "$NAME: no src/nz/linz_hydro.gpkg (download_all.sh --only nz, needs LINZ_API_KEY)" >&2; exit 1
 			fi
 			if [ $KEEP -eq 1 ] && [ -f "$OUT/$NAME.depth.obf" ]; then echo "== $NAME.depth.obf exists, kept"; exit 0; fi
 			mkdir -p "$OUT"
-			python3 "$HERE/depth_bands_merge.py" "$DATA/src/nz/linz_hydro.gpkg" "$OUT/$NAME.bands.gpkg" \
-				--bbox ${BBOX:-165 -48 180 -33.5} 2>&1 | grep -v numpy
-			"$HERE/build_depth_charts.sh" -n "$NAME" -i "$OUT/$NAME.bands.gpkg" -m "$DATA/mask/land_polygons.gpkg" \
-				-o "$OUT" -j "$JOBS" ${MAP_CREATOR:+-c "$MAP_CREATOR"}
+			: "${NZ_BBOX:=145 -78.5 -143.8 -7}"
+			# the land mask without the lakes: the OSM land polygons cover them, so the soundings of a lake
+			# would be dropped as if they were on land and its depth areas cut away
+			NZ_LAND="$DATA/src/nz/land_without_lakes.gpkg"
+			if [ ! -f "$NZ_LAND" ]; then
+				python3 "$HERE/depth_water_mask.py" "$DATA/mask/land_polygons.gpkg" "$NZ_LAND" \
+					--area "$DATA/src/nz/linz_hydro.gpkg" --layer area_1 --layer area_2 --layer area_3 \
+					--layer area_4 --layer area_5 --bbox $NZ_BBOX 2>&1 | grep -v numpy
+			fi
+			# the merged bands are kept: they only depend on the chart source
+			if [ ! -f "$OUT/$NAME.bands.gpkg" ] || [ "$DATA/src/nz/linz_hydro.gpkg" -nt "$OUT/$NAME.bands.gpkg" ]; then
+				python3 "$HERE/depth_bands_merge.py" "$DATA/src/nz/linz_hydro.gpkg" "$OUT/$NAME.bands.gpkg" \
+					--bbox ${BBOX:-$NZ_BBOX} 2>&1 | grep -v numpy
+			fi
+			# the chart data of the box and the rest of the hull of its coverage: the GEBCO fill of the map
+			# covers only the gaps, so the hull has no empty water inside it
+			nz_layers="--layer area_1 --layer area_2 --layer area_3 --layer area_4 --layer area_5"
+			nz_layers+=" --layer contour_1 --layer contour_2 --layer contour_3 --layer contour_4 --layer contour_5"
+			nz_layers+=" --layer sounding_1 --layer sounding_2 --layer sounding_3 --layer sounding_4 --layer sounding_5"
+			coverage new-zealand-charts "--cell 0.001 --shrink 0 --radius 0.005 --max-extent 20 --bbox $NZ_BBOX $nz_layers" \
+				"$DATA/src/nz/linz_hydro.gpkg"; nz_charts=$COVERAGE
+			coverage new-zealand-outside "--complement --bbox $NZ_BBOX --cell 0.0001 --shrink 0" "$DATA/src/coverage/new-zealand.gpkg"
+			NZ_FILL_EXCLUDE="$nz_charts,$COVERAGE"; export NZ_FILL_EXCLUDE
+			# the chart map alone; the fill is a map section of its own and the two are merged below
+			TMP="$OUT/$NAME.tmp"; rm -rf "$TMP"; mkdir -p "$TMP/charts"
+			"$HERE/build_depth_charts.sh" -n "$NAME" -i "$OUT/$NAME.bands.gpkg" -m "$NZ_LAND" \
+				-o "$TMP/charts" -j "$JOBS" ${MAP_CREATOR:+-c "$MAP_CREATOR"}
+			if [ -n "$MAP_CREATOR" ]; then
+				# the water inside the hull that the charts do not cover: the world's GEBCO. The box crosses the
+				# antimeridian, so the fill is two builds, and all the sections keep the name of the map.
+				export SECTION_NAME="$NAME"
+				bash "$HERE/$(basename "$0")" -D "$DATA" -n New-zealand_fill-east -b "145 -78.5 180 -7" \
+					-o "$TMP/fill_east" -c "$MAP_CREATOR" -j "$JOBS" || exit 1
+				bash "$HERE/$(basename "$0")" -D "$DATA" -n New-zealand_fill-west -b "-180 -78.5 -143.8 -7" \
+					-o "$TMP/fill_west" -c "$MAP_CREATOR" -j "$JOBS" || exit 1
+				# the chart map and the fill are map sections of one map
+				mkdir -p "$TMP/merge"
+				(cd "$TMP/merge" && JAVA_OPTS="${JAVA_OPTS:--Xmx16g}" bash "$MAP_CREATOR/utilities.sh" merge-index \
+					"$OUT/$NAME.depth.obf" "$TMP/charts/$NAME.depth.obf" "$TMP/fill_east/New-zealand_fill-east.depth.obf" \
+					"$TMP/fill_west/New-zealand_fill-west.depth.obf" \
+					> merge.log 2>&1) || { tail -20 "$TMP/merge/merge.log" >&2; exit 1; }
+			else
+				mv "$TMP/charts/$NAME.depth.obf" "$OUT/$NAME.depth.obf"
+			fi
 			# the merged bands (about 0.3 GB) are only an intermediate
-			rm -f "$OUT/$NAME.bands.gpkg"; exit 0 ;;
+			rm -f "$OUT/$NAME.bands.gpkg"; rm -rf "$TMP"; exit 0 ;;
+		New-zealand_fill-east|New-zealand_fill-west)
+			# The water inside the hull of the New Zealand chart data that the charts do not cover: the world's
+			# GEBCO fills it, so that the hull has no empty gaps (as EMODnet fills in the UK map). The world leaves
+			# the whole hull out, so the fill must be inside the same map, and the charts keep their own areas.
+			: "${BBOX:=145 -78.5 -143.8 -7}"; : "${GRID:=$GEBCO}"; : "${LEVELS:=$(steps 10:300:10 350:950:50),$DEEP_LEVELS}"
+			: "${SMOOTH:=4}"; : "${MIN_RING_CELLS:=8}"; : "${TIERS:=$GEBCO_TIERS}"
+			: "${EXCLUDE:=${NZ_FILL_EXCLUDE:-}}"
+			[ "$TILE" != 0 ] || TILE=15 ;;
 		Netherlands_contours)
 			# The Rijkswaterstaat grids in chart datum with the coastal gap closed by the Laplace fill
 			# (netherlands_filled.vrt); without it, use the raw grids and the NSGI datum shift.
@@ -360,26 +466,27 @@ if [ -n "$DATA" ]; then
 			: "${FULL_NAME:=Europe_full_coverage_contours}"
 			[ "$TILE" != 0 ] || TILE=10 ;;
 		Europe_points)
-			: "${BBOX:=-36.0 25.0 41.8 83.1}"; : "${GRID:=$EMODNET}"; : "${LEVELS:=none}"
+			# the same area as Europe_contours: the two are one map, split into the contours and the points.
+			# The EMODnet coverage outside the box (Cape Verde, the Atlantic west of 31 W, the Arctic) has
+			# no other map, so it stays in the world on GEBCO.
+			: "${BBOX:=-31.3 25.4 36.0 71.2}"; : "${GRID:=$EMODNET}"; : "${LEVELS:=none}"
 			: "${TIERS:=0.25:7-8 0.1:9 0.04:10 0.02:11-12 0.01:13-}"; [ "$TILE" != 0 ] || TILE=10
-			if [ -n "$KARTVERKET" ]; then : "${EXCLUDE:=$KARTVERKET}"; : "${EXCLUDE_LAYER:=datakvalitet}"; fi ;;
+			if [ -n "$KARTVERKET" ]; then : "${EXCLUDE:=$KARTVERKET}"; : "${EXCLUDE_LAYER:=datakvalitet}"; fi
+			# the points of the general map are the same map as the contours of the general map: the detailed
+			# regions are cut out of it as well
+			if [ -z "$NO_DETAILED" ]; then detailed_europe; NO_DETAILED="Europe_points:$DETAILED_EUROPE"; fi
+			: "${FULL_NAME:=Europe_full_coverage_points}" ;;
 		World_contours)
 			: "${BBOX:=-180 -79 180 85}"; : "${GRID:=$GEBCO}"; : "${LEVELS:=$(steps 10:300:10 350:950:50),$DEEP_LEVELS}"
+			# the lakes and the depressions below the sea level are not the sea: they are masked out as land
+			: "${LAND_EXTRA:=$DATA/mask/inland_water.gpkg}"
 			: "${OVERVIEW:=$OVERVIEW_Z5_8}"
 			# one unsmoothed section of the 15" grid is 3.1 GB, over the 2 GB limit of a map index: keep the
 			# published smoothing of the world map (4x4 cells, rings under 8 cells dropped)
 			: "${SMOOTH:=4}"; : "${MIN_RING_CELLS:=8}"
 			if [ -z "$NO_DETAILED" ]; then
-				detailed_europe
-				# Europe_contours is published only within its bbox (-31.3 25.4 36 71.2), so the world leaves
-				# out exactly that part of EMODnet; the rest of its coverage (Cape Verde, the Atlantic west
-				# of 31 W) has no other map and must stay in the world on GEBCO
-				coverage emodnet_europe "--cell 0.02 --bbox -31.3 25.4 36.0 71.2" "$EMODNET"; emodnet_europe=$COVERAGE
-				# the box of New-zealand_contours: LINZ also has the Pacific islands and the Ross Sea
-				coverage new-zealand "--bbox 165 -48 180 -33.5 --layer area_1 --layer area_2 --layer area_3 --layer area_4 --layer area_5" \
-					"$DATA/src/nz/linz_hydro.gpkg"; nz=$COVERAGE
-				coverage gulf-cudem "--bbox $GULF_BBOX" "$DATA/src/cudem/cudem.vrt"; gulf=$COVERAGE
-				NO_DETAILED="World_contours:$emodnet_europe,$DETAILED_EUROPE,$nz,$gulf:$emodnet_europe"
+				world_exclusions
+				NO_DETAILED="World_contours:$WORLD_EXCLUDE:$emodnet_europe"
 			fi
 			# four map sections, built two at a time and merged: every part stays well below the 2 GB limit,
 			# and the memory of the build stays moderate (two JVMs of 6 GB instead of one of 16 GB)
@@ -388,6 +495,15 @@ if [ -n "$DATA" ]; then
 			[ "$TILE" != 0 ] || TILE=15 ;;
 		World_Northern_hemisphere_points)
 			: "${BBOX:=-180 0 180 85}"; : "${GRID:=$GEBCO}"; : "${LEVELS:=none}"; : "${TIERS:=$GEBCO_TIERS}"
+			# the lakes and the depressions below the sea level are not the sea: they are masked out as land
+			: "${LAND_EXTRA:=$DATA/mask/inland_water.gpkg}"
+			# the points of the world are the same map as the contours of the world: the areas of the other
+			# maps are cut out of it as well
+			if [ -z "$NO_DETAILED" ]; then
+				world_exclusions
+				NO_DETAILED="World_Northern_hemisphere_points:$WORLD_EXCLUDE"
+			fi
+			: "${FULL_NAME:=World_Northern_hemisphere_full_coverage_points}"
 			[ "$TILE" != 0 ] || TILE=15 ;;
 		Gulf_of_Mexico_north-west_contours)
 			: "${BBOX:=$GULF_BBOX}"; : "${GRID:=$GEBCO,$DATA/src/cudem/cudem.vrt}"; : "${CELL:=0.0005}"
@@ -397,6 +513,15 @@ if [ -n "$DATA" ]; then
 			[ "$TILE" != 0 ] || TILE=3 ;;
 		World_Southern_hemisphere_points)
 			: "${BBOX:=-180 -79 180 0}"; : "${GRID:=$GEBCO}"; : "${LEVELS:=none}"; : "${TIERS:=$GEBCO_TIERS}"
+			# the lakes and the depressions below the sea level are not the sea: they are masked out as land
+			: "${LAND_EXTRA:=$DATA/mask/inland_water.gpkg}"
+			# the points of the world are the same map as the contours of the world: the areas of the other
+			# maps are cut out of it as well
+			if [ -z "$NO_DETAILED" ]; then
+				world_exclusions
+				NO_DETAILED="World_Southern_hemisphere_points:$WORLD_EXCLUDE"
+			fi
+			: "${FULL_NAME:=World_Southern_hemisphere_full_coverage_points}"
 			[ "$TILE" != 0 ] || TILE=15 ;;
 		*) echo "Unknown region '$NAME', see --help" >&2; exit 1 ;;
 	esac
@@ -447,7 +572,7 @@ single() {
 	local output=$1; shift
 	local dir; dir=$(mktemp -d "$TMP/single.XXXX")
 	(cd "$dir" && JAVA_OPTS="${JAVA_OPTS:-${SECTION_HEAP:--Xmx16g}}" bash "$MAP_CREATOR/utilities.sh" generate-single-map "$output" \
-		--name="$NAME" "$@" ${RENDERING_TYPES:+--rendering-types=$RENDERING_TYPES} > single.log 2>&1) || { tail -20 "$dir/single.log" >&2; return 1; }
+		--name="${SECTION_NAME:-$NAME}" "$@" ${RENDERING_TYPES:+--rendering-types=$RENDERING_TYPES} > single.log 2>&1) || { tail -20 "$dir/single.log" >&2; return 1; }
 	# an old OsmAndMapCreator prints its usage for an unknown command and exits with 0
 	[ -f "$output" ] || { tail -20 "$dir/single.log" >&2; return 1; }
 	rm -rf "$dir"
@@ -466,6 +591,29 @@ merge() {
 	rm -rf "$dir"
 }
 
+# a map section is built from at most MAX_FILES tiles: the index of OsmAndMapCreator fails above 2048 files
+MAX_FILES="${MAX_FILES:-2000}"
+
+# map_sections OUTPUT ZOOMS OSM_GZ... : one map section per MAX_FILES files, built in parallel.
+# The files of a section are the tiles of one kind, so a section that has to be split is split by the tile order.
+map_sections() {
+	local output=$1 zooms=$2; shift 2
+	local -a chunk=()
+	local part=0 f
+	for f in "$@"; do
+		chunk+=("$f")
+		if [ ${#chunk[@]} -ge "$MAX_FILES" ]; then
+			single "${output%.obf}_$part.obf" $zooms "${chunk[@]}" & PIDS+=($!)
+			OBFS+=("${output%.obf}_$part.obf")
+			part=$((part + 1)); chunk=()
+		fi
+	done
+	if [ ${#chunk[@]} -gt 0 ]; then
+		single "${output%.obf}_$part.obf" $zooms "${chunk[@]}" & PIDS+=($!)
+		OBFS+=("${output%.obf}_$part.obf")
+	fi
+}
+
 # ENC: charted contours and soundings where approach and harbour cells exist; the grid is left out there (-x)
 ENC_OSM=()
 if [ -n "$ENC" ]; then
@@ -477,7 +625,7 @@ if [ -n "$ENC" ]; then
 	EXCLUDE="$TMP/enc_coverage.gpkg"; EXCLUDE_LAYER=coverage
 	ENC_OSM+=("$ENC_OUT/${NAME}_enc.osm.gz:" "$ENC_OUT/${NAME}_enc_minor.osm.gz:15-")
 	python3 "$HERE/depth_areas_osm.py" "$TMP/enc_areas.gpkg" "$ENC_OUT/${NAME}_enc_areas.osm.gz" --layer areas \
-		--field mindepth --field-max maxdepth --land "$LAND" --bbox "$W" "$S" "$E" "$N" 2>&1 | grep -v numpy
+		--field mindepth --field-max maxdepth --land "$LAND" --bbox "$W" "$S" "$E" "$N" --max-segment "$MAX_SEGMENT" 2>&1 | grep -v numpy
 	# multipolygons: generate-map, not generate-single-map
 	ENC_AREAS="$ENC_OUT/${NAME}_enc_areas.osm.gz"
 	spacings=""; for tier in $ENC_TIERS; do spacings+="${tier%%:*} "; done
@@ -524,7 +672,7 @@ if [ -n "$TILES" ]; then
 	step "$NAME: $(echo "$TILES" | wc -l | tr -d ' ') tiles of $TILE degrees, $JOBS at a time"
 	TILE_OUT="$TMP/tiles"; mkdir -p "$TILE_OUT"
 	export SELF="$0" GRID LAND LEVELS TIERS CELL UPSAMPLE SMOOTH SMOOTH_FROM RESAMPLING MIN_RING_CELLS SIMPLIFY OVERVIEW EXCLUDE \
-		EXCLUDE_LAYER FILL MAP_CREATOR TILE_OUT INTERP
+		EXCLUDE_LAYER FILL MAP_CREATOR TILE_OUT INTERP LAND_EXTRA
 	echo "$TILES" | xargs -P "$JOBS" -L 1 bash -c '
 		name=$1; shift
 		args=(-n "$name" -b "$*" -i "$GRID" -m "$LAND" -o "$TILE_OUT" -l "${LEVELS:-none}" -p "$TIERS" -r "$CELL" \
@@ -569,20 +717,20 @@ if [ -n "$TILES" ]; then
 						for pid in "${pids[@]}"; do wait "$pid" || exit 1; done
 					done
 				else
-					single "${pre}contours.obf" "${contours[@]}" & PIDS+=($!); OBFS+=("${pre}contours.obf")
+					map_sections "${pre}contours.obf" "" "${contours[@]}"
 				fi
 			fi
 			overview=("$dir"/*_overview.osm.gz)
 			if [ -n "$OVERVIEW" ] && [ -f "${overview[0]}" ]; then
 				step "overview obf of ${#overview[@]} tiles"
-				single "${pre}overview.obf" --map-zooms="${OVERVIEW#*:}" "${overview[@]}" & PIDS+=($!); OBFS+=("${pre}overview.obf")
+				map_sections "${pre}overview.obf" "--map-zooms=${OVERVIEW#*:}" "${overview[@]}"
 			fi
 			i=0
 			for tier in $TIERS; do
 				i=$((i + 1)); points=("$dir"/*_points$i.osm.gz)
 				[ -f "${points[0]}" ] || continue
 				step "points $i obf of ${#points[@]} tiles"
-				single "${pre}points$i.obf" --map-zooms="${tier#*:}" "${points[@]}" & PIDS+=($!); OBFS+=("${pre}points$i.obf")
+				map_sections "${pre}points$i.obf" "--map-zooms=${tier#*:}" "${points[@]}"
 			done
 			if [ -n "$ENC_AREAS" ]; then
 				obf "$ENC_AREAS" > "${pre}enc_areas.section" & PIDS+=($!)
@@ -590,7 +738,7 @@ if [ -n "$TILES" ]; then
 			areas=("$dir"/*_areas.osm.gz)
 			if [ -f "${areas[0]}" ]; then
 				step "depth areas obf of ${#areas[@]} tiles"
-				single "${pre}areas.obf" "${areas[@]}" & PIDS+=($!); OBFS+=("${pre}areas.obf")
+				map_sections "${pre}areas.obf" "" "${areas[@]}"
 			fi
 			for e in ${ENC_OSM[@]+"${ENC_OSM[@]}"}; do
 				o="${pre}$(basename "${e%%:*}" .osm.gz).obf"; z=${e#*:}
@@ -687,11 +835,28 @@ fi
 step "land mask"
 ogr2ogr -q -f GPKG -spat "$GW" "$GS" "$GE" "$GN" -clipsrc "$GW" "$GS" "$GE" "$GN" -nlt MULTIPOLYGON "$TMP/land.gpkg" "$LAND"
 LAND_LAYER=$(ogrinfo -q "$TMP/land.gpkg" | awk -F'[: ]+' 'NR==1{print $2}')
+# the extra land: the inland water (the lakes and the depressions below the sea level) is land for the map
+LAND_LAYER_ARGS="-l $LAND_LAYER"
+if [ -n "$LAND_EXTRA" ]; then
+	IFS=, read -ra land_extra <<< "$LAND_EXTRA"
+	for f in "${land_extra[@]}"; do
+		[ -f "$f" ] || { echo "no $f, the inland water is not masked out"; continue; }
+		extra_layer=$(ogrinfo -ro -q "$f" | awk -F'[: ]+' 'NR==1{print $2}')
+		ogr2ogr -q -f GPKG -update -nln "$extra_layer" -spat "$GW" "$GS" "$GE" "$GN" \
+			-clipsrc "$GW" "$GS" "$GE" "$GN" -nlt MULTIPOLYGON "$TMP/land.gpkg" "$f"
+		LAND_LAYER_ARGS="$LAND_LAYER_ARGS -l $extra_layer"
+	done
+fi
 # exclude RASTER : nodata where the EXCLUDE polygons are
 exclude() {
 	[ -n "$EXCLUDE" ] || return 0
-	[ -n "$EXCLUDE_LAYER" ] || EXCLUDE_LAYER=$(ogrinfo -ro -q "$EXCLUDE" | awk -F'[: ]+' 'NR==1{print $2}')
-	gdal_rasterize -q -burn nan -l "$EXCLUDE_LAYER" "$EXCLUDE" "$1"
+	local f layer; local -a files
+	IFS=, read -ra files <<< "$EXCLUDE"
+	for f in "${files[@]}"; do
+		layer="$EXCLUDE_LAYER"
+		[ -n "$layer" ] || layer=$(ogrinfo -ro -q "$f" | awk -F'[: ]+' 'NR==1{print $2}')
+		gdal_rasterize -q -burn nan -l "$layer" "$f" "$1"
+	done
 }
 OBFS=()
 
@@ -713,7 +878,8 @@ if [ -n "$LEVELS" ]; then
 		rm -f "$TMP/coarse.tif"
 	fi
 	for raster in "$TMP/contour_grid.tif" "$TMP/smooth.tif"; do
-		if [ -f "$raster" ]; then gdal_rasterize -q -burn 0 -l "$LAND_LAYER" "$TMP/land.gpkg" "$raster"; fi
+		# shellcheck disable=SC2086
+		if [ -f "$raster" ]; then gdal_rasterize -q -burn 0 $LAND_LAYER_ARGS "$TMP/land.gpkg" "$raster"; fi
 	done
 
 	# levels ascending as gdal_contour wants them: -11000 ... -2
@@ -730,7 +896,7 @@ if [ -n "$LEVELS" ]; then
 		step "no contours in $NAME"
 	else
 		step "contours osm"
-		python3 "$V4/ogr2osm.py" -f -t "$V4/translations/contours_depth.py" -o "$TMP/$NAME.osm" "$TMP/depth.fgb" >/dev/null
+		python3 "$V4/ogr2osm.py" -f --max-segment="$MAX_SEGMENT" -t "$V4/translations/contours_depth.py" -o "$TMP/$NAME.osm" "$TMP/depth.fgb" >/dev/null
 		gzip -f "$TMP/$NAME.osm"
 		mv "$TMP/$NAME.osm.gz" "$OUT/$NAME.osm.gz"
 		mv "$TMP/depth.fgb" "$OUT/$NAME.fgb"
@@ -748,14 +914,15 @@ if [ -n "$OVERVIEW" ] && [ -n "$OVERVIEW_LEVELS" ]; then
 	step "overview contours every 200 m, $ov_cell deg cells, zooms ${OVERVIEW#*:}"
 	gdalwarp -q -overwrite -te "$W" "$S" "$E" "$N" -tr "$ov_cell" "$ov_cell" -r average -ot Float32 -srcnodata nan \
 		-dstnodata nan "$TMP/grid.tif" "$TMP/overview.tif"
-	gdal_rasterize -q -burn 0 -l "$LAND_LAYER" "$TMP/land.gpkg" "$TMP/overview.tif"
+	# shellcheck disable=SC2086
+	gdal_rasterize -q -burn 0 $LAND_LAYER_ARGS "$TMP/land.gpkg" "$TMP/overview.tif"
 	# shellcheck disable=SC2086
 	gdal_contour -q -a elev -fl $OVERVIEW_LEVELS "$TMP/overview.tif" "$TMP/overview.gpkg"
 	overview_simplify=${SIMPLIFY:-$(python3 -c "print(float('$ov_cell') / 2)")}
 	python3 "$HERE/depth_contours_filter.py" "$TMP/overview.gpkg" "$TMP/overview.fgb" --cell "$ov_cell" \
 		--min-ring-cells "$MIN_RING_CELLS" --simplify "$overview_simplify"
 	if [ "$(ogrinfo -so -al "$TMP/overview.fgb" | awk -F': ' '/Feature Count/{print $2}')" != 0 ]; then
-		python3 "$V4/ogr2osm.py" -f -t "$V4/translations/contours_depth.py" -o "$TMP/${NAME}_overview.osm" \
+		python3 "$V4/ogr2osm.py" -f --max-segment="$MAX_SEGMENT" -t "$V4/translations/contours_depth.py" -o "$TMP/${NAME}_overview.osm" \
 			"$TMP/overview.fgb" >/dev/null
 		gzip -f "$TMP/${NAME}_overview.osm"
 		mv "$TMP/${NAME}_overview.osm.gz" "$OUT/${NAME}_overview.osm.gz"
@@ -803,10 +970,14 @@ if [ -n "$FILL" ]; then
 	done
 	rm -f "$TMP"/coverage_*.tif "$TMP/fill_level.vrt" "$TMP/fill_cut.tif" "$TMP/band.gpkg"
 	if [ -f "$TMP/areas.gpkg" ]; then
-		area_exclude=(); [ -z "$EXCLUDE" ] || area_exclude=(--exclude "$EXCLUDE")
+		area_exclude=()
+		if [ -n "$EXCLUDE" ]; then
+			IFS=, read -ra ex_files <<< "$EXCLUDE"
+			for ex in "${ex_files[@]}"; do area_exclude+=(--exclude "$ex"); done
+		fi
 		python3 "$HERE/depth_areas_osm.py" "$TMP/areas.gpkg" "$OUT/${NAME}_areas.osm.gz" --layer areas --field mindepth \
 			--nested --land "$TMP/land.gpkg" "${area_exclude[@]}" --bbox "$W" "$S" "$E" "$N" \
-			--simplify "$AREA_SIMPLIFY" 2>&1 | grep -v numpy
+			--simplify "$AREA_SIMPLIFY" --max-segment "$MAX_SEGMENT" 2>&1 | grep -v numpy
 		if [ -n "$MAP_CREATOR" ] && [ "$(zcat < "$OUT/${NAME}_areas.osm.gz" | grep -c -m1 '<way')" != 0 ]; then
 			o=$(obf "$OUT/${NAME}_areas.osm.gz"); OBFS+=("$o")
 		fi
@@ -817,7 +988,8 @@ rm -f "$TMP/contour_grid.tif" "$TMP/smooth.tif"
 
 if [ -n "$TIERS" ]; then
 	# land as nodata, so that averages are over water only
-	gdal_rasterize -q -burn "$LAND_NODATA" -l "$LAND_LAYER" "$TMP/land.gpkg" "$TMP/grid.tif"
+	# shellcheck disable=SC2086
+	gdal_rasterize -q -burn "$LAND_NODATA" $LAND_LAYER_ARGS "$TMP/land.gpkg" "$TMP/grid.tif"
 	gdalwarp -q -overwrite -srcnodata "$LAND_NODATA" -dstnodata nan -co COMPRESS=DEFLATE -co TILED=YES \
 		"$TMP/grid.tif" "$TMP/water.tif"
 	exclude "$TMP/water.tif"

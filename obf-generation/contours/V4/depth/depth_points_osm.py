@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Depth points as OSM from a depth raster.
 
-    depth_points_osm.py RASTER OUTPUT.osm.gz --bbox W S E N [--shoalest SPACING] [--thin] [--first-id N]
+    depth_points_osm.py RASTER OUTPUT.osm.gz --bbox W S E N [--shoalest SPACING] [--thin]
+                        [--water LAYER] [--interp RASTER] [--first-id N]
 
 Without --shoalest every cell of RASTER (depths already averaged per cell) with a value below 0 m inside
 [W, E) x [S, N) becomes a node at the cell centre: a regular grid of points.
@@ -24,6 +25,7 @@ import gzip
 import math
 import struct
 
+import numpy as np
 from osgeo import gdal
 
 gdal.UseExceptions()
@@ -37,7 +39,55 @@ def node(node_id, lat, lon, depth):
             '<tag k="name" v="%s"/></node>\n' % (node_id, lat, lon, name))
 
 
-def grid_points(ds, out, w, s, e, n, node_id):
+def water_mask(ds, water):
+    """Byte mask of the raster cells whose centre is inside the water polygons: a grid cell on the shore may hold a
+    depth while the map counts it as land, and a sounding there would stand on the shore. The dataset is returned,
+    not the band: a band of a freed dataset points nowhere."""
+    mask = gdal.GetDriverByName('MEM').Create('', ds.RasterXSize, ds.RasterYSize, 1, gdal.GDT_Byte)
+    mask.SetGeoTransform(ds.GetGeoTransform())
+    mask.SetProjection(ds.GetProjection())
+    gdal.Rasterize(mask, water, bands=[1], burnValues=[1])
+    return mask
+
+
+def interp_mask(ds, path):
+    """Cells the shore fill interpolated, on the grid of ds; a lazy VRT, read by rows."""
+    gt = ds.GetGeoTransform()
+    return gdal.Warp('', path, format='VRT', width=ds.RasterXSize, height=ds.RasterYSize,
+                     outputBounds=(gt[0], gt[3] + gt[5] * ds.RasterYSize,
+                                   gt[0] + gt[1] * ds.RasterXSize, gt[3]),
+                     dstNodata=0, resampleAlg='near', outputType=gdal.GDT_Byte)
+
+
+def allowed_mask(ds, water, interp):
+    """Water cells that are not interpolated; None when every cell is allowed.
+
+    The masks are copied in row chunks: a lake grid of 40000 x 16000 cells would take
+    gigabytes if all three arrays were held at once.
+    """
+    wet = water_mask(ds, water) if water else None
+    interpolated = interp_mask(ds, interp) if interp else None
+    if wet is None and interpolated is None:
+        return None
+    width, height = ds.RasterXSize, ds.RasterYSize
+    mask = gdal.GetDriverByName('MEM').Create('', width, height, 1, gdal.GDT_Byte)
+    mask.SetGeoTransform(ds.GetGeoTransform())
+    mask.SetProjection(ds.GetProjection())
+    out = mask.GetRasterBand(1)
+    chunk = 1024
+    for row in range(0, height, chunk):
+        rows = min(chunk, height - row)
+        if wet is not None:
+            allowed = wet.GetRasterBand(1).ReadAsArray(0, row, width, rows).astype(bool)
+        else:
+            allowed = np.ones((rows, width), dtype=bool)
+        if interpolated is not None:
+            allowed &= interpolated.GetRasterBand(1).ReadAsArray(0, row, width, rows) == 0
+        out.WriteArray(allowed.astype(np.uint8), 0, row)
+    return mask
+
+
+def grid_points(ds, out, w, s, e, n, node_id, mask=None):
     band = ds.GetRasterBand(1)
     x0, dx, _, y0, _, dy = ds.GetGeoTransform()
     nodata = band.GetNoDataValue()
@@ -49,8 +99,11 @@ def grid_points(ds, out, w, s, e, n, node_id):
         if not (s <= lat < n):
             continue
         values = struct.unpack(fmt, band.ReadRaster(0, row, cols, 1, buf_type=gdal.GDT_Float32))
+        wet = mask.ReadRaster(0, row, cols, 1, buf_type=gdal.GDT_Byte) if mask is not None else None
         lines = []
         for col, v in enumerate(values):
+            if wet is not None and not wet[col]:
+                continue
             if math.isnan(v) or v >= 0 or (nodata is not None and v == nodata):
                 continue
             lon = x0 + (col + 0.5) * dx
@@ -87,7 +140,7 @@ def thin_out(cells):
     return drop - set(blocks.values())
 
 
-def shoalest_points(ds, out, w, s, e, n, spacing, node_id, thin=False):
+def shoalest_points(ds, out, w, s, e, n, spacing, node_id, thin=False, mask=None):
     # nodata and NaN as NONE through a warped VRT, so the rows need no per-value check
     ds = gdal.Warp('', ds, format='VRT', dstNodata=NONE, outputType=gdal.GDT_Float32)
     band = ds.GetRasterBand(1)
@@ -114,16 +167,26 @@ def shoalest_points(ds, out, w, s, e, n, spacing, node_id, thin=False):
     cells = {}
     for cy, r0, r1 in row_cells:
         data = [struct.unpack(fmt, band.ReadRaster(0, r, cols, 1, buf_type=gdal.GDT_Float32)) for r in range(r0, r1)]
+        wet_rows = [mask.ReadRaster(0, r, cols, 1, buf_type=gdal.GDT_Byte) for r in range(r0, r1)] if mask is not None else None
         for cx, c0, c1 in col_cells:
             best, best_r, best_c = NONE, -1, -1
             for k, values in enumerate(data):
                 part = values[c0:c1]
-                m = max(part)
-                if m >= 0:  # drying or land height in the cell: the shoalest value below 0 m instead
-                    below = [v for v in part if v < 0]
-                    m = max(below) if below else NONE
-                if m > best:
-                    best, best_r, best_c = m, r0 + k, c0 + part.index(m)
+                if wet_rows is None:
+                    m = max(part)
+                    if m >= 0:  # drying or land height in the cell: the shoalest value below 0 m instead
+                        below = [v for v in part if v < 0]
+                        m = max(below) if below else NONE
+                    if m > best:
+                        best, best_r, best_c = m, r0 + k, c0 + part.index(m)
+                    continue
+                # the raster may hold a depth in a cell the map counts as land: only its water cells count
+                wet = wet_rows[k][c0:c1]
+                pick = max(((v, j) for j, v in enumerate(part) if wet[j]), default=None)
+                if pick is not None and pick[0] >= 0:
+                    pick = max(((v, j) for j, v in enumerate(part) if wet[j] and v < 0), default=None)
+                if pick is not None and pick[0] > best:
+                    best, best_r, best_c = pick[0], r0 + k, c0 + pick[1]
             if best > NONE / 2:
                 cells[(cx, cy)] = (best, y0 + (best_r + 0.5) * dy, x0 + (best_c + 0.5) * dx)
     drop = thin_out(cells) if thin else set()
@@ -146,17 +209,23 @@ def main():
     parser.add_argument('--shoalest', type=float, metavar='SPACING',
                         help='one node per SPACING degree cell at its shoalest fine cell')
     parser.add_argument('--thin', action='store_true', help='with --shoalest: leave out the soundings a neighbour already tells')
+    parser.add_argument('--water', help='water polygons of the map: a sounding outside them is dropped, because a '
+                                        'raster cell on the shore may hold a depth the map counts as land')
+    parser.add_argument('--interp', help='raster of the cells filled by interpolation (non-zero): their depth is '
+                                         'not a measurement, so no sounding is placed there')
     parser.add_argument('--first-id', type=int, default=1, help='ids are negative, counting down from this')
     args = parser.parse_args()
     w, s, e, n = args.bbox
 
     ds = gdal.Open(args.raster)
+    mask_ds = allowed_mask(ds, args.water, args.interp)
+    mask = mask_ds.GetRasterBand(1) if mask_ds is not None else None
     with gzip.open(args.output, 'wt', compresslevel=5) as out:
         out.write("<?xml version='1.0' encoding='UTF-8'?>\n<osm version='0.6' upload='false' generator='depth_points_osm'>\n")
         if args.shoalest:
-            written = shoalest_points(ds, out, w, s, e, n, args.shoalest, args.first_id, args.thin)
+            written = shoalest_points(ds, out, w, s, e, n, args.shoalest, args.first_id, args.thin, mask)
         else:
-            written = grid_points(ds, out, w, s, e, n, args.first_id)
+            written = grid_points(ds, out, w, s, e, n, args.first_id, mask)
         out.write('</osm>\n')
     print('depth points written: %d' % written)
 

@@ -54,6 +54,13 @@ def box(w, s, e, n):
     return ogr.CreateGeometryFromWkt('POLYGON((%r %r,%r %r,%r %r,%r %r,%r %r))' % (w, s, e, s, e, n, w, n, w, s))
 
 
+def segment_km(a, b):
+    """Approximate length of a lon/lat segment: a flat earth with the longitude scaled by the mean latitude."""
+    dx = (b[0] - a[0]) * 111.32 * math.cos(math.radians((a[1] + b[1]) / 2))
+    dy = (b[1] - a[1]) * 111.32
+    return math.hypot(dx, dy)
+
+
 def polygons(g):
     """The polygon parts as clones: a part got by GetGeometryRef dies with its parent, and the parent is often a
     temporary (MakeValid, Intersection) - using the part after that crashes GDAL."""
@@ -85,18 +92,27 @@ def main():
     parser.add_argument('--field', required=True, help='shallowest depth of the area, metres, negative dries')
     parser.add_argument('--field-max', help='deepest depth of the area, metres: the class is the one its band covers most')
     parser.add_argument('--land', required=True)
+    parser.add_argument('--water', help='water polygons of the map: the bands are cut by them, so the fill ends on '
+                                        'the shoreline the map draws instead of the raster cell edge')
     parser.add_argument('--exclude', action='append', help='polygons of another depth map, repeatable')
     parser.add_argument('--bbox', nargs=4, type=float, metavar=('W', 'S', 'E', 'N'))
     parser.add_argument('--cell', type=float, default=0.25)
     parser.add_argument('--simplify', type=float, default=0, help='tolerance in degrees; default 0 keeps every vertex')
+    parser.add_argument('--max-segment', type=float, default=0,
+                        help='split a longer straight segment of a ring with points on it, kilometres; 0 keeps it')
     parser.add_argument('--first-id', type=int, default=700000000)
     parser.add_argument('--nested', action='store_true', help='a class holds the shallower ones: cut them out')
+    parser.add_argument('--cumulative', action='store_true',
+                        help='the bands are disjoint: make each class cover all shallower classes, so the class has no '
+                             'hole at the inner contour and no inner ring is written to the map')
     args = parser.parse_args()
 
     src = ogr.Open(args.source)
     layer = src.GetLayer(args.layer)
     land_src = ogr.Open(args.land)
     land = land_src.GetLayer(0)
+    water_src = ogr.Open(args.water) if args.water else None
+    water = water_src.GetLayer(0) if water_src is not None else None
     excluded = Coverage(args.exclude, args.cell) if args.exclude else None
     w, s, e, n = args.bbox if args.bbox else layer.GetExtent()[0:1] + layer.GetExtent()[2:3] + \
         layer.GetExtent()[1:2] + layer.GetExtent()[3:4]
@@ -109,11 +125,24 @@ def main():
         def ring(r, tags=''):
             """Write one closed way, or connected open ways for a multipolygon when the OSM node limit requires it."""
             nonlocal nid
+            pts = [(r.GetX(i), r.GetY(i)) for i in range(r.GetPointCount())]
+            if len(pts) > 1 and pts[0] == pts[-1]:
+                pts.pop()
             refs = []
-            for i in range(r.GetPointCount() - 1):
-                nid += 1
-                out.write('<node id="-%d" visible="true" lat="%.7f" lon="%.7f"/>\n' % (nid, r.GetY(i), r.GetX(i)))
-                refs.append(nid)
+            for i, a in enumerate(pts):
+                b = pts[(i + 1) % len(pts)]
+                points = [a]
+                if args.max_segment > 0:
+                    # a long straight edge is split with points on it: the shape is the same, but the renderer
+                    # gets short segments instead of one that spans a lot of tiles
+                    parts = int(math.ceil(segment_km(a, b) / args.max_segment))
+                    for k in range(1, parts):
+                        t = float(k) / parts
+                        points.append((a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t))
+                for x, y in points:
+                    nid += 1
+                    out.write('<node id="-%d" visible="true" lat="%.7f" lon="%.7f"/>\n' % (nid, y, x))
+                    refs.append(nid)
             # The closing node is repeated in a single way. Split rings share the end vertex of adjacent ways;
             # only the relation is tagged then, as for any other multipolygon with several outer ways.
             sequence = refs + refs[:1]
@@ -130,6 +159,28 @@ def main():
                 start = end
             return ways
 
+        def emit(area, at):
+            """Write one final band polygon: each part as a way, a multipolygon when it has holes."""
+            nonlocal nid, written
+            for p in polygons(area):
+                outer = p.GetGeometryRef(0)
+                if outer.GetPointCount() < 4:
+                    continue
+                tags = '<tag k="contourarea" v="depth"/><tag k="areatype" v="%s"/>' % at
+                inners = [p.GetGeometryRef(k) for k in range(1, p.GetGeometryCount())
+                          if p.GetGeometryRef(k).GetPointCount() >= 4]
+                ow = ring(outer, tags if not inners else '')
+                iw = []
+                for r in inners:
+                    iw += ring(r)
+                if inners or len(ow) > 1:
+                    nid += 1
+                    members = ''.join('<member type="way" ref="-%d" role="outer"/>' % x for x in ow)
+                    members += ''.join('<member type="way" ref="-%d" role="inner"/>' % x for x in iw)
+                    out.write('<relation id="-%d" visible="true">%s'
+                              '<tag k="type" v="multipolygon"/>%s</relation>\n' % (nid, members, tags))
+                written += 1
+
         for i in range(math.floor(w / c), math.ceil(e / c)):
             for j in range(math.floor(s / c), math.ceil(n / c)):
                 cell = box(max(w, i * c), max(s, j * c), min(e, (i + 1) * c), min(n, (j + 1) * c))
@@ -144,13 +195,28 @@ def main():
                         if depth not in (None, '') else None
                     if at is None or g is None:
                         continue
-                    classes.setdefault(at, []).append(g.Clone())
+                    # a band of a lake is one multipolygon of tens of thousands of parts: clipped to the cell
+                    # first, the union and the overlays below work on the cell instead of the whole lake
+                    try:
+                        clipped = g.Intersection(cell)
+                    except Exception:
+                        clipped = (g.MakeValid() if not g.IsValid() else g).Intersection(cell)
+                    classes.setdefault(at, []).extend(polygons(clipped))
                 if not classes:
                     continue
                 land.SetSpatialFilterRect(x0, y0, x1, y1)
                 # clipped to the cell first: a complete land polygon is a continent, its union alone takes seconds
                 dry = multipolygon(p for f in land for p in polygons(f.GetGeometryRef().Intersection(cell)))
                 dry = dry.UnionCascaded() if dry.GetGeometryCount() else None
+                wet = None
+                if water is not None:
+                    water.SetSpatialFilterRect(x0, y0, x1, y1)
+                    mp = multipolygon(p for f in water for p in polygons(f.GetGeometryRef().Intersection(cell)))
+                    wet = mp.UnionCascaded() if mp.GetGeometryCount() else None
+                    if wet is None:
+                        # The land sentinel lies in the 0-2 class, so a cell with no water would be
+                        # written as a rectangle of land; there is nothing valid to write there.
+                        continue
                 exclude = excluded.near(x0, y0, x1, y1) if excluded is not None else None
                 shallower = None
                 for at, geoms in sorted(classes.items(), key=lambda c: int(c[0])):
@@ -167,6 +233,10 @@ def main():
                             if shallower is not None:
                                 area = area.Difference(shallower)
                             shallower = own if shallower is None else shallower.Union(own)
+                        elif args.cumulative:
+                            if shallower is not None:
+                                area = area.Union(shallower)
+                            shallower = area
                         # simplify before the land cut: the coast then stays exactly on the land
                         # boundary, a simplify after the cut would move it and leave small gaps
                         area = area.SimplifyPreserveTopology(args.simplify)
@@ -180,28 +250,28 @@ def main():
                                 # a GEOS that cannot assign the free holes of the result: the same cut
                                 # on repaired geometries
                                 area = area.Buffer(0).Difference(dry.Buffer(0))
+                        if wet is not None:
+                            # the fill ends on the water polygon the map draws, not on the edge of the raster
+                            # cell that happens to hold the shore: no staircase, nothing on the land
+                            area = area.Intersection(wet)
+                            if area is None or area.IsEmpty():
+                                continue
                     except Exception as e:
                         # one broken band must not stop the tile
                         print('skipped the area %s at %.4f,%.4f: %s' % (at, x0, y0, e), file=sys.stderr)
                         continue
-                    for p in polygons(area):
-                        outer = p.GetGeometryRef(0)
-                        if outer.GetPointCount() < 4:
+                    # The difference of two bands can leave a self-intersection (it does at the tail of a
+                    # narrow strip). The fill is written as is, and a tessellator drops the lobes of such a
+                    # polygon or fills the wrong side: the band gets holes and its edge steps off the
+                    # isobath. MakeValid splits the ring at the crossing, so every part is a clean polygon.
+                    if not area.IsValid():
+                        try:
+                            area = area.MakeValid()
+                        except Exception:
+                            area = area.Buffer(0)
+                        if area is None or area.IsEmpty():
                             continue
-                        tags = '<tag k="contourarea" v="depth"/><tag k="areatype" v="%s"/>' % at
-                        inners = [p.GetGeometryRef(k) for k in range(1, p.GetGeometryCount())
-                                  if p.GetGeometryRef(k).GetPointCount() >= 4]
-                        ow = ring(outer, tags if not inners else '')
-                        iw = []
-                        for r in inners:
-                            iw += ring(r)
-                        if inners or len(ow) > 1:
-                            nid += 1
-                            members = ''.join('<member type="way" ref="-%d" role="outer"/>' % x for x in ow)
-                            members += ''.join('<member type="way" ref="-%d" role="inner"/>' % x for x in iw)
-                            out.write('<relation id="-%d" visible="true">%s'
-                                      '<tag k="type" v="multipolygon"/>%s</relation>\n' % (nid, members, tags))
-                        written += 1
+                    emit(area, at)
         out.write('</osm>\n')
     print('depth areas written: %d' % written)
 

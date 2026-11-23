@@ -44,6 +44,7 @@ Based very heavily on code released under the following terms:
 
 import sys
 import os
+import math
 import optparse
 import logging as l
 import re
@@ -149,6 +150,11 @@ parser.add_option("--add-timestamp", dest="addTimestamp", action="store_true",
 
 parser.add_option("--sql", dest="sqlQuery", type=str, default=None,
                      help="SQL query to execute on a PostgreSQL source")
+
+parser.add_option("--max-segment", dest="maxSegment", type=float, default=0,
+                    help="Split a line segment longer than this many kilometres with intermediate points; "
+                         "a straight segment keeps its shape, but the renderer no longer walks one segment "
+                         "over many tiles (0 keeps the source vertices as they are)")
 
 parser.set_defaults(sourceEPSG=None, sourcePROJ4=None, verbose=False,
                     debugTags=False,
@@ -356,6 +362,12 @@ def getTransform(layer):
         destSpatialRef = osr.SpatialReference()
         # Destionation projection will *always* be EPSG:4326, WGS84 lat-lon
         destSpatialRef.ImportFromEPSG(4326)
+        # the coordinates of the source are read and written in the lon-lat order, so the transformation
+        # must use the traditional axis order too: with the authority order of EPSG:4326 (lat, lon) GDAL
+        # swaps the latitudes and the longitudes of every source that has a CRS, and the geometry ends up
+        # in the wrong place (the sources without a CRS are not transformed at all and stay correct)
+        destSpatialRef.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+        spatialRef.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
         coordTrans = osr.CoordinateTransformation(spatialRef, destSpatialRef)
         reproject = lambda geometry: geometry.Transform(coordTrans)
 
@@ -449,13 +461,37 @@ def parsePoint(ogrgeometry):
     return geometry
 
 linestring_points = {}
+
+def segmentKilometres(a, b):
+    """Approximate length of a lon/lat segment: a flat earth with the longitude scaled by the mean latitude."""
+    dx = (b[0] - a[0]) * 111.32 * math.cos(math.radians((a[1] + b[1]) / 2))
+    dy = (b[1] - a[1]) * 111.32
+    return math.hypot(dx, dy)
+
+def splitLongSegments(points):
+    """Insert intermediate points into every segment longer than options.maxSegment kilometres.
+
+    The points lie on the segment, so the line keeps its shape; the renderer, however, gets many short
+    segments instead of one that spans a lot of tiles (a long segment made the map slow to draw).
+    """
+    if options.maxSegment <= 0 or len(points) < 2:
+        return points
+    out = [points[0]]
+    for a, b in zip(points, points[1:]):
+        parts = int(math.ceil(segmentKilometres(a, b) / options.maxSegment))
+        for k in range(1, parts):
+            t = float(k) / parts
+            out.append((a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t))
+        out.append(b)
+    return out
+
 def parseLineString(ogrgeometry):
     geometry = Way()
     # LineString.GetPoint() returns a tuple, so we can't call parsePoint on it
     # and instead have to create the point ourself
     global linestring_points
-    for i in range(ogrgeometry.GetPointCount()):
-        (x, y, unused) = ogrgeometry.GetPoint(i)
+    points = [(ogrgeometry.GetPoint(i)[0], ogrgeometry.GetPoint(i)[1]) for i in range(ogrgeometry.GetPointCount())]
+    for (x, y) in splitLongSegments(points):
         (rx, ry) = (int(round(x*10**options.roundingDigits)), int(round(y*10**options.roundingDigits)))
         (x, y) = (int(round(x*10**options.significantDigits)), int(round(y*10**options.significantDigits)))
         if (rx,ry) in linestring_points:

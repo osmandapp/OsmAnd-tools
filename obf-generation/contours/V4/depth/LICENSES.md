@@ -30,6 +30,12 @@ be used for navigation"; cite CIRES / NCEI.
 https://data.norge.no/en/datasets/946d865a-e9ac-439e-8cbf-15de7ada9a3f/sjokart-dybdedata
 CC BY 4.0, public access, commercial use allowed with attribution to Kartverket. Depths refer to chart datum.
 
+**swisstopo swissBATHY3D** (`swiss_lakes`) -
+https://www.swisstopo.admin.ch/en/height-model-swissbathy3d
+Free geodata (OGD), commercial use allowed with the mandatory attribution "swisstopo" (Bundesamt für
+Landestopografie). The model gives the height of the lake bed above sea level (LN02), not the depth below the
+water surface: the build subtracts the lake level. Cite swisstopo when the map is published.
+
 **Rijkswaterstaat bottom height 20 m, Zeeland, NCP 2019** (`netherlands`) -
 https://data.overheid.nl/en/dataset/61446-bathymetrie-nederland---kust-en-vaklodingen-20-mtr
 CC0 1.0: no conditions at all. Heights refer to NAP, not chart datum.
