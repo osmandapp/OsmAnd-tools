@@ -165,7 +165,7 @@ public class UserdataController {
 	                                                @RequestParam(name = "deviceid", required = false) String deviceId,
 	                                                @RequestParam(required = false) String orderid,
 	                                                HttpServletRequest request) {
-		email = email.toLowerCase().trim();
+		email = EmailSenderService.normalizeEmail(email);
 		CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
 		if (pu == null) {
 			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not registered");
@@ -194,7 +194,7 @@ public class UserdataController {
                                                @RequestParam(required = false) String userToken,
                                                HttpServletRequest request) {
 		// allow to register only with small case
-		email = email.toLowerCase().trim();
+		email = EmailSenderService.normalizeEmail(email);
 		if (!emailSender.isEmail(email)) {
 			logErrorWithThrow(request, ERROR_CODE_EMAIL_IS_INVALID, "email is not valid to be registered");
 		}
@@ -305,7 +305,7 @@ public class UserdataController {
 												 @RequestParam(name = "model", required = false) String model,
 												 @RequestParam(name = "lang", required = false) String lang
 	) throws IOException {
-		email = email.toLowerCase().trim();
+		email = EmailSenderService.normalizeEmail(email);
 		String accessToken = UUID.randomUUID().toString();
 		return userdataService.registerNewDevice(email, token, deviceId, accessToken, lang, brand, model);
 	}
@@ -511,8 +511,8 @@ public class UserdataController {
 
 	@PostMapping(path = {"/auth/confirm-code"})
 	public ResponseEntity<String> confirmCode(@RequestBody MapApiController.UserPasswordPost credentials) {
-		if (emailSender.isEmail(credentials.username)) {
-			String username = credentials.username;
+		String username = EmailSenderService.normalizeEmail(credentials.username);
+		if (emailSender.isEmail(username)) {
 			String token = credentials.token;
 			return userdataService.confirmCode(username, token);
 		}

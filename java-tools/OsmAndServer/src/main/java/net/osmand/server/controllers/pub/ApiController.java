@@ -725,7 +725,7 @@ public class ApiController {
 	public ResponseEntity<String> addUser(@RequestParam String promoKey,
 	                                      @RequestParam String userEmail) {
 		synchronized (this) {
-			return promoService.addUser(promoKey, userEmail);
+			return promoService.addUser(promoKey, EmailSenderService.normalizeEmail(userEmail));
 		}
 	}
 

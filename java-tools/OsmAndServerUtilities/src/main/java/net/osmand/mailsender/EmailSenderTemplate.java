@@ -74,6 +74,7 @@ public class EmailSenderTemplate {
 	static final String TEMPLATES_ENV = "EMAIL_TEMPLATES";
 	static final String TEMPLATES_HINT = TEMPLATES_ENV + "=/path/to/templates/email (environment)";
 	static final Pattern VARIABLE = Pattern.compile("@([A-Z0-9_]+)@");
+	private static final Pattern EMAIL_FORMAT_CHARS = Pattern.compile("\\p{Cf}");
 
 	public String defaultTemplatesDirectory = templatesDirectory();
 
@@ -207,6 +208,7 @@ public class EmailSenderTemplate {
 	}
 
 	public EmailSenderTemplate to(String email) {
+		email = cleanEmail(email);
 		setVarsByTo(email);
 		if (isDomainAllowed(email)) {
 			toList.add(email);
@@ -217,8 +219,9 @@ public class EmailSenderTemplate {
 	}
 
 	public EmailSenderTemplate to(List<String> emails) {
-		setVarsByTo(emails.isEmpty() ? "no@email" : emails.get(0));
+		setVarsByTo(emails.isEmpty() ? "no@email" : cleanEmail(emails.get(0)));
 		for (String email : emails) {
+			email = cleanEmail(email);
 			if (isDomainAllowed(email)) {
 				toList.add(email);
 				totalEmails++;
@@ -316,6 +319,27 @@ public class EmailSenderTemplate {
 
 	public String concealEmail(String email) {
 		return email.replaceFirst(".....", "....."); // do not discover email in logs
+	}
+
+	// any Unicode space or control char: NBSP and U+2028 included, which \s misses, and all that trim() drops
+	public static boolean isEmailSpace(int c) {
+		return Character.isSpaceChar(c) || Character.isISOControl(c);
+	}
+
+	// a loop, not a regex: [...]+$ backtracks quadratically on a long run of inner spaces
+	public static String cleanEmail(String email) {
+		if (email == null) {
+			return null;
+		}
+		String visible = EMAIL_FORMAT_CHARS.matcher(email).replaceAll("");
+		int start = 0, end = visible.length();
+		while (start < end && isEmailSpace(visible.charAt(start))) {
+			start++;
+		}
+		while (end > start && isEmailSpace(visible.charAt(end - 1))) {
+			end--;
+		}
+		return visible.substring(start, end);
 	}
 
 	// compatible with SendGrid

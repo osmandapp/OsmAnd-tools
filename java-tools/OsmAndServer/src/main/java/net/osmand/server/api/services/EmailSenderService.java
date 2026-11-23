@@ -392,24 +392,15 @@ public class EmailSenderService {
 	}
 
 	public boolean isEmail(String comment) {
-		if (comment.contains(" ")) {
-			return false;
-		}
-		if (!comment.contains("@")) {
+		if (comment.chars().anyMatch(EmailSenderTemplate::isEmailSpace)) {
 			return false;
 		}
 		String[] twoParts = comment.split("@");
-		if(twoParts.length != 2) {
-			return false;
-		}
-		if (twoParts[0].trim().isEmpty()) {
-			return false;
-		}
-		// validate domain
-		if (!twoParts[1].contains(".") || twoParts[1].trim().isEmpty()) {
-			return false;
-		}
-		return true;
+		return twoParts.length == 2 && !twoParts[0].isEmpty() && twoParts[1].contains(".");
+	}
+
+	public static String normalizeEmail(String email) {
+		return email == null ? null : EmailSenderTemplate.cleanEmail(email).toLowerCase(Locale.ROOT);
 	}
 
 	// n***@example.com - enough for the owner to recognise the address without exposing it in full

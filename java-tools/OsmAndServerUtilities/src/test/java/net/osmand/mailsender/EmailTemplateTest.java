@@ -8,7 +8,10 @@ import org.junit.rules.TemporaryFolder;
 import java.io.IOException;
 import java.nio.file.Files;
 
+import static net.osmand.mailsender.EmailSenderTemplate.cleanEmail;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 public class EmailTemplateTest {
@@ -125,6 +128,29 @@ public class EmailTemplateTest {
 	@Test
 	public void htmlIsSentAsIs() {
 		assertTrue("comments and Outlook blocks must survive verbatim", load("mailing").toString().contains(MAILING_CONTENT));
+	}
+
+	@Test
+	public void recipientIsCleanedOfInvisibleCharacters() {
+		EmailSenderTemplate pasted = new EmailSenderTemplate();
+		pasted.defaultTemplatesDirectory = templates.getRoot().getPath();
+		pasted.load("cloud/purchase/receipt", EmailTemplate.DEFAULT_LANG).to("\u200Fb@b.com\u2028");
+		assertEquals(load("cloud/purchase/receipt").toString(), pasted.toString());
+	}
+
+	@Test
+	public void cleanEmailDropsFormatCharsAnywhereAndSpacesAtEdges() {
+		assertEquals("user@example.com", cleanEmail("\u200Euser@exa\u200Bmple.com\uFEFF"));
+		assertEquals("user@example.com", cleanEmail(" \u200F\u00A0\tuser@example.com\u3000\u2028\n"));
+		assertEquals("john smith@example.com", cleanEmail("john smith@example.com"));
+		assertEquals("user\u2028@example.com", cleanEmail("user\u2028@example.com"));
+		assertNull(cleanEmail(null));
+	}
+
+	@Test(timeout = 1000)
+	public void cleanEmailIsLinearOnLongInnerSpaces() {
+		String spaced = "a" + " ".repeat(100_000) + "b";
+		assertEquals(spaced, cleanEmail(spaced));
 	}
 
 	@Test(expected = IllegalStateException.class)

@@ -127,6 +127,7 @@ public class OrderManagementController {
 			@RequestParam String purchaseToken,
 			@RequestParam boolean isSubscription) {
 
+		email = EmailSenderService.normalizeEmail(email);
 		if (usersRepository.findByEmailIgnoreCase(email) == null) {
 			return ResponseEntity
 					.status(HttpStatus.BAD_REQUEST)
@@ -211,7 +212,7 @@ public class OrderManagementController {
 	@PreAuthorize("hasAnyAuthority(T(net.osmand.server.WebSecurityConfiguration).ROLE_ADMIN, T(net.osmand.server.WebSecurityConfiguration).ROLE_SUPPORT)")
 	@ResponseBody
 	public ResponseEntity<?> createWebLoginLink(Authentication auth, @RequestParam String email) {
-		CloudUsersRepository.CloudUser pu = usersRepository.findByEmailIgnoreCase(email.trim());
+		CloudUsersRepository.CloudUser pu = usersRepository.findByEmailIgnoreCase(EmailSenderService.normalizeEmail(email));
 		if (pu == null) {
 			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("OsmAnd Cloud account not found");
 		}
