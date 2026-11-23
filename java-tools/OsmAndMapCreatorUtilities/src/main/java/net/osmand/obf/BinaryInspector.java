@@ -6,6 +6,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.text.MessageFormat;
 import java.text.ParseException;
@@ -125,7 +126,7 @@ public class BinaryInspector {
 
 	private void printToFile(String s) throws IOException {
 		if (vInfo.osmOut != null) {
-			vInfo.osmOut.write(s.getBytes());
+			vInfo.osmOut.write(s.getBytes(StandardCharsets.UTF_8));
 		} else {
 			System.out.println(s);
 		}
@@ -1479,10 +1480,10 @@ public class BinaryInspector {
 		if(name == null || name.length() == 0) {
 			return "EMPTY";
 		}
+		name = name.replace("&", "&amp;");
 		name = name.replace("'", "&apos;");
 		name = name.replace("<", "&lt;");
 		name = name.replace(">", "&gt;");
-		name = name.replace("&", "&amp;");
 		return name;
 	}
 
