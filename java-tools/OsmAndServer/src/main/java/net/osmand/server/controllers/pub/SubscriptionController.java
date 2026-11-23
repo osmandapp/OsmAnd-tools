@@ -40,9 +40,7 @@ import java.security.PrivateKey;
 import java.security.Signature;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
-import java.text.DateFormat;
 import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.util.*;
 import java.util.Map.Entry;
@@ -51,7 +49,6 @@ import java.util.concurrent.ThreadLocalRandom;
 import static net.osmand.server.api.repo.DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase;
 import static net.osmand.server.api.repo.DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchasePrimaryKey;
 import static net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
-import static net.osmand.server.api.services.ReceiptValidationService.NO_SUBSCRIPTIONS_FOUND_STATUS;
 import static net.osmand.server.api.services.UserSubscriptionService.OSMAND_PROMO_SUBSCRIPTION;
 
 @RestController
@@ -194,7 +191,7 @@ public class SubscriptionController {
     public ResponseEntity<String> register(HttpServletRequest request) {
         String email = request.getParameter("email");
         if (email != null) {
-            email = EmailSenderTemplate.cleanEmail(email);
+            email = EmailSenderTemplate.trimLowerCaseEmail(email);
         }
         String visibleName = request.getParameter("visibleName");
         String preferredCountry = request.getParameter("preferredCountry");

@@ -207,7 +207,7 @@ public class EmailSenderTemplate {
 	}
 
 	public EmailSenderTemplate to(String email) {
-		email = cleanEmail(email);
+		email = trimLowerCaseEmail(email);
 		setVarsByTo(email);
 		if (isDomainAllowed(email)) {
 			toList.add(email);
@@ -218,9 +218,9 @@ public class EmailSenderTemplate {
 	}
 
 	public EmailSenderTemplate to(List<String> emails) {
-		setVarsByTo(emails.isEmpty() ? "no@email" : cleanEmail(emails.get(0)));
+		setVarsByTo(emails.isEmpty() ? "no@email" : trimLowerCaseEmail(emails.get(0)));
 		for (String email : emails) {
-			email = cleanEmail(email);
+			email = trimLowerCaseEmail(email);
 			if (isDomainAllowed(email)) {
 				toList.add(email);
 				totalEmails++;
@@ -321,7 +321,7 @@ public class EmailSenderTemplate {
 	}
 
 	// U+200F (right-to-left mark) and U+2028 (line separator) come along with addresses pasted from some apps
-	public static String cleanEmail(String email) {
+	public static String trimLowerCaseEmail(String email) {
 		if (email == null) {
 			return null;
 		}

@@ -8,7 +8,7 @@ import org.junit.rules.TemporaryFolder;
 import java.io.IOException;
 import java.nio.file.Files;
 
-import static net.osmand.mailsender.EmailSenderTemplate.cleanEmail;
+import static net.osmand.mailsender.EmailSenderTemplate.trimLowerCaseEmail;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -140,10 +140,10 @@ public class EmailTemplateTest {
 
 	@Test
 	public void cleanEmailDropsRtlMarkAndLineSeparator() {
-		assertEquals("user@example.com", cleanEmail("\u200Fuser@example.com\u2028"));
-		assertEquals("user@example.com", cleanEmail(" user@exa\u200Fmple.com\u2028 "));
-		assertEquals("john smith@example.com", cleanEmail("john smith@example.com"));
-		assertNull(cleanEmail(null));
+		assertEquals("user@example.com", trimLowerCaseEmail("\u200Fuser@example.com\u2028"));
+		assertEquals("user@example.com", trimLowerCaseEmail(" user@exa\u200Fmple.com\u2028 "));
+		assertEquals("john smith@example.com", trimLowerCaseEmail("john smith@example.com"));
+		assertNull(trimLowerCaseEmail(null));
 	}
 
 	@Test(expected = IllegalStateException.class)
