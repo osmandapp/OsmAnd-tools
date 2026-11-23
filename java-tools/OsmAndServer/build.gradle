@@ -46,6 +46,12 @@ tasks.register('zipColorPalette', Zip) {
 }
 processResources.dependsOn(zipColorPalette)
 
+processResources {
+    from("../../../resources") {
+        include "countries-info/outdated-deleted-maps.xml"
+    }
+}
+
 bootJar {
     dependsOn generateGitProperties
     launchScript()

@@ -37,6 +37,7 @@ import net.osmand.osm.edit.Entity.EntityType;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.io.OsmBaseStorage;
+import net.osmand.Location;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import org.apache.commons.logging.Log;
@@ -76,6 +77,10 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	TLongObjectHashMap<TIntArrayList> pointTypes = new TLongObjectHashMap<TIntArrayList>();
 	TLongObjectHashMap<TIntObjectHashMap<String> >  pointNames = new TLongObjectHashMap<TIntObjectHashMap<String> > ();
 	Map<MapRoutingTypes.MapRouteType, String> names = createTreeMap();
+
+	private TLongObjectHashMap<List<LatLon>> speedCameraTargets = new TLongObjectHashMap<>();
+	private final double SPEED_CAMERA_FORWARD = 45.0;
+	private final double SPEED_CAMERA_BACKWARD = 135.0;
 
 
 
@@ -147,15 +152,27 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			tagsTransformer.handleRelationPropogatedTags((Relation) e, renderingTypes, ctx, EntityConvertApplyType.ROUTING);
 			Map<String, String> tags = renderingTypes.transformTags(e.getTags(), EntityType.RELATION, EntityConvertApplyType.ROUTING);
 			if ("enforcement".equals(tags.get("type")) && "maxspeed".equals(tags.get("enforcement"))) {
-				ctx.loadEntityRelation((Relation) e);
-				Iterator<RelationMember> from = ((Relation) e).getMembers("from").iterator();
+				Relation r = (Relation) e;
+				ctx.loadEntityRelation(r);
+				List<Entity> from = r.getMemberEntities("from");
+				List<Entity> target = r.getMemberEntities("to");
+				target.removeAll(from);
+				if (target.isEmpty()) {
+					target = r.getMemberEntities("device");
+					target.removeAll(from);
+				}
 				// mark as speed cameras
-				while(from.hasNext()) {
-					Entity n = from.next().getEntity();
+				for (Entity n : from) {
 					if (n instanceof Node) {
 						PropagateEntityTags pt = tagsTransformer
 								.getPropogateTagForEntity(new EntityId(EntityType.NODE, n.getId()));
 						pt.putThroughTags.put("highway", "speed_camera");
+						if (!target.isEmpty() && target.get(0) instanceof Node targetNode) {
+							if (!speedCameraTargets.containsKey(n.getId())) {
+								speedCameraTargets.put(n.getId(), new ArrayList<>());
+							}
+                            speedCameraTargets.get(n.getId()).add((targetNode).getLatLon());
+						}
 					}
 				}
 			}
@@ -248,6 +265,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					propagateToNodes.propagateTagsToWayNodesNoBorderRule(e);
 				}
 				routeTypes.encodePointTypes(e, pointTypes, pointNames, tagsTransformer, renderingTypes, false);
+				addSpeedCameraDirection(e);
 				addWayToIndex(e.getId(), e.getNodes(), mapRouteInsertStat, routeTree, outTypes, pointTypes, pointNames, names);
 			}
 			if (settings.generateLowLevel) {
@@ -258,6 +276,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 					long id = e.getId();
 					List<Node> result = simplifyRouteForBaseSection(source, id);
 					routeTypes.encodePointTypes(e, pointTypes, pointNames, tagsTransformer, renderingTypes, true);
+					addSpeedCameraDirection(e);
 					addWayToIndex(e.getId(), result, basemapRouteInsertStat, baserouteTree, outTypes, pointTypes,
 							pointNames, names);
 					// generalizeWay(e);
@@ -1745,6 +1764,52 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 			} while (total < dist);
 			return -Math.atan2( x - px, y - py );
 		}
+	}
+
+	private void addSpeedCameraDirection(Way w) {
+		List<Node> nodes = w.getNodes();
+		for (int i = 0; i < nodes.size(); i++) {
+			Node n = nodes.get(i);
+			if (n == null || !speedCameraTargets.containsKey(n.getId()) || !pointTypes.containsKey(n.getId())
+					|| n.getTag("direction") != null || (n.getTag("highway") != null && !"speed_camera".equals(n.getTag("highway")))) {
+				continue;
+			}
+			int segStart = i + 1 < nodes.size() ? i : i - 1;
+			Node a = nodes.get(segStart);
+			Node b = nodes.get(segStart + 1);
+			if (a == null || b == null) {
+				continue;
+			}
+			double wayBearing = getBearing(a.getLatLon(), b.getLatLon());
+			String direction = null;
+			for (LatLon t : speedCameraTargets.get(n.getId())) {
+				double diff = Math.abs(MapUtils.degreesDiff(wayBearing,
+						getBearing(n.getLatLon(), t)));
+				String d;
+				if (diff < SPEED_CAMERA_FORWARD) {
+					d = "forward";
+				} else if (diff > SPEED_CAMERA_BACKWARD) {
+					d = "backward";
+				} else {
+					direction = null; // direction is undefined
+					break;
+				}
+				if (direction != null && !direction.equals(d)) {
+					direction = null;
+					break;
+				}
+				direction = d;
+			}
+			if (!Algorithms.isEmpty(direction)) {
+				routeTypes.addPointType(pointTypes, n.getId(), "direction", direction);
+			}
+		}
+	}
+
+	private static double getBearing(LatLon a, LatLon b) {
+		float[] res = new float[2];
+		Location.distanceBetween(a.getLatitude(), a.getLongitude(), b.getLatitude(), b.getLongitude(), res);
+		return res[1]; // initialBearing
 	}
 
 

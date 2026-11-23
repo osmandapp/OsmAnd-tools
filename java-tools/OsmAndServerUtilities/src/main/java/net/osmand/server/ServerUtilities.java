@@ -11,6 +11,7 @@ import net.osmand.purchases.UpdateInAppPurchase;
 import net.osmand.purchases.UpdateSubscription;
 import net.osmand.mailsender.EmailSenderMain;
 import net.osmand.server.osmgpx.DownloadOsmGPX;
+import net.osmand.server.osmgpx.SyncRemoteOsmGpx;
 import net.osmand.server.utilities.GenerateWebTranslations;
 import net.osmand.server.utilities.StyleDataExtractor;
 import net.osmand.server.utilities.WikidataUtilities;
@@ -37,6 +38,8 @@ public class ServerUtilities {
 			CalculateOsmChangesets.downloadChangesets();
 		} else if (utl.equals("download-osm-gpx")) {
 			DownloadOsmGPX.main(subArgsArray);
+		} else if (utl.equals("sync-remote-osm-gpx")) {
+			SyncRemoteOsmGpx.main(subArgsArray);
 		} else if (utl.equals("generate-translations")) {
 			GenerateWebTranslations.generateTranslations(subArgsArray[0], subArgsArray[1]);
 		} else if (utl.equals("parse-styles")) {

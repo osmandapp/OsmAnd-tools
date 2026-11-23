@@ -14,6 +14,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Temporal;
 import jakarta.persistence.TemporalType;
+import org.hibernate.annotations.DynamicUpdate;
 import org.springframework.data.domain.Pageable;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -43,6 +44,7 @@ public interface CloudUsersRepository extends JpaRepository<CloudUser, Long> {
 	
     @Entity
     @Table(name = "user_accounts")
+    @DynamicUpdate
     class CloudUser implements Serializable {
         @Serial
         private static final long serialVersionUID = 1L;

@@ -72,6 +72,7 @@ public class UpdateSubscription {
 	public static final String OSMAND_PRO_FAST_SPRING_SUBSCRIPTION_PREFIX = "net.osmand.fastspring.subscription.pro";
 
 	public static final String EXPIRED_STATE = "expired";
+	public static final String INVALID_STATE = "invalid";
 
 	private static final int BATCH_SIZE = 200;
 	private static final long DAY = 1000L * 60 * 60 * 24;
@@ -402,7 +403,7 @@ public class UpdateSubscription {
 				}
 			} else if (loadReceipt.error == ReceiptValidationHelper.USER_GONE) {
 				// sandbox: do not update anymore
-				kind = "invalid";
+				kind = INVALID_STATE;
 				reasonToDelete = "user gone";
 			}
 			if (subscription != null) {
@@ -641,7 +642,7 @@ public class UpdateSubscription {
 				// a request that got no response from Google says nothing about the token
 				reason = String.format(" subscription is invalid - possibly fraud %s, %s (%s)", orderId, purchaseToken, e.getMessage());
 				if (regTime != null && currentTime - regTime.getTime() > MAX_WAITING_TIME_TO_MAKE_INVALID) {
-					kind = "invalid";
+					kind = INVALID_STATE;
 				}
 			} else if (errorCode == 410) {
 				kind = "gone";
@@ -684,6 +685,7 @@ public class UpdateSubscription {
 		try {
 			FastSpringSubscription fsSub = FastSpringHelper.getSubscriptionByOrderIdAndSku(orderId, sku);
 			if (fsSub == null) {
+				kind = INVALID_STATE;
 				reason = "FastSpring: subscription not found";
 			} else if (!Boolean.TRUE.equals(fsSub.active)) {
 				kind = EXPIRED_STATE;

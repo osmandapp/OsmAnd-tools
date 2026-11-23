@@ -81,6 +81,9 @@ public class MapApiController {
 	UserdataService userdataService;
 
 	@Autowired
+	CloudMapFilesService cloudMapFilesService;
+
+	@Autowired
 	TrackAnalyzerService trackAnalyzerService;
 
 	@Autowired
@@ -388,13 +391,14 @@ public class MapApiController {
 	public ResponseEntity<String> listFiles(@RequestParam(required = false) String name,
 	                                        @RequestParam(required = false) String type,
 	                                        @RequestParam(required = false, defaultValue = "false") boolean addDevices,
-	                                        @RequestParam(required = false, defaultValue = "false") boolean allVersions) {
+	                                        @RequestParam(required = false, defaultValue = "false") boolean allVersions) throws IOException {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
 		Set<String> types = userdataService.parseFileTypes(type);
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, true, types);
+		cloudMapFilesService.prepareFileListForDeletedMaps(res, true);
 		Map<String, Set<String>> sharedFilesMap = shareFileService.getFilesByOwner(dev.userid);
 
 		res.uniqueFiles.forEach(nd -> {
@@ -777,7 +781,10 @@ public class MapApiController {
 			// check if new email is not registered
 			CloudUsersRepository.CloudUser pu = usersRepository.findByEmailIgnoreCase(newEmail);
 			if (pu != null) {
-				return ResponseEntity.badRequest().body("User was already registered with such email");
+				ResponseEntity<String> accountError = userdataService.checkNewEmailAccount(pu);
+				if (accountError != null) {
+					return accountError;
+				}
 			}
 			// create temp user with new email
 			pu = new CloudUsersRepository.CloudUser();

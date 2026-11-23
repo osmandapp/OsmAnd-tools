@@ -115,7 +115,11 @@ public class AmenityTagsService {
 		}
 		List<ValueLabel> labels = types.stream().map(AmenityTagEntriesBuilder::getValueLabel)
 				.collect(Collectors.toList());
-		return new VisibleTag(key, joinPoiTypeKeys(tagEntry), null, null, null, labels);
+		List<String> values = Algorithms.isEmpty(tagEntry.collapsableEntries) ? null : types.stream()
+				.map(type -> tagEntry.getCollapsableEntryValue(type.getKeyName()))
+				.collect(Collectors.toList());
+		String icon = poiTypesService.getSharedPoiTypes().getPoiAdditionalCategoryIconName(tagEntry.key);
+		return new VisibleTag(key, joinPoiTypeKeys(tagEntry), null, null, null, labels, values, icon);
 	}
 
 	private VisibleTag toPlainTag(AmenityTagEntry tagEntry, Set<String> genericRowKeys) {
@@ -127,7 +131,7 @@ public class AmenityTagsService {
 		List<ValueLabel> labels = type != null && !type.isText()
 				? List.of(AmenityTagEntriesBuilder.getValueLabel(type)) : null;
 		String value = Amenity.OPENING_HOURS.equals(tagEntry.key) ? toOpeningHoursRules(tagEntry.value) : tagEntry.value;
-		return new VisibleTag(tagEntry.key, value, null, null, generic ? Boolean.TRUE : null, labels);
+		return new VisibleTag(tagEntry.key, value, null, null, generic ? Boolean.TRUE : null, labels, null, null);
 	}
 
 	private String toOpeningHoursRules(String value) {
@@ -154,13 +158,13 @@ public class AmenityTagsService {
 	}
 
 	public record VisibleTag(String key, String value, String lang, List<LangValue> otherLangs, Boolean generic,
-	                         List<ValueLabel> labels) {
+	                         List<ValueLabel> labels, List<String> values, String icon) {
 		public VisibleTag(String key, String value, String lang) {
-			this(key, value, lang, null, null, null);
+			this(key, value, lang, null, null, null, null, null);
 		}
 
 		public VisibleTag(String key, String value, String lang, List<LangValue> otherLangs) {
-			this(key, value, lang, otherLangs, null, null);
+			this(key, value, lang, otherLangs, null, null, null, null);
 		}
 	}
 

@@ -11,13 +11,15 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -33,6 +35,9 @@ public abstract class AbstractWikiFilesDownloader {
 	private static final String LATEST_PAGES_XML_BZ_2_PATTERNS = "-latest-pages-articles\\d+\\.xml.+bz2\"";
 	private final List<String> downloadedPageFiles = new ArrayList<>();
 	private long maxId = 0;
+	private String destFolder;
+	private Instant nextTimestamp;
+	private boolean removeTimestampAfterUpdate;
 	public final String USER_AGENT = "OsmAnd-Bot/1.0 (+https://osmand.net; support@osmand.net) OsmAndJavaServer/1.0";
 	private static final String TIMESTAMP_FILE = "timestamp.txt";
 	private static final int INITIAL_WAIT_TIME_MS = 1000;
@@ -45,17 +50,22 @@ public abstract class AbstractWikiFilesDownloader {
 			log.info("Start %s download".formatted(getFilePrefix()));
 			maxId = daily ? 0 : getMaxIdFromDb(wikiDB);
 			List<FileForDBUpdate> updateFileList;
-			String destFolder = wikiDB.getParent();
+			destFolder = wikiDB.getParent();
 			if (daily) {
 				Instant instant = readTimestampFile(destFolder);
-				LocalDate lastModifiedDate = instant.atZone(ZoneId.systemDefault()).toLocalDate();
-				updateFileList = getLatestFilesURL(getWikiIncrDirURL(), lastModifiedDate);
+				LocalDate lastModifiedDate = instant.atZone(ZoneOffset.UTC).toLocalDate();
+				boolean failOnMissingDays = !Instant.EPOCH.equals(instant);
+				updateFileList = getLatestFilesURL(getWikiIncrDirURL(), lastModifiedDate, failOnMissingDays);
 			} else {
 				updateFileList = readFilesUrl(getWikiLatestDirURL());
 			}
-			downloadPageFiles(destFolder, updateFileList, dh);
+			downloadPageFiles(updateFileList, dh);
 			if (!Algorithms.isEmpty(updateFileList)) {
-				writeTimestampFile(destFolder);
+				if (daily) {
+					nextTimestamp = getNextDailyTimestamp(updateFileList);
+				} else {
+					removeTimestampAfterUpdate = downloadsFullLatestDump();
+				}
 			}
 			log.info("Finish %s download".formatted(getFilePrefix()));
 		} catch (SQLException | IOException | InterruptedException e) {
@@ -68,6 +78,10 @@ public abstract class AbstractWikiFilesDownloader {
 	public abstract long getMaxPageId() throws IOException;
 
 	public abstract long getMaxIdFromDb(File wikiSqlite) throws SQLException;
+
+	protected boolean downloadsFullLatestDump() {
+		return true;
+	}
 
 	public String getWikiLatestDirURL() {
 		return DUMPS_WIKIMEDIA_URL + getFilePrefix() + LATEST_URL;
@@ -89,7 +103,7 @@ public abstract class AbstractWikiFilesDownloader {
 		return downloadedPageFiles;
 	}
 
-	Instant readTimestampFile(String pathToTimestamp) {
+	static Instant readTimestampFile(String pathToTimestamp) {
 		Path timestampFile = Path.of(pathToTimestamp, TIMESTAMP_FILE);
 		if (!Files.exists(timestampFile)) {
 			return Instant.EPOCH;
@@ -105,16 +119,36 @@ public abstract class AbstractWikiFilesDownloader {
 		}
 	}
 
-	void writeTimestampFile(String pathToTimestamp) {
-		Instant now = Instant.now();
+	static void writeTimestampFile(String pathToTimestamp, Instant timestamp) {
 		try (FileWriter writer = new FileWriter(new File(pathToTimestamp, TIMESTAMP_FILE))) {
-			writer.write(now.toString()); // e.g. "2025-10-22T11:24:56.123Z"
+			writer.write(timestamp.toString()); // e.g. "2025-10-22T11:24:56.123Z"
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
 	}
 
-	private void downloadPageFiles(String destFolder, List<FileForDBUpdate> updateList, DownloadHandler dh)
+	public void saveUpdateTimestamp() {
+		if (nextTimestamp != null) {
+			writeTimestampFile(destFolder, nextTimestamp);
+		} else if (removeTimestampAfterUpdate) {
+			removeTimestampFile(destFolder);
+		}
+	}
+
+	private Instant getNextDailyTimestamp(List<FileForDBUpdate> updateFileList) {
+		LocalDate lastDumpDate = updateFileList.get(updateFileList.size() - 1).date;
+		return lastDumpDate.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+	}
+
+	static void removeTimestampFile(String pathToTimestamp) {
+		try {
+			Files.deleteIfExists(Path.of(pathToTimestamp, TIMESTAMP_FILE));
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	private void downloadPageFiles(List<FileForDBUpdate> updateList, DownloadHandler dh)
 			throws IOException, InterruptedException {
 		for (FileForDBUpdate p : updateList) {
 			String fileName = p.url.substring(p.url.lastIndexOf("/") + 1);
@@ -129,15 +163,24 @@ public abstract class AbstractWikiFilesDownloader {
 				}
 				continue;
 			}
+			File partFile = new File(gzFile + ".part");
 			try (InputStream in = new BufferedInputStream(openConnectionWithRetry(p.url).getInputStream());
 				 BZip2CompressorInputStream bzIn = new BZip2CompressorInputStream(in);
-				 GZIPOutputStream gzOut = new GZIPOutputStream(new FileOutputStream(gzFile))) {
+				 GZIPOutputStream gzOut = new GZIPOutputStream(new FileOutputStream(partFile))) {
 				byte[] buffer = new byte[8192];
 				int n;
 				while ((n = bzIn.read(buffer)) != -1) {
 					gzOut.write(buffer, 0, n);
 				}
+			} catch (IOException e) {
+				try {
+					Files.deleteIfExists(partFile.toPath());
+				} catch (IOException deleteError) {
+					e.addSuppressed(deleteError);
+				}
+				throw e;
 			}
+			Files.move(partFile.toPath(), gz.toPath(), StandardCopyOption.REPLACE_EXISTING);
 			System.out.println(gzFile + " downloading is finished");
 			downloadedPageFiles.add(gzFile);
 			if (dh != null) {
@@ -182,7 +225,8 @@ public abstract class AbstractWikiFilesDownloader {
 		return result;
 	}
 
-	private List<FileForDBUpdate> getLatestFilesURL(String wikiUrl, LocalDate lastUpdateDate) throws IOException, InterruptedException {
+	private List<FileForDBUpdate> getLatestFilesURL(String wikiUrl, LocalDate lastUpdateDate, boolean failOnMissingDays)
+			throws IOException, InterruptedException {
 		// https://dumps.wikimedia.org/other/incr/commonswiki/
 		// pattern for <a href="20250926/">20250926/</a> find subfolder whose name is a date
 		Pattern pattern = Pattern.compile("<a href=\"\\d{8}/\">\\d{8}/</a>");
@@ -191,28 +235,39 @@ public abstract class AbstractWikiFilesDownloader {
 		BufferedReader r = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
 		String line;
 		List<FileForDBUpdate> result = new ArrayList<>();
+		LocalDate firstAvailableDate = null;
 		while ((line = r.readLine()) != null) {
 			Matcher matcher = pattern.matcher(line);
 			if (matcher.find()) {
-				FileForDBUpdate fileForUpdate = getIncrFile(wikiUrl, line, lastUpdateDate);
-				if (fileForUpdate != null) {
-					result.add(fileForUpdate);
+				String fileDate = line.replace("<a href=\"", "").replaceAll("/\">.+$", "");
+				LocalDate date = LocalDate.parse(fileDate, DateTimeFormatter.BASIC_ISO_DATE);
+				if (firstAvailableDate == null || date.isBefore(firstAvailableDate)) {
+					firstAvailableDate = date;
+				}
+				if (date.isAfter(lastUpdateDate) || date.isEqual(lastUpdateDate)) {
+					result.add(getIncrFile(wikiUrl, date));
 				}
 			}
 		}
 		connection.disconnect();
+		if (failOnMissingDays) {
+			if (firstAvailableDate == null) {
+				throw new IOException("No daily dumps found at %s".formatted(wikiUrl));
+			}
+			if (firstAvailableDate.isAfter(lastUpdateDate)) {
+				throw new IOException("Daily dumps since %s are no longer available at %s (the oldest is %s): recreate the database from a full dump"
+						.formatted(lastUpdateDate, wikiUrl, firstAvailableDate));
+			}
+		}
+		result.sort(Comparator.comparing(f -> f.date));
 		return result;
 	}
 
-	private FileForDBUpdate getIncrFile(String wikiUrl, String line, LocalDate lastUpdateDate) {
-		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
-		String fileDate = line.replace("<a href=\"", "").replaceAll("/\">.+$", "");
-		LocalDate date = LocalDate.parse(fileDate, formatter);
-		FileForDBUpdate fileForUpdate = null;
-		if (date.isAfter(lastUpdateDate) || date.isEqual(lastUpdateDate)) {
-			fileForUpdate = new FileForDBUpdate();
-			fileForUpdate.url = wikiUrl + fileDate + "/" + getFilePrefix() + "-" + fileDate + PAGES_INCR_XML_BZ_2_SUFFIX;
-		}
+	private FileForDBUpdate getIncrFile(String wikiUrl, LocalDate date) {
+		String fileDate = date.format(DateTimeFormatter.BASIC_ISO_DATE);
+		FileForDBUpdate fileForUpdate = new FileForDBUpdate();
+		fileForUpdate.url = wikiUrl + fileDate + "/" + getFilePrefix() + "-" + fileDate + PAGES_INCR_XML_BZ_2_SUFFIX;
+		fileForUpdate.date = date;
 		return fileForUpdate;
 	}
 
@@ -222,6 +277,7 @@ public abstract class AbstractWikiFilesDownloader {
 
 	private static class FileForDBUpdate {
 		String url;
+		LocalDate date;
 	}
 
 	public HttpURLConnection openConnectionWithRetry(String urlString)

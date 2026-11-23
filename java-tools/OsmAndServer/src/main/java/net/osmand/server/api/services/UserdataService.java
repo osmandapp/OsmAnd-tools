@@ -85,6 +85,9 @@ public class UserdataService {
     protected DownloadIndexesService downloadService;
 
     @Autowired
+    protected CloudMapFilesService cloudMapFilesService;
+
+    @Autowired
     protected CloudUserFilesRepository filesRepository;
 
 	@Lazy
@@ -173,6 +176,7 @@ public class UserdataService {
     public static final long MAXIMUM_FREE_ACCOUNT_SIZE = 5 * MB;
     private static final long MAXIMUM_FREE_ACCOUNT_FILE_SIZE = 2 * MB;
     public static final String FILE_TYPE_GLOBAL = "GLOBAL";
+    public static final String FILE_TYPE = "FILE";
     public static final String FILE_TYPE_FAVOURITES = "FAVOURITES";
     public static final String FILE_TYPE_PROFILE = "PROFILE";
     public static final String FILE_TYPE_GPX = "GPX";
@@ -409,6 +413,9 @@ public class UserdataService {
 
 	public ResponseEntity<String> uploadMultipartFile(MultipartFile file, CloudUserDevicesRepository.CloudUserDevice dev,
 			String name, String type, Long clienttime, HttpSession session) throws IOException {
+		if (cloudMapFilesService.isDeletedMapFile(name, type)) {
+			return cloudMapFilesService.handleDeletedMapUpload(name, type, clienttime, dev);
+		}
 		try (InternalZipFile zipfile = getUploadZipFile(file, name, type, session)) {
 			validateUserForUpload(dev, type, zipfile.getSize());
 			return uploadFile(zipfile, dev, name, type, clienttime);
@@ -746,6 +753,7 @@ public class UserdataService {
 
     public void getFile(CloudUserFilesRepository.UserFile userFile, HttpServletResponse response, HttpServletRequest request, String name, String type,
                         CloudUserDevicesRepository.CloudUserDevice dev, boolean simplified) throws IOException {
+        cloudMapFilesService.validateDownload(name, type);
         InputStream bin = null;
         File fileToDelete = null;
         try {
@@ -1300,7 +1308,6 @@ public class UserdataService {
 
 
     private boolean isSelectedType(Set<String> filterTypes, CloudUserFilesRepository.UserFileNoData sf) {
-        final String FILE_TYPE = "FILE";
         final String FILE_TYPE_MAPS = "FILE_MAPS";
         final String FILE_TYPE_OTHER = "FILE_OTHER";
         String currentFileType = sf.type.toUpperCase();
@@ -1741,30 +1748,38 @@ public class UserdataService {
         usersRepository.saveAndFlush(pu);
     }
 
-
-    public ResponseEntity<String> changeEmail(String username, String token, CloudUserDevicesRepository.CloudUserDevice dev, HttpServletRequest request) throws ServletException {
-        // validate new email
-        CloudUsersRepository.CloudUser tempUser = usersRepository.findByEmailIgnoreCase(username);
-        if (tempUser == null) {
-            return ResponseEntity.badRequest().body("Something went wrong with your new email");
-        }
-        if (tempUser.orderid != null) {
-            String errorMsg = userSubService.checkOrderIdPro(tempUser.orderid);
-            if (errorMsg != null) {
-                return ResponseEntity.badRequest().body("You can't change email, because you have subscription on new email");
-            }
-        } else {
-            List<CloudUserFilesRepository.UserFileNoData> allFiles = filesRepository.listFilesByUserid(tempUser.id, null, null);
-            if (!allFiles.isEmpty()) {
-                return ResponseEntity.badRequest().body("You can't change email, because you have files in account on new email");
-            }
-        }
+    @Nullable
+    public ResponseEntity<String> checkNewEmailAccount(CloudUsersRepository.CloudUser tempUser) {
         List<CloudUserDevicesRepository.CloudUserDevice> devices = devicesRepository.findByUserid(tempUser.id);
         if (!devices.isEmpty()) {
             return ResponseEntity.badRequest().body("You can't change email, because you have devices in account on new email");
         }
+        if (!Algorithms.isEmpty(tempUser.orderid) && userSubService.checkOrderIdPro(tempUser.orderid) == null) {
+            return ResponseEntity.badRequest().body("You can't change email, because you have subscription on new email");
+        }
+        if (!subscriptionsRepo.findAllByUserId(tempUser.id).isEmpty() || !inAppPurchasesRepo.findByUserId(tempUser.id).isEmpty()) {
+            return ResponseEntity.badRequest().body("You can't change email, because you have purchases in account on new email");
+        }
+        List<CloudUserFilesRepository.UserFileNoData> allFiles = filesRepository.listFilesByUserid(tempUser.id, null, null);
+        if (!allFiles.isEmpty()) {
+            return ResponseEntity.badRequest().body("You can't change email, because you have files in account on new email");
+        }
+        return null;
+    }
+
+
+    public ResponseEntity<String> changeEmail(String newEmail, String token, CloudUserDevicesRepository.CloudUserDevice dev, HttpServletRequest request) throws ServletException {
+        // validate new email
+        CloudUsersRepository.CloudUser tempUser = usersRepository.findByEmailIgnoreCase(newEmail);
+        if (tempUser == null) {
+            return ResponseEntity.badRequest().body("Something went wrong with your new email");
+        }
+        ResponseEntity<String> accountError = checkNewEmailAccount(tempUser);
+        if (accountError != null) {
+            return accountError;
+        }
         // validate token
-        ResponseEntity<String> response = confirmCode(username, token);
+        ResponseEntity<String> response = confirmCode(newEmail, token);
         if (!response.getStatusCode().is2xxSuccessful()) {
             return response;
         }
@@ -1777,9 +1792,10 @@ public class UserdataService {
         emailTokenRequests.invalidate(currentUser.email.trim().toLowerCase(Locale.ROOT));
         emailTokenRequests.invalidate(tempUser.email.trim().toLowerCase(Locale.ROOT));
         usersRepository.delete(tempUser);
-        currentUser.email = username;
+        String oldEmail = currentUser.email;
+        currentUser.email = newEmail;
         usersRepository.saveAndFlush(currentUser);
-	    LOG.info("User email changed (/auth/change-email) from " + tempUser.email + " to " + currentUser.email);
+	    LOG.info("User email changed (/auth/change-email) from " + EmailSenderService.shortenEmail(oldEmail) + " to " + EmailSenderService.shortenEmail(currentUser.email));
 
 	    userSubService.verifyAndRefreshProOrderId(currentUser);
 

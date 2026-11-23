@@ -10,6 +10,7 @@ import com.google.gson.*;
 import net.osmand.server.assist.DeviceLocationManager;
 import net.osmand.server.assist.OsmAndAssistantBot;
 import net.osmand.server.assist.data.*;
+import net.osmand.util.Algorithms;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -24,6 +25,7 @@ public class DeviceController {
 	private static final String DEVICE_NAME = "deviceName";
 	private static final String USER = "user";
 	private static final String CHAT_ID = "chatId";
+	private static final String UID = "uid";
 
 	@Autowired
 	DeviceLocationManager deviceLocationManager;
@@ -124,14 +126,17 @@ public class DeviceController {
 	}
 
 	@RequestMapping("/device/send-devices")
-	public @ResponseBody String getDevicesByUserId(@RequestParam(required = false) String uid) {
+	public ResponseEntity<String> getDevicesByUserId(@RequestParam(name = UID, required = false) String uid) {
+		if (Algorithms.isEmpty(uid)) {
+			return missingParameterResponse(UID);
+		}
 		List<DeviceBean> devices = deviceRepo.findByUserIdOrderByCreatedDate(Long.parseLong(uid));
 		DevicesInfo result = new DevicesInfo();
 		for(DeviceBean b : devices) {
 			DeviceBean db = simplifyDevice(b);
 			result.devices.add(db);
 		}
-		return gson.toJson(result);
+		return ResponseEntity.ok().body(gson.toJson(result));
 	}
 	
 	@RequestMapping("/device/{deviceId}/send")

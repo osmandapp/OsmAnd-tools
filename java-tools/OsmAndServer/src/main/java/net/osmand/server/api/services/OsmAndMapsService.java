@@ -29,6 +29,9 @@ import java.util.Set;
 import java.util.Map.Entry;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -181,6 +184,9 @@ public class OsmAndMapsService {
 	final List<RoutingCacheContext> routingCaches = new ArrayList<>();
 
 	NativeJavaRendering nativelib;
+
+	private final ExecutorService srtmUnzipExecutor = Executors.newSingleThreadExecutor();
+	private Future<?> srtmUnzip;
 
 	File tempDir;
 
@@ -571,15 +577,37 @@ public class OsmAndMapsService {
 
 	@Scheduled(fixedRate = INTERVAL_TO_MONITOR_ZIP)
 	public void checkZippedFiles() throws IOException {
-		if (tileConfig != null && !Algorithms.isEmpty(tileConfig.obfZipLocation) && !Algorithms.isEmpty(tileConfig.obfLocation)) {
-			LOGGER.info("Checking new files at " + tileConfig.obfZipLocation + " " + tileConfig.obfLocation);
-			File[] zipFiles = new File(tileConfig.obfZipLocation).listFiles();
-			List<File> zipWithoutJointMaps = zipFiles != null ? filterMap(Arrays.asList(zipFiles)) : new ArrayList<>();
-			for (File zipFile : zipWithoutJointMaps) {
-				if (zipFile.getName().endsWith(".obf.zip")) {
+		if (tileConfig != null) {
+			unzipNewObfFiles(tileConfig.obfZipLocation, tileConfig.obfLocation, IndexConstants.BINARY_MAP_INDEX_EXT_ZIP, false);
+			if (srtmUnzip == null || srtmUnzip.isDone()) {
+				srtmUnzip = srtmUnzipExecutor.submit(() -> {
+					try {
+						unzipNewObfFiles(tileConfig.obfSrtmZipLocation, tileConfig.obfSrtmLocation,
+								IndexConstants.BINARY_SRTM_MAP_INDEX_EXT_ZIP, true);
+						unzipNewObfFiles(tileConfig.obfSrtmZipLocation, tileConfig.obfSrtmLocation,
+								IndexConstants.BINARY_SRTM_FEET_MAP_INDEX_EXT_ZIP, true);
+					} catch (IOException e) {
+						LOGGER.error(e.getMessage(), e);
+					}
+				});
+			}
+		}
+	}
+
+	private void unzipNewObfFiles(String zipLocation, String obfLocation, String zipExt, boolean srtm) throws IOException {
+		if (!Algorithms.isEmpty(zipLocation) && !Algorithms.isEmpty(obfLocation)) {
+			File obfDir = new File(obfLocation);
+			if (srtm) {
+				Files.createDirectories(obfDir.toPath());
+			}
+			LOGGER.info("Checking new files at " + zipLocation + " " + obfDir);
+			File[] zipFiles = new File(zipLocation).listFiles();
+			List<File> files = zipFiles != null ? Arrays.asList(zipFiles) : List.of();
+			for (File zipFile : srtm ? filterCoveredByParents(files, zipExt) : filterMap(files)) {
+				if (zipFile.getName().endsWith(zipExt)) {
 					String fn = zipFile.getName().substring(0, zipFile.getName().length() - ".zip".length());
-					File target = new File(tileConfig.obfLocation, fn);
-					File targetTemp = new File(tileConfig.obfLocation, fn + ".new");
+					File target = new File(obfDir, fn);
+					File targetTemp = new File(obfDir, fn + ".new");
 					if (!target.exists() || target.lastModified() < zipFile.lastModified()
 							|| zipFile.length() > target.length()) {
 						long val = System.currentTimeMillis();
@@ -649,6 +677,11 @@ public class OsmAndMapsService {
 			}
 			String nativeLibraryPath = System.getenv("NATIVE_LIBRARY_PATH"); // use native library from file, optional
 			nativelib = NativeJavaRendering.getDefault(nativeLibraryPath, tileConfig.obfLocation, fontsFolder.getAbsolutePath());
+			if (nativelib != null && !Algorithms.isEmpty(tileConfig.obfSrtmLocation)) {
+				File srtmDir = new File(tileConfig.obfSrtmLocation);
+				Files.createDirectories(srtmDir.toPath());
+				nativelib.initFilesInDir(srtmDir);
+			}
 		}
 		return tileConfig.initErrorMessage == null;
 	}
@@ -673,10 +706,11 @@ public class OsmAndMapsService {
 		return image;
 	}
 
-	public byte[] renderMapboxVectorTile(int zoom, int x, int y, int shift) throws IOException {
+	public byte[] renderMapboxVectorTile(int zoom, int x, int y, int shift, boolean contoursOnly, boolean feetContours)
+			throws IOException {
 		byte[] tile = null;
 		if (nativelib != null) {
-			tile = nativelib.getMapboxVectorTileFile(zoom, x, y, shift);
+			tile = nativelib.getMapboxVectorTileFile(zoom, x, y, shift, contoursOnly, feetContours);
 		}
 		return tile;
 	}
@@ -1459,19 +1493,19 @@ public class OsmAndMapsService {
 
 
 	private synchronized void initNewObfFiles(File target, File targetTemp) throws IOException {
-		initObfReaders();
 		long val = System.currentTimeMillis();
-		BinaryMapIndexReaderReference ref = obfFiles.get(target.getAbsolutePath());
-		if (ref == null) {
-			ref = new BinaryMapIndexReaderReference();
-			ref.file = target;
-			obfFiles.put(target.getAbsolutePath(), ref);
-		}
-		if (ref.fileIndex != null) {
+		boolean srtm = target.getName().endsWith(IndexConstants.BINARY_SRTM_MAP_INDEX_EXT)
+				|| target.getName().endsWith(IndexConstants.BINARY_SRTM_FEET_MAP_INDEX_EXT);
+		if (!srtm) {
+			initObfReaders();
+			BinaryMapIndexReaderReference ref = obfFiles.get(target.getAbsolutePath());
+			if (ref == null) {
+				ref = new BinaryMapIndexReaderReference();
+				ref.file = target;
+				obfFiles.put(target.getAbsolutePath(), ref);
+			}
 			ref.fileIndex = null;
-		}
 
-		if (!ref.readers.isEmpty()) {
 			for (Entry<BinaryMapIndexReader, Boolean> r : ref.readers.entrySet()) {
 				r.getKey().close();
 			}
@@ -1481,11 +1515,14 @@ public class OsmAndMapsService {
 		}
 		target.delete();
 		targetTemp.renameTo(target);
-		RandomAccessFile raf = new RandomAccessFile(target, "r");
-		BinaryMapIndexReader reader = new BinaryMapIndexReader(raf, target);
-		ref.readers.put(reader, true);
-		ref.fileIndex = cacheFiles.addToCache(reader, target);
-		cacheFiles.writeToFile(new File(tileConfig.cacheLocation, CachedOsmandIndexes.INDEXES_DEFAULT_FILENAME));
+		if (!srtm) {
+			BinaryMapIndexReaderReference ref = obfFiles.get(target.getAbsolutePath());
+			RandomAccessFile raf = new RandomAccessFile(target, "r");
+			BinaryMapIndexReader reader = new BinaryMapIndexReader(raf, target);
+			ref.readers.put(reader, true);
+			ref.fileIndex = cacheFiles.addToCache(reader, target);
+			cacheFiles.writeToFile(new File(tileConfig.cacheLocation, CachedOsmandIndexes.INDEXES_DEFAULT_FILENAME));
+		}
 		if (nativelib != null) {
 			nativelib.initMapFile(target.getAbsolutePath(), false);
 		}
@@ -1675,6 +1712,35 @@ public class OsmAndMapsService {
 				}
 			}
 		}
+		return res;
+	}
+
+	private List<File> filterCoveredByParents(List<File> files, String zipExt) throws IOException {
+		if (osmandRegions == null) {
+			osmandRegions = new OsmandRegions(null);
+		}
+		List<File> res = new ArrayList<>();
+		Set<String> downloadNames = new HashSet<>();
+		for (File file : files) {
+			if (file.getName().endsWith(zipExt)) {
+				res.add(file);
+				downloadNames.add(getDownloadNameByFileName(file.getName()));
+			}
+		}
+		res.removeIf(file -> {
+			WorldRegion region = osmandRegions.getRegionDataByDownloadName(getDownloadNameByFileName(file.getName()));
+			if (region == null) {
+				return false;
+			}
+			WorldRegion parent = region.getSuperregion();
+			while (parent != null) {
+				if (downloadNames.contains(parent.getRegionDownloadNameLC())) {
+					return true; // meters 287 of 1387, feet 276 of 1375 filtered
+				}
+				parent = parent.getSuperregion();
+			}
+			return false;
+		});
 		return res;
 	}
 

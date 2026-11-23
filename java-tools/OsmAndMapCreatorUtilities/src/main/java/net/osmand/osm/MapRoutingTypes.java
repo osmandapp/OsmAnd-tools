@@ -331,6 +331,10 @@ public class MapRoutingTypes {
 		}
 	}
 
+	public void addPointType(TLongObjectHashMap<TIntArrayList> pointTypes, long nodeId, String tag, String value) {
+		pointTypes.get(nodeId).add(registerRule(tag, value).id);
+	}
+
 	public MapRouteType getTypeByInternalId(int id) {
 		return listTypes.get(id - 1);
 	}
