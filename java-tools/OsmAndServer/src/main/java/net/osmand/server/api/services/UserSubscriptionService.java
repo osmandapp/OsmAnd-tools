@@ -14,6 +14,7 @@ import net.osmand.server.api.repo.DeviceInAppPurchasesRepository.SupporterDevice
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
@@ -56,6 +57,7 @@ public class UserSubscriptionService {
 
 	private static final String ACCOUNT_KEY = "account";
 	private static final String FREE_ACCOUNT = "Free";
+	private static final String MAPS_PLUS_KEY = "mapsPlus";
 	private static final String MAX_ACCOUNT_SIZE = "maxAccSize";
 	private static final String PURCHASE_NAME_KEY = "name";
 	private static final String PURCHASE_STORE_KEY = "store";
@@ -129,36 +131,58 @@ public class UserSubscriptionService {
 				LOG.info("Subscription sku is not pro: " + s.sku);
 				return "subscription is not pro: " + s.sku;
 			}
-			String platform = PurchaseHelper.getPlatformBySku(s.sku);
-			// s.sku could be checked for pro
-			if (s.expiretime == null || s.expiretime.getTime() < System.currentTimeMillis() || s.checktime == null) {
-				if (s.sku.contains(OSMAND_PROMO_SUBSCRIPTION) || (s.purchaseToken != null && s.purchaseToken.equals(MANUALLY_VALIDATED))) {
-					// no need to revalidate
-				} else if (platform.equalsIgnoreCase(PLATFORM_GOOGLE)) {
-					s = revalidateGoogleSubscription(s);
-				} else if (platform.equalsIgnoreCase(PLATFORM_HUAWEI)) {
-					s = revalidateHuaweiSubscription(s);
-				} else if (platform.equalsIgnoreCase(PLATFORM_AMAZON)) {
-					s = revalidateAmazonSubscription(s);
-				} else if (platform.equalsIgnoreCase(PLATFORM_APPLE)) {
-					s = revalidateiOSSubscription(s);
-				} else if (platform.equalsIgnoreCase(PLATFORM_FASTSPRING)) {
-					s = revalidateFastSpringSubscription(s);
-				} else {
-					return "subscription is not eligible for OsmAnd Cloud";
-				}
-			}
-			if (s.valid == null || !s.valid) {
-				return "no valid subscription present";
-			} else {
-				if (s.expiretime != null && s.expiretime.getTime() > System.currentTimeMillis()) {
-					return null;
-				} else {
-					return "subscription is expired or not validated yet";
-				}
-			}
+			return isSubscriptionValid(s);
 		}
 		return "no subscription present";
+	}
+
+	@Nullable
+	private String isSubscriptionValid(SupporterDeviceSubscription s) {
+		String platform = PurchaseHelper.getPlatformBySku(s.sku);
+		// s.sku could be checked for pro
+		if (s.expiretime == null || s.expiretime.getTime() < System.currentTimeMillis() || s.checktime == null) {
+			if (s.sku.contains(OSMAND_PROMO_SUBSCRIPTION) || (s.purchaseToken != null && s.purchaseToken.equals(MANUALLY_VALIDATED))) {
+				// no need to revalidate
+			} else if (platform.equalsIgnoreCase(PLATFORM_GOOGLE)) {
+				s = revalidateGoogleSubscription(s);
+			} else if (platform.equalsIgnoreCase(PLATFORM_HUAWEI)) {
+				s = revalidateHuaweiSubscription(s);
+			} else if (platform.equalsIgnoreCase(PLATFORM_AMAZON)) {
+				s = revalidateAmazonSubscription(s);
+			} else if (platform.equalsIgnoreCase(PLATFORM_APPLE)) {
+				s = revalidateiOSSubscription(s);
+			} else if (platform.equalsIgnoreCase(PLATFORM_FASTSPRING)) {
+				s = revalidateFastSpringSubscription(s);
+			} else {
+				return "subscription is not eligible for OsmAnd Cloud";
+			}
+		}
+		if (s.valid == null || !s.valid) {
+			return "no valid subscription present";
+		} else {
+			if (s.expiretime != null && s.expiretime.getTime() > System.currentTimeMillis()) {
+				return null;
+			} else {
+				return "subscription is expired or not validated yet";
+			}
+		}
+	}
+
+	private boolean hasValidMapsPurchase(List<SupporterDeviceSubscription> subscriptions,
+	                                     List<SupporterDeviceInAppPurchase> inApps,
+	                                     Map<String, PurchasesDataLoader.Subscription> subMap,
+	                                     Map<String, PurchasesDataLoader.InApp> inappMap) {
+		for (SupporterDeviceInAppPurchase p : inApps) {
+			PurchasesDataLoader.InApp inAppBaseData = inappMap.get(p.sku);
+			if (inAppBaseData != null && inAppBaseData.isMaps() && Boolean.TRUE.equals(p.valid)) {
+				return true;
+			}
+		}
+		return subscriptions.stream()
+				.filter(s -> Boolean.TRUE.equals(s.valid) && subMap.get(s.sku) != null && subMap.get(s.sku).isMaps())
+				.max(Comparator.comparing(s -> s.expiretime != null ? s.expiretime : new Date(0)))
+				.map(s -> isSubscriptionValid(s) == null)
+				.orElse(false);
 	}
 
 	private String isProInappValid(String orderid, Map<String, PurchasesDataLoader.InApp> inappMap) {
@@ -715,17 +739,27 @@ public class UserSubscriptionService {
 				} else {
 					info.put(PURCHASE_NAME_KEY, subBaseData.name());
 				}
+			} else {
+				inAppPurchasesRepo.findByOrderId(orderId).stream().findFirst().ifPresent(p -> {
+					PurchasesDataLoader.InApp inAppBaseData = inappMap.get(p.sku);
+					info.put(PURCHASE_NAME_KEY, inAppBaseData != null ? inAppBaseData.name() : getInAppName(p));
+				});
 			}
 		}
+		List<SupporterDeviceSubscription> userSubscriptions = subscriptionsRepo.findAllByUserId(pu.id);
+		List<SupporterDeviceInAppPurchase> userInApps = inAppPurchasesRepo.findByUserId(pu.id);
+		if (hasValidMapsPurchase(userSubscriptions, userInApps, subMap, inappMap)) {
+			info.put(MAPS_PLUS_KEY, "true");
+		}
 		// get other purchases
-		info.put(SUBSCRIPTIONS_KEY, gson.toJson(getAllSubscriptionsInfo(pu, subMap)));
-		info.put(IN_APP_PURCHASES_KEY, gson.toJson(getAllInAppsInfo(pu, inappMap)));
+		info.put(SUBSCRIPTIONS_KEY, gson.toJson(getAllSubscriptionsInfo(userSubscriptions, subMap)));
+		info.put(IN_APP_PURCHASES_KEY, gson.toJson(getAllInAppsInfo(userInApps, inappMap)));
 
 		return info;
 	}
 
-	private List<Map<String, String>> getAllSubscriptionsInfo(CloudUsersRepository.CloudUser pu, Map<String, PurchasesDataLoader.Subscription> subMap) {
-		List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptionList = subscriptionsRepo.findAllByUserId(pu.id);
+	private List<Map<String, String>> getAllSubscriptionsInfo(List<SupporterDeviceSubscription> subscriptionList,
+	                                                         Map<String, PurchasesDataLoader.Subscription> subMap) {
 		List<Map<String, String>> subsInfo = new ArrayList<>();
 		if (subscriptionList != null && !subscriptionList.isEmpty()) {
 			subscriptionList.sort((a, b) -> {
@@ -784,16 +818,16 @@ public class UserSubscriptionService {
 		Map<String, PurchasesDataLoader.Subscription> subMap = purchasesDataLoader.getSubscriptions();
 		Map<String, PurchasesDataLoader.InApp> inappMap = purchasesDataLoader.getInApps();
 		String name = subMap.containsKey(sku) ? subMap.get(sku).name() : inappMap.get(sku).name();
-		List<Map<String, String>> purchases = new ArrayList<>(getAllSubscriptionsInfo(pu, subMap));
-		purchases.addAll(getAllInAppsInfo(pu, inappMap));
+		List<Map<String, String>> purchases = new ArrayList<>(getAllSubscriptionsInfo(subscriptionsRepo.findAllByUserId(pu.id), subMap));
+		purchases.addAll(getAllInAppsInfo(inAppPurchasesRepo.findByUserId(pu.id), inappMap));
 
 		return purchases.stream().anyMatch(p -> "true".equals(p.get(VALID_KEY))
 				&& name.equals(p.get(PURCHASE_NAME_KEY))
 				&& type.equals(p.getOrDefault(PURCHASE_TYPE_KEY, PURCHASE_TYPE_ONE_TIME)));
 	}
 
-	private List<Map<String, String>> getAllInAppsInfo(CloudUsersRepository.CloudUser pu, Map<String, PurchasesDataLoader.InApp> inappMap) {
-		List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> purchases = inAppPurchasesRepo.findByUserId(pu.id);
+	private List<Map<String, String>> getAllInAppsInfo(List<SupporterDeviceInAppPurchase> purchases,
+	                                                  Map<String, PurchasesDataLoader.InApp> inappMap) {
 		List<Map<String, String>> inAppPurchasesInfo = new ArrayList<>();
 		if (purchases != null && !purchases.isEmpty()) {
 			purchases.sort((a, b) -> {

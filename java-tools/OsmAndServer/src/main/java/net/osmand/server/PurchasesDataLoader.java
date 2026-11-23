@@ -139,7 +139,7 @@ public class PurchasesDataLoader {
 		}
 
 		public boolean isMaps() {
-			return !maps.isBoolean() || maps.booleanValue();
+			return maps != null && (!maps.isBoolean() || maps.booleanValue());
 		}
 
 		public InAppProFeatures getProFeatures() {
