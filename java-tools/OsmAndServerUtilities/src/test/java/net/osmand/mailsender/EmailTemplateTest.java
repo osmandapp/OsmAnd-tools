@@ -8,7 +8,10 @@ import org.junit.rules.TemporaryFolder;
 import java.io.IOException;
 import java.nio.file.Files;
 
+import static net.osmand.mailsender.EmailSenderTemplate.trimLowerCaseEmail;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 public class EmailTemplateTest {
@@ -125,6 +128,23 @@ public class EmailTemplateTest {
 	@Test
 	public void htmlIsSentAsIs() {
 		assertTrue("comments and Outlook blocks must survive verbatim", load("mailing").toString().contains(MAILING_CONTENT));
+	}
+
+	@Test
+	public void recipientIsCleanedOfInvisibleCharacters() {
+		EmailSenderTemplate pasted = new EmailSenderTemplate();
+		pasted.defaultTemplatesDirectory = templates.getRoot().getPath();
+		pasted.load("cloud/purchase/receipt", EmailTemplate.DEFAULT_LANG).to("\u200Fb@b.com\u2028");
+		assertEquals(load("cloud/purchase/receipt").toString(), pasted.toString());
+	}
+
+	@Test
+	public void trimLowerCaseEmailDropsInvisibleCharactersAndLowerCases() {
+		assertEquals("user@example.com", trimLowerCaseEmail("\u200Fuser@example.com\u2028"));
+		assertEquals("user@example.com", trimLowerCaseEmail(" user@exa\u200Fmp\u200Fle.com\u2028 "));
+		assertEquals("user@example.com", trimLowerCaseEmail("\u200FUser@Example.COM"));
+		assertEquals("john smith@example.com", trimLowerCaseEmail("john smith@example.com"));
+		assertNull(trimLowerCaseEmail(null));
 	}
 
 	@Test(expected = IllegalStateException.class)

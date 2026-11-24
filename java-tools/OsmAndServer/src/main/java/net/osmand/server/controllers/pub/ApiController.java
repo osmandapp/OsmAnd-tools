@@ -24,12 +24,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import net.osmand.purchases.PurchaseHelper;
+import net.osmand.mailsender.EmailSenderTemplate;
 import net.osmand.server.PurchasesDataLoader;
 import net.osmand.server.api.repo.*;
 import net.osmand.server.api.services.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
@@ -725,7 +725,7 @@ public class ApiController {
 	public ResponseEntity<String> addUser(@RequestParam String promoKey,
 	                                      @RequestParam String userEmail) {
 		synchronized (this) {
-			return promoService.addUser(promoKey, userEmail);
+			return promoService.addUser(promoKey, EmailSenderTemplate.trimLowerCaseEmail(userEmail));
 		}
 	}
 
