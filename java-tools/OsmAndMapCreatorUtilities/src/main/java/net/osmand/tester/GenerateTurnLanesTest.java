@@ -71,6 +71,7 @@ public class GenerateTurnLanesTest {
 		public boolean linksOnly;
 		public boolean anyTurn;
 		public boolean noneLanes;
+		public boolean bothWays;
 		public String regionsPath;
 		public String highway = "secondary";
 
@@ -194,7 +195,8 @@ public class GenerateTurnLanesTest {
 			int arms = graph.arms(key);
 			int rank = graph.rankOf(key);
 			if (arms < 3 || rank > lowest || (options.linksOnly && !graph.hasLink(key))
-					|| (options.noneLanes && !graph.hasNoneLanes(key))) {
+					|| (options.noneLanes && !graph.hasNoneLanes(key))
+					|| (options.bothWays && !graph.hasBothWays(key))) {
 				continue;
 			}
 			candidates.add(new long[] {rank, -arms, key});
@@ -298,6 +300,9 @@ public class GenerateTurnLanesTest {
 		if (options.noneLanes && !readsFromNone(route)) {
 			return null;
 		}
+		if (options.bothWays && !readsFromBothWays(route)) {
+			return null;
+		}
 		Map<String, String> results = instructions(route, points);
 		return results.isEmpty() || !worthKeeping(results) ? null : results;
 	}
@@ -359,6 +364,20 @@ public class GenerateTurnLanesTest {
 			}
 		}
 		return false;
+	}
+
+	private boolean readsFromBothWays(List<RouteSegmentResult> route) {
+		for (int i = 1; i < route.size(); i++) {
+			if (route.get(i).getTurnType() != null && hasBothWays(route.get(i - 1).getObject())) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private static boolean hasBothWays(RouteDataObject road) {
+		return road.getOneway() == 0
+				&& (road.getValue("turn:lanes:both_ways") != null || road.getValue("lanes:both_ways") != null);
 	}
 
 	private static String turnLanesOf(RouteSegmentResult segment) {
@@ -702,6 +721,15 @@ public class GenerateTurnLanesTest {
 				RouteDataObject road = roads.get(roadOf(p));
 				if (hasNoneLane(road.getValue("turn:lanes")) || hasNoneLane(road.getValue("turn:lanes:forward"))
 						|| hasNoneLane(road.getValue("turn:lanes:backward"))) {
+					return true;
+				}
+			}
+			return false;
+		}
+
+		boolean hasBothWays(long key) {
+			for (long p : at.get(key)) {
+				if (GenerateTurnLanesTest.hasBothWays(roads.get(roadOf(p)))) {
 					return true;
 				}
 			}

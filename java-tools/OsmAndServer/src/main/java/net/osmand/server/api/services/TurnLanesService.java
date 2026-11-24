@@ -58,6 +58,7 @@ public class TurnLanesService {
 		public Boolean linksOnly;
 		public Boolean anyTurn;
 		public Boolean noneLanes;
+		public Boolean bothWays;
 		public String regionsPath;
 		/** the smallest class of road a junction is picked on: motorway, trunk, primary, secondary, tertiary */
 		public String highway;
@@ -236,6 +237,7 @@ public class TurnLanesService {
 		o.linksOnly = Boolean.TRUE.equals(req.linksOnly);
 		o.anyTurn = Boolean.TRUE.equals(req.anyTurn);
 		o.noneLanes = Boolean.TRUE.equals(req.noneLanes);
+		o.bothWays = Boolean.TRUE.equals(req.bothWays);
 		o.regionsPath = Algorithms.isEmpty(req.regionsPath) ? null : req.regionsPath.trim();
 		if (!Algorithms.isEmpty(req.highway)) {
 			o.highway = req.highway.trim();
