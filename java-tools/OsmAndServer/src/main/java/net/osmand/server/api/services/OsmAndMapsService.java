@@ -1646,8 +1646,10 @@ public class OsmAndMapsService {
 //		}
 //		LOGGER.info("Spatial search region maps " + mapsLog(files, lat, lon));
 
-		// 3. + maps within the 400 km bbox (regular selection), then base map
-		files.addAll(getMaps(bbox));
+		// 3. + maps within the 400 km bbox (regular selection), the nearest first as in the app, then base map
+		List<File> maps = getMaps(bbox);
+		maps.sort(Comparator.comparingDouble(f -> regionDistance(f, lat, lon)));
+		files.addAll(maps);
 		files.add(getBaseMap().file);
 		LOGGER.info("Spatial search total maps " + mapsLog(files, lat, lon));
 
