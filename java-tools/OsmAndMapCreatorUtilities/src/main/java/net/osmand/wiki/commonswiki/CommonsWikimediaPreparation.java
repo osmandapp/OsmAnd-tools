@@ -3,10 +3,10 @@ package net.osmand.wiki.commonswiki;
 import net.osmand.MainUtilities;
 import net.osmand.PlatformUtil;
 import net.osmand.impl.FileProgressImplementation;
-import net.osmand.obf.preparation.DBDialect;
 import net.osmand.wiki.AbstractWikiFilesDownloader;
 import net.osmand.wiki.AbstractWikiFilesDownloader.DownloadHandler;
 import net.osmand.wiki.WikiDatabasePreparation;
+import net.osmand.wiki.commonswiki.CommonsMetaWriter.Article;
 import org.apache.commons.logging.Log;
 import org.xml.sax.Attributes;
 import org.xml.sax.InputSource;
@@ -18,10 +18,9 @@ import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.sql.*;
+import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -34,18 +33,27 @@ public class CommonsWikimediaPreparation {
 	private static final Log log = PlatformUtil.getLog(CommonsWikimediaPreparation.class);
 	
 	private static final int DEFAULT_THREADS = 8; // it's parsing threads (downloads always run in a single thread https://dumps.wikimedia.org/)
-	public static final int BATCH_SIZE = 5000;
-	private static final BlockingQueue<Article> QUEUE = new LinkedBlockingQueue<>(10_000);
-	private static final Article END_SIGNAL = new Article(-1L, "", "", "", "", "", "");
-	private static final AtomicLong articlesCount = new AtomicLong(0);
-	private static final AtomicLong writtenToDatabaseCount = new AtomicLong(0);
-	private static final AtomicLong totalPagesCount = new AtomicLong(0);
-	private static final AtomicLong otherErrorsCount = new AtomicLong(0);
-	private static final AtomicLong changedLicenseCount = new AtomicLong(0);
 
 	public static final String RESULT_SQLITE = "meta_commonswiki.sqlite";
 	public static final String FILE_NAMESPACE = "6";
-	private static boolean showLog = false;
+
+	private final AtomicLong articlesCount = new AtomicLong(0);
+	private final AtomicLong totalPagesCount = new AtomicLong(0);
+	private final AtomicLong otherErrorsCount = new AtomicLong(0);
+
+	private enum Mode {
+		RECREATE(true, false),
+		UPDATE(false, false),
+		DAILY(false, true);
+
+		final boolean recreateDb;
+		final boolean daily;
+
+		Mode(boolean recreateDb, boolean daily) {
+			this.recreateDb = recreateDb;
+			this.daily = daily;
+		}
+	}
 
 	public static void main(String[] args) {
 		applyCommandLineOpts(new MainUtilities.CommandLineOpts(args));
@@ -62,7 +70,7 @@ public class CommonsWikimediaPreparation {
 		boolean recreateDb = opts.getBoolean("--recreate_db");
 		boolean keepFiles = opts.getBoolean("--keep_files");
 		int threads = opts.getIntOrDefault("--threads", DEFAULT_THREADS);
-		showLog = opts.getBoolean("--show_log");
+		boolean showLog = opts.getBoolean("--show_log");
 
 		if (mode.isEmpty() || folder.isEmpty()) {
 			printHelp();
@@ -72,22 +80,17 @@ public class CommonsWikimediaPreparation {
 		File commonsWikiDB = database.isEmpty()
 				? new File(folder, RESULT_SQLITE)
 				: new File(database);
-		CommonsWikimediaPreparation p = new CommonsWikimediaPreparation();
-		try {
-			switch (mode) {
-				case "parse-img-meta":
-					p.updateCommonsWiki(commonsWikiDB, true, false, keepFiles, threads);
-					break;
-				case "update-img-meta":
-					p.updateCommonsWiki(commonsWikiDB, recreateDb, false, keepFiles, threads);
-					break;
-				case "update-img-meta-daily":
-					p.updateCommonsWiki(commonsWikiDB, false, true, keepFiles, threads);
-					break;
-				default:
-					printHelp();
-					throw new RuntimeException("Unknown mode: " + mode);
+		Mode updateMode = switch (mode) {
+			case "parse-img-meta" -> Mode.RECREATE;
+			case "update-img-meta" -> recreateDb ? Mode.RECREATE : Mode.UPDATE;
+			case "update-img-meta-daily" -> Mode.DAILY;
+			default -> {
+				printHelp();
+				throw new RuntimeException("Unknown mode: " + mode);
 			}
+		};
+		try {
+			new CommonsWikimediaPreparation().updateCommonsWiki(commonsWikiDB, updateMode, keepFiles, threads, showLog);
 		} catch (SQLException | InterruptedException e) {
 			throw new RuntimeException("Error during parsing: " + e.getMessage(), e);
 		}
@@ -104,7 +107,7 @@ public class CommonsWikimediaPreparation {
 		--result_db=/path/to/result_db/meta_commonswiki.sqlite
 		--recreate_db recreate meta_commonswiki.sqlite
 		--keep_files keep downloaded files instead of deleting them
-		--threads=8 number of parsing threads (downloads always run in a single thread)
+		--threads=8 number of parsing threads (downloads always run in a single thread, daily dumps are parsed one at a time in date order)
 		--show_log show license update log
 		
 		--mode=parse-img-meta
@@ -123,26 +126,29 @@ public class CommonsWikimediaPreparation {
 		""");
 	}
 
-	private void updateCommonsWiki(File commonsWikiDB, boolean recreateDb, boolean dailyUpdate,boolean keepFiles,
-								   int threads) throws SQLException, InterruptedException {
+	private void updateCommonsWiki(File commonsWikiDB, Mode mode, boolean keepFiles, int threads, boolean showLog)
+			throws SQLException, InterruptedException {
 		long start = System.currentTimeMillis();
-		String commonsWikiDBPath = commonsWikiDB.getAbsolutePath();
-		initDatabase(commonsWikiDBPath, recreateDb);
-		ExecutorService executor = Executors.newFixedThreadPool(threads);
-		Thread writerThread = new Thread(() -> writeToDatabase(commonsWikiDBPath));
-		writerThread.start();
+		CommonsMetaWriter writer = new CommonsMetaWriter(commonsWikiDB.getAbsolutePath(), mode.recreateDb, showLog);
+		ExecutorService executor = Executors.newFixedThreadPool(mode.daily ? 1 : threads);
 		log.info("Updating wikidata...");
 		ExecutorCompletionService<Void> completionService = new ExecutorCompletionService<>(executor);
 		AtomicInteger taskCount = new AtomicInteger(0);
 		DownloadHandler dh = fileName -> {
 			log.info("Updating from " + fileName);
 			completionService.submit(() -> {
-				parseCommonArticles(fileName);
+				parseCommonArticles(fileName, writer);
 				return null;
 			});
 			taskCount.incrementAndGet();
 		};
-		AbstractWikiFilesDownloader wfd = new CommonsWikiFilesDownloader(commonsWikiDB, dailyUpdate, dh);
+		AbstractWikiFilesDownloader wfd;
+		try {
+			wfd = new CommonsWikiFilesDownloader(commonsWikiDB, mode.daily, dh);
+		} catch (RuntimeException e) {
+			stopWorkers(executor, writer);
+			throw e;
+		}
 		executor.shutdown();
 		
 		// Check tasks as they complete, stop immediately on critical error
@@ -153,8 +159,7 @@ public class CommonsWikimediaPreparation {
 				future.get();
 				completed++;
 			} catch (ExecutionException | InterruptedException e) {
-				executor.shutdownNow();
-				writerThread.interrupt();
+				stopWorkers(executor, writer);
 				Throwable cause = e instanceof ExecutionException ? e.getCause() : e;
 				if (e instanceof InterruptedException) {
 					Thread.currentThread().interrupt();
@@ -166,146 +171,41 @@ public class CommonsWikimediaPreparation {
 		if (!keepFiles) {
 			wfd.removeDownloadedPages();
 		}
-		QUEUE.put(END_SIGNAL);
-		writerThread.join();
-		createIndex(commonsWikiDBPath);
+		writer.finish();
+		writer.createIndex();
+		wfd.saveUpdateTimestamp();
 		log.info("========= All tasks done in %.0fs ========="
 				.formatted((System.currentTimeMillis() - start) / 1000.0));
 		log.info("========= Statistics =========");
 		log.info("Total pages with namespace=6: " + totalPagesCount.get());
 		log.info("Added to queue: " + articlesCount.get());
-		log.info("Written to database: " + writtenToDatabaseCount.get());
+		log.info("Written to database: " + writer.getWrittenCount());
 		log.info("Other errors: " + otherErrorsCount.get());
 		if (showLog) {
-			log.info("Changed licenses: " + changedLicenseCount.get());
+			log.info("Changed licenses: " + writer.getChangedLicenseCount());
 		}
 		log.info("========= End Statistics =========");
 	}
 
-	private static void initDatabase(String sqliteFileName, boolean recreateDb) throws SQLException {
-
-		try (Connection conn = DBDialect.SQLITE.getDatabaseConnection(sqliteFileName, log);
-			 Statement stmt = conn.createStatement()) {
-			stmt.execute("PRAGMA journal_mode = WAL;");
-			stmt.execute("PRAGMA synchronous = OFF;");
-			stmt.execute("PRAGMA busy_timeout = 5000;");
-			if (recreateDb) {
-				log.info("========= DROP old TABLE common_meta =========");
-				stmt.execute("DROP TABLE IF EXISTS common_meta");
-			}
-			log.info("========= CREATE TABLE common_meta =========");
-			stmt.execute("""
-					CREATE TABLE IF NOT EXISTS common_meta(
-					id long PRIMARY KEY,
-					name text,
-					author text,
-					date text,
-					license text,
-					description text,
-					source text)""");
-		}
+	private static void stopWorkers(ExecutorService executor, CommonsMetaWriter writer) {
+		executor.shutdownNow();
+		writer.abort();
 	}
 
-	private static void writeToDatabase(String sqliteFileName) {
-		System.out.println("Writer started...");
-		try (Connection conn = DBDialect.SQLITE.getDatabaseConnection(sqliteFileName, log)) {
-			conn.setAutoCommit(false);
-			try (PreparedStatement insertStatement = conn.prepareStatement("""
-					INSERT INTO common_meta(id, name, author, date, license, description, source) VALUES (?, ?, ?, ?, ?, ?, ?)
-					ON CONFLICT(id) DO UPDATE SET
-					name = excluded.name,
-					author = excluded.author,
-					date = excluded.date,
-					license = excluded.license,
-					description = excluded.description,
-					source = excluded.source;""")) {
-				PreparedStatement selectStatement = conn
-						.prepareStatement("SELECT id, name, license FROM common_meta WHERE id = ?");
-
-				int counter = 0;
-				try (Statement st = conn.createStatement();
-					 ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM common_meta")) {
-					rs.next();
-					log.info("Rows in common_meta at start: %d".formatted(rs.getInt(1)));
-				}
-				while (true) {
-					Article a = QUEUE.take();
-					if (a == END_SIGNAL) break;
-					if (showLog) {
-						selectStatement.setLong(1, a.id);
-						try (ResultSet rs = selectStatement.executeQuery()) {
-							if (rs.next()) {
-								String oldLicense = rs.getString("license");
-								if (!Objects.equals(oldLicense, a.license)) {
-									changedLicenseCount.incrementAndGet();
-									log.info("==== Article %s (%s) license changed from %s to %s"
-											.formatted(rs.getString("name"), rs.getString("id"), oldLicense, a.license));
-								}
-							}
-						}
-					}
-					insertStatement.setLong(1, a.id);
-					insertStatement.setString(2, a.title);
-					insertStatement.setString(3, a.author);
-					insertStatement.setString(4, a.date);
-					insertStatement.setString(5, a.license);
-					insertStatement.setString(6, a.description);
-					insertStatement.setString(7, a.source);
-					insertStatement.addBatch();
-					counter++;
-
-					if (counter % BATCH_SIZE == 0) {
-						insertStatement.executeBatch();
-						conn.commit();
-						writtenToDatabaseCount.addAndGet(counter);
-						counter = 0;
-					}
-				}
-
-				if (counter > 0) {
-					insertStatement.executeBatch();
-					conn.commit();
-					writtenToDatabaseCount.addAndGet(counter);
-				}
-			}
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		System.out.println("Writer finished (queue empty).");
-	}
-
-	public void createIndex(String sqliteFileName) {
-		log.info("========= DONE =========");
-		log.info("Create indexes");
-
-		try (Connection conn = DBDialect.SQLITE.getDatabaseConnection(sqliteFileName, log);
-			 Statement stmt = conn.createStatement()) {
-			stmt.execute("CREATE INDEX IF NOT EXISTS name_common_meta_index ON common_meta(name)");
-
-		} catch (SQLException e) {
-			System.err.println("Failed to create index: " + e.getMessage());
-			e.printStackTrace();
-		}
-	}
-
-	private record Article(Long id, String title, String author, String date, String license, String description,
-						   String source) {
-	}
-
-	private void parseCommonArticles(String articles) {
+	private void parseCommonArticles(String articles, CommonsMetaWriter writer) {
 		try {
 			SAXParser sx = SAXParserFactory.newInstance().newSAXParser();
 			FileProgressImplementation progress = new FileProgressImplementation("Read commonswiki articles file", new File(articles));
 			InputStream streamFile = progress.openFileInputStream();
 			InputSource is = getInputSource(streamFile);
-			final CommonsWikiHandler handler = new CommonsWikiHandler(sx, progress);
+			final CommonsWikiHandler handler = new CommonsWikiHandler(sx, progress, writer);
 			sx.parse(is, handler);
 		} catch (ParserConfigurationException | IOException | SAXException e) {
 			throw new RuntimeException(e);
 		}
 	}
 
-	private static class CommonsWikiHandler extends DefaultHandler {
+	private class CommonsWikiHandler extends DefaultHandler {
 		private final SAXParser saxParser;
 		private boolean pageTag = false;
 		private boolean pageIdParsed = false;
@@ -316,13 +216,15 @@ public class CommonsWikimediaPreparation {
 		private final StringBuilder ns = new StringBuilder();
 		private final StringBuilder id = new StringBuilder();
 		private final FileProgressImplementation progress;
+		private final CommonsMetaWriter writer;
 
 		private final StringBuilder textContent = new StringBuilder();
 		private final StringBuilder lastRevisionText = new StringBuilder();
 
-		CommonsWikiHandler(SAXParser saxParser, FileProgressImplementation progress) {
+		CommonsWikiHandler(SAXParser saxParser, FileProgressImplementation progress, CommonsMetaWriter writer) {
 			this.saxParser = saxParser;
 			this.progress = progress;
+			this.writer = writer;
 		}
 
 		@Override
@@ -416,10 +318,10 @@ public class CommonsWikimediaPreparation {
 					String description = meta.get("description");
 					String source = meta.get("source");
 					try {
-						QUEUE.put(new Article(Long.parseLong(id.toString()), imageTitle.replace(" ", "_"),
+						writer.add(new Article(Long.parseLong(id.toString()), imageTitle.replace(" ", "_"),
 								author, date, license, description, source));
 						if (articlesCount.incrementAndGet() % 100000 == 0) {
-							System.out.println(articlesCount.get() + " Articles processed");
+							log.info(articlesCount.get() + " Articles processed");
 						}
 					} catch (InterruptedException e) {
 						Thread.currentThread().interrupt();

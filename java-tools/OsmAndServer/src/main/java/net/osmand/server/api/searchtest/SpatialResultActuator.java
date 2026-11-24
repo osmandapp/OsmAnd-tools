@@ -34,6 +34,21 @@ public class SpatialResultActuator extends ResultActuator {
 	// (Elmira), the shop '9333 Research Boulevard' is 210 m from the building (Austin); malls reach 700 m and stay failures
 	protected static final int DIST_SAME_NUMBER_THRESHOLD_M = 300;
 
+	// a category row (POI_TYPE since #1802, no location) is not the first result either, otherwise the row is written
+	// empty and becomes Not Found ("Synagoge": the synagogue category above the POI). The place stays the index + 1:
+	// isFound reads the following rows by it
+	@Override
+	protected Result findFirstResult(List<SearchResult> searchResults) throws IOException {
+		int resPlace = 1;
+		for (SearchResult sr : searchResults) {
+			if (sr.objectType != null && sr.objectType != ObjectType.LOCATION && sr.objectType != ObjectType.POI_TYPE) {
+				return new Result(ResultType.Best, resPlace, sr);
+			}
+			resPlace++;
+		}
+		return null;
+	}
+
 	protected Result findActualResult(List<SearchResult> searchResults) throws IOException {
 		// The first result that is the target: the same object or one at the point (deduplication may keep the id of the
 		// building). Categories and LOCATION rows take no place (findFirstResult skips LOCATION too: "Via Provinciale 39"

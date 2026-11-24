@@ -1,20 +1,84 @@
 package net.osmand.server.api.services;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.text.DateFormat;
 import java.util.Arrays;
+import java.util.Base64;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+import java.util.TimeZone;
 
 import net.osmand.mailsender.EmailSenderTemplate;
+import net.osmand.server.PurchasesDataLoader;
+import net.osmand.server.api.repo.CloudUserDevicesRepository;
+import net.osmand.server.api.repo.CloudUserFilesRepository;
+import net.osmand.server.api.repo.CloudUsersRepository;
+import net.osmand.server.api.repo.DeviceInAppPurchasesRepository;
+import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
+import net.osmand.server.api.repo.ShareFileRepository;
+import net.osmand.util.Algorithms;
+import jakarta.annotation.Nullable;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.util.HtmlUtils;
 
 @Service
 public class EmailSenderService {
+
+	@Autowired
+	protected PurchasesDataLoader purchasesDataLoader;
+
+	@Autowired
+	protected CloudUserDevicesRepository devicesRepository;
+
+	@Autowired
+	protected CloudUsersRepository usersRepository;
+
+	@Autowired
+	protected CloudUserFilesRepository filesRepository;
+
+	public void sendAfterCommit(Runnable send) {
+		if (TransactionSynchronizationManager.isSynchronizationActive()) {
+			TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+				@Override
+				public void afterCommit() {
+					send.run();
+				}
+			});
+		} else {
+			send.run();
+		}
+	}
+
+	@Nullable
+	public String getLatestUserLang(int userid) {
+		String lang = null;
+		Date latest = null;
+		for (CloudUserDevicesRepository.CloudUserDevice device : devicesRepository.findByUserid(userid)) {
+			if (Algorithms.isEmpty(device.lang)) {
+				continue;
+			}
+			if (lang == null || (device.udpatetime != null && (latest == null || device.udpatetime.after(latest)))) {
+				lang = device.lang;
+				latest = device.udpatetime;
+			}
+		}
+		return lang;
+	}
+
 	public static void test(String[] args) {
 		EmailSenderService sender = new EmailSenderService();
 		String email = "dmarc-reports@osmand.net";
 		sender.sendOsmAndCloudPromoEmail(email, "promo");
-		sender.sendOsmAndCloudWebEmail(email, "token", "en", "delete");
-		sender.sendOsmAndCloudRegistrationEmail(email, "token", "en", true);
+		for (CloudAccountAction action : CloudAccountAction.values()) {
+			sender.sendOsmAndCloudAccountEmail(email, "token", "en", action, "new@osmand.net");
+		}
 		sender.sendPromocodesEmails(email, "promocode/android", "ANDROID");
 		sender.sendPromocodesEmails(email, "promocode/ios", "IOS");
 	}
@@ -28,48 +92,282 @@ public class EmailSenderService {
 				.to(email)
 				.send()
 				.isSuccess();
-	    LOGGER.info("sendOsmAndCloudPromoEmail to: " + shorten(email) + " (" + ok + ")");
+	    LOGGER.info("sendOsmAndCloudPromoEmail to: " + shortenEmail(email) + " (" + ok + ")");
 	}
     
-    public void sendOsmAndCloudWebEmail(String email, String token, String action, String lang) {
-		String templateAction = action;
-		if ("setup".equals(action)) {
-			templateAction = "@ACTION_SETUP@";
-		} else if("change".equals(action)) {
-			templateAction = "@ACTION_CHANGE@";
-		} else if("delete".equals(action)) {
-			templateAction = "@ACTION_DELETE@";
+	public enum CloudAccountAction {
+		SETUP("cloud/account/setup"),
+		LOGIN("cloud/account/login"),
+		PASSWORD("cloud/account/password"),
+		EMAIL_CHANGE_REQUEST("cloud/account/change-request"),
+		EMAIL_CHANGE("cloud/account/change"),
+		DELETE("cloud/account/delete"),
+		EMAIL_CHANGED("cloud/account/email-changed");
+
+		public final String template;
+
+		CloudAccountAction(String template) {
+			this.template = template;
 		}
-	    boolean ok = new EmailSenderTemplate()
-			    .load("cloud/web", lang)
-			    .set("ACTION", templateAction)
-			    .set("TOKEN", token)
-			    .to(email)
-			    .send()
-			    .isSuccess();
-	    LOGGER.info("sendOsmAndCloudWebEmail to: " + shorten(email) + " (" + ok + ") [" + lang + "]");
-	}
-    
-    public void sendOsmAndCloudWebLinkEmail(String email, String cancelUrl) {
-	    boolean ok = new EmailSenderTemplate()
-			    .load("cloud/web-link")
-			    .set("CANCEL_URL", cancelUrl)
-			    .to(email)
-			    .send()
-			    .isSuccess();
-	    LOGGER.info("sendOsmAndCloudWebLinkEmail to: " + shorten(email) + " (" + ok + ")");
+
+		public static CloudAccountAction fromCodeRequest(String action, boolean toNewEmail) {
+			if (action == null) {
+				return null;
+			}
+			switch (action) {
+				case "setup":
+					return SETUP;
+				case "change":
+					return toNewEmail ? EMAIL_CHANGE : EMAIL_CHANGE_REQUEST;
+				case "delete":
+					return DELETE;
+				default:
+					return null;
+			}
+		}
 	}
 
-    public void sendOsmAndCloudRegistrationEmail(String email, String token, String lang, boolean newUser) {
-		String subject = newUser ? "@SUBJECT_NEW@" : "@SUBJECT_OLD@";
-	    boolean ok = new EmailSenderTemplate()
-			    .load("cloud/register", lang)
-			    .set("SUBJECT", subject)
-			    .set("TOKEN", token)
-			    .to(email)
-			    .send()
-			    .isSuccess();
-	    LOGGER.info("sendOsmAndCloudRegistrationEmail to: " + shorten(email) + " (" + ok + ") [" + lang + "]");
+	public boolean sendOsmAndCloudAccountEmail(String email, String token, String lang, CloudAccountAction action) {
+		return sendOsmAndCloudAccountEmail(email, token, lang, action, null);
+	}
+
+	public void sendShareFileAccessEmail(ShareFileRepository.ShareFilesAccess access, boolean approved) {
+		ShareFileRepository.ShareFile file = access.file;
+		CloudUsersRepository.CloudUser requester = access.user;
+		if (file == null || requester == null || requester.email == null) {
+			return;
+		}
+		try {
+			CloudUsersRepository.CloudUser owner = usersRepository.findById(file.ownerid);
+			if (owner == null) {
+				return;
+			}
+			String ownerName = owner.nickname;
+			if (Algorithms.isEmpty(ownerName)) {
+				int at = Algorithms.isEmpty(owner.email) ? -1 : owner.email.indexOf('@');
+				ownerName = at > 0 ? owner.email.substring(0, at) : null;
+			}
+			String template = approved ? "cloud/share/approved" : "cloud/share/declined";
+			boolean ok = loadShareFileTemplate(template, getLatestUserLang(requester.id), file)
+					.set("OWNER_NAME", Algorithms.isEmpty(ownerName) ? "@OWNER_DEFAULT@" : htmlText(ownerName))
+					.to(requester.email)
+					.send()
+					.isSuccess();
+			LOGGER.info("sendShareFileAccessEmail approved=" + approved + " to: " + shortenEmail(requester.email) + " (" + ok + ")");
+		} catch (Exception e) {
+			LOGGER.error("Failed to send share access email: " + e.getMessage(), e);
+		}
+	}
+
+	public void sendShareFileRequestEmail(ShareFileRepository.ShareFilesAccess access) {
+		ShareFileRepository.ShareFile file = access.file;
+		CloudUsersRepository.CloudUser requester = access.user;
+		if (file == null || requester == null) {
+			return;
+		}
+		try {
+			CloudUsersRepository.CloudUser owner = usersRepository.findById(file.ownerid);
+			if (owner == null || Algorithms.isEmpty(owner.email)) {
+				return;
+			}
+			boolean ok = loadShareFileTemplate("cloud/share/requested", getLatestUserLang(owner.id), file)
+					.set("REQUESTER_NAME", htmlText(requester.nickname))
+					.set("FILE_SHARE_SETTINGS_PATH", getShareSettingsPath(file))
+					.to(owner.email)
+					.send()
+					.isSuccess();
+			LOGGER.info("sendShareFileRequestEmail to: " + shortenEmail(owner.email) + " (" + ok + ")");
+		} catch (Exception e) {
+			LOGGER.error("Failed to send share request email: " + e.getMessage(), e);
+		}
+	}
+
+	private EmailSenderTemplate loadShareFileTemplate(String template, String lang, ShareFileRepository.ShareFile file) {
+		CloudUserFilesRepository.UserFile userFile =
+				filesRepository.findTopByUseridAndNameAndTypeOrderByUpdatetimeDesc(file.ownerid, file.filepath, file.type);
+		String name = file.name == null ? "" : file.name;
+		int dotIdx = name.lastIndexOf('.');
+		String ext = dotIdx > 0 && dotIdx < name.length() - 1
+				? name.substring(dotIdx + 1).toUpperCase(Locale.ROOT) : "FILE";
+		String meta = file.type == null ? ext : file.type;
+		if (userFile != null && userFile.filesize > 0) {
+			meta = meta + " · " + Algorithms.formatFileSize(userFile.filesize);
+		}
+		return new EmailSenderTemplate()
+				.load(template, lang)
+				.set("FILE_NAME", htmlText(name))
+				.set("FILE_NAME_PLAIN", plainText(name))
+				.set("FILE_EXT", htmlText(ext))
+				.set("FILE_META", htmlText(meta))
+				.set("FILE_UUID", file.uuid == null ? "" : file.uuid.toString());
+	}
+
+	// the same path as the web builds for the Share menu of a track or a favorites group
+	static String getShareSettingsPath(ShareFileRepository.ShareFile file) {
+		String dir = UserdataService.FILE_TYPE_FAVOURITES.equals(file.type) ? "favorites" : "tracks";
+		String id = Base64.getEncoder().encodeToString(file.filepath.getBytes(StandardCharsets.UTF_8));
+		return "mydata/" + dir + "/info/" + URLEncoder.encode(id, StandardCharsets.UTF_8) + "/share/";
+	}
+
+	static String htmlText(String s) {
+		return s == null ? "" : HtmlUtils.htmlEscape(s).replace("@", "&#64;");
+	}
+
+	static String plainText(String s) {
+		return s == null ? "" : s.replaceAll("[\\r\\n]+", " ");
+	}
+
+	public void sendPurchaseReceiptEmail(String email, int userId, String checkoutLang, String orderId, Date orderDate,
+			String orderTotal, List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> purchases,
+			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions) {
+		try {
+			String lang = getLatestUserLang(userId);
+			sendReceipt(email, lang != null ? lang : checkoutLang, orderId, orderDate, orderTotal, purchases, subscriptions);
+		} catch (Exception e) {
+			LOGGER.error("Failed to send receipt for orderId " + orderId + ": " + e.getMessage(), e);
+		}
+	}
+
+	private void sendReceipt(String email, String lang, String orderId, Date orderDate, String orderTotal,
+			List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> purchases,
+			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions) {
+		String productName;
+		String planName;
+		String planCount = "";
+		String renewalLabel;
+		Date renewalDate;
+		boolean renews = false;
+		if (subscriptions != null && !subscriptions.isEmpty()) {
+			DeviceSubscriptionsRepository.SupporterDeviceSubscription sub = subscriptions.get(0);
+			PurchasesDataLoader.Subscription skuData = purchasesDataLoader.getSubscriptions().get(sub.sku);
+			productName = skuData != null ? skuData.name() : sub.sku;
+			PurchasesDataLoader.Plan plan = skuData == null ? null : skuData.plan();
+			if (plan == null) {
+				planName = "@RECEIPT_PLAN_SUBSCRIPTION@";
+			} else {
+				planName = switch (plan) {
+					case MONTHLY -> "@RECEIPT_PLAN_MONTHLY@";
+					case ANNUAL -> "@RECEIPT_PLAN_ANNUAL@";
+					case YEARS -> "@RECEIPT_PLAN_YEARS@";
+					case MONTHS -> "@RECEIPT_PLAN_MONTHS@";
+				};
+				planCount = switch (plan) {
+					case YEARS -> String.valueOf(skuData.months() / 12);
+					case MONTHS -> String.valueOf(skuData.months());
+					default -> "";
+				};
+			}
+			renews = Boolean.TRUE.equals(sub.autorenewing);
+			renewalLabel = renews ? "@RECEIPT_RENEWS_ON@" : "@RECEIPT_EXPIRES_ON@";
+			renewalDate = sub.expiretime;
+		} else if (purchases != null && !purchases.isEmpty()) {
+			DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase iap = purchases.get(0);
+			PurchasesDataLoader.InApp skuData = purchasesDataLoader.getInApps().get(iap.sku);
+			productName = skuData != null ? skuData.name() : iap.sku;
+			planName = "@RECEIPT_PLAN_ONETIME@";
+			renewalLabel = "@RECEIPT_EXPIRES_ON@";
+			renewalDate = skuData != null ? skuData.getExpireDate(iap.purchaseTime) : null;
+		} else {
+			return;
+		}
+		EmailSenderTemplate sender = new EmailSenderTemplate()
+				.load("cloud/purchase/receipt", lang)
+				.set("EMAIL", htmlText(email))
+				.set("ORDER_ID", htmlText(orderId))
+				.set("ORDER_DATE", htmlText(formatReceiptDate(orderDate, lang)))
+				.set("ORDER_TOTAL", orderTotal == null ? "&mdash;" : htmlText(orderTotal))
+				.set("PRODUCT_NAME", htmlText(productName))
+				.set("PRODUCT_SHORT", htmlText(productShort(productName)))
+				.set("PLAN_NAME", planName)
+				.set("RECEIPT_PLAN_COUNT", planCount);
+		String productIcon = productIcon(productName);
+		if (productIcon != null) {
+			sender.set("CARD_ICON", "@ICON_IMG@")
+					.set("ICON_FILE", productIcon);
+		}
+		if (renewalDate != null) {
+			sender.set("RENEWAL_ROW", "@RECEIPT_RENEWAL_ROW@")
+					.set("RENEWAL_LABEL", renewalLabel)
+					.set("RENEWAL_DATE", htmlText(formatReceiptDate(renewalDate, lang)));
+			if (renews) {
+				sender.set("FOOTER_MANAGE", "@MANAGE_SUBSCRIPTION_LINK@");
+			}
+		}
+		boolean ok = sender.to(email).send().isSuccess();
+		LOGGER.info("sendPurchaseReceiptEmail order " + orderId + " to: " + shortenEmail(email) + " (" + ok + ") [" + lang + "]");
+	}
+    
+    public boolean sendOsmAndCloudWebLinkEmail(String email, String lang, String cancelUrl) {
+	    boolean ok;
+	    try {
+		    ok = new EmailSenderTemplate()
+				    .load("cloud/account/web-link", lang)
+				    .set("CANCEL_URL", cancelUrl)
+				    .set("WEB_LINK_VALID_FROM_HOURS", String.valueOf(UserdataService.WEB_LINK_VALID_FROM_HOURS))
+				    .set("WEB_LINK_VALID_TO_HOURS", String.valueOf(UserdataService.WEB_LINK_VALID_TO_HOURS))
+				    .to(email)
+				    .send()
+				    .isSuccess();
+	    } catch (Exception e) {
+		    LOGGER.error("Failed to send web link email: " + e.getMessage(), e);
+		    ok = false;
+	    }
+	    LOGGER.info("sendOsmAndCloudWebLinkEmail to: " + shortenEmail(email) + " (" + ok + ") [" + lang + "]");
+	    return ok;
+	}
+
+	public void sendPurchaseLinkedEmail(String email, String lang, String productName, boolean subscription) {
+		String kind = subscription ? "_SUBSCRIPTION@" : "_PURCHASE@";
+		boolean ok = new EmailSenderTemplate()
+				.load("cloud/purchase/linked", lang)
+				.set("LINKED_PREHEADER", "@LINKED_PREHEADER" + kind)
+				.set("LINKED_INTRO", "@LINKED_INTRO" + kind)
+				.set("LINKED_FEATURES", "@LINKED_FEATURES" + kind)
+				.set("PRODUCT_SHORT", htmlText(productShort(productName)))
+				.set("EMAIL", htmlText(email))
+				.set("PRODUCT_NAME", htmlText(productName))
+				.to(email)
+				.send()
+				.isSuccess();
+		LOGGER.info("sendPurchaseLinkedEmail to: " + shortenEmail(email) + " (" + ok + ") [" + lang + "]");
+	}
+
+	private static String productShort(String productName) {
+		return productName.startsWith("OsmAnd ") ? productName.substring("OsmAnd ".length()) : productName;
+	}
+
+	private static String productIcon(String productName) {
+		return switch (productName) {
+			case "OsmAnd Pro" -> "icon_osmand_pro.png";
+			case "OsmAnd Maps+" -> "icon_osmand_maps_plus.png";
+			case "OsmAnd XV" -> "icon_osmand_xv.png";
+			default -> null;
+		};
+	}
+
+	private static String formatReceiptDate(Date date, String lang) {
+		Locale locale = Locale.forLanguageTag(EmailSenderTemplate.safeLang(lang).replace('_', '-'));
+		DateFormat format = DateFormat.getDateInstance(DateFormat.MEDIUM, locale);
+		format.setTimeZone(TimeZone.getTimeZone("UTC"));
+		return format.format(date);
+	}
+
+	public boolean sendOsmAndCloudAccountEmail(String email, String token, String lang, CloudAccountAction action,
+			String newEmail) {
+		if (token == null && action != CloudAccountAction.EMAIL_CHANGED) {
+			throw new IllegalArgumentException("Token is required for " + action.name() + " email:" + shortenEmail(email));
+		}
+		EmailSenderTemplate sender = new EmailSenderTemplate()
+				.load(action.template, lang)
+				.set("TOKEN", token == null ? "" : token)
+				.set("CODE_TTL_HOURS", String.valueOf(UserdataService.EMAIL_TOKEN_EXPIRATION_HOURS));
+		if (newEmail != null) {
+			sender.set("NEW_EMAIL", htmlText(newEmail));
+		}
+		boolean ok = sender.to(email).send().isSuccess();
+		LOGGER.info("sendOsmAndCloudAccountEmail " + action.name() + " to: " + shortenEmail(email)
+				+ " (" + ok + ") [" + lang + "]");
+		return ok;
 	}
     
     public boolean sendPromocodesEmails(String mailTo, String templateId, String promocodes) {
@@ -79,18 +377,18 @@ public class EmailSenderService {
 			    .set("PROMOCODE", promocodes)
 			    .send()
 			    .isSuccess();
-	    LOGGER.info("sendPromocodesEmails to: " + shorten(mailTo) + " (" + ok + ")");
+	    LOGGER.info("sendPromocodesEmails to: " + shortenEmail(mailTo) + " (" + ok + ")");
 		return ok;
     }
 
 	public void sendOsmAndSpecialGiftEmail(String email) {
 		boolean ok = new EmailSenderTemplate()
-				.load("birthday/XV")
+				.load("cloud/xv")
 				.to(email)
 				.send()
 				.isSuccess();
 
-		LOGGER.info("sendOsmAndSpecialGiftEmail to: " + shorten(email) + " (" + ok + ")");
+		LOGGER.info("sendOsmAndSpecialGiftEmail to: " + shortenEmail(email) + " (" + ok + ")");
 	}
 
 	public boolean isEmail(String comment) {
@@ -114,8 +412,17 @@ public class EmailSenderService {
 		return true;
 	}
 
+	// n***@example.com - enough for the owner to recognise the address without exposing it in full
+	public static String maskEmail(String email) {
+		int at = email == null ? -1 : email.indexOf('@');
+		if (at <= 0) {
+			return "***";
+		}
+		return email.charAt(0) + "***" + email.substring(at);
+	}
+
 	// hide full email from logs
-	public static String shorten(String full) {
-		return full == null ? null : full.replaceFirst(".....", "....."); // osmand@t-online.de -> .....d@t-online.de
+	public static String shortenEmail(String full) {
+		return full == null ? null : full.replaceFirst("....", "...."); // osmand@t-online.de -> ....nd@t-online.de
 	}
  }

@@ -102,11 +102,12 @@ public class FastSpringController {
 			List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> purchases = new ArrayList<>();
 			List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subscriptions = new ArrayList<>();
 			String orderId = data.order;
+			Date orderDate = event.created != null ? new Date(event.created) : new Date();
 			int userId = user.id;
 			boolean sendOsmAndAndSpecialGiftEmail = false;
 			for (FastSpringWebhookRequest.Item item : data.items) {
 				String sku = item.sku;
-				LOGGER.info(String.format("FastSpring: hook recorded for user %s %d with orderId: %s, sku: %s, purchaseToken: %s", EmailSenderService.shorten(email), userId, orderId, sku, data.reference));
+				LOGGER.info(String.format("FastSpring: hook recorded for user %s %d with orderId: %s, sku: %s, purchaseToken: %s", EmailSenderService.shortenEmail(email), userId, orderId, sku, data.reference));
 				if (FastSpringHelper.productSkuMap.contains(sku)) {
 					// Handle product purchase
 					List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> existingInApps = deviceInAppPurchasesRepository.findByOrderId(orderId);
@@ -124,13 +125,13 @@ public class FastSpringController {
 					iap.orderId = orderId;
 					iap.sku = sku;
 					iap.purchaseToken = data.reference;
-					iap.purchaseTime = event.created != null ? new Date(event.created) : new Date();
+					iap.purchaseTime = orderDate;
 					iap.timestamp = new Date();
 					iap.userId = userId;
 					iap.valid = true;
 
 					purchases.add(iap);
-					LOGGER.info(String.format("FastSpring: InApp recorded for user %s purchaseToken: %s", EmailSenderService.shorten(email), data.reference));
+					LOGGER.info(String.format("FastSpring: InApp recorded for user %s purchaseToken: %s", EmailSenderService.shortenEmail(email), data.reference));
 				} else if (FastSpringHelper.subscriptionSkuMap.contains(sku)) {
 					// Handle subscription purchase
 					List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> existingSubscriptions = deviceSubscriptionsRepository.findByOrderId(orderId);
@@ -148,9 +149,10 @@ public class FastSpringController {
 						subscription.valid = true;
 
 						setInitialSubscriptionDates(subscription, sku);
+						setAutorenewingFromApi(subscription);
 
 						subscriptions.add(subscription);
-						LOGGER.info(String.format("FastSpring: Subscription recorded for user %s purchaseToken: %s", EmailSenderService.shorten(email), data.reference));
+						LOGGER.info(String.format("FastSpring: Subscription recorded for user %s purchaseToken: %s", EmailSenderService.shortenEmail(email), data.reference));
 					}
 				} else {
 					LOGGER.error("FastSpring: Unknown product " + sku);
@@ -162,12 +164,15 @@ public class FastSpringController {
 
 			userSubService.verifyAndRefreshProOrderId(user);
 
+			emailSender.sendAfterCommit(() -> emailSender.sendPurchaseReceiptEmail(email, userId, data.language, data.order,
+					orderDate, data.totalDisplay, purchases, subscriptions));
+
 			if (sendOsmAndAndSpecialGiftEmail) {
-				LOGGER.info("FastSpring: Sending special gift email to " + EmailSenderService.shorten(email) + " for orderId: " + data.order + ", purchaseToken: " + data.reference);
-				emailSender.sendOsmAndSpecialGiftEmail(email);
+				LOGGER.info("FastSpring: Sending special gift email to " + EmailSenderService.shortenEmail(email) + " for orderId: " + data.order + ", purchaseToken: " + data.reference);
+				emailSender.sendAfterCommit(() -> emailSender.sendOsmAndSpecialGiftEmail(email));
 			}
 		} else {
-			LOGGER.error("FastSpring: User not found for email " + EmailSenderService.shorten(email) + " orderId: " + data.order + ", purchaseToken: " + data.reference);
+			LOGGER.error("FastSpring: User not found for email " + EmailSenderService.shortenEmail(email) + " orderId: " + data.order + ", purchaseToken: " + data.reference);
 		}
 
 		return null;
@@ -522,6 +527,25 @@ public class FastSpringController {
 		}
 	}
 
+	private void setAutorenewingFromApi(DeviceSubscriptionsRepository.SupporterDeviceSubscription subscription) {
+		if (!FastSpringHelper.isConfigured()) {
+			return;
+		}
+		String reason = "no autorenew data yet";
+		try {
+			FastSpringHelper.FastSpringSubscription fsSub =
+					FastSpringHelper.getSubscriptionByOrderIdAndSku(subscription.orderId, subscription.sku);
+			if (fsSub != null && fsSub.autoRenew != null && fsSub.state != null) {
+				subscription.autorenewing = fsSub.isAutoRenewing();
+				return;
+			}
+		} catch (Exception e) {
+			reason = e.getMessage();
+		}
+		LOGGER.warn("FastSpring: keeping estimated autorenew for orderId " + subscription.orderId
+				+ ", sku " + subscription.sku + ": " + reason);
+	}
+
 	public static class FastSpringWebhookRequest {
 
 		public List<Event> events;
@@ -537,6 +561,8 @@ public class FastSpringController {
 			public String order; // orderId
 			public String subscription; // subscriptionId, present on subscription.* events
 			public String reference; // purchaseToken
+			public String totalDisplay;
+			public String language; // two-letter ISO code of the order's language
 			public Customer customer;
 			public Tags tags;
 			public List<Item> items;

@@ -11,6 +11,7 @@ import java.util.*;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.services.TransportStopsService;
 import net.osmand.server.utils.MultiPlatform;
+import net.osmand.server.utils.TimezoneMapper;
 import net.osmand.shared.wiki.WikiHelper;
 import net.osmand.shared.wiki.WikiImage;
 import net.osmand.shared.wiki.WikiMetadata;
@@ -34,6 +35,7 @@ import net.osmand.server.api.services.search.ClassicSearchService;
 import net.osmand.server.api.services.search.MapReadersService;
 import net.osmand.server.api.services.search.PoiTypesService;
 import net.osmand.server.api.services.search.PoiSearchService;
+import net.osmand.server.api.services.search.SearchResultConverter;
 import net.osmand.server.api.services.search.SpatialSearchService;
 import net.osmand.server.api.services.WikiService;
 import net.osmand.server.controllers.pub.GeojsonClasses.FeatureCollection;
@@ -74,6 +76,9 @@ public class SearchController {
 	SpatialSearchService spatialSearchService;
 
 	@Autowired
+	SearchResultConverter searchResultConverter;
+
+	@Autowired
 	TransportStopsService transportStopsService;
 
 	@Autowired
@@ -102,7 +107,6 @@ public class SearchController {
 	                                     @RequestParam(required = false) Boolean baseSearch,
 	                                     @RequestParam(required = false) Boolean spatial,
 	                                     @RequestParam(required = false) Boolean autocomplete,
-	                                     @RequestParam(required = false) String timeZone,
 	                                     @RequestParam(required = false) String maps,
 	                                     HttpServletRequest request) throws IOException {
 		if (!osmAndMapsService.validateAndInitConfig()) {
@@ -112,13 +116,16 @@ public class SearchController {
 				baseSearch != null && baseSearch, northWest, southEast);
 		if (spatial != null && spatial) {
 			SpatialSearchService.SpatialResponse res =
-					spatialSearchService.searchSpatial(searchContext, timeZone, autocomplete != null && autocomplete,
+					spatialSearchService.searchSpatial(searchContext, autocomplete != null && autocomplete,
 							sessionRoutingKey(request), maps);
 			JsonObject json = gson.toJsonTree(new FeatureCollection(res.features.toArray(new Feature[0]))).getAsJsonObject();
 			json.add("info", gson.toJsonTree(res.info));
+			if (res.typoSuggestion != null) {
+				json.addProperty("typoSuggestion", res.typoSuggestion);
+			}
 			return ResponseEntity.ok(gson.toJson(json));
 		}
-		List<Feature> features = classicSearchService.search(searchContext, timeZone);
+		List<Feature> features = classicSearchService.search(searchContext);
 		return ResponseEntity.ok(gson.toJson(new FeatureCollection(features.toArray(new Feature[0]))));
 	}
 
@@ -132,6 +139,8 @@ public class SearchController {
 	                                        @RequestParam(required = false) Integer zoom,
 	                                        @RequestParam(required = false) String timeZone) throws IOException {
 		PoiSearchService.PoiSearchResult poiSearchResult = poiSearchService.searchPoi(searchData, locale, new LatLon(lat, lon), baseSearch != null && baseSearch, zoom != null ? zoom : -1, timeZone);
+		poiSearchResult.categoryNames = poiTypesService.getCategoryNames(
+				searchData.categories.stream().map(PoiSearchService.PoiSearchCategory::category).toList(), locale);
 		return ResponseEntity.ok(gson.toJson(poiSearchResult));
 	}
 
@@ -142,7 +151,7 @@ public class SearchController {
 	                                     @RequestParam(required = false) String name,
 	                                     @RequestParam(required = false) Long osmId,
 	                                     @RequestParam(required = false) Long wikidataId,
-	                                     @RequestParam(required = false) String timeZone) throws IOException {
+	                                     @RequestParam(required = false) String lang) throws IOException {
 		Feature poiSearchResult;
 
 		if (pin == null || pin.isEmpty()) {
@@ -161,7 +170,8 @@ public class SearchController {
 			return ResponseEntity.badRequest().body("Invalid 'pin' coordinates, expected numeric values for 'lat,lon'");
 		}
 
-		poiSearchResult = poiSearchService.getPoiResultByShareLink(type, new LatLon(lat, lng), name, osmId, wikidataId, timeZone);
+		poiSearchResult = poiSearchService.getPoiResultByShareLink(type, new LatLon(lat, lng), name, osmId, wikidataId,
+				lang);
 
 		return ResponseEntity.ok(gson.toJson(poiSearchResult));
 	}
@@ -231,8 +241,9 @@ public class SearchController {
 	@ResponseBody
 	public ResponseEntity<String> searchPoiCategories(@RequestParam String search,
 	                                                  @RequestParam double lat,
-	                                                  @RequestParam double lon) throws IOException {
-		Map<String, Map<String, String>> res = poiSearchService.searchPoiCategories(search, new LatLon(lat, lon));
+	                                                  @RequestParam double lon,
+	                                                  @RequestParam(required = false) String locale) throws IOException {
+		Map<String, Map<String, String>> res = poiSearchService.searchPoiCategories(search, new LatLon(lat, lon), locale);
 		return ResponseEntity.ok(gson.toJson(res));
 	}
 
@@ -355,9 +366,8 @@ public class SearchController {
 	public ResponseEntity<String> getPoiByOsmId(@RequestParam double lat,
 	                                            @RequestParam double lon,
 	                                            @RequestParam long osmid,
-	                                            @RequestParam String type,
-	                                            @RequestParam(required = false) String timeZone) throws IOException {
-		Feature poi = poiSearchService.searchPoiByOsmId(new LatLon(lat, lon), osmid, type, timeZone);
+	                                            @RequestParam String type) throws IOException {
+		Feature poi = poiSearchService.searchPoiByOsmId(new LatLon(lat, lon), osmid, type);
 		return ResponseEntity.ok(gson.toJson(poi));
 	}
 
@@ -366,17 +376,25 @@ public class SearchController {
 	public ResponseEntity<String> getPoiByMapObject(@RequestBody Map<String, String> tags,
 	                                                @RequestParam double lat,
 	                                                @RequestParam double lon,
-	                                                @RequestParam long id,
-	                                                @RequestParam(required = false) String timeZone) throws IOException {
+	                                                @RequestParam long id) throws IOException {
 		ResponseEntity<String> error = validateTags(tags);
 		if (error != null) {
 			return error;
 		}
-		List<Feature> poi = poiSearchService.getPoiByMapObject(id, new LatLon(lat, lon), tags, timeZone);
+		List<Feature> poi = poiSearchService.getPoiByMapObject(id, new LatLon(lat, lon), tags);
 		if (poi.isEmpty()) {
 			return ResponseEntity.badRequest().body("Error getting poi by map object!");
 		}
 		return ResponseEntity.ok(gson.toJson(new FeatureCollection(poi.toArray(new Feature[0]))));
+	}
+
+	@GetMapping(path = {"/get-opening-hours-info"}, produces = "application/json")
+	@ResponseBody
+	public ResponseEntity<String> getOpeningHoursInfo(@RequestParam String openingHours,
+	                                                  @RequestParam double lat,
+	                                                  @RequestParam double lon) {
+		String placeTimeZone = TimezoneMapper.latLngToTimezoneString(lat, lon);
+		return ResponseEntity.ok(gson.toJson(searchResultConverter.getOpeningHoursInfo(openingHours, SearchResultConverter.getCurrentTime(placeTimeZone))));
 	}
 
 	@GetMapping(path = {"/get-poi-by-name"}, produces = "application/json")

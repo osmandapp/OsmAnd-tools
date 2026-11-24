@@ -25,6 +25,10 @@ public class WikidataFilesDownloader extends AbstractWikiFilesDownloader {
 		return "wikidatawiki";
 	}
 
+	protected boolean downloadsFullLatestDump() {
+		return false;
+	}
+
 	public long getMaxIdFromDb(File wikiSqlite) throws SQLException {
 		DBDialect dialect = DBDialect.SQLITE;
 		Connection conn = dialect.getDatabaseConnection(wikiSqlite.getAbsolutePath(), log);

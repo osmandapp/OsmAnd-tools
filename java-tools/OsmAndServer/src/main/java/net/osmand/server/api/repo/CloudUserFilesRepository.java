@@ -71,7 +71,7 @@ public interface CloudUserFilesRepository extends JpaRepository<UserFile, Long> 
         @Column(name = "type")
         public String type;
         
-        @Column(name = "name")
+        @Column(name = "name", columnDefinition = "text")
         public String name;
 
         @Column(name = "filesize")
@@ -91,7 +91,7 @@ public interface CloudUserFilesRepository extends JpaRepository<UserFile, Long> 
         @Column(name = "storage")
         public String storage;
 
-        @Column(name = "storagename")
+        @Column(name = "storagename", columnDefinition = "text")
         public String storagename;
 
         @Column(name = "gendetails", columnDefinition = "jsonb")

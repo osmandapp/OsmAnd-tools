@@ -6,6 +6,7 @@ import jakarta.transaction.Transactional;
 import net.osmand.purchases.PurchaseHelper;
 import net.osmand.purchases.ReceiptValidationHelper;
 import net.osmand.purchases.ReceiptValidationHelper.InAppReceipt;
+import net.osmand.mailsender.EmailSenderTemplate;
 import net.osmand.server.PurchasesDataLoader;
 import net.osmand.server.api.repo.*;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository.SupporterDeviceSubscription;
@@ -39,9 +40,7 @@ import java.security.PrivateKey;
 import java.security.Signature;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
-import java.text.DateFormat;
 import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.util.*;
 import java.util.Map.Entry;
@@ -50,7 +49,6 @@ import java.util.concurrent.ThreadLocalRandom;
 import static net.osmand.server.api.repo.DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase;
 import static net.osmand.server.api.repo.DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchasePrimaryKey;
 import static net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
-import static net.osmand.server.api.services.ReceiptValidationService.NO_SUBSCRIPTIONS_FOUND_STATUS;
 import static net.osmand.server.api.services.UserSubscriptionService.OSMAND_PROMO_SUBSCRIPTION;
 
 @RestController
@@ -191,10 +189,7 @@ public class SubscriptionController {
 
 	@PostMapping(path = {"/register", "/register.php"}, consumes =  MediaType.APPLICATION_FORM_URLENCODED_VALUE, produces =  MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<String> register(HttpServletRequest request) {
-        String email = request.getParameter("email");
-        if (email != null) {
-            email = email.toLowerCase().trim();
-        }
+        String email = EmailSenderTemplate.trimLowerCaseEmail(request.getParameter("email"));
         String visibleName = request.getParameter("visibleName");
         String preferredCountry = request.getParameter("preferredCountry");
         // no email validation cause client doesn't provide it 99%

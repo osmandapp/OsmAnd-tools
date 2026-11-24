@@ -54,6 +54,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -302,6 +303,7 @@ public class IssuesController {
 	}
 
 	@PostMapping("/analyze")
+	@PreAuthorize("hasAnyAuthority(T(net.osmand.server.WebSecurityConfiguration).ROLE_ADMIN, T(net.osmand.server.WebSecurityConfiguration).ROLE_SUPPORT)")
 	public ResponseEntity<StreamingResponseBody> analyzeIssues(@RequestBody AnalyzeRequest request)
 			throws IOException, InterruptedException {
 		String apiKey = System.getenv("ISSUE_OPENROUTER_TOKEN");

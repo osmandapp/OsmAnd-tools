@@ -78,7 +78,7 @@ public class ClassicSearchService {
 		}
 	}
 
-	public List<Feature> search(SearchContext ctx, String timeZone) throws IOException {
+	public List<Feature> search(SearchContext ctx) throws IOException {
 		long tm = System.currentTimeMillis();
 		SearchResults searchResults = getImmediateSearchResults(ctx,
 				new SearchOption(false, null, null, true, false, CLASSIC_SEARCH_TYPES), null);
@@ -93,7 +93,7 @@ public class ClassicSearchService {
 		}
 		List<Feature> features = new ArrayList<>();
 		if (res != null && !res.isEmpty()) {
-			searchResultConverter.saveSearchResult(res, features, timeZone);
+			searchResultConverter.saveSearchResult(res, features);
 		}
 
 		return !features.isEmpty() ? features : Collections.emptyList();

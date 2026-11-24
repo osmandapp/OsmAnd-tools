@@ -3,6 +3,7 @@ package net.osmand.server.controllers.user;
 import java.io.*;
 
 import jakarta.servlet.http.HttpSession;
+import net.osmand.mailsender.EmailSenderTemplate;
 import net.osmand.server.api.repo.*;
 import net.osmand.shared.gpx.GpxTrackAnalysis;
 import okio.Buffer;
@@ -10,6 +11,7 @@ import okio.Buffer;
 import static net.osmand.IndexConstants.*;
 import static net.osmand.server.api.services.WebUserdataService.*;
 import static net.osmand.server.api.services.UserdataService.*;
+import static net.osmand.server.api.services.EmailSenderService.CloudAccountAction;
 import static org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE;
 
 import java.io.IOException;
@@ -49,7 +51,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 
 import net.osmand.server.WebSecurityConfiguration.OsmAndProUser;
@@ -57,6 +58,7 @@ import net.osmand.server.api.repo.CloudUserDevicesRepository.CloudUserDevice;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFile;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFileNoData;
 import net.osmand.server.controllers.pub.UserdataController.UserFilesResults;
+import net.osmand.server.utils.GpxJson;
 import org.xmlpull.v1.XmlPullParserException;
 
 @RestController
@@ -78,6 +80,9 @@ public class MapApiController {
 
 	@Autowired
 	UserdataService userdataService;
+
+	@Autowired
+	CloudMapFilesService cloudMapFilesService;
 
 	@Autowired
 	TrackAnalyzerService trackAnalyzerService;
@@ -113,7 +118,7 @@ public class MapApiController {
 
 	Gson gson = new Gson();
 
-	Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
+	Gson gsonWithNans = GpxJson.createWithNans();
 
 	public static class UserPasswordPost {
 		// security alert: don’t add fields to this class
@@ -129,7 +134,7 @@ public class MapApiController {
 	}
 
 	@GetMapping(path = { "/auth/info" }, produces = "application/json")
-	public String userInfo(java.security.Principal user) {
+	public String userInfo(java.security.Principal user, HttpServletRequest request) throws ServletException {
 		if (user == null) {
 			return gson.toJson(user);
 		}
@@ -137,6 +142,10 @@ public class MapApiController {
 			Object obj = ((Authentication) user).getPrincipal();
 			if (obj instanceof OsmAndProUser) {
 				OsmAndProUser pu = (OsmAndProUser) ((Authentication) user).getPrincipal();
+				if (usersRepository.findById(pu.getUserDevice().userid) == null) {
+					request.logout();
+					return gson.toJson(null);
+				}
 				List<String> roles = pu.getAuthorities().stream()
 						.map(GrantedAuthority::getAuthority)
 						.toList();
@@ -164,7 +173,7 @@ public class MapApiController {
 		if (user != null) {
 			request.logout();
 		}
-		String username = credentials.username;
+		String username = EmailSenderTemplate.trimLowerCaseEmail(credentials.username);
 		String password = credentials.password;
 		if (username == null || password == null) {
 			return ResponseEntity.badRequest().body("Username and password are required");
@@ -201,7 +210,7 @@ public class MapApiController {
 
 	@PostMapping(path = { "/auth/activate" }, consumes = "application/json", produces = "application/json")
 	public ResponseEntity<String> activateMapUser(@RequestBody UserPasswordPost credentials) {
-		String username = credentials.username;
+		String username = EmailSenderTemplate.trimLowerCaseEmail(credentials.username);
 		String password = credentials.password;
 		String token = credentials.token;
 		if (username == null || password == null) {
@@ -222,7 +231,7 @@ public class MapApiController {
 
 	@PostMapping(path = { "/auth/cancel-link" }, consumes = "application/json", produces = "application/json")
 	public ResponseEntity<String> cancelWebLoginLink(@RequestBody UserPasswordPost credentials) {
-		return userdataService.cancelWebLoginLink(credentials.username, credentials.token);
+		return userdataService.cancelWebLoginLink(EmailSenderTemplate.trimLowerCaseEmail(credentials.username), credentials.token);
 	}
 
 	@PostMapping(path = { "/auth/logout" }, consumes = "application/json", produces = "application/json")
@@ -236,7 +245,7 @@ public class MapApiController {
 	                                              @RequestParam String lang,
 	                                              @RequestParam boolean isNew,
 	                                              HttpServletRequest request) {
-		String username = credentials.username;
+		String username = EmailSenderTemplate.trimLowerCaseEmail(credentials.username);
 		if (username == null) {
 			return ResponseEntity.badRequest().body("Username is required");
 		}
@@ -245,7 +254,7 @@ public class MapApiController {
 	
 	@PostMapping(path = {"/auth/validate-token"}, consumes = "application/json", produces = "application/json")
 	public ResponseEntity<String> registerMapUser(@RequestBody UserPasswordPost credentials) {
-		String username = credentials.username;
+		String username = EmailSenderTemplate.trimLowerCaseEmail(credentials.username);
 		String token = credentials.token;
 		if (username == null) {
 			return ResponseEntity.badRequest().body("Username and token are required");
@@ -383,13 +392,14 @@ public class MapApiController {
 	public ResponseEntity<String> listFiles(@RequestParam(required = false) String name,
 	                                        @RequestParam(required = false) String type,
 	                                        @RequestParam(required = false, defaultValue = "false") boolean addDevices,
-	                                        @RequestParam(required = false, defaultValue = "false") boolean allVersions) {
+	                                        @RequestParam(required = false, defaultValue = "false") boolean allVersions) throws IOException {
 		CloudUserDevice dev = osmAndMapsService.checkUser();
 		if (dev == null) {
 			return userdataService.tokenNotValidResponse();
 		}
 		Set<String> types = userdataService.parseFileTypes(type);
 		UserFilesResults res = userdataService.generateFiles(dev.userid, name, allVersions, true, types);
+		cloudMapFilesService.prepareFileListForDeletedMaps(res, true);
 		Map<String, Set<String>> sharedFilesMap = shareFileService.getFilesByOwner(dev.userid);
 
 		res.uniqueFiles.forEach(nd -> {
@@ -745,12 +755,17 @@ public class MapApiController {
 		if (pu == null) {
 			return ResponseEntity.badRequest().body("User not found");
 		}
-		return userdataService.sendCode(action, lang, pu);
+		return userdataService.sendCode(CloudAccountAction.fromCodeRequest(action, false), lang, pu);
 	}
 
 	@PostMapping(path = {"/auth/send-code-to-new-email"})
 	public ResponseEntity<String> sendCodeToNewEmail(@RequestParam String action, @RequestParam String lang, @RequestParam String email, @RequestParam String code) {
-		if (emailSender.isEmail(email)) {
+		CloudAccountAction emailAction = CloudAccountAction.fromCodeRequest(action, true);
+		if (emailAction != CloudAccountAction.EMAIL_CHANGE) {
+			return ResponseEntity.badRequest().body("Unsupported action");
+		}
+		String newEmail = EmailSenderTemplate.trimLowerCaseEmail(email);
+		if (emailSender.isEmail(newEmail)) {
 			CloudUserDevice dev = osmAndMapsService.checkUser();
 			if (dev == null) {
 				return userdataService.tokenNotValidResponse();
@@ -765,31 +780,36 @@ public class MapApiController {
 				return response;
 			}
 			// check if new email is not registered
-			CloudUsersRepository.CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
-			if (pu != null) {
-				return ResponseEntity.badRequest().body("User was already registered with such email");
+			CloudUsersRepository.CloudUser pu = usersRepository.findByEmailIgnoreCase(newEmail);
+			if (pu == null) {
+				// create temp user with new email
+				pu = new CloudUsersRepository.CloudUser();
+				pu.email = newEmail;
+				pu.regTime = new Date();
+				pu.orderid = null;
+				usersRepository.saveAndFlush(pu);
+			} else {
+				ResponseEntity<String> accountError = userdataService.checkNewEmailAccount(pu);
+				if (accountError != null) {
+					return accountError;
+				}
 			}
-			// create temp user with new email
-			pu = new CloudUsersRepository.CloudUser();
-			pu.email = email;
-			pu.regTime = new Date();
-			pu.orderid = null;
-			usersRepository.saveAndFlush(pu);
 
 			// send code to new email
-			return userdataService.sendCode(action, lang, pu);
+			String oldEmail = currentAcc.email;
+			return userdataService.sendCode(emailAction, lang, pu, () -> emailSender.sendOsmAndCloudAccountEmail(
+					oldEmail, null, lang, CloudAccountAction.EMAIL_CHANGED, EmailSenderService.maskEmail(newEmail)));
 		}
 		return ResponseEntity.badRequest().body("Please enter valid email");
 	}
 
 	@PostMapping(path = {"/auth/change-email"})
 	public ResponseEntity<String> changeEmail(@RequestBody UserPasswordPost credentials, HttpServletRequest request) throws ServletException {
-		String username = credentials.username;
+		String username = EmailSenderTemplate.trimLowerCaseEmail(credentials.username);
 		String token = credentials.token;
 		if (username == null || token == null) {
 			return ResponseEntity.badRequest().body("Username and token are required");
 		}
-		username = username.toLowerCase().trim();
 		if (emailSender.isEmail(username)) {
 			CloudUserDevice dev = osmAndMapsService.checkUser();
 			if (dev == null) {

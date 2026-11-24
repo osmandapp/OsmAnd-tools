@@ -26,6 +26,7 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
@@ -84,7 +85,8 @@ public class OsmAndServerMonitorTasks {
 			"dl3.osmand.net",
 			"dl4.osmand.net",
 			"dl8.osmand.net",
-			"dl9.osmand.net"
+			"dl9.osmand.net",
+			"us1.osmand.net"
 	};
 	private static final String[] JAVA_HOSTS_TO_TEST = new String[]{
 			"download.osmand.net",
@@ -181,6 +183,7 @@ public class OsmAndServerMonitorTasks {
 	// Index map validation
 	boolean mapIndexPrevValidation = true;
 	Map<String, DownloadTestResult> downloadTests = new TreeMap<>();
+	private final Map<String, Boolean> downServerMap = new ConcurrentHashMap<>();
 
 	OsmAndServerMonitoringBot.Sender telegram;
 
@@ -389,6 +392,14 @@ public class OsmAndServerMonitorTasks {
 				close(gis);
 			}
 		}
+		checkDownloads();
+	}
+
+	public Map<String, Boolean> getDownServerMap() {
+		return downServerMap;
+	}
+
+	protected void checkDownloads() {
 		for (String host : HOSTS_TO_TEST) {
 			URL url = null;
 			DownloadTestResult res = downloadTests.get(host);
@@ -397,10 +408,11 @@ public class OsmAndServerMonitorTasks {
 				downloadTests.put(host, res);
 			}
 			try {
-				url = new URL("https://" + host + "/download?standard=yes&file=Angola_africa_2.obf.zip");
+				url = new URL("https://" + host + "/download?standard=yes&self=true&file=Montenegro_europe_2.obf.zip"); // ~50MB
 				// on download servers there is a glitch that randomly it starts downloading very slow, so let's take 3 measurements
 				double spd1 = downloadSpeed(url);
 				double spd2 = downloadSpeed(url);
+				downServerMap.remove(host);
 				res.addSpeedMeasurement(Math.max(spd1, spd2));
 				if (!res.lastSuccess) {
 					sendBroadcastMessage(host + " OK. Maps download works fine");
@@ -408,6 +420,7 @@ public class OsmAndServerMonitorTasks {
 				res.lastSuccess = true;
 
 			} catch (IOException ex) {
+				downServerMap.put(host, true);
 				if(res.lastSuccess ) {
 					sendBroadcastMessage(host + " FAILURE: problems downloading maps " + ex.getMessage());
 					LOG.error(ex.getMessage(), ex);
@@ -417,7 +430,7 @@ public class OsmAndServerMonitorTasks {
 		}
 	}
 
-	private double downloadSpeed(URL url) throws IOException {
+	protected double downloadSpeed(URL url) throws IOException {
 		long startedAt = System.currentTimeMillis();
 		long contentLength = 0;
 		URLConnection conn = url.openConnection();

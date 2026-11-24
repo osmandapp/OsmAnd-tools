@@ -36,6 +36,7 @@ import net.osmand.server.api.services.DownloadIndexesService;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadServerLoadBalancer;
 import net.osmand.server.api.services.DownloadIndexesService.PredefinedServerSpecialty;
 import net.osmand.server.api.services.DownloadIndexesService.DownloadType;
+import net.osmand.server.api.services.IpLocationService;
 
 @Controller
 public class DownloadIndexController {
@@ -45,6 +46,9 @@ public class DownloadIndexController {
 	
 	@Autowired
 	private DownloadIndexesService downloadService;
+
+	@Autowired
+	private IpLocationService locationService;
 	
 	@Value("${osmand.files.location}")
 	private String filesPath;
@@ -247,7 +251,7 @@ public class DownloadIndexController {
 					for (String httpParam : type.getHeaders()) {
 						if (isContainAndEqual(httpParam, params)) {
 							headerFound = true;
-							host = servers.getServer(servers.getServerType(dss, userAgent), remoteAddr);
+							host = servers.getServer(servers.getServerType(dss, userAgent, remoteAddr, locationService), remoteAddr);
 							if (host != null) {
 								break loop;
 							}
@@ -256,7 +260,7 @@ public class DownloadIndexController {
 				}
 			}
 			if (host == null && !headerFound) {
-				host = servers.getServer(servers.getServerType(PredefinedServerSpecialty.MAIN, userAgent), remoteAddr);
+				host = servers.getServer(servers.getServerType(PredefinedServerSpecialty.MAIN, userAgent, remoteAddr, locationService), remoteAddr);
 			}
 			if (host != null) {
 				resp.setStatus(HttpServletResponse.SC_FOUND);

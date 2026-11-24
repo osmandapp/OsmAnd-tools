@@ -1,6 +1,5 @@
 package net.osmand.obf.preparation;
 
-import net.osmand.binary.Abbreviations;
 import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
@@ -9,6 +8,9 @@ import net.osmand.map.WorldRegion;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.osm.edit.*;
 import net.osmand.osm.edit.OSMSettings.OSMTagKey;
+import net.osmand.search.rules.SearchModLocaleRules.PoiService;
+import net.osmand.search.rules.SearchModLocales;
+import net.osmand.search.rules.SearchModRules;
 import net.osmand.util.Algorithms;
 import net.osmand.util.translit.ChineseTranslitHelper;
 import net.osmand.util.translit.JapaneseTranslitHelper;
@@ -28,16 +30,21 @@ import java.util.*;
 
 public class IndexCreationContext {
     private static final Log log = LogFactory.getLog(IndexCreationContext.class);
-    private static final String JAPAN = "japan";
-	private static final String CHINA = "china";
+	// transliteration of names of <locales> of rules.xml (SearchModLocales.translitForMap)
+	private static final String JAPANESE = "ja";
+	private static final String CHINESE = "zh";
 
     public OsmandRegions allRegions;
     public boolean basemap;
 
-    private boolean decryptAbbreviations = false;
     private boolean translitJapaneseNames = false;
 	private boolean translitChineseNames = false;
 	private final IndexCreator indexCreator;
+	// <locales> of the search rules, read on first use
+	private SearchModLocales locales;
+	private SearchModRules searchRules;
+	// <poi><service> of the rules of the locale of the map: their places get a searchable tag
+	private List<PoiService> poiServices = Collections.emptyList();
 
 	protected final IndexRegionBboxFilter bboxFilter = new IndexRegionBboxFilter();
 
@@ -49,14 +56,36 @@ public class IndexCreationContext {
         }
         this.allRegions = prepareRegions();
 		if (regionName != null) {
-			this.translitJapaneseNames = regionName.toLowerCase().startsWith(JAPAN);
-			this.translitChineseNames = regionName.toLowerCase().startsWith(CHINA);
-			this.decryptAbbreviations = needDecryptAbbreviations(getRegionLang(allRegions, regionName));
+			String translit = locales().translitForMap(regionName);
+			this.translitJapaneseNames = JAPANESE.equals(translit);
+			this.translitChineseNames = CHINESE.equals(translit);
+			String mapLocale = locales().forMap(regionName);
+			if (!Algorithms.isEmpty(mapLocale)) {
+				this.poiServices = searchRules().rules(mapLocale).services();
+			}
             WorldRegion region = this.allRegions.getRegionDataByDownloadName(regionName);
             if (region != null) {
 				bboxFilter.initRegionQuads(region);
             }
 		}
+	}
+
+	private SearchModRules searchRules() {
+		if (searchRules == null) {
+			searchRules = new SearchModRules();
+		}
+		return searchRules;
+	}
+
+	private SearchModLocales locales() {
+		if (locales == null) {
+			locales = searchRules().locales();
+		}
+		return locales;
+	}
+
+	List<PoiService> poiServices() {
+		return poiServices;
 	}
 
 	IndexPoiCreator getIndexPoiCreator() {
@@ -114,32 +143,9 @@ public class IndexCreationContext {
 		return regionsFinalFile;
 	}
 
-    private static String getRegionLang(OsmandRegions osmandRegions, String regionName) {
-		if (osmandRegions == null) {
-			return null;
-		}
-        WorldRegion wr = osmandRegions.getRegionDataByDownloadName(regionName);
-        if (wr != null) {
-            return wr.getParams().getRegionLang();
-        } else {
-            return null;
-        }
-    }
-
-    private static boolean needDecryptAbbreviations(String regionLang) {
-        if (regionLang != null) {
-            String[] langArr = regionLang.split(",");
-            for (String lang : langArr) {
-                if (lang.equals("en")) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
 
 	public void translitJapaneseNames(Entity e) {
-		if (needTranslitName(e, e.getTags(), translitJapaneseNames, JAPAN)) {
+		if (needTranslitName(e, e.getTags(), translitJapaneseNames, JAPANESE)) {
 			String ltn = e.getTag("name:ja-latn");
 			if (!Algorithms.isEmpty(ltn)) {
 				e.putTag(OSMTagKey.NAME_EN.getValue(), ltn);
@@ -151,7 +157,7 @@ public class IndexCreationContext {
 	}
 
 	public void translitChineseNames(Entity e) {
-		if (needTranslitName(e, e.getTags(), translitChineseNames, CHINA)) {
+		if (needTranslitName(e, e.getTags(), translitChineseNames, CHINESE)) {
 			try {
 				String pinyinNameTag = "name:zh_pinyin";
 				if (e.getNameTags().containsKey(pinyinNameTag)) {
@@ -166,7 +172,7 @@ public class IndexCreationContext {
 		}
 	}
 
-	private boolean needTranslitName(Entity e, Map<String, String> etags, boolean translitByRegionName, String region) {
+	private boolean needTranslitName(Entity e, Map<String, String> etags, boolean translitByRegionName, String translit) {
 		if (!Algorithms.isEmpty(etags.get(OSMTagKey.NAME_EN.getValue()))
 				|| Algorithms.isEmpty(etags.get(OSMTagKey.NAME.getValue()))) {
 			return false;
@@ -174,29 +180,14 @@ public class IndexCreationContext {
 		if (translitByRegionName) {
 			return true;
 		} else if (!Algorithms.isEmpty(etags.get(MapRenderingTypesEncoder.OSMAND_REGION_NAME_TAG))) {
-			return etags.get(MapRenderingTypesEncoder.OSMAND_REGION_NAME_TAG).contains(region);
-		}
-		return false;
-	}
-
-	public String decryptAbbreviations(String name, LatLon loc, boolean addRegionTag) {
-		boolean upd = false;
-		if (decryptAbbreviations) {
-			upd = true;
-		} else if (addRegionTag && loc != null) {
-			Set<String> dwNames = calcDownloadNames(null, false, allRegions,
-					new QuadRect(loc.getLongitude(), loc.getLatitude(), loc.getLongitude(), loc.getLatitude()));
-			for (String dwName : dwNames) {
-				if (needDecryptAbbreviations(getRegionLang(allRegions, dwName))) {
-					upd = true;
-					break;
+			String regions = etags.get(MapRenderingTypesEncoder.OSMAND_REGION_NAME_TAG);
+			for (Map.Entry<String, String> prefix : locales().translitsByPrefix().entrySet()) {
+				if (prefix.getValue().equals(translit) && regions.contains(prefix.getKey())) {
+					return true;
 				}
 			}
 		}
-		if(upd) {
-			name = Abbreviations.replaceAll(name);
-		}
-		return name;
+		return false;
 	}
 
 	public Set<String> calcRegionTag(Entity entity, boolean add) {

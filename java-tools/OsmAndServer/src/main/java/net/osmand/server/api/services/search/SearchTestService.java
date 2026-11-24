@@ -45,6 +45,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -55,6 +56,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 @Service
 public class SearchTestService implements ReportService, DataService, DetectorService, InspectorService, AnalystService, TokenAnalystService, AddressPOIAnalystService {
@@ -79,7 +81,17 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 	// Spatial engines of a running run, one per worker thread. SpatialTextSearch keeps the name-index caches of every
 	// OBF it has read; the service's thread-local engines live as long as the executor threads, so those caches piled
 	// up run after run until the server had to be restarted. The run's engines are dropped when the run ends.
-	private final ConcurrentHashMap<Long, ConcurrentHashMap<Thread, SpatialTextSearch>> runSearchEngines = new ConcurrentHashMap<>();
+	private final ConcurrentHashMap<Long, ConcurrentHashMap<Thread, RunWorker>> runSearchEngines = new ConcurrentHashMap<>();
+
+	// A worker thread keeps the same readers for the whole run. The engine caches the regions of the readers it read
+	// first (keyed by file name): a pooled reader handed to another thread made two threads share one PoiRegion
+	// (ConcurrentModificationException in PoiRegion.checkMissingTagGroups).
+	private static class RunWorker {
+		final SpatialTextSearch engine = new SpatialTextSearch();
+		final Map<String, BinaryMapIndexReader> readers = new HashMap<>();
+		// files of the run's own OBF directory by path, opened by this worker and closed at the end of the run
+		final Map<String, BinaryMapIndexReader> customReaders = new HashMap<>();
+	}
 
 	@Autowired
 	private ObjectMapper objectMapper;
@@ -270,7 +282,8 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 		}, EXECUTOR);
 	}
 
-	public CompletableFuture<Run> runTestCase(Long caseId, RunParam payload, ClassicSearchService.SearchOption options) {
+	public CompletableFuture<Run> runTestCase(Long caseId, RunParam payload, String obfPath,
+			ClassicSearchService.SearchOption options) {
 		TestCase test = testCaseRepo.findById(caseId)
 				.orElseThrow(() -> new RuntimeException("Test-case not found with id: " + caseId));
 
@@ -306,6 +319,14 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 		test.skipFound = payload.skipFound;
 		run.spatial = payload.spatial;
 		test.spatial = payload.spatial;
+		obfPath = obfPath == null || obfPath.isBlank() ? null : obfPath.trim();
+		if (obfPath != null && !Boolean.TRUE.equals(payload.spatial)) {
+			throw new RuntimeException("OBF directory is supported only for spatial runs");
+		}
+		if (obfPath != null && !new File(obfPath).isDirectory()) {
+			throw new RuntimeException("OBF directory not found: " + obfPath);
+		}
+		run.obfPath = obfPath;
 		run.shift = payload.shift;
 		test.shift = payload.shift;
 		run.setNorthWest(payload.getNorthWest());
@@ -401,7 +422,11 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 			loggedStoppedRuns.remove(run.id);
 			runResultBatches.remove(run.id);
 			runResultBatchTasks.remove(run.id);
-			Map<Thread, SpatialTextSearch> engines = runSearchEngines.remove(run.id);
+			Map<Thread, RunWorker> engines = runSearchEngines.remove(run.id);
+			if (engines != null) {
+				engines.values().forEach(w -> mapsService.unlockReaders(new ArrayList<>(w.readers.values())));
+				engines.values().forEach(w -> closeReaders(w.customReaders.values()));
+			}
 			// readers nobody holds now; the next run opens its files again
 			mapsService.closeMapReaders();
 			Runtime rt = Runtime.getRuntime();
@@ -427,9 +452,9 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 		}
 
 		try {
-			List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-					sql + (limit > 0 ? " LIMIT " + limit + " OFFSET " + offset : ""),
-					run.rerunId != null ? run.rerunId : run.caseId);
+			String chunkSql = sql + (limit > 0 ? " LIMIT " + limit + " OFFSET " + offset : "");
+			List<Map<String, Object>> rows = retryWhileLocked(() -> jdbcTemplate.queryForList(chunkSql,
+					run.rerunId != null ? run.rerunId : run.caseId));
 			if (rows.isEmpty())
 				return;
 
@@ -507,8 +532,12 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 								query, run.locale, false, bbox[0], bbox[1]);
 						if (isSpatial) {
 							// test rows are complete queries: suggestion settings match the last word as a prefix
-							SpatialSearchService.SpatialResults spatialResult = searchTestSpatial(ctx, options,
-									null, false, false, runSearchEngine(run.id));
+							RunWorker worker = runWorker(run.id);
+							SpatialSearchService.SpatialResults spatialResult = run.obfPath != null
+									? searchTestSpatialCustom(ctx, options, run.obfPath, worker)
+									: searchTestSpatial(ctx, options, null, false, false,
+									worker == null ? new SpatialTextSearch() : worker.engine,
+									worker == null ? null : worker.readers);
 							if (spatialResult != null) {
 								maxMapsCount.accumulateAndGet(spatialResult.obfCount(), Math::max);
 								actuator.setFormatter(spatialResult.formatter());
@@ -553,21 +582,22 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 	public SpatialSearchService.SpatialResults searchTestSpatial(ClassicSearchService.SearchContext ctx, ClassicSearchService.SearchOption options, List<BinaryMapIndexReader> readers, boolean printLogs)
 			throws IOException {
 		return searchTestSpatial(ctx, options, readers, printLogs, !options.queryIsCompleted(),
-				spatialSearchService.getSpatialTextSearch());
+				spatialSearchService.getSpatialTextSearch(), null);
 	}
 
-	private SpatialTextSearch runSearchEngine(Long runId) {
-		Map<Thread, SpatialTextSearch> engines = runSearchEngines.get(runId);
-		// a worker still going after its run has ended gets a throwaway engine, not a cache nobody drops
-		return engines == null ? new SpatialTextSearch()
-				: engines.computeIfAbsent(Thread.currentThread(), t -> new SpatialTextSearch());
+	private RunWorker runWorker(Long runId) {
+		Map<Thread, RunWorker> engines = runSearchEngines.get(runId);
+		// a worker still going after its run has ended gets a throwaway worker; its readers go back to the pool
+		// after each query, as nobody would unlock them later
+		return engines == null ? null : engines.computeIfAbsent(Thread.currentThread(), t -> new RunWorker());
 	}
 
 	private SpatialSearchService.SpatialResults searchTestSpatial(ClassicSearchService.SearchContext ctx,
 			ClassicSearchService.SearchOption options, List<BinaryMapIndexReader> readers, boolean printLogs,
-			boolean autocomplete, SpatialTextSearch engine) throws IOException {
+			boolean autocomplete, SpatialTextSearch engine, Map<String, BinaryMapIndexReader> threadReaders) throws IOException {
 		long startedNs = System.nanoTime();
 		SpatialSearchService.SpatialResults res = null;
+		boolean unlock = threadReaders == null;
 		try {
 			if (readers == null) {
 				int radiusKm = Math.toIntExact(Math.round(options.getRadius()));
@@ -578,7 +608,25 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 							"No OBF maps found for spatial search at %.6f, %.6f within %.3f km",
 							ctx.lat(), ctx.lon(), options.getRadius()));
 				}
-				readers = mapsService.getReaders(maps, null);
+				if (threadReaders == null) {
+					readers = mapsService.getReaders(maps, null);
+				} else {
+					readers = new ArrayList<>();
+					for (OsmAndMapsService.BinaryMapIndexReaderReference ref : maps) {
+						String name = ref.getFile().getName();
+						BinaryMapIndexReader r = threadReaders.get(name);
+						if (r == null) {
+							List<BinaryMapIndexReader> got = mapsService.getReaders(Collections.singletonList(ref), null);
+							r = got.isEmpty() ? null : got.get(0);
+							if (r != null) {
+								threadReaders.put(name, r);
+							}
+						}
+						if (r != null) {
+							readers.add(r);
+						}
+					}
+				}
 			}
 			int obfCount = readers.size();
 			readers = new ArrayList<>(readers);
@@ -597,7 +645,7 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 			LOGGER.error(String.format("Spatial search failed for '%s': %s", ctx.text(), e), e);
 			throw e;
 		} finally {
-			if (readers != null) {
+			if (readers != null && unlock) {
 				mapsService.unlockReaders(readers);
 			}
 			LOGGER.info("PERF searchTestSpatial query='{}' autocomplete={} obfs={} results={} elapsedMs={}",
@@ -606,6 +654,51 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 					(System.nanoTime() - startedNs) / 1_000_000);
 		}
 		return res;
+	}
+
+	// a run on the OBF files of one server directory instead of the server maps
+	private SpatialSearchService.SpatialResults searchTestSpatialCustom(ClassicSearchService.SearchContext ctx,
+			ClassicSearchService.SearchOption options, String obfPath, RunWorker worker) throws IOException {
+		List<String> paths = getCustomOBFs(options.getRadius(), ctx.lat(), ctx.lon(), true, obfPath);
+		if (paths.isEmpty()) {
+			throw new IOException(String.format(Locale.US, "No OBF maps in %s for spatial search at %.6f, %.6f within %.3f km",
+					obfPath, ctx.lat(), ctx.lon(), options.getRadius()));
+		}
+		List<BinaryMapIndexReader> readers = new ArrayList<>();
+		List<BinaryMapIndexReader> opened = new ArrayList<>();
+		try {
+			for (String path : paths) {
+				BinaryMapIndexReader r = worker == null ? null : worker.customReaders.get(path);
+				if (r == null) {
+					r = openObfReaders(Collections.singletonList(path)).get(0);
+					if (worker != null) {
+						worker.customReaders.put(path, r);
+					} else {
+						opened.add(r);
+					}
+				}
+				readers.add(r);
+			}
+			int obfCount = readers.size();
+			BinaryMapIndexReader regionsReader = spatialSearchService.regionsReaderForThread();
+			if (regionsReader != null) {
+				readers.add(regionsReader);
+			}
+			return searchTestSpatial(ctx, readers, false, obfCount, false,
+					worker == null ? new SpatialTextSearch() : worker.engine);
+		} finally {
+			closeReaders(opened);
+		}
+	}
+
+	private static void closeReaders(Collection<BinaryMapIndexReader> readers) {
+		for (BinaryMapIndexReader r : readers) {
+			try {
+				r.close();
+			} catch (IOException e) {
+				LOGGER.warn("Cannot close {}: {}", r.getFile(), e.getMessage());
+			}
+		}
 	}
 
 	private SpatialSearchService.SpatialResults searchTestSpatial(ClassicSearchService.SearchContext ctx, List<BinaryMapIndexReader> readers,
@@ -675,6 +768,15 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 	private SearchResult fromSpatialResult(SpatialSearchResult res, String locale) {
 		if (res == null) {
 			return null;
+		}
+		if (res.isPoiCategory()) {
+			// a category row takes no place; its objects (e.g. two streets) made it look like a street intersection
+			SearchResult category = new SearchResult();
+			category.objectType = ObjectType.POI_TYPE;
+			category.location = res.getLatLon();
+			category.localeName = res.getMainObject() == null ? null : spatialName(res.getMainObject(), locale);
+			category.spatialResult = res;
+			return category;
 		}
 		List<MapObject> objects = res.getObjects();
 		MapObject object = res.getMainObject();
@@ -804,12 +906,44 @@ public class SearchTestService implements ReportService, DataService, DetectorSe
 
 		CompletableFuture<Void> f = CompletableFuture.runAsync(() -> {
 			try {
-				jdbcTemplate.batchUpdate(sql, batchArgs);
+				retryWhileLocked(() -> jdbcTemplate.batchUpdate(sql, batchArgs));
 			} catch (Exception ex) {
 				LOGGER.error("Failed batch insert for run {} ({} rows)", run.id, batchArgs.size(), ex);
 			}
 		}, SAVE_EXECUTOR);
 		runResultBatchTasks.computeIfAbsent(run.id, k -> Collections.synchronizedList(new ArrayList<>())).add(f);
+	}
+
+	private static final int LOCKED_RETRIES = 10;
+
+	// SQLite answers SQLITE_BUSY while another connection writes (results of a run, the run page polling the status):
+	// without a retry a 100-row chunk or a 10-row batch of results is lost and its rows show up as missing
+	private static <T> T retryWhileLocked(Supplier<T> call) {
+		for (int attempt = 1; ; attempt++) {
+			try {
+				return call.get();
+			} catch (RuntimeException e) {
+				if (!isLocked(e) || attempt >= LOCKED_RETRIES) {
+					throw e;
+				}
+				try {
+					Thread.sleep(100L * attempt);
+				} catch (InterruptedException ie) {
+					Thread.currentThread().interrupt();
+					throw e;
+				}
+			}
+		}
+	}
+
+	private static boolean isLocked(Throwable e) {
+		for (Throwable t = e; t != null; t = t.getCause()) {
+			String m = t.getMessage();
+			if (m != null && (m.contains("SQLITE_BUSY") || m.contains("database is locked"))) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	@Async

@@ -14,6 +14,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -59,6 +60,7 @@ import net.osmand.osm.edit.OsmMapUtils;
 import net.osmand.osm.edit.Relation;
 import net.osmand.osm.edit.Relation.RelationMember;
 import net.osmand.osm.edit.Way;
+import net.osmand.search.rules.SearchModRules;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
@@ -174,15 +176,13 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			List<City> citiesToSearch = cityDataStorage.getClosestObjects(boundaryCenter.getLatitude(), boundaryCenter.getLongitude());
 			// assumption order of citiesToSearch not important as we do step by step
 			City cityFound = null;
-			String boundaryName = boundary.getName().toLowerCase();
-			String altBoundaryName = Algorithms.isEmpty(boundary.getAltName()) ? "" : boundary.getAltName().toLowerCase();
+			String boundaryName = normalizeBoundaryName(boundary.getName());
+			String altBoundaryName = normalizeBoundaryName(boundary.getAltName());
 			if (boundary.hasAdminCenterId()) {
 				for (City c : citiesToSearch) {
 					if (c.getId() == boundary.getAdminCenterId() || c.getId() == boundary.getLabelId()) {
-						String cityLower = c.getName().toLowerCase();
 						// Check names to not combine municipality Samolaco (that has many villages) with admin_center village Eva
-						if (!nameContains(boundaryName, cityLower) && !nameContains(altBoundaryName, cityLower) &&
-								!nameContains(cityLower, boundaryName)) {
+						if (!isBoundaryNamedAsCity(boundary, c)) {
 							String msg = String.format("Ignore boundary '%s' (%d) admin center  for city '%s' name doesn't match",
 									boundary.getName(), ObfConstants.getOsmIdFromMapObjectId(boundary.getBoundaryId()), c.getName());
 							if (logMapDataWarn != null) {
@@ -200,7 +200,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			}
 			if (cityFound == null) {
 				for (City c : citiesToSearch) {
-					if ((boundaryName.equalsIgnoreCase(c.getName()) || altBoundaryName.equalsIgnoreCase(c.getName()))
+					String cityLower = normalizeBoundaryName(c.getName());
+					if ((boundaryName.equals(cityLower) || altBoundaryName.equals(cityLower))
 							&& boundary.containsPoint(c.getLocation())) {
 						cityFound = c;
 						break;
@@ -212,7 +213,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			// False case : London Borough of Richmond upon Thames (bigger) -> Richmond!
 			if (cityFound == null) {
 				for (City c : citiesToSearch) {
-					String lower = c.getName().toLowerCase();
+					String lower = normalizeBoundaryName(c.getName());
 					if (nameContains(boundaryName, lower) || nameContains(altBoundaryName, lower)) {
 						if (boundary.containsPoint(c.getLocation())) {
 							cityFound = c;
@@ -245,6 +246,14 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 	}
 
 
+	// "Erlenbach (ZH)" boundary vs "Erlenbach ZH" place
+	private String normalizeBoundaryName(String name) {
+		if (Algorithms.isEmpty(name)) {
+			return "";
+		}
+		return name.toLowerCase().replace('(', ' ').replace(')', ' ').replaceAll("\\s+", " ").trim();
+	}
+
 	private boolean nameContains(String part, String fullString) {
 		if (Algorithms.isEmpty(part)) {
 			return false;
@@ -253,9 +262,18 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				|| part.contains(" " + fullString + " ");
 	}
 
+	private boolean isBoundaryNamedAsCity(Boundary boundary, City city) {
+		String boundaryName = normalizeBoundaryName(boundary.getName());
+		String altBoundaryName = normalizeBoundaryName(boundary.getAltName());
+		String cityName = normalizeBoundaryName(city.getName());
+		return nameContains(boundaryName, cityName) || nameContains(altBoundaryName, cityName)
+				|| nameContains(cityName, boundaryName);
+	}
+
 
 	public void tryToAssignBoundaryToFreeCities(IProgress progress) {
 		progress.startWork(cityDataStorage.citiesSize());
+		Set<Boundary> linkedBoundaries = new HashSet<>();
 		// This is incorrect to do with suburbs because it assigns boundary that is much bigger!
 		// Than suburb and after that findCityPart works incorrectly
 		// So we do only for Cities & Towns without boundaries, try to find the right one
@@ -269,7 +287,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				Boundary smallestBoundary = null;
 				// try to found boundary
 				for (Boundary b : cityDataStorage.getNotAssignedBoundaries()) {
-					if (b.getAdminLevel() >= smallestAdminLevel) {
+					if (b.getAdminLevel() >= smallestAdminLevel && !linkedBoundaries.contains(b)) {
 						if (b.containsPoint(location.getLatitude(), location.getLongitude())) {
 							// the bigger the admin level, the smaller the boundary :-)
 							smallestAdminLevel = b.getAdminLevel();
@@ -279,7 +297,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				}
 				if (smallestBoundary != null) {
 					putCityBoundary(smallestBoundary, c);
-					cityDataStorage.removeNotAssignedBoundary(smallestBoundary);
+					linkedBoundaries.add(smallestBoundary);
+					// Municipality Schwalmtal linked to its town Waldniel stays searchable as a boundary
+					if (isBoundaryNamedAsCity(smallestBoundary, c)) {
+						cityDataStorage.removeNotAssignedBoundary(smallestBoundary);
+					}
 				}
 			}
 		}
@@ -307,9 +329,10 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 //	4. Zurich admin_level = 6 win admin_level = 4
 //  5. Bucurest admin_level = 4 win nothing
 	private int getCityBoundaryImportance(Boundary b, City c) {
-		boolean nameEq = b.getName().equalsIgnoreCase(c.getName());
+		String cityName = normalizeBoundaryName(c.getName());
+		boolean nameEq = normalizeBoundaryName(b.getName()).equals(cityName);
 		if (!Algorithms.isEmpty(b.getAltName()) && !nameEq) {
-			nameEq = b.getAltName().equalsIgnoreCase(c.getName());
+			nameEq = normalizeBoundaryName(b.getAltName()).equals(cityName);
 		}
 		boolean cityBoundary = b.getCityType() != null;
 		// max 10
@@ -565,7 +588,6 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 		}
 		name = name.trim();
 		name = name.replace("’", "'");
-		name = icc.decryptAbbreviations(name, location, settings.addRegionTag);
 
 		if (normalizeStreets) {
 			String newName = name;
@@ -1002,7 +1024,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 						building.setName(hname + additionalHname);
 					}
 					if (!Algorithms.isEmpty(street2)) {
-						String secondHno= e.getTag(OSMTagKey.ADDR2_HOUSE_NUMBER);
+						String secondHno = e.getTag(OSMTagKey.ADDR2_HOUSE_NUMBER);
 						String firstNo = building.getName();
 						int secondNumberInd = hname.indexOf('/');
 						if (secondNumberInd != -1 && secondNumberInd < hname.length() - 1 &&
@@ -1012,7 +1034,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 						}
 						if (secondHno != null) {
 							Building building2 = EntityParser.parseBuilding(e);
-							building2.setName(hname.substring(secondNumberInd + 1) + additionalHname);
+							building2.setName(secondHno + additionalHname);
 							Set<Long> ids2OfStreet = getStreetInCity(0, e.getIsInNames(), street2, false, null, l, icc);
 							ids2OfStreet.removeAll(idsOfStreet); // remove duplicated entries!
 							if (!ids2OfStreet.isEmpty()) {
@@ -1263,7 +1285,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 
 
 		NameIndexCreator<MapObject> namesIndex = new NameIndexCreator<>(CommonWords.getAddrInstance());
-		namesIndex.setMapName(settings.nameIndexMapName != null ? settings.nameIndexMapName : regionName);
+		namesIndex.setMapName(settings.nameIndexMapName != null ? settings.nameIndexMapName : regionName,
+				new SearchModRules());
 
 		progress.startTask(settings.getString("IndexCreator.SERIALIZING_ADDRESS"), cityTowns.size() + villages.size() / 100 + 1); //$NON-NLS-1$
 		TLongObjectHashMap<Long> streetIds = new TLongObjectHashMap<Long>();

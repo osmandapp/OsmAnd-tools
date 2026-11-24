@@ -14,6 +14,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
+import net.osmand.mailsender.EmailSenderTemplate;
 import net.osmand.server.PurchasesDataLoader;
 import net.osmand.server.WebAccessConfig;
 import net.osmand.server.api.repo.*;
@@ -211,7 +212,7 @@ public class AdminController {
 	
 	@PostMapping(path = {"/register-promo"})
 	public String registerPromo(@RequestParam String comment, final RedirectAttributes redirectAttrs) {
-		PromoService.PromoResponse resp = promoService.createPromoSubscription(comment, PROMO_WEBSITE, null, false);
+		PromoService.PromoResponse resp = promoService.createPromoSubscription(EmailSenderTemplate.trimLowerCaseEmail(comment), PROMO_WEBSITE, null, false);
 		redirectAttrs.addFlashAttribute("subscriptions", Collections.singleton(resp.deviceSub));
 		return "redirect:info#audience";
 	}
@@ -1568,6 +1569,11 @@ public class AdminController {
 			}
 		}
 	}
+	@GetMapping(path = {"/osmgpx-reviews", "/osmgpx-reviews/"})
+	public String osmGpxReviewsPage() {
+		return "admin/osmgpx-reviews";
+	}
+
 	@GetMapping(path = {"/releases"})
 	public String releasesPage(Model model) {
 		List<ReleaseInfo> releases = new ArrayList<>();

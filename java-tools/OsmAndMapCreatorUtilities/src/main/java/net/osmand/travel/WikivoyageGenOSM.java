@@ -22,10 +22,13 @@ import org.xmlpull.v1.XmlSerializer;
 
 import gnu.trove.list.array.TIntArrayList;
 import net.osmand.PlatformUtil;
+import net.osmand.binary.BinaryMapDataObject;
 import net.osmand.data.LatLon;
 import net.osmand.gpx.GPXFile;
 import net.osmand.gpx.GPXUtilities;
 import net.osmand.gpx.GPXUtilities.WptPt;
+import net.osmand.map.OsmandRegions;
+import net.osmand.map.WorldRegion;
 import net.osmand.obf.preparation.DBDialect;
 import net.osmand.osm.MapRenderingTypesEncoder;
 import net.osmand.wiki.WikivoyageOSMTags;
@@ -125,6 +128,18 @@ public class WikivoyageGenOSM {
 
 		public int size() {
 			return langs.size();
+		}
+
+		// the region language first, as in OSM, then English, then a stable pick among the languages present
+		public String getBaseName(String regionLang) {
+			int ind = langs.indexOf(regionLang);
+			if (ind == -1) {
+				ind = langs.indexOf("en");
+			}
+			if (ind == -1) {
+				ind = langs.indexOf(Collections.min(langs));
+			}
+			return titles.get(ind);
 		}
 
 		public void updateCategoryCounts() {
@@ -268,6 +283,7 @@ public class WikivoyageGenOSM {
 				+ "from travel_articles order by trip_id asc");
 		int count = 0, totalArticles = 0, emptyLocation = 0, emptyContent = 0;
 		CombinedWikivoyageArticle combinedArticle = new CombinedWikivoyageArticle();
+		OsmandRegions regions = new OsmandRegions(null);
 
 		while (rs.next()) {
 			int rind = 1;
@@ -277,7 +293,7 @@ public class WikivoyageGenOSM {
 				boolean res = false;
 				for (WikivoyageOutputFile out : outs) {
 					if (out.accept(combinedArticle)) {
-						res |= combineAndSave(combinedArticle, out.serializer);
+						res |= combineAndSave(combinedArticle, out.serializer, regions);
 					}
 				}
 				if (res) {
@@ -319,7 +335,7 @@ public class WikivoyageGenOSM {
 		}
 		for (WikivoyageOutputFile out : outs) {
 			if (out.accept(combinedArticle)) {
-				combineAndSave(combinedArticle, out.serializer);
+				combineAndSave(combinedArticle, out.serializer, regions);
 			}
 			out.close();
 		}
@@ -354,7 +370,25 @@ public class WikivoyageGenOSM {
 		serializer.endTag(null, "tag");
 	}
 
-	private static boolean combineAndSave(CombinedWikivoyageArticle article, XmlSerializer serializer) throws IOException {
+	private static String getFirstRegionLang(OsmandRegions regions, LatLon location) throws IOException {
+		WorldRegion deepest = null;
+		for (BinaryMapDataObject o : regions.getRegionsToDownload(location.getLatitude(), location.getLongitude())) {
+			WorldRegion region = regions.getRegionData(regions.getFullName(o));
+			if (region != null && (deepest == null || region.getLevel() > deepest.getLevel())) {
+				deepest = region;
+			}
+		}
+		for (WorldRegion region = deepest; region != null; region = region.getSuperregion()) {
+			String lang = region.getParams().getRegionLang();
+			if (!Algorithms.isEmpty(lang)) {
+				return lang.split(",")[0].trim();
+			}
+		}
+		return null;
+	}
+
+	private static boolean combineAndSave(CombinedWikivoyageArticle article, XmlSerializer serializer,
+			OsmandRegions regions) throws IOException {
 		article.updateCategoryCounts();
 		long idStart = NODE_ID ;
 		LatLon mainArticlePoint = article.latlons.get(0);
@@ -397,6 +431,7 @@ public class WikivoyageGenOSM {
 		serializer.attribute(null, "lon", formatLon(mainArticlePoint.getLongitude()));
 		tagValue(serializer, "route", "point");
 		tagValue(serializer, "route_type", "article");
+		tagValue(serializer, "name", article.getBaseName(getFirstRegionLang(regions, mainArticlePoint)));
 		addArticleTags(article, serializer, true);
 		serializer.endTag(null, "node");
 

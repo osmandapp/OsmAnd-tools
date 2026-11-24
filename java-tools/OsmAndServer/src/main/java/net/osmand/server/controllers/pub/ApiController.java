@@ -4,10 +4,6 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -26,22 +22,20 @@ import java.util.Set;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import javax.sql.DataSource;
 
 import net.osmand.purchases.PurchaseHelper;
+import net.osmand.mailsender.EmailSenderTemplate;
 import net.osmand.server.PurchasesDataLoader;
 import net.osmand.server.api.repo.*;
 import net.osmand.server.api.services.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.jdbc.datasource.DataSourceUtils;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import java.util.Base64;
@@ -51,7 +45,6 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.multipart.MultipartFile;
 
 import com.google.gson.Gson;
 
@@ -84,10 +77,6 @@ public class ApiController {
 
     @Value("${osmand.files.location}")
     private String filesLocation;
-
-
-	@Autowired
-	private DataSource dataSource;
 
     @Autowired
     PlacesService placesService;
@@ -250,6 +239,34 @@ public class ApiController {
 			@RequestParam(required = false) String os, @RequestParam(required = false) String purchaseType) {
 		// here we could validate purchase in fiture
 		return "{\"status\":\"OK\"}";
+	}
+
+	// free version: replaces of the free country before the app asks for an email, and at all
+	private static final int FREE_REPLACES_BEFORE_EMAIL = 5;
+	private static final int FREE_REPLACES_MAX = 1000;
+
+	/**
+	 * Free version of the app: maps of one country are free, and the app asks here before it
+	 * replaces that country with another one. The app sends the number of replaces it has already
+	 * made and whether the user has left an email. Answers "ok", "request_email" (one more replace
+	 * for an email) or "no" (only Maps+). A GET request on purpose: package, version, nd, ns, aid
+	 * and utm* stay in the access log.
+	 */
+	@GetMapping(path = { "/replace-download-map" }, produces = "application/json")
+	@ResponseBody
+	public String replaceDownloadMap(@RequestParam(required = false) String from,
+			@RequestParam(required = false) String to,
+			@RequestParam(required = false, defaultValue = "0") int replaces,
+			@RequestParam(required = false, defaultValue = "false") boolean email) {
+		String status;
+		if (replaces >= FREE_REPLACES_MAX) {
+			status = "no";
+		} else if (replaces >= FREE_REPLACES_BEFORE_EMAIL && !email) {
+			status = "request_email";
+		} else {
+			status = "ok";
+		}
+		return "{\"status\":\"" + status + "\"}";
 	}
 
 
@@ -659,49 +676,6 @@ public class ApiController {
     	return "pub/email/subscribe";
     }
 
-	@PostMapping(path = {"/submit_analytics"}, consumes = {"multipart/form-data"})
-	@ResponseBody
-	public String submitAnalytics(HttpServletRequest request,
-								  @RequestParam() Long startDate,
-								  @RequestParam() Long finishDate,
-								  @RequestParam() Integer nd,
-								  @RequestParam() Integer ns,
-								  @RequestParam(required = false) String aid,
-								  @RequestParam() String version,
-								  @RequestParam() String lang,
-								  @RequestParam() MultipartFile file) throws IOException, SQLException {
-		String remoteAddr = request.getRemoteAddr();
-		Enumeration<String> hs = request.getHeaders("X-Forwarded-For");
-		if (hs != null && hs.hasMoreElements()) {
-			remoteAddr = hs.nextElement();
-		}
-		if (!file.isEmpty()) {
-			Connection conn = DataSourceUtils.getConnection(dataSource);
-			try {
-				PreparedStatement p = conn.prepareStatement(
-						"insert into analytics " +
-								"(ip, date, aid, nd, ns, version, lang, start_date, finish_date, data) " +
-								"values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-				p.setString(1, remoteAddr);
-				p.setTimestamp(2, new Timestamp(System.currentTimeMillis()));
-				p.setString(3, aid);
-				p.setInt(4, nd);
-				p.setInt(5, ns);
-				p.setString(6, version);
-				p.setString(7, lang);
-				p.setTimestamp(8, new Timestamp(startDate));
-				p.setTimestamp(9, new Timestamp(finishDate));
-				p.setBinaryStream(10, file.getInputStream());
-				p.executeUpdate();
-			} finally {
-				DataSourceUtils.releaseConnection(conn, dataSource);
-			}
-		} else {
-			throw new IllegalArgumentException("File is empty");
-		}
-		return "OK";
-	}
-
 	/// LOTTERY
 	@GetMapping(path = {"/giveaway-series"}, produces = MediaType.APPLICATION_JSON_VALUE)
 	@ResponseBody
@@ -751,7 +725,7 @@ public class ApiController {
 	public ResponseEntity<String> addUser(@RequestParam String promoKey,
 	                                      @RequestParam String userEmail) {
 		synchronized (this) {
-			return promoService.addUser(promoKey, userEmail);
+			return promoService.addUser(promoKey, EmailSenderTemplate.trimLowerCaseEmail(userEmail));
 		}
 	}
 

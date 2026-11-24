@@ -1,11 +1,14 @@
 package net.osmand.server.api.services.search;
 
-import net.osmand.data.AdditionalInfoBundle;
 import net.osmand.data.Amenity;
-import net.osmand.data.AmenityTagEntry;
-import net.osmand.data.AmenityTagEntriesBuilder;
-import net.osmand.osm.PoiCategory;
-import net.osmand.osm.PoiType;
+import net.osmand.shared.data.AdditionalInfoBundle;
+import net.osmand.shared.data.AmenityTagEntriesBuilder;
+import net.osmand.shared.data.AmenityTagEntriesBuilder.ValueLabel;
+import net.osmand.shared.data.AmenityTagEntry;
+import net.osmand.shared.osm.PoiCategory;
+import net.osmand.shared.osm.PoiType;
+import net.osmand.shared.util.OpeningHoursParser;
+import net.osmand.shared.util.OpeningHoursParser.OpeningHours;
 import net.osmand.util.Algorithms;
 import org.springframework.stereotype.Service;
 
@@ -25,10 +28,11 @@ public class AmenityTagsService {
 		if (tags == null || tags.isEmpty()) {
 			return Collections.emptyList();
 		}
-		AdditionalInfoBundle infoBundle = new AdditionalInfoBundle(poiTypesService.getMapPoiTypes(lang), tags);
+		AdditionalInfoBundle infoBundle = new AdditionalInfoBundle(poiTypesService.getSharedPoiTypes(), tags);
 		List<String> preferredLangs = lang != null ? List.of(lang) : List.of();
 		boolean allowNoteTag = false; // The "note" tag is enabled only for OSM editing.
-		List<AmenityTagEntry> tagEntries = infoBundle.getVisibleTags(allowNoteTag, preferredLangs);
+		Set<String> genericRowKeys = AdditionalInfoBundle.getGenericRowKeys(tags);
+		List<AmenityTagEntry> tagEntries = infoBundle.getVisibleTags(allowNoteTag, preferredLangs, genericRowKeys);
 
 		List<AmenityTagEntry> infoTagEntries = new ArrayList<>();
 		List<AmenityTagEntry> descriptionTagEntries = new ArrayList<>();
@@ -43,7 +47,7 @@ public class AmenityTagsService {
 
 		List<AmenityTagEntry> sortedTagEntries = sortTagEntries(infoBundle, infoTagEntries);
 		sortedTagEntries.addAll(descriptionTagEntries);
-		return toVisibleTags(sortedTagEntries);
+		return toVisibleTags(sortedTagEntries, genericRowKeys);
 	}
 
 	private List<AmenityTagEntry> sortTagEntries(AdditionalInfoBundle infoBundle, List<AmenityTagEntry> tagEntries) {
@@ -60,7 +64,7 @@ public class AmenityTagsService {
 		if (tagEntry.collapsableEntryType == AmenityTagEntry.CollapsableEntryType.POI_TYPE_GROUP) {
 			return resolveGroupSortName(tagEntry);
 		}
-		PoiType additionalType = infoBundle.resolvePoiType(category, tagEntry.key, tagEntry.value).additionalType();
+		PoiType additionalType = infoBundle.resolvePoiType(category, tagEntry.key, tagEntry.value).getAdditionalType();
 		return additionalType != null ? additionalType.getKeyName() : tagEntry.key;
 	}
 
@@ -85,13 +89,13 @@ public class AmenityTagsService {
 				.collect(Collectors.joining(Amenity.SEPARATOR));
 	}
 
-	private List<VisibleTag> toVisibleTags(List<AmenityTagEntry> tagEntries) {
+	private List<VisibleTag> toVisibleTags(List<AmenityTagEntry> tagEntries, Set<String> genericRowKeys) {
 		List<VisibleTag> result = new ArrayList<>();
 		for (AmenityTagEntry tagEntry : tagEntries) {
 			VisibleTag tag = switch (tagEntry.collapsableEntryType) {
 				case POI_TYPE_GROUP -> toGroupTag(tagEntry);
 				case PLAIN -> toLocalizedTag(tagEntry);
-				case NONE -> toPlainTag(tagEntry);
+				case NONE -> toPlainTag(tagEntry, genericRowKeys);
 				case ELEVATION_PILLS, OPENING_HOURS -> throw new UnsupportedOperationException(
 						"AmenityTagEntry.CollapsableEntryType." + tagEntry.collapsableEntryType
 								+ " is a UI-only rendering hint with no server-side tag representation");
@@ -105,11 +109,34 @@ public class AmenityTagsService {
 
 	private VisibleTag toGroupTag(AmenityTagEntry tagEntry) {
 		String key = Amenity.COLLAPSABLE_PREFIX + tagEntry.key;
-		return new VisibleTag(key, joinPoiTypeKeys(tagEntry), null);
+		List<PoiType> types = tagEntry.collapsablePoiTypes;
+		if (!tagEntry.poiAdditional || Algorithms.isEmpty(types)) {
+			return new VisibleTag(key, joinPoiTypeKeys(tagEntry), null);
+		}
+		List<ValueLabel> labels = types.stream().map(AmenityTagEntriesBuilder::getValueLabel)
+				.collect(Collectors.toList());
+		List<String> values = Algorithms.isEmpty(tagEntry.collapsableEntries) ? null : types.stream()
+				.map(type -> tagEntry.getCollapsableEntryValue(type.getKeyName()))
+				.collect(Collectors.toList());
+		String icon = poiTypesService.getSharedPoiTypes().getPoiAdditionalCategoryIconName(tagEntry.key);
+		return new VisibleTag(key, joinPoiTypeKeys(tagEntry), null, null, null, labels, values, icon);
 	}
 
-	private VisibleTag toPlainTag(AmenityTagEntry tagEntry) {
-		return tagEntry.value != null ? new VisibleTag(tagEntry.key, tagEntry.value, null) : null;
+	private VisibleTag toPlainTag(AmenityTagEntry tagEntry, Set<String> genericRowKeys) {
+		if (tagEntry.value == null) {
+			return null;
+		}
+		PoiType type = tagEntry.resolvedType != null ? tagEntry.resolvedType.getAdditionalType() : null;
+		boolean generic = genericRowKeys.contains(tagEntry.key) && type == null;
+		List<ValueLabel> labels = type != null && !type.isText()
+				? List.of(AmenityTagEntriesBuilder.getValueLabel(type)) : null;
+		String value = Amenity.OPENING_HOURS.equals(tagEntry.key) ? toOpeningHoursRules(tagEntry.value) : tagEntry.value;
+		return new VisibleTag(tagEntry.key, value, null, null, generic ? Boolean.TRUE : null, labels, null, null);
+	}
+
+	private String toOpeningHoursRules(String value) {
+		OpeningHours openingHours = OpeningHoursParser.parseOpenedHours(value);
+		return openingHours != null ? openingHours.toString() : value;
 	}
 
 	private VisibleTag toLocalizedTag(AmenityTagEntry tagEntry) {
@@ -130,9 +157,14 @@ public class AmenityTagsService {
 				: new LangValue(child.value, null);
 	}
 
-	public record VisibleTag(String key, String value, String lang, List<LangValue> otherLangs) {
+	public record VisibleTag(String key, String value, String lang, List<LangValue> otherLangs, Boolean generic,
+	                         List<ValueLabel> labels, List<String> values, String icon) {
 		public VisibleTag(String key, String value, String lang) {
-			this(key, value, lang, null);
+			this(key, value, lang, null, null, null, null, null);
+		}
+
+		public VisibleTag(String key, String value, String lang, List<LangValue> otherLangs) {
+			this(key, value, lang, otherLangs, null, null, null, null);
 		}
 	}
 

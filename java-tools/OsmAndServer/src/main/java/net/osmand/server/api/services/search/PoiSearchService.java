@@ -3,7 +3,6 @@ package net.osmand.server.api.services.search;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -27,14 +26,12 @@ import net.osmand.binary.BinaryMapPoiReaderAdapter.PoiRegion;
 import net.osmand.binary.BinaryMapIndexReader.SearchPoiTypeFilter;
 import net.osmand.binary.BinaryMapIndexReader.SearchRequest;
 import net.osmand.binary.BinaryMapPoiReaderAdapter;
-import net.osmand.binary.NameIndexReader;
 import net.osmand.binary.ObfConstants;
 import net.osmand.data.Amenity;
 import net.osmand.data.BaseDetailsObject;
 import net.osmand.data.City;
 import net.osmand.data.City.CityType;
 import net.osmand.data.LatLon;
-import net.osmand.data.MapObject;
 import net.osmand.data.QuadRect;
 import net.osmand.data.TransportStopMatcher;
 import net.osmand.osm.PoiType;
@@ -106,6 +103,7 @@ public class PoiSearchService {
 		public boolean zoomInHint;
 		public FeatureCollection features;
 		public Map<String, Object> info;
+		public Map<String, String> categoryNames;
 	}
 
 	public static class PoiSearchData {
@@ -241,39 +239,12 @@ public class PoiSearchService {
 
 	private List<Amenity> searchPoiAmenities(SpatialSearchContext sscontext, String categoryKey, QuadRect bboxLatLon,
 	                                         int poiZoom, int limit) throws IOException {
-		SpatialPoiSearch poiTypeSearch = spatialSearchService.getSpatialPoiTypeSearch();
-		SpatialPoiType spatialType = null;
-		if (!categoryKey.startsWith(MapPoiTypes.TOP_INDEX_ADDITIONAL_PREFIX)) {
-			spatialType = poiTypeSearch.getByKey(categoryKey);
-			if (spatialType == null) {
-				LOGGER.debug(String.format("Unknown poi category '%s'", categoryKey));
-				return Collections.emptyList();
-			}
-			categoryKey = spatialType.getKey();
-		}
-		boolean indexed = spatialType == null
-				|| (spatialType.singleType instanceof PoiType poiType && !poiType.isNonIndx());
-		if (!indexed) {
-			return poiTypeSearch.loadPOIObjects(sscontext, spatialType, bboxLatLon, poiZoom, limit);
-		}
-
-		SpatialSearchResults res = spatialSearchService.getSpatialTextSearch()
-				.searchAPI(NameIndexReader.POI_CATEGORY_PREFIX + categoryKey, sscontext);
-
-		List<Amenity> amenities = new ArrayList<>();
-		if (res.mainResults != null) {
-			for (SpatialSearchResult r : res.mainResults) {
-				for (MapObject o : r.getObjects()) {
-					if (o instanceof Amenity amenity) {
-						amenities.add(amenity);
-					}
-				}
-			}
-		}
-		return amenities;
+		return spatialSearchService.getSpatialTextSearch().searchPoiByCategory(sscontext, categoryKey, bboxLatLon,
+				poiZoom, limit);
 	}
 
-	public Map<String, Map<String, String>> searchPoiCategories(String search, LatLon center) throws IOException {
+	public Map<String, Map<String, String>> searchPoiCategories(String search, LatLon center, String locale)
+			throws IOException {
 		Map<String, Map<String, String>> res = new LinkedHashMap<>();
 		List<BinaryMapIndexReader> readers = new ArrayList<>();
 		try {
@@ -291,8 +262,7 @@ public class PoiSearchService {
 				for (SpatialSearchResult r : results.mainResults) {
 					SpatialPoiType type = r.getPoiCategory(poiTypeSearch);
 					if (type != null) {
-						Map<String, String> fields = spatialSearchService.getSpatialPoiTypeFields(type);
-						res.put(fields.get(SearchResultConverter.PoiTypeField.NAME.getFieldName()), fields);
+						res.put(type.getKey(), spatialSearchService.getSpatialPoiTypeFields(type, locale));
 					}
 				}
 			}
@@ -408,7 +378,7 @@ public class PoiSearchService {
 		return sscontext.getStats();
 	}
 
-	private Feature getPoi(String type, String name, LatLon loc, Long osmId, String timeZone) throws IOException {
+	private Feature getPoi(String type, String name, LatLon loc, Long osmId) throws IOException {
 		if (!osmAndMapsService.validateAndInitConfig()) {
 			return null;
 		}
@@ -438,7 +408,7 @@ public class PoiSearchService {
 						: osmId != null && ObfConstants.getOsmObjectId(a) == osmId;
 				if (match) {
 					Feature f = searchResultConverter.getPoiFeature(
-							searchResultConverter.buildPoiSearchResult(a, PoiTypesService.DEFAULT_SEARCH_LANG, ""), timeZone);
+							searchResultConverter.buildPoiSearchResult(a, PoiTypesService.DEFAULT_SEARCH_LANG, ""));
 					if (f != null) {
 						return f;
 					}
@@ -451,36 +421,34 @@ public class PoiSearchService {
 	}
 
 	public Feature getPoiResultByShareLink(String type, LatLon loc, String name, Long osmId, Long wikidataId,
-	                                       String timeZone) throws IOException {
-		Feature poiFeature = getPoi(type, name, loc, osmId, timeZone);
+	                                       String lang) throws IOException {
+		Feature poiFeature = getPoi(type, name, loc, osmId);
 
 		if (poiFeature != null && wikidataId == null) {
 			Object wikiIdFromOsm = poiFeature.properties.get("osm_tag_wikidata");
 			if (wikiIdFromOsm != null) {
-				wikidataId = Long.parseLong(wikiIdFromOsm.toString().replace("Q", ""));
+				wikidataId = WikiService.parseWikidataId(wikiIdFromOsm.toString());
 			}
 		}
 
-		Feature wikiFeature = getWikiPoiById(wikidataId);
+		Feature wikiFeature = getWikiPoiById(wikidataId, lang);
 		return SearchResultConverter.mergeFeatures(wikiFeature, poiFeature);
 	}
 
-	private Feature getWikiPoiById(Long wikidataId) {
+	private Feature getWikiPoiById(Long wikidataId, String lang) {
 		if (wikidataId == null) {
 			return null;
 		}
-		List<String> langs = List.of(PoiTypesService.DEFAULT_SEARCH_LANG);
-
-		String langListQuery = wikiService.getLangListQuery(langs);
+		List<String> langs = wikiService.buildLangPriorityList(lang);
 
 		String query = "SELECT w.id, w.photoId, w.wikiTitle, w.wikiLang, w.wikiDesc, w.photoTitle, "
 				+ "w.osmid, w.osmtype, w.poitype, w.poisubtype, " + "w.search_lat AS lat, w.search_lon AS lon, "
-				+ "arrayFirst(x -> has(w.wikiArticleLangs, x), " + langListQuery + ") AS lang, "
+				+ wikiService.getArticleLangQuery(langs) + " AS lang, "
 				+ "indexOf(w.wikiArticleLangs, lang) AS ind, " + "w.wikiArticleContents[ind] AS content, "
 				+ "w.wvLinks, w.elo AS elo, w.topic AS topic, w.categories AS categories, w.qrank, w.labelsJson "
 				+ "FROM wiki.wikidata w " + "WHERE w.id = " + wikidataId + " " + "ORDER BY w.elo DESC, w.qrank DESC";
 		FeatureCollection res = wikiService.getPoiData(null, null, query, "lat", "lon", langs);
-		return res.features.get(0);
+		return res.features.isEmpty() ? null : res.features.get(0);
 	}
 
 	private boolean matchesName(Amenity a, String name) {
@@ -505,12 +473,12 @@ public class PoiSearchService {
 		return s != null && s.equalsIgnoreCase(t);
 	}
 
-	public Feature searchPoiByOsmId(LatLon loc, long osmid, String type, String timeZone) throws IOException {
+	public Feature searchPoiByOsmId(LatLon loc, long osmid, String type) throws IOException {
 		final String NODE_TYPE = "1";
-		return searchPoiByOsmId(loc, osmid, NODE_TYPE.equals(type) ? EntityType.NODE : EntityType.WAY, timeZone);
+		return searchPoiByOsmId(loc, osmid, NODE_TYPE.equals(type) ? EntityType.NODE : EntityType.WAY);
 	}
 
-	private Feature searchPoiByOsmId(LatLon loc, long osmid, EntityType type, String timeZone) throws IOException {
+	private Feature searchPoiByOsmId(LatLon loc, long osmid, EntityType type) throws IOException {
 		int radius = type == EntityType.NODE
 				? AmenitySearcher.AMENITY_SEARCH_RADIUS : AmenitySearcher.AMENITY_SEARCH_RADIUS_FOR_RELATION;
 		SearchResult res = searchSinglePoi(loc, radius, new ResultMatcher<>() {
@@ -524,11 +492,11 @@ public class PoiSearchService {
 				return false;
 			}
 		});
-		return res != null ? getMapObjectFeature(res, timeZone) : null;
+		return res != null ? getMapObjectFeature(res) : null;
 	}
 
-	private Feature getMapObjectFeature(SearchResult res, String timeZone) throws IOException {
-		Feature feature = searchResultConverter.getPoiFeature(res, timeZone);
+	private Feature getMapObjectFeature(SearchResult res) throws IOException {
+		Feature feature = searchResultConverter.getPoiFeature(res);
 		if (res.object instanceof Amenity amenity && TransportStopMatcher.isPublicTransportStop(amenity)) {
 			Long stopId = transportStopsService.findTransportStopId(amenity);
 			if (stopId != null) {
@@ -539,12 +507,12 @@ public class PoiSearchService {
 	}
 
 	// vector tile object: POI from the index by its osm id, else (no_indx types, buildings, ...) amenities from its tags as the map creator does
-	public List<Feature> getPoiByMapObject(long mapObjectId, LatLon loc, Map<String, String> tags, String timeZone) throws IOException {
+	public List<Feature> getPoiByMapObject(long mapObjectId, LatLon loc, Map<String, String> tags) throws IOException {
 		RenderedObject renderedObject = new RenderedObject();
 		renderedObject.setId(mapObjectId);
 		long osmId = ObfConstants.getOsmObjectId(renderedObject);
 		EntityType entityType = ObfConstants.getOsmEntityType(renderedObject);
-		Feature feature = searchPoiByOsmId(loc, osmId, entityType, timeZone);
+		Feature feature = searchPoiByOsmId(loc, osmId, entityType);
 		if (feature != null) {
 			return List.of(feature);
 		}
@@ -566,7 +534,7 @@ public class PoiSearchService {
 		List<Feature> features = new ArrayList<>();
 		for (Amenity amenity : amenities) {
 			Feature poiFeature = getMapObjectFeature(
-					searchResultConverter.buildPoiSearchResult(amenity, PoiTypesService.DEFAULT_SEARCH_LANG, ""), timeZone);
+					searchResultConverter.buildPoiSearchResult(amenity, PoiTypesService.DEFAULT_SEARCH_LANG, ""));
 			features.add(poiFeature.prop(SearchResultConverter.PoiTypeField.POI_FROM_TAGS.getFieldName(), true));
 		}
 		return features;
@@ -598,7 +566,7 @@ public class PoiSearchService {
 				return false;
 			}
 		});
-		return res != null ? searchResultConverter.getPoiFeature(res, null) : null;
+		return res != null ? searchResultConverter.getPoiFeature(res) : null;
 	}
 
 	private SearchResult searchSinglePoi(LatLon loc, int radiusMeters, ResultMatcher<Amenity> matcher)

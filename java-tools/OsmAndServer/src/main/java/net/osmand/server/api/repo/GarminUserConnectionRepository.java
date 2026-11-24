@@ -10,7 +10,10 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public interface GarminUserConnectionRepository extends JpaRepository<GarminUserConnectionRepository.GarminUserConnection, Integer> {
@@ -19,7 +22,12 @@ public interface GarminUserConnectionRepository extends JpaRepository<GarminUser
 
 	GarminUserConnection findByGarminUserId(String garminUserId);
 
-	@Entity
+	@Transactional
+	@Modifying
+	@Query("DELETE FROM GarminUserConnection c WHERE c.userid = :userid")
+	void deleteByUserid(int userid);
+
+	@Entity(name = "GarminUserConnection")
 	@Table(
 			name = "garmin_user_connection",
 			uniqueConstraints = @UniqueConstraint(name = "uk_garmin_connection_garmin_user", columnNames = "garmin_user_id")

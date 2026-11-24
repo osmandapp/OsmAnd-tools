@@ -42,7 +42,7 @@ class RandomRouteGenerator {
 			try {
 				generateRandomTests();
 			} catch (IOException e) {
-				throw new IllegalStateException("generateRandomTests() failed");
+				throw new IllegalStateException("generateRandomTests() failed", e);
 			}
 		}
 		return testList;
@@ -331,6 +331,9 @@ class RandomRouteGenerator {
 
 			if (restart) {
 				if (replenishCounter++ >= REPLENISH_LIMIT) {
+					if (!testList.isEmpty()) {
+						break; // small region (few HH points) - all points are used, keep the routes generated so far
+					}
 					throw new IllegalStateException(
 							"Random routes not generated. Check min/max dist, region size, and OBF connectivity.");
 				}

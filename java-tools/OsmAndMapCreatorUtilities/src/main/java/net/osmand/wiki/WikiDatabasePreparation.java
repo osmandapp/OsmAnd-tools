@@ -81,6 +81,8 @@ public class WikiDatabasePreparation {
 	public static final String WIKI_ARTICLES_GZ = "wiki-latest-pages-articles.xml.gz";
 	public static final String OSM_WIKI_FILE_PREFIX = "osm_wiki_";
 
+	private static final Map<String, String[]> POI_POSITIONAL_FIELDS = Map.of(
+			"znacznik", new String[] {"name", "lat", "long"});
 	private static final int OPTIMAL_SHORT_DESCR = 250;
 	private static final int OPTIMAL_LONG_DESCR = 500;
 	private static final int SHORT_PARAGRAPH = 10;
@@ -862,6 +864,8 @@ public class WikiDatabasePreparation {
 			throws IOException, SQLException {
 		StringBuilder poiShortDescription = new StringBuilder();
 		String[] parts = val.split("\\|");
+		String[] positionalFields = POI_POSITIONAL_FIELDS.get(parts[0].trim().toLowerCase());
+		int positionalIndex = 0;
 		for (int i = 1; i < parts.length; i++) {
 			String field = parts[i].trim();
 			String value = "";
@@ -870,17 +874,29 @@ public class WikiDatabasePreparation {
 				value = appendSqareBracketsIfNeeded(i, parts, field.substring(index + 1, field.length()).trim())
 						.replaceAll("\n", " ").trim();
 				field = field.substring(0, index).trim();
+			} else if (positionalFields != null) {
+				value = appendSqareBracketsIfNeeded(i, parts, field);
+				i += StringUtils.countMatches(value, "|");
+				value = value.replace("'''", "").replaceAll("\n", " ").trim();
+				field = positionalIndex < positionalFields.length ? positionalFields[positionalIndex] : "";
+				positionalIndex++;
 			}
 			if (!value.isEmpty() && !value.contains("{{")) {
 				try {
 					if (field.equalsIgnoreCase(("name")) || field.equalsIgnoreCase("nome")
 							|| field.equalsIgnoreCase("nom") || field.equalsIgnoreCase("שם")
 							|| field.equalsIgnoreCase("نام")) {
-						poiShortDescription.append("'''").append(value).append("'''").append(", ");
+						if (positionalFields == null) {
+							poiShortDescription.append("'''").append(value).append("'''").append(", ");
+						}
 						int l = value.indexOf("[[");
 						int e = value.indexOf("]]");
+						int sp = value.indexOf(' ');
 						if (l >= 0 && e >= 0) {
 							poiFields.put(PoiFieldType.NAME, value.substring(l + 2, e).trim());
+						} else if (value.startsWith("[http") && value.endsWith("]") && sp > 0) {
+							poiFields.put(PoiFieldType.NAME, value.substring(sp + 1, value.length() - 1).trim());
+							poiFields.putIfAbsent(PoiFieldType.WEBSITE, value.substring(1, sp));
 						} else {
 							poiFields.put(PoiFieldType.NAME, value);
 						}
@@ -891,7 +907,8 @@ public class WikiDatabasePreparation {
 					} else if (field.equalsIgnoreCase("intl-area-code")) {
 						poiFields.put(PoiFieldType.AREA_CODE, value);
 					} else if (field.equalsIgnoreCase("address") || field.equalsIgnoreCase("addresse")
-							|| field.equalsIgnoreCase("כתובת") || field.equalsIgnoreCase("نشانی")) {
+							|| field.equalsIgnoreCase("כתובת") || field.equalsIgnoreCase("نشانی")
+							|| field.equalsIgnoreCase("adres")) {
 						poiShortDescription.append(value).append(", ");
 						poiFields.put(PoiFieldType.ADDRESS, value);
 					} else if (field.equalsIgnoreCase("lat") || field.equalsIgnoreCase("latitude")
@@ -904,7 +921,8 @@ public class WikiDatabasePreparation {
 						poiFields.put(PoiFieldType.LON, value);
 					} else if (field.equalsIgnoreCase("content") || field.equalsIgnoreCase("descrizione")
 							|| field.equalsIgnoreCase("description") || field.equalsIgnoreCase("sobre")
-							|| field.equalsIgnoreCase("תיאור") || field.equalsIgnoreCase("متن")) {
+							|| field.equalsIgnoreCase("תיאור") || field.equalsIgnoreCase("متن")
+							|| field.equalsIgnoreCase("opis") || field.equalsIgnoreCase("treść")) {
 						poiShortDescription.append(value).append(" ");
 						poiFields.put(PoiFieldType.DESCRIPTION, value);
 					} else if (field.equalsIgnoreCase("email") || field.equalsIgnoreCase("מייל")
@@ -929,15 +947,16 @@ public class WikiDatabasePreparation {
 						poiShortDescription.append("☎ " + "tel:").append(value).append(". ");
 					} else if (field.equalsIgnoreCase("price") || field.equalsIgnoreCase("prezzo")
 							|| field.equalsIgnoreCase("מחיר") || field.equalsIgnoreCase("prix")
-							|| field.equalsIgnoreCase("بها")) {
+							|| field.equalsIgnoreCase("بها") || field.equalsIgnoreCase("ceny")) {
 						poiFields.put(PoiFieldType.PRICE, value);
 						poiShortDescription.append(value).append(". ");
 					} else if (field.equalsIgnoreCase("hours") || field.equalsIgnoreCase("שעות")
-							|| field.equalsIgnoreCase("ساعت‌ها")) {
+							|| field.equalsIgnoreCase("ساعت‌ها") || field.equalsIgnoreCase("godziny")) {
 						poiFields.put(PoiFieldType.WORK_HOURS, value);
 						poiShortDescription.append("Working hours: ").append(value).append(". ");
 					} else if (field.equalsIgnoreCase("directions") || field.equalsIgnoreCase("direction")
-							|| field.equalsIgnoreCase("הוראות") || field.equalsIgnoreCase("مسیرها")) {
+							|| field.equalsIgnoreCase("הוראות") || field.equalsIgnoreCase("مسیرها")
+							|| field.equalsIgnoreCase("wskazówki")) {
 						poiFields.put(PoiFieldType.DIRECTIONS, value);
 						poiShortDescription.append(value).append(". ");
 					} else if (field.equalsIgnoreCase("indicazioni")) {
@@ -974,27 +993,32 @@ public class WikiDatabasePreparation {
 
 	private static PoiFieldCategory transformCategory(String[] info) {
 		// {{listing | type=go}
-		// en: type, pt: tipo, fr: group,
+		// en: type, pt: tipo, fr: group, pl: typ
 		PoiFieldCategory res = PoiFieldCategory.OTHER;
 		for (int i = 0; i < info.length; i++) {
 			int ind = info[i].indexOf('=');
 			if (ind >= 0) {
 				String key = info[i].substring(0, ind).trim();
-				if (key.equals("type") || key.equals("tipo") || key.equals("group")) {
+				if (key.equals("type") || key.equals("tipo") || key.equals("group") || key.equals("typ")) {
 					String val = info[i].substring(ind + 1).toLowerCase().trim();
+					// exact match wins over contains: "parking" contains "park"
+					PoiFieldCategory exact = null;
 					for (PoiFieldCategory p : PoiFieldCategory.values()) {
 						for (String s : p.names) {
 							if (val.contains(s)) {
 								res = p;
-								break;
+								exact = val.equals(s) ? p : exact;
 							}
 						}
 						for (String s : p.types) {
 							if (val.contains(s)) {
 								res = p;
-								break;
+								exact = val.equals(s) ? p : exact;
 							}
 						}
+					}
+					if (exact != null && exact != PoiFieldCategory.OTHER) {
+						return exact;
 					}
 					if (res != PoiFieldCategory.OTHER) {
 						return res;
@@ -1008,7 +1032,8 @@ public class WikiDatabasePreparation {
 	}
 
 	private static PoiFieldCategory isPOIKey(String str, String lang) {
-		if (str.startsWith("listing") || str.startsWith("vcard")) {
+		// pl: {{znacznik | typ=...}} is the generic listing template (like en "listing")
+		if (str.startsWith("listing") || str.startsWith("vcard") || str.startsWith("znacznik")) {
 			return transformCategory(str.split("\\|"));
 		}
 		for (PoiFieldCategory p : PoiFieldCategory.values()) {
@@ -1234,6 +1259,7 @@ public class WikiDatabasePreparation {
 			log.info("Create wikidata...");
 			processWikidata(wikidataDB, wikidataFile, osmCoordinates, 0, -1, false);
 			createOSMWikidataTable(wikidataDB, osmCoordinates);
+			AbstractWikiFilesDownloader.removeTimestampFile(wikidataDB.getParent());
 			break;
 		case "create-osm-wikidata":
 			wikidataDB = new File(wikidataSqliteName);
@@ -1288,6 +1314,7 @@ public class WikiDatabasePreparation {
 		}
 		wfd.removeDownloadedPages();
 		createOSMWikidataTable(wikidataDB, osmCoordinates);
+		wfd.saveUpdateTimestamp();
 	}
 
 	protected static void processWikidataRegions(final String sqliteFileName) throws SQLException, IOException {
@@ -1366,26 +1393,44 @@ public class WikiDatabasePreparation {
 		Connection commonsWikiConn = DBDialect.SQLITE.getDatabaseConnection(wikidataDB.getAbsolutePath(), log);
 		Statement st = commonsWikiConn.createStatement();
 		ResultSet rs = st
-				.executeQuery("SELECT C.id,M.lang,M.title FROM wiki_coords C LEFT JOIN wiki_mapping M ON M.id=C.id");
+				.executeQuery("SELECT C.id,M.lang,M.title,C.osmid FROM wiki_coords C LEFT JOIN wiki_mapping M ON M.id=C.id");
 		Map<Long, OsmLatLonId> res = new TreeMap<>();
+		// items without an OSM link: update-wikidata processes only new items, so older ones get the link here
+		// (OSM objects that got a wikidata tag later or were missing in the OSM extract); wikipedia links first
+		Map<Long, OsmLatLonId> missingByWiki = new HashMap<>();
+		Map<Long, OsmLatLonId> missingByWikidata = new HashMap<>();
 		int scan = 0;
 		long time = System.currentTimeMillis();
 		while (rs.next()) {
 			long wid = rs.getLong(1);
 			String articleLang = rs.getString(2);
 			String articleTitle = rs.getString(3);
+			boolean noOsm = rs.getLong(4) == 0;
 			if (++scan % 500000 == 0) {
 				System.out.println("Scanning wiki to merge with OSM... " + scan + " "
 						+ (System.currentTimeMillis() - time) + " ms");
 				time = System.currentTimeMillis();
 			}
 			if (articleLang != null) {
-				setWikidataId(res, c.getCoordinates("wikipedia:" + articleLang, articleTitle), wid);
-				setWikidataId(res, c.getCoordinates("wikipedia", articleLang + ":" + articleTitle), wid);
-				setWikidataId(res, c.getCoordinates("wikipedia", articleTitle), wid);
+				OsmLatLonId o = c.getCoordinates("wikipedia:" + articleLang, articleTitle);
+				setWikidataId(res, o, wid);
+				OsmLatLonId o2 = c.getCoordinates("wikipedia", articleLang + ":" + articleTitle);
+				setWikidataId(res, o2, wid);
+				OsmLatLonId o3 = c.getCoordinates("wikipedia", articleTitle);
+				setWikidataId(res, o3, wid);
+				OsmLatLonId first = o != null ? o : (o2 != null ? o2 : o3);
+				if (noOsm && first != null) {
+					missingByWiki.putIfAbsent(wid, first);
+				}
 			}
-			setWikidataId(res, c.getCoordinates("wikidata", "Q" + wid), wid);
+			OsmLatLonId ow = c.getCoordinates("wikidata", "Q" + wid);
+			setWikidataId(res, ow, wid);
+			if (noOsm && ow != null) {
+				missingByWikidata.putIfAbsent(wid, ow);
+			}
 		}
+		missingByWikidata.forEach(missingByWiki::putIfAbsent);
+		updateMissingOsmLinks(commonsWikiConn, missingByWiki);
 		try {
 			commonsWikiConn.createStatement().executeQuery("DROP TABLE osm_wikidata");
 		} catch (SQLException e) {
@@ -1456,6 +1501,34 @@ public class WikiDatabasePreparation {
 		mappingConn.close();
 		srcSt.close();
 		srcConn.close();
+	}
+
+	// the same OSM fields as WikiDataHandler.processJsonPage writes for a new item
+	private static void updateMissingOsmLinks(Connection conn, Map<Long, OsmLatLonId> links) throws SQLException {
+		boolean autoCommit = conn.getAutoCommit();
+		conn.setAutoCommit(false);
+		PreparedStatement ps = conn.prepareStatement(
+				"UPDATE wiki_coords SET lat = ?, lon = ?, osmtype = ?, osmid = ?, poitype = ?, poisubtype = ? WHERE id = ?");
+		int batch = 0;
+		for (Map.Entry<Long, OsmLatLonId> e : links.entrySet()) {
+			OsmLatLonId o = e.getValue();
+			ps.setDouble(1, o.lat);
+			ps.setDouble(2, o.lon);
+			ps.setInt(3, o.type + 1);
+			ps.setLong(4, o.id);
+			ps.setString(5, o.amenity == null ? null : o.amenity.getType().getKeyName());
+			ps.setString(6, o.amenity == null ? null : o.amenity.getSubType());
+			ps.setLong(7, e.getKey());
+			ps.addBatch();
+			if (++batch % 1000 == 0) {
+				ps.executeBatch();
+			}
+		}
+		ps.executeBatch();
+		ps.close();
+		conn.commit();
+		conn.setAutoCommit(autoCommit);
+		System.out.println("OSM links added to " + links.size() + " wiki items");
 	}
 
 	private static void setWikidataId(Map<Long, OsmLatLonId> mp, OsmLatLonId c, long wid) {

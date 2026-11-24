@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
+import java.util.function.Consumer;
 
 import static net.osmand.purchases.UpdateSubscription.MINIMUM_WAIT_TO_REVALIDATE;
 
@@ -158,6 +159,7 @@ public class OrderManagementService {
 			}
 
 		}
+		markLinkablePurchases(result);
 		result.sort(Comparator.comparing(
 				(AdminService.Purchase p) ->
 						p.starttime != null
@@ -168,6 +170,23 @@ public class OrderManagementService {
 				Comparator.nullsLast(Comparator.naturalOrder())
 		).reversed());
 		return result;
+	}
+
+	private void markLinkablePurchases(List<AdminService.Purchase> purchases) {
+		Set<String> ownerlessOrderIds = new HashSet<>();
+		for (AdminService.Purchase p : purchases) {
+			if (p.userId == null && p.orderId != null) {
+				ownerlessOrderIds.add(p.orderId);
+			}
+		}
+		if (ownerlessOrderIds.isEmpty()) {
+			return;
+		}
+		Set<String> usedOrderIds = new HashSet<>();
+		usersRepository.findByOrderidIn(ownerlessOrderIds).forEach(u -> usedOrderIds.add(u.orderid));
+		for (AdminService.Purchase p : purchases) {
+			p.canLinkUser = p.userId == null && p.orderId != null && !usedOrderIds.contains(p.orderId);
+		}
 	}
 
 	public AdminService.CloudUserInfo getCloudInfo(CloudUsersRepository.CloudUser user) {
@@ -472,32 +491,76 @@ public class OrderManagementService {
 		if (orderId == null || orderId.isBlank() || sku == null || sku.isBlank()) {
 			return false;
 		}
+		boolean updated = updatePurchase(orderId, sku,
+				sub -> {
+					validateOwner(userId, sub.userId);
+					sub.valid = valid;
+				},
+				iap -> {
+					validateOwner(userId, iap.userId);
+					iap.valid = valid;
+				});
+		if (updated) {
+			verifyAndRefreshProForUserId(userId);
+		}
+		return updated;
+	}
+
+	@Transactional
+	public void linkPurchaseToUser(String orderId, String sku, int userId) {
+		CloudUsersRepository.CloudUser pu = usersRepository.findById(userId);
+		if (pu == null) {
+			throw new IllegalArgumentException("User with id " + userId + " not found");
+		}
+		CloudUsersRepository.CloudUser orderOwner =
+				usersRepository.findFirstByOrderidAndEmailNotIgnoreCaseOrderByIdAsc(orderId, pu.email);
+		if (orderOwner != null) {
+			throw new IllegalArgumentException("Order ID “" + orderId + "” is already used by user " + orderOwner.id);
+		}
+		boolean linked = updatePurchase(orderId, sku,
+				sub -> {
+					checkNotLinked(sub.userId);
+					sub.userId = userId;
+				},
+				iap -> {
+					checkNotLinked(iap.userId);
+					iap.userId = userId;
+				});
+		if (!linked) {
+			throw new IllegalArgumentException("Order ID “" + orderId + "” not found");
+		}
+		userSubService.verifyAndRefreshProOrderId(pu);
+	}
+
+	private boolean updatePurchase(String orderId, String sku,
+	                               Consumer<DeviceSubscriptionsRepository.SupporterDeviceSubscription> updateSub,
+	                               Consumer<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> updateIap) {
 		List<DeviceSubscriptionsRepository.SupporterDeviceSubscription> subs =
 				subscriptionsRepository.findByOrderIdAndSku(orderId, sku);
-		int n = subs == null ? 0 : subs.size();
-		if (n > 0) {
-			if (n != 1) {
+		if (!subs.isEmpty()) {
+			if (subs.size() != 1) {
 				return false;
 			}
 			DeviceSubscriptionsRepository.SupporterDeviceSubscription sub = subs.get(0);
-			validateOwner(userId, sub.userId);
-			sub.valid = valid;
+			updateSub.accept(sub);
 			subscriptionsRepository.saveAndFlush(sub);
-			verifyAndRefreshProForUserId(userId);
 			return true;
 		}
 		List<DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase> iaps =
 				deviceInAppPurchasesRepository.findByOrderIdAndSku(orderId, sku);
-		n = iaps == null ? 0 : iaps.size();
-		if (n != 1) {
+		if (iaps.size() != 1) {
 			return false;
 		}
 		DeviceInAppPurchasesRepository.SupporterDeviceInAppPurchase iap = iaps.get(0);
-		validateOwner(userId, iap.userId);
-		iap.valid = valid;
+		updateIap.accept(iap);
 		deviceInAppPurchasesRepository.saveAndFlush(iap);
-		verifyAndRefreshProForUserId(iap.userId);
 		return true;
+	}
+
+	private void checkNotLinked(Integer purchaseUserId) {
+		if (purchaseUserId != null) {
+			throw new IllegalArgumentException("Purchase is already linked to user " + purchaseUserId);
+		}
 	}
 
 	private void validateOwner(int cloudUserId, int userId) {

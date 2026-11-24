@@ -39,7 +39,7 @@ public class MapPoiTypesTranslator implements MapPoiTypes.PoiTranslator {
 		if (baseLangType != null) {
 			return getTranslation(baseLangType) + " (" + type.getLang().toLowerCase() + ")";
 		}
-		return getTranslation(type.getIconKeyName());
+		return getTranslation(type.getFormattedKeyName());
 	}
 
 	@Override
@@ -57,7 +57,7 @@ public class MapPoiTypesTranslator implements MapPoiTypes.PoiTranslator {
 		if (baseLangType != null) {
 			return getEnTranslation(baseLangType) + " (" + type.getLang().toLowerCase() + ")";
 		}
-		return getEnTranslation(type.getIconKeyName());
+		return getEnTranslation(type.getFormattedKeyName());
 	}
 
 	@Override
@@ -78,7 +78,7 @@ public class MapPoiTypesTranslator implements MapPoiTypes.PoiTranslator {
 		if (baseLangType != null) {
 			return getSynonyms(baseLangType);
 		}
-		return getSynonyms(type.getIconKeyName());
+		return getSynonyms(type.getFormattedKeyName());
 	}
 
 	@Override

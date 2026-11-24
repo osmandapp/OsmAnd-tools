@@ -1,7 +1,6 @@
 package net.osmand.server.api.services;
 
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import jakarta.annotation.Nullable;
 import jakarta.servlet.http.HttpSession;
@@ -10,6 +9,7 @@ import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository;
 import net.osmand.server.controllers.pub.UserSessionResources;
+import net.osmand.server.utils.GpxJson;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.server.utils.exception.OsmAndPublicApiException;
 import net.osmand.shared.gpx.GpxFile;
@@ -55,7 +55,7 @@ public class FavoriteService {
     
     Gson gson = new Gson();
     
-    Gson gsonWithNans = new GsonBuilder().serializeSpecialFloatingPointValues().create();
+    Gson gsonWithNans = GpxJson.createWithNans();
     
     @Transactional
     public ResponseEntity<String> renameFavFolder(String oldName, String newName, StorageService.InternalZipFile fl, CloudUserDevicesRepository.CloudUserDevice dev) throws IOException {
@@ -74,9 +74,10 @@ public class FavoriteService {
     }
 
     public void uploadFavoriteFile(File tmpFile, CloudUserDevicesRepository.CloudUserDevice dev, String name, Long updatetime, Date clienttime) throws IOException {
-        StorageService.InternalZipFile fl = StorageService.InternalZipFile.buildFromFileAndDelete(tmpFile);
-        userdataService.validateUserForUpload(dev, FILE_TYPE_FAVOURITES, fl.getSize());
-        userdataService.uploadFile(fl, dev, name, FILE_TYPE_FAVOURITES, clienttime != null ? clienttime.getTime() : System.currentTimeMillis());
+        try (StorageService.InternalZipFile fl = StorageService.InternalZipFile.buildFromFileAndDelete(tmpFile)) {
+            userdataService.validateUserForUpload(dev, FILE_TYPE_FAVOURITES, fl.getSize());
+            userdataService.uploadFile(fl, dev, name, FILE_TYPE_FAVOURITES, clienttime != null ? clienttime.getTime() : System.currentTimeMillis());
+        }
         if (updatetime != null) {
             boolean isWebDevice = UserdataService.TOKEN_DEVICE_WEB.equals(dev.deviceid);
             boolean isRecentWebEdit = System.currentTimeMillis() - updatetime < WEB_VERSION_INTERVAL_MS;

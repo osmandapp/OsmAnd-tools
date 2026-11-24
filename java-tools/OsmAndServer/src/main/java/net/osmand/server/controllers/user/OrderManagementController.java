@@ -1,6 +1,7 @@
 package net.osmand.server.controllers.user;
 
 import jakarta.servlet.http.HttpServletRequest;
+import net.osmand.mailsender.EmailSenderTemplate;
 import net.osmand.server.PurchasesDataLoader;
 import net.osmand.server.api.repo.DeviceSubscriptionsRepository;
 import net.osmand.server.api.repo.OrderInfoRepository;
@@ -9,6 +10,7 @@ import net.osmand.server.api.services.AdminService;
 import net.osmand.server.api.services.AdminService.Purchase;
 import net.osmand.server.WebSecurityConfiguration;
 import net.osmand.server.api.services.AppleOrderLookupService;
+import net.osmand.server.api.services.EmailSenderService;
 import net.osmand.server.api.services.OrderManagementService;
 import net.osmand.server.api.services.UserdataService;
 import org.apache.commons.logging.Log;
@@ -126,6 +128,7 @@ public class OrderManagementController {
 			@RequestParam String purchaseToken,
 			@RequestParam boolean isSubscription) {
 
+		email = EmailSenderTemplate.trimLowerCaseEmail(email);
 		if (usersRepository.findByEmailIgnoreCase(email) == null) {
 			return ResponseEntity
 					.status(HttpStatus.BAD_REQUEST)
@@ -210,12 +213,16 @@ public class OrderManagementController {
 	@PreAuthorize("hasAnyAuthority(T(net.osmand.server.WebSecurityConfiguration).ROLE_ADMIN, T(net.osmand.server.WebSecurityConfiguration).ROLE_SUPPORT)")
 	@ResponseBody
 	public ResponseEntity<?> createWebLoginLink(Authentication auth, @RequestParam String email) {
-		CloudUsersRepository.CloudUser pu = usersRepository.findByEmailIgnoreCase(email.trim());
+		CloudUsersRepository.CloudUser pu = usersRepository.findByEmailIgnoreCase(EmailSenderTemplate.trimLowerCaseEmail(email));
 		if (pu == null) {
 			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("OsmAnd Cloud account not found");
 		}
 		Date validFrom = userdataService.createWebLoginLink(pu);
-		LOG.info("web-link: created by " + auth.getName() + " for " + pu.email);
+		if (validFrom == null) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+					.body("The owner email was not sent, the link was not created");
+		}
+		LOG.info("web-link: created by " + EmailSenderService.shortenEmail(auth.getName()) + " for " + EmailSenderService.shortenEmail(pu.email));
 		Map<String, Object> res = new LinkedHashMap<>();
 		res.put("url", userdataService.getWebLinkUrl(pu));
 		res.put("validFrom", validFrom);
@@ -240,6 +247,39 @@ public class OrderManagementController {
 		if (!orderManagementService.updatePurchaseValidation(orderId.trim(), sku.trim(), valid, cloudUserId)) {
 			return ResponseEntity.notFound().build();
 		}
+		return ResponseEntity.ok().build();
+	}
+
+	@GetMapping("/cloud/user")
+	@PreAuthorize("hasAnyAuthority(T(net.osmand.server.WebSecurityConfiguration).ROLE_ADMIN, T(net.osmand.server.WebSecurityConfiguration).ROLE_SUPPORT)")
+	@ResponseBody
+	public ResponseEntity<?> cloudUser(@RequestParam int id) {
+		CloudUsersRepository.CloudUser pu = usersRepository.findById(id);
+		if (pu == null) {
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body("OsmAnd Cloud account not found");
+		}
+		Map<String, Object> res = new LinkedHashMap<>();
+		res.put("id", pu.id);
+		res.put("email", pu.email);
+		return ResponseEntity.ok(res);
+	}
+
+	@PostMapping("/orders/link-user")
+	@PreAuthorize("hasAnyAuthority(T(net.osmand.server.WebSecurityConfiguration).ROLE_ADMIN, T(net.osmand.server.WebSecurityConfiguration).ROLE_SUPPORT)")
+	@ResponseBody
+	public ResponseEntity<String> linkPurchaseToUser(Authentication auth,
+	                                                 @RequestParam String sku,
+	                                                 @RequestParam String orderId,
+	                                                 @RequestParam int userId) {
+		if (StringUtils.isBlank(sku) || StringUtils.isBlank(orderId)) {
+			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("sku and orderId are required");
+		}
+		try {
+			orderManagementService.linkPurchaseToUser(orderId.trim(), sku.trim(), userId);
+		} catch (IllegalArgumentException e) {
+			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+		}
+		LOG.info("link-user: " + EmailSenderService.shortenEmail(auth.getName()) + " linked " + sku + " / " + orderId + " to user " + userId);
 		return ResponseEntity.ok().build();
 	}
 }

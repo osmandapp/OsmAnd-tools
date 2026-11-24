@@ -109,6 +109,17 @@
       "maps": ["China_zhejiang_asia_2.obf"]
     },
     {
+      "issue": 94149,
+      "title": "Plouguerneau (Brittany): land north of Aber Wrac'h drawn as sea at z15, straight coast at z14 (support #94149, OsmAnd 5.4.11)",
+      "url": "https://github.com/osmandapp/OsmAnd-Issues/issues/3291",
+      "lat": 48.62,
+      "lon": -4.52,
+      "minzoom": 12,
+      "maxzoom": 16,
+      "radius": 2,
+      "maps": ["France_brittany_europe_2.obf"]
+    },
+    {
       "issue": 3291,
       "title": "Greenland islets mapped as natural=coastline multipolygons drawn twice (Sallinngualua, Niaqornaarsuk)",
       "url": "https://github.com/osmandapp/OsmAnd-Issues/issues/3291",

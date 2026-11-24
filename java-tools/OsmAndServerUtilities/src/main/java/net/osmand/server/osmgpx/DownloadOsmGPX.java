@@ -91,6 +91,11 @@ import oauth.signpost.exception.OAuthCommunicationException;
 import oauth.signpost.exception.OAuthExpectationFailedException;
 import oauth.signpost.exception.OAuthMessageSignerException;
 
+import static net.osmand.server.osmgpx.OsmGpxSchema.GPX_FILES_TABLE_NAME;
+import static net.osmand.server.osmgpx.OsmGpxSchema.GPX_METADATA_TABLE_NAME;
+import static net.osmand.server.osmgpx.OsmGpxSchema.OUTDATED_STATS_CONDITION;
+import static net.osmand.server.osmgpx.OsmGpxSchema.TRACK_STATS_VERSION;
+
 public class DownloadOsmGPX {
 
 	private static final int BATCH_SIZE = 100;
@@ -112,8 +117,6 @@ public class DownloadOsmGPX {
 
 	// preindex before 76787 with maxlat/minlat
 	private static final long INITIAL_ID = 1000; // start with 1000
-	private static final String GPX_METADATA_TABLE_NAME = "osm_gpx_data";
-	private static final String GPX_FILES_TABLE_NAME = "osm_gpx_files";
 	private static final long FETCH_INTERVAL_SLEEP = 10000;
 
 	private static final int HTTP_TIMEOUT = 5000;
@@ -125,12 +128,7 @@ public class DownloadOsmGPX {
 
 	private static final long MIN_SPEED_INTERVAL_MS = 500; // min elapsed time to trust a speed sample
 	private static final double MIN_MOVING_SPEED_MPS = 0.1; // below this the interval counts as standing still
-	private static final int SRID_WGS84 = 4326;
-	private static final int TRACK_STATS_VERSION = 1;
-	// tracks parse_tracks still has to parse; also the idx_osm_gpx_parse_v* predicate, the query must use the same text
-	private static final String OUTDATED_STATS_CONDITION =
-			"track_stats IS NULL OR COALESCE((track_stats->>'v')::int, 0) < " + TRACK_STATS_VERSION;
-	private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
+	static final ObjectMapper JSON_MAPPER = new ObjectMapper();
 	private static final int PARSE_BATCH_LIMIT = 1000;
 	private static final int LARGE_GPX_BYTES = 5 << 20; // compressed; larger files are parsed one at a time
 	private static final int CLASSIFY_BATCH_LIMIT = 10000;
@@ -179,7 +177,6 @@ public class DownloadOsmGPX {
 	public static void main(String[] args) throws Exception {
 		String main = args.length > 0 ? args[0] : "";
 		DownloadOsmGPX utility = new DownloadOsmGPX();
-		//createActivitiesMap("../../");
 		if ("test_download".equals(main)) {
 			String gpx = utility.downloadGpx(57905, "");
 			Source src = new Buffer().write(gpx.getBytes());
@@ -269,21 +266,21 @@ public class DownloadOsmGPX {
 			utility.recalculateMinMaxLatLon(true);
 		} else if ("add_activity".equals(main)) {
 			// kept for existing jobs: parses tracks without activity
-			utility.addActivityColumnAndPopulate(args[1]);
+			utility.addActivityColumnAndPopulate();
 		} else if ("update_activity".equals(main)) {
-			// kept for existing jobs: update_activity <rootPath> foot,cycling,garbage parses those tracks again
+			// kept for existing jobs: update_activity <ignored-path> foot,cycling,garbage parses those tracks again
 			String categories = args.length > 2 ? args[2] : null;
-			utility.updateActivity(args[1], categories);
+			utility.updateActivity(categories);
 		} else if ("parse_tracks".equals(main)) {
-			// parse_tracks <rootPath> [--threads=N] [--categories=foot,garbage] [--where=<SQL condition>] [--force]
+			// parse_tracks [--threads=N] [--categories=foot,garbage] [--where=<SQL condition>] [--force]
 			// parses tracks without track_stats or with an older TRACK_STATS_VERSION (every track with --force),
 			// so a stopped run continues where it stopped
-			JobOptions options = JobOptions.parse(args, 2);
-			utility.parseTracks(args[1], options.force ? TrackSelection.ALL : TrackSelection.OUTDATED_STATS, options);
+			JobOptions options = JobOptions.parse(args);
+			utility.parseTracks(options.force ? TrackSelection.ALL : TrackSelection.OUTDATED_STATS, options);
 		} else if ("classify_tracks".equals(main)) {
-			// classify_tracks <rootPath> [--categories=foot,garbage] [--where=<SQL condition>]
+			// classify_tracks [--categories=foot,garbage] [--where=<SQL condition>]
 			// sets activity again from stored columns and track_stats, without reading GPX
-			utility.classifyTracks(args[1], JobOptions.parse(args, 2));
+			utility.classifyTracks(JobOptions.parse(args));
 		} else {
 			System.out.println("Arguments " + Arrays.toString(args));
 			for (int i = 0; i < args.length; i++) {
@@ -307,70 +304,15 @@ public class DownloadOsmGPX {
 		utility.commitAllStatements();
 	}
 
-	private void ensureActivitySchema() throws SQLException {
-		try (Statement statement = dbConn.createStatement()) {
-			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS activity text");
 
-			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS speed float");
-			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS distance float");
-			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS points integer");
-			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS max_speed float");
-			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS max_dist_between_points float");
-			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS time_minutes integer");
-			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS waypoints integer");
-			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS simplified_geometry bytea");
-			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS speed_matches_activity boolean");
-			// activity written in the file itself (osmand:activity), kept apart from the computed activity
-			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS file_activity text");
-			// rule that set activity: file, keyword, speed, garbage, error
-			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS activity_source text");
-			// facts from one GPX parse, so classification rules can change without parsing again (see computeTrackStats)
-			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS track_stats json");
-			// reviews people give tracks on the heatmap (PubTracksController); parsing and classifying never write it
-			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS manual_review jsonb");
-			// ids of the tracks parse_tracks still has to parse: a restarted run starts at once instead of reading
-			// the parsed rows; built once per TRACK_STATS_VERSION, a parsed track leaves it
-			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_parse_v" + TRACK_STATS_VERSION
-					+ " ON " + GPX_METADATA_TABLE_NAME + " (id) WHERE " + OUTDATED_STATS_CONDITION);
-			statement.executeUpdate("DROP INDEX IF EXISTS idx_osm_gpx_parse_v" + (TRACK_STATS_VERSION - 1));
-
-			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_speed ON " + GPX_METADATA_TABLE_NAME + " (speed)");
-			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_distance ON " + GPX_METADATA_TABLE_NAME + " (distance)");
-			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_points ON " + GPX_METADATA_TABLE_NAME + " (points)");
-			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_max_speed ON " + GPX_METADATA_TABLE_NAME + " (max_speed)");
-			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_max_dist_between_points ON " + GPX_METADATA_TABLE_NAME + " (max_dist_between_points)");
-			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_time_minutes ON " + GPX_METADATA_TABLE_NAME + " (time_minutes)");
-			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_waypoints ON " + GPX_METADATA_TABLE_NAME + " (waypoints)");
-
-			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_activity ON " + GPX_METADATA_TABLE_NAME + " (activity)");
-			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_tags_gin ON " + GPX_METADATA_TABLE_NAME + " USING GIN (tags)");
-
-			statement.executeUpdate("CREATE EXTENSION IF NOT EXISTS postgis");
-			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " ADD COLUMN IF NOT EXISTS bbox geometry"
-					+ " GENERATED ALWAYS AS (ST_MakeEnvelope(minlon, minlat, maxlon, maxlat, " + SRID_WGS84 + ")) STORED");
-			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_bbox_geom ON " + GPX_METADATA_TABLE_NAME
-					+ " USING GIST (bbox)");
-			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_year ON " + GPX_METADATA_TABLE_NAME + " ((extract(year from date)))");
-			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_ranges_optimized ON " + GPX_METADATA_TABLE_NAME
-					+ " (minlat, maxlat, minlon, maxlon, activity) INCLUDE (distance, speed)"
-					+ " WHERE (distance > 0::double precision OR speed > 0::double precision)"
-					+ " AND activity NOT LIKE 'garbage%' AND activity <> 'error'::text");
-			statement.executeUpdate("CREATE INDEX IF NOT EXISTS idx_osm_gpx_ranges_composite ON " + GPX_METADATA_TABLE_NAME
-					+ " (activity, minlat, minlon, maxlat, maxlon) INCLUDE (distance, speed)"
-					+ " WHERE (distance > 0::double precision OR speed > 0::double precision)"
-					+ " AND activity NOT LIKE 'garbage%' AND activity <> 'error'::text");
-		}
-		LOG.info("Activity schema (columns and indexes) ensured.");
+	protected void addActivityColumnAndPopulate() throws SQLException, InterruptedException {
+		parseTracks(TrackSelection.WITHOUT_ACTIVITY, new JobOptions());
 	}
 
-	protected void addActivityColumnAndPopulate(String rootPath) throws SQLException, InterruptedException {
-		parseTracks(rootPath, TrackSelection.WITHOUT_ACTIVITY, new JobOptions());
-	}
-
-	protected void updateActivity(String rootPath, String categories) throws SQLException, InterruptedException {
+	protected void updateActivity(String categories) throws SQLException, InterruptedException {
 		JobOptions options = new JobOptions();
 		options.categories = categories;
-		parseTracks(rootPath, TrackSelection.ALL, options);
+		parseTracks(TrackSelection.ALL, options);
 	}
 
 	private enum TrackSelection {
@@ -386,8 +328,10 @@ public class DownloadOsmGPX {
 		String where; // e.g. "id % 1000 = 0" for a sample, "(track_stats->>'speed_p95')::float > 40" for a subgroup
 		boolean force;
 
-		static JobOptions parse(String[] args, int from) {
+		static JobOptions parse(String[] args) {
 			JobOptions options = new JobOptions();
+			// Ignore the optional directory argument used by older jobs.
+			int from = args.length > 1 && !args[1].startsWith("--") ? 2 : 1;
 			for (int i = from; i < args.length; i++) {
 				String arg = args[i];
 				String value = arg.substring(arg.indexOf('=') + 1).trim();
@@ -463,14 +407,10 @@ public class DownloadOsmGPX {
 		return condition.toString();
 	}
 
-	protected void parseTracks(String rootPath, TrackSelection selection, JobOptions options)
+	protected void parseTracks(TrackSelection selection, JobOptions options)
 			throws SQLException, InterruptedException {
-		ensureActivitySchema();
-		Map<String, List<String>> activitiesMap = createActivitiesMap(rootPath);
-		if (activitiesMap.isEmpty()) {
-			LOG.info("Activities map is empty. Skipping.");
-			return;
-		}
+		OsmGpxSchema.actualizeSchema(dbConn);
+		Map<String, List<String>> activitiesMap = createActivitiesMap();
 		String condition = trackCondition(activitiesMap, options);
 		if (condition == null) {
 			return;
@@ -570,13 +510,9 @@ public class DownloadOsmGPX {
 		}
 	}
 
-	protected void classifyTracks(String rootPath, JobOptions options) throws SQLException {
-		ensureActivitySchema();
-		Map<String, List<String>> activitiesMap = createActivitiesMap(rootPath);
-		if (activitiesMap.isEmpty()) {
-			LOG.info("Activities map is empty. Skipping.");
-			return;
-		}
+	protected void classifyTracks(JobOptions options) throws SQLException {
+		OsmGpxSchema.actualizeSchema(dbConn);
+		Map<String, List<String>> activitiesMap = createActivitiesMap();
 		String condition = trackCondition(activitiesMap, options);
 		if (condition == null) {
 			return;
@@ -943,8 +879,7 @@ public class DownloadOsmGPX {
 				}
 				for (WptPt p : seg.getPoints()) {
 					WptPt last = points.isEmpty() ? null : points.get(points.size() - 1);
-					if (!(Math.abs(p.getLat()) <= 90 && Math.abs(p.getLon()) <= 180)
-							|| (Math.abs(p.getLat()) < 0.01 && Math.abs(p.getLon()) < 0.01)) {
+					if (!isValidPoint(p)) {
 						clean.invalidPoints++;
 					} else if (last != null && p.getLat() == last.getLat() && p.getLon() == last.getLon()) {
 						clean.frozenPoints++;
@@ -959,6 +894,12 @@ public class DownloadOsmGPX {
 		}
 		splitPieces(removeSpikes(points, clean), clean);
 		return clean;
+	}
+
+	// NaN fails the range check too
+	static boolean isValidPoint(WptPt p) {
+		return Math.abs(p.getLat()) <= 90 && Math.abs(p.getLon()) <= 180
+				&& !(Math.abs(p.getLat()) < 0.01 && Math.abs(p.getLon()) < 0.01);
 	}
 
 	private static List<WptPt> removeSpikes(List<WptPt> points, CleanTrack clean) {
@@ -1251,17 +1192,18 @@ public class DownloadOsmGPX {
 		boolean teleport;
 	}
 
-	private static Map<String, List<String>> createActivitiesMap(String rootPath) {
-		File activityFile = new File(rootPath, "resources/poi/activities.json");
-		if (!activityFile.exists()) {
-			return Collections.emptyMap();
-		}
-
-		ObjectMapper mapper = new ObjectMapper();
+	private static Map<String, List<String>> createActivitiesMap() {
+		String resource = "/resources/activities.json";
 		Map<String, List<String>> activitiesMap = new LinkedHashMap<>();
 
-		try {
-			JsonNode rootNode = mapper.readTree(activityFile);
+		try (InputStream stream = DownloadOsmGPX.class.getResourceAsStream(resource)) {
+			if (stream == null) {
+				throw new IllegalStateException("Missing JAR resource: " + resource);
+			}
+			JsonNode rootNode = JSON_MAPPER.readTree(stream);
+			if (rootNode == null || !rootNode.path("groups").isArray()) {
+				throw new IllegalStateException("Invalid JAR resource: " + resource);
+			}
 
 			JsonNode groups = rootNode.path("groups");
 			for (JsonNode group : groups) {
@@ -1289,9 +1231,12 @@ public class DownloadOsmGPX {
 				}
 			}
 		} catch (IOException e) {
-			return Collections.emptyMap();
+			throw new IllegalStateException("Cannot read JAR resource: " + resource, e);
 		}
 
+		if (activitiesMap.isEmpty()) {
+			throw new IllegalStateException("No activities in JAR resource: " + resource);
+		}
 		return activitiesMap;
 	}
 
@@ -1645,7 +1590,26 @@ public class DownloadOsmGPX {
 	private GpxFile calculateMinMaxLatLon(OsmGpxFile r) {
 		GpxFile gpxFile = GpxUtilities.INSTANCE.loadGpxFile(new Buffer().write(r.gpx.getBytes()));
 		if (gpxFile.getError() == null) {
-			KQuadRect rect = gpxFile.getBounds(r.lat, r.lon);
+			// the bounds of the valid points only: one NaN point would make them all NaN
+			KQuadRect rect = null;
+			List<WptPt> points = new ArrayList<>(gpxFile.getAllPoints());
+			gpxFile.getRoutes().forEach(route -> points.addAll(route.getPoints()));
+			for (WptPt p : points) {
+				if (!isValidPoint(p)) {
+					continue;
+				}
+				if (rect == null) {
+					rect = new KQuadRect(p.getLon(), p.getLat(), p.getLon(), p.getLat());
+				} else {
+					rect.setLeft(Math.min(rect.getLeft(), p.getLon()));
+					rect.setRight(Math.max(rect.getRight(), p.getLon()));
+					rect.setTop(Math.max(rect.getTop(), p.getLat()));
+					rect.setBottom(Math.min(rect.getBottom(), p.getLat()));
+				}
+			}
+			if (rect == null) {
+				rect = new KQuadRect(r.lon, r.lat, r.lon, r.lat);
+			}
 			r.minlon = rect.getLeft();
 			r.minlat = rect.getBottom();
 			r.maxlon = rect.getRight();
@@ -1721,27 +1685,23 @@ public class DownloadOsmGPX {
 		}
 	}
 
-	private void initDBConnection() throws SQLException {
-		if (dbConn == null) {
-			dbConn = DriverManager.getConnection(System.getenv("DB_CONN"),
-					isEmpty(System.getenv("DB_USER")) ? "test" : System.getenv("DB_USER"),
-					isEmpty(System.getenv("DB_PWD")) ? "test" : System.getenv("DB_PWD"));
-//			executeSQL("DROP TABLE " + TABLE_NAME);
-			ResultSet rs = dbConn.getMetaData().getTables(null, null, GPX_METADATA_TABLE_NAME, null);
-			if (!rs.next()) {
-				executeSQL("CREATE TABLE " + GPX_FILES_TABLE_NAME + " (id bigint primary key, data bytea)");
-				executeSQL("CREATE TABLE " + GPX_METADATA_TABLE_NAME
-						+ "(id bigint primary key, \"user\" text, \"date\" timestamp, name text, lat float, lon float, "
-						+ " minlat float, minlon float, maxlat float, maxlon float, "
-						+ "pending boolean, tags text[], description text, visibility text)");
-			}
+	static Connection openDatabase() throws SQLException {
+		Connection connection = DriverManager.getConnection(System.getenv("DB_CONN"),
+				isEmpty(System.getenv("DB_USER")) ? "test" : System.getenv("DB_USER"),
+				isEmpty(System.getenv("DB_PWD")) ? "test" : System.getenv("DB_PWD"));
+		try {
+			OsmGpxSchema.initializeSchema(connection);
+		} catch (SQLException e) {
+			connection.close();
+			throw e;
 		}
+		return connection;
 	}
 
-	private void executeSQL(String sql) throws SQLException {
-		Statement statement = dbConn.createStatement();
-		statement.execute(sql);
-		statement.close();
+	private void initDBConnection() throws SQLException {
+		if (dbConn == null) {
+			dbConn = openDatabase();
+		}
 	}
 
 	private Object executeSQLQuery(String sql) throws SQLException {

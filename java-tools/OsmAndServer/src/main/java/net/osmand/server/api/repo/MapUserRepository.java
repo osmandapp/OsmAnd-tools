@@ -17,6 +17,9 @@ import net.osmand.server.api.repo.MapUserRepository.MapUser;
 import net.osmand.server.api.repo.MapUserRepository.MapUserPrimaryKey;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -26,7 +29,11 @@ public interface MapUserRepository extends JpaRepository<MapUser, MapUserPrimary
 
 	List<MapUser> findByEmailIgnoreCase(String email);
 
-	@Entity
+	@Modifying
+	@Query("DELETE FROM MapUser u WHERE lower(u.email) = lower(:email)")
+	void deleteAllByEmailIgnoreCase(@Param("email") String email);
+
+	@Entity(name = "MapUser")
 	@Table(name = "email_free_users")
 	@IdClass(MapUserPrimaryKey.class)
 	class MapUser implements Serializable {
