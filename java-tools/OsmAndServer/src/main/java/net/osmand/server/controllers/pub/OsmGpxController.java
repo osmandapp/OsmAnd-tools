@@ -25,15 +25,9 @@ import org.apache.commons.logging.LogFactory;
 import org.geojson.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.core.task.AsyncTaskExecutor;
-import org.springframework.core.task.TaskRejectedException;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.ResponseEntity;
-import org.springframework.jdbc.core.ArgumentPreparedStatementSetter;
-import org.springframework.jdbc.core.ColumnMapRowMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.PreparedStatementCallback;
-import org.springframework.jdbc.core.RowMapperResultSetExtractor;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -43,13 +37,11 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.sql.Date;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
@@ -68,10 +60,6 @@ public class OsmGpxController {
 	JdbcTemplate jdbcTemplate;
 
 	@Autowired
-	@Qualifier("applicationTaskExecutor")
-	AsyncTaskExecutor activitiesExecutor;
-
-	@Autowired
 	protected GpxService gpxService;
 
 	@Autowired
@@ -84,7 +72,6 @@ public class OsmGpxController {
 	Gson gsonWithNans = GpxJson.createWithNans();
 
 	Map<String, RouteFile> routesCache = new ConcurrentHashMap<>();
-	private final Map<UUID, ActivityQuery> activityQueries = new ConcurrentHashMap<>();
 
 	private final ReentrantLock lock = new ReentrantLock();
 
@@ -387,16 +374,14 @@ public class OsmGpxController {
 	}
 
 	@GetMapping(path = {"/activities"}, produces = "application/json")
-	public CompletableFuture<ResponseEntity<String>> getActivities(
-			@RequestParam String minLat,
-			@RequestParam String maxLat,
-			@RequestParam String minLon,
-			@RequestParam String maxLon,
-			@RequestParam(required = false) String dateFrom,
-			@RequestParam(required = false) String dateTo,
-			@RequestParam(required = false) UUID clientId) {
+	public ResponseEntity<String> getActivities(@RequestParam String minLat,
+	                                            @RequestParam String maxLat,
+	                                            @RequestParam String minLon,
+	                                            @RequestParam String maxLon,
+	                                            @RequestParam(required = false) String dateFrom,
+	                                            @RequestParam(required = false) String dateTo) {
 		if (!config.osmgpxInitialized()) {
-			return CompletableFuture.completedFuture(ResponseEntity.ok("OsmGpx datasource is not initialized"));
+			return ResponseEntity.ok("OsmGpx datasource is not initialized");
 		}
 
 		StringBuilder dateConditions = new StringBuilder();
@@ -404,13 +389,13 @@ public class OsmGpxController {
 
 		ResponseEntity<String> error = filterByDate(dateFrom, dateTo, params, dateConditions);
 		if (error != null) {
-			return CompletableFuture.completedFuture(error);
+			return error;
 		}
 
 		StringBuilder conditions = new StringBuilder();
 		error = addCoords(params, conditions, minLat, maxLat, minLon, maxLon);
 		if (error != null) {
-			return CompletableFuture.completedFuture(error);
+			return error;
 		}
 
 		conditions.append(" AND m.activity IS NOT NULL AND m.activity <> ''");
@@ -422,78 +407,8 @@ public class OsmGpxController {
 						" GROUP BY m.activity " +
 						"ORDER BY count DESC";
 
-		UUID queryClientId = clientId == null ? UUID.randomUUID() : clientId;
-		ActivityQuery current = new ActivityQuery(params.toArray());
-		ActivityQuery previous = activityQueries.put(queryClientId, current);
-		if (previous != null) {
-			previous.cancel();
-		}
-
-		try {
-			return CompletableFuture.supplyAsync(() -> {
-				try {
-					if (current.cancelled) {
-						return ResponseEntity.noContent().build();
-					}
-					List<Map<String, Object>> rows = jdbcTemplate.execute(query, current);
-					return current.cancelled ? ResponseEntity.noContent().build() : ResponseEntity.ok(gson.toJson(rows));
-				} catch (DataAccessException e) {
-					if (current.cancelled) {
-						return ResponseEntity.noContent().build();
-					}
-					throw e;
-				} finally {
-					activityQueries.remove(queryClientId, current);
-				}
-			}, activitiesExecutor);
-		} catch (TaskRejectedException e) {
-			activityQueries.remove(queryClientId, current);
-			return CompletableFuture.completedFuture(ResponseEntity.status(503).build());
-		}
-	}
-
-	private static class ActivityQuery implements PreparedStatementCallback<List<Map<String, Object>>> {
-		private final Object[] params;
-		private PreparedStatement statement;
-		private volatile boolean cancelled;
-
-		ActivityQuery(Object[] params) {
-			this.params = params;
-		}
-
-		synchronized void cancel() {
-			cancelled = true;
-			if (statement != null) {
-				try {
-					statement.cancel();
-				} catch (SQLException e) {
-					LOGGER.warn("Cannot cancel OsmGpx activities query", e);
-				}
-			}
-		}
-
-		@Override
-		public List<Map<String, Object>> doInPreparedStatement(PreparedStatement statement) throws SQLException {
-			synchronized (this) {
-				if (cancelled) {
-					return List.of();
-				}
-				this.statement = statement;
-			}
-			try {
-				new ArgumentPreparedStatementSetter(params).setValues(statement);
-				if (cancelled) {
-					return List.of();
-				}
-				try (ResultSet rs = statement.executeQuery()) {
-					return new RowMapperResultSetExtractor<>(new ColumnMapRowMapper()).extractData(rs);
-				}
-			} finally {
-				synchronized (this) {
-					this.statement = null;
-				}
-			}
-		}
+		List<Map<String, Object>> rows = jdbcTemplate.queryForList(query, params.toArray());
+		return ResponseEntity.ok(gson.toJson(rows));
 	}
 
 	private void applyTagsFilter(List<String> tags,
