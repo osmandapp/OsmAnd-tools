@@ -384,23 +384,24 @@ public class OsmGpxController {
 			return ResponseEntity.ok("OsmGpx datasource is not initialized");
 		}
 
-		StringBuilder conditions = new StringBuilder();
+		StringBuilder dateConditions = new StringBuilder();
 		List<Object> params = new ArrayList<>();
 
-		ResponseEntity<String> error = addCoords(params, conditions, minLat, maxLat, minLon, maxLon);
+		ResponseEntity<String> error = filterByDate(dateFrom, dateTo, params, dateConditions);
+		if (error != null) {
+			return error;
+		}
+
+		StringBuilder conditions = new StringBuilder();
+		error = addCoords(params, conditions, minLat, maxLat, minLon, maxLon);
 		if (error != null) {
 			return error;
 		}
 
 		conditions.append(" AND m.activity IS NOT NULL AND m.activity <> ''");
 
-		error = filterByDate(dateFrom, dateTo, params, conditions);
-		if (error != null) {
-			return error;
-		}
-
 		String query =
-				"SELECT m.activity AS id, COUNT(*) AS count " +
+				"SELECT m.activity AS id, COUNT(*) FILTER (WHERE 1 = 1 " + dateConditions + ") AS count, COUNT(*) AS total " +
 						"FROM " + GPX_METADATA_TABLE_NAME + " m " +
 						"WHERE 1 = 1 " + conditions +
 						" GROUP BY m.activity " +

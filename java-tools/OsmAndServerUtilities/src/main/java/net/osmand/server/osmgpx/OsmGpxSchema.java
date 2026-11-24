@@ -104,6 +104,8 @@ public class OsmGpxSchema {
 	public static void actualizeSchema(Connection connection) throws SQLException {
 		try (Statement statement = connection.createStatement()) {
 			statement.executeUpdate("ALTER TABLE " + GPX_METADATA_TABLE_NAME + " DROP COLUMN IF EXISTS manual_review");
+			statement.executeUpdate("CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_osm_gpx_bbox_counts ON " + GPX_METADATA_TABLE_NAME
+					+ " USING GIST (bbox) INCLUDE (bbox, activity, date) WHERE activity IS NOT NULL AND activity <> ''");
 		}
 	}
 
