@@ -166,120 +166,12 @@ std::pair<QString, OsmAnd::ElevationConfiguration> elevationConfigurationPresets
     {
         QStringLiteral("none"),
         OsmAnd::ElevationConfiguration()
-            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::None)
             .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::None)
-    },
-    {
-        QStringLiteral("hs-traditional-ZT"),
-        OsmAnd::ElevationConfiguration()
-            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::ZevenbergenThorne)
-            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::HillshadeTraditional)
-            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::GrayscaleHillshade)
-    },
-    {
-        QStringLiteral("hs-traditional-H"),
-        OsmAnd::ElevationConfiguration()
-            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::Horn)
-            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::HillshadeTraditional)
-            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::GrayscaleHillshade)
-    },
-    {
-        QStringLiteral("hs-igor-ZT"),
-        OsmAnd::ElevationConfiguration()
-            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::ZevenbergenThorne)
-            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::HillshadeIgor)
-            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::GrayscaleHillshade)
-    },
-    {
-        QStringLiteral("hs-igor-H"),
-        OsmAnd::ElevationConfiguration()
-            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::Horn)
-            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::HillshadeIgor)
-            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::GrayscaleHillshade)
-    },
-    {
-        QStringLiteral("hs-combined-ZT"),
-        OsmAnd::ElevationConfiguration()
-            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::ZevenbergenThorne)
-            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::HillshadeCombined)
-            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::GrayscaleHillshade)
     },
     {
         QStringLiteral("hs-combined-H"),
         OsmAnd::ElevationConfiguration()
-            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::Horn)
             .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::HillshadeCombined)
-            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::GrayscaleHillshade)
-    },
-    {
-        QStringLiteral("hs-multidir-ZT"),
-        OsmAnd::ElevationConfiguration()
-            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::ZevenbergenThorne)
-            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::HillshadeMultidirectional)
-            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::GrayscaleHillshade)
-    },
-    {
-        QStringLiteral("hs-multidir-H"),
-        OsmAnd::ElevationConfiguration()
-            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::Horn)
-            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::HillshadeMultidirectional)
-            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::GrayscaleHillshade)
-    },
-    {
-        QStringLiteral("slope°-grayscale-ZT"),
-        OsmAnd::ElevationConfiguration()
-            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::ZevenbergenThorne)
-            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::SlopeDegrees)
-            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::GrayscaleSlopeDegrees)
-    },
-    {
-        QStringLiteral("slope°-grayscale-H"),
-        OsmAnd::ElevationConfiguration()
-            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::Horn)
-            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::SlopeDegrees)
-            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::GrayscaleSlopeDegrees)
-    },
-    {
-        QStringLiteral("slope°-terrain-ZT"),
-        OsmAnd::ElevationConfiguration()
-            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::ZevenbergenThorne)
-            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::SlopeDegrees)
-            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::TerrainSlopeDegrees)
-    },
-    {
-        QStringLiteral("slope°-terrain-H"),
-        OsmAnd::ElevationConfiguration()
-            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::Horn)
-            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::SlopeDegrees)
-            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::TerrainSlopeDegrees)
-    },
-    {
-        QStringLiteral("slope%-grayscale-ZT"),
-        OsmAnd::ElevationConfiguration()
-            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::ZevenbergenThorne)
-            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::SlopePercents)
-            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::GrayscaleSlopeDegrees)
-    },
-    {
-        QStringLiteral("slope%-grayscale-H"),
-        OsmAnd::ElevationConfiguration()
-            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::Horn)
-            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::SlopePercents)
-            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::GrayscaleSlopeDegrees)
-    },
-    {
-        QStringLiteral("slope%-terrain-ZT"),
-        OsmAnd::ElevationConfiguration()
-            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::ZevenbergenThorne)
-            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::SlopePercents)
-            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::TerrainSlopeDegrees)
-    },
-    {
-        QStringLiteral("slope%-terrain-H"),
-        OsmAnd::ElevationConfiguration()
-            .setSlopeAlgorithm(OsmAnd::ElevationConfiguration::SlopeAlgorithm::Horn)
-            .setVisualizationStyle(OsmAnd::ElevationConfiguration::VisualizationStyle::SlopePercents)
-            .setVisualizationColorMapPreset(OsmAnd::ElevationConfiguration::ColorMapPreset::TerrainSlopeDegrees)
     }
 };
 const int elevationConfigurationPresetsCount = std::size(elevationConfigurationPresets);
