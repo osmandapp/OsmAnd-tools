@@ -69,7 +69,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 
 
 	private TLongObjectHashMap<List<RestrictionInfo>> highwayRestrictions = new TLongObjectHashMap<List<RestrictionInfo>>();
-	private final MultiViaRestrictions multiViaRestrictions = new MultiViaRestrictions();
+	private final MultiViaRestrictions multiViaRestrictions = new MultiViaRestrictions(highwayRestrictions);
 	private TLongObjectHashMap<WayNodeId> basemapRemovedNodes = new TLongObjectHashMap<WayNodeId>();
 	private TLongObjectHashMap<RouteMissingPoints> basemapNodesToReinsert = new TLongObjectHashMap<RouteMissingPoints> ();
 
@@ -269,7 +269,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 				addSpeedCameraDirection(e);
 				addWayToIndex(e.getId(), multiViaRestrictions.routingNodes(e), mapRouteInsertStat, routeTree, outTypes,
 						pointTypes, pointNames, names);
-				multiViaRestrictions.registerWayAtJunctions(e, highwayRestrictions);
+				multiViaRestrictions.registerWayAtJunctions(e);
 				List<Way> viaCopies = multiViaRestrictions.copiesOf(e, tags);
 				if (viaCopies != null) {
 					for (Way c : viaCopies) {
@@ -703,21 +703,25 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 		}
 	}
 
+	// 2+ via ways: written by MultiViaRestrictions (copies of via ways), false - the usual record is written
 	private boolean addMultiViaRestriction(Collection<RelationMember> fromL, Collection<RelationMember> viaL,
 			Collection<RelationMember> toL, byte type) {
-		if (fromL.size() != 1 || toL.size() != 1 || viaL.size() != 2) {
+		if (fromL.size() != 1 || toL.size() != 1 || viaL.size() < 2) {
 			return false;
 		}
+		List<RelationMember> ms = new ArrayList<>(viaL);
+		ms.add(fromL.iterator().next());
+		ms.add(toL.iterator().next());
 		List<Way> ws = new ArrayList<>();
-		for (RelationMember m : Arrays.asList(fromL.iterator().next(), viaL.iterator().next(),
-				new ArrayList<>(viaL).get(1), toL.iterator().next())) {
+		for (RelationMember m : ms) {
 			if (!(m.getEntity() instanceof Way)) {
 				return false;
 			}
 			ws.add((Way) m.getEntity());
 		}
-		return multiViaRestrictions.addRestriction(ws.get(0), ws.get(1), ws.get(2), ws.get(3), type, highwayRestrictions)
-				|| multiViaRestrictions.addRestriction(ws.get(0), ws.get(2), ws.get(1), ws.get(3), type, highwayRestrictions);
+		Way t = ws.remove(ws.size() - 1), f = ws.remove(ws.size() - 1);
+		List<Way> vias = MultiViaRestrictions.orderVias(f, ws);
+		return vias != null && multiViaRestrictions.addRestriction(f, vias, t, type);
 	}
 
 	public void createRTreeFiles(String rTreeRouteIndexPackFileName) throws RTreeException {
@@ -736,7 +740,7 @@ public class IndexRouteCreator extends AbstractIndexPartCreator {
 	}
 
 	public void writeBinaryRouteIndex(File fl, BinaryMapIndexWriter writer, String regionName, boolean generateLowLevel) throws IOException, SQLException {
-		multiViaRestrictions.finish(highwayRestrictions);
+		multiViaRestrictions.finish();
 		closePreparedStatements(mapRouteInsertStat);
 		if (basemapRouteInsertStat != null) {
 			closePreparedStatements(basemapRouteInsertStat);

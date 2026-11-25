@@ -1,12 +1,16 @@
 package net.osmand.obf.preparation;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.hash.TLongObjectHashMap;
+import gnu.trove.set.hash.TLongHashSet;
 import net.osmand.binary.ObfConstants;
 import net.osmand.binary.RouteDataObject.RestrictionInfo;
 import net.osmand.osm.MapRenderingTypes;
@@ -15,29 +19,65 @@ import net.osmand.osm.edit.Way;
 import net.osmand.util.MapUtils;
 
 /**
- * Turn restrictions with two via ways: from F -(J0)- V1 -(J1)- V2 -(J2)- to T.
- * The router remembers one road back, so it cannot tell traffic that came onto V1 from F from traffic that
- * entered V1 from the side. A copy C of V1 is added to the routing data for traffic from F only:
- * C starts at a new point M inserted into F just before J0, its other points are moved off V1, so no other
- * road connects to it, and it ends at J1. The restriction is then written on C as a usual single via-way one
- * (C - via V2 - T), which the router already supports.
- * <ul>
- * <li>no_*: F - via V1 - V2 is closed, so F reaches V2 only over C; F still uses V1 itself.</li>
- * <li>only_*: F may not enter V1 at J0 or leave J0 by another road; C - J1 - only V2; C - via V2 - only T.</li>
- * </ul>
+ * Turn restrictions with two and more via ways.
+ * F - from, V1..Vn - via ways, T - to, Jk - junction of Vk and Vk+1 (J0 = F/V1), Ck - copy of Vk,
+ * M - a new point inserted into F just before J0, where the copy leaves F.
+ *
+ * F - V - T: one via way, the router checks it itself, nothing to do here.
+ *
+ * F - V1 - V2 - T: the router remembers one road back: on V2 it knows "came from V1", not "came from F".
+ * So V1 gets a copy C1 used only by traffic from F:
+ *
+ *   F --M--J0------ V1 ------J1------ V2 ------ T
+ *        \___ C1 (shifted off V1) ___/
+ *
+ *   M - C1 start: a lead (own id); C1 has no other junctions and ends at J1.
+ *   M is not J0: a copy starting at J0 could be entered from any road of J0.
+ *   F - via V1 - V2 = no_straight_on   F reaches V2 only over C1, exits of V1 stay open
+ *   C1 - via V2 - T = original type    a one via rule, the router supports it
+ *   only_*: F may leave J0 only to C1, C1 - J1 - only V2, C1 - via V2 - only T.
+ *
+ * F - V1 - V2 - V3 - T: a chain, every copy is F for the next step (M' - the point M on C1):
+ *
+ *   F --M--J0------ V1 ------J1------ V2 ------J2------ V3 ------ T
+ *        \___ C1 _____M'___/                  /
+ *                      \______ C2 ___________/
+ *
+ *   F - via V1 - V2 and C1 - via V2 - V3 = no_straight_on, C2 - via V3 - T = original type.
+ *   n via ways -> n-1 copies, the number of via ways is not limited.
+ *
+ * Nested: if V1 is itself F of another chain, that chain is added once more with C1 as F (MAX_NEST_LEVEL).
  * Copies carry osmand_via_copy=yes (routing.xml gives it destination_priority 0, so start and finish never
  * snap to a copy).
  */
 public class MultiViaRestrictions {
 
 	public static final String COPY_TAG = "osmand_via_copy";
-	// route points are stored with ~30 cm precision: new points stay metres away from existing ones
-	private static final double MIN_M_DIST = 1.0;
+	// route points are stored on a ~30 cm grid (diagonal 0.42 m): points 0.5 m apart never share a cell
+	private static final double MIN_M_DIST = 0.5;
+	// M takes at most this part of F's last segment (of a copy's last segment when F is a copy)
 	private static final double MAX_M_PART = 0.4;
-	private static final double SHIFT_DIST = 1.5;
-	private static final double SHIFT_STEP = 2.0;
+	// the first copy of a way is shifted off it by SHIFT_DIST metres, every next copy SHIFT_STEP more
+	private static final double SHIFT_DIST = 1.2;
+	private static final double SHIFT_STEP = 1.0;
+	// sides tried for a copy: +-SHIFT, +-(SHIFT + STEP), +-(SHIFT + 2 STEP)
+	private static final int SHIFT_ATTEMPTS = 6;
+	// J0' moves along V1 by this part of V1's first segment, at most AHEAD_MAX_DIST metres
+	private static final double AHEAD_PART = 0.3;
+	private static final double AHEAD_MAX_DIST = 2.0;
+	// side choice: turn angle difference in degrees, plus this per metre of shift
+	private static final double SHIFT_SCORE_PER_M = 0.01;
+	// copy ids: COPY_ID_BASE + 39-bit hash of (F, V1); lead ids are the same + LEAD_ID_OFFSET
 	private static final long COPY_ID_BASE = 1L << 40;
+	private static final long COPY_ID_HASH_MASK = (1L << 39) - 1;
+	private static final long LEAD_ID_OFFSET = 1L << 39;
+	// odd multipliers that spread the bits of OSM ids over the whole long (golden ratio and murmur3 constants)
+	private static final long HASH_MUL_FROM = 1_000_003L;
+	private static final long HASH_MUL_VIA = 0x9E3779B97F4A7C15L;
+	private static final long HASH_MUL_SALT = 0xC2B2AE3D27D4EB4FL;
 	private static final long COPY_NODE_ID_BASE = 1L << 47;
+	// chains inside chains (see prepareNested); via ways of one chain are not limited
+	private static final int MAX_NEST_LEVEL = 3;
 
 	private static class Copy {
 		long id; // J0' .. J1, carries the restrictions
@@ -49,50 +89,105 @@ public class MultiViaRestrictions {
 		Node m;
 		List<Node> shifted = new ArrayList<>();
 		boolean only;
-		int depth;
+		int nestLevel;
 	}
 
 	private static class Chain {
-		Way v1;
-		Way v2;
+		List<Way> vias;
 		Way t;
 		byte type;
 	}
 
-	private final Map<String, Copy> copies = new LinkedHashMap<>(); // "F V1" -> copy
+	private final List<Copy> copies = new ArrayList<>();
 	private final TLongObjectHashMap<List<Copy>> copiesByFrom = new TLongObjectHashMap<>();
 	private final TLongObjectHashMap<List<Copy>> copiesByV1 = new TLongObjectHashMap<>();
 	private final TLongObjectHashMap<List<Copy>> onlyCopiesByJ0 = new TLongObjectHashMap<>();
 	private final TLongObjectHashMap<List<Chain>> chainsByFrom = new TLongObjectHashMap<>();
 	// F - via V1 - V2 records that send F over the copy: never copied with via = copy
-	private final java.util.Set<RestrictionInfo> closures = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
-	private TLongObjectHashMap<List<RestrictionInfo>> restrictions;
+	private final Set<RestrictionInfo> closures = Collections.newSetFromMap(new IdentityHashMap<>());
+	private final TLongObjectHashMap<List<RestrictionInfo>> restrictions;
+	private final TLongHashSet copyIds = new TLongHashSet();
 	private long nodeIdCounter = 0;
 	private boolean nestedDone;
 	private boolean finished;
 
+	public MultiViaRestrictions(TLongObjectHashMap<List<RestrictionInfo>> restrictions) {
+		this.restrictions = restrictions;
+	}
+
 	/**
+	 * @param vias in driving order (see orderVias), two or more
 	 * @return true if the restriction is written by this class (the caller must not write its own record)
 	 */
-	public boolean addRestriction(Way f, Way v1, Way v2, Way t, byte type,
-			TLongObjectHashMap<List<RestrictionInfo>> restrictions) {
-		this.restrictions = restrictions;
-		if (addChain(f, v1, v2, t, type, 0) == null) {
+	public boolean addRestriction(Way f, List<Way> vias, Way t, byte type) {
+		if (addChain(f, vias, t, type, 0) == null) {
 			return false;
 		}
 		Chain ch = new Chain();
-		ch.v1 = v1;
-		ch.v2 = v2;
+		ch.vias = vias;
 		ch.t = t;
 		ch.type = type;
 		add(chainsByFrom, f.getId(), ch);
 		return true;
 	}
 
-	/** @return the copy that carries this chain, or null if the chain is left as it is */
-	private Copy addChain(Way f, Way v1, Way v2, Way t, byte type, int depth) {
-		if (f.getId() == t.getId() || f.getId() == v1.getId() || f.getId() == v2.getId()
-				|| v1.getId() == v2.getId() || t.getId() == v1.getId() || t.getId() == v2.getId()) {
+	/**
+	 * Via ways in driving order: V1 touches F with an end, each next one starts where the previous one ends.
+	 * @return null if they do not form such a chain
+	 */
+	public static List<Way> orderVias(Way f, List<Way> vias) {
+		List<Way> left = new ArrayList<>(vias);
+		List<Way> res = new ArrayList<>();
+		TLongArrayList fn = f.getNodeIds();
+		long end = 0;
+		for (Way v : left) {
+			TLongArrayList vn = v.getNodeIds();
+			if (vn.size() >= 2 && (fn.contains(vn.get(0)) || fn.contains(vn.get(vn.size() - 1)))) {
+				res.add(v);
+				end = fn.contains(vn.get(0)) ? vn.get(vn.size() - 1) : vn.get(0);
+				break;
+			}
+		}
+		if (res.isEmpty()) {
+			return null;
+		}
+		left.remove(res.get(0));
+		while (!left.isEmpty()) {
+			Way next = null;
+			for (Way v : left) {
+				TLongArrayList vn = v.getNodeIds();
+				if (vn.size() >= 2 && (vn.get(0) == end || vn.get(vn.size() - 1) == end)) {
+					next = v;
+					break;
+				}
+			}
+			if (next == null) {
+				return null;
+			}
+			TLongArrayList vn = next.getNodeIds();
+			end = vn.get(0) == end ? vn.get(vn.size() - 1) : vn.get(0);
+			res.add(next);
+			left.remove(next);
+		}
+		TLongHashSet ids = new TLongHashSet();
+		for (Way w : res) {
+			if (!ids.add(w.getId())) {
+				return null;
+			}
+		}
+		return res;
+	}
+
+	/** @return the copy of V1 for F, or null if the chain is left as it is */
+	private Copy addChain(Way f, List<Way> vias, Way t, byte type, int nestLevel) {
+		Way v1 = vias.get(0), v2 = vias.get(1);
+		boolean last = vias.size() == 2;
+		for (Way v : vias) {
+			if (f.getId() == v.getId() || t.getId() == v.getId()) {
+				return null;
+			}
+		}
+		if (f.getId() == t.getId() || v1.getId() == v2.getId()) {
 			return null;
 		}
 		TLongArrayList fn = f.getNodeIds(), n1 = v1.getNodeIds(), n2 = v2.getNodeIds(), tn = t.getNodeIds();
@@ -107,9 +202,11 @@ public class MultiViaRestrictions {
 		if (!isEnd(n2, j1)) {
 			return null;
 		}
-		long j2 = other(n2, j1);
-		if (!tn.contains(j2) || tn.contains(j1)) {
-			return null;
+		if (last) {
+			long j2 = other(n2, j1);
+			if (!tn.contains(j2) || tn.contains(j1)) {
+				return null;
+			}
 		}
 		boolean only = type == MapRenderingTypes.RESTRICTION_ONLY_LEFT_TURN
 				|| type == MapRenderingTypes.RESTRICTION_ONLY_RIGHT_TURN
@@ -122,23 +219,41 @@ public class MultiViaRestrictions {
 		if ((ow1 > 0 && n1.get(0) != j0) || (ow1 < 0 && n1.get(0) == j0)) {
 			return null;
 		}
-		String key = f.getId() + " " + v1.getId();
-		Copy c = copies.get(key);
+		Copy c = findCopy(f.getId(), v1.getId());
+		boolean created = c == null;
 		if (c == null) {
-			c = createCopy(f, v1, j0);
-			if (c == null) {
-				return null;
-			}
-			c.depth = depth;
 			for (RestrictionInfo ri : get(restrictions, f.getId())) {
 				if (ri.toWay == v1.getId()) {
 					// F already has a restriction onto V1, leave the relation as it is
 					return null;
 				}
 			}
-			copies.put(key, c);
+			c = createCopy(f, v1, j0);
+			if (c == null) {
+				return null;
+			}
+			c.nestLevel = nestLevel;
+			copies.add(c);
+			copyIds.add(c.id);
 			add(copiesByFrom, f.getId(), c);
 			add(copiesByV1, v1.getId(), c);
+		}
+		if (!last) {
+			// the rest of the chain starts on the copy: C - V2 - .. - Vn - T
+			if (addChain(copyWay(c, null), vias.subList(1, vias.size()), t, type, nestLevel) == null) {
+				if (created) {
+					removeCopy(c);
+				}
+				return null;
+			}
+			c.only |= only;
+			if (only) {
+				put(restrictions, f.getId(), v1.getId(), MapRenderingTypes.RESTRICTION_NO_STRAIGHT_ON, 0);
+				add(onlyCopiesByJ0, j0, c);
+			} else {
+				closures.add(put(restrictions, f.getId(), v2.getId(), MapRenderingTypes.RESTRICTION_NO_STRAIGHT_ON, v1.getId()));
+			}
+			return c;
 		}
 		c.only |= only;
 		if (only) {
@@ -152,6 +267,22 @@ public class MultiViaRestrictions {
 			put(restrictions, c.id, t.getId(), type, v2.getId());
 		}
 		return c;
+	}
+
+	private Copy findCopy(long from, long v1) {
+		for (Copy c : get(copiesByFrom, from)) {
+			if (c.v1 == v1) {
+				return c;
+			}
+		}
+		return null;
+	}
+
+	private void removeCopy(Copy c) {
+		copies.remove(c);
+		copyIds.remove(c.id);
+		copiesByFrom.get(c.from).remove(c);
+		copiesByV1.get(c.v1).remove(c);
 	}
 
 	private Copy createCopy(Way f, Way v1, long j0) {
@@ -176,28 +307,35 @@ public class MultiViaRestrictions {
 		}
 		double seg = MapUtils.getDistance(p.getLatLon(), j.getLatLon());
 		double a = Math.max(0.1, MIN_M_DIST / Math.max(seg, 0.01));
-		if (a > MAX_M_PART) {
-			return null;
-		}
 		if (isCopy(f.getId())) {
-			// copies of one way meet at J1; far from J1 they are metres apart, so points inserted there stay apart
+			// copies of one way meet at J1; far from J1 they are metres apart, so points inserted there stay apart;
+			// a short copy (a short via in a chain) still takes M if it stays clear of J1
 			a = MAX_M_PART;
+			if (a * seg < MIN_M_DIST) {
+				return null;
+			}
+		} else if (a > MAX_M_PART) {
+			return null;
 		}
 		List<Node> path = new ArrayList<>(v1.getNodes());
 		if (path.isEmpty() || path.get(0) == null || path.get(path.size() - 1) == null || path.contains(null)) {
 			return null;
 		}
 		if (path.get(0).getId() != j0) {
-			java.util.Collections.reverse(path);
+			Collections.reverse(path);
 		}
 		Copy c = new Copy();
 		c.from = f.getId();
 		c.v1 = v1.getId();
 		c.p = p.getId();
 		c.j0 = j0;
-		long h = (f.getId() * 1_000_003L) ^ (v1.getId() * 0x9E3779B97F4A7C15L);
-		c.id = (COPY_ID_BASE + ((h >>> 20) & ((1L << 39) - 1))) << ObfConstants.SHIFT_ID;
-		c.leadId = c.id + (1L << (39 + ObfConstants.SHIFT_ID));
+		long h = (f.getId() * HASH_MUL_FROM) ^ (v1.getId() * HASH_MUL_VIA);
+		c.id = copyId(h);
+		for (long salt = 1; copyIds.contains(c.id); salt++) {
+			// another F, V1 pair got the same hash
+			c.id = copyId(h ^ (salt * HASH_MUL_SALT));
+		}
+		c.leadId = c.id + (LEAD_ID_OFFSET << ObfConstants.SHIFT_ID);
 		c.m = new Node(j.getLatitude() + a * (p.getLatitude() - j.getLatitude()),
 				j.getLongitude() + a * (p.getLongitude() - j.getLongitude()), nextNodeId());
 		// points move sideways, a different distance for every copy of the same way, so no copy shares a point
@@ -211,7 +349,7 @@ public class MultiViaRestrictions {
 			}
 		}
 		avoid.add(c.m);
-		for (Copy o : others == null ? java.util.Collections.<Copy>emptyList() : others) {
+		for (Copy o : others == null ? Collections.<Copy>emptyList() : others) {
 			avoid.add(o.m);
 			avoid.addAll(o.shifted.subList(0, o.shifted.size() - 1));
 		}
@@ -221,8 +359,8 @@ public class MultiViaRestrictions {
 		Node n1 = path.get(1);
 		double segLen = MapUtils.getDistance(path.get(0).getLatLon(), n1.getLatLon());
 		// J0' also moves a little along V1, so the lead M - J0' goes forward from F and is not a U-turn
-		double ahead = Math.min(2.0, 0.3 * segLen) / Math.max(segLen, 0.01);
-		for (int attempt = 0; attempt < 6; attempt++) {
+		double ahead = Math.min(AHEAD_MAX_DIST, AHEAD_PART * segLen) / Math.max(segLen, 0.01);
+		for (int attempt = 0; attempt < SHIFT_ATTEMPTS; attempt++) {
 			double off = (base + SHIFT_STEP * (attempt / 2)) * (attempt % 2 == 0 ? 1 : -1);
 			List<Node> sh = new ArrayList<>();
 			boolean ok = true;
@@ -234,8 +372,8 @@ public class MultiViaRestrictions {
 					la0 += ahead * (n1.getLatitude() - n.getLatitude());
 					lo0 += ahead * (n1.getLongitude() - n.getLongitude());
 				}
-				Node s = new Node(la0 + off * nr[1] / 111320.0,
-						lo0 + off * nr[0] / (111320.0 * Math.cos(Math.toRadians(n.getLatitude()))), 0);
+				Node s = new Node(la0 + off * nr[1] / MapUtils.METERS_IN_DEGREE,
+						lo0 + off * nr[0] / (MapUtils.METERS_IN_DEGREE * Math.cos(Math.toRadians(n.getLatitude()))), 0);
 				for (Node av : avoid) {
 					if (MapUtils.getDistance(av.getLatLon(), s.getLatLon()) < MIN_M_DIST) {
 						ok = false;
@@ -246,7 +384,7 @@ public class MultiViaRestrictions {
 			}
 			if (ok) {
 				// prefer the side where the turn F -> lead is closest to the turn F -> V1
-				double score = Math.abs(turn(p, j, sh.get(0)) - turn(p, j, n1)) + Math.abs(off) * 0.01;
+				double score = Math.abs(turn(p, j, sh.get(0)) - turn(p, j, n1)) + Math.abs(off) * SHIFT_SCORE_PER_M;
 				if (score < bestScore) {
 					bestScore = score;
 					best = sh;
@@ -265,24 +403,24 @@ public class MultiViaRestrictions {
 
 	/**
 	 * Chains inside chains: when V1 is itself `from` of another chain B, traffic on V1's copy is on V1 too, so
-	 * B is added once more with the copy as `from` (it gets its own copy of B's via1). Up to 3 levels.
+	 * B is added once more with the copy as `from` (it gets its own copy of B's via1). Up to MAX_NEST_LEVEL.
 	 */
 	private void prepareNested() {
 		if (nestedDone) {
 			return;
 		}
 		nestedDone = true;
-		List<Copy> queue = new ArrayList<>(copies.values());
+		List<Copy> queue = new ArrayList<>(copies);
 		for (int i = 0; i < queue.size(); i++) {
 			Copy c = queue.get(i);
 			List<Chain> chains = chainsByFrom.get(c.v1);
-			if (chains == null || c.depth >= 3) {
+			if (chains == null || c.nestLevel >= MAX_NEST_LEVEL) {
 				continue;
 			}
 			Way cw = copyWay(c, null);
 			for (Chain b : chains) {
 				int before = copies.size();
-				Copy nc = addChain(cw, b.v1, b.v2, b.t, b.type, c.depth + 1);
+				Copy nc = addChain(cw, b.vias, b.t, b.type, c.nestLevel + 1);
 				if (nc != null && copies.size() > before) {
 					queue.add(nc);
 				}
@@ -349,6 +487,10 @@ public class MultiViaRestrictions {
 		return d;
 	}
 
+	private static long copyId(long hash) {
+		return (COPY_ID_BASE + ((hash >>> 20) & COPY_ID_HASH_MASK)) << ObfConstants.SHIFT_ID;
+	}
+
 	private static boolean isCopy(long id) {
 		return id >= COPY_ID_BASE << ObfConstants.SHIFT_ID;
 	}
@@ -407,7 +549,7 @@ public class MultiViaRestrictions {
 	}
 
 	/** only_*: from F, J0 may be left by V1's copy only. Called for every routing way. */
-	public void registerWayAtJunctions(Way w, TLongObjectHashMap<List<RestrictionInfo>> restrictions) {
+	public void registerWayAtJunctions(Way w) {
 		prepareNested();
 		if (onlyCopiesByJ0.isEmpty()) {
 			return;
@@ -430,13 +572,13 @@ public class MultiViaRestrictions {
 	 * Before writing: restrictions of V1 also bind its copies, F's own records with via V1 also get via C,
 	 * and any no_* record A - via X - Y also closes the copy of Y made for X as from (chains inside chains).
 	 */
-	public void finish(TLongObjectHashMap<List<RestrictionInfo>> restrictions) {
+	public void finish() {
 		if (finished) {
 			return;
 		}
 		finished = true;
 		prepareNested();
-		for (Copy c : copies.values()) {
+		for (Copy c : copies) {
 			for (RestrictionInfo ri : new ArrayList<>(get(restrictions, c.v1))) {
 				RestrictionInfo n = put(restrictions, c.id, ri.toWay, ri.type, ri.viaWay);
 				if (closures.contains(ri)) {
@@ -455,7 +597,7 @@ public class MultiViaRestrictions {
 				if (ri.viaWay == 0 || ri.type > MapRenderingTypes.RESTRICTION_NO_STRAIGHT_ON) {
 					continue;
 				}
-				Copy nested = copies.get(ri.viaWay + " " + ri.toWay);
+				Copy nested = findCopy(ri.viaWay, ri.toWay);
 				if (nested != null) {
 					put(restrictions, from, nested.leadId, ri.type, ri.viaWay);
 				}
@@ -463,9 +605,9 @@ public class MultiViaRestrictions {
 		}
 	}
 
-	private static List<RestrictionInfo> get(TLongObjectHashMap<List<RestrictionInfo>> m, long id) {
-		List<RestrictionInfo> l = m.get(id);
-		return l == null ? java.util.Collections.emptyList() : l;
+	private static <T> List<T> get(TLongObjectHashMap<List<T>> m, long id) {
+		List<T> l = m.get(id);
+		return l == null ? Collections.<T>emptyList() : l;
 	}
 
 	private static RestrictionInfo put(TLongObjectHashMap<List<RestrictionInfo>> m, long from, long to, int type, long via) {
