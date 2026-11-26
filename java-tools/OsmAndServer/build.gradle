@@ -49,6 +49,7 @@ processResources.dependsOn(zipColorPalette)
 processResources {
     from("../../../resources") {
         include "countries-info/outdated-deleted-maps.xml"
+        include "test-resources/tz/TimezoneMapper*.json"
     }
 }
 
