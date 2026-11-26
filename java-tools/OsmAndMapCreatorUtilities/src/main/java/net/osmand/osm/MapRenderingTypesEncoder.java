@@ -350,7 +350,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			EntityConvertApplyType appType) {
 		checkIfInitNeeded();
 		tags = transformShieldTags(tags, entity, appType);
-		tags = transformIntegrityTags(tags, entity, appType);
 		tags = transformOpeningHoursTags(tags, appType);
 		tags = transformChargingTags(tags, entity);
 		tags = transformOsmcAndColorTags(tags);
@@ -362,7 +361,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		List<EntityConvert> listToTransform = getApplicableConverts(tags, entity, EntityConvertType.TAG_TRANSFORM, appType);
 		List<EntityConvert> listToCombine = getApplicableConverts(tags, entity, EntityConvertType.TAG_COMBINE, appType);
 		if (listToTransform == null && listToCombine == null) {
-			return postTransform(tags);
+			return postTransform(transformIntegrityTags(tags, entity, appType));
 		}
 		Map<String, String> rtags = new LinkedHashMap<String, String>(tags);
 		if (listToTransform != null) {
@@ -375,7 +374,8 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				applyTagCombines(rtags, ec, entity, tags);
 			}
 		}
-		return postTransform(rtags);
+		// after the tag transforms, so renamed surfaces (soil, grit, hard...) are scored by their new value
+		return postTransform(transformIntegrityTags(rtags, entity, appType));
 	}
 
 	private Map<String, String> postTransform(Map<String, String> tags) {
@@ -1500,13 +1500,14 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		} else if ("pebblestone".equals(surface)) {
 			result += 9;
 			result_bicycle_routing += 9;
-		} else if ("ground".equals(surface) || "earth".equals(surface) || "dirt".equals(surface)) {
+		} else if ("ground".equals(surface) || "earth".equals(surface) || "dirt".equals(surface)
+				|| "laterite".equals(surface) || "clay".equals(surface)) {
 			result += 9;
 			result_bicycle_routing += 9;
-		} else if ("grass".equals(surface)) {
+		} else if ("grass".equals(surface) || "grass;ground".equals(surface) || "ground;grass".equals(surface)) {
 			result += 12;
 			result_bicycle_routing += 12;
-		} else if ("gravel".equals(surface)) {
+		} else if ("gravel".equals(surface) || "gravel;ground".equals(surface)) {
 			result += 12;
 			result_bicycle_routing += 12;
 		} else if ("stone".equals(surface) || "rock".equals(surface) || "rocky".equals(surface)) {

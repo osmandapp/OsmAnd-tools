@@ -3,6 +3,8 @@ package net.osmand.osm;
 import org.junit.Before;
 import org.junit.Test;
 
+import net.osmand.osm.edit.Entity;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +31,35 @@ public class MapRenderingTypesEncoderTest {
             actual = this.mapRenderingTypesEncoder.transformOsmcAndColorTags(tags);
             assertEquals(actual, resultTagsList.get(tagsList.indexOf(tags)));
         }
+    }
+
+    @Test
+    public void testIntegrityOfUnpavedSurfaces() {
+        // values kept in the map, scored like the value they resemble
+        assertSameIntegrity("laterite", "ground");
+        assertSameIntegrity("clay", "ground");
+        assertSameIntegrity("grass;ground", "grass");
+        assertSameIntegrity("ground;grass", "grass");
+        assertSameIntegrity("gravel;ground", "gravel");
+        // values renamed by rendering_types.xml, scored like their new value
+        assertSameIntegrity("soil", "ground");
+        assertSameIntegrity("grit", "gravel");
+        assertSameIntegrity("hard", "compacted");
+        assertSameIntegrity("bare_rock", "stone");
+        assertSameIntegrity("woodchips", "wood");
+        assertEquals("0", integrity("asphalt"));
+        assertEquals("3", integrity("ground"));
+    }
+
+    private void assertSameIntegrity(String surface, String expectedLike) {
+        assertEquals(surface, integrity(expectedLike), integrity(surface));
+    }
+
+    private String integrity(String surface) {
+        Map<String, String> tags = mapRenderingTypesEncoder.transformTags(
+                Map.of("highway", "unclassified", "surface", surface),
+                Entity.EntityType.WAY, MapRenderingTypesEncoder.EntityConvertApplyType.MAP);
+        return tags.get("osmand_highway_integrity");
     }
 
     private void createTransformOsmcCaseList() {
