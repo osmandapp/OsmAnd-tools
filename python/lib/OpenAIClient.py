@@ -15,6 +15,8 @@ MODEL_TEMPERATURE = float(os.getenv('MODEL_TEMPERATURE', 0.1))
 top_p = float(os.getenv('MODEL_TOP_P', 1.0))  # Controls randomness; lower is more deterministic
 MAX_TOKENS = int(os.getenv('MAX_TOKENS', 8 * 1024))  # Limit the response length
 LLM_TIMEOUT = float(os.getenv('LLM_TIMEOUT', 120))
+# Gemini block reasons that trigger the per-photo fallback and block the photo
+BLOCK_REASONS = ("PROHIBITED_CONTENT", "OTHER", "SAFETY", "IMAGE_SAFETY")
 
 
 class ImageCompletionError(RuntimeError):
@@ -33,7 +35,7 @@ def _image_completion_error(error: dict, response_id: str | None = None) -> Imag
     reason = provider_code or message_reason.strip()
     block_reason = reason if (
         prefix in ("Gemini blocked the request", "Gemini blocked the response")
-        and reason in ("PROHIBITED_CONTENT", "OTHER")
+        and reason in BLOCK_REASONS
     ) else None
     details = {
         "code": error.get("code"),
@@ -137,7 +139,7 @@ class OpenAIClient:
 
         choice = response.choices[0]
         native_reason = getattr(choice, "native_finish_reason", None)
-        if native_reason in ("PROHIBITED_CONTENT", "OTHER"):
+        if native_reason in BLOCK_REASONS:
             raise ImageCompletionError(f"{native_reason} (response_id={response.id})", native_reason)
         if not choice.message or not choice.message.content:
             reason = native_reason or choice.finish_reason

@@ -95,7 +95,7 @@ def _filter_prohibited_content(images, pos):
         try:
             _ask_with_images("Does image include prohibited content?", [im], pos + i, image_prompt="Check image.")
         except ImageCompletionError as error:
-            if not error.block_reason:
+            if not error.block_reason:  # any of BLOCK_REASONS blocks the photo
                 raise
             block_images({im[0]}, BLOCK_PROHIBITED)  # persist immediately, a later failure must not lose it
             prohibited.append({"photo_id": im[2], "safe_reason": error.block_reason})
