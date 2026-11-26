@@ -375,13 +375,21 @@ public class IndexPoiCreator extends AbstractIndexPartCreator {
 	}
 
 
-	// a place of a national service of the search rules (DMV, ЦНАП) gets its word as a top_index tag
+	// a place of a national service of the search rules (DMV, ЦНАП) gets its word as a top_index tag;
+	// a service matching the name wins over one matching only the operator
 	private static void addPoiService(Amenity a, Map<String, String> tags, IndexCreationContext icc) {
+		PoiService byOperator = null;
 		for (PoiService service : icc.poiServices()) {
-			if (service.matches(tags, a.getName())) {
+			if (service.matchesByName(tags, a.getName())) {
 				a.setAdditionalInfo(POI_SERVICE_TAG, service.word());
 				return;
 			}
+			if (byOperator == null && service.matches(tags, a.getName())) {
+				byOperator = service;
+			}
+		}
+		if (byOperator != null) {
+			a.setAdditionalInfo(POI_SERVICE_TAG, byOperator.word());
 		}
 	}
 
