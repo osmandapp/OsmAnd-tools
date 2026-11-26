@@ -709,6 +709,7 @@ public class WebGpxParser {
     }
     
     private void addSegmentsToTrack(List<Point> points, List<TrkSegment> segments, List<GpxUtilities.RouteType> routeTypes) {
+        List<GpxUtilities.RouteType> types = routeTypes != null ? routeTypes : Collections.emptyList();
         TrkSegment segment = new TrkSegment();
         boolean isNanEle = isNanEle(points);
         int lastStartTrkptIdx = 0;
@@ -732,7 +733,7 @@ public class WebGpxParser {
             if (point.profile != null && point.profile.equals(GAP_PROFILE_TYPE)) {
                 filePoint.getExtensionsToWrite().put(PROFILE_TYPE_EXTENSION, GAP_PROFILE_TYPE);
                 segment.getPoints().add(filePoint);
-                segment.getRouteTypes().addAll(routeTypes);
+                segment.getRouteTypes().addAll(types);
                 segments.add(segment);
                 segment = new TrkSegment();
             } else {
@@ -756,9 +757,7 @@ public class WebGpxParser {
                 lastPointWithSeg = point;
             }
         }
-        if (routeTypes != null) {
-            segment.getRouteTypes().addAll(routeTypes);
-        }
+        segment.getRouteTypes().addAll(types);
         segments.add(segment);
     }
     
