@@ -4,9 +4,7 @@ from pathlib import Path
 from typing import List, Callable, Dict
 
 import json5
-import openai
 import yaml
-from httpx import RemoteProtocolError
 
 from python.lib.OpenAIClient import ImageCompletionError, OpenAIClient
 from python.lib.block_images_utils import block_images, BLOCK_PROHIBITED
@@ -86,27 +84,23 @@ def split_list_by_n(l: List, n) -> List[List]:
 def _ask_with_images(prompt, images, pos, **kwargs):
     try:
         return llm_client.ask_with_image(prompt, images, pos, **kwargs)
-    except (ImageCompletionError, openai.APIError, RemoteProtocolError) as error:
+    except Exception as error:
         error.prompt_photo_ids = [image[2] for image in images]
         raise
 
 
 def _filter_prohibited_content(images, pos):
     allowed, prohibited = [], []
-    prohibited_files = set()
     for i, im in enumerate(images):
         try:
             _ask_with_images("Does image include prohibited content?", [im], pos + i, image_prompt="Check image.")
         except ImageCompletionError as error:
             if not error.block_reason:
                 raise
+            block_images({im[0]}, BLOCK_PROHIBITED)  # persist immediately, a later failure must not lose it
             prohibited.append({"photo_id": im[2], "safe_reason": error.block_reason})
-            prohibited_files.add(im[0])
         else:
             allowed.append(im)
-
-    if prohibited_files:
-        block_images(prohibited_files, BLOCK_PROHIBITED)
     return allowed, prohibited
 
 
