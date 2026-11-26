@@ -92,16 +92,13 @@ def _ask_with_images(prompt, images, pos, **kwargs):
 
 
 def _filter_prohibited_content(images, pos):
-    allowed, prohibited, unresolved = [], [], []
+    allowed, prohibited = [], []
     prohibited_files = set()
     for i, im in enumerate(images):
         try:
             _ask_with_images("Does image include prohibited content?", [im], pos + i, image_prompt="Check image.")
         except ImageCompletionError as error:
-            if error.block_reason == "OTHER":
-                unresolved.append(f"{im[2]}: {error}")
-                continue
-            if error.block_reason != "PROHIBITED_CONTENT":
+            if not error.block_reason:
                 raise
             prohibited.append({"photo_id": im[2], "safe_reason": error.block_reason})
             prohibited_files.add(im[0])
@@ -110,7 +107,7 @@ def _filter_prohibited_content(images, pos):
 
     if prohibited_files:
         block_images(prohibited_files, BLOCK_PROHIBITED)
-    return allowed, prohibited, unresolved
+    return allowed, prohibited
 
 
 def _scoring_prompt(prompt, images):
@@ -135,8 +132,7 @@ def call_llm(prompt, images) -> Dict:
             duration += llm_client.duration
             prompt_tokens += llm_client.prompt_tokens
             completion_tokens += llm_client.completion_tokens
-            allowed_images, prohibited_ims, unresolved = _filter_prohibited_content(chunk_images, pos)
-            content_errors.extend(unresolved)
+            allowed_images, prohibited_ims = _filter_prohibited_content(chunk_images, pos)
             if allowed_images:
                 llm_resp = _ask_with_images(_scoring_prompt(prompt, allowed_images), allowed_images, pos)
 
