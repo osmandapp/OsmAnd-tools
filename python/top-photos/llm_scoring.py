@@ -1,12 +1,14 @@
 import os
 import re
 from pathlib import Path
-from typing import List, Callable, Dict, Tuple
+from typing import List, Callable, Dict
 
 import json5
+import openai
 import yaml
+from httpx import RemoteProtocolError
 
-from python.lib.OpenAIClient import OpenAIClient
+from python.lib.OpenAIClient import ImageCompletionError, OpenAIClient
 from python.lib.block_images_utils import block_images, BLOCK_PROHIBITED
 
 MODEL = os.getenv('MODEL')
@@ -81,51 +83,69 @@ def split_list_by_n(l: List, n) -> List[List]:
     return [l[i:i + n] for i in range(0, len(l), n)]
 
 
-def _filter_prohibited_content(prompt, images, pos) -> Tuple[List, List]:
-    res_items, prohibited_items, prohibited_files = [], [], set()
-    for i, im in enumerate(images):
-        reason, is_error = llm_client.ask_with_image(prompt, [im], pos + i, "Check image.")
-        if is_error:
-            prohibited_items.append({"photo_id": im[2], "safe_reason": reason})
-            prohibited_files.add(im[0])
-            continue
-        res_items.append(im)
+def _ask_with_images(prompt, images, pos, **kwargs):
+    try:
+        return llm_client.ask_with_image(prompt, images, pos, **kwargs)
+    except (ImageCompletionError, openai.APIError, RemoteProtocolError) as error:
+        error.prompt_photo_ids = [image[2] for image in images]
+        raise
 
-    block_images(prohibited_files, BLOCK_PROHIBITED)
-    return res_items, prohibited_items
+
+def _filter_prohibited_content(images, pos):
+    allowed, prohibited, unresolved = [], [], []
+    prohibited_files = set()
+    for i, im in enumerate(images):
+        try:
+            _ask_with_images("Does image include prohibited content?", [im], pos + i, image_prompt="Check image.")
+        except ImageCompletionError as error:
+            if error.block_reason == "OTHER":
+                unresolved.append(f"{im[2]}: {error}")
+                continue
+            if error.block_reason != "PROHIBITED_CONTENT":
+                raise
+            prohibited.append({"photo_id": im[2], "safe_reason": error.block_reason})
+            prohibited_files.add(im[0])
+        else:
+            allowed.append(im)
+
+    if prohibited_files:
+        block_images(prohibited_files, BLOCK_PROHIBITED)
+    return allowed, prohibited, unresolved
+
+
+def _scoring_prompt(prompt, images):
+    return prompt.replace("%PHOTO_COUNT%", str(len(images))).replace("%PHOTO_IDS%", str([im[2] for im in images]))
 
 
 def call_llm(prompt, images) -> Dict:
     res, pos = [], 0
+    content_errors = []
     duration, prompt_tokens, completion_tokens = [0, 0, 0]
     split_images = split_array(images, 0 if len(images) <= MAX_PHOTOS_PER_REQUEST else int(len(images) // MAX_PHOTOS_PER_REQUEST) + 1)
-    for chunk_images in split_images:
-        new_prompt = prompt.replace("%PHOTO_COUNT%", f"{len(chunk_images)}").replace("%PHOTO_IDS%", f"{[im[2] for im in chunk_images]}")
-        llm_resp, is_error = llm_client.ask_with_image(new_prompt, chunk_images, pos)
+    for chunk_images in filter(None, split_images):
+        allowed_images = chunk_images
         prohibited_ims = []
-        if is_error and llm_resp == "PROHIBITED_CONTENT":
+        llm_resp = None
+        try:
+            llm_resp = _ask_with_images(_scoring_prompt(prompt, chunk_images), chunk_images, pos)
+        except ImageCompletionError as error:
+            if not error.block_reason:
+                raise
+            content_errors.append(str(error))
             duration += llm_client.duration
             prompt_tokens += llm_client.prompt_tokens
             completion_tokens += llm_client.completion_tokens
+            allowed_images, prohibited_ims, unresolved = _filter_prohibited_content(chunk_images, pos)
+            content_errors.extend(unresolved)
+            if allowed_images:
+                llm_resp = _ask_with_images(_scoring_prompt(prompt, allowed_images), allowed_images, pos)
 
-            allowed_ims, prohibited_ims = _filter_prohibited_content("Does image include prohibited content?", chunk_images, pos)
-            new_prompt = prompt.replace("%PHOTO_COUNT%", f"{len(allowed_ims)}").replace("%PHOTO_IDS%", f"{[im[2] for im in allowed_ims]}")
-            llm_resp, is_error = llm_client.ask_with_image(new_prompt, allowed_ims, pos)
-        if is_error:
-            raise RuntimeError(llm_resp)
-
-        pos += len(chunk_images)
-
-        duration += llm_client.duration
-        prompt_tokens += llm_client.prompt_tokens
-        completion_tokens += llm_client.completion_tokens
-
-        res_item = _get_json(llm_resp)
-        if not res_item:
-            res_item = [None] * len(chunk_images)
-        else:
-            for im in prohibited_ims:
-                res_item.append(im)
+        res_item = list(prohibited_ims)
+        if allowed_images:
+            duration += llm_client.duration
+            prompt_tokens += llm_client.prompt_tokens
+            completion_tokens += llm_client.completion_tokens
+            res_item.extend(_get_json(llm_resp) or [])
 
         if len(chunk_images) != len(res_item):
             print(f"Warning: LLM response contains {len(res_item)} but expected {len(chunk_images)} results.")
@@ -135,7 +155,9 @@ def call_llm(prompt, images) -> Dict:
                 res_item.extend([None] * (len(chunk_images) - len(res_item)))
 
         res.extend(res_item)
+        pos += len(chunk_images)
     if len(images) != len(res):
         print(f"Assert: {len(images)} but expected {len(res)} results.")
 
-    return {'cached_tokens': 0, 'results': res, 'duration': duration, 'prompt_tokens': prompt_tokens, 'completion_tokens': completion_tokens}
+    return {'cached_tokens': 0, 'results': res, 'duration': duration, 'prompt_tokens': prompt_tokens,
+            'completion_tokens': completion_tokens, 'error': " | ".join(content_errors)}
