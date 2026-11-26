@@ -758,6 +758,17 @@ public class IndexCreator {
 			throws SQLException, InterruptedException {
 		if (settings.indexAddress || settings.indexMap || settings.indexRouting || settings.indexPOI
 				|| settings.indexTransport) {
+			if (settings.indexMap && settings.indexPOI && settings.indexRouteRelations) {
+				// Parallel route lanes need to know which routes share a way before any geometry is
+				// written, so route membership is collected in a pass of its own.
+				setGeneralProgress(progress, "[28 / 100]"); //$NON-NLS-1$
+				accessor.iterateOverEntities(progress, EntityType.RELATION, new OsmDbVisitor() {
+					@Override
+					public void iterateEntity(Entity e, OsmDbAccessorContext ctx) throws SQLException {
+						indexRouteRelationCreatorV2.collectRouteMembership((Relation) e, ctx);
+					}
+				});
+			}
 			setGeneralProgress(progress, "[30 / 100]"); //$NON-NLS-1$
 			progress.startTask(settings.getString("IndexCreator.PREINDEX_BOUNDARIES_RELATIONS"), //$NON-NLS-1$
 					accessor.getAllRelations());
