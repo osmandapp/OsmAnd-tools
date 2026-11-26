@@ -253,8 +253,8 @@ def insert_place_batch(place: dict, images: List[dict]):
         data.append(values)
 
     row = [place[key] if key in place and place[key] else d for key, d in image_run_columns]
-    # row = list(place.values())
-    ch_insert('top_images_score', data)
+    if data:
+        ch_insert('top_images_score', data)
     ch_insert('top_images_run', [row])
 
 

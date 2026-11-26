@@ -15,6 +15,36 @@ MODEL_TEMPERATURE = float(os.getenv('MODEL_TEMPERATURE', 0.1))
 top_p = float(os.getenv('MODEL_TOP_P', 1.0))  # Controls randomness; lower is more deterministic
 MAX_TOKENS = int(os.getenv('MAX_TOKENS', 8 * 1024))  # Limit the response length
 LLM_TIMEOUT = float(os.getenv('LLM_TIMEOUT', 120))
+# Gemini block reasons that trigger the per-photo fallback and block the photo
+BLOCK_REASONS = ("PROHIBITED_CONTENT", "OTHER", "SAFETY", "IMAGE_SAFETY")
+
+
+class ImageCompletionError(RuntimeError):
+    def __init__(self, message: str, block_reason: str | None = None):
+        super().__init__(message)
+        self.block_reason = block_reason
+
+
+def _image_completion_error(error: dict, response_id: str | None = None) -> ImageCompletionError:
+    message = str(error.get("message") or "LLM response error")
+    metadata = error.get("metadata")
+    if not isinstance(metadata, dict):
+        metadata = {}
+    provider_code = metadata.get("provider_code") or metadata.get("provider_error_code")
+    prefix, _, message_reason = message.partition(":")
+    reason = provider_code or message_reason.strip()
+    block_reason = reason if (
+        prefix in ("Gemini blocked the request", "Gemini blocked the response")
+        and reason in BLOCK_REASONS
+    ) else None
+    details = {
+        "code": error.get("code"),
+        "error_type": metadata.get("error_type"),
+        "provider_code": provider_code,
+        "response_id": response_id,
+    }
+    detail = ", ".join(f"{key}={value}" for key, value in details.items() if value is not None)
+    return ImageCompletionError(f"{message} ({detail})" if detail else message, block_reason)
 
 
 class OpenAIClient:
@@ -68,7 +98,7 @@ class OpenAIClient:
             self.duration = time.time() - start_time
             print(f"#{current_thread().name}. LLM call {self.duration:.2f}s. {self.prompt_tokens} / {self.completion_tokens}.", flush=True)
 
-    def ask_with_image(self, system_prompt: str, images: List[Tuple[str, str]], init_enum: int = 1, image_prompt: str = "Score image and provide justifying reasons.") -> Tuple[str, bool]:
+    def ask_with_image(self, system_prompt: str, images: List[Tuple[str, str]], init_enum: int = 1, image_prompt: str = "Score image and provide justifying reasons.") -> str:
         start_time = time.time()
         self._init()
 
@@ -80,25 +110,41 @@ class OpenAIClient:
             content.append(
                 {"type": "image_url", "image_url": {"url": f"data:image/{format};base64,{im[1]}"}})
 
-        response = self.client.chat.completions.create(model=self.model,
-                                                       messages=[{"role": "system", "content": system_prompt},
-                                                                 {"role": "user", "content": content}],
-                                                       max_tokens=512 + 256 * len(images), n=1, temperature=MODEL_TEMPERATURE, top_p=top_p, stream=False)
-        if response.usage:
-            self.prompt_tokens = response.usage.prompt_tokens
-            self.completion_tokens = response.usage.completion_tokens
-        self.duration = time.time() - start_time
+        try:
+            response = self.client.chat.completions.create(model=self.model,
+                                                           messages=[{"role": "system", "content": system_prompt},
+                                                                     {"role": "user", "content": content}],
+                                                           max_tokens=512 + 256 * len(images), n=1, temperature=MODEL_TEMPERATURE, top_p=top_p, stream=False)
+            if response.usage:
+                self.prompt_tokens = response.usage.prompt_tokens
+                self.completion_tokens = response.usage.completion_tokens
+        except openai.APIError as error:
+            body = error.body
+            if isinstance(body, dict):
+                provider_error = body.get("error", body)
+                if isinstance(provider_error, dict):
+                    completion_error = _image_completion_error(provider_error, body.get("id"))
+                    if completion_error.block_reason:
+                        raise completion_error from error
+            raise
+        finally:
+            self.duration = time.time() - start_time
 
         print(f"#{current_thread().name}. LLM call {self.duration:.2f}s. {self.prompt_tokens} / {self.completion_tokens}. Images: {init_enum}-{i + 1}", flush=True)
-        if not response.choices or len(response.choices) == 0:
-            print(f"#{current_thread().name}. Warning: LLM response doesn't have 'choices'. Response: {response}", flush=True)
-            return "No 'choices' in LLM response.", True
+        error = getattr(response, "error", None)
+        if isinstance(error, dict):
+            raise _image_completion_error(error, response.id)
+        if not response.choices:
+            raise ImageCompletionError(f"LLM response is missing choices (response_id={response.id})")
 
-        if self.completion_tokens == 0 or not response.choices[0].message:
-            print(f"#{current_thread().name}. Warning: LLM response is empty. Reason: {response}", flush=True)
-            return response.choices[0].native_finish_reason, True
-
-        return response.choices[0].message.content, False
+        choice = response.choices[0]
+        native_reason = getattr(choice, "native_finish_reason", None)
+        if native_reason in BLOCK_REASONS:
+            raise ImageCompletionError(f"{native_reason} (response_id={response.id})", native_reason)
+        if not choice.message or not choice.message.content:
+            reason = native_reason or choice.finish_reason
+            raise ImageCompletionError(f"LLM response is empty (finish_reason={reason}, response_id={response.id})")
+        return choice.message.content
 
 
 def file_name_image_format_lowercase(file_name):

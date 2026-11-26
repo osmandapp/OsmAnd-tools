@@ -124,11 +124,19 @@ def split_array(arr: List, n) -> List[List]:
 
 
 def _normalize_photo_id(value):
-    """LLM sometimes returns photo_id as a list, string or float instead of an int — normalize to int or None."""
+    """Normalize an unambiguous model-provided photo ID."""
     if isinstance(value, list):
-        value = value[0] if len(value) > 0 else None
-    if isinstance(value, str) and value.strip().isdigit():
-        value = int(value.strip())
+        if len(value) != 1:
+            return None
+        value = value[0]
+    if isinstance(value, str):
+        value = value.strip()
+        if not value.isdecimal():
+            return None
+        try:
+            value = int(value)
+        except ValueError:
+            return None
     if isinstance(value, float) and value.is_integer():
         value = int(value)
     return value if isinstance(value, int) and not isinstance(value, bool) else None
@@ -178,6 +186,27 @@ def _mix_images(place_id, is_selected: bool, non_scored_items: List[ImageItem], 
     return images
 
 
+def _set_batch_error(place_run, error):
+    place_run['error'] = str(error)
+    original_photo_ids = place_run['prompt_photo_ids']
+    failed_photo_ids = getattr(error, "prompt_photo_ids", original_photo_ids)
+    if failed_photo_ids != original_photo_ids:
+        place_run['error'] += f" (original prompt_photo_ids={original_photo_ids})"
+        place_run['prompt_photo_ids'] = failed_photo_ids
+
+
+def _stop_place(place_run, error):
+    _set_batch_error(place_run, error)
+    print(f"#{current_thread().name}. STOPPED place {place_run['wikidata_id']}! "
+          f"Run: {place_run['run_id']}, batch: {place_run['batch_id']}, "
+          f"prompt_photo_ids: {place_run['prompt_photo_ids']}. Error: {place_run['error']}", flush=True)
+    try:
+        insert_place_batch(place_run, [])
+    except Exception as save_error:
+        print(f"#{current_thread().name}. Failed to record stopped batch in top_images_run: {save_error}", flush=True)
+    return True, place_run
+
+
 def process_place(run_id, place_info, is_selected, media_ids):
     start_time = time.time()
     photos = {}
@@ -211,11 +240,11 @@ def process_place(run_id, place_info, is_selected, media_ids):
         scored_photos_count = 0
         split_images = split_array(images, 0 if len(images) <= MAX_PHOTOS_PER_REQUEST else int(len(images) // MAX_PHOTOS_PER_REQUEST) + 1)
         batch_id = 0
-        for batch_images in split_images:
-            place_run['prompt_photo_ids'] = []
-            for i, (path, image_base64, media_id) in enumerate(batch_images):
-                place_run['prompt_photo_ids'].append(media_id)
-            place_run['batch_id'] = batch_id
+        for batch_images in filter(None, split_images):
+            place_run.update(
+                batch_id=batch_id, prompt_photo_ids=[media_id for _, _, media_id in batch_images],
+                scored_photo_ids=[], duration=0.0, prompt_tokens=0, completion_tokens=0, cached_tokens=0, error='',
+            )
             batch_id += MAX_PHOTOS_PER_REQUEST
             prompt = PROMPT.format(photo_count="%PHOTO_COUNT%",
                                    long_title=f"for the place: '{wiki_title}'",
@@ -223,28 +252,26 @@ def process_place(run_id, place_info, is_selected, media_ids):
                                    categories=f"place's categories: {categories},",
                                    photoids="%PHOTO_IDS%",
                                    lat=lat, lon=lon)
-            place_run['scored_photo_ids'] = []
-
             try:
                 res = call_llm_with_backoff(prompt, batch_images)
                 if res:
                     place_run['duration'] = res['duration']
                     place_run['prompt_tokens'] = res['prompt_tokens']
                     place_run['completion_tokens'] = res['completion_tokens']
+                    place_run['error'] = res['error']
             except (
                     openai.PermissionDeniedError,
                     openai.AuthenticationError,
                     openai.RateLimitError,  # only after RATE_LIMIT_RETRIES are exhausted
                     openai.NotFoundError,
             ) as e:
-                print(f"#{current_thread().name}. STOPPED place {place_id}! Error: {e}")
-                return True, place_run
+                return _stop_place(place_run, e)
             except (
                     RuntimeError, # PROHIBITED_CONTENT or other application error
                     JSONDecodeError, # LLM protocol decoding errors
                     RemoteProtocolError # LLM protocol connection errors (incomplete chunked read)
             ) as e:
-                place_run['error'] = f"{e}"
+                _set_batch_error(place_run, e)
                 insert_place_batch(place_run, [])
                 return False, place_run
 
@@ -288,7 +315,8 @@ def process_place(run_id, place_info, is_selected, media_ids):
                 return False, place_run
 
             if len(place_run['scored_photo_ids']) != len(place_run['prompt_photo_ids']):
-                place_run['error'] = f"Missing some scoring results"
+                if not place_run['error']:
+                    place_run['error'] = "Missing some scoring results"
                 print(
                     f"#{current_thread().name}. Warning: LLM response for place {place_id} contains missing results: {len(place_run['scored_photo_ids'])} scored of {len(place_run['prompt_photo_ids'])} .",
                     flush=True)
@@ -301,8 +329,7 @@ def process_place(run_id, place_info, is_selected, media_ids):
             flush=True)
         return False, place_run
     except clickhouse_connect.driver.exceptions.ProgrammingError as e:
-        print(f"#{current_thread().name}. Could not process place {place_id}. Error: {e}.")
-        return True, place_run
+        return _stop_place(place_run, e)
     except (
             requests.exceptions.RequestException,
             clickhouse_connect.driver.exceptions.DatabaseError,
@@ -312,11 +339,7 @@ def process_place(run_id, place_info, is_selected, media_ids):
         return False, place_run
     except Exception as e:
         traceback.print_exc()
-        print(f"#{current_thread().name}. Error!\n Place: {place_id}\n Images: {photos}\n Error: {e}")
-
-        place_run['error'] = f"{e}"
-        insert_place_batch(place_run, [])
-        return True, place_run
+        return _stop_place(place_run, e)
 
 
 executor = BoundedThreadPoolExecutor(process_place, done_callback, PARALLEL, "Thread")
