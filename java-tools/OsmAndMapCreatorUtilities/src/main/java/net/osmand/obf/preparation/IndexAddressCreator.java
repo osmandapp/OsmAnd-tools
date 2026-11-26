@@ -14,6 +14,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -180,10 +181,8 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 			if (boundary.hasAdminCenterId()) {
 				for (City c : citiesToSearch) {
 					if (c.getId() == boundary.getAdminCenterId() || c.getId() == boundary.getLabelId()) {
-						String cityLower = normalizeBoundaryName(c.getName());
 						// Check names to not combine municipality Samolaco (that has many villages) with admin_center village Eva
-						if (!nameContains(boundaryName, cityLower) && !nameContains(altBoundaryName, cityLower) &&
-								!nameContains(cityLower, boundaryName)) {
+						if (!isBoundaryNamedAsCity(boundary, c)) {
 							String msg = String.format("Ignore boundary '%s' (%d) admin center  for city '%s' name doesn't match",
 									boundary.getName(), ObfConstants.getOsmIdFromMapObjectId(boundary.getBoundaryId()), c.getName());
 							if (logMapDataWarn != null) {
@@ -263,9 +262,18 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				|| part.contains(" " + fullString + " ");
 	}
 
+	private boolean isBoundaryNamedAsCity(Boundary boundary, City city) {
+		String boundaryName = normalizeBoundaryName(boundary.getName());
+		String altBoundaryName = normalizeBoundaryName(boundary.getAltName());
+		String cityName = normalizeBoundaryName(city.getName());
+		return nameContains(boundaryName, cityName) || nameContains(altBoundaryName, cityName)
+				|| nameContains(cityName, boundaryName);
+	}
+
 
 	public void tryToAssignBoundaryToFreeCities(IProgress progress) {
 		progress.startWork(cityDataStorage.citiesSize());
+		Set<Boundary> linkedBoundaries = new HashSet<>();
 		// This is incorrect to do with suburbs because it assigns boundary that is much bigger!
 		// Than suburb and after that findCityPart works incorrectly
 		// So we do only for Cities & Towns without boundaries, try to find the right one
@@ -279,7 +287,7 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				Boundary smallestBoundary = null;
 				// try to found boundary
 				for (Boundary b : cityDataStorage.getNotAssignedBoundaries()) {
-					if (b.getAdminLevel() >= smallestAdminLevel) {
+					if (b.getAdminLevel() >= smallestAdminLevel && !linkedBoundaries.contains(b)) {
 						if (b.containsPoint(location.getLatitude(), location.getLongitude())) {
 							// the bigger the admin level, the smaller the boundary :-)
 							smallestAdminLevel = b.getAdminLevel();
@@ -289,7 +297,11 @@ public class IndexAddressCreator extends AbstractIndexPartCreator {
 				}
 				if (smallestBoundary != null) {
 					putCityBoundary(smallestBoundary, c);
-					cityDataStorage.removeNotAssignedBoundary(smallestBoundary);
+					linkedBoundaries.add(smallestBoundary);
+					// Municipality Schwalmtal linked to its town Waldniel stays searchable as a boundary
+					if (isBoundaryNamedAsCity(smallestBoundary, c)) {
+						cityDataStorage.removeNotAssignedBoundary(smallestBoundary);
+					}
 				}
 			}
 		}

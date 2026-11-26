@@ -48,6 +48,8 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.zip.GZIPInputStream;
 
 import static net.osmand.server.api.services.UserdataService.BUFFER_SIZE;
+import static net.osmand.server.osmgpx.OsmGpxSchema.GPX_FILES_TABLE_NAME;
+import static net.osmand.server.osmgpx.OsmGpxSchema.GPX_METADATA_TABLE_NAME;
 
 @RestController
 @RequestMapping("/osmgpx")
@@ -76,14 +78,12 @@ public class OsmGpxController {
 	private static final int MAX_RUNTIME_CACHE_SIZE = 5000;
 	private static final int MAX_ROUTES_SUMMARY = 100000;
 	private static final int MAX_ROUTES_FULL_MODE_THRESHOLD = 5000;
-	private static final int MAX_NEAR_RADIUS_M = 500_000;
-	private static final int MAX_NEAR_ROUTES = 500;
+	private static final int MAX_NEAR_RADIUS_M = 50_000;
+	private static final int MAX_NEAR_ROUTES = 1000;
 	private static final int MAX_NEAR_CANDIDATES = 5000;
 	private static final int MAX_TAGS_PER_BBOX = 1000;
 	private final AtomicInteger cacheTouch = new AtomicInteger(0);
 
-	private static final String GPX_METADATA_TABLE_NAME = "osm_gpx_data";
-	private static final String GPX_FILES_TABLE_NAME = "osm_gpx_files";
 	private static final String ROUTE_COLUMNS = "m.id, m.name, m.description, m.user, m.date, m.activity, m.lat, m.lon, " +
 			"m.speed, m.distance, m.points, m.max_speed, m.max_dist_between_points, m.time_minutes, m.waypoints, m.tags";
 	private static final int SRID_WGS84 = 4326;
@@ -384,23 +384,24 @@ public class OsmGpxController {
 			return ResponseEntity.ok("OsmGpx datasource is not initialized");
 		}
 
-		StringBuilder conditions = new StringBuilder();
+		StringBuilder dateConditions = new StringBuilder();
 		List<Object> params = new ArrayList<>();
 
-		ResponseEntity<String> error = addCoords(params, conditions, minLat, maxLat, minLon, maxLon);
+		ResponseEntity<String> error = filterByDate(dateFrom, dateTo, params, dateConditions);
+		if (error != null) {
+			return error;
+		}
+
+		StringBuilder conditions = new StringBuilder();
+		error = addCoords(params, conditions, minLat, maxLat, minLon, maxLon);
 		if (error != null) {
 			return error;
 		}
 
 		conditions.append(" AND m.activity IS NOT NULL AND m.activity <> ''");
 
-		error = filterByDate(dateFrom, dateTo, params, conditions);
-		if (error != null) {
-			return error;
-		}
-
 		String query =
-				"SELECT m.activity AS id, COUNT(*) AS count " +
+				"SELECT m.activity AS id, COUNT(*) FILTER (WHERE 1 = 1 " + dateConditions + ") AS count, COUNT(*) AS total " +
 						"FROM " + GPX_METADATA_TABLE_NAME + " m " +
 						"WHERE 1 = 1 " + conditions +
 						" GROUP BY m.activity " +

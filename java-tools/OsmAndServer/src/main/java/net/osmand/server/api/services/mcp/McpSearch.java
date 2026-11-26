@@ -333,13 +333,15 @@ public class McpSearch {
 	// a track waypoint as OsmAnd saves a POI: amenity_origin, amenity_* / osm_tag_* tags (the app shows the POI
 	// details from them and finds the POI on its maps), the POI icon; w: {lat, lon, osm, tags, name,
 	// description, icon, color, background, group, link}
-	public WptPt waypoint(Map<?, ?> w, String locale) throws SearchException {
+	public WptPt waypoint(Map<?, ?> w, String locale, List<String> warnings) throws SearchException {
 		WptPt pt = new WptPt();
 		Double lat = w.get("lat") instanceof Number n ? n.doubleValue() : null;
 		Double lon = w.get("lon") instanceof Number n ? n.doubleValue() : null;
 		String osm = w.get("osm") instanceof String o ? o.trim() : null;
 		String name = w.get("name") instanceof String x && !x.isBlank() ? x : null;
 		String icon = w.get("icon") instanceof String x && !x.isBlank() ? x.replaceFirst("^mx_", "") : null;
+		JsonObject f = null;
+		JsonObject p = null;
 		if (osm != null) {
 			if (!osm.matches("(node|way|relation)/\\d+")) {
 				throw new SearchException("osm must look like node/123, way/123 or relation/123: " + osm);
@@ -347,13 +349,19 @@ public class McpSearch {
 			if (lat == null || lon == null) {
 				throw new SearchException("lat and lon are required with osm (the POI is searched near them)");
 			}
-			JsonObject f = get("/search/get-poi-by-osmid?lat=" + lat + "&lon=" + lon + "&osmid="
-					+ osm.substring(osm.indexOf('/') + 1) + "&type=" + osm.substring(0, osm.indexOf('/')));
-			JsonObject p = f.has("properties") && f.get("properties").isJsonObject() ? f.getAsJsonObject("properties")
-					: null;
-			if (p == null || str(p, "amenity_type") == null) {
-				throw new SearchException("POI " + osm + " is not found near " + lat + ", " + lon);
+			JsonElement found = new JsonParser().parse(getRaw("/search/get-poi-by-osmid?lat=" + lat + "&lon=" + lon
+					+ "&osmid=" + osm.substring(osm.indexOf('/') + 1) + "&type=" + osm.substring(0, osm.indexOf('/'))));
+			f = found.isJsonObject() ? found.getAsJsonObject() : null;
+			JsonObject props = f != null && f.has("properties") && f.get("properties").isJsonObject()
+					? f.getAsJsonObject("properties") : null;
+			if (props != null && str(props, "amenity_type") != null) {
+				p = props;
+			} else {
+				warnings.add((name != null ? name + " (" + osm + ")" : osm) + " is not found on the OsmAnd map near "
+						+ lat + ", " + lon + ": saved from the given fields, without POI details");
 			}
+		}
+		if (p != null) {
 			// the POI properties are Amenity.getAmenityExtensions (SearchResultConverter), as WptPtEditor stores them
 			for (String k : p.keySet()) {
 				String v = str(p, k);

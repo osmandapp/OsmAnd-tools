@@ -315,7 +315,7 @@ public class EmailSenderMain {
 		if (Algorithms.isEmpty(address)) {
 			return;
 		}
-		if (!unsubscribed.contains(address)) {
+		if (!unsubscribed.contains(EmailSenderTemplate.trimLowerCaseEmail(address))) {
 			sendMail(address, p);
 		} else {
 			LOGGER.info("Skip unsubscribed email: " + address.replaceFirst(".....", "....."));
@@ -461,7 +461,7 @@ public class EmailSenderMain {
         ResultSet rs = ps.executeQuery();
         Set<String> res = new HashSet<>();
         while (rs.next()) {
-            res.add(rs.getString(1));
+            res.add(EmailSenderTemplate.trimLowerCaseEmail(rs.getString(1)));
         }
         ps.close();
         rs.close();

@@ -622,7 +622,6 @@ public class UserdataService {
             return response;
         }
         
-		email = email.toLowerCase().trim();
 		if (!emailSender.isEmail(email)) {
             return ResponseEntity.badRequest().body("Email is not valid.");
 		}
@@ -707,7 +706,6 @@ public class UserdataService {
 			LOG.error("device-register: email is empty (" + EmailSenderService.shortenEmail(email) + ")");
 			throw new OsmAndPublicApiException(ERROR_CODE_USER_IS_NOT_REGISTERED, "empty email");
 		}
-        email = email.toLowerCase().trim();
         CloudUsersRepository.CloudUser pu = usersRepository.findByEmailIgnoreCase(email);
         if (pu == null) {
             LOG.error("device-register: email is not found (" + EmailSenderService.shortenEmail(email) + ")");
@@ -1754,7 +1752,7 @@ public class UserdataService {
     }
 
     public ResponseEntity<String> cancelWebLoginLink(String email, String cancelCode) {
-        CloudUsersRepository.CloudUser pu = email == null ? null : usersRepository.findByEmailIgnoreCase(email.trim());
+        CloudUsersRepository.CloudUser pu = email == null ? null : usersRepository.findByEmailIgnoreCase(email);
         if (pu == null || pu.webLinkToken == null || cancelCode == null || !getWebLinkCancelCode(pu.webLinkToken).equals(cancelCode)) {
             return ResponseEntity.badRequest().body("Link is not valid or already cancelled");
         }
