@@ -1231,8 +1231,8 @@ public class OsmAndMapsService {
 	private static long getLocalTimeMillisByLatLon(double lat, double lon) {
 		String tz = TimezoneMapper.latLngToTimezoneString(lat, lon);
 		ZonedDateTime zonedDateTime = ZonedDateTime.now(ZoneId.of(tz));
-//		System.out.printf("TimezoneMapper (%.5f, %.5f) = %s\n", lat, lon, zonedDateTime);
-		return zonedDateTime.toInstant().toEpochMilli();
+		// Shift the timestamp so the router sees the route start's local time.
+		return zonedDateTime.withZoneSameLocal(ZoneId.systemDefault()).toInstant().toEpochMilli();
 	}
 
 	private RoutingContext lockCacheRoutingContext(RoutePlannerFrontEnd router, RouteParameters rp, DebugInfo di) throws IOException, InterruptedException {
