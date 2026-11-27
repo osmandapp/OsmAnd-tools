@@ -3,10 +3,14 @@ package net.osmand.osm;
 import org.junit.Before;
 import org.junit.Test;
 
+import net.osmand.osm.edit.Entity;
+
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
 public class MapRenderingTypesEncoderTest {
@@ -29,6 +33,60 @@ public class MapRenderingTypesEncoderTest {
             actual = this.mapRenderingTypesEncoder.transformOsmcAndColorTags(tags);
             assertEquals(actual, resultTagsList.get(tagsList.indexOf(tags)));
         }
+    }
+
+    @Test
+    public void testIntegrityScoresSurfaceAfterTagTransform() {
+        // rendering_types.xml renames these values, the score must use the new value
+        assertSameIntegrity("soil", "ground");
+        assertSameIntegrity("grit", "gravel");
+        assertSameIntegrity("hard", "compacted");
+        assertSameIntegrity("bare_rock", "stone");
+        assertSameIntegrity("woodchips", "wood");
+        assertSameIntegrity("dirt/sand", "dirt");
+        assertSameIntegrity("moss", "grass");
+        assertSameIntegrity("grass;earth", "grass;ground");
+    }
+
+    @Test
+    public void testIntegrityKeepsOtherTagsAsInOsm() {
+        // only surface is taken after tag_transform: highway=path is not scored as footway in routing,
+        // smoothness=very_good is not scored as excellent
+        assertEquals("4", integrity(ROUTING, "highway", "path", "foot", "designated")[1]);
+        assertEquals("0", integrity(ROUTING, "highway", "track", "surface", "compacted", "smoothness", "very_good")[1]);
+    }
+
+    @Test
+    public void testIntegrityOfUnpavedSurfaces() {
+        assertSameIntegrity("laterite", "ground");
+        assertSameIntegrity("clay", "ground");
+        assertSameIntegrity("grass;ground", "grass");
+        assertSameIntegrity("ground;grass", "grass");
+        assertSameIntegrity("gravel;ground", "gravel");
+        assertSameIntegrity("asphalt;mud", "mud");
+        assertEquals("0", integrity(MAP, "highway", "unclassified", "surface", "asphalt")[0]);
+        assertEquals("3", integrity(MAP, "highway", "unclassified", "surface", "ground")[0]);
+    }
+
+    private static final MapRenderingTypesEncoder.EntityConvertApplyType MAP = MapRenderingTypesEncoder.EntityConvertApplyType.MAP;
+    private static final MapRenderingTypesEncoder.EntityConvertApplyType ROUTING = MapRenderingTypesEncoder.EntityConvertApplyType.ROUTING;
+
+    private void assertSameIntegrity(String surface, String expectedLike) {
+        for (MapRenderingTypesEncoder.EntityConvertApplyType appType : List.of(MAP, ROUTING)) {
+            assertArrayEquals(surface + " in " + appType,
+                    integrity(appType, "highway", "unclassified", "surface", expectedLike),
+                    integrity(appType, "highway", "unclassified", "surface", surface));
+        }
+    }
+
+    // osmand_highway_integrity and osmand_highway_integrity_brouting after transformTags
+    private String[] integrity(MapRenderingTypesEncoder.EntityConvertApplyType appType, String... tagValues) {
+        Map<String, String> tags = new LinkedHashMap<>();
+        for (int i = 0; i < tagValues.length; i += 2) {
+            tags.put(tagValues[i], tagValues[i + 1]);
+        }
+        Map<String, String> res = mapRenderingTypesEncoder.transformTags(tags, Entity.EntityType.WAY, appType);
+        return new String[] { res.get("osmand_highway_integrity"), res.get("osmand_highway_integrity_brouting") };
     }
 
     private void createTransformOsmcCaseList() {
