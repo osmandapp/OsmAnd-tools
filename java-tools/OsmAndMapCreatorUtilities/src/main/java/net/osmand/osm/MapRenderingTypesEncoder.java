@@ -350,7 +350,6 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			EntityConvertApplyType appType) {
 		checkIfInitNeeded();
 		tags = transformShieldTags(tags, entity, appType);
-		tags = transformIntegrityTags(tags, entity, appType);
 		tags = transformOpeningHoursTags(tags, appType);
 		tags = transformChargingTags(tags, entity);
 		tags = transformOsmcAndColorTags(tags);
@@ -359,10 +358,17 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		tags = transformTurnLanesTags(tags);
 		tags = transformStepsRampTags(tags);
 		tags = addEleFeetTags(tags);
+		Map<String, String> rtags = applyTagTransformsAndCombines(tags, entity, appType);
+		rtags = transformIntegrityTags(tags, rtags, entity);
+		return postTransform(rtags);
+	}
+
+	private Map<String, String> applyTagTransformsAndCombines(Map<String, String> tags, EntityType entity,
+			EntityConvertApplyType appType) {
 		List<EntityConvert> listToTransform = getApplicableConverts(tags, entity, EntityConvertType.TAG_TRANSFORM, appType);
 		List<EntityConvert> listToCombine = getApplicableConverts(tags, entity, EntityConvertType.TAG_COMBINE, appType);
 		if (listToTransform == null && listToCombine == null) {
-			return postTransform(tags);
+			return tags;
 		}
 		Map<String, String> rtags = new LinkedHashMap<String, String>(tags);
 		if (listToTransform != null) {
@@ -375,7 +381,7 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 				applyTagCombines(rtags, ec, entity, tags);
 			}
 		}
-		return postTransform(rtags);
+		return rtags;
 	}
 
 	private Map<String, String> postTransform(Map<String, String> tags) {
@@ -502,11 +508,12 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 	}
 
-	private Map<String, String> transformIntegrityTags(Map<String, String> tags, EntityType entity,
-	                                                   EntityConvertApplyType appType) {
+	private Map<String, String> transformIntegrityTags(Map<String, String> tags, Map<String, String> rtags,
+	                                                   EntityType entity) {
 		if (tags.containsKey("highway") && entity == EntityType.WAY) {
-			tags = new LinkedHashMap<>(tags);
-			int[] integrityResult = calculateIntegrity(tags);
+			// surface as stored in the map (after tag_transform), the other tags as in OSM
+			int[] integrityResult = calculateIntegrity(tags, rtags.get("surface"));
+			tags = new LinkedHashMap<>(rtags);
 			int integrity = integrityResult[0];
 			int integrity_bicycle_routing = integrityResult[1];
 			int max_integrity = 30;
@@ -524,8 +531,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 			if (normalised_integrity_brouting > 4 && normalised_integrity_brouting <= 10) {
 				tags.put("osmand_highway_integrity_brouting_low", "yes");
 			}
+			return tags;
 		}
-		return tags;
+		return rtags;
 	}
 
 	private Map<String, String> transformAddMultipleNetwoksTag(Map<String, String> tags) {
@@ -1465,10 +1473,9 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		return tags;
 	}
 
-	private static int[] calculateIntegrity(Map<String, String> mp) {
+	private static int[] calculateIntegrity(Map<String, String> mp, String surface) {
 		int result = 0;
 		int result_bicycle_routing = 0;
-		String surface = mp.get("surface");
 		String smoothness = mp.get("smoothness");
 		String tracktype = mp.get("tracktype");
 		String highway = mp.get("highway");
@@ -1483,47 +1490,14 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		if (tracktype != null) {
 			tracktype = tracktype.toLowerCase();
 		}
-		if ("paved".equals(surface) || "concrete".equals(surface) || "concrete:lanes".equals(surface)
-				|| "concrete:plates".equals(surface) || "sett".equals(surface) || "paving_stones".equals(surface)
-				|| "metal".equals(surface) || "wood".equals(surface) || "chipseal".equals(surface)) {
-			result += 3;
-			result_bicycle_routing += 3;
-		} else if ("fine_gravel".equals(surface) || "grass_paver".equals(surface)) {
-			result += 4;
-			result_bicycle_routing += 4;
-		} else if ("compacted".equals(surface)) {
-			result += 8;
-			result_bicycle_routing += 8;
-		} else if ("cobblestone".equals(surface)) {
-			result += 8;
-			result_bicycle_routing += 8;
-		} else if ("pebblestone".equals(surface)) {
-			result += 9;
-			result_bicycle_routing += 9;
-		} else if ("ground".equals(surface) || "earth".equals(surface) || "dirt".equals(surface)) {
-			result += 9;
-			result_bicycle_routing += 9;
-		} else if ("grass".equals(surface)) {
-			result += 12;
-			result_bicycle_routing += 12;
-		} else if ("gravel".equals(surface)) {
-			result += 12;
-			result_bicycle_routing += 12;
-		} else if ("stone".equals(surface) || "rock".equals(surface) || "rocky".equals(surface)) {
-			result += 13;
-			result_bicycle_routing += 13;
-		} else if ("unpaved".equals(surface)) {
-			result += 14;
-			result_bicycle_routing += 14;
-		} else if ("salt".equals(surface) || "ice".equals(surface) || "snow".equals(surface)) {
-			result += 15;
-			result_bicycle_routing += 15;
-		} else if ("sand".equals(surface)) {
-			result += 16;
-			result_bicycle_routing += 16;
-		} else if ("mud".equals(surface)) {
-			result += 18;
-			result_bicycle_routing += 18;
+		if (surface != null) {
+			// mixed values like grass;ground score as their roughest part
+			int points = 0;
+			for (String part : surface.split(";")) {
+				points = Math.max(points, surfacePoints(part.trim()));
+			}
+			result += points;
+			result_bicycle_routing += points;
 		}
 		if ("excellent".equals(smoothness)) {
 			if (("track".equals(highway) || ("path".equals(highway))) && (surface == null)) {
@@ -1663,6 +1637,40 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		}
 		int[] result_array = { result, result_bicycle_routing };
 		return result_array;
+	}
+
+	private static int surfacePoints(String surface) {
+		if ("paved".equals(surface) || "concrete".equals(surface) || "concrete:lanes".equals(surface)
+				|| "concrete:plates".equals(surface) || "sett".equals(surface) || "paving_stones".equals(surface)
+				|| "metal".equals(surface) || "wood".equals(surface) || "chipseal".equals(surface)) {
+			return 3;
+		} else if ("fine_gravel".equals(surface) || "grass_paver".equals(surface)) {
+			return 4;
+		} else if ("compacted".equals(surface)) {
+			return 8;
+		} else if ("cobblestone".equals(surface)) {
+			return 8;
+		} else if ("pebblestone".equals(surface)) {
+			return 9;
+		} else if ("ground".equals(surface) || "earth".equals(surface) || "dirt".equals(surface)
+				|| "laterite".equals(surface) || "clay".equals(surface)) {
+			return 9;
+		} else if ("grass".equals(surface)) {
+			return 12;
+		} else if ("gravel".equals(surface)) {
+			return 12;
+		} else if ("stone".equals(surface) || "rock".equals(surface) || "rocky".equals(surface)) {
+			return 13;
+		} else if ("unpaved".equals(surface)) {
+			return 14;
+		} else if ("salt".equals(surface) || "ice".equals(surface) || "snow".equals(surface)) {
+			return 15;
+		} else if ("sand".equals(surface)) {
+			return 16;
+		} else if ("mud".equals(surface)) {
+			return 18;
+		}
+		return 0;
 	}
 
 	public static class MapRouteTag {
