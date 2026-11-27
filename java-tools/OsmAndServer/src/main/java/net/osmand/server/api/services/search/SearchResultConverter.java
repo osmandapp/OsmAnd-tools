@@ -270,7 +270,7 @@ public class SearchResultConverter {
 	}
 
 	private void addOpeningHoursInfo(Feature feature, String timeZone) {
-		OpeningHoursTime clientTime = getClientTime(timeZone);
+		OpeningHoursTime clientTime = getCurrentTime(timeZone);
 		if (clientTime != null && feature.properties.get(AMENITY_PREFIX + OPENING_HOURS) instanceof String openingHoursValue) {
 			String openingHoursInfo = getOpeningHoursInfo(openingHoursValue, clientTime);
 			if (openingHoursInfo != null) {
@@ -373,7 +373,7 @@ public class SearchResultConverter {
 	}
 
 	@Nullable
-	public static OpeningHoursTime getClientTime(String timeZone) {
+	public static OpeningHoursTime getCurrentTime(String timeZone) {
 		if (Algorithms.isBlank(timeZone)) {
 			return null;
 		}

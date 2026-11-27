@@ -289,6 +289,9 @@ public class OsmExtractionUI implements IMapLocationListener {
 			@Override
 			public void keyPressed(KeyEvent e) {
 				super.keyPressed(e);
+				if (isNonEditingKey(e)) {
+					return;
+				}
 				mapPanel.setStatusField(null);
 				if(e.getKeyCode() == KeyEvent.VK_DOWN && popup.getComponentCount() > 0) {
 					popup.setVisible(false);
@@ -302,6 +305,9 @@ public class OsmExtractionUI implements IMapLocationListener {
 			}
 	    	@Override
 	    	public void keyTyped(KeyEvent e) {
+				if (isNonEditingKey(e)) {
+					return;
+				}
 	    		mapPanel.setStatusField(null);
 	    		if(e.getKeyCode() == KeyEvent.VK_DOWN) {
 	    			return;
@@ -350,6 +356,29 @@ public class OsmExtractionUI implements IMapLocationListener {
 				mapPanel.refresh();
 			}
 		});
+	}
+
+
+	/**
+	 * Modifier keys, copy and select-all don't change the text, so they must not detach
+	 * the status field from the map: after copying the URL the field has to keep following the map.
+	 */
+	private static boolean isNonEditingKey(KeyEvent e) {
+		int keyCode = e.getKeyCode();
+		if (keyCode == KeyEvent.VK_CONTROL || keyCode == KeyEvent.VK_SHIFT
+				|| keyCode == KeyEvent.VK_ALT || keyCode == KeyEvent.VK_ALT_GRAPH
+				|| keyCode == KeyEvent.VK_META) {
+			return true;
+		}
+		if (!(e.isControlDown() || e.isMetaDown()) || e.isAltDown()) {
+			return false;
+		}
+		if (keyCode == KeyEvent.VK_C || keyCode == KeyEvent.VK_A || keyCode == KeyEvent.VK_INSERT) {
+			return true;
+		}
+		// KEY_TYPED events have no key code, only the control character
+		return keyCode == KeyEvent.VK_UNDEFINED
+				&& (e.getKeyChar() == '\u0001' || e.getKeyChar() == '\u0003');
 	}
 
 

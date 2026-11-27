@@ -6,6 +6,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.text.MessageFormat;
 import java.text.ParseException;
@@ -125,7 +126,7 @@ public class BinaryInspector {
 
 	private void printToFile(String s) throws IOException {
 		if (vInfo.osmOut != null) {
-			vInfo.osmOut.write(s.getBytes());
+			vInfo.osmOut.write(s.getBytes(StandardCharsets.UTF_8));
 		} else {
 			System.out.println(s);
 		}
@@ -441,11 +442,17 @@ public class BinaryInspector {
 				} else {
 					vInfo = new VerboseInfo(args);
 					
+					if (vInfo.osm) {
+						printToFile("<?xml version='1.0' encoding='UTF-8'?>\n<osm version='0.6'>\n");
+					}
 					for (int i = 0; i < args.length; i++) {
 						if (args[i].startsWith("-")) {
 							continue;
 						}
 						printFileInformation(args[i]);
+					}
+					if (vInfo.osm) {
+						printToFile("</osm>\n");
 					}
 					if (vInfo.isVpoi() && vInfo.globalPoiStats.files > 1) {
 						System.out.println("\nGlobal poi stats");
@@ -802,10 +809,6 @@ public class BinaryInspector {
 						MapUtils.get31TileNumberX(vInfo.lonright), MapUtils.get31TileNumberY(vInfo.lattop),
 						MapUtils.get31TileNumberY(vInfo.latbottom), vInfo.getZoom(), null),
 				vInfo.getZoom() < 15 ? p.getBaseSubregions() : p.getSubregions());
-		if (vInfo.osm) {
-			printToFile("<?xml version='1.0' encoding='UTF-8'?>\n" +
-					"<osm version='0.6'>\n");
-		}
 		index.loadRouteIndexData(regions, new ResultMatcher<RouteDataObject>() {
 			@Override
 			public boolean publish(RouteDataObject obj) {
@@ -901,9 +904,6 @@ public class BinaryInspector {
 			}
 		});
 		println("\tTotal map objects: " + mapObjectsCounter.value + " points " + mapObjectsCounter.pntValue);
-		if (vInfo.osm) {
-			printToFile("</osm >\n");
-		}
 	}
 
 	private void printAddressDetailedInfo(BinaryMapIndexReader index, AddressRegion region) throws IOException {
@@ -1264,10 +1264,6 @@ public class BinaryInspector {
 		final StringBuilder b = new StringBuilder();
 		final DamnCounter mapObjectsCounter = new DamnCounter();
 		final MapStats mapObjectStats = new MapStats();
-		if (vInfo.osm) {
-			printToFile("<?xml version='1.0' encoding='UTF-8'?>\n" +
-					"<osm version='0.6'>\n");
-		}
 		if (vInfo.isVStats()) {
 			BinaryMapIndexReader.READ_STATS = true;
 		}
@@ -1316,9 +1312,6 @@ public class BinaryInspector {
 			mapObjectStats.setReq(req);
 		}
 		index.searchMapIndex(req, mapIndex);
-		if (vInfo.osm) {
-			printToFile("</osm >\n");
-		}
 		if (vInfo.vstats) {
 			mapObjectStats.print();
 		}
@@ -1487,10 +1480,10 @@ public class BinaryInspector {
 		if(name == null || name.length() == 0) {
 			return "EMPTY";
 		}
+		name = name.replace("&", "&amp;");
 		name = name.replace("'", "&apos;");
 		name = name.replace("<", "&lt;");
 		name = name.replace(">", "&gt;");
-		name = name.replace("&", "&amp;");
 		return name;
 	}
 

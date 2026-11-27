@@ -63,9 +63,10 @@ public class OverpassFetcherTest {
 					if (!ids.add(intId)) {
 						continue;
 					}
-					List<Amenity> amenities = bmir.readAmenityBlock(nir.poiRegion, shift, poiInd);
-					Amenity obj = amenities.get(poiInd);
-					analyze(obj, bbox, intId);
+					Amenity obj = bmir.readAmenity(nir.poiRegion, shift, poiInd);
+					if (obj != null) {
+						analyze(obj, bbox, intId);
+					}
 				}
 			}
 		}
