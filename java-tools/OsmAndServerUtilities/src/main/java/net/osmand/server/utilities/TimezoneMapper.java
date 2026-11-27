@@ -16667,7 +16667,9 @@ public class TimezoneMapper {
 			boolean inside = false;
 			for (int i = 0, j = points.length - 2; i < points.length; j = i, i += 2) {
 				double yi = points[i], xi = points[i + 1], yj = points[j], xj = points[j + 1];
-				if ((yi > lat) != (yj > lat) && lng < (xj - xi) * (lat - yi) / (yj - yi) + xi) inside = !inside;
+				if ((yi > lat) != (yj > lat) && lng < (xj - xi) * (lat - yi) / (yj - yi) + xi) {
+					inside = !inside;
+				}
 			}
 			return inside;
 		}
