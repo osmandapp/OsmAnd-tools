@@ -60,6 +60,9 @@ public class ShareFileService {
 	public static final String PRIVATE_SHARE_TYPE = "private";
 	public static final String PUBLIC_SHARE_TYPE = "public";
 
+	private static final List<String> ACCESS_PRIORITY = List.of(PermissionType.PENDING.name(),
+			PermissionType.READ.name(), PermissionType.BLOCKED.name());
+
 	@Transactional
 	public UUID generateSharedCode(CloudUserFilesRepository.UserFile userFile, boolean publicAccess) {
 		UUID uniqueCode = generateUniqueCode();
@@ -91,7 +94,7 @@ public class ShareFileService {
 		}
 		ShareFileRepository.ShareFile shareFile = new ShareFileRepository.ShareFile();
 
-		String name = userFile.name.substring(userFile.name.lastIndexOf("/") + 1);
+		String name = getShareName(userFile.name);
 
 		shareFile.uuid = (uniqueCode);
 		shareFile.name = (name);
@@ -156,6 +159,54 @@ public class ShareFileService {
 			return true;
 		}
 		return false;
+	}
+
+	public void renameShareFile(String name, String newName, int userid) {
+		ShareFileRepository.ShareFile shareFile = shareFileRepository.findByOwneridAndFilepath(userid, name);
+		if (shareFile == null) {
+			return;
+		}
+		ShareFileRepository.ShareFile newShareFile = shareFileRepository.findByOwneridAndFilepath(userid, newName);
+		if (newShareFile != null) {
+			mergeAccess(shareFile, newShareFile);
+			shareFileRepository.delete(shareFile);
+		} else {
+			shareFile.filepath = newName;
+			shareFile.name = getShareName(newName);
+			shareFileRepository.saveAndFlush(shareFile);
+		}
+	}
+
+	private static String getShareName(String filepath) {
+		return filepath.substring(filepath.lastIndexOf("/") + 1);
+	}
+
+	private void mergeAccess(ShareFileRepository.ShareFile from, ShareFileRepository.ShareFile to) {
+		boolean changed = false;
+		if (from.publicAccess && !to.publicAccess) {
+			to.publicAccess = true;
+			changed = true;
+		}
+		for (ShareFileRepository.ShareFilesAccess access : from.accessRecords) {
+			ShareFileRepository.ShareFilesAccess existing = to.accessRecords.stream()
+					.filter(a -> a.user.id == access.user.id)
+					.findFirst()
+					.orElse(null);
+			if (existing == null) {
+				ShareFileRepository.ShareFilesAccess copy = new ShareFileRepository.ShareFilesAccess();
+				copy.user = access.user;
+				copy.access = access.access;
+				copy.requestDate = access.requestDate;
+				to.addAccessRecord(copy);
+				changed = true;
+			} else if (ACCESS_PRIORITY.indexOf(access.access) > ACCESS_PRIORITY.indexOf(existing.access)) {
+				existing.access = access.access;
+				changed = true;
+			}
+		}
+		if (changed) {
+			shareFileRepository.saveAndFlush(to);
+		}
 	}
 
 	public void deleteAllShareFiles(int userid) {

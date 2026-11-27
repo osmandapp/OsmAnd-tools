@@ -30,10 +30,9 @@ import java.util.Set;
 public class FixInfoFilesOperation extends AbstractFileFixOperation {
 
 	private static final ObjectMapper MAPPER = new ObjectMapper();
-	private static final String INFO_EXT = ".info";
 	private static final String GPX_INFO_EXT = ".gpx.info";
 	private static final String KEY_TYPE = "type";
-	private static final String KEY_FILE = "file";
+	private static final String KEY_FILE = UserdataService.INFO_FILE_FIELD;
 	private static final String KEY_SUBTYPE = "subtype";
 	private static final String TYPE_GPX = "GPX";
 	private static final String SUBTYPE_GPX = "gpx";
@@ -61,7 +60,7 @@ public class FixInfoFilesOperation extends AbstractFileFixOperation {
 			return false;
 		}
 		ObjectNode obj = (ObjectNode) node;
-		String expectedFile = TRACKS_PREFIX + trackName(file.name);
+		String expectedFile = TRACKS_PREFIX + UserdataService.removeInfoExt(file.name);
 		boolean noFile = !obj.hasNonNull(KEY_FILE);
 		boolean wrongFile = !noFile && !expectedFile.equals(obj.get(KEY_FILE).asText());
 		if (!noFile && !wrongFile) {
@@ -75,13 +74,8 @@ public class FixInfoFilesOperation extends AbstractFileFixOperation {
 		out.put(KEY_SUBTYPE, SUBTYPE_GPX);
 		out.setAll(rest);
 		if (!isTest(params)) {
-			save(file, MAPPER.writeValueAsBytes(out));
+			save(file, UserdataService.writeInfoJson(out));
 		}
 		return true;
-	}
-
-	// cloud name of the gpx the info file belongs to, folder included: "Folder/Track.gpx.info" -> "Folder/Track.gpx"
-	static String trackName(String name) {
-		return name.endsWith(INFO_EXT) ? name.substring(0, name.length() - INFO_EXT.length()) : name;
 	}
 }

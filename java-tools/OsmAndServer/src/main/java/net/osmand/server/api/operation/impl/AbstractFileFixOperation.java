@@ -18,6 +18,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.GZIPInputStream;
 
+import com.amazonaws.SdkClientException;
+
+import jakarta.annotation.Nullable;
+
 import net.osmand.server.api.operation.OperationContext;
 import net.osmand.server.api.repo.CloudUserFilesRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFile;
@@ -185,9 +189,27 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 	}
 
 	protected byte[] read(UserFile file) throws IOException {
-		InputStream raw = userdataService.getInputStream(file);
-		if (raw == null) {
+		byte[] content = readIfExists(file);
+		if (content == null) {
 			throw new IOException("File content is not available");
+		}
+		return content;
+	}
+
+	@Nullable
+	protected byte[] readIfExists(UserFile file) throws IOException {
+		InputStream raw;
+		try {
+			boolean localWithoutData = file.data == null && StorageService.LOCAL_STORAGE.equals(file.storage);
+			raw = localWithoutData ? null : userdataService.getInputStream(file);
+		} catch (SdkClientException e) {
+			if (StorageService.isMissingObject(e)) {
+				return null;
+			}
+			throw e;
+		}
+		if (raw == null) {
+			return null;
 		}
 		try (InputStream in = new GZIPInputStream(new BufferedInputStream(raw))) {
 			return in.readAllBytes();
@@ -199,12 +221,16 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 		try {
 			Files.write(tmp.toPath(), content);
 			try (InternalZipFile zip = InternalZipFile.buildFromFileAndDelete(tmp)) {
-				storageService.save(userdataService.userFolder(file), userdataService.storageFileName(file), zip);
-				if (storageService.storeLocally()) {
+				String folder = userdataService.userFolder(file);
+				String storageFileName = userdataService.storageFileName(file);
+				String storage = storageService.save(folder, storageFileName, zip);
+				if (file.data != null || storageService.storeLocally()) {
 					file.data = zip.getBytes();
-					file.filesize = zip.getContentSize();
-					file.zipfilesize = zip.getSize();
-					filesRepository.save(file);
+				}
+				file.filesize = zip.getContentSize();
+				file.zipfilesize = zip.getSize();
+				if (filesRepository.updateContent(file.id, file.data, file.filesize, file.zipfilesize) == 0) {
+					storageService.deleteFile(storage, folder, storageFileName);
 				}
 			}
 		} finally {
@@ -249,7 +275,7 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 		return null;
 	}
 
-	private Set<String> typesOf(Params params) {
+	protected Set<String> typesOf(Params params) {
 		Set<String> supported = supportedTypes();
 		Set<String> chosen = params.fileTypes() == null ? Set.of() : params.fileTypes();
 		if (supported == null) {
