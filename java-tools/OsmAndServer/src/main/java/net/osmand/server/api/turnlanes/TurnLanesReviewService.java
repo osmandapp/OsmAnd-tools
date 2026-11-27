@@ -1,4 +1,4 @@
-package net.osmand.server.api.services;
+package net.osmand.server.api.turnlanes;
 
 import java.io.File;
 import java.io.IOException;
@@ -12,7 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import net.osmand.data.LatLon;
-import net.osmand.server.api.services.TurnLanesCompareService.Compare;
+import net.osmand.server.api.turnlanes.TurnLanesCompareService.Compare;
 import net.osmand.util.Algorithms;
 
 /**

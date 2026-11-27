@@ -28,17 +28,17 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import jakarta.servlet.http.HttpServletResponse;
-import net.osmand.server.api.services.TurnLanesBuilds;
-import net.osmand.server.api.services.TurnLanesCompareService;
-import net.osmand.server.api.services.TurnLanesCompareService.Compare;
-import net.osmand.server.api.services.TurnLanesCompareService.CompareRequest;
-import net.osmand.server.api.services.TurnLanesReviewService;
-import net.osmand.server.api.services.TurnLanesReviewService.NewCaseRequest;
-import net.osmand.server.api.services.TurnLanesReviewService.VerdictRequest;
-import net.osmand.server.api.services.TurnLanesService;
-import net.osmand.server.api.services.TurnLanesService.Dataset;
-import net.osmand.server.api.services.TurnLanesService.GenerateRequest;
-import net.osmand.server.api.services.TurnLanesService.ObfFile;
+import net.osmand.server.api.turnlanes.TurnLanesBuilds;
+import net.osmand.server.api.turnlanes.TurnLanesCompareService;
+import net.osmand.server.api.turnlanes.TurnLanesCompareService.Compare;
+import net.osmand.server.api.turnlanes.TurnLanesCompareService.CompareRequest;
+import net.osmand.server.api.turnlanes.TurnLanesReviewService;
+import net.osmand.server.api.turnlanes.TurnLanesReviewService.NewCaseRequest;
+import net.osmand.server.api.turnlanes.TurnLanesReviewService.VerdictRequest;
+import net.osmand.server.api.turnlanes.TurnLanesService;
+import net.osmand.server.api.turnlanes.TurnLanesService.Dataset;
+import net.osmand.server.api.turnlanes.TurnLanesService.GenerateRequest;
+import net.osmand.server.api.turnlanes.TurnLanesService.ObfFile;
 import net.osmand.tester.GenerateTurnLanesTest;
 
 @Controller

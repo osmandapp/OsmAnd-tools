@@ -1,4 +1,4 @@
-package net.osmand.server.api.services;
+package net.osmand.server.api.turnlanes;
 
 import java.io.File;
 import java.io.IOException;

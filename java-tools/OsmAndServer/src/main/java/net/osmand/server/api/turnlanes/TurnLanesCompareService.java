@@ -1,4 +1,4 @@
-package net.osmand.server.api.services;
+package net.osmand.server.api.turnlanes;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -33,8 +33,8 @@ import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PreDestroy;
 import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.server.api.services.TurnLanesService.Dataset;
-import net.osmand.server.api.services.TurnLanesService.Status;
+import net.osmand.server.api.turnlanes.TurnLanesService.Dataset;
+import net.osmand.server.api.turnlanes.TurnLanesService.Status;
 import net.osmand.tester.GenerateTurnLanesTest;
 import net.osmand.util.Algorithms;
 

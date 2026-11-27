@@ -1,4 +1,4 @@
-package net.osmand.server.api.services;
+package net.osmand.server.api.turnlanes;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -21,7 +21,7 @@ import java.util.Set;
 
 /**
  * Replays turn-lanes drives on another OsmAndMapCreator build, in a JVM of its own: {@code java -cp
- * <this class>:<build>/lib/* net.osmand.server.api.services.TurnLanesRunner <profile> <memory MB>}.
+ * <this class>:<build>/lib/* net.osmand.server.api.turnlanes.TurnLanesRunner <profile> <memory MB>}.
  *
  * It names no OsmAnd class, so it loads against a build of any year - the routing API has changed under it
  * (searchRoute returned a List until 2023, a RouteCalcResult since) - and nothing of the server: the class file is
