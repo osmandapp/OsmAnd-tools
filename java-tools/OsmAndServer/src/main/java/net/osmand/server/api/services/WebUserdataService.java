@@ -31,9 +31,9 @@ import org.springframework.stereotype.Service;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 
+import static net.osmand.server.api.services.UserdataService.EMPTY_FILE_NAME;
 import static net.osmand.server.api.services.UserdataService.FILE_TYPE_GPX;
 import static net.osmand.shared.IndexConstants.GPX_FILE_EXT;
 
@@ -590,10 +590,13 @@ public class WebUserdataService {
 	                                           CloudUserDevicesRepository.CloudUserDevice dev, HttpSession session) throws IOException {
 		Iterable<CloudUserFilesRepository.UserFile> files = userFilesRepository.findLatestFilesByFolderName(dev.userid, folderName + "/", type);
 		for (CloudUserFilesRepository.UserFile file : files) {
+			if (file.filesize == -1) {
+				continue;
+			}
 			if (file.name.endsWith(INFO_FILE_SUFFIX)) {
 				continue; // handled inside renameFile via renameInfoFile
 			}
-			String newName = file.name.replaceFirst(Pattern.quote(folderName), newFolderName);
+			String newName = newFolderName + file.name.substring(folderName.length());
 			ResponseEntity<String> response = renameFile(file.name, newName, type, dev, false, session);
 			if (!response.getStatusCode().is2xxSuccessful()) {
 				return response;
@@ -661,7 +664,7 @@ public class WebUserdataService {
 		if (preparedName == null) {
 			return null;
 		}
-		boolean isTrack = file.type.equals(FILE_TYPE_GPX);
+		boolean isTrack = file.type.equals(FILE_TYPE_GPX) && !file.name.endsWith(EMPTY_FILE_NAME);
 		if (isTrack) {
 			GpxFile gpxFile = null;
 			InputStream in = null;
