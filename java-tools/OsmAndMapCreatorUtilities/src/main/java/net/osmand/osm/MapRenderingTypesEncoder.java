@@ -358,23 +358,30 @@ public class MapRenderingTypesEncoder extends MapRenderingTypes {
 		tags = transformTurnLanesTags(tags);
 		tags = transformStepsRampTags(tags);
 		tags = addEleFeetTags(tags);
+		Map<String, String> rtags = applyTagTransformsAndCombines(tags, entity, appType);
+		rtags = transformIntegrityTags(tags, rtags, entity);
+		return postTransform(rtags);
+	}
+
+	private Map<String, String> applyTagTransformsAndCombines(Map<String, String> tags, EntityType entity,
+			EntityConvertApplyType appType) {
 		List<EntityConvert> listToTransform = getApplicableConverts(tags, entity, EntityConvertType.TAG_TRANSFORM, appType);
 		List<EntityConvert> listToCombine = getApplicableConverts(tags, entity, EntityConvertType.TAG_COMBINE, appType);
-		Map<String, String> rtags = tags;
-		if (listToTransform != null || listToCombine != null) {
-			rtags = new LinkedHashMap<String, String>(tags);
-			if (listToTransform != null) {
-				for (EntityConvert ec : listToTransform) {
-					applyTagTransforms(rtags, ec, tags);
-				}
-			}
-			if (listToCombine != null) {
-				for (EntityConvert ec : listToCombine) {
-					applyTagCombines(rtags, ec, entity, tags);
-				}
+		if (listToTransform == null && listToCombine == null) {
+			return tags;
+		}
+		Map<String, String> rtags = new LinkedHashMap<String, String>(tags);
+		if (listToTransform != null) {
+			for (EntityConvert ec : listToTransform) {
+				applyTagTransforms(rtags, ec, tags);
 			}
 		}
-		return postTransform(transformIntegrityTags(tags, rtags, entity));
+		if (listToCombine != null) {
+			for (EntityConvert ec : listToCombine) {
+				applyTagCombines(rtags, ec, entity, tags);
+			}
+		}
+		return rtags;
 	}
 
 	private Map<String, String> postTransform(Map<String, String> tags) {
