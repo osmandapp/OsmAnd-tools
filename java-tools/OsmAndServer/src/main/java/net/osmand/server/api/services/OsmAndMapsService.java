@@ -102,7 +102,7 @@ import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.tileManager.TileMemoryCache;
 import net.osmand.server.tileManager.TileServerConfig;
 import net.osmand.server.tileManager.VectorMetatile;
-import net.osmand.server.utils.TimezoneMapper;
+import net.osmand.server.utilities.TimezoneMapper;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;

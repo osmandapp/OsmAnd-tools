@@ -40,6 +40,7 @@ import org.springframework.stereotype.Service;
 
 import net.osmand.data.LatLon;
 import net.osmand.server.DatasourceConfiguration;
+import net.osmand.server.ServerUtilities;
 import net.osmand.server.controllers.pub.GeojsonClasses.Feature;
 import net.osmand.server.controllers.pub.GeojsonClasses.FeatureCollection;
 import net.osmand.server.controllers.pub.GeojsonClasses.Geometry;
@@ -54,7 +55,6 @@ public class WikiService {
 
 	protected static final Log log = LogFactory.getLog(WikiService.class);
 
-	public static final String USER_AGENT = "OsmAnd-Bot/1.0 (+https://osmand.net; support@osmand.net) OsmAndJavaServer/1.0";
 	public static final String WIKIMEDIA_COMMON_SPECIAL_FILE_PATH = "https://commons.wikimedia.org/wiki/Special:FilePath/";
 	private static final String IMAGE_ROOT_URL = "https://upload.wikimedia.org/wikipedia/commons/";
 	private static final String OSMAND_IMAGE_ROOT_URL = "https://data.osmand.net/wikimedia/images-1280/";
@@ -160,7 +160,7 @@ public class WikiService {
 			URL url = new URL(urlStr);
 			connection = (HttpURLConnection) url.openConnection();
 			connection.setRequestMethod("GET");
-			connection.setRequestProperty("User-Agent", USER_AGENT);
+			connection.setRequestProperty("User-Agent", ServerUtilities.USER_AGENT);
 			
 			int responseCode = connection.getResponseCode();
 			String rawData;

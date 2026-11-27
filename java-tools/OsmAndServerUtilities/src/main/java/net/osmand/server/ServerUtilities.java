@@ -14,11 +14,20 @@ import net.osmand.server.osmgpx.DownloadOsmGPX;
 import net.osmand.server.osmgpx.SyncRemoteOsmGpx;
 import net.osmand.server.utilities.GenerateWebTranslations;
 import net.osmand.server.utilities.StyleDataExtractor;
+import net.osmand.server.utilities.TimezoneMapperDataGenerator;
+import net.osmand.server.utilities.TimezoneMapperGenerator;
 import net.osmand.server.utilities.WikidataUtilities;
 
 public class ServerUtilities {
 
+	public static final String USER_AGENT =
+			"OsmAnd-Bot/1.0 (+https://osmand.net; support@osmand.net) OsmAndJavaServer/1.0";
+
 	public static void main(String[] args) throws Exception {
+		if (args.length == 0) {
+			System.out.println("Usage: utilities.sh <command> [options]");
+			return;
+		}
 		String utl = args[0];
 		List<String> subArgs = new ArrayList<String>(Arrays.asList(args).subList(1, args.length));
 		String[] subArgsArray = subArgs.toArray(new String[args.length - 1]);
@@ -52,6 +61,12 @@ public class ServerUtilities {
 			WikidataUtilities.parseWikidataLicenses(subArgsArray[0]);
 		} else if (utl.equals("generate-reports")) {
 			OsmAndLiveReports.main(subArgsArray);
+		} else if (utl.equals("generate-timezone-mapper")) {
+			TimezoneMapperGenerator.main(subArgsArray);
+		} else if (utl.equals("generate-timezone-data")) {
+			TimezoneMapperDataGenerator.main(subArgsArray);
+		} else if (utl.equals("test-timezone-mapper")) {
+			TimezoneMapperGenerator.testGeneratedMapperMain(subArgsArray);
 		} else {
 			System.err.println("Unknown command");
 			System.exit(1);

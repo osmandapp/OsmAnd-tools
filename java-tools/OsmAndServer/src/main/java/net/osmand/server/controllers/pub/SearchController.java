@@ -11,7 +11,7 @@ import java.util.*;
 import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.api.services.TransportStopsService;
 import net.osmand.server.utils.MultiPlatform;
-import net.osmand.server.utils.TimezoneMapper;
+import net.osmand.server.utilities.TimezoneMapper;
 import net.osmand.shared.wiki.WikiHelper;
 import net.osmand.shared.wiki.WikiImage;
 import net.osmand.shared.wiki.WikiMetadata;
