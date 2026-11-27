@@ -5,7 +5,7 @@
  * Approach: Tim Cooper, LatLongToTimezone (MIT): https://github.com/drtimcooper/LatLongToTimezone
  * Douglas-Peucker tolerance: 1500.0 m; minimum polygon diagonal: 2000.0 m.
  */
-package net.osmand.server.utils;
+package net.osmand.server.utilities;
 
 public class TimezoneMapper {
 	public static String latLngToTimezoneString(double lat, double lng) {
