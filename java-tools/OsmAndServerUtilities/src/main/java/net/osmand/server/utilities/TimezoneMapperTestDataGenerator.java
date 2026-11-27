@@ -271,7 +271,7 @@ public class TimezoneMapperTestDataGenerator {
 		return testCase;
 	}
 
-	private static String normalize(String timezone, JsonObject aliases) {
+	static String normalize(String timezone, JsonObject aliases) {
 		while (aliases.has(timezone)) {
 			timezone = aliases.get(timezone).getAsString();
 		}

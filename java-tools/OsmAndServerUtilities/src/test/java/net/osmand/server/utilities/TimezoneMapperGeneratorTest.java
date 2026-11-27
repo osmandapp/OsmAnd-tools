@@ -20,6 +20,7 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
 import net.osmand.server.utilities.TimezoneMapperTestDataGenerator.TimezoneTestData;
@@ -43,6 +44,35 @@ public class TimezoneMapperGeneratorTest {
 	@Test
 	public void kotlinGenerationIsByteIdenticalForTheSameData() throws Exception {
 		assertByteIdenticalGeneration(OutputFormat.KOTLIN);
+	}
+
+	@Test
+	public void cppGenerationIsByteIdenticalForTheSameData() throws Exception {
+		assertByteIdenticalGeneration(OutputFormat.CPP);
+	}
+
+	@Test
+	public void cppTestCasesExpandAliasesAndAlternativesWithoutChangingJson() throws Exception {
+		TimezoneTestData data = data("UTC");
+		data.aliases().addProperty("UTC", "Etc/Universal");
+		data.aliases().addProperty("Etc/Universal", "Etc/UTC");
+		JsonObject testCase = data.iana().getAsJsonArray("cases").get(0).getAsJsonObject();
+		testCase.addProperty("city", "Рим \"<>&\"\n");
+		JsonArray alternatives = new JsonArray();
+		alternatives.add("Europe/Paris");
+		testCase.add("alternatives", alternatives);
+		String original = data.iana().toString();
+		Path first = temporary.getRoot().toPath().resolve("first.cpp");
+		Path second = temporary.getRoot().toPath().resolve("second.cpp");
+		Path source = Path.of(OutputFormat.CPP.sourceFileName());
+		TimezoneMapperCppHelper.writeValidationSource(source, first, data);
+		TimezoneMapperCppHelper.writeValidationSource(source, second, data);
+		assertArrayEquals(Files.readAllBytes(first), Files.readAllBytes(second));
+		String generated = Files.readString(first);
+		assertTrue(generated.contains("|Etc/UTC|Etc/Universal|Europe/Paris|UTC|"));
+		assertTrue(generated.contains("\\320"));
+		assertTrue(generated.contains("\\\"<>&\\\"\\012"));
+		assertEquals(original, data.iana().toString());
 	}
 
 	private void assertByteIdenticalGeneration(OutputFormat format) throws Exception {

@@ -35,7 +35,8 @@ import net.osmand.server.utilities.TimezoneMapperTestDataGenerator.TimezoneTestD
 /** Cross-checks a release mapper and its test data against the versions embedded in this JAR. */
 public class TimezoneMapperValidator {
 
-	private static final String CLASSES_JAR = "classes.jar";
+	static final String CLASSES_JAR = "classes.jar";
+	static final String RELEASE_CHECK_STEP = "Step 3: Release mapper on release JSON";
 
 	public static void main(String[] args) throws Exception {
 		CommandLineOpts opts = new CommandLineOpts(args);
@@ -43,35 +44,40 @@ public class TimezoneMapperValidator {
 			System.out.println("""
 					Usage: utilities.sh validate-timezone-mapper [options]
 
-					Requires JDK 17+; Java needs javac, Kotlin needs kotlinc in PATH. Steps:
+					Requires JDK 17+ with javac; Kotlin needs kotlinc, C++ needs clang++ in PATH.
+					C++ sources use C++14. Steps:
 					  1. Download the selected timezone-boundary-builder release, generate and
-					     compile its mapper, then load it in an isolated class loader.
+					     compile the JVM mapper in an isolated class loader.
+					     C++ also generates a release Java mapper for JSON expectations.
 					  2. Generate release JSON: aliases and reference points from the matching
 					     IANA release, and basemap city expectations from the release mapper.
 					     With --format=kotlin, city expectations use the compiled release Kotlin mapper.
+					     With --format=cpp, city expectations use the compiled release Java mapper.
 					  3. Check the release mapper against its own release JSON.
-					  4. Check the release mapper against the current JSON embedded in this JAR.
+					     For C++, embed these cases in a temporary C++ test, compile with clang++ and run it.
+					  4. Java/Kotlin only: check the release mapper against the embedded JSON.
 					  5. Java only: check the current mapper from this JAR against the release JSON.
 					  6. With --output, keep the release source and all three JSON files,
 					     including when checks fail, for review and updating the repository.
 
 					Options:
 					  --release=TAG   timezone-boundary-builder release (default: latest).
-					  --format=TYPE   Mapper format: java or kotlin (default: java).
+					  --format=TYPE   Mapper format: java, kotlin or cpp (default: java).
 					  --basemap=FILE  World basemap OBF (default: found in OBF_LOCATION).
 					  --output=DIR    Save release source and JSON (default: no files kept).
 					  --help          Show this help.
 
-					Runs checks 3-5 for Java, checks 3-4 for Kotlin. On mismatches, prints failed steps and update
+					Runs checks 3-5 for Java, 3-4 for Kotlin, and only 3 for C++.
+					On mismatches, prints failed steps and update
 					instructions, then exits with code 1 without a stack trace.
-					Saved files: %s or %s, plus %s, %s, %s.
+					Saved files: %s, %s or %s, plus %s, %s, %s.
 					For Java, replace the reviewed mapper source in OsmAndServerUtilities.
-					For Kotlin, review the generated source before integrating it;
+					For Kotlin/C++, review the generated source before integrating it;
 					copy reviewed JSON files to resources/test-resources/tz/.
 					Rebuild and run TimezoneMapperTest after updating the repository.
-					Temporary source and compiled JAR are always removed.
+					Temporary sources, JAR and C++ executable are always removed.
 					""".formatted(OutputFormat.JAVA.sourceFileName(), OutputFormat.KOTLIN.sourceFileName(),
-							ALIASES_FILE, IANA_FILE, CITIES_FILE));
+							OutputFormat.CPP.sourceFileName(), ALIASES_FILE, IANA_FILE, CITIES_FILE));
 			return;
 		}
 		String basemapOption = opts.getOpt("--basemap");
@@ -90,6 +96,16 @@ public class TimezoneMapperValidator {
 	public static boolean validateTimezoneMapper(TimezoneBoundaryRelease release, Path basemap, Path output,
 	                                             OutputFormat format)
 			throws Exception {
+		boolean valid = format == OutputFormat.CPP ? TimezoneMapperCppHelper.validateMapper(release, basemap, output)
+				: validateJvmMapper(release, basemap, output, format);
+		if (valid) {
+			System.out.println("SUCCESS! TimezoneMapper " + release.version() + ": all validation checks passed!");
+		}
+		return valid;
+	}
+
+	private static boolean validateJvmMapper(TimezoneBoundaryRelease release, Path basemap, Path output,
+	                                         OutputFormat format) throws Exception {
 		Path directory = Files.createTempDirectory("timezone-mapper-validation-");
 		Path source = directory.resolve(format.sourceFileName());
 		boolean valid;
@@ -107,9 +123,6 @@ public class TimezoneMapperValidator {
 			Files.deleteIfExists(source);
 			Files.delete(directory);
 		}
-		if (valid) {
-			System.out.println("SUCCESS! TimezoneMapper " + release.version() + ": all validation checks passed!");
-		}
 		return valid;
 	}
 
@@ -119,6 +132,7 @@ public class TimezoneMapperValidator {
 		switch (format) {
 			case JAVA -> compileJavaMapper(source, classes);
 			case KOTLIN -> compileKotlinMapper(source, classes);
+			case CPP -> throw new IllegalArgumentException("C++ validation uses clang++");
 		}
 		// The platform parent cannot load the built mapper with the same class name.
 		URLClassLoader loader = new URLClassLoader(new URL[] { classes.toUri().toURL() },
@@ -172,36 +186,44 @@ public class TimezoneMapperValidator {
 	                                        TimezoneTestData releaseData,
 	                                        BiFunction<Double, Double, String> releaseLookup, OutputFormat format)
 			throws IOException {
-		if (output != null) {
-			releaseData.writeJsonFiles(output);
-			Files.copy(source, output.resolve(format.sourceFileName()), StandardCopyOption.REPLACE_EXISTING);
-		}
+		saveReleaseFiles(source, output, releaseData);
 		List<String> failures = new ArrayList<>();
-		collectTimezoneFailures("Step 3: Release mapper on release JSON", releaseData, releaseLookup, failures);
+		collectTimezoneFailures(RELEASE_CHECK_STEP, releaseData, releaseLookup, failures);
 		collectTimezoneFailures("Step 4: Release mapper on current JSON", currentData, releaseLookup, failures);
 		if (format == OutputFormat.JAVA) {
 			collectTimezoneFailures("Step 5: Current mapper on release JSON", releaseData,
 					TimezoneMapper::latLngToTimezoneString, failures);
 		}
 		if (!failures.isEmpty()) {
-			System.err.println("VALIDATION FAILED at:\n" + String.join("\n", failures));
-			if (output == null) {
-				System.err.println("Run validate-timezone-mapper again with --output=DIR to save release files.");
-			} else {
-				System.err.println("Release files have been saved in --output.");
-			}
-			System.err.println("Review the failures and update the repository with verified release files:");
-			if (format == OutputFormat.JAVA) {
-				System.err.println("Replace " + format.sourceFileName()
-						+ " in OsmAndServerUtilities/src/main/java/net/osmand/server/utilities/;");
-			} else {
-				System.err.println("Review " + format.sourceFileName() + " before integrating the Kotlin mapper;");
-			}
-			System.err.println("replace " + ALIASES_FILE + ", " + IANA_FILE + ", " + CITIES_FILE
-					+ " in resources/test-resources/tz/.");
-			System.err.println("Rebuild and run TimezoneMapperTest.");
+			printValidationFailure(failures, output, format);
 		}
 		return failures.isEmpty();
+	}
+
+	static void saveReleaseFiles(Path source, Path output, TimezoneTestData data) throws IOException {
+		if (output != null) {
+			data.writeJsonFiles(output);
+			Files.copy(source, output.resolve(source.getFileName()), StandardCopyOption.REPLACE_EXISTING);
+		}
+	}
+
+	static void printValidationFailure(List<String> failures, Path output, OutputFormat format) {
+		System.err.println("VALIDATION FAILED at:\n" + String.join("\n", failures));
+		if (output == null) {
+			System.err.println("Run validate-timezone-mapper again with --output=DIR to save release files.");
+		} else {
+			System.err.println("Release files have been saved in --output.");
+		}
+		System.err.println("Review the failures and update the repository with verified release files:");
+		if (format == OutputFormat.JAVA) {
+			System.err.println("Replace " + format.sourceFileName()
+					+ " in OsmAndServerUtilities/src/main/java/net/osmand/server/utilities/;");
+		} else {
+			System.err.println("Review " + format.sourceFileName() + " before integrating the generated mapper;");
+		}
+		System.err.println("replace " + ALIASES_FILE + ", " + IANA_FILE + ", " + CITIES_FILE
+				+ " in resources/test-resources/tz/.");
+		System.err.println("Rebuild and run TimezoneMapperTest.");
 	}
 
 	private static void collectTimezoneFailures(String direction, TimezoneTestData data,
