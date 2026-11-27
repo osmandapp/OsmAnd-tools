@@ -1,3 +1,8 @@
+processResources {
+	from("../../../resources") {
+		include "test-resources/tz/TimezoneMapper*.json"
+	}
+}
 
 dependencies {
     testImplementation group: 'junit', name: 'junit', version: '4.12'

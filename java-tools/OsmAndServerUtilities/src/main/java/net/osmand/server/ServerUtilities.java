@@ -14,8 +14,9 @@ import net.osmand.server.osmgpx.DownloadOsmGPX;
 import net.osmand.server.osmgpx.SyncRemoteOsmGpx;
 import net.osmand.server.utilities.GenerateWebTranslations;
 import net.osmand.server.utilities.StyleDataExtractor;
-import net.osmand.server.utilities.TimezoneMapperDataGenerator;
 import net.osmand.server.utilities.TimezoneMapperGenerator;
+import net.osmand.server.utilities.TimezoneMapperTestDataGenerator;
+import net.osmand.server.utilities.TimezoneMapperValidator;
 import net.osmand.server.utilities.WikidataUtilities;
 
 public class ServerUtilities {
@@ -63,10 +64,10 @@ public class ServerUtilities {
 			OsmAndLiveReports.main(subArgsArray);
 		} else if (utl.equals("generate-timezone-mapper")) {
 			TimezoneMapperGenerator.main(subArgsArray);
-		} else if (utl.equals("generate-timezone-data")) {
-			TimezoneMapperDataGenerator.main(subArgsArray);
-		} else if (utl.equals("test-timezone-mapper")) {
-			TimezoneMapperGenerator.testGeneratedMapperMain(subArgsArray);
+		} else if (utl.equals("generate-timezone-test-data")) {
+			TimezoneMapperTestDataGenerator.main(subArgsArray);
+		} else if (utl.equals("validate-timezone-mapper")) {
+			TimezoneMapperValidator.main(subArgsArray);
 		} else {
 			System.err.println("Unknown command");
 			System.exit(1);
