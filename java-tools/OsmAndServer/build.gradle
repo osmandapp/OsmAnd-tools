@@ -21,9 +21,20 @@ task generateGitProperties {
             // def commitHash = revision.split(' ').last()
             // def timestamp = revision ? new java.util.Date(java.util.concurrent.TimeUnit.SECONDS.toMillis(revision.split(' ').first() as long)).format("yyyy-MM-dd'T'HH:mm:ssZ") : null
             def commit = 'git log -1 --pretty=format:"%h%x09%an%x09%ad%x09%s"'.execute().text.trim()
+            // the routing code comes from the android checkout: which branch of it, for the turn-lanes datasets
+            def android = new File(rootDir, '../../android')
+            def androidBranch = ['git', '-C', android.path, 'rev-parse', '--abbrev-ref', 'HEAD'].execute().text.trim()
+            def androidCommit = ['git', '-C', android.path, 'log', '-1', '--pretty=format:%h %ad', '--date=short'].execute().text.trim()
             File propertiesFile = new File(project.getBuildDir(), '/resources/main/git.properties')
+            def lines = []
             if (commit) {
-                propertiesFile.text = """git.commit.format=$commit"""
+                lines << "git.commit.format=$commit"
+            }
+            if (androidCommit) {
+                lines << "git.android.format=$androidBranch $androidCommit"
+            }
+            if (lines) {
+                propertiesFile.text = lines.join('\n') + '\n'
             }
         } catch (e) {
             project.logger.error('Unable to generate Git properties file.', e)
@@ -38,6 +49,9 @@ tasks.register('copyAndroidResources', Copy) {
     into("src/main/resources/androidResources")
 }
 processResources.dependsOn(copyAndroidResources)
+// after processResources, which would put the placeholder git.properties back over it
+generateGitProperties.mustRunAfter(processResources)
+bootRun.dependsOn(generateGitProperties)
 
 tasks.register('zipColorPalette', Zip) {
     from("../../../resources/color-palette/")
