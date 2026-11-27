@@ -10,6 +10,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -59,6 +60,10 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.gson.Gson;
@@ -186,6 +191,9 @@ public class UserdataService {
     public static final Set<String> FREE_TYPES = Set.of(FILE_TYPE_FAVOURITES, FILE_TYPE_GLOBAL, FILE_TYPE_PROFILE, FILE_TYPE_OSM_EDITS, FILE_TYPE_OSM_NOTES);
     public static final String EMPTY_FILE_NAME = "__folder__.info";
     public static final String INFO_EXT = ".info";
+    public static final String INFO_FILE_FIELD = "file";
+    private static final int MAX_INFO_CONTENT_SIZE = 1024 * 1024;
+    private static final ObjectMapper INFO_MAPPER = new ObjectMapper();
 
 	public static final String FILE_NOT_FOUND = "File not found";
 	public static final String FILE_WAS_DELETED = "File was deleted";
@@ -413,13 +421,14 @@ public class UserdataService {
 
 	public ResponseEntity<String> uploadMultipartFile(MultipartFile file, CloudUserDevicesRepository.CloudUserDevice dev,
 			String name, String type, Long clienttime, HttpSession session) throws IOException {
-		String fileName = getStoredFileName(dev.userid, name, type);
+		UploadName uploadName = getUploadName(dev.userid, name, type);
+		String fileName = uploadName.name();
 		if (cloudMapFilesService.isDeletedMapFile(fileName, type)) {
 			return cloudMapFilesService.handleDeletedMapUpload(fileName, type, clienttime, dev);
 		}
 		try (InternalZipFile zipfile = getUploadZipFile(file, fileName, type, session)) {
 			validateUserForUpload(dev, type, zipfile.getSize());
-			return uploadFile(zipfile, dev, fileName, type, clienttime);
+			return uploadFile(zipfile, dev, name, uploadName, type, clienttime);
 		} catch (OsmAndPublicApiException e) {
 			LOG.warn(String.format("Upload rejected for user %d, file %s/%s: %s", dev.userid, type, fileName, e.getMessage()));
 			throw e;
@@ -471,8 +480,13 @@ public class UserdataService {
 
 	public ResponseEntity<String> uploadFile(InternalZipFile zipfile, CloudUserDevicesRepository.CloudUserDevice dev,
 			String name, String type, Long clienttime) throws IOException {
+		return uploadFile(zipfile, dev, name, getUploadName(dev.userid, name, type), type, clienttime);
+	}
+
+	private ResponseEntity<String> uploadFile(InternalZipFile zipfile, CloudUserDevicesRepository.CloudUserDevice dev,
+			String name, UploadName uploadName, String type, Long clienttime) throws IOException {
 		CloudUserFilesRepository.UserFile usf = new CloudUserFilesRepository.UserFile();
-		usf.name = getStoredFileName(dev.userid, name, type);
+		usf.name = uploadName.name();
 		usf.type = type;
 		usf.updatetime = new Date();
 		if (clienttime != null) {
@@ -480,15 +494,85 @@ public class UserdataService {
 		}
 		usf.userid = dev.userid;
 		usf.deviceid = dev.id;
-		usf.filesize = zipfile.getContentSize();
-		usf.zipfilesize = zipfile.getSize();
 		usf.storagename = computeStorageName(usf.type, usf.name, usf.updatetime);
-		usf.storage = storageService.save(userFolder(usf), storageFileName(usf), zipfile);
-		if (storageService.storeLocally()) {
-			usf.data = zipfile.getBytes();
+		saveContent(usf, zipfile, uploadName);
+		if (usf.name.equals(KUnicode.INSTANCE.normalizeNFC(usf.name))) {
+			filesRepository.saveAndFlush(usf);
+		} else {
+			saveWithNameLock(usf, zipfile, name);
 		}
-		filesRepository.saveAndFlush(usf);
 		return ResponseEntity.ok(gson.toJson(new ResponseFileStatus(usf)));
+	}
+
+	private void saveContent(CloudUserFilesRepository.UserFile usf, InternalZipFile zipfile, UploadName uploadName) throws IOException {
+		InternalZipFile content = uploadName.normalizeFileField() ? getNfcInfoZipFile(zipfile, usf.name, usf.userid) : zipfile;
+		usf.filesize = content.getContentSize();
+		usf.zipfilesize = content.getSize();
+		usf.storage = storageService.save(userFolder(usf), storageFileName(usf), content);
+		if (storageService.storeLocally()) {
+			usf.data = content.getBytes();
+		}
+	}
+
+	private void saveWithNameLock(CloudUserFilesRepository.UserFile usf, InternalZipFile zipfile, String name) throws IOException {
+		try {
+			new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+				filesRepository.lockFileNames(usf.userid);
+				UploadName uploadName = getUploadName(usf.userid, name, usf.type);
+				if (!uploadName.name().equals(usf.name)) {
+					setNameKeepingStorageKey(usf, uploadName.name());
+					if (uploadName.normalizeFileField()) {
+						try {
+							saveContent(usf, zipfile, uploadName);
+						} catch (IOException e) {
+							throw new UncheckedIOException(e);
+						}
+					}
+				}
+				filesRepository.saveAndFlush(usf);
+			});
+		} catch (UncheckedIOException e) {
+			throw e.getCause();
+		}
+	}
+
+	private InternalZipFile getNfcInfoZipFile(InternalZipFile zipfile, String name, int userid) throws IOException {
+		byte[] content;
+		try (InputStream in = new GZIPInputStream(zipfile.getInputStream())) {
+			content = in.readNBytes(MAX_INFO_CONTENT_SIZE + 1);
+		}
+		if (content.length > MAX_INFO_CONTENT_SIZE) {
+			LOG.warn(String.format("Kept .info JSON over %d bytes as is for user %d, file %s", MAX_INFO_CONTENT_SIZE, userid, name));
+			return zipfile;
+		}
+		byte[] nfcContent = null;
+		try {
+			nfcContent = getNfcInfoContent(content);
+		} catch (JsonProcessingException e) {
+			LOG.warn(String.format("Failed to parse .info JSON of user %d, file %s: %s", userid, name, e.getMessage()));
+		}
+		return nfcContent == null ? zipfile : InternalZipFile.buildFromBytes(nfcContent);
+	}
+
+	@Nullable
+	public static byte[] getNfcInfoContent(byte[] content) throws IOException {
+		JsonNode json = INFO_MAPPER.readTree(content);
+		String path = json.path(INFO_FILE_FIELD).textValue();
+		String nfcPath = path == null ? null : KUnicode.INSTANCE.normalizeNFC(path);
+		if (nfcPath == null || nfcPath.equals(path)) {
+			return null;
+		}
+		((ObjectNode) json).put(INFO_FILE_FIELD, nfcPath);
+		return writeInfoJson(json);
+	}
+
+	public static byte[] writeInfoJson(JsonNode json) throws JsonProcessingException {
+		return INFO_MAPPER.writeValueAsString(json).replace("/", "\\/").getBytes(StandardCharsets.UTF_8);
+	}
+
+	// cloud name of the gpx the info file belongs to, folder included: "Folder/Track.gpx.info" -> "Folder/Track.gpx"
+	public static String removeInfoExt(String name) {
+		return name.endsWith(INFO_EXT) ? name.substring(0, name.length() - INFO_EXT.length()) : name;
 	}
 
 
@@ -561,11 +645,15 @@ public class UserdataService {
     }
 
     public void renameFileVersion(UserFile fl, String newName) {
+        setNameKeepingStorageKey(fl, newName);
+        filesRepository.save(fl);
+    }
+
+    private void setNameKeepingStorageKey(UserFile fl, String newName) {
         if (hasContent(fl) && Algorithms.isEmpty(fl.storagename)) {
             fl.storagename = storageFileName(fl);
         }
         fl.name = newName;
-        filesRepository.save(fl);
     }
 
     public String getStoredFileName(int userid, String name, String type) {
@@ -574,6 +662,21 @@ public class UserdataService {
             return nfcName;
         }
         return name;
+    }
+
+    private record UploadName(String name, boolean normalizeFileField) {}
+
+    private UploadName getUploadName(int userid, String name, String type) {
+        String storedName = getStoredFileName(userid, name, type);
+        if (storedName.equals(name) || !name.endsWith(INFO_EXT)) {
+            return new UploadName(storedName, false);
+        }
+        String fileName = removeInfoExt(name);
+        boolean nonNfcFile = getStoredFileName(userid, fileName, type).equals(fileName);
+        if (nonNfcFile && !filesRepository.existsByUseridAndNameAndType(userid, storedName, type)) {
+            return new UploadName(name, false);
+        }
+        return new UploadName(storedName, !nonNfcFile);
     }
 
     public static boolean hasContent(UserFile file) {
@@ -1037,6 +1140,7 @@ public class UserdataService {
 
 	@Transactional
     public void deleteFile(String name, String type, Integer deviceId, Long clienttime, CloudUserDevicesRepository.CloudUserDevice dev) {
+        filesRepository.lockFileNames(dev.userid);
         CloudUserFilesRepository.UserFile usf = new CloudUserFilesRepository.UserFile();
         usf.name = getStoredFileName(dev.userid, name, type);
         usf.type = type;

@@ -199,12 +199,16 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 		try {
 			Files.write(tmp.toPath(), content);
 			try (InternalZipFile zip = InternalZipFile.buildFromFileAndDelete(tmp)) {
-				storageService.save(userdataService.userFolder(file), userdataService.storageFileName(file), zip);
-				if (storageService.storeLocally()) {
+				String folder = userdataService.userFolder(file);
+				String storageFileName = userdataService.storageFileName(file);
+				String storage = storageService.save(folder, storageFileName, zip);
+				if (file.data != null || storageService.storeLocally()) {
 					file.data = zip.getBytes();
-					file.filesize = zip.getContentSize();
-					file.zipfilesize = zip.getSize();
-					filesRepository.save(file);
+				}
+				file.filesize = zip.getContentSize();
+				file.zipfilesize = zip.getSize();
+				if (filesRepository.updateContent(file.id, file.data, file.filesize, file.zipfilesize) == 0) {
+					storageService.deleteFile(storage, folder, storageFileName);
 				}
 			}
 		} finally {

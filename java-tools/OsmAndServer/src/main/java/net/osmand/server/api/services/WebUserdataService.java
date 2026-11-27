@@ -739,7 +739,7 @@ public class WebUserdataService {
 			ObjectMapper mapper = new ObjectMapper();
 
 			ObjectNode json = (ObjectNode) mapper.readTree(gis);
-			String oldPath = json.path("file").asText();
+			String oldPath = json.path(UserdataService.INFO_FILE_FIELD).asText();
 			// save /tracks folder
 			int tracksFolderEndIndex = oldPath.indexOf('/', oldPath.startsWith("/") ? 1 : 0);
 			String folder = (tracksFolderEndIndex >= 0)
@@ -747,11 +747,9 @@ public class WebUserdataService {
 					: "";
 
 			// save new name
-			json.put("file", folder + newName);
+			json.put(UserdataService.INFO_FILE_FIELD, folder + newName);
 			// prepare new json
-			String jsonStr = mapper.writeValueAsString(json)
-					.replace("/", "\\/");
-			byte[] updated = jsonStr.getBytes(StandardCharsets.UTF_8);
+			byte[] updated = UserdataService.writeInfoJson(json);
 			// create new file
 			File tmpInfo = File.createTempFile(UserdataService.tmpFilePrefix(newName + INFO_FILE_EXT), INFO_FILE_EXT);
 			try (FileOutputStream fos = new FileOutputStream(tmpInfo)) {

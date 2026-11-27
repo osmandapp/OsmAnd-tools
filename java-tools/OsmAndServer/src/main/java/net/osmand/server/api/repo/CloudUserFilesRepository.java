@@ -15,9 +15,11 @@ import net.osmand.data.QuadRect;
 import net.osmand.server.assist.data.JsonbType;
 import org.hibernate.annotations.Type;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.google.gson.JsonObject;
 
@@ -37,6 +39,15 @@ public interface CloudUserFilesRepository extends JpaRepository<UserFile, Long> 
 	List<UserFile> findAllByUseridAndNameAndTypeOrderByUpdatetimeDesc(int userid, String name, String type);
 
 	boolean existsByUseridAndNameAndType(int userid, String name, String type);
+
+	@Query(value = "SELECT COUNT(*) FROM (SELECT pg_advisory_xact_lock(:userid)) AS l", nativeQuery = true)
+	long lockFileNames(@Param("userid") int userid);
+
+	@Transactional
+	@Modifying
+	@Query("UPDATE UserFile uf SET uf.data = :data, uf.filesize = :filesize, uf.zipfilesize = :zipfilesize WHERE uf.id = :id")
+	int updateContent(@Param("id") long id, @Param("data") byte[] data, @Param("filesize") long filesize,
+			@Param("zipfilesize") long zipfilesize);
 
 	Iterable<UserFile> findAllByUserid(int userid);
 
