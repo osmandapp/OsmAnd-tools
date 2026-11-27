@@ -37,12 +37,21 @@ public class TimezoneMapperGeneratorTest {
 
 	@Test
 	public void javaGenerationIsByteIdenticalForTheSameData() throws Exception {
+		assertByteIdenticalGeneration(OutputFormat.JAVA);
+	}
+
+	@Test
+	public void kotlinGenerationIsByteIdenticalForTheSameData() throws Exception {
+		assertByteIdenticalGeneration(OutputFormat.KOTLIN);
+	}
+
+	private void assertByteIdenticalGeneration(OutputFormat format) throws Exception {
 		Path archive = archive();
 		Path copy = Files.copy(archive, temporary.getRoot().toPath().resolve("renamed.zip"));
-		Path first = temporary.newFolder("first").toPath().resolve(TimezoneMapperGenerator.JAVA_FILE);
-		Path second = temporary.newFolder("second").toPath().resolve(TimezoneMapperGenerator.JAVA_FILE);
-		TimezoneMapperGenerator.generateMapper(RELEASE, archive, first, OutputFormat.JAVA);
-		TimezoneMapperGenerator.generateMapper(RELEASE, copy, second, OutputFormat.JAVA);
+		Path first = temporary.newFolder("first").toPath().resolve(format.sourceFileName());
+		Path second = temporary.newFolder("second").toPath().resolve(format.sourceFileName());
+		TimezoneMapperGenerator.generateMapper(RELEASE, archive, first, format);
+		TimezoneMapperGenerator.generateMapper(RELEASE, copy, second, format);
 		assertArrayEquals(Files.readAllBytes(first), Files.readAllBytes(second));
 	}
 
@@ -52,7 +61,7 @@ public class TimezoneMapperGeneratorTest {
 		Path directory = temporary.newFolder("dynamic").toPath();
 		TimezoneMapperGenerator.generateMapper(RELEASE, archive(),
 				directory.resolve(TimezoneMapperGenerator.JAVA_FILE), OutputFormat.JAVA);
-		try (CompiledTimezoneMapper mapper = TimezoneMapperValidator.compileMapper(directory)) {
+		try (CompiledTimezoneMapper mapper = TimezoneMapperValidator.compileMapper(directory, OutputFormat.JAVA)) {
 			assertEquals("Etc/UTC", mapper.apply(48.8566, 2.3522));
 		}
 	}
@@ -63,10 +72,10 @@ public class TimezoneMapperGeneratorTest {
 		Path source = directory.resolve(TimezoneMapperGenerator.JAVA_FILE);
 		Path output = temporary.getRoot().toPath().resolve("output");
 		TimezoneMapperGenerator.generateMapper(RELEASE, archive(), source, OutputFormat.JAVA);
-		try (CompiledTimezoneMapper mapper = TimezoneMapperValidator.compileMapper(directory)) {
+		try (CompiledTimezoneMapper mapper = TimezoneMapperValidator.compileMapper(directory, OutputFormat.JAVA)) {
 			TimezoneTestData releaseData = data(mapper.apply(48.8566, 2.3522));
 			String log = captureValidationFailure(() -> TimezoneMapperValidator.validateTimezoneMappings(
-					source, output, data("Europe/Paris"), releaseData, mapper));
+					source, output, data("Europe/Paris"), releaseData, mapper, OutputFormat.JAVA));
 			assertTrue(log.contains("expected=Europe/Paris actual=Etc/UTC"));
 			assertTrue(log.contains("expected=Etc/UTC actual=Europe/Paris"));
 			String summary = log.substring(log.indexOf("VALIDATION FAILED"));
@@ -90,7 +99,7 @@ public class TimezoneMapperGeneratorTest {
 	@Test
 	public void releaseSelfCheckReportsFailureAndContinuesCrossChecks() throws Exception {
 		String log = captureValidationFailure(() -> TimezoneMapperValidator.validateTimezoneMappings(
-				null, null, data("Europe/Paris"), data("Europe/Paris"), (lat, lon) -> "Etc/UTC"));
+				null, null, data("Europe/Paris"), data("Europe/Paris"), (lat, lon) -> "Etc/UTC", OutputFormat.JAVA));
 		assertTrue(log.contains("Step 5: Current mapper on release JSON"));
 		String summary = log.substring(log.indexOf("VALIDATION FAILED"));
 		assertTrue(summary.contains("Step 3: Release mapper on release JSON"));
@@ -108,7 +117,24 @@ public class TimezoneMapperGeneratorTest {
 		TimezoneTestData releaseData = data("Etc/UTC");
 		releaseData.aliases().addProperty("Europe/Paris", "Etc/UTC");
 		assertTrue(TimezoneMapperValidator.validateTimezoneMappings(
-				null, null, currentData, releaseData, (lat, lon) -> "Etc/UTC"));
+				null, null, currentData, releaseData, (lat, lon) -> "Etc/UTC", OutputFormat.JAVA));
+	}
+
+	@Test
+	public void kotlinValidationSkipsBuiltJavaMapper() throws Exception {
+		assertEquals("Europe/Paris", TimezoneMapper.latLngToTimezoneString(48.8566, 2.3522));
+		assertTrue(TimezoneMapperValidator.validateTimezoneMappings(
+				null, null, data("Etc/UTC"), data("Etc/UTC"), (lat, lon) -> "Etc/UTC", OutputFormat.KOTLIN));
+	}
+
+	@Test
+	public void kotlinValidationReportsChangedEmbeddedExpectations() throws Exception {
+		String log = captureValidationFailure(() -> TimezoneMapperValidator.validateTimezoneMappings(
+				null, null, data("Europe/Paris"), data("Etc/UTC"), (lat, lon) -> "Etc/UTC", OutputFormat.KOTLIN));
+		String summary = log.substring(log.indexOf("VALIDATION FAILED"));
+		assertTrue(summary.contains("Step 4: Release mapper on current JSON"));
+		assertTrue(summary.contains(OutputFormat.KOTLIN.sourceFileName()));
+		assertFalse(log.contains("Step 5:"));
 	}
 
 	private static String captureValidationFailure(Callable<Boolean> validation) throws Exception {
