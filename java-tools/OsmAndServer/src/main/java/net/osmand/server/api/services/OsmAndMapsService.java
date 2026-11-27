@@ -102,7 +102,7 @@ import net.osmand.server.api.repo.CloudUserDevicesRepository;
 import net.osmand.server.tileManager.TileMemoryCache;
 import net.osmand.server.tileManager.TileServerConfig;
 import net.osmand.server.tileManager.VectorMetatile;
-import net.osmand.server.utils.TimezoneMapper;
+import net.osmand.server.utilities.TimezoneMapper;
 import net.osmand.server.utils.WebGpxParser;
 import net.osmand.shared.gpx.GpxFile;
 import net.osmand.shared.gpx.GpxUtilities;
@@ -1231,8 +1231,8 @@ public class OsmAndMapsService {
 	private static long getLocalTimeMillisByLatLon(double lat, double lon) {
 		String tz = TimezoneMapper.latLngToTimezoneString(lat, lon);
 		ZonedDateTime zonedDateTime = ZonedDateTime.now(ZoneId.of(tz));
-//		System.out.printf("TimezoneMapper (%.5f, %.5f) = %s\n", lat, lon, zonedDateTime);
-		return zonedDateTime.toInstant().toEpochMilli();
+		// Shift the timestamp so the router sees the route start's local time.
+		return zonedDateTime.withZoneSameLocal(ZoneId.systemDefault()).toInstant().toEpochMilli();
 	}
 
 	private RoutingContext lockCacheRoutingContext(RoutePlannerFrontEnd router, RouteParameters rp, DebugInfo di) throws IOException, InterruptedException {

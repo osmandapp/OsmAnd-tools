@@ -17,7 +17,6 @@ import java.util.Objects;
 import java.util.Set;
 
 import net.osmand.MainUtilities.CommandLineOpts;
-import net.osmand.PlatformUtil;
 import net.osmand.NativeLibrary;
 import net.osmand.router.GeneralRouter;
 import net.osmand.router.HHRouteDataStructure;
@@ -135,8 +134,6 @@ public class RandomRouteTester {
 	private final RandomRouteGenerator generator;
 	private final GeneratorConfig config = new GeneratorConfig();
 	private List<RandomRouteEntry> testList = new ArrayList<>();
-
-//	private final Log LOG = PlatformUtil.getLog(RandomRouteTester.class);
 
 	public static final int EXIT_SUCCESS = 0;
 	public static final int EXIT_TEST_FAILED = 1;

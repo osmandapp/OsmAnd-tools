@@ -41,6 +41,7 @@ import net.osmand.Location;
 import net.osmand.binary.BinaryVectorTileReader;
 import net.osmand.data.GeometryTile;
 import net.osmand.data.LatLon;
+import net.osmand.server.ServerUtilities;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
@@ -76,7 +77,7 @@ public class PlacesService {
 	@Autowired
 	public PlacesService(RestTemplateBuilder builder) {
 		this.restTemplate = builder.requestFactory(HttpComponentsClientHttpRequestFactory.class)
-				.defaultHeader(HttpHeaders.USER_AGENT, WikiService.USER_AGENT)
+				.defaultHeader(HttpHeaders.USER_AGENT, ServerUtilities.USER_AGENT)
 				.setConnectTimeout(Duration.ofMillis(TIMEOUT))
 				.setReadTimeout(Duration.ofMillis(TIMEOUT))
 				.build();
