@@ -1,6 +1,8 @@
 package net.osmand.server.api.operation.impl;
 
+import java.io.EOFException;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -9,7 +11,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
+import java.util.zip.ZipException;
+
+import jakarta.annotation.Nullable;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,26 +68,24 @@ public class FixNfcNamesOperation extends AbstractFileFixOperation {
 	}
 
 	@Override
-	protected boolean fix(UserFile file, Params params) throws IOException {
+	protected boolean fix(UserFile file, Params params) {
 		String newName = KUnicode.INSTANCE.normalizeNFC(file.name);
 		boolean bothForms;
 		if (isTest(params)) {
 			bothForms = filesRepository.existsByUseridAndNameAndType(file.userid, newName, file.type);
 		} else {
-			List<UserFile> versions = getVersions(file, file.name);
-			boolean infoFile = file.name.endsWith(UserdataService.INFO_EXT);
 			Map<UserFile, byte[]> oldContent = new HashMap<>();
 			try {
-				if (infoFile) {
-					saveNfcInfoContent(versions, oldContent);
-				}
-				bothForms = Boolean.TRUE.equals(transaction.execute(status -> renameToNfc(file, newName, getIds(versions))));
-			} catch (IOException | RuntimeException e) {
+				bothForms = Boolean.TRUE.equals(transaction.execute(status -> {
+					try {
+						return renameToNfc(file, newName, oldContent);
+					} catch (IOException e) {
+						throw new UncheckedIOException(e);
+					}
+				}));
+			} catch (RuntimeException e) {
 				restoreContent(oldContent);
 				throw e;
-			}
-			if (!infoFile) {
-				saveNfcInfoContent(getVersions(file, newName + UserdataService.INFO_EXT), new HashMap<>());
 			}
 		}
 		if (bothForms) {
@@ -98,20 +100,41 @@ public class FixNfcNamesOperation extends AbstractFileFixOperation {
 			if (!UserdataService.hasContent(v)) {
 				continue;
 			}
-			byte[] content;
-			byte[] nfcContent;
+			byte[] content = readInfoContent(v);
+			byte[] nfcContent = null;
 			try {
-				content = read(v);
-				nfcContent = UserdataService.getNfcInfoContent(content);
-			} catch (IOException | RuntimeException e) {
-				LOG.warn("Keeping .info content as is: id={}, userid={}, name={}: {}", v.id, v.userid, v.name, e.getMessage());
-				continue;
+				nfcContent = content == null ? null : UserdataService.getNfcInfoContent(content);
+			} catch (IOException e) {
+				logKeptInfoContent(v, e.getMessage());
 			}
 			if (nfcContent != null) {
 				oldContent.put(v, content);
 				save(v, nfcContent);
 			}
 		}
+	}
+
+	@Nullable
+	private byte[] readInfoContent(UserFile v) throws IOException {
+		if (v.filesize > UserdataService.MAX_INFO_CONTENT_SIZE) {
+			logKeptInfoContent(v, "over " + UserdataService.MAX_INFO_CONTENT_SIZE + " bytes");
+			return null;
+		}
+		byte[] content;
+		try {
+			content = readIfExists(v);
+		} catch (ZipException | EOFException e) {
+			logKeptInfoContent(v, e.getMessage());
+			return null;
+		}
+		if (content == null) {
+			logKeptInfoContent(v, "no content");
+		}
+		return content;
+	}
+
+	private void logKeptInfoContent(UserFile v, String reason) {
+		LOG.warn("Keeping .info content as is: id={}, userid={}, name={}: {}", v.id, v.userid, v.name, reason);
 	}
 
 	private void restoreContent(Map<UserFile, byte[]> oldContent) {
@@ -125,12 +148,11 @@ public class FixNfcNamesOperation extends AbstractFileFixOperation {
 		}
 	}
 
-	private boolean renameToNfc(UserFile file, String newName, Set<Long> checkedVersionIds) {
+	private boolean renameToNfc(UserFile file, String newName, Map<UserFile, byte[]> oldContent) throws IOException {
 		filesRepository.lockFileNames(file.userid);
 		List<UserFile> versions = getVersions(file, file.name);
-		if (!getIds(versions).equals(checkedVersionIds)) {
-			throw new IllegalStateException("File versions changed during the operation, run it again");
-		}
+		boolean infoFile = file.name.endsWith(UserdataService.INFO_EXT);
+		saveNfcInfoContent(infoFile ? versions : getVersions(file, newName + UserdataService.INFO_EXT), oldContent);
 		List<UserFile> nfcVersions = getVersions(file, newName);
 		List<UserFile> staleDeletions = getStaleDeletions(versions, nfcVersions);
 		filesRepository.deleteAll(staleDeletions);
@@ -145,10 +167,6 @@ public class FixNfcNamesOperation extends AbstractFileFixOperation {
 
 	private List<UserFile> getVersions(UserFile file, String name) {
 		return filesRepository.findAllByUseridAndNameAndTypeOrderByUpdatetimeDesc(file.userid, name, file.type);
-	}
-
-	private static Set<Long> getIds(List<UserFile> versions) {
-		return versions.stream().map(v -> v.id).collect(Collectors.toSet());
 	}
 
 	private List<UserFile> getStaleDeletions(List<UserFile> versions, List<UserFile> nfcVersions) {

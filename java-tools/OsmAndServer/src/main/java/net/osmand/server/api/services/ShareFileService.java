@@ -94,7 +94,7 @@ public class ShareFileService {
 		}
 		ShareFileRepository.ShareFile shareFile = new ShareFileRepository.ShareFile();
 
-		String name = userFile.name.substring(userFile.name.lastIndexOf("/") + 1);
+		String name = getShareName(userFile.name);
 
 		shareFile.uuid = (uniqueCode);
 		shareFile.name = (name);
@@ -168,16 +168,25 @@ public class ShareFileService {
 		}
 		ShareFileRepository.ShareFile newShareFile = shareFileRepository.findByOwneridAndFilepath(userid, newName);
 		if (newShareFile != null) {
-			copyAccessRecords(shareFile, newShareFile);
+			mergeAccess(shareFile, newShareFile);
 			shareFileRepository.delete(shareFile);
 		} else {
 			shareFile.filepath = newName;
+			shareFile.name = getShareName(newName);
 			shareFileRepository.saveAndFlush(shareFile);
 		}
 	}
 
-	private void copyAccessRecords(ShareFileRepository.ShareFile from, ShareFileRepository.ShareFile to) {
+	private static String getShareName(String filepath) {
+		return filepath.substring(filepath.lastIndexOf("/") + 1);
+	}
+
+	private void mergeAccess(ShareFileRepository.ShareFile from, ShareFileRepository.ShareFile to) {
 		boolean changed = false;
+		if (from.publicAccess && !to.publicAccess) {
+			to.publicAccess = true;
+			changed = true;
+		}
 		for (ShareFileRepository.ShareFilesAccess access : from.accessRecords) {
 			ShareFileRepository.ShareFilesAccess existing = to.accessRecords.stream()
 					.filter(a -> a.user.id == access.user.id)

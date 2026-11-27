@@ -18,6 +18,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.GZIPInputStream;
 
+import com.amazonaws.SdkClientException;
+
+import jakarta.annotation.Nullable;
+
 import net.osmand.server.api.operation.OperationContext;
 import net.osmand.server.api.repo.CloudUserFilesRepository;
 import net.osmand.server.api.repo.CloudUserFilesRepository.UserFile;
@@ -185,9 +189,27 @@ public abstract class AbstractFileFixOperation extends AbstractParallelOperation
 	}
 
 	protected byte[] read(UserFile file) throws IOException {
-		InputStream raw = userdataService.getInputStream(file);
-		if (raw == null) {
+		byte[] content = readIfExists(file);
+		if (content == null) {
 			throw new IOException("File content is not available");
+		}
+		return content;
+	}
+
+	@Nullable
+	protected byte[] readIfExists(UserFile file) throws IOException {
+		InputStream raw;
+		try {
+			boolean localWithoutData = file.data == null && StorageService.LOCAL_STORAGE.equals(file.storage);
+			raw = localWithoutData ? null : userdataService.getInputStream(file);
+		} catch (SdkClientException e) {
+			if (StorageService.isMissingObject(e)) {
+				return null;
+			}
+			throw e;
+		}
+		if (raw == null) {
+			return null;
 		}
 		try (InputStream in = new GZIPInputStream(new BufferedInputStream(raw))) {
 			return in.readAllBytes();

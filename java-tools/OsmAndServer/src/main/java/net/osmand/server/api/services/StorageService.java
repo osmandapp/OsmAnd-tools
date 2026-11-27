@@ -39,7 +39,7 @@ public class StorageService {
 	
 	protected static final Log LOGGER = LogFactory.getLog(StorageService.class);
 
-	protected static final String LOCAL_STORAGE = "local";
+	public static final String LOCAL_STORAGE = "local";
 	public static final String GZ_FILE_EXT = ".gz";
 
 	@Value("${storage.default}")
@@ -268,8 +268,7 @@ public class StorageService {
 					try {
 						st.s3Conn.deleteObject(st.bucket, fld + FILE_SEPARATOR + filename);
 					} catch (com.amazonaws.SdkClientException e) {
-						if (e instanceof AmazonS3Exception s3Exception
-								&& "NoSuchKey".equals(s3Exception.getErrorCode())) {
+						if (isMissingObject(e)) {
 							LOGGER.info(String.format("Storage delete skipped for missing file %s/%s", fld, filename));
 						} else {
 							handleException(st, "delete", fld, filename, e);
@@ -279,6 +278,10 @@ public class StorageService {
 				}
 			}
 		}
+	}
+
+	public static boolean isMissingObject(com.amazonaws.SdkClientException e) {
+		return e instanceof AmazonS3Exception s3Exception && "NoSuchKey".equals(s3Exception.getErrorCode());
 	}
 
 	private void handleException(StorageType st, String req, String fld, String fileName, SdkClientException e) {

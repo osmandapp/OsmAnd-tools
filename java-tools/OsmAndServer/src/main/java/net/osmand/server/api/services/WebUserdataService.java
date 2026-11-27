@@ -631,7 +631,7 @@ public class WebUserdataService {
 						}
 						if (!saveCopy) {
 							//delete file with old name
-							userdataService.deleteFile(oldName, type, null, null, dev);
+							userdataService.deleteRenamedFile(oldName, newName, type, dev);
 						}
 						return userdataService.ok();
 					}
@@ -763,7 +763,7 @@ public class WebUserdataService {
 			}
 			if (res.getStatusCode().is2xxSuccessful()) {
 				if (!saveCopy) {
-					userdataService.deleteFile(oldName + INFO_FILE_EXT, FILE_TYPE_GPX, null, null, dev);
+					userdataService.deleteRenamedFile(oldName + INFO_FILE_EXT, newName + INFO_FILE_EXT, FILE_TYPE_GPX, dev);
 				}
 				return true;
 			}

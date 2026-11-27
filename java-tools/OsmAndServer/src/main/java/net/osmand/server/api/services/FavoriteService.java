@@ -61,7 +61,7 @@ public class FavoriteService {
     public ResponseEntity<String> renameFavFolder(String oldName, String newName, StorageService.InternalZipFile fl, CloudUserDevicesRepository.CloudUserDevice dev) throws IOException {
         userdataService.validateUserForUpload(dev, FILE_TYPE_FAVOURITES, fl.getSize());
         userdataService.uploadFile(fl, dev, newName, FILE_TYPE_FAVOURITES, System.currentTimeMillis());
-        userdataService.deleteFile(oldName, FILE_TYPE_FAVOURITES, null, null, dev);
+        userdataService.deleteRenamedFile(oldName, newName, FILE_TYPE_FAVOURITES, dev);
         
         return userdataService.ok();
     }
