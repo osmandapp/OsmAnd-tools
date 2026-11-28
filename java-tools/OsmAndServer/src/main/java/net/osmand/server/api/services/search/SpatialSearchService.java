@@ -24,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -294,6 +295,7 @@ public class SpatialSearchService {
 			};
 			ThreadPoolExecutor executor = executorForKey(autocomplete ? autocompleteExecutors : spatialSearchExecutors,
 					userSessionKey);
+			AtomicReference<SpatialSearchContext> searchContext = new AtomicReference<>();
 			Future<SpatialSearchResults> task = executor.submit(() -> {
 				try {
 					if (cancelled.get()) {
@@ -307,6 +309,7 @@ public class SpatialSearchService {
 					SpatialSearchContext sscontext =
 							new SpatialSearchContext(settings, readers, poiTypeSearch, new LatLon(ctx.lat(), ctx.lon()));
 					sscontext.resultMatcher = matcher;
+					searchContext.set(sscontext);
 					return getSpatialTextSearch().searchAPI(ctx.text(), sscontext);
 				} finally {
 					osmAndMapsService.unlockReaders(lockedReaders);
@@ -329,11 +332,11 @@ public class SpatialSearchService {
 					if (r.isPoiCategory()) {
 						SpatialPoiType type = r.getPoiCategory(poiTypeSearch);
 						if (type != null) {
-							f = getSpatialPoiTypeFeature(r, type, poiTypeSearch, ctx.locale());
+							f = getSpatialPoiTypeFeature(r, type, searchContext.get(), ctx.locale());
 						}
 					} else if (!objs.isEmpty()) {
 						LatLon l = r.getLatLon() == null ? new LatLon(ctx.lat(), ctx.lon()) : r.getLatLon();
-						f = getSpatialFeature(l, objs, ctx.locale(), dominatedCity, r);
+						f = getSpatialFeature(l, objs, ctx.locale(), dominatedCity, r, searchContext.get());
 					}
 					if (f != null) {
 						f.prop(SearchResultConverter.PoiTypeField.MATCHED_OBJECTS.getFieldName(),
@@ -390,16 +393,19 @@ public class SpatialSearchService {
 		return info;
 	}
 
-	private Feature getSpatialPoiTypeFeature(SpatialSearchResult r, SpatialPoiType type, SpatialPoiSearch poiTypeSearch,
-	                                         String locale) {
+	private Feature getSpatialPoiTypeFeature(SpatialSearchResult r, SpatialPoiType type,
+	                                         SpatialSearchContext ssCtx, String locale) {
 		Feature feature = new Feature(Geometry.point(new LatLon(0, 0)))
 				.prop(SearchResultConverter.PoiTypeField.TYPE.getFieldName(), ObjectType.POI_TYPE);
-		Map<String, String> tags = getSpatialPoiTypeFields(type, locale);
+		Map<String, String> tags = getSpatialPoiTypeFields(type.getLocalType(ssCtx), locale);
 		for (Map.Entry<String, String> entry : tags.entrySet()) {
 			feature.prop(entry.getKey(), entry.getValue());
 		}
 		String name = tags.get(SearchResultConverter.PoiTypeField.NAME.getFieldName());
-		String altName = r.getPoiCategoryMatchedName(poiTypeSearch);
+		String altName = type.getAltName(ssCtx, locale);
+		if (altName == null) {
+			altName = r.getPoiCategoryMatchedName(ssCtx.poiSearch);
+		}
 		if (altName != null && !altName.equalsIgnoreCase(name)) {
 			feature.prop(SearchResultConverter.PoiTypeField.ALT_NAME.getFieldName(), altName);
 		}
@@ -492,7 +498,7 @@ public class SpatialSearchService {
 	}
 
 	private Feature getSpatialFeature(LatLon loc, List<MapObject> objs, String locale, String dominatedCity,
-	                                  SpatialSearchResult ssr) {
+	                                  SpatialSearchResult ssr, SpatialSearchContext ssCtx) {
 		String extraNameMatch = ssr.getExtraNameMatch();
 
 		MapObject obj = objs.isEmpty() ? null : objs.get(0);
@@ -510,7 +516,7 @@ public class SpatialSearchService {
 		SearchResult result = new SearchResult();
 
 		if (spatialTextSearchAPI
-				.convertSpatialSearchResult(ssr, result, getSpatialPoiTypeSearch(), loc, locale, false) != null) {
+				.convertSpatialSearchResult(ssr, result, ssCtx, loc, locale, false) != null) {
 			return searchResultConverter.getFeature(result); // non-Amenity objects
 		}
 
